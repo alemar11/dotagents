@@ -7,16 +7,19 @@ Use this as the authoritative script catalog referenced by `github/SKILL.md`.
 - `scripts/check_gh_installed.sh [--min-version <version>]`: Validate that `gh` is installed and meets a minimum version.
 - `scripts/check_gh_authenticated.sh [--host github.com]`: Verify active GitHub CLI authentication.
 - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
+- `scripts/check_docs_script_refs.sh [--skill-dir <path>]`: Verify docs reference existing scripts and documented flags are present in `--help` output.
 - `scripts/issue_resolve_repo.sh [--repo <owner/repo>] [--allow-non-project]`: Resolve the target repository, defaulting to current git project.
 - `scripts/repos_list.sh [--owner <owner>] [--type all|public|private|forks|archived|sources|member] [--all] [--limit N] [--allow-non-project]`: List repositories available to current user or specified owner.
 
 ## Issue scripts
 
+- Recommended close sequence: `issues_close_with_evidence.sh` (single-step verify/comment/close).
 - `scripts/issues_list.sh [--state open|closed|all] [--labels <label1,label2>] [--limit N] [--repo <owner/repo>] [--allow-non-project]` (default state: open)
 - `scripts/issues_view.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/issues_create.sh --title <text> [--body <text>] [--labels <label1,label2>] [--assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/issues_suggest_labels.sh --repo <owner/repo> --title <text> [--body <text>] [--max-suggestions N] [--min-score <float>] [--allow-new-label] [--new-label-color <rrggbb>] [--new-label-description <text>] [--json]`
 - `scripts/issues_update.sh --issue <number> [--title <text>] [--body <text>] [--state open|closed] [--type bug|task|none] [--milestone <name>|--milestone-id <number>] [--remove-milestone] [--type-label-bug <label>] [--type-label-task <label>] [--add-labels <label1,label2>] [--remove-labels <label1,label2>] [--assignees <user1,user2>] [--remove-assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`
+- `scripts/issues_close_with_evidence.sh --issue <number> --commit-sha <sha> [--commit-url <url>] [--pr-url <url>] [--repo <owner/repo>] [--allow-non-project] [--dry-run]`
 - `scripts/issues_comment_add.sh --issue <number> --body <text> [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/issues_comments_list.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/issues_lock.sh --issue <number> [--reason <reason>] [--repo <owner/repo>] [--allow-non-project]`

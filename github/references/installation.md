@@ -29,3 +29,11 @@ gh auth status
 ```
 
 Use `gh auth status` to confirm the session before running write operations.
+
+## Run preflight before operations
+
+```bash
+scripts/preflight_gh.sh --host github.com --min-version 2.0.0
+```
+
+Use `--allow-non-project` only for explicit non-project workflows.

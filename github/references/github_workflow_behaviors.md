@@ -86,3 +86,26 @@ Evaluate candidate issue IDs from the strongest source to weakest:
 - Never add a second close token if one already exists.
 - Default mode is dry-run/preview; commit execution is only performed with `--execute`.
 - Keep behavior repository-scoped and non-destructive unless explicitly executed.
+
+## Issue close evidence policy
+
+Goal: close issues with traceable implementation proof.
+
+### Required closure sequence
+
+1. Verify issue is open.
+2. Add a closure comment with implementation evidence.
+3. Close the issue.
+
+### Evidence format
+
+- Commit evidence:
+  - `Implemented in commit <short_sha> (<commit_url>).`
+- PR evidence (when available):
+  - `Implemented via PR <pr_url>.`
+- Prefer both links when available.
+
+### JSON field behavior note
+
+- For issue metadata in `gh issue view --json`, do not use `projects`.
+- Use `projectItems` and `projectCards`.

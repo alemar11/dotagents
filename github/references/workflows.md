@@ -2,6 +2,69 @@
 
 Use this section for copy-paste, branch-safe operational flows.
 
+## issue-close-with-evidence
+
+Purpose: close an issue safely with explicit state verification and implementation evidence links using the dedicated helper script.
+
+### Preconditions
+
+- `gh` installed and authenticated.
+- Issue number is known.
+- Commit SHA is known.
+
+### Paste and run: close with evidence script
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="{skill_dir}/scripts/issues_close_with_evidence.sh"
+REPO="{repo}"
+ISSUE="{issue_number}"
+COMMIT_SHA="{commit_sha}"
+COMMIT_URL="{commit_url}"
+PR_URL="{pr_url}"
+
+if [[ "$SCRIPT_PATH" == "{skill_dir}/scripts/issues_close_with_evidence.sh" ]]; then
+  SCRIPT_PATH="scripts/issues_close_with_evidence.sh"
+fi
+if [[ "$REPO" == "{repo}" ]]; then
+  REPO=""
+fi
+if [[ "$COMMIT_URL" == "{commit_url}" ]]; then
+  COMMIT_URL=""
+fi
+if [[ "$PR_URL" == "{pr_url}" ]]; then
+  PR_URL=""
+fi
+if [[ "$ISSUE" == "{issue_number}" || -z "$ISSUE" ]]; then
+  echo "Replace {issue_number} with the target issue number."
+  exit 1
+fi
+if [[ "$COMMIT_SHA" == "{commit_sha}" || -z "$COMMIT_SHA" ]]; then
+  echo "Replace {commit_sha} with the implementation commit SHA."
+  exit 1
+fi
+
+SCRIPT_ARGS=(--issue "$ISSUE" --commit-sha "$COMMIT_SHA")
+if [[ -n "$REPO" ]]; then
+  SCRIPT_ARGS+=(--repo "$REPO" --allow-non-project)
+fi
+if [[ -n "$COMMIT_URL" ]]; then
+  SCRIPT_ARGS+=(--commit-url "$COMMIT_URL")
+fi
+if [[ -n "$PR_URL" ]]; then
+  SCRIPT_ARGS+=(--pr-url "$PR_URL")
+fi
+
+"$SCRIPT_PATH" "${SCRIPT_ARGS[@]}"
+```
+
+### Fallbacks
+
+- auth failures: run `gh auth login`, then rerun preflight
+- repo resolution failures: run in repo root or pass explicit `owner/repo` (the template automatically enables non-project mode when `REPO` is set)
+
 ## pr-comment-address
 
 Purpose: process pull-request comments for the PR associated with the current branch:
@@ -276,7 +339,7 @@ done
 ### Workflow note
 
 This is intentionally a template, not an all-in-one automation.
-If you want to promote this into a script, the next iteration is a dedicated `scripts/prs_address_comments.sh` that accepts `--pr`, `--selection`, `--repo`, and optional `--comment-ids`.
+If you want to promote this into a script, the next iteration is a dedicated `prs_address_comments.sh` helper that accepts `--pr`, `--selection`, `--repo`, and optional `--comment-ids`.
 
 ## fix-ci
 
