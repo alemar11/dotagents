@@ -33,6 +33,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
 2) Choose action:
    - Connect/run a query, inspect schema, or run a helper script.
    - Default query runner: use `./scripts/psql_with_ssl_fallback.sh` (or `./scripts/run_sql.sh` for SQL text/file/stdin).
+   - If the user says a migration is "migrated", "released", or "run in production", execute the release workflow in `references/postgres_guardrails.md` (move pending SQL to `released/` and transition changelog entries from `WIP` to `RELEASED`).
    - For official PostgreSQL docs lookup, use `./scripts/search_postgres_docs.sh` only when the user explicitly asks for docs search/verification.
 3) Execute and report:
    - Run the requested action and summarize results or errors.
@@ -55,6 +56,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
 - Slow/active query diagnostics: `./scripts/slow_queries.sh`, `./scripts/activity_overview.sh`, `./scripts/long_running_queries.sh`
 - Lock diagnostics: `./scripts/locks_overview.sh`
 - Official docs search (explicit request only): `./scripts/search_postgres_docs.sh`
+- Flag migration as migrated/run in production: follow release workflow in `references/postgres_guardrails.md`
 
 ## Config and schema (brief)
 - Config file: `<project-root>/.skills/postgres/postgres.toml`
@@ -75,11 +77,16 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
 - Ask whether to save the profile into `postgres.toml` or use a one-off (temporary) connection.
 - Do not run `./scripts/search_postgres_docs.sh` unless the user explicitly asks for official docs lookup/verification.
 - For migrations path resolution and schema-change workflow, follow the guardrails reference.
+- If the user explicitly marks a migration as migrated/released/run in production, perform the release workflow in guardrails immediately (unless they ask for a dry run only).
+- If `CHANGELOG.md` is not in `WIP/RELEASED` format, migrate it to that template before writing new migration notes.
 
 ## Guardrails (summary)
 - Always ask for approval before making any database structure change (DDL like CREATE/ALTER/DROP).
 - Keep pending changes in prerelease migration files and maintain a changelog.
-- Never touch any file or folder whose name ends with `released` (case-insensitive) inside the migrations folder.
+- Do not edit existing released SQL files; only create a new released file by moving a pending prerelease file when the user explicitly confirms release.
+- Use released filename policy: `YYYYMMDDHHMMSS.sql`; add `_<slug>` only on same-second collision; add `_<slug>_01`, `_02`, ... if still colliding.
+- Maintain changelog sections as `## WIP` and `## RELEASED`; if the changelog is not in this template, migrate it first, then continue updates.
+- When releasing, remove related bullets from `WIP` and add one short summary under `RELEASED` (newest first).
 - After any schema change, run the least expensive query that confirms the change.
 - For full rules and migration workflow, read `references/postgres_guardrails.md` when doing schema changes.
 

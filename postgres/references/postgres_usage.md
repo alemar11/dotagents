@@ -132,6 +132,45 @@ SQL
 
 Important: avoid `-c "DO $$ ... $$"` with double quotes, because shell expansion can alter `$$`.
 
+## Flag a migration as migrated/run in production
+Use this flow when the user explicitly confirms the pending SQL has been run in production.
+
+1) Set migration context:
+```sh
+migrations_path="db/migrations"
+pending_file="prerelease.sql"   # e.g. prerelease_cdr.sql for CDR track
+slug="livekit_agents_contexts"  # used only on filename collision
+```
+
+2) Move pending SQL into `released/` with collision-safe naming:
+```sh
+ts="$(date -u +%Y%m%d%H%M%S)"
+mkdir -p "${migrations_path}/released"
+
+target="${migrations_path}/released/${ts}.sql"
+if [ -e "${target}" ]; then
+  target="${migrations_path}/released/${ts}_${slug}.sql"
+  n=1
+  while [ -e "${target}" ]; do
+    target="${migrations_path}/released/${ts}_${slug}_$(printf '%02d' "${n}").sql"
+    n=$((n + 1))
+  done
+fi
+
+mv "${migrations_path}/${pending_file}" "${target}"
+: > "${migrations_path}/${pending_file}"
+echo "Released: ${target}"
+```
+
+3) Update `${migrations_path}/CHANGELOG.md`:
+- Ensure template sections exist; migrate legacy changelog format if needed:
+  - `## WIP`
+  - `## RELEASED`
+- Remove released change bullets from the matching `WIP` pending-file subsection.
+- Add one short summary at the top of `RELEASED`:
+  - `### YYYY-MM-DD — \`<released_filename>.sql\``
+  - `- <short summary>`
+
 ## Bootstrap a profile (interactive)
 This helper will optionally scan a project for existing config, recap candidates in TOML format, and let you save or use a one-off connection. It prompts for the project root to scan.
 Use `DB_PROFILE_SCAN_MODE=full` for a deeper scan; default mode is `fast` for lower startup latency.
