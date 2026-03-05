@@ -1,6 +1,6 @@
 # Skills
 
-This directory contains reusable skills—task-specific packages of instructions, resources, and optional scripts that help agents follow workflows reliably.
+This directory contains reusable skills and project maintainer skills—task-specific packages of instructions, resources, and optional scripts that help agents follow workflows reliably.
 
 ## Skills
 - `ask-questions-if-underspecified/` — Clarify requirements before implementing when a request is underspecified.
@@ -8,6 +8,10 @@ This directory contains reusable skills—task-specific packages of instructions
 - `github/` — Use the GitHub CLI (`gh`) to manage repositories, issues, pull requests, and workflows.
 - `learn/` — Capture durable corrections or preferences and write them to AGENTS.md.
 - `postgres/` — Connect to Postgres, run queries/diagnostics, and lookup official docs on explicit request.
+
+## Project Skills
+- `.agents/skills/tools/` — Orchestrate maintainer workflows for keeping the repository's skills and docs consistent.
+Project skills are repository-local and are not included in the reusable `skill-installer` prompts below.
 
 ## Codex
 
