@@ -20,6 +20,10 @@ Use this file first to route maintenance requests to the right playbook.
    - `audit` -> `doc-consistency.md`, then `release-checklist.md`
 6. Always end with `release-checklist.md` for mixed or multi-step maintenance tasks.
 
+## Task Isolation Rule
+- Run only the routed task playbook unless the user explicitly requests a mixed workflow.
+- Do not silently expand `sync` into `audit`, `benchmark`, or `refresh`.
+
 ## Output Contract
 For every routed workflow, report:
 - Scope covered

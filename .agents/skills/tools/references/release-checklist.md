@@ -17,8 +17,8 @@ Run this checklist before finalizing maintainer updates.
 - If upstream benchmarking was run, confirm one-by-one local skill decisions were generated (`CHANGE`/`NOOP`) in `per_skill_review.json` (or in `proposals.json` equivalent field).
 
 ## Command Set (Typical)
-- `find . -type f -name 'SKILL.md' -not -path '*/.git/*' | sort`
-- `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' | sort`
+- `find . -type f -name 'SKILL.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
+- `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
 - `rg -n "postgres-best-practices-runbook|openai-skill-benchmark|\\.agents/skills/tools|agents/openai.yaml|SKILL.md" -S`
 - `test -f .agents/skills/tools/artifacts/openai-skill-benchmark/per_skill_review.json`
 - `git diff --stat`

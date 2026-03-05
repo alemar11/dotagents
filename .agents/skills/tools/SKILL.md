@@ -55,4 +55,5 @@ Use this skill when users ask to:
 - Prefer repeatable commands and documented checks in this skill before inventing ad-hoc flows.
 - Do not depend on markdown guidance outside this skill's `references/` folder.
 - Keep changes scoped to requested maintenance outcomes.
+- Keep task boundaries explicit: run only the requested task (`sync`, `audit`, `refresh`, `benchmark`) unless the user requests a mixed flow.
 - If no meaningful updates are needed, return `PASS (NOOP)` and avoid persistent file edits.

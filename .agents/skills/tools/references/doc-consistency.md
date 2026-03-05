@@ -21,11 +21,22 @@ Use this playbook for repository-wide structure and policy checks.
 - Skill-specific rules (for example Postgres guardrails) are not contradicted by newer docs.
 - Benchmark playbook commands and script flags match the benchmark script contract.
 
+## Severity Rules
+- `FAIL` (blocking):
+  - Missing required skill files (`SKILL.md`, required `agents/openai.yaml` where expected).
+  - Broken script/reference links in active playbooks.
+  - Policy contradictions that can cause unsafe or incorrect task execution.
+- `WARN` (non-blocking):
+  - Cleanup opportunities (wording drift, overly broad commands, minor doc mismatches).
+  - Recommendations that improve maintainability but do not break current behavior.
+- `PASS`:
+  - No blocking issues and no unresolved warnings requiring immediate action.
+
 ## Suggested Commands
-- `find . -type f -name 'SKILL.md' -not -path '*/.git/*' | sort`
-- `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' | sort`
-- `find . -type f -path '*/references/*.md' -not -path '*/.git/*' | sort`
-- `find . -type f -path '*/references/*.md' | awk -F/ '{print $NF}'`
+- `find . -type f -name 'SKILL.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
+- `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
+- `find . -type f -path '*/references/*.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
+- `find . -type f -path '*/references/*.md' -not -path '*/.git/*' -not -path '*/.cache/*' | awk -F/ '{print $NF}'`
 - `rg -n "\./scripts/|agents/openai.yaml|SKILL.md|\\.agents/skills/" -S`
 
 ## Reporting Format
