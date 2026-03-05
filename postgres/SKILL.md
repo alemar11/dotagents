@@ -30,6 +30,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
    - When creating or loading `postgres.toml` and the target project is a git repo, verify `.skills/postgres/postgres.toml` is gitignored to avoid committing credentials.
    - If `postgres.toml` exists, **first** ensure it is at the latest schema version. Run `./scripts/migrate_toml_schema.sh` only when an older schema is found, and run it from the skill dir only if `DB_PROJECT_ROOT` is set.
    - Treat missing or outdated `schema_version` as a hard stop for TOML profile usage; migrate first, then continue.
+   - In `postgres.toml`, `sslmode` must be a boolean (`true`/`false`), not a string.
 2) Choose action:
    - Connect/run a query, inspect schema, or run a helper script.
    - Default query runner: use `./scripts/psql_with_ssl_fallback.sh` (or `./scripts/run_sql.sh` for SQL text/file/stdin).
@@ -79,6 +80,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
 - For migrations path resolution and schema-change workflow, follow the guardrails reference.
 - If the user explicitly marks a migration as migrated/released/run in production, perform the release workflow in guardrails immediately (unless they ask for a dry run only).
 - If `CHANGELOG.md` is not in `WIP/RELEASED` format, migrate it to that template before writing new migration notes.
+- If the user asks to refresh Postgres best-practices docs/references, route to `.agents/skills/tools/references/postgres-best-practices-runbook.md` via the `tools` skill workflow.
 
 ## Guardrails (summary)
 - Always ask for approval before making any database structure change (DDL like CREATE/ALTER/DROP).
