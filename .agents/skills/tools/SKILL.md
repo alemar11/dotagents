@@ -1,6 +1,6 @@
 ---
 name: tools
-description: Orchestrate repository maintenance tasks for Codex skills, including metadata/doc sync, consistency checks, and skill-specific refresh runbooks.
+description: Orchestrate maintenance, optimization, and refactor workflows for skills in this repository, including metadata/doc sync and consistency checks.
 ---
 
 # Tools
@@ -11,6 +11,8 @@ Use this project-maintainer skill to keep skills aligned, healthy, and releasabl
 ## Trigger rules
 Use this skill when users ask to:
 - Maintain or clean up one or more skills
+- Optimize one or more skills (quality, consistency, or maintainability)
+- Refactor skill structure or instructions while preserving intent
 - Sync `SKILL.md`, `agents/openai.yaml`, and repository docs
 - Run a maintenance pass before release
 - Refresh Postgres best-practices references

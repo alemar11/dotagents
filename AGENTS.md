@@ -35,3 +35,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - If the user asks to upgrade or refresh Postgres skill docs/references, follow `.agents/skills/tools/references/postgres-best-practices-runbook.md` (do not use ad-hoc update steps).
 - Treat `DB_*` as the only user-facing env contract for the Postgres skill; reject non-`DB_*` aliases (for example `PROJECT_ROOT`, `DATABASE_URL`, `PGHOST`) and keep `PG*` usage internal-only when invoking Postgres tools.
 - Enforce TOML schema gating at runtime for profile-based scripts: missing/outdated `schema_version` must fail fast and require `./scripts/migrate_toml_schema.sh` before proceeding.
+
+### Tools skill
+- The `.agents/skills/tools` skill is the default orchestrator for maintenance, optimization, and refactor tasks affecting skills in this repository.
+- Keep `tools` self-contained: workflow markdown guidance must live under `.agents/skills/tools/references/`.
+- When updating skill metadata/docs across the repo, route through the `tools` playbooks and keep README/openai metadata text aligned.
