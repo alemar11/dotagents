@@ -21,7 +21,7 @@ do update set value = excluded.value;
 ```
 
 ## 3) Prefer keyset pagination for deep paging
-`OFFSET` cost grows with page depth; keyset/cursor pagination remains stable.
+`OFFSET` cost grows with page depth; keyset/cursor pagination remains stable. Order by a stable unique key (or compound key with a unique tiebreaker) and build the index in the same column order.
 
 ```sql
 select * from products
@@ -56,5 +56,6 @@ returning id, created_at;
 - https://www.postgresql.org/docs/current/sql-copy.html
 - https://www.postgresql.org/docs/current/sql-insert.html
 - https://www.postgresql.org/docs/current/queries-limit.html
+- https://www.postgresql.org/docs/current/indexes-multicolumn.html
 - https://www.postgresql.org/docs/current/sql-prepare.html
 - https://www.postgresql.org/docs/current/dml-returning.html

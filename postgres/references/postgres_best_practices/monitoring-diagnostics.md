@@ -11,9 +11,11 @@ select * from orders where customer_id = 123 and status = 'pending';
 ```
 
 ## 2) Track workload with `pg_stat_statements`
-Identify expensive/frequent query fingerprints and prioritize by total impact.
+Identify expensive/frequent query fingerprints and prioritize by total impact. The module must be preloaded and query identifiers enabled before `CREATE EXTENSION` is enough.
 
 ```sql
+-- ensure shared_preload_libraries includes 'pg_stat_statements'
+-- and compute_query_id is enabled, then restart if required:
 create extension if not exists pg_stat_statements;
 
 select query, calls, mean_exec_time, total_exec_time
@@ -65,5 +67,6 @@ select pg_reload_conf();
 - https://www.postgresql.org/docs/current/routine-vacuuming.html
 - https://www.postgresql.org/docs/current/monitoring-stats.html
 - https://www.postgresql.org/docs/current/monitoring-locks.html
+- https://www.postgresql.org/docs/current/runtime-config-statistics.html
 - https://www.postgresql.org/docs/current/runtime-config-logging.html
 - https://www.postgresql.org/docs/current/runtime-config-locks.html

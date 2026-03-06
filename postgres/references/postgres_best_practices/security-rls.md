@@ -36,14 +36,17 @@ using (tenant_id = current_setting('app.tenant_id')::bigint);
 alter table orders force row level security;
 ```
 
-## 5) Index columns referenced by policies
+## 5) Run application traffic as roles subject to RLS
+Superusers, roles with `BYPASSRLS`, and table owners can bypass policies unless `FORCE ROW LEVEL SECURITY` is active. Keep application connections on least-privileged non-owner roles.
+
+## 6) Index columns referenced by policies
 RLS predicates run with user queries; index policy columns to avoid full scans.
 
 ```sql
 create index orders_tenant_id_idx on orders (tenant_id);
 ```
 
-## 6) Set default privileges for future objects
+## 7) Set default privileges for future objects
 Use `ALTER DEFAULT PRIVILEGES` so newly created tables/sequences/functions do not accidentally get overly broad access.
 
 ```sql

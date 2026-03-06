@@ -11,15 +11,15 @@ A pooler lets many clients share fewer database backends, improving resilience u
 ## 3) Match pool mode to session features
 If your workload depends on session state (for example named prepared statements or temp tables), use a compatible pooling mode.
 
-## 4) Enforce defensive session timeouts
-Use timeouts to protect the cluster from runaway or abandoned sessions.
+## 4) Set timeouts at the narrowest practical scope
+Use timeouts to protect the cluster from runaway or abandoned sessions, but prefer role-, database-, or session-scoped defaults for application traffic. Cluster-wide defaults for `statement_timeout`, `transaction_timeout`, and `lock_timeout` can break maintenance or administrative work.
 
 ```sql
-alter system set statement_timeout = '30s';
-alter system set lock_timeout = '5s';
-alter system set idle_in_transaction_session_timeout = '30s';
-alter system set idle_session_timeout = '10min';
-select pg_reload_conf();
+alter role app_user in database appdb set statement_timeout = '30s';
+alter role app_user in database appdb set lock_timeout = '5s';
+alter role app_user in database appdb set idle_in_transaction_session_timeout = '30s';
+alter role app_user in database appdb set idle_session_timeout = '10min';
+alter role app_user in database appdb set transaction_timeout = '2min';
 ```
 
 ## 5) Monitor connection pressure continuously
@@ -35,5 +35,6 @@ order by count(*) desc;
 ## Verification References
 - https://www.postgresql.org/docs/current/runtime-config-connection.html
 - https://www.postgresql.org/docs/current/runtime-config-client.html
+- https://www.postgresql.org/docs/current/sql-alterrole.html
 - https://www.postgresql.org/docs/current/monitoring-stats.html
 - https://www.pgbouncer.org/features.html

@@ -32,9 +32,11 @@ create index users_email_trgm_idx on users using gin (email gin_trgm_ops);
 ```
 
 ## 4) Use range types + exclusion constraints for overlap rules
-For scheduling and booking, enforce non-overlap at the database level.
+For scheduling and booking, enforce non-overlap at the database level. When a GiST exclusion constraint mixes range operators with scalar equality (for example `room_id with =`), install `btree_gist` so the scalar column has a compatible operator class.
 
 ```sql
+create extension if not exists btree_gist;
+
 create table room_bookings (
   room_id bigint not null,
   during tstzrange not null,
@@ -54,6 +56,7 @@ create index users_lower_email_idx on users (lower(email));
 - https://www.postgresql.org/docs/current/datatype-json.html#JSON-INDEXING
 - https://www.postgresql.org/docs/current/pgtrgm.html
 - https://www.postgresql.org/docs/current/rangetypes.html
+- https://www.postgresql.org/docs/current/btree-gist.html
 - https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-EXCLUSION
 - https://www.postgresql.org/docs/current/ddl-generated-columns.html
 - https://www.postgresql.org/docs/current/indexes-expressional.html
