@@ -1,12 +1,12 @@
 ---
 name: postgres
-description: Connect to Postgres databases, run queries/diagnostics, and search official PostgreSQL docs only when explicitly requested.
+description: Connect to Postgres databases, run queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
 ---
 
 # Postgres
 
 ## Goal
-Use this skill to connect to Postgres, run user-requested queries/diagnostics, and search official PostgreSQL docs only when explicitly requested.
+Use this skill to connect to Postgres, run user-requested queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
 
 ## Fast path (copy/paste)
 - Ad-hoc read query:
@@ -32,7 +32,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
    - Treat missing or outdated `schema_version` as a hard stop for TOML profile usage; migrate first, then continue.
    - In `postgres.toml`, `sslmode` must be a boolean (`true`/`false`), not a string.
 2) Choose action:
-   - Connect/run a query, inspect schema, or run a helper script.
+   - Connect/run a query, inspect schema, review backend SQL/query usage, or run a helper script.
    - Default query runner: use `./scripts/psql_with_ssl_fallback.sh` (or `./scripts/run_sql.sh` for SQL text/file/stdin).
    - If the user says a migration is "migrated", "released", or "run in production", execute the release workflow in `references/postgres_guardrails.md` (move pending SQL to `released/` and transition changelog entries from `WIP` to `RELEASED`).
    - For official PostgreSQL docs lookup, use `./scripts/search_postgres_docs.sh` only when the user explicitly asks for docs search/verification.
@@ -41,6 +41,31 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
    - If a connection test fails, run `./scripts/check_deps.sh` and/or `./scripts/connection_info.sh` to diagnose.
 4) Persist only if asked:
    - Update TOML only with explicit user approval, except `[configuration].pg_bin_path` which may be auto-written when missing. `schema_version` is written by the migration helper. Prompt before changing an existing value.
+
+## Backend query performance review
+- Use this path when the user asks to review backend queries, inspect SQL for speed, improve loading time, or analyze schema/index support.
+- Inventory read queries separately from write queries before making recommendations.
+- Unless the user explicitly includes writes, optimize only read-side queries and treat write queries as out of scope.
+- Prioritize by user-visible loading time, query count per request, and obvious scaling risks over local row counts.
+- Look for:
+  - N+1 query patterns
+  - dynamic `IN (...)` SQL that should become parameterized arrays
+  - recursive views/CTEs on hot read paths
+  - repeated correlated `EXISTS` / `COUNT(*)` subqueries
+  - missing composite indexes that match real join/filter predicates
+- Validate with schema/catalog inspection first:
+  - `pg_indexes`
+  - `pg_stats`
+  - `pg_views`
+  - relation size and stats when useful
+- Treat local data volume as inspection context only. Do not overfit conclusions to small local datasets if the user is concerned about production scale.
+- Report findings in this shape:
+  - hotspot
+  - why it scales poorly
+  - safe optimization approach
+  - payload/behavior constraints
+  - validation method
+- When helpful, recommend `EXPLAIN (ANALYZE, BUFFERS)` targets, but do not require live benchmarking to identify obvious query-shape issues.
 
 ## SQL safety
 - Never run `DO $$ ... $$` using `-c "..."` with double quotes; shell expansion can break `$$`.
@@ -54,6 +79,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
 - Postgres version: `./scripts/pg_version.sh`
 - Find objects by name: `./scripts/find_objects.sh`
 - Schema introspection: `./scripts/schema_introspect.sh`
+- Backend query review: use repo search plus `./scripts/run_sql.sh` for catalog inspection and validation
 - Slow/active query diagnostics: `./scripts/slow_queries.sh`, `./scripts/activity_overview.sh`, `./scripts/long_running_queries.sh`
 - Lock diagnostics: `./scripts/locks_overview.sh`
 - Official docs search (explicit request only): `./scripts/search_postgres_docs.sh`
@@ -77,6 +103,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, a
 - If the user provides a connection URL, infer missing fields from it.
 - Ask whether to save the profile into `postgres.toml` or use a one-off (temporary) connection.
 - Do not run `./scripts/search_postgres_docs.sh` unless the user explicitly asks for official docs lookup/verification.
+- If the user asks for backend query optimization or performance review, inspect the application query code and separate read paths from write paths before recommending changes.
 - For migrations path resolution and schema-change workflow, follow the guardrails reference.
 - If the user explicitly marks a migration as migrated/released/run in production, perform the release workflow in guardrails immediately (unless they ask for a dry run only).
 - If `CHANGELOG.md` is not in `WIP/RELEASED` format, migrate it to that template before writing new migration notes.
