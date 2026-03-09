@@ -23,8 +23,11 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
    - Forbidden: organization-level or higher scope mutations (for example org settings, org rulesets, org membership, org secrets/variables, enterprise APIs).
    - If a request is forbidden, stop and ask for a repo-scoped alternative.
 3. Run preflight before any `gh` action:
-   - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>]`
+   - Run preflight from the target repository working directory, not from the skill directory or an unrelated repository.
+   - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>]`
+   - When the target repo is known, prefer `--expect-repo <owner/repo>` to catch working-directory mismatches early.
    - Use `--allow-non-project` only when the user explicitly requests a non-project operation.
+   - For cross-repo issue transfers, prefer the dedicated helper scripts instead of manual `gh issue create/edit/close` sequences.
 4. Run the narrowest `gh` command needed, then report only relevant output.
 5. If the operation fails, return the command error and propose the next retry command from the retry matrix below.
 
@@ -34,6 +37,7 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
   - `gh repo view` and `gh repo clone <owner>/<repo>`
 - Issue actions
   - `gh issue list`, `gh issue view`, `gh issue create`, `gh issue edit`, `gh issue comment`, `gh issue close`
+  - `scripts/issues_copy.sh` and `scripts/issues_move.sh` for cross-repo issue transfers
 - Pull request actions
   - `gh pr list`, `gh pr view`, `gh pr create`, `gh pr edit`, `gh pr comment`, `gh pr review`, `gh pr checkout`, `gh pr merge`, `gh pr checks`
 - Workflow actions
@@ -57,6 +61,8 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
 - `references/workflows.md`: Reusable, copy-ready end-to-end workflows (for example, PR review-comment and PR check triage flows on the current branch).
 - `references/github_workflow_behaviors.md`: Decision policy for issue label suggestion and commit issue-link workflows.
 
+Note (2026-03): issue transfer is standardized with dedicated copy/move scripts after manual transfers proved too easy to run from the wrong repo context.
+
 ## Issue close standard
 
 - For issue closure, follow this sequence:
@@ -69,6 +75,21 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
   - `Implemented in commit <short_sha> (<commit_url>).`
   - `Implemented via PR <pr_url>.`
 - Prefer including both commit and PR links when available.
+
+## Issue transfer standard
+
+- Prefer `scripts/issues_copy.sh` when the source issue should stay open and work should continue in both places.
+- Prefer `scripts/issues_move.sh` when work should continue only in the target repository.
+- Standard target-body note for copies:
+  - `Copied from <source_repo>#<issue> (<source_url>).`
+- Standard target-body note for moves:
+  - `Moved from <source_repo>#<issue> (<source_url>).`
+- Standard source backlink comment for moves:
+  - `Moved to <target_repo>#<new_issue> (<new_url>). Continuing work there.`
+- Standard move behavior:
+  1. create the target issue,
+  2. add the backlink comment on the source issue,
+  3. close the source issue if it is still open.
 
 ## `gh issue view --json` field pitfalls
 
@@ -85,7 +106,7 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
 - `references/installation.md`: Check whether `gh` is installed and how to install it on common OSes.
 - `scripts/check_gh_installed.sh [--min-version <version>]`: Validate that `gh` exists and meets a minimum version.
 - `scripts/check_gh_authenticated.sh [--host github.com]`: Verify the active `gh` authentication session for the host.
-- `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
+- `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
 - `scripts/check_docs_script_refs.sh [--skill-dir <path>]`: Verify docs reference valid scripts and documented flags.
 
 ## Failure retry matrix
@@ -94,6 +115,8 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
   - Retry command: `gh auth login && scripts/preflight_gh.sh --host github.com`
 - Repository context errors (not a git repo, cannot resolve repo):
   - Retry command: `gh repo view --json nameWithOwner` in the target repo directory, or pass explicit `--repo owner/repo`.
+- Repository mismatch errors (`--expect-repo` does not match current directory):
+  - Retry command: `scripts/preflight_gh.sh --host github.com --expect-repo owner/repo` from the target repo root, or use `scripts/issues_copy.sh` / `scripts/issues_move.sh` with explicit repo arguments for cross-repo transfers.
 - Invalid JSON field errors (for example `Unknown JSON field: "projects"`):
   - Retry command: replace with supported fields, e.g. `gh issue view <n> --json number,title,state,projectItems,projectCards`.
 - Transient API/network failures (502/503/timeouts):

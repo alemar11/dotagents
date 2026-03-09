@@ -2,6 +2,85 @@
 
 Use this section for copy-paste, branch-safe operational flows.
 
+Note (2026-03): cross-repo issue transfers now use dedicated helper scripts so the repo context and source-closure behavior stay consistent.
+
+## issue-copy-or-move
+
+Purpose: copy or move an issue between repositories without manually reassembling title/body text or improvising the source backlink behavior.
+
+### Preconditions
+
+- `gh` installed and authenticated.
+- Source issue number is known.
+- Source and target repositories are known in `owner/repo` format.
+- If you are operating on the current repo manually, run preflight from that repo root and prefer `--expect-repo`.
+
+### Standard notes
+
+- Copy target note: `Copied from <source_repo>#<issue> (<source_url>).`
+- Move target note: `Moved from <source_repo>#<issue> (<source_url>).`
+- Move source note: `Moved to <target_repo>#<new_issue> (<new_url>). Continuing work there.`
+
+### Paste and run: copy an issue across repositories
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="{skill_dir}/scripts/issues_copy.sh"
+SOURCE_REPO="{source_repo}"
+TARGET_REPO="{target_repo}"
+ISSUE="{issue_number}"
+
+if [[ "$SCRIPT_PATH" == "{skill_dir}/scripts/issues_copy.sh" ]]; then
+  SCRIPT_PATH="scripts/issues_copy.sh"
+fi
+if [[ "$SOURCE_REPO" == "{source_repo}" || -z "$SOURCE_REPO" ]]; then
+  echo "Replace {source_repo} with the source owner/repo."
+  exit 1
+fi
+if [[ "$TARGET_REPO" == "{target_repo}" || -z "$TARGET_REPO" ]]; then
+  echo "Replace {target_repo} with the target owner/repo."
+  exit 1
+fi
+if [[ "$ISSUE" == "{issue_number}" || -z "$ISSUE" ]]; then
+  echo "Replace {issue_number} with the source issue number."
+  exit 1
+fi
+
+"$SCRIPT_PATH" --issue "$ISSUE" --source-repo "$SOURCE_REPO" --target-repo "$TARGET_REPO"
+```
+
+### Paste and run: move an issue across repositories
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_PATH="{skill_dir}/scripts/issues_move.sh"
+SOURCE_REPO="{source_repo}"
+TARGET_REPO="{target_repo}"
+ISSUE="{issue_number}"
+
+if [[ "$SCRIPT_PATH" == "{skill_dir}/scripts/issues_move.sh" ]]; then
+  SCRIPT_PATH="scripts/issues_move.sh"
+fi
+if [[ "$SOURCE_REPO" == "{source_repo}" || -z "$SOURCE_REPO" ]]; then
+  echo "Replace {source_repo} with the source owner/repo."
+  exit 1
+fi
+if [[ "$TARGET_REPO" == "{target_repo}" || -z "$TARGET_REPO" ]]; then
+  echo "Replace {target_repo} with the target owner/repo."
+  exit 1
+fi
+if [[ "$ISSUE" == "{issue_number}" || -z "$ISSUE" ]]; then
+  echo "Replace {issue_number} with the source issue number."
+  exit 1
+fi
+
+"$SCRIPT_PATH" --issue "$ISSUE" --source-repo "$SOURCE_REPO" --target-repo "$TARGET_REPO"
+```
+
 ## issue-close-with-evidence
 
 Purpose: close an issue safely with explicit state verification and implementation evidence links using the dedicated helper script.

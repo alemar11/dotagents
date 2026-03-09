@@ -3,17 +3,19 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: preflight_gh.sh [--host <hostname>] [--min-version <version>] [--allow-non-project]
+Usage: preflight_gh.sh [--host <hostname>] [--min-version <version>] [--expect-repo <owner/repo>] [--allow-non-project]
 
 Run prerequisite checks before performing gh commands:
 - verify gh is installed (optionally version-gated)
 - verify gh authentication for the target host
+- optionally verify that the current working directory resolves to the expected owner/repo
 - optionally allow running when not inside a git repository
 EOF
 }
 
 HOST="github.com"
 MIN_VERSION=""
+EXPECT_REPO=""
 REQUIRE_GIT_REPO=1
 ALLOW_NON_PROJECT=0
 
@@ -37,6 +39,15 @@ while [[ $# -gt 0 ]]; do
       fi
       shift 2
       ;;
+    --expect-repo)
+      EXPECT_REPO="${2:-}"
+      if [[ -z "$EXPECT_REPO" ]]; then
+        echo "Missing value for --expect-repo" >&2
+        usage >&2
+        exit 64
+      fi
+      shift 2
+      ;;
     --allow-non-project)
       ALLOW_NON_PROJECT=1
       REQUIRE_GIT_REPO=0
@@ -55,6 +66,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/github_lib.sh"
+
+if [[ -n "$EXPECT_REPO" ]]; then
+  github_require_repo_reference "$EXPECT_REPO"
+fi
 
 "$SCRIPT_DIR/check_gh_installed.sh" ${MIN_VERSION:+--min-version "$MIN_VERSION"}
 "$SCRIPT_DIR/check_gh_authenticated.sh" --host "$HOST"
@@ -64,8 +80,21 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   REMOTE="$(git remote get-url origin 2>/dev/null || true)"
   if [[ -n "$REMOTE" ]]; then
     echo "origin remote: $REMOTE"
+
+    CURRENT_REPO="$(printf '%s\n' "$REMOTE" \
+      | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#^ssh://[^/]+/##; s#^git://[^/]+/##; s#\.git$##; s#/$##')"
+
+    if [[ -n "$EXPECT_REPO" && "$CURRENT_REPO" != "$EXPECT_REPO" ]]; then
+      echo "Current directory resolves to $CURRENT_REPO, but --expect-repo requires $EXPECT_REPO." >&2
+      echo "Run preflight from the target repository working directory, or use a helper script that accepts explicit repo arguments." >&2
+      exit 6
+    fi
   else
     echo "No origin remote configured."
+    if [[ -n "$EXPECT_REPO" ]]; then
+      echo "Cannot verify --expect-repo without an origin remote." >&2
+      exit 6
+    fi
   fi
 elif [[ "$REQUIRE_GIT_REPO" -eq 1 ]]; then
   if [[ "$ALLOW_NON_PROJECT" -eq 1 ]]; then
@@ -79,6 +108,13 @@ elif [[ "$REQUIRE_GIT_REPO" -eq 1 ]]; then
   fi
 else
   echo "Current directory is not a git repository. Proceeding with non-project operations."
+fi
+
+if [[ -n "$EXPECT_REPO" ]]; then
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "--expect-repo requires running from the target repository working directory." >&2
+    exit 6
+  fi
 fi
 
 echo "gh preflight checks passed."
