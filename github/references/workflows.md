@@ -20,14 +20,22 @@ Purpose: create a release-backed tag or a tag-only ref without guessing the targ
 - Decide whether the request is for a GitHub release or a tag only.
 - Never assume `main`; resolve the repository default branch.
 - When the user does not provide a target branch or commit, propose the default branch HEAD commit and confirm it before creating anything.
+- If preflight was run from the wrong working directory, discard that result and rerun preflight from the target repository root before proceeding.
 - For releases, choose the notes strategy before publishing:
   - option 1: infer notes by diffing since the last published release tag,
   - option 2: keep the release notes blank,
   - option 3: use user-provided notes.
 - If the user does not specify a notes strategy, offer those three options and recommend option 1.
+- Do not interpret silence as delegation. Only choose option 1 automatically when the user explicitly asks you to decide.
 - For option 1, resolve the latest published release tag when one exists and generate proposed notes from that tag to the confirmed target.
 - If the user wants a different target, choose branch first, then commit.
 - Even after default-target confirmation, prefer `gh release create <tag> --target <branch-or-sha>` so the target is explicit.
+
+### Preferred helper path
+
+- Use `scripts/release_plan.sh` first to resolve repository, default branch, target commit, and previous published release tag.
+- Use `scripts/release_create.sh` for the mutation step because it requires explicit `--target-ref` and explicit `--notes-mode`.
+- `scripts/release_create.sh` intentionally refuses to run if `--notes-mode` is omitted, so accidental “silent defaulting” does not publish a release.
 
 ### Paste and run (Phase 1): resolve the default target and show it for confirmation
 
@@ -65,6 +73,12 @@ echo "If this is not the target you want, choose a branch first and then a speci
 echo "Recent commits on $TARGET_BRANCH:"
 gh api "repos/$REPO/commits?sha=$TARGET_BRANCH&per_page=10" \
   --jq '.[] | "  \(.sha[0:7]) \(.commit.message | split("\n")[0])"'
+```
+
+Preferred helper:
+
+```bash
+scripts/release_plan.sh [--repo <owner/repo>] [--target-branch <branch>]
 ```
 
 ### Paste and run (Phase 1B, option 1): prepare inferred release notes since the last published release tag
@@ -187,6 +201,19 @@ esac
 gh release view "$TAG" --repo "$REPO" --json url,tagName,targetCommitish
 ```
 
+Preferred helper:
+
+```bash
+scripts/release_create.sh \
+  --tag <tag> \
+  --target-ref <branch-or-sha> \
+  --notes-mode <infer|blank|user> \
+  [--repo <owner/repo>] \
+  [--title <text>|--title-file <path>] \
+  [--notes-file <path>|--notes-text <text>] \
+  [--previous-tag <tag>]
+```
+
 ### Paste and run (Phase 2B): create a tag only from a local clone
 
 ```bash
@@ -221,8 +248,10 @@ git rev-list -n 1 "$TAG"
 - `gh release create <tag>` auto-creates the tag when it is missing, but this workflow still resolves and confirms the target up front so the release does not accidentally point at the wrong commit.
 - The release-notes API can generate a name and markdown body for the new release; GitHub documents that the body contains information such as the changes since the last release and contributors.
 - Option 1 is the recommended default when the user asks to create a release without specifying how notes should be produced.
+- Silence is not the same as delegation; ask the user to choose a notes strategy unless they explicitly tell you to decide.
 - Option 2 keeps the release notes blank on purpose.
 - Option 3 is for text the user wants to supply directly or via a file.
+- Correction note (2026-03): added dedicated release helpers so release creation can require an explicit notes mode and reduce mistakes caused by ad-hoc command assembly.
 - If you need a release from an annotated tag, create and push the annotated tag first, then run `gh release create <tag> --verify-tag --notes-from-tag`.
 - For remote-only tag creation without a local clone, use `gh api` against the Git database endpoints only when the user explicitly wants that API-based path.
 

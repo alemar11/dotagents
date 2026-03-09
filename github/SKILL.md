@@ -26,6 +26,7 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
    - Run preflight from the target repository working directory, not from the skill directory or an unrelated repository.
    - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>]`
    - When the target repo is known, prefer `--expect-repo <owner/repo>` to catch working-directory mismatches early.
+   - If preflight was run from the wrong working directory, treat it as invalid and rerun it from the target repository before proceeding.
    - Use `--allow-non-project` only when the user explicitly requests a non-project operation.
    - For cross-repo issue transfers, prefer the dedicated helper scripts instead of manual `gh issue create/edit/close` sequences.
 4. Run the narrowest `gh` command needed, then report only relevant output.
@@ -44,6 +45,7 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
   - `gh run list`, `gh run view`, `gh run watch`
 - Release actions
   - `gh release list`, `gh release view`, `gh release create`, `gh release edit`, `gh release delete`
+  - `scripts/release_plan.sh`, `scripts/release_create.sh`
 - General
   - `gh alias`, `gh api`, `gh extension`
 
@@ -83,8 +85,11 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
     1. infer notes by diffing since the last published release tag,
     2. keep the release notes blank,
     3. use user-provided notes.
-  - Default to option 1 when the user delegates the choice.
+  - Do not treat user silence as delegation. Ask for the notes strategy unless the user explicitly says to choose for them.
+  - Default to option 1 only when the user explicitly delegates the choice.
   - For option 1, resolve the latest published release tag when one exists and generate the proposed title/body for the new tag from that prior release range.
+- Prefer `scripts/release_plan.sh` to resolve the default branch, target commit, and previous release tag before asking for confirmation.
+- Prefer `scripts/release_create.sh` for release creation because it requires an explicit `--notes-mode` and explicit `--target-ref`.
 - If the user does not want the default target:
   - pick the branch first,
   - then pick the commit on that branch.
@@ -145,6 +150,8 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
 - `scripts/check_gh_installed.sh [--min-version <version>]`: Validate that `gh` exists and meets a minimum version.
 - `scripts/check_gh_authenticated.sh [--host github.com]`: Verify the active `gh` authentication session for the host.
 - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
+- `scripts/release_plan.sh [--repo <owner/repo>] [--target-branch <branch>] [--allow-non-project]`: Resolve the default release target and latest published release tag before mutation.
+- `scripts/release_create.sh --tag <tag> --target-ref <branch-or-sha> --notes-mode <infer|blank|user> [--repo <owner/repo>] [--title <text>|--title-file <path>] [--notes-file <path>|--notes-text <text>] [--previous-tag <tag>] [--allow-non-project]`: Create a release with explicit target and explicit notes strategy.
 - `scripts/check_docs_script_refs.sh [--skill-dir <path>]`: Verify docs reference valid scripts and documented flags.
 
 ## Failure retry matrix
@@ -167,4 +174,5 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
   1. Update the relevant script(s) under `github/scripts/` first.
   2. Update `github/SKILL.md` and `github/references/` docs in the same change set so the instructions stay current.
   3. Record the correction in a short note in the updated docs so future runs use the new behavior.
+- Correction note (2026-03): release creation now uses dedicated helper scripts and explicitly distinguishes user silence from explicit delegation when choosing release notes strategy.
 - Keep user-facing guidance in `references/` and workflow logic in scripts aligned with tested real-world usage.
