@@ -26,8 +26,10 @@ description:
 1. Read session history to identify scope, intent, and rationale.
 2. Inspect the working tree and staged changes (`git status`, `git diff`,
    `git diff --staged`).
-3. Stage intended changes, including new files (`git add -A`) after confirming
-   scope.
+3. Stage only the intended changes after confirming scope. Prefer explicit
+   pathspecs (for example, `git add -- <path>`) when the change is narrowly
+   scoped; use `git add -A` only when all worktree changes are intended for
+   the commit.
 4. Sanity-check newly added files; if anything looks random or likely ignored
    (build artifacts, logs, temp files), flag it to the user before committing.
 5. If staging is incomplete or includes unrelated files, fix the index or ask
@@ -50,6 +52,10 @@ description:
 12. Commit only when the message matches the staged changes: if the staged diff
     includes unrelated files or the message describes work that isn't staged,
     fix the index or revise the message before committing.
+13. After `git commit` succeeds, verify the result sequentially, not in
+    parallel with the commit itself. Run `git status --short --branch` and
+    `git log -1` to confirm the worktree is clean and `HEAD` matches the new
+    commit.
 
 ## Output
 
