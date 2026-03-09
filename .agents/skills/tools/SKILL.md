@@ -9,7 +9,7 @@ description: Orchestrate maintenance, optimization, refactor, and upstream bench
 Use this project-maintainer skill to keep skills aligned, healthy, and releasable. Primary maintainer outcome: improve local skill markdown quality (`SKILL.md` and `references/*.md`) through structured analysis and actionable optimization proposals. This skill orchestrates maintenance workflows; it does not replace domain skills.
 
 ## User-facing Capability Summary
-If the user asks what this skill can do, answer with these two capability groups:
+If the user asks what this skill can do, answer with these three capability groups:
 1) Maintain local skills:
    - Keep skill docs and metadata aligned (`SKILL.md`, `agents/openai.yaml`, `README.md`, `AGENTS.md`).
    - Run structure/consistency checks and flag issues.
@@ -19,6 +19,11 @@ If the user asks what this skill can do, answer with these two capability groups
    - Study upstream `SKILL.md` structure patterns (frontmatter, sections, workflow/trigger clarity, and layout).
    - Audit local skills including hidden `.agents/skills/*`.
    - Generate markdown-focused optimization proposals for local skill docs (`SKILL.md`, `references/*.md`, and related maintainer docs) with no auto-applied refactors.
+3) Bootstrap new skills:
+   - Create skill scaffolds with required files and metadata assets.
+   - Start by invoking `$skill-creator` to initialize the skill template and required metadata.
+   - Align README/install prompts and maintainer metadata.
+   - Run consistency and sync checks to avoid drift.
 
 ## Available Tasks (User Menu)
 When the user asks what this skill can do, offer this task list:
@@ -26,9 +31,11 @@ When the user asks what this skill can do, offer this task list:
    - Align `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md`.
 2) `audit consistency`
    - Run structure/rules checks across skills and report findings by severity.
-3) `refresh postgres references`
+3) `bootstrap skill`
+   - Use `$skill-creator` to initialize the new skill scaffold, then add required files and run metadata/docs checks.
+4) `refresh postgres references`
    - Execute Postgres best-practices refresh workflow defined in this skill references.
-4) `benchmark against upstream`
+5) `benchmark against upstream`
    - Download/update `openai/skills` and `anthropics/skills`, study `SKILL.md` patterns, compare local skills, and propose markdown optimization updates (no auto-apply).
    - After artifacts are generated, review local skills one by one and state whether each skill needs changes (`CHANGE`) or not (`NOOP`), with concrete proposals when needed.
 
@@ -37,6 +44,7 @@ Use this skill when users ask to:
 - Maintain or clean up one or more skills
 - Optimize one or more skills (quality, consistency, or maintainability)
 - Refactor skill structure or instructions while preserving intent
+- Bootstrap a new skill (reusable or maintainer)
 - Benchmark local skills against upstream skill ecosystems (for example `openai/skills` and `anthropics/skills`)
 - Sync `SKILL.md`, `agents/openai.yaml`, and repository docs
 - Run a maintenance pass before release
@@ -46,14 +54,15 @@ Use this skill when users ask to:
 1) Route the request with `references/maintenance-router.md`.
 2) For metadata/docs alignment, follow `references/metadata-sync.md`.
 3) For repository-wide structure and rules checks, follow `references/doc-consistency.md`.
-4) For upstream benchmarking and structure proposals, follow `references/openai-skill-benchmark.md` (clone/update upstream repos first, then analyze artifacts and propose per-skill updates one by one).
-5) For Postgres best-practices refresh, follow `references/postgres-refresh.md` (self-contained workflow in this skill).
-6) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
+4) For skill bootstrap, follow `references/skill_openai_metadata.md` then `references/metadata-sync.md`.
+5) For upstream benchmarking and structure proposals, follow `references/openai-skill-benchmark.md` (clone/update upstream repos first, then analyze artifacts and propose per-skill updates one by one).
+6) For Postgres best-practices refresh, follow `references/postgres-refresh.md` (self-contained workflow in this skill).
+7) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
 
 ## Guardrails
 - Keep this skill orchestration-only in v1.
 - Prefer repeatable commands and documented checks in this skill before inventing ad-hoc flows.
 - Do not depend on markdown guidance outside this skill's `references/` folder.
 - Keep changes scoped to requested maintenance outcomes.
-- Keep task boundaries explicit: run only the requested task (`sync`, `audit`, `refresh`, `benchmark`) unless the user requests a mixed flow.
+- Keep task boundaries explicit: run only the requested task (`sync`, `audit`, `bootstrap`, `refresh`, `benchmark`) unless the user requests a mixed flow.
 - If no meaningful updates are needed, return `PASS (NOOP)` and avoid persistent file edits.
