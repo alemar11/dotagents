@@ -37,6 +37,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
    - Default query runner: use `./scripts/psql_with_ssl_fallback.sh` (or `./scripts/run_sql.sh` for SQL text/file/stdin).
    - If the user says a migration is "migrated", "released", or "run in production", execute the release workflow in `references/postgres_guardrails.md` (move pending SQL to `released/` and transition changelog entries from `WIP` to `RELEASED`).
    - For official PostgreSQL docs lookup, use `./scripts/search_postgres_docs.sh` only when the user explicitly asks for docs search/verification.
+   - If the failure is local-runtime or Docker-specific (for example port collisions, `PGDATA`/bind-mount mismatch, or corrupted local cluster startup), follow `references/postgres_local_recovery.md`.
 3) Execute and report:
    - Run the requested action and summarize results or errors.
    - If a connection test fails, run `./scripts/check_deps.sh` and/or `./scripts/connection_info.sh` to diagnose.
@@ -104,6 +105,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - Lock diagnostics: `./scripts/locks_overview.sh`
 - Official docs search (explicit request only): `./scripts/search_postgres_docs.sh`
 - Flag migration as migrated/run in production: follow release workflow in `references/postgres_guardrails.md`
+- Local/Docker startup or cluster recovery: follow `references/postgres_local_recovery.md`
 
 ## Config and schema (brief)
 - Config file: `<project-root>/.skills/postgres/postgres.toml`
@@ -155,3 +157,4 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 
 ## Usage references
 - Setup, env defaults, and script catalog: `references/postgres_usage.md`
+- Local/Docker recovery playbook: `references/postgres_local_recovery.md`

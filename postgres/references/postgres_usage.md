@@ -269,6 +269,14 @@ DB_PROFILE_A=local DB_PROFILE_B=staging ./scripts/schema_diff.sh
 ./scripts/long_running_queries.sh 5 20
 ```
 
+## Local recovery (local/dev only)
+Use `references/postgres_local_recovery.md` when the failure is not a normal query/auth problem but a local runtime incident, for example:
+- a host Postgres process and a Docker-published Postgres port competing on `5432`
+- a bind mount or `PGDATA` pointing at the wrong cluster root
+- startup logs showing `invalid checkpoint record`, `could not locate a valid checkpoint record`, or a non-empty directory that is not a cluster root
+
+This playbook is for local/dev recovery only. It can include emergency tools such as `pg_resetwal`, so do not treat it as production recovery guidance.
+
 ## Official docs search (explicit request only)
 Run this helper only when the user explicitly asks to search or verify against official PostgreSQL docs (for example: "search docs", "find official docs", or "verify against official docs"). Do not run it for normal SQL/query/diagnostics requests.
 
