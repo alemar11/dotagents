@@ -26,7 +26,7 @@ require_cmd() {
 }
 
 get_sslmode_from_url() {
-  python3 - "$1" <<'PY'
+  postgres_runtime_python_exec "" - "$1" <<'PY'
 import sys
 import urllib.parse
 
@@ -45,7 +45,7 @@ PY
 }
 
 set_sslmode_in_url() {
-  python3 - "$1" "$2" <<'PY'
+  postgres_runtime_python_exec "" - "$1" "$2" <<'PY'
 import sys
 import urllib.parse
 
@@ -121,7 +121,6 @@ dump_schema() {
   return 1
 }
 
-require_cmd python3
 require_cmd pg_dump
 require_cmd diff
 

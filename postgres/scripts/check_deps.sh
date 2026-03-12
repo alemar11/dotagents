@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-required=(psql pg_dump pg_restore python3)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/runtime_env.sh"
+
+required=(psql pg_dump pg_restore)
 optional=(diff)
 
 missing=()
@@ -16,12 +19,13 @@ for cmd in "${required[@]}"; do
   fi
 done
 
-# postgres.toml profile parsing helpers require python3 with tomllib (3.11+).
-if command -v python3 >/dev/null 2>&1; then
-  if ! python3 -c 'import sys, tomllib; raise SystemExit(0 if sys.version_info >= (3,11) else 1)' >/dev/null 2>&1; then
-    echo "  missing python3>=3.11 (tomllib for postgres.toml profiles)"
-    missing+=("python3>=3.11")
-  fi
+toml_path="$(postgres_runtime_resolve_toml_path "$(postgres_runtime_resolve_project_root)")"
+if python_bin="$(postgres_runtime_resolve_python "$toml_path" 2>/dev/null)"; then
+  python_version="$("$python_bin" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null || true)"
+  echo "  ok   python (${python_bin}${python_version:+, ${python_version}})"
+else
+  echo "  missing python>=3.11 (tomllib for postgres.toml profiles)"
+  missing+=("python>=3.11")
 fi
 
 echo ""

@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEFAULT_PROFILE="local"
-CACHE_VERSION="2"
+CACHE_VERSION="3"
+source "$SCRIPT_DIR/runtime_env.sh"
 
 check_unsupported_env() {
   local key="$1"
@@ -284,13 +285,6 @@ normalize_sslmode_from_env_url() {
   esac
 }
 
-require_python3() {
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo "python3 is required to parse postgres.toml profiles. Install Python 3.11+ or set DB_URL for a one-off connection." >&2
-    exit 1
-  fi
-}
-
 check_unsupported_env "PROJECT_ROOT" "DB_PROJECT_ROOT"
 check_unsupported_env "DATABASE_URL" "DB_URL"
 check_unsupported_env "POSTGRES_URL" "DB_URL"
@@ -361,26 +355,23 @@ fi
 
 maybe_check_toml_gitignored "$PROJECT_ROOT"
 
-require_python3
+PYTHON_BIN="$(postgres_runtime_resolve_python "$TOML_PATH")" || exit 1
 
-resolved_output="$(python3 - "$TOML_PATH" "$PROFILE" "$DEFAULT_PROFILE" "$PROJECT_ROOT" "$PWD" <<'PY'
+resolved_output="$("$PYTHON_BIN" - "$TOML_PATH" "$PROFILE" "$DEFAULT_PROFILE" "$PROJECT_ROOT" "$PWD" <<'PY'
 import os
 import re
 import shlex
 import sys
 import urllib.parse
 
-try:
-    import tomllib
-except Exception:
-    print(
-        "python3>=3.11 is required to parse postgres.toml profiles (tomllib). "
-        "Update python3 or set DB_URL for a one-off connection.",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+import tomllib
 
-LATEST_SCHEMA = 1
+LATEST_SCHEMA = (1, 1, 0)
+LEGACY_SCHEMA = (1, 0, 0)
+
+
+def format_schema_version(version: tuple[int, int, int]) -> str:
+    return ".".join(str(part) for part in version)
 
 
 def shell_print(key: str, value: str) -> None:
@@ -443,7 +434,7 @@ def normalize_sslmode_from_toml(value) -> str | None:
         return "require" if bool(value) else "disable"
     die(
         "Invalid sslmode type in postgres.toml. "
-        "In schema v1, [database].sslmode and [database.<profile>].sslmode must be boolean (true/false). "
+        "[database].sslmode and [database.<profile>].sslmode must be boolean (true/false). "
         "Run ./scripts/migrate_toml_schema.sh or fix the value manually."
     )
     return None
@@ -454,18 +445,34 @@ def die(message: str) -> None:
     sys.exit(1)
 
 
-def parse_schema_version(value) -> int:
+def parse_schema_version(value) -> tuple[int, int, int]:
     if value is None:
-        return 0
+        return (0, 0, 0)
     if isinstance(value, bool):
-        return int(value)
+        return (int(value), 0, 0)
     if isinstance(value, int):
-        return value
-    text = str(value).strip()
-    if text.isdigit():
-        return int(text)
+        if value == 1:
+            return LEGACY_SCHEMA
+        die(f"Invalid schema_version in postgres.toml: {value!r}")
+    if isinstance(value, str):
+        text = value.strip()
+    else:
+        text = str(value).strip()
+    if not text:
+        return (0, 0, 0)
+    if text == "1":
+        return LEGACY_SCHEMA
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", text)
+    if match:
+        version = tuple(int(part) for part in match.groups())
+        if version in {LEGACY_SCHEMA, LATEST_SCHEMA}:
+            return version
+        die(
+            "Unsupported schema_version in postgres.toml: "
+            f"{text}. Run ./scripts/migrate_toml_schema.sh."
+        )
     die(f"Invalid schema_version in postgres.toml: {value!r}")
-    return 0
+    return (0, 0, 0)
 
 
 toml_path = sys.argv[1]
@@ -498,21 +505,29 @@ if not isinstance(config, dict):
     )
 
 current_schema = parse_schema_version(config.get("schema_version"))
-if current_schema == 0:
+if current_schema == (0, 0, 0):
     die(
         "postgres.toml is missing [configuration].schema_version; "
         "run ./scripts/migrate_toml_schema.sh before using TOML profiles."
     )
-if current_schema < LATEST_SCHEMA:
-    die(
-        "postgres.toml schema_version is outdated "
-        f"({current_schema} < {LATEST_SCHEMA}). "
-        "Run ./scripts/migrate_toml_schema.sh first."
-    )
 if current_schema > LATEST_SCHEMA:
     die(
         "postgres.toml schema_version is newer than this skill supports "
-        f"({current_schema} > {LATEST_SCHEMA})."
+        f"({format_schema_version(current_schema)} > {format_schema_version(LATEST_SCHEMA)})."
+    )
+if current_schema < LEGACY_SCHEMA:
+    die(
+        "postgres.toml schema_version is outdated "
+        f"({format_schema_version(current_schema)} < {format_schema_version(LEGACY_SCHEMA)}). "
+        "Run ./scripts/migrate_toml_schema.sh first."
+    )
+if current_schema < LATEST_SCHEMA:
+    print(
+        "postgres.toml schema_version "
+        f"{format_schema_version(current_schema)} is supported for now, but "
+        f"{format_schema_version(LATEST_SCHEMA)} is the latest. "
+        "Run ./scripts/migrate_toml_schema.sh to upgrade.",
+        file=sys.stderr,
     )
 
 db = data.get("database")

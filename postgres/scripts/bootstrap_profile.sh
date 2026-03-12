@@ -3,6 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/runtime_env.sh"
 if [[ -n "${PROJECT_ROOT+x}" ]]; then
   echo "Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead." >&2
   exit 1
@@ -31,13 +32,6 @@ if [[ -x "$SCRIPT_DIR/check_toml_gitignored.sh" ]]; then
   "$SCRIPT_DIR/check_toml_gitignored.sh" "$PROJECT_ROOT" || true
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required to bootstrap postgres profiles. Install Python 3.11+." >&2
-  exit 1
-fi
-if ! python3 -c 'import sys, tomllib; raise SystemExit(0 if sys.version_info >= (3,11) else 1)' >/dev/null 2>&1; then
-  echo "python3>=3.11 is required to bootstrap postgres profiles (tomllib)." >&2
-  exit 1
-fi
+PYTHON_BIN="$(postgres_runtime_resolve_python "$TOML_PATH")" || exit 1
 
-python3 "$SCRIPT_DIR/bootstrap_profile.py" "$TOML_PATH" "$PROJECT_ROOT"
+"$PYTHON_BIN" "$SCRIPT_DIR/bootstrap_profile.py" "$TOML_PATH" "$PROJECT_ROOT"

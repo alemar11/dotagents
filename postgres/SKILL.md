@@ -29,7 +29,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
    - If not in a git repo, or if running outside the target project, set `DB_PROJECT_ROOT` explicitly.
    - When creating or loading `postgres.toml` and the target project is a git repo, verify `.skills/postgres/postgres.toml` is gitignored to avoid committing credentials.
    - If `postgres.toml` exists, **first** ensure it is at the latest schema version. Run `./scripts/migrate_toml_schema.sh` only when an older schema is found, and run it from the skill dir only if `DB_PROJECT_ROOT` is set.
-   - Treat missing or outdated `schema_version` as a hard stop for TOML profile usage; migrate first, then continue.
+   - Treat missing or pre-`1.0.0` `schema_version` as a hard stop for TOML profile usage. Legacy `1` / `1.0.0` is still readable, but migrate it to `1.1.0` before relying on it long-term.
    - In `postgres.toml`, `sslmode` must be a boolean (`true`/`false`), not a string.
 2) Choose action:
    - Connect/run a query, inspect schema, review backend SQL/query usage, or run a helper script.
@@ -42,7 +42,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
    - Run the requested action and summarize results or errors.
    - If a connection test fails, run `./scripts/check_deps.sh` and/or `./scripts/connection_info.sh` to diagnose.
 4) Persist only if asked:
-   - Update TOML only with explicit user approval, except `[configuration].pg_bin_path` which may be auto-written when missing. `schema_version` is written by the migration helper. Prompt before changing an existing value.
+   - Update TOML only with explicit user approval, except `[configuration].pg_bin_dir`, `[configuration].python_bin`, and `schema_version` which may be written by bootstrap/migration helpers. Prompt before changing an existing value outside those flows.
 
 ## Backend query performance review
 - Use this path when the user asks to review backend queries, inspect SQL for speed, improve loading time, or analyze schema/index support.

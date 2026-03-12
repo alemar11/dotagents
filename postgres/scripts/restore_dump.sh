@@ -16,7 +16,7 @@ if [[ ! -f "$input" ]]; then
 fi
 
 set_sslmode_in_url() {
-  python3 - "$1" "$2" <<'PY'
+  postgres_runtime_python_exec "${DB_TOML_PATH:-}" - "$1" "$2" <<'PY'
 import sys
 import urllib.parse
 

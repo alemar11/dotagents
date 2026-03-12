@@ -24,11 +24,11 @@ Windows:
 - or `choco install postgresql`
 
 ## Dependencies
-- `python3` (3.11+ for `tomllib`) is required for `postgres.toml` profile parsing (`resolve_db_url.sh`, `bootstrap_profile.sh`, `migrate_toml_schema.sh`). One-off `DB_URL` resolution does not require TOML parsing.
-  - macOS: prefer Homebrew `python3` (3.11+) to avoid the older system Python. Example:
+- A Python 3.11+ interpreter with `tomllib` is required for `postgres.toml` profile parsing (`resolve_db_url.sh`, `bootstrap_profile.sh`, `migrate_toml_schema.sh`). The skill resolves it in this order: `DB_PYTHON_BIN`, `[configuration].python_bin`, then auto-detection on PATH/common install locations. One-off `DB_URL` resolution does not require TOML parsing.
+  - macOS: Homebrew Python is usually the best candidate if `/usr/bin/python3` is too old.
     ```sh
-    export PATH="$(brew --prefix python)/bin:$PATH"
-    python3 --version
+    export DB_PYTHON_BIN="/opt/homebrew/bin/python3.14"
+    "$DB_PYTHON_BIN" --version
     ```
 - `pg_dump`/`pg_restore` are required for schema diff and dump/restore helpers.
 
@@ -46,13 +46,14 @@ Windows:
 - `DB_TABLE_SIZES_SCHEMA` and `DB_TABLE_SIZES_MIN_BYTES` scope `table_sizes.sh` output on large databases.
 - `DB_FIND_OBJECT_TYPES` sets a default object-type filter for `find_objects.sh` (same format as `--types`).
 - `DB_DOCS_SEARCH_URL` and `DB_DOCS_SEARCH_MAX_TIME` tune official docs lookup behavior.
+- `DB_PYTHON_BIN` overrides Python interpreter selection for helpers that need Python.
 
 ## psql usage
 Run these from the skill directory (the one that contains `scripts/`).
 Set `DB_PROJECT_ROOT` to the target project root (the directory that contains `.skills/postgres/postgres.toml`).
 
 This skill accepts only `DB_*` user-facing env vars. Legacy aliases such as `PROJECT_ROOT`, `DATABASE_URL`, `POSTGRES_URL`, and `PGHOST` are unsupported.
-When using TOML profiles, scripts require `postgres.toml` to be on the latest schema version; run `./scripts/migrate_toml_schema.sh` if prompted. One-off `DB_URL` usage bypasses TOML schema checks.
+When using TOML profiles, new files use schema `1.1.0`. Legacy schema `1` / `1.0.0` still works temporarily, but run `./scripts/migrate_toml_schema.sh` to upgrade to the latest layout. One-off `DB_URL` usage bypasses TOML schema checks.
 
 Example:
 ```sh
@@ -60,7 +61,7 @@ export DB_PROJECT_ROOT="/path/to/project"
 DB_PROFILE=local ./scripts/test_connection.sh
 ```
 
-1) Ensure `psql` is on your PATH (only if `psql` is not found). If `[configuration].pg_bin_path` is set, it is prepended automatically. If the key is missing, scripts will try to locate `psql` and persist `pg_bin_path`. If `pg_bin_path` is set but invalid, you will be prompted before updating it.
+1) Ensure `psql` is on your PATH (only if `psql` is not found). If `[configuration].pg_bin_dir` is set, it is prepended automatically. Legacy `[configuration].pg_bin_path` is still read for older files. If the latest key is missing, scripts will try to locate `psql` and persist `pg_bin_dir` on schema `1.1.0` files. If the configured path is invalid, you will be prompted before updating it.
 
 macOS (Homebrew):
 ```sh
@@ -381,7 +382,7 @@ DB_CONFIRM=YES ./scripts/terminate_backend.sh 12345
 - `vacuum_analyze_status.sh` — Summarizes VACUUM/ANALYZE recency and dead tuples.
 - `missing_fk_indexes.sh` — Lists foreign keys without supporting indexes.
 - `update_sslmode.sh` — Updates `sslmode` for a profile in `postgres.toml` (used by the fallback flow).
-- `migrate_toml_schema.sh` — Migrates `postgres.toml` to the latest schema version (adds `schema_version`, normalizes `sslmode`).
+- `migrate_toml_schema.sh` — Migrates `postgres.toml` to the latest schema version (normalizes `sslmode`, renames legacy config keys, and writes `python_bin`).
 - `bootstrap_profile.py` — Helper for interactive profile setup (used by `bootstrap_profile.sh`).
 
 ## Skill maintenance

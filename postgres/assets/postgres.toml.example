@@ -1,6 +1,7 @@
 [configuration]
-schema_version = 1
-pg_bin_path = "/path/to/postgres/bin"
+schema_version = "1.1.0"
+pg_bin_dir = "/path/to/postgres/bin"
+python_bin = "/path/to/python3.14"
 
 [database]
 sslmode = false

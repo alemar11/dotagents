@@ -6,6 +6,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/runtime_env.sh"
 
 if [[ -n "${PROJECT_ROOT+x}" ]]; then
   echo "Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead." >&2
@@ -36,56 +37,54 @@ pg_env_normalize_bin_dir() {
 }
 
 pg_env_resolve_project_root() {
-  local root_override="${DB_PROJECT_ROOT:-}"
-  local root="$root_override"
-  if [[ -z "$root" && -x "$(command -v git)" ]]; then
-    root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-  fi
-  if [[ -z "$root" ]]; then
-    root="$PWD"
-  fi
-  if [[ -z "$root_override" ]]; then
-    case "$root" in
-      "$SKILL_ROOT"|"$SKILL_ROOT"/*)
-        root=""
-        ;;
-    esac
-  fi
-  echo "$root"
+  postgres_runtime_resolve_project_root
 }
 
-pg_env_read_pg_bin_path() {
+pg_env_read_pg_bin_dir() {
   local toml_path="$1"
-  python3 - "$toml_path" <<'PY' 2>/dev/null || true
-import sys
-try:
-    import tomllib
-except Exception:
-    sys.exit(0)
-
-path = sys.argv[1]
-try:
-    with open(path, "rb") as fh:
-        data = tomllib.load(fh)
-except Exception:
-    sys.exit(0)
-
-conf = data.get("configuration", {})
-val = conf.get("pg_bin_path", "")
-if isinstance(val, str):
-    print(val)
-PY
+  local value=""
+  value="$(postgres_runtime_read_configuration_value "$toml_path" "pg_bin_dir")"
+  if [[ -n "$value" ]]; then
+    printf '%s' "$value"
+    return 0
+  fi
+  postgres_runtime_read_configuration_value "$toml_path" "pg_bin_path"
 }
 
-pg_env_write_pg_bin_path() {
+pg_env_preferred_pg_bin_key() {
   local toml_path="$1"
-  local new_dir="$2"
-  if [[ -z "$toml_path" || -z "$new_dir" || ! -f "$toml_path" ]]; then
+  local schema_version=""
+
+  schema_version="$(postgres_runtime_schema_version "$toml_path")"
+  case "$schema_version" in
+    1.1.0)
+      echo "pg_bin_dir"
+      return 0
+      ;;
+  esac
+
+  if [[ -n "$(postgres_runtime_read_configuration_value "$toml_path" "pg_bin_dir")" ]]; then
+    echo "pg_bin_dir"
+    return 0
+  fi
+
+  echo "pg_bin_path"
+}
+
+pg_env_write_config_string_key() {
+  local toml_path="$1"
+  local key="$2"
+  local new_value="$3"
+  local remove_key="${4:-}"
+  local escaped_value=""
+  if [[ -z "$toml_path" || -z "$key" || ! -f "$toml_path" ]]; then
     return 1
   fi
+  escaped_value="${new_value//\\/\\\\}"
+  escaped_value="${escaped_value//\"/\\\"}"
   local tmp_file
   tmp_file="$(mktemp)" || return 1
-  if awk -v new="$new_dir" '
+  if awk -v key="$key" -v remove_key="$remove_key" -v new="$escaped_value" '
     BEGIN { in_config=0; found=0; seen_config=0 }
     /^[[:space:]]*\[configuration\][[:space:]]*$/ {
       seen_config=1
@@ -95,7 +94,7 @@ pg_env_write_pg_bin_path() {
     }
     /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
       if (in_config && !found) {
-        print "pg_bin_path = \"" new "\""
+        print key " = \"" new "\""
         print ""
         found=1
       }
@@ -104,8 +103,11 @@ pg_env_write_pg_bin_path() {
       next
     }
     {
-      if (in_config && $0 ~ /^[[:space:]]*pg_bin_path[[:space:]]*=/) {
-        print "pg_bin_path = \"" new "\""
+      if (in_config && remove_key != "" && $0 ~ "^[[:space:]]*" remove_key "[[:space:]]*=") {
+        next
+      }
+      if (in_config && $0 ~ "^[[:space:]]*" key "[[:space:]]*=") {
+        print key " = \"" new "\""
         found=1
         next
       }
@@ -113,24 +115,43 @@ pg_env_write_pg_bin_path() {
     }
     END {
       if (in_config && !found) {
-        print "pg_bin_path = \"" new "\""
+        print key " = \"" new "\""
         found=1
       }
       if (!seen_config) {
-        # Do not auto-create [configuration] for legacy TOMLs; require explicit migration.
         exit 3
       }
     }
   ' "$toml_path" > "$tmp_file"; then
     mv "$tmp_file" "$toml_path"
-    echo "Updated postgres.toml: [configuration] pg_bin_path = \"$new_dir\"" >&2
     return 0
   fi
 
   status=$?
   rm -f "$tmp_file"
-  if [[ $status -eq 3 ]]; then
-    echo "postgres.toml is missing [configuration]. Run ./scripts/migrate_toml_schema.sh before persisting pg_bin_path." >&2
+  [[ $status -eq 3 ]] || return 1
+  echo "postgres.toml is missing [configuration]. Run ./scripts/migrate_toml_schema.sh before persisting ${key}." >&2
+  return 1
+}
+
+pg_env_write_pg_bin_dir() {
+  local toml_path="$1"
+  local new_dir="$2"
+  local key=""
+  local remove_key=""
+
+  if [[ -z "$toml_path" || -z "$new_dir" || ! -f "$toml_path" ]]; then
+    return 1
+  fi
+
+  key="$(pg_env_preferred_pg_bin_key "$toml_path")"
+  if [[ "$key" == "pg_bin_dir" ]]; then
+    remove_key="pg_bin_path"
+  fi
+
+  if pg_env_write_config_string_key "$toml_path" "$key" "$new_dir" "$remove_key"; then
+    echo "Updated postgres.toml: [configuration] ${key} = \"$new_dir\"" >&2
+    return 0
   fi
   return 1
 }
@@ -179,7 +200,7 @@ if [[ -z "$pg_env_psql_path" ]]; then
   fi
 
   if [[ -n "$pg_env_toml_path" && -f "$pg_env_toml_path" ]]; then
-    pg_env_config_bin="$(pg_env_read_pg_bin_path "$pg_env_toml_path")"
+    pg_env_config_bin="$(pg_env_read_pg_bin_dir "$pg_env_toml_path")"
   fi
 
   if [[ -n "$pg_env_config_bin" ]]; then
@@ -240,12 +261,13 @@ if [[ -n "$pg_env_psql_path" ]]; then
   pg_env_found_bin="$(dirname "$pg_env_psql_path")"
   if [[ -n "$pg_env_toml_path" && -f "$pg_env_toml_path" ]]; then
     if [[ -z "$pg_env_config_bin" ]]; then
-      pg_env_write_pg_bin_path "$pg_env_toml_path" "$pg_env_found_bin" || true
+      pg_env_write_pg_bin_dir "$pg_env_toml_path" "$pg_env_found_bin" || true
     else
+      pg_env_config_key="$(pg_env_preferred_pg_bin_key "$pg_env_toml_path")"
       pg_env_config_bin_dir="$(pg_env_normalize_bin_dir "$pg_env_config_bin")"
       if [[ "$pg_env_found_bin" != "$pg_env_config_bin_dir" ]]; then
-        if pg_env_confirm_update "Configured pg_bin_path '${pg_env_config_bin}' does not resolve to psql. Update postgres.toml to '${pg_env_found_bin}'?"; then
-          pg_env_write_pg_bin_path "$pg_env_toml_path" "$pg_env_found_bin" || true
+        if pg_env_confirm_update "Configured ${pg_env_config_key} '${pg_env_config_bin}' does not resolve to psql. Update postgres.toml to '${pg_env_found_bin}'?"; then
+          pg_env_write_pg_bin_dir "$pg_env_toml_path" "$pg_env_found_bin" || true
         fi
       fi
     fi

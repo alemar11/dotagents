@@ -6,6 +6,7 @@ This skill exposes a `DB_*`-only user-facing environment contract.
 - `DB_URL`
 - `DB_PROFILE`
 - `DB_PROJECT_ROOT`
+- `DB_PYTHON_BIN`
 - `DB_APPLICATION_NAME`
 - `DB_STATEMENT_TIMEOUT_MS`
 - `DB_LOCK_TIMEOUT_MS`

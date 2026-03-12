@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/runtime_env.sh"
+
 if [[ -n "${PG_DOCS_SEARCH_URL+x}" ]]; then
   echo "Unsupported environment variable 'PG_DOCS_SEARCH_URL'. Use 'DB_DOCS_SEARCH_URL' instead." >&2
   exit 1
@@ -81,7 +84,6 @@ if (( limit < 1 || limit > MAX_LIMIT )); then
 fi
 
 require_cmd curl
-require_cmd python3
 
 tmp_html="$(mktemp)"
 trap 'rm -f "$tmp_html"' EXIT
@@ -105,7 +107,7 @@ if ! curl \
   exit 2
 fi
 
-if ! python3 - "$tmp_html" "$query" "$limit" <<'PY'; then
+if ! postgres_runtime_python_exec "$(postgres_runtime_resolve_toml_path "$(postgres_runtime_resolve_project_root)")" - "$tmp_html" "$query" "$limit" <<'PY'; then
 import html
 import pathlib
 import re

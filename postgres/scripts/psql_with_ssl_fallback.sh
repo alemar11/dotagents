@@ -102,7 +102,7 @@ fi
 
 if [[ "${DB_SSLMODE:-}" == "disable" ]] && should_retry_with_ssl "$first_err_file"; then
   SSL_URL="$(
-    python3 - "$DB_URL" <<'PY'
+    postgres_runtime_python_exec "${DB_TOML_PATH:-}" - "$DB_URL" <<'PY'
 import sys
 import urllib.parse
 

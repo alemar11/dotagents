@@ -8,7 +8,7 @@ import tomllib
 import urllib.parse
 
 
-LATEST_SCHEMA = 1
+LATEST_SCHEMA = "1.1.0"
 TOML_PATH = sys.argv[1]
 PROJECT_ROOT = sys.argv[2] if len(sys.argv) > 2 else os.getcwd()
 SCAN_MODE = os.environ.get("DB_PROFILE_SCAN_MODE", "fast").strip().lower()
@@ -259,7 +259,7 @@ def build_url(cfg: dict) -> str:
     return urllib.parse.urlunparse(("postgresql", netloc, path, "", query, ""))
 
 
-def normalize_pg_bin_path(value: str) -> str:
+def normalize_pg_bin_dir(value: str) -> str:
     value = str(value).strip().rstrip("/\\")
     if not value:
         return ""
@@ -269,7 +269,7 @@ def normalize_pg_bin_path(value: str) -> str:
     return value
 
 
-def is_pg_bin_path_valid(path: str) -> bool:
+def is_pg_bin_dir_valid(path: str) -> bool:
     if not path:
         return False
     if not os.path.isdir(path):
@@ -279,27 +279,50 @@ def is_pg_bin_path_valid(path: str) -> bool:
     )
 
 
-def ensure_pg_bin_path(config: dict) -> dict:
-    current = normalize_pg_bin_path(config.get("pg_bin_path", ""))
-    if current and is_pg_bin_path_valid(current):
-        config["pg_bin_path"] = current
+def ensure_pg_bin_dir(config: dict) -> dict:
+    current = normalize_pg_bin_dir(config.get("pg_bin_dir", "") or config.get("pg_bin_path", ""))
+    if current and is_pg_bin_dir_valid(current):
+        config["pg_bin_dir"] = current
+        config.pop("pg_bin_path", None)
         return config
 
     detected = shutil.which("psql")
     if detected:
-        config["pg_bin_path"] = os.path.dirname(detected)
+        config["pg_bin_dir"] = os.path.dirname(detected)
+        config.pop("pg_bin_path", None)
         return config
 
     while True:
-        entered = normalize_pg_bin_path(
-            prompt_required("pg_bin_path (directory containing psql)")
+        entered = normalize_pg_bin_dir(
+            prompt_required("pg_bin_dir (directory containing psql)")
         )
-        if is_pg_bin_path_valid(entered):
-            config["pg_bin_path"] = entered
+        if is_pg_bin_dir_valid(entered):
+            config["pg_bin_dir"] = entered
+            config.pop("pg_bin_path", None)
             return config
         print(
-            "Invalid pg_bin_path. Provide the directory that contains psql (or psql.exe)."
+            "Invalid pg_bin_dir. Provide the directory that contains psql (or psql.exe)."
         )
+
+
+def normalize_python_bin(value: str) -> str:
+    text = str(value).strip()
+    if not text:
+        return ""
+    resolved = shutil.which(text) if os.sep not in text else text
+    if not resolved or not os.path.isfile(resolved):
+        return ""
+    return os.path.realpath(resolved)
+
+
+def ensure_python_bin(config: dict) -> dict:
+    current = normalize_python_bin(config.get("python_bin", ""))
+    if current:
+        config["python_bin"] = current
+        return config
+
+    config["python_bin"] = os.path.realpath(sys.executable)
+    return config
 
 
 def validate_profile(name: str) -> bool:
@@ -415,7 +438,9 @@ def write_toml(path: str, data: dict, profile_order: list[str]) -> None:
     if not isinstance(config, dict):
         config = {}
     config.setdefault("schema_version", LATEST_SCHEMA)
-    config.setdefault("pg_bin_path", "")
+    config.setdefault("pg_bin_dir", "")
+    config.setdefault("python_bin", "")
+    config.pop("pg_bin_path", None)
 
     db = data.get("database", {})
     defaults = {k: v for k, v in db.items() if not isinstance(v, dict)}
@@ -430,8 +455,12 @@ def write_toml(path: str, data: dict, profile_order: list[str]) -> None:
     lines.append(
         f"schema_version = {format_value(config.get('schema_version', LATEST_SCHEMA))}"
     )
-    lines.append(f'pg_bin_path = {format_value(config.get("pg_bin_path", ""))}')
-    for key in sorted(k for k in config.keys() if k not in {"schema_version", "pg_bin_path"}):
+    lines.append(f'pg_bin_dir = {format_value(config.get("pg_bin_dir", ""))}')
+    if config.get("python_bin"):
+        lines.append(f'python_bin = {format_value(config.get("python_bin", ""))}')
+    for key in sorted(
+        k for k in config.keys() if k not in {"schema_version", "pg_bin_dir", "python_bin"}
+    ):
         lines.append(f"{key} = {format_value(config[key])}")
 
     lines.append("")
@@ -839,7 +868,8 @@ def main() -> None:
     if not isinstance(config, dict):
         config = {}
     config["schema_version"] = LATEST_SCHEMA
-    config = ensure_pg_bin_path(config)
+    config = ensure_pg_bin_dir(config)
+    config = ensure_python_bin(config)
     data["configuration"] = config
 
     db = data.get("database")

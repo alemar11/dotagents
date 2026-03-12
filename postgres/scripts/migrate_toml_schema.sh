@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+source "$SCRIPT_DIR/runtime_env.sh"
+
 if [[ -n "${PROJECT_ROOT+x}" ]]; then
   echo "Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead." >&2
   exit 1
@@ -37,23 +39,18 @@ if [[ -x "$SCRIPT_DIR/check_toml_gitignored.sh" ]]; then
   "$SCRIPT_DIR/check_toml_gitignored.sh" "$PROJECT_ROOT" || true
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 is required to migrate postgres.toml schema. Install Python 3.11+." >&2
-  exit 1
-fi
-if ! python3 -c 'import sys, tomllib; raise SystemExit(0 if sys.version_info >= (3,11) else 1)' >/dev/null 2>&1; then
-  echo "python3>=3.11 is required to migrate postgres.toml schema (tomllib)." >&2
-  exit 1
-fi
+PYTHON_BIN="$(postgres_runtime_resolve_python "$TOML_PATH")" || exit 1
 
-python3 - "$TOML_PATH" <<'PY'
+MIGRATE_RESOLVED_PYTHON_BIN="$PYTHON_BIN" "$PYTHON_BIN" - "$TOML_PATH" <<'PY'
 import os
+import shutil
 import sys
 import tomllib
-import shutil
 from typing import Any
 
-LATEST_SCHEMA = 1
+LATEST_SCHEMA = (1, 1, 0)
+LEGACY_SCHEMA = (1, 0, 0)
+RESOLVED_PYTHON_BIN = os.environ.get("MIGRATE_RESOLVED_PYTHON_BIN", sys.executable)
 
 
 def die(message: str) -> None:
@@ -61,18 +58,32 @@ def die(message: str) -> None:
     sys.exit(1)
 
 
-def parse_schema_version(value: Any) -> int:
+def format_schema(version: tuple[int, int, int]) -> str:
+    return ".".join(str(part) for part in version)
+
+
+def parse_schema_version(value: Any) -> tuple[int, int, int]:
     if value is None:
-        return 0
+        return (0, 0, 0)
     if isinstance(value, bool):
-        return int(value)
+        return (int(value), 0, 0)
     if isinstance(value, int):
-        return value
+        if value == 1:
+            return LEGACY_SCHEMA
+        die(f"Invalid schema_version: {value!r}")
     text = str(value).strip()
-    if text.isdigit():
-        return int(text)
-    die(f"Invalid schema_version: {value!r}")
-    return 0
+    if not text:
+        return (0, 0, 0)
+    if text == "1":
+        return LEGACY_SCHEMA
+    parts = text.split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        die(f"Invalid schema_version: {value!r}")
+    version = tuple(int(part) for part in parts)
+    if version in {LEGACY_SCHEMA, LATEST_SCHEMA}:
+        return version
+    die(f"Unsupported schema_version: {text}")
+    return (0, 0, 0)
 
 
 def sslmode_to_bool(value: Any) -> bool:
@@ -104,34 +115,28 @@ def sslmode_to_bool(value: Any) -> bool:
     if lower in {"false", "f", "0", "no", "n", "off", "disable", "disabled"}:
         return False
     die(
-        "Unrecognized sslmode value while migrating to schema v1: "
-        f"{value!r}. In schema v1, sslmode in postgres.toml is strictly boolean "
-        "(true/false). Set a boolean value (or remove sslmode and rely on a one-off DB_URL) and re-run."
+        "Unrecognized sslmode value while migrating postgres.toml: "
+        f"{value!r}. sslmode must be boolean (true/false), or remove it and "
+        "rely on a one-off DB_URL."
     )
     return False
 
 
 def normalize_sslmode_fields(data: dict) -> bool:
-    """
-    Enforce boolean sslmode values in TOML by converting legacy representations.
-    Returns True if any changes were made.
-    """
     changed = False
     db = data.get("database")
     if not isinstance(db, dict):
         return False
 
     if "sslmode" in db and not isinstance(db.get("sslmode"), bool):
-        old = db.get("sslmode")
-        db["sslmode"] = sslmode_to_bool(old)
+        db["sslmode"] = sslmode_to_bool(db.get("sslmode"))
         changed = True
 
     for _, value in list(db.items()):
         if not isinstance(value, dict):
             continue
         if "sslmode" in value and not isinstance(value.get("sslmode"), bool):
-            old = value.get("sslmode")
-            value["sslmode"] = sslmode_to_bool(old)
+            value["sslmode"] = sslmode_to_bool(value.get("sslmode"))
             changed = True
 
     if "sslmode" not in db:
@@ -141,60 +146,89 @@ def normalize_sslmode_fields(data: dict) -> bool:
     return changed
 
 
-def normalize_pg_bin_path(value: Any) -> str:
+def normalize_pg_bin_dir(value: Any) -> str:
     if value is None:
         return ""
-    text = str(value).strip()
+    text = str(value).strip().rstrip("/\\")
     if not text:
         return ""
-    text = text.rstrip("/")
-    if os.path.basename(text) == "psql":
+    base = os.path.basename(text)
+    if base in {"psql", "psql.exe"}:
         return os.path.dirname(text)
     return text
 
 
-def detect_pg_bin_path() -> str:
+def detect_pg_bin_dir() -> str:
     psql_path = shutil.which("psql")
     if not psql_path:
         return ""
     return os.path.dirname(psql_path)
 
 
-def require_pg_bin_path(config: dict) -> None:
-    value = normalize_pg_bin_path(config.get("pg_bin_path"))
+def require_pg_bin_dir(config: dict) -> None:
+    value = normalize_pg_bin_dir(config.get("pg_bin_dir") or config.get("pg_bin_path"))
     if not value:
-        value = detect_pg_bin_path()
+        value = detect_pg_bin_dir()
     if not value:
         die(
-            "pg_bin_path is required but could not be determined. "
-            "Install psql or set [configuration].pg_bin_path, then re-run."
+            "pg_bin_dir is required but could not be determined. "
+            "Install psql or set [configuration].pg_bin_dir, then re-run."
         )
     if not os.path.isdir(value):
-        die(
-            "pg_bin_path must point to a directory that exists. "
-            f"Got: {value}"
-        )
+        die(f"pg_bin_dir must point to a directory that exists. Got: {value}")
     psql_path = os.path.join(value, "psql")
     psql_exe_path = os.path.join(value, "psql.exe")
     if not (os.path.isfile(psql_path) or os.path.isfile(psql_exe_path)):
         die(
-            "pg_bin_path must contain a psql binary. "
+            "pg_bin_dir must contain a psql binary. "
             f"Expected: {psql_path} (or {psql_exe_path} on Windows)"
         )
-    config["pg_bin_path"] = value
+    config["pg_bin_dir"] = value
+    config.pop("pg_bin_path", None)
 
 
-def migrate_0_to_1(data: dict) -> dict:
+def normalize_python_bin(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    resolved = shutil.which(text) if os.sep not in text else text
+    if not resolved or not os.path.isfile(resolved):
+        return ""
+    return os.path.realpath(resolved)
+
+
+def ensure_python_bin(config: dict) -> None:
+    value = normalize_python_bin(config.get("python_bin"))
+    if not value:
+        value = normalize_python_bin(RESOLVED_PYTHON_BIN) or os.path.realpath(sys.executable)
+    config["python_bin"] = value
+
+
+def migrate_0_to_1_0_0(data: dict) -> dict:
     config = data.setdefault("configuration", {})
-    config["schema_version"] = 1
-    require_pg_bin_path(config)
-
+    config["schema_version"] = format_schema(LEGACY_SCHEMA)
+    legacy_bin = normalize_pg_bin_dir(config.get("pg_bin_dir") or config.get("pg_bin_path"))
+    if legacy_bin:
+        config["pg_bin_path"] = legacy_bin
+    require_pg_bin_dir(config)
+    config["pg_bin_path"] = config.pop("pg_bin_dir")
     normalize_sslmode_fields(data)
     return data
 
 
+def migrate_1_0_0_to_1_1_0(data: dict) -> dict:
+    config = data.setdefault("configuration", {})
+    require_pg_bin_dir(config)
+    ensure_python_bin(config)
+    config["schema_version"] = format_schema(LATEST_SCHEMA)
+    return data
+
+
 MIGRATIONS = {
-    0: migrate_0_to_1,
+    (0, 0, 0): migrate_0_to_1_0_0,
+    LEGACY_SCHEMA: migrate_1_0_0_to_1_1_0,
 }
 
 
@@ -209,8 +243,11 @@ def format_value(value: Any) -> str:
 def render_table(name: str, data: dict) -> list[str]:
     lines: list[str] = [f"[{name}]"]
     keys = list(data.keys())
-    if name == "configuration" and "schema_version" in data:
-        keys = ["schema_version"] + [k for k in keys if k != "schema_version"]
+    if name == "configuration":
+        ordered = ["schema_version", "pg_bin_dir", "python_bin"]
+        keys = [key for key in ordered if key in data] + [
+            key for key in keys if key not in ordered
+        ]
     for key in keys:
         lines.append(f"{key} = {format_value(data[key])}")
     return lines
@@ -260,38 +297,49 @@ with open(toml_path, "rb") as fh:
 config = data.get("configuration", {})
 if not isinstance(config, dict):
     die("postgres.toml [configuration] must be a table if present.")
+
 current = parse_schema_version(config.get("schema_version"))
-
 if current > LATEST_SCHEMA:
-    die(f"postgres.toml schema_version {current} is newer than supported {LATEST_SCHEMA}.")
+    die(
+        "postgres.toml schema_version "
+        f"{format_schema(current)} is newer than supported {format_schema(LATEST_SCHEMA)}."
+    )
 
-existing_pg_bin = normalize_pg_bin_path(config.get("pg_bin_path"))
+before_render = render_toml(data)
+
 if current == LATEST_SCHEMA:
-    require_pg_bin_path(data.setdefault("configuration", {}))
-    ssl_changed = normalize_sslmode_fields(data)
-    if normalize_pg_bin_path(data["configuration"].get("pg_bin_path")) == existing_pg_bin:
-        if not ssl_changed:
-            print(f"postgres.toml already at schema_version {LATEST_SCHEMA}.")
-            sys.exit(0)
+    require_pg_bin_dir(config)
+    ensure_python_bin(config)
+    data["configuration"] = config
+    normalize_sslmode_fields(data)
+    if render_toml(data) == before_render:
+        print(f"postgres.toml already at schema_version {format_schema(LATEST_SCHEMA)}.")
+        sys.exit(0)
     with open(toml_path, "w", encoding="utf-8") as fh:
         fh.write(render_toml(data))
-    print(f"Updated postgres.toml for schema_version {LATEST_SCHEMA}.")
+    print(f"Updated postgres.toml for schema_version {format_schema(LATEST_SCHEMA)}.")
     sys.exit(0)
 
 version = current
 while version < LATEST_SCHEMA:
     migrate = MIGRATIONS.get(version)
     if not migrate:
-        die(f"Missing migration for schema_version {version} -> {version + 1}.")
+        die(
+            "Missing migration for schema_version "
+            f"{format_schema(version)} -> {format_schema(LATEST_SCHEMA)}."
+        )
     data = migrate(data)
-    version += 1
+    config = data.setdefault("configuration", {})
+    version = parse_schema_version(config.get("schema_version"))
 
-data.setdefault("configuration", {})["schema_version"] = LATEST_SCHEMA
-require_pg_bin_path(data.setdefault("configuration", {}))
+config = data.setdefault("configuration", {})
+config["schema_version"] = format_schema(LATEST_SCHEMA)
+require_pg_bin_dir(config)
+ensure_python_bin(config)
 normalize_sslmode_fields(data)
 
 with open(toml_path, "w", encoding="utf-8") as fh:
     fh.write(render_toml(data))
 
-print(f"Migrated postgres.toml to schema_version {LATEST_SCHEMA}.")
+print(f"Migrated postgres.toml to schema_version {format_schema(LATEST_SCHEMA)}.")
 PY
