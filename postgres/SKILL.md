@@ -8,17 +8,29 @@ description: Connect to Postgres databases, run queries/diagnostics, review back
 ## Goal
 Use this skill to connect to Postgres, run user-requested queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
 
+## Script location
+
+- `<project-root>/.skills/postgres/` is project-local config only. It usually
+  contains `postgres.toml` and does not contain helper scripts.
+- Helper scripts always live in the installed skill directory next to this
+  `SKILL.md`, under `scripts/`.
+- When the target repo has `.skills/postgres/postgres.toml`, point
+  `DB_PROJECT_ROOT` at that repo root and invoke scripts from the installed
+  skill directory.
+- `./scripts/...` examples assume your current working directory is the
+  installed skill directory, not the target project root.
+
 ## Fast path (copy/paste)
 - Ad-hoc read query:
-  - `DB_PROFILE=local ./scripts/run_sql.sh -c "select now();"`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh -c "select now();"`
 - DDL/DO block (safe quoting):
-  - `DB_PROFILE=local ./scripts/run_sql.sh <<'SQL'`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh <<'SQL'`
   - `DO $$ BEGIN RAISE NOTICE 'ok'; END $$;`
   - `SQL`
 - Connection test:
-  - `DB_PROFILE=local ./scripts/test_connection.sh`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/test_connection.sh`
 - Find objects:
-  - `DB_PROFILE=local ./scripts/find_objects.sh users`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/find_objects.sh users`
 
 ## Workflow
 1) Confirm connection source:
@@ -26,6 +38,8 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
    - Use only `DB_*` environment variables for this skill. Non-`DB_*` aliases (for example `PROJECT_ROOT`, `DATABASE_URL`, `PGHOST`) are unsupported.
    - Use `postgres.toml` when present; otherwise ask the user for the data required to create a profile.
    - If a `postgres.toml` is already present under the current repo/root at `.skills/postgres/postgres.toml`, treat that repo/root as the project root and proceed without prompting for `DB_PROJECT_ROOT`.
+   - Do not look for helper scripts under `<project-root>/.skills/postgres/`; that location is config-only.
+   - Resolve helper scripts relative to the installed skill directory that contains this `SKILL.md`.
    - If not in a git repo, or if running outside the target project, set `DB_PROJECT_ROOT` explicitly.
    - When creating or loading `postgres.toml` and the target project is a git repo, verify `.skills/postgres/postgres.toml` is gitignored to avoid committing credentials.
    - If `postgres.toml` exists, **first** ensure it is at the latest schema version. Run `./scripts/migrate_toml_schema.sh` only when an older schema is found, and run it from the skill dir only if `DB_PROJECT_ROOT` is set.
@@ -113,11 +127,12 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - Schema history/migrations: `references/postgres_skill_schema.md`
 - Env var contract: `references/postgres_env.md`
 - Best practices index: `references/postgres_best_practices/README.md`
-- Scripts are intended to be run from the skill directory; set `DB_PROJECT_ROOT` to the target project root.
+- Scripts are intended to be run from the installed skill directory that contains this `SKILL.md`; set `DB_PROJECT_ROOT` to the target project root.
 
 ## Trigger rules (summary)
 - If `<project-root>/.skills/postgres/postgres.toml` exists, do not scan by default; only scan when asked or missing.
 - If that TOML is under the current repo/root, use that root for scripts without asking for `DB_PROJECT_ROOT`.
+- If `./scripts/...` is missing in the current working directory, do not assume the skill is unavailable; resolve scripts from the installed skill directory and continue.
 - If `DB_PROFILE` is unset and multiple profiles exist, ask the user which profile to use before running queries. Show profile `name` + `description`, and include a context-based suggested default.
 - If `DB_PROFILE` is unset and exactly one profile exists, use it.
 - If `postgres.toml` is missing, ask for host/port/database/user/password to create a profile (ask for `sslmode` only if needed).
@@ -145,15 +160,15 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 
 ## Common requests
 - Run SQL safely (inline):
-  - `DB_PROFILE=local ./scripts/run_sql.sh -c "select 1;"`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh -c "select 1;"`
 - Run SQL safely (heredoc):
-  - `DB_PROFILE=local ./scripts/run_sql.sh <<'SQL'`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh <<'SQL'`
   - `select current_database();`
   - `SQL`
-- Check connection: `DB_PROFILE=local ./scripts/test_connection.sh`
-- Postgres version: `DB_PROFILE=local ./scripts/pg_version.sh`
-- Connection details: `DB_PROFILE=local ./scripts/connection_info.sh`
-- Find objects by name: `DB_PROFILE=local ./scripts/find_objects.sh users`
+- Check connection: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/test_connection.sh`
+- Postgres version: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/pg_version.sh`
+- Connection details: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/connection_info.sh`
+- Find objects by name: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/find_objects.sh users`
 
 ## Usage references
 - Setup, env defaults, and script catalog: `references/postgres_usage.md`
