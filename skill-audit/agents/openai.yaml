@@ -1,0 +1,5 @@
+interface:
+  display_name: "Skill Audit"
+  short_description: "Audit installed skills and plan refinements."
+  brand_color: "#C06C84"
+  default_prompt: "Use $skill-audit to review the installed skills relevant to this repo and produce a one-by-one improvement roadmap."

@@ -9,6 +9,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `github/` — Use the GitHub CLI (`gh`) for repository-scoped issue, pull request, workflow, release, and tag operations; default to the current git project unless another `owner/repo` is provided.
 - `learn/` — Capture durable corrections or preferences and write confirmed learnings to `AGENTS.md` when the user sets lasting guidance.
 - `postgres/` — Connect to Postgres databases, run queries/diagnostics, and search official PostgreSQL docs only when explicitly requested.
+- `skill-audit/` — Audit installed Codex skills using project history, memories, sessions, and current context to plan updates, additions, merges, or disables.
 
 ## Project Skills
 - `.agents/skills/tools/` — Orchestrate maintenance, optimization, refactor, and upstream benchmark workflows for skills in this repository, including metadata/doc sync and consistency checks.
@@ -20,13 +21,14 @@ Project skills are repository-local and are not included in the reusable install
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/skills --path commit ask-questions-if-underspecified codex-changelog github learn postgres`
+- `Use $skill-installer to install skills from alemar11/skills --path commit ask-questions-if-underspecified codex-changelog github learn postgres skill-audit`
 - `Use $skill-installer to install skills from alemar11/skills --path github`
 - `Use $skill-installer to install skills from alemar11/skills --path commit`
 - `Use $skill-installer to install skills from alemar11/skills --path ask-questions-if-underspecified`
 - `Use $skill-installer to install skills from alemar11/skills --path codex-changelog`
 - `Use $skill-installer to install skills from alemar11/skills --path learn`
 - `Use $skill-installer to install skills from alemar11/skills --path postgres`
+- `Use $skill-installer to install skills from alemar11/skills --path skill-audit`
 
 ### Install With `npx skills` (Vercel Skills CLI)
 These commands use the [`vercel-labs/skills`](https://github.com/vercel-labs/skills) CLI and target Codex directly.
@@ -46,7 +48,8 @@ npx skills add alemar11/skills -a codex -g -y \
   --skill codex-changelog \
   --skill github \
   --skill learn \
-  --skill postgres
+  --skill postgres \
+  --skill skill-audit
 ```
 
 Install a single skill globally for Codex:
