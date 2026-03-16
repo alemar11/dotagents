@@ -2,8 +2,10 @@
 name: commit
 description:
   Create a well-formed git commit from current changes using session history for
-  rationale and summary; use when asked to commit, prepare a commit message, or
-  finalize staged work.
+  rationale and summary; prefer explicit pathspec staging and, in monorepos,
+  default to one subproject per commit unless the user asks for a cross-cutting
+  commit. Use when asked to commit, prepare a commit message, or finalize
+  staged work.
 ---
 
 # Commit
@@ -24,6 +26,26 @@ description:
 ## Execution Modes
 
 Choose one of these modes after the initial worktree inspection.
+
+## Monorepo Default
+
+If repo docs or the top-level layout show multiple subprojects, packages, apps,
+or services, default to one subproject per commit unless the user explicitly
+wants a cross-cutting commit.
+
+Typical signals:
+
+- repo guidance explicitly says to split commits by subproject
+- multiple top-level folders such as `project-a/`, `project-b/`, `shared/`,
+  `infra/`, or `tools/`
+- the worktree contains changes across unrelated subproject roots
+
+In these repos:
+
+- prefer separate commits over a single mixed commit
+- use explicit pathspec staging per subproject
+- if one change truly spans subprojects, confirm that bundling is intentional
+  or split the work into sequential commits
 
 ### Fast Path
 
@@ -63,6 +85,8 @@ Use the safe path by default, and always use it when any of these apply:
    pathspecs (for example, `git add -- <path>`) when the change is narrowly
    scoped; use `git add -A` only when all worktree changes are intended for
    the commit.
+   In monorepos, stage by subproject root by default and avoid mixing
+   unrelated roots in one commit unless the user asked for that.
 5. Sanity-check newly added files; if anything looks random or likely ignored
    (build artifacts, logs, temp files), flag it to the user before committing.
 6. If staging is incomplete or includes unrelated files, fix the index or ask
@@ -95,6 +119,9 @@ Use the safe path by default, and always use it when any of these apply:
 - Prefer the fast path for obvious docs-only or similarly low-risk commits.
 - Prefer the safe path whenever there is any chance the commit scope is mixed
   or the resulting behavior needs validation.
+- In monorepos, spend a few extra seconds on pathspec staging if it keeps
+  subproject boundaries clean; that is usually worth more than shaving one
+  command off the workflow.
 - The actual `git commit` command is rarely the slow part; inspection,
   validation, and selective staging are what add time. Spend that time only
   where it reduces real risk.

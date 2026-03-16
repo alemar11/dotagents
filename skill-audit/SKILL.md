@@ -36,7 +36,13 @@ If `skill-audit` itself is part of the installed portfolio, always audit it too 
    - `$CODEX_HOME/skills/.system/*/SKILL.md`
    Only open shared skills that are relevant to the current repo or overlap with the local skill surface.
 
-4. Read memory and session evidence.
+4. Check cheap maintenance signals before deep history.
+   For each skill you are seriously evaluating, inspect lightweight staleness signals before opening raw sessions:
+   - `git log -- <skill-dir>` for maintenance recency and whether the skill is actively revised
+   - repo docs or adjacent docs that may have become the real source of truth
+   - whether `SKILL.md` and `agents/openai.yaml` still describe the same owner and trigger
+
+5. Read memory and session evidence.
    Use these locations:
    - `$CODEX_HOME/memories/MEMORY.md`
    - `$CODEX_HOME/memories/rollout_summaries/`
@@ -44,7 +50,7 @@ If `skill-audit` itself is part of the installed portfolio, always audit it too 
    Search the memory index first, then open only the 1-3 most relevant rollout summaries.
    Fall back to raw session JSONL only when the summaries are missing exact evidence you need.
 
-5. Inspect current live context when available.
+6. Inspect current live context when available.
    If the runtime prompt or current turn already exposes relevant prompt context, inspect:
    - skill mentions already present
    - skill bodies or summaries injected into the current turn
@@ -59,6 +65,7 @@ For each installed skill, evaluate:
 - whether it matches recurring work actually seen in history
 - whether its triggers are too weak, too broad, or stale
 - whether its guardrails, validation steps, or paths are outdated
+- whether cheap maintenance signals suggest it is stale, under-maintained, or superseded by repo docs
 - whether `SKILL.md` and `agents/openai.yaml` drift from each other
 - whether it duplicates or overlaps another installed skill
 - whether missing project-specific behavior should live in the shared skill, in project docs or memory, or only as a last-resort project-local specialization
@@ -96,9 +103,18 @@ For `skill-audit` itself, also evaluate:
   - what commands proved correctness
   - which skill instructions look stale, weak, or missing in hindsight
 
-### 3. Use raw sessions only as a fallback
+### 3. Check git history before raw sessions
 
-- Search `sessions/` JSONL only when summaries do not contain the concrete detail you need.
+- Before reading raw session JSONL, inspect `git log -- <skill-dir>` for the skills under review.
+- Use this as a cheap signal for:
+  - whether the skill is actively maintained
+  - whether one skill keeps changing while an overlapping skill stays stale
+  - whether repo docs are evolving faster than the skill itself
+- If git history already explains the likely staleness or ownership gap, prefer that evidence over a deeper session scan.
+
+### 4. Use raw sessions only as a fallback
+
+- Search `sessions/` JSONL only when memory, rollout summaries, and git-history signals still do not contain the concrete detail you need.
 - Search by:
   - exact `cwd`
   - repo basename
@@ -171,6 +187,7 @@ Return a compact audit with these sections:
 - Do not propose a project-local specialization when the gap is better solved by improving a shared skill or strengthening project docs and memory.
 - Do not exempt `skill-audit` from critique; self-review is required when it is installed.
 - Do not bulk-load all rollout summaries or raw sessions; stay targeted.
+- Do not skip cheap git-history checks and jump straight to raw sessions when staleness is the main question.
 
 ## Follow-up
 
