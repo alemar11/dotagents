@@ -40,8 +40,11 @@ description: Capture durable corrections or preferences and write confirmed lear
 - If repo docs are the better owner, recommend that path instead of writing `AGENTS.md`.
 
 ## AGENTS.md write
-- Use section `## Codex Learnings` (create if missing).
+- Prefer the most appropriate existing section for the rule's topic or scope.
+- If no appropriate section exists, create a concise section that matches the topic or scope.
+- Use section `## Codex Learnings` only as a fallback when no better section fits.
 - Bullets should be concise and specific ("Avoid X" / "Do Y instead of Z").
+- Append ` (Codex learning)` to every bullet inserted by this skill.
 - Skip duplicates. If a conflict exists, ask how to resolve before writing.
 
 ## Target labels

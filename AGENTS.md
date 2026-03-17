@@ -42,6 +42,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Learn skill
 - Keep `learn` scoped to `AGENTS.md` writes only; do not instruct it to write `MEMORY.md`, `memory_summary.md`, or other memory files.
+- When `learn` writes to `AGENTS.md`, place entries in the most appropriate existing section when possible, otherwise create a fitting section; use `## Codex Learnings` only as a fallback, and suffix each inserted bullet with ` (Codex learning)`.
 
 ### Skill Audit skill
 - Keep `skill-audit` biased toward improving shared skills first, especially for broad reusable skills such as `postgres`.

@@ -2,4 +2,4 @@ interface:
   display_name: "Learn"
   short_description: "Capture durable corrections or preferences and write confirmed learnings only to AGENTS.md. Use when the user sets lasting guidance."
   brand_color: "#2F9E44"
-  default_prompt: "Capture the durable correction or preference from this conversation and confirm which AGENTS.md target to write. Do not write memory files."
+  default_prompt: "Capture the durable correction or preference from this conversation, confirm which AGENTS.md target to write, place it in the most appropriate section, and suffix each inserted bullet with (Codex learning). Do not write memory files."
