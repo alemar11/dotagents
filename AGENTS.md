@@ -40,6 +40,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - For release creation, standardize the notes choice as three options: infer from the last published release tag, keep blank, or use user-provided notes; recommend infer when the user leaves it unspecified.
 - For tag-creation requests, distinguish "release-backed tag" (`gh release create`) from "tag-only" (`git tag` / `gh api`) before choosing commands.
 
+### Learn skill
+- Keep `learn` scoped to `AGENTS.md` writes only; do not instruct it to write `MEMORY.md`, `memory_summary.md`, or other memory files.
+
 ### Skill Audit skill
 - Keep `skill-audit` biased toward improving shared skills first, especially for broad reusable skills such as `postgres`.
 - When a gap is project-specific but lightweight, prefer project docs, `AGENTS.md`, repo references, or memory over proposing a project-local specialization.
