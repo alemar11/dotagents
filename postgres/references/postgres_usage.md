@@ -173,11 +173,13 @@ echo "Released: ${target}"
   - `- <short summary>`
 
 ## Bootstrap a profile (interactive)
-This helper will optionally scan a project for existing config, recap candidates in TOML format, and let you save or use a one-off connection. It prompts for the project root to scan.
+This helper will optionally scan a project for existing config, recap candidates in TOML format, and let you save or use a one-off connection.
+Run it from the target project root, or set `DB_PROJECT_ROOT` explicitly if you are invoking it from the skill directory or another repo.
+It is interactive-only; use `--help` for usage text without starting prompts.
 Use `DB_PROFILE_SCAN_MODE=full` for a deeper scan; default mode is `fast` for lower startup latency.
 
 ```sh
-./scripts/bootstrap_profile.sh
+DB_PROJECT_ROOT=/path/to/project ./scripts/bootstrap_profile.sh
 ```
 
 ## Temporary connection (no TOML write)
@@ -352,7 +354,7 @@ DB_CONFIRM=YES ./scripts/terminate_backend.sh 12345
   - Example: `DB_PROFILE=local ./scripts/run_sql.sh <<'SQL'`
   - `select current_database();`
   - `SQL`
-- `bootstrap_profile.sh` — Interactive profile setup with optional project scan.
+- `bootstrap_profile.sh` — Interactive profile setup with optional project scan and `--help` usage output.
 - `check_deps.sh` — Verifies required CLI tools and prints install hints.
 - `check_psql.sh` — Lightweight check for `psql` presence (uses `pg_env.sh`), prints version if available.
 - `test_connection.sh` — Quick connection check (profile-aware).

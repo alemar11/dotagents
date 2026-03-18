@@ -21,6 +21,8 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
   installed skill directory, not the target project root.
 
 ## Fast path (copy/paste)
+- Interactive profile bootstrap:
+  - `DB_PROJECT_ROOT=/path/to/repo /path/to/postgres-skill/scripts/bootstrap_profile.sh`
 - Ad-hoc read query:
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh -c "select now();"`
 - DDL/DO block (safe quoting):
@@ -37,6 +39,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
    - If `DB_URL` is provided, use it for a one-off connection unless the user asks to persist it.
    - Use only `DB_*` environment variables for this skill. Non-`DB_*` aliases (for example `PROJECT_ROOT`, `DATABASE_URL`, `PGHOST`) are unsupported.
    - Use `postgres.toml` when present; otherwise ask the user for the data required to create a profile.
+   - If the user explicitly asks to bootstrap, repair, or refresh a saved profile, prefer `./scripts/bootstrap_profile.sh` over hand-editing TOML. It is interactive-only; run it from the target repo root or set `DB_PROJECT_ROOT`.
    - If a `postgres.toml` is already present under the current repo/root at `.skills/postgres/postgres.toml`, treat that repo/root as the project root and proceed without prompting for `DB_PROJECT_ROOT`.
    - Do not look for helper scripts under `<project-root>/.skills/postgres/`; that location is config-only.
    - Resolve helper scripts relative to the installed skill directory that contains this `SKILL.md`.
@@ -110,6 +113,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 
 ## Task to script map
 - Ad-hoc SQL query: `./scripts/run_sql.sh` (or `./scripts/psql_with_ssl_fallback.sh`)
+- Profile bootstrap/update: `./scripts/bootstrap_profile.sh` (interactive)
 - Connection check: `./scripts/test_connection.sh`
 - Connection diagnostics: `./scripts/check_deps.sh`, `./scripts/connection_info.sh`
 - Postgres version: `./scripts/pg_version.sh`
@@ -140,6 +144,7 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - If `DB_PROFILE` is unset and exactly one profile exists, use it.
 - If `postgres.toml` is missing, ask for host/port/database/user/password to create a profile (ask for `sslmode` only if needed).
 - If the requested profile is missing, ask for the profile details to add it.
+- If the user asks to bootstrap or refresh a persisted profile, use `./scripts/bootstrap_profile.sh` instead of manually drafting `postgres.toml`.
 - If the user provides a connection URL, infer missing fields from it.
 - Ask whether to save the profile into `postgres.toml` or use a one-off (temporary) connection.
 - Do not run `./scripts/search_postgres_docs.sh` unless the user explicitly asks for official docs lookup/verification.
@@ -162,6 +167,8 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - For full rules and migration workflow, read `references/postgres_guardrails.md` when doing schema changes.
 
 ## Common requests
+- Bootstrap or refresh a saved profile (interactive):
+  - `DB_PROJECT_ROOT=/path/to/repo /path/to/postgres-skill/scripts/bootstrap_profile.sh`
 - Run SQL safely (inline):
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh -c "select 1;"`
 - Run SQL safely (heredoc):

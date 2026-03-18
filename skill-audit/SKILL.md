@@ -48,10 +48,15 @@ If `skill-audit` itself is part of the installed portfolio, always audit it too 
    - whether `SKILL.md` and `agents/openai.yaml` still describe the same owner and trigger
 
 5. Read memory and session evidence.
-   Use these locations:
-   - `$CODEX_HOME/memories/MEMORY.md`
-   - `$CODEX_HOME/memories/rollout_summaries/`
-   - `$CODEX_HOME/sessions/`
+   Resolve evidence roots in this order:
+   - `$CODEX_HOME/...` when `$CODEX_HOME` is set
+   - `~/.codex/...`
+   - `~/.agents/...`
+   Use the first existing path for each category. Missing memory files are not blocking.
+   Check these locations:
+   - `<root>/memories/MEMORY.md`
+   - `<root>/memories/rollout_summaries/`
+   - `<root>/sessions/`
    Search the memory index first, then open only the 1-3 most relevant rollout summaries.
    Fall back to raw session JSONL only when the summaries are missing exact evidence you need.
 
@@ -87,6 +92,8 @@ For `skill-audit` itself, also evaluate:
 
 ### 1. Search the memory index first
 
+- Resolve the active evidence root first (`$CODEX_HOME`, then `~/.codex`, then `~/.agents`).
+- If no `MEMORY.md` exists in any root, record that explicitly and continue; do not treat the audit as blocked.
 - Search `MEMORY.md` with `rg` using:
   - repo name
   - repo basename
@@ -101,6 +108,7 @@ For `skill-audit` itself, also evaluate:
 
 ### 2. Open targeted rollout summaries
 
+- If no rollout summary directory exists in the resolved roots, record that explicitly and move to raw sessions only if needed.
 - Prefer summaries whose filenames, `cwd`, or `rollout_path` match the current project.
 - Extract:
   - what the user asked for repeatedly
@@ -120,7 +128,7 @@ For `skill-audit` itself, also evaluate:
 
 ### 4. Use raw sessions only as a fallback
 
-- Search `sessions/` JSONL only when memory, rollout summaries, and git-history signals still do not contain the concrete detail you need.
+- Search the resolved `sessions/` JSONL root only when memory, rollout summaries, and git-history signals still do not contain the concrete detail you need.
 - Search by:
   - exact `cwd`
   - repo basename

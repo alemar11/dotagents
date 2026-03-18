@@ -70,7 +70,7 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
 
 ## Workflow templates
 
-- `references/workflows.md`: Reusable, copy-ready end-to-end workflows, including PR review-comment, PR check triage, and release/tag creation with explicit default-branch and target-commit confirmation.
+- `references/workflows.md`: Reusable, copy-ready end-to-end workflows, including PR review-comment, PR metadata refresh from the latest commit, PR check triage, and release/tag creation with explicit default-branch and target-commit confirmation.
 - `references/github_workflow_behaviors.md`: Decision policy for issue label suggestion and commit issue-link workflows.
 
 Note (2026-03): issue transfer is standardized with dedicated copy/move scripts after manual transfers proved too easy to run from the wrong repo context.

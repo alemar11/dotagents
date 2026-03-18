@@ -26,6 +26,38 @@ Purpose: update a PR title, body, or base branch without getting blocked by the 
 scripts/prs_update.sh --pr <number> [--title <text>] [--body <text>] [--base <branch>] [--repo <owner/repo>]
 ```
 
+### Fast path: refresh PR title/body from the latest commit
+
+Use this when the PR metadata should mirror the current `HEAD` commit more closely than the existing PR text.
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+PR_NUMBER="{pr_number}"
+REPO="{owner/repo}"
+
+if [[ "$PR_NUMBER" == "{pr_number}" || -z "$PR_NUMBER" ]]; then
+  echo "Replace {pr_number} with the pull request number."
+  exit 1
+fi
+
+if [[ "$REPO" == "{owner/repo}" || -z "$REPO" ]]; then
+  REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+fi
+
+scripts/preflight_gh.sh --expect-repo "$REPO"
+
+TITLE="$(git log -1 --format=%s)"
+BODY="$(git log -1 --format=%b)"
+
+if [[ -z "$BODY" ]]; then
+  BODY="Update PR metadata to match the latest commit."
+fi
+
+scripts/prs_update.sh --pr "$PR_NUMBER" --repo "$REPO" --title "$TITLE" --body "$BODY"
+```
+
 ## release-or-tag-create
 
 Purpose: create a release-backed tag or a tag-only ref without guessing the target branch or commit.

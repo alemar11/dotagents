@@ -3,6 +3,34 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+usage() {
+  cat <<'EOF'
+Usage: bootstrap_profile.sh [--help]
+
+Interactive Postgres profile bootstrap.
+
+- Run from the target project root, or set DB_PROJECT_ROOT explicitly.
+- Writes/updates .skills/postgres/postgres.toml only if you choose to save.
+- Scans project files for likely DB configs; it does not read environment variables.
+
+Optional environment:
+- DB_PROJECT_ROOT=/path/to/project
+- DB_PROFILE_SCAN_MODE=fast|full
+EOF
+}
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -gt 0 ]]; then
+  echo "Unknown argument: $1" >&2
+  usage >&2
+  exit 2
+fi
+
 source "$SCRIPT_DIR/runtime_env.sh"
 if [[ -n "${PROJECT_ROOT+x}" ]]; then
   echo "Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead." >&2
