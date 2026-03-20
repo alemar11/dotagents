@@ -12,7 +12,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `skill-audit/` — Audit installed Codex skills using project history, memories, sessions, and current context to plan updates, additions, merges, or disables.
 
 ## Project Skills
-- `.agents/skills/tools/` — Orchestrate maintenance, optimization, refactor, and upstream benchmark workflows for skills in this repository, including metadata/doc sync and consistency checks.
+- `.agents/skills/tools/` — Orchestrate targeted skill upgrades, metadata/doc sync, consistency checks, and upstream benchmark workflows for skills in this repository.
 Project skills are repository-local and are not included in the reusable install examples below.
 
 ## Codex

@@ -54,6 +54,18 @@ Both are required by default unless the user explicitly requests a narrower scop
 7. `review-one-by-one`: after artifacts exist, review every local skill one by one and produce a per-skill decision:
    - `CHANGE`: propose concrete markdown updates for that skill.
    - `NOOP`: explicitly state no meaningful updates are needed for that skill.
+   - If subagents are available and the user explicitly requested parallel work, shard the skill list across them and merge the final `CHANGE`/`NOOP` decisions in the parent agent.
+
+## Parallel Subagent Pattern
+- Use this only when subagent tools are available and the user explicitly asked for delegation or parallel agent work.
+- Keep the benchmark script as the default way to generate baseline artifacts; do not replace the script with ad-hoc subagent work when the script can run cleanly.
+- Safe parallel splits around that baseline:
+  - after `download`, spawn one explorer subagent per upstream repo to inspect structure patterns independently
+  - in parallel with upstream inspection, spawn one explorer subagent to inventory local skills if that does not overlap with the baseline artifact writer
+  - after artifacts exist, spawn multiple explorer subagents for disjoint local-skill review buckets such as top-level reusable skills vs `.agents/skills/*`
+- If you delegate per-skill proposal implementation later, assign disjoint file ownership to worker subagents and keep final proposal synthesis local.
+- Keep artifact generation, comparison logic, final proposal merge, and PASS/FAIL result assembly in the main agent.
+- Do not run multiple copies of `openai_skill_benchmark.py` concurrently against the same clone root or output directory. If isolated parallel analysis is required, give each subagent separate scratch paths and merge the results in the parent agent.
 
 ## Per-skill Output Requirement (Mandatory)
 - Always provide a per-skill list for all locally discovered skills after benchmark artifacts are generated.

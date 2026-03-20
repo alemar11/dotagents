@@ -39,6 +39,14 @@ Use this playbook for repository-wide structure and policy checks.
 - `find . -type f -path '*/references/*.md' -not -path '*/.git/*' -not -path '*/.cache/*' | awk -F/ '{print $NF}'`
 - `rg -n "\./scripts/|agents/openai.yaml|SKILL.md|\\.agents/skills/" -S`
 
+## Parallel Subagent Pattern
+- Use this only when subagent tools are available and the user explicitly asked for delegation or parallel agent work.
+- Safe explorer split:
+  - one subagent for naming/layout and required-file checks
+  - one subagent for script/reference integrity
+  - one subagent for policy alignment and benchmark-playbook contract review
+- Keep final severity assignment, duplicate-findings cleanup, and the user-facing PASS/FAIL/WARN report in the main agent.
+
 ## Reporting Format
 - `PASS`: check succeeded
 - `FAIL`: blocking inconsistency with file path

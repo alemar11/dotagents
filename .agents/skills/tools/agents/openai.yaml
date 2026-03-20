@@ -1,5 +1,5 @@
 interface:
   display_name: "Tools"
-  short_description: "Orchestrate maintenance, optimization, refactor, and upstream benchmark workflows for skills in this repository, including metadata/doc sync and consistency checks."
+  short_description: "Orchestrate targeted skill upgrades, metadata/doc sync, consistency checks, and upstream benchmark workflows for skills in this repository."
   brand_color: "#B85C00"
-  default_prompt: "Run the requested maintenance, optimization, refactor, or benchmark workflow for this skills repository, route to the correct playbook, and report clear pass/fail findings with next actions."
+  default_prompt: "Run the requested skill maintenance workflow for this repository, including targeted upgrades, metadata/doc sync, audits, refreshes, or benchmarks, route to the correct playbook, and report clear pass/fail findings with next actions."

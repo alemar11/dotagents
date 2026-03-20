@@ -24,6 +24,11 @@ Run this checklist before finalizing maintainer updates.
 - `git diff --stat`
 - `git diff`
 
+## Parallelism Guardrail
+- Read-only manifest listing and grep-style checks may run concurrently or through explorer subagents.
+- Keep `git diff --stat`, `git diff`, final findings cleanup, and final PASS/FAIL report assembly in the main agent.
+- If the broader maintenance task also includes a commit, keep post-commit verification sequential to avoid stale state.
+
 ## Final Report Template
 - Scope: `<what was covered>`
 - Commands run: `<ordered list of key commands>`
