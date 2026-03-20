@@ -34,6 +34,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep the dependency direction one-way: runtime skills must not depend on or reference `.agents/skills/tools`; only repo-level maintainer docs may route work to `tools`.
 - When updating skill metadata/docs across the repo, route through the `tools` playbooks and keep README/openai metadata text aligned.
 - Treat plain-language "upgrade this skill" requests as targeted-skill maintenance first; only expand to repo-wide benchmark or refresh flows when the user asks for them explicitly.
+- Treat generic `$tools` imperatives like "run" or "run your tasks" as the default mixed maintenance pass: `sync metadata/docs` -> `audit consistency` -> `release-checklist.md`; do not infer `bootstrap`, `refresh`, or `benchmark`. (Codex learning)
 - When delegation is explicitly requested and the runtime supports subagents, `tools` may spawn multiple subagents only for independent analysis or disjoint write scopes; keep routing, final synthesis, and git verification in the main agent. (Codex learning)
 
 ### GitHub skill

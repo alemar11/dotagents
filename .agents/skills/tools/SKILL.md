@@ -8,6 +8,7 @@ description: Orchestrate targeted skill upgrades, metadata/doc sync, consistency
 ## Goal
 Use this project-maintainer skill to keep skills aligned, healthy, and releasable. Primary maintainer outcome: improve local skill markdown quality (`SKILL.md` and `references/*.md`) through structured analysis and actionable optimization proposals. This skill orchestrates maintenance workflows; it does not replace domain skills.
 When a user asks to "upgrade" a skill, treat that as a scoped request to improve the named skill's docs, metadata, and workflow clarity while preserving intent.
+When a user invokes `$tools` generically with a bare imperative such as "run" or "run your tasks" and does not name a task, treat that as a safe mixed maintenance pass: `sync metadata/docs` -> `audit consistency` -> `references/release-checklist.md`.
 
 ## User-facing Capability Summary
 If the user asks what this skill can do, answer with these three capability groups:
@@ -30,6 +31,7 @@ If the user asks what this skill can do, answer with these three capability grou
 
 ## Available Tasks (User Menu)
 When the user asks what this skill can do, offer this task list:
+If the user invokes `$tools` generically and does not name one of these tasks, default to `sync metadata/docs`, then `audit consistency`, and finish with `references/release-checklist.md`.
 1) `upgrade skill`
    - Improve an existing skill's docs, metadata, and workflow clarity while preserving intent.
    - Run focused sync/audit checks for the touched skill and return `PASS`, `PASS (NOOP)`, or `FAIL`.
@@ -48,6 +50,7 @@ When the user asks what this skill can do, offer this task list:
 
 ## Trigger rules
 Use this skill when users ask to:
+- Invoke `$tools` generically to run a maintenance pass without naming a more specific task
 - Upgrade, modernize, or tighten an existing skill
 - Maintain or clean up one or more skills
 - Optimize one or more skills (quality, consistency, or maintainability)
@@ -83,6 +86,7 @@ Use this skill when users ask to:
 - Do not depend on markdown guidance outside this skill's `references/` folder.
 - Keep changes scoped to requested maintenance outcomes.
 - Treat plain-language "upgrade" requests as targeted-skill work by default; do not silently escalate them into repo-wide benchmark or refresh flows.
+- Treat generic bare imperatives like "run" as the default mixed maintenance pass only; do not infer `bootstrap`, `refresh`, or `benchmark` from them.
 - Only spawn subagents when delegation is explicitly allowed in the current run; otherwise execute the same workflow locally.
 - Keep task boundaries explicit: run only the requested task (`upgrade`, `sync`, `audit`, `bootstrap`, `refresh`, `benchmark`) unless the user requests a mixed flow.
 - If no meaningful updates are needed, return `PASS (NOOP)` and avoid persistent file edits.
