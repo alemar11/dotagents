@@ -101,17 +101,13 @@ Use the safe path by default, and always use it when any of these apply:
    - Summary of key changes (what changed).
    - Rationale and trade-offs (why it changed).
    - Tests or validation run (or explicit note if not run).
-10. Append a `Co-authored-by` trailer for Codex using `Codex <codex@openai.com>`
-   only if the current agent running this commit workflow is Codex.
-   If another agent or user is performing the commit, skip this trailer unless
-   explicitly requested.
-11. Wrap body lines at 72 characters.
-12. Create the commit message with a here-doc or temp file and use
+10. Wrap body lines at 72 characters.
+11. Create the commit message with a here-doc or temp file and use
     `git commit -F <file>` so newlines are literal (avoid `-m` with `\n`).
-13. Commit only when the message matches the staged changes: if the staged diff
+12. Commit only when the message matches the staged changes: if the staged diff
     includes unrelated files or the message describes work that isn't staged,
     fix the index or revise the message before committing.
-14. After `git commit` succeeds, verify the result sequentially, not in
+13. After `git commit` succeeds, verify the result sequentially, not in
     parallel with the commit itself. Run `git status --short --branch` and
     `git log -1` to confirm the worktree is clean and `HEAD` matches the new
     commit.
@@ -149,7 +145,4 @@ Rationale:
 
 Tests:
 - <command or "not run (reason)">
-
-(Optional) If this commit is authored by Codex, add:
-Co-authored-by: Codex <codex@openai.com>
 ```
