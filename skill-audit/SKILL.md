@@ -17,6 +17,10 @@ For broad reusable skills, prefer fixing the shared skill or relying on project 
 
 If `skill-audit` itself is part of the installed portfolio, always audit it too and treat its own gaps as first-class findings.
 
+If the user asks for a narrow audit, such as only the skills used in the
+current workflow, honor that scope explicitly instead of expanding to the full
+installed portfolio.
+
 ## Audit Order
 
 1. Map the current repo surface.
@@ -43,7 +47,11 @@ If `skill-audit` itself is part of the installed portfolio, always audit it too 
 
 4. Check cheap maintenance signals before deep history.
    For each skill you are seriously evaluating, inspect lightweight staleness signals before opening raw sessions:
-   - `git log -- <skill-dir>` for maintenance recency and whether the skill is actively revised
+   - `git log` for maintenance recency and whether the skill is actively revised
+     - if the skill path is inside the current repo, `git log -- <skill-dir>` is fine
+     - if the skill lives outside the current repo, run `git log` from the repo
+       that owns the skill path, for example
+       `git -C <skills-root> log -- <relative-skill-dir>`
    - repo docs or adjacent docs that may have become the real source of truth
    - whether `SKILL.md` and `agents/openai.yaml` still describe the same owner and trigger
 
@@ -66,7 +74,10 @@ If `skill-audit` itself is part of the installed portfolio, always audit it too 
    - skill bodies or summaries injected into the current turn
    - project docs and other active context competing for prompt budget
    Treat this evidence as opportunistic. Use only what is visible in the current prompt context. Do not invent hidden telemetry or unsupported internal metrics.
-   - If the repo has no local skills and the current prompt already exposes relevant shared skill metadata or bodies, use that to narrow which shared skills need deeper review instead of insisting on a local-skill-first deep dive.
+- If the repo has no local skills and the current prompt already exposes relevant shared skill metadata or bodies, use that to narrow which shared skills need deeper review instead of insisting on a local-skill-first deep dive.
+- If the user asks for only certain skills, keep the audit output limited to
+  those skills and explain any skipped portfolio areas as intentionally out of
+  scope.
 
 ## What To Evaluate
 
@@ -119,7 +130,12 @@ For `skill-audit` itself, also evaluate:
 
 ### 3. Check git history before raw sessions
 
-- Before reading raw session JSONL, inspect `git log -- <skill-dir>` for the skills under review.
+- Before reading raw session JSONL, inspect git history for the skills under
+  review.
+- If the skill is inside the current repo, `git log -- <skill-dir>` is enough.
+- If the skill lives outside the current repo, first resolve the repo that owns
+  the skill path and run git history from there, for example
+  `git -C <skills-root> log -- <relative-skill-dir>`.
 - Use this as a cheap signal for:
   - whether the skill is actively maintained
   - whether one skill keeps changing while an overlapping skill stays stale
