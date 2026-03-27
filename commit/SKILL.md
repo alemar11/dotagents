@@ -131,6 +131,12 @@ Use the safe path by default, and always use it when any of these apply:
 
 - A single commit created with `git commit` whose message reflects the session.
 
+## Examples
+
+- "Commit the docs change in this skill and keep the scope narrow."
+- "Stage only the GitHub skill files, write the commit message, and verify the result."
+- "Prepare a commit for the current staged changes and make sure the message matches the diff."
+
 ## Template
 
 Type and scope are examples only; adjust to fit the repo and changes.
