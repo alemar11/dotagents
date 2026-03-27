@@ -5,6 +5,14 @@ description: Use GitHub CLI (gh) for repository-scoped issues, pull requests, Ac
 
 # GitHub CLI
 
+## Overview
+
+Use this skill when the main job is repository-scoped GitHub work through
+`gh`, especially when the user needs issue, pull request, release, tag, or
+Actions run handling in the current repository. Keep the skill focused on the
+smallest command path that solves the request, and route to dedicated helper
+scripts when the workflow is already standardized.
+
 ## Trigger rules
 
 - Use for repository-scoped GitHub operations via `gh` (issues, pull requests, Actions workflow runs/logs, releases, tags, and repo metadata).
@@ -104,6 +112,15 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
 - `references/github_workflow_behaviors.md`: Decision policy for issue label suggestion and commit issue-link workflows.
 
 Note (2026-03): issue transfer is standardized with dedicated copy/move scripts after manual transfers proved too easy to run from the wrong repo context.
+
+## Output Expectations
+
+- Restate the resolved target repository, PR, issue, release, tag, or run ID
+  before mutating anything.
+- For read-only requests, return the relevant facts and next useful command or
+  action, not raw command noise.
+- For failed commands, report the concrete error and the retry command from the
+  retry matrix when one applies.
 
 ## Release and tag creation standard
 
@@ -225,3 +242,9 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
   view` uses positional `owner/repo`, while many issue/PR/release commands and
   helper scripts use `--repo owner/repo`.
 - Keep user-facing guidance in `references/` and workflow logic in scripts aligned with tested real-world usage.
+
+## Examples
+
+- "Show me the open PRs for this repo and summarize which one needs attention."
+- "Inspect the failing Actions run on this branch and tell me the likely cause."
+- "Create a release for this tag, but confirm the target branch and notes strategy first."
