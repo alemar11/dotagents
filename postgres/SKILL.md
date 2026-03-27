@@ -65,6 +65,15 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 4) Persist only if asked:
    - Update TOML only with explicit user approval, except `[configuration].pg_bin_dir`, `[configuration].python_bin`, and `schema_version` which may be written by bootstrap/migration helpers. Prompt before changing an existing value outside those flows.
 
+## Output Expectations
+
+- For queries and diagnostics, return the answer first, then the minimum
+  supporting context needed to trust it.
+- For performance reviews, group findings by hotspot, scaling risk, and safe
+  optimization path.
+- For migration or data-copy drafting, call out any values that were adapted or
+  should be adapted before production use.
+
 ## Backend query performance review
 - Use this path when the user asks to review backend queries, inspect SQL for speed, improve loading time, or analyze schema/index support.
 - Inventory read queries separately from write queries before making recommendations.
@@ -186,6 +195,12 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - Postgres version: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/pg_version.sh`
 - Connection details: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/connection_info.sh`
 - Find objects by name: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/find_objects.sh users`
+
+## Examples
+
+- "Run this query against the local profile and summarize the results."
+- "Review this backend SQL for read-path performance problems."
+- "Copy these rows from dev into the pending migration file, but adapt anything that should not ship to production."
 
 ## Usage references
 - Setup, env defaults, and script catalog: `references/postgres_usage.md`
