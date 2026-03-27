@@ -17,9 +17,9 @@ If the user asks what this skill can do, answer with these three capability grou
    - Keep skill docs and metadata aligned (`SKILL.md`, `agents/openai.yaml`, `README.md`, `AGENTS.md`).
    - Run structure/consistency checks and flag issues.
    - Propose meaningful optimization/refactor updates and report PASS/FAIL.
-2) Benchmark local skills against upstream ecosystems (`openai/skills` and `anthropics/skills`) and propose meaningful structure improvements.
-   - Download/update both upstream repos into `.cache/upstream-skills/`.
-   - Study upstream `SKILL.md` structure patterns (frontmatter, sections, workflow/trigger clarity, and layout).
+2) Benchmark local skills against upstream ecosystems (`openai/skills`, `openai/plugins`, and `anthropics/skills`) and propose meaningful structure improvements.
+   - Download/update the upstream repos into `.cache/upstream-skills/`.
+   - Study upstream `SKILL.md` structure patterns (frontmatter, sections, workflow/trigger clarity, and layout), including plugin skill packages under `plugins/*/skills/*`.
    - Audit local skills including hidden `.agents/skills/*`.
    - Generate markdown-focused optimization proposals for local skill docs (`SKILL.md`, `references/*.md`, and related maintainer docs) with no auto-applied refactors.
    - If subagents are available and the user explicitly requested parallel work, delegate repo-specific analysis or shard per-skill review across multiple subagents; keep artifact generation and final synthesis in the parent agent.
@@ -44,7 +44,7 @@ If the user invokes `$tools` generically and does not name one of these tasks, d
 5) `refresh postgres references`
    - Execute Postgres best-practices refresh workflow defined in this skill references.
 6) `benchmark against upstream`
-   - Download/update `openai/skills` and `anthropics/skills`, study `SKILL.md` patterns, compare local skills, and propose markdown optimization updates (no auto-apply).
+   - Download/update `openai/skills`, `openai/plugins`, and `anthropics/skills`, study `SKILL.md` patterns, compare local skills, and propose markdown optimization updates (no auto-apply).
    - After artifacts are generated, review local skills one by one and state whether each skill needs changes (`CHANGE`) or not (`NOOP`), with concrete proposals when needed.
    - If subagents are available and the user explicitly requested parallel work, split upstream analysis by repo or shard per-skill review, but keep the shared benchmark script run and final result merge centralized.
 
@@ -56,7 +56,7 @@ Use this skill when users ask to:
 - Optimize one or more skills (quality, consistency, or maintainability)
 - Refactor skill structure or instructions while preserving intent
 - Bootstrap a new skill (reusable or maintainer)
-- Benchmark local skills against upstream skill ecosystems (for example `openai/skills` and `anthropics/skills`)
+- Benchmark local skills against upstream skill ecosystems (for example `openai/skills`, `openai/plugins`, and `anthropics/skills`)
 - Sync `SKILL.md`, `agents/openai.yaml`, and repository docs
 - Run a maintenance pass before release
 - Refresh Postgres best-practices references
@@ -67,7 +67,7 @@ Use this skill when users ask to:
 3) For metadata/docs alignment, follow `references/metadata-sync.md`.
 4) For repository-wide structure and rules checks, follow `references/doc-consistency.md`.
 5) For skill bootstrap, follow `references/skill_openai_metadata.md` then `references/metadata-sync.md`.
-6) For upstream benchmarking and structure proposals, follow `references/openai-skill-benchmark.md` (clone/update upstream repos first, then analyze artifacts and propose per-skill updates one by one).
+6) For upstream benchmarking and structure proposals, follow `references/openai-skill-benchmark.md` (clone/update upstream repos first, then analyze top-level and plugin-packaged skill artifacts and propose per-skill updates one by one).
 7) For Postgres best-practices refresh, follow `references/postgres-refresh.md` (self-contained workflow in this skill).
 8) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
 

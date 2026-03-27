@@ -5,13 +5,15 @@ Use this playbook when users ask to benchmark local skills against upstream skil
 ## Purpose
 - Compare local skills against proven upstream patterns.
 - Emphasize `SKILL.md` structure quality and trigger/workflow clarity.
+- Include both standard skill repos and plugin-packaged skills when they are part of the configured upstream baselines.
 - Produce actionable markdown optimization proposals only (no auto-applied edits).
 
 ## Mandatory Upstream Baselines
 - `openai/skills`
+- `openai/plugins`
 - `anthropics/skills`
 
-Both are required by default unless the user explicitly requests a narrower scope.
+All three are required by default unless the user explicitly requests a narrower scope.
 
 ## Script Entry Point
 - `./.agents/skills/tools/scripts/openai_skill_benchmark.py`
@@ -22,6 +24,7 @@ Both are required by default unless the user explicitly requests a narrower scop
   --ref main \
   --scope both \
   --repo openai/skills \
+  --repo openai/plugins \
   --repo anthropics/skills \
   --clone-root .cache/upstream-skills \
   --output-dir .agents/skills/tools/artifacts/openai-skill-benchmark \
@@ -31,7 +34,7 @@ Both are required by default unless the user explicitly requests a narrower scop
 ## Defaults
 - `--ref main`
 - `--scope both`
-- `--repo openai/skills --repo anthropics/skills`
+- `--repo openai/skills --repo openai/plugins --repo anthropics/skills`
 - `--clone-root .cache/upstream-skills`
 - `--output-dir .agents/skills/tools/artifacts/openai-skill-benchmark`
 - `--format both`
@@ -44,8 +47,10 @@ Both are required by default unless the user explicitly requests a narrower scop
 - `comparison_report.md`
 
 ## Workflow (Mandatory Order)
-1. `download`: clone or update mandatory upstream repos into `.cache/upstream-skills/` (`openai/skills` and `anthropics/skills`).
+1. `download`: clone or update mandatory upstream repos into `.cache/upstream-skills/` (`openai/skills`, `openai/plugins`, and `anthropics/skills`).
 2. `extract-upstream`: parse frontmatter and `SKILL.md` section taxonomy, length metrics, and resource layout from downloaded repos.
+   - For standard skill repositories, inspect top-level `skills/*`.
+   - For plugin repositories such as `openai/plugins`, also inspect plugin-packaged skills under `plugins/*/skills/*`.
 3. `audit-local`: inventory local skills (including hidden `.agents/skills/*` paths) with the same rubric.
 4. `compare`: compute meaningful deltas against upstream patterns.
 5. `propose`: generate non-auto-applied structural recommendations for local skills.
@@ -102,6 +107,6 @@ Do not propose:
 - Clean stale temporary files before final report unless user asks to keep them.
 
 ## Network/Clone Failure Notes
-- If `git clone`/`git fetch` fails for one or both mandatory repos, report `FAIL` and include captured errors in the report.
+- If `git clone`/`git fetch` fails for one or more mandatory repos, report `FAIL` and include captured errors in the report.
 - Keep generated local inventory and partial artifacts for diagnostics.
 - Retry after network recovery and rerun the same command contract.

@@ -2,8 +2,8 @@
 """Benchmark local skills against upstream skill repositories.
 
 This script clones/pulls upstream repositories into .cache, analyzes SKILL.md
-structure, audits local skills (including hidden .agents paths), and writes
-actionable proposal artifacts.
+structure across standard and plugin-packaged skill layouts, audits local skills
+(including hidden .agents paths), and writes actionable proposal artifacts.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-DEFAULT_REPOS = ["openai/skills", "anthropics/skills"]
+DEFAULT_REPOS = ["openai/skills", "openai/plugins", "anthropics/skills"]
 DEFAULT_OUTPUT_DIR = ".agents/skills/tools/artifacts/openai-skill-benchmark"
 DEFAULT_CLONE_ROOT = ".cache/upstream-skills"
 
@@ -67,7 +67,10 @@ def parse_args() -> argparse.Namespace:
         "--repo",
         action="append",
         default=None,
-        help="Upstream repo in owner/repo format; repeatable. Default: openai/skills + anthropics/skills",
+        help=(
+            "Upstream repo in owner/repo format; repeatable. "
+            "Default: openai/skills + openai/plugins + anthropics/skills"
+        ),
     )
     parser.add_argument(
         "--clone-root",
@@ -220,6 +223,35 @@ def list_skill_dirs(skills_root: Path, scope: str) -> list[tuple[str, Path]]:
     return roots
 
 
+def collect_repo_skill_dirs(repo_dir: Path, scope: str) -> list[tuple[str, Path]]:
+    roots: list[tuple[str, Path]] = []
+    seen: set[str] = set()
+
+    def add(bucket: str, skill_dir: Path) -> None:
+        key = skill_dir.resolve().as_posix()
+        if key in seen:
+            return
+        seen.add(key)
+        roots.append((bucket, skill_dir))
+
+    for bucket, skill_dir in list_skill_dirs(repo_dir / "skills", scope):
+        add(bucket, skill_dir)
+
+    plugins_root = repo_dir / "plugins"
+    if plugins_root.is_dir():
+        for plugin_dir in sorted(plugins_root.iterdir()):
+            if not plugin_dir.is_dir() or plugin_dir.name.startswith("."):
+                continue
+            plugin_skills_root = plugin_dir / "skills"
+            if not plugin_skills_root.is_dir():
+                continue
+            for skill_dir in sorted(plugin_skills_root.iterdir()):
+                if skill_dir.is_dir() and not skill_dir.name.startswith("."):
+                    add(f"plugin:{plugin_dir.name}", skill_dir)
+
+    return roots
+
+
 def collect_upstream_inventory(
     repos: list[str], ref: str, scope: str, clone_root: Path
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -233,10 +265,12 @@ def collect_upstream_inventory(
         if not repo_dir:
             continue
 
-        skills_root = repo_dir / "skills"
-        skill_dirs = list_skill_dirs(skills_root, scope)
+        skill_dirs = collect_repo_skill_dirs(repo_dir, scope)
         if not skill_dirs:
-            errors.append(f"{repo}: no skill directories found under {skills_root}")
+            errors.append(
+                f"{repo}: no skill directories found in supported layouts "
+                "(skills/* or plugins/*/skills/*)"
+            )
             continue
 
         for scope_bucket, skill_dir in skill_dirs:
