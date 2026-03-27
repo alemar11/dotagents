@@ -73,6 +73,16 @@ Use this skill when users ask to:
 7) For Postgres best-practices refresh, follow `references/postgres-refresh.md` (self-contained workflow in this skill).
 8) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
 
+## References
+
+- `references/maintenance-router.md`: route the request to the correct maintenance workflow first.
+- `references/skill-upgrade.md`: use for scoped improvements to one existing skill.
+- `references/metadata-sync.md`: use for `SKILL.md`, `agents/openai.yaml`, and README alignment.
+- `references/doc-consistency.md`: use for repository-wide structure and policy checks.
+- `references/openai-skill-benchmark.md`: use for OpenAI-first benchmark analysis and proposal generation.
+- `references/postgres-refresh.md`: use for maintainer-only Postgres best-practices refresh work.
+- `references/release-checklist.md`: use at the end of mixed or multi-step maintenance tasks.
+
 ## Subagent Usage
 - If the runtime exposes subagent tools and the user explicitly asks for delegation or parallel agent work, spawn multiple subagents for independent analysis slices or disjoint write scopes.
 - Prefer explorer subagents for read-only inspection and worker subagents only when file ownership is clearly split.
