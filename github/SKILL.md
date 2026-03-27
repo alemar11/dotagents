@@ -1,13 +1,13 @@
 ---
 name: github
-description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request, workflow, release, and tag operations. Default to the current git project unless another `owner/repo` is provided.
+description: Use GitHub CLI (gh) for repository-scoped issues, pull requests, Actions runs/logs, releases, and tags. Default to the current git project unless another `owner/repo` is provided.
 ---
 
 # GitHub CLI
 
 ## Trigger rules
 
-- Use for repository-scoped GitHub operations via `gh` (issues, pull requests, workflow runs, releases, tags, and repo metadata).
+- Use for repository-scoped GitHub operations via `gh` (issues, pull requests, Actions workflow runs/logs, releases, tags, and repo metadata).
 - Default to the current repository unless the user explicitly provides another `owner/repo`.
 - Reject or reroute organization-level or enterprise-level mutation requests.
 - If a task does not require GitHub CLI operations, use a more direct non-`gh` workflow.
@@ -22,10 +22,13 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
    - Allowed: repository-level read/write for issues, pull requests, runs, and repo labels.
    - Forbidden: organization-level or higher scope mutations (for example org settings, org rulesets, org membership, org secrets/variables, enterprise APIs).
    - If a request is forbidden, stop and ask for a repo-scoped alternative.
-3. Use the read-only fast path when it is enough.
+3. Classify Actions and CI requests before choosing commands.
+   - If the task is tied to an open PR or the user explicitly asks about PR checks, start with `gh pr checks` and prefer `scripts/inspect_pr_checks.py` when you need failing GitHub Actions snippets plus run metadata.
+   - If the task is tied to a branch push, commit SHA, workflow name, scheduled/manual run, or an explicit run ID, start with `gh run list` / `gh run view`; do not assume a PR exists.
+4. Use the read-only fast path when it is enough.
    - Skip full preflight for clearly read-only inspection such as:
      - `gh --help`, `<subcommand> --help`, `gh auth status`, `gh --version`
-     - `gh repo view`, `gh pr view`, `gh issue view`, `gh run view`
+     - `gh repo view`, `gh pr view`, `gh issue view`, `gh run list`, `gh run view`
      - read-only `gh api` or GraphQL lookups that inspect the current user, repository, or PR metadata
    - For repo-scoped reads, run from the target repository when practical. If
      the repo is not the current working directory, use the subcommand's
@@ -33,15 +36,15 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
      - many `gh` subcommands accept `--repo owner/repo`
      - `gh repo view` itself expects positional `gh repo view owner/repo`
    - If the command might mutate state, create side effects, or depends on project scripts/helpers, do not use the fast path; run full preflight instead.
-4. Run preflight before mutating or context-sensitive `gh` actions:
+5. Run preflight before mutating or context-sensitive `gh` actions:
    - Run preflight from the target repository working directory, not from the skill directory or an unrelated repository.
    - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>]`
    - When the target repo is known, prefer `--expect-repo <owner/repo>` to catch working-directory mismatches early.
    - If preflight was run from the wrong working directory, treat it as invalid and rerun it from the target repository before proceeding.
    - Use `--allow-non-project` only when the user explicitly requests a non-project operation.
    - For cross-repo issue transfers, prefer the dedicated helper scripts instead of manual `gh issue create/edit/close` sequences.
-5. Run the narrowest `gh` command needed, then report only relevant output.
-6. If the operation fails, return the command error and propose the next retry command from the retry matrix below.
+6. Run the narrowest `gh` command needed, then report only relevant output.
+7. If the operation fails, return the command error and propose the next retry command from the retry matrix below.
 
 ## Common operations
 
@@ -52,9 +55,11 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
   - `scripts/issues_copy.sh` and `scripts/issues_move.sh` for cross-repo issue transfers
 - Pull request actions
   - `gh pr list`, `gh pr view`, `gh pr create`, `gh pr edit`, `gh pr comment`, `gh pr review`, `gh pr checkout`, `gh pr merge`, `gh pr checks`
+  - Prefer `scripts/inspect_pr_checks.py` for PR check triage when you need failing Actions snippets, run metadata, and a structured summary of the failing jobs.
   - Prefer `scripts/prs_update.sh` for PR metadata updates; it can fall back to `gh api` for `--title`, `--body`, and `--base` when `gh pr edit` hits the `read:project` scope issue.
 - Workflow actions
-  - `gh run list`, `gh run view`, `gh run watch`
+  - `gh run list`, `gh run view`, `gh run watch`, `gh run download`
+  - For generic Actions investigation, prefer `gh run list` to resolve the run ID, then `gh run view <run-id> --log-failed`; use `gh run view --job <job-id> --log` for full job logs and `gh run download <run-id>` when artifacts matter.
 - Release actions
   - `gh release list`, `gh release view`, `gh release create`, `gh release edit`, `gh release delete`
   - `scripts/release_plan.sh`, `scripts/release_create.sh`
@@ -62,6 +67,20 @@ description: Use the GitHub CLI (`gh`) for repository-scoped issue, pull request
   - `gh alias`, `gh api`, `gh extension`
 
 Use `--help` on the relevant command for options, and prefer `--json` and `--jq` when scripted output is needed.
+
+## Actions triage standard
+
+- Separate PR-check triage from generic Actions run inspection.
+- Use PR-check triage when the failing workflow is tied to an open PR or the user explicitly asks for PR checks.
+  - Start with `gh pr checks`.
+  - Prefer `scripts/inspect_pr_checks.py` when you need failing log snippets plus run metadata.
+- Use generic Actions run inspection when the failing workflow is tied to a branch, commit SHA, workflow name, scheduled/manual run, or explicit run ID, or when no PR exists.
+  - Start with `gh run list` and add only the filters you know (`--branch`, `--commit`, `--workflow`, `--event`, `--status`).
+  - Inspect summary metadata with `gh run view <run-id> --json databaseId,workflowName,status,conclusion,headBranch,headSha,displayTitle,url`.
+  - Inspect failure context with `gh run view <run-id> --log-failed`.
+  - Inspect a single job with `gh run view --job <job-id> --log`.
+  - Download artifacts with `gh run download <run-id> -n <artifact>` when artifacts matter.
+- Do not default to `gh pr checks` for branch workflows without an open PR. `gh run ...` is the correct path for non-PR Actions failures.
 
 ## Scope rules
 
@@ -81,7 +100,7 @@ Use `references/script-summary.md` for the full list of reusable scripts (issues
 
 ## Workflow templates
 
-- `references/workflows.md`: Reusable, copy-ready end-to-end workflows, including PR review-comment, PR metadata refresh from the latest commit, PR check triage, and release/tag creation with explicit default-branch and target-commit confirmation.
+- `references/workflows.md`: Reusable, copy-ready end-to-end workflows, including generic Actions run/log inspection, PR review-comment, PR metadata refresh from the latest commit, PR check triage, and release/tag creation with explicit default-branch and target-commit confirmation.
 - `references/github_workflow_behaviors.md`: Decision policy for issue label suggestion and commit issue-link workflows.
 
 Note (2026-03): issue transfer is standardized with dedicated copy/move scripts after manual transfers proved too easy to run from the wrong repo context.
@@ -187,6 +206,8 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
   - Retry command: replace with supported fields, e.g. `gh issue view <n> --json number,title,state,projectItems,projectCards`.
 - PR edit scope errors (`gh pr edit` fails with `missing required scopes [read:project]`):
   - Retry command: `scripts/prs_update.sh --pr <n> [--title ...] [--body ...] [--base ...] [--repo owner/repo]` from the target repo root; this helper retries via `gh api` for title/body/base-only updates.
+- Actions log retrieval limitations (`gh run view --log` shows missing log associations, `UNKNOWN STEP`, or fails to pair logs with jobs):
+  - Retry command: `gh run view <run-id> --job <job-id> --log`; if artifacts are more relevant than logs, use `gh run download <run-id> [ -n <artifact> ]`.
 - Transient API/network failures (502/503/timeouts):
   - Retry command: re-run the same `gh ...` command after a short delay; keep scope unchanged.
 
@@ -199,6 +220,7 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
   3. Record the correction in a short note in the updated docs so future runs use the new behavior.
 - Correction note (2026-03): release creation now uses dedicated helper scripts and explicitly distinguishes user silence from explicit delegation when choosing release notes strategy.
 - Correction note (2026-03): `gh pr edit` may require `read:project` even for simple metadata updates; `scripts/prs_update.sh` now falls back to `gh api` for title/body/base-only changes when that scope is missing.
+- Correction note (2026-03): generic GitHub Actions run inspection is not always tied to a PR; use `gh run list` / `gh run view` for branch, SHA, workflow, and explicit run-id investigations, and reserve `gh pr checks` for PR-associated runs.
 - Correction note (2026-03): repo targeting is command-specific. `gh repo
   view` uses positional `owner/repo`, while many issue/PR/release commands and
   helper scripts use `--repo owner/repo`.

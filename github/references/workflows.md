@@ -725,9 +725,144 @@ done
 This is intentionally a template, not an all-in-one automation.
 If you want to promote this into a script, the next iteration is a dedicated `prs_address_comments.sh` helper that accepts `--pr`, `--selection`, `--repo`, and optional `--comment-ids`.
 
+## actions-run-inspect
+
+Purpose: inspect GitHub Actions runs and logs when the failure is tied to a branch, commit SHA, workflow, event, or explicit run ID rather than necessarily to an open PR.
+
+### Preconditions
+
+- `gh` installed and authenticated.
+- Repository scope resolves (`gh repo view` works in the target repo path).
+- At least one of run ID, branch, commit SHA, workflow name, event, or status is known, or you will list recent runs first.
+
+### Operator policy
+
+- Use this workflow for push, schedule, workflow_dispatch, branch, SHA, and explicit run-id investigations.
+- Do not require an open PR.
+- If the user explicitly asks about failing PR checks or the current branch has an open PR and the checks are PR-associated, prefer the `fix-ci` workflow below.
+- Start with `gh run list` to resolve the run ID unless the run ID is already known.
+- Use `gh run view <run-id> --log-failed` for quick failure context.
+- Use `gh run view --job <job-id> --log` when a specific job needs the full log.
+- Use `gh run download <run-id>` only when artifacts matter.
+
+### Paste and run (Phase 1): resolve recent runs
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="{repo}"
+BRANCH="{branch}"
+COMMIT="{commit}"
+WORKFLOW="{workflow}"
+EVENT="{event}"
+STATUS="{status}"
+LIMIT="{limit}"
+
+if [[ "$REPO" == "{repo}" || -z "$REPO" ]]; then
+  REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+fi
+if [[ "$BRANCH" == "{branch}" ]]; then
+  BRANCH=""
+fi
+if [[ "$COMMIT" == "{commit}" ]]; then
+  COMMIT=""
+fi
+if [[ "$WORKFLOW" == "{workflow}" ]]; then
+  WORKFLOW=""
+fi
+if [[ "$EVENT" == "{event}" ]]; then
+  EVENT=""
+fi
+if [[ "$STATUS" == "{status}" ]]; then
+  STATUS=""
+fi
+if [[ "$LIMIT" == "{limit}" || -z "$LIMIT" ]]; then
+  LIMIT=10
+fi
+
+CMD=(gh run list --repo "$REPO" -L "$LIMIT" --json databaseId,workflowName,status,conclusion,headBranch,headSha,displayTitle,event,url)
+if [[ -n "$BRANCH" ]]; then
+  CMD+=(--branch "$BRANCH")
+fi
+if [[ -n "$COMMIT" ]]; then
+  CMD+=(--commit "$COMMIT")
+fi
+if [[ -n "$WORKFLOW" ]]; then
+  CMD+=(--workflow "$WORKFLOW")
+fi
+if [[ -n "$EVENT" ]]; then
+  CMD+=(--event "$EVENT")
+fi
+if [[ -n "$STATUS" ]]; then
+  CMD+=(--status "$STATUS")
+fi
+
+"${CMD[@]}"
+```
+
+### Paste and run (Phase 2): inspect one run and its failed log lines
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="{repo}"
+RUN_ID="{run_id}"
+
+if [[ "$REPO" == "{repo}" || -z "$REPO" ]]; then
+  REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+fi
+if [[ "$RUN_ID" == "{run_id}" || -z "$RUN_ID" ]]; then
+  echo "Replace {run_id} with a workflow run ID from phase 1."
+  exit 1
+fi
+
+gh run view "$RUN_ID" --repo "$REPO" \
+  --json databaseId,workflowName,status,conclusion,headBranch,headSha,displayTitle,url
+echo
+gh run view "$RUN_ID" --repo "$REPO" --log-failed
+```
+
+### Paste and run (Phase 3): inspect one job or download artifacts
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="{repo}"
+RUN_ID="{run_id}"
+JOB_ID="{job_id}"
+ARTIFACT_NAME="{artifact_name}"
+
+if [[ "$REPO" == "{repo}" || -z "$REPO" ]]; then
+  REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
+fi
+if [[ "$RUN_ID" == "{run_id}" || -z "$RUN_ID" ]]; then
+  echo "Replace {run_id} with a workflow run ID."
+  exit 1
+fi
+if [[ "$JOB_ID" == "{job_id}" ]]; then
+  JOB_ID=""
+fi
+if [[ "$ARTIFACT_NAME" == "{artifact_name}" ]]; then
+  ARTIFACT_NAME=""
+fi
+
+if [[ -n "$JOB_ID" ]]; then
+  gh run view --repo "$REPO" --job "$JOB_ID" --log
+fi
+
+if [[ -n "$ARTIFACT_NAME" ]]; then
+  gh run download "$RUN_ID" --repo "$REPO" -n "$ARTIFACT_NAME"
+fi
+```
+
 ## fix-ci
 
 Purpose: inspect PR check failures, fetch run metadata/log snippets, and provide next actions.
+
+Use this when the failing workflow is tied to an open PR. For branch, SHA, schedule, workflow_dispatch, or explicit run-id investigations that are not necessarily PR-associated, use `actions-run-inspect` instead.
 
 ### Preconditions
 
