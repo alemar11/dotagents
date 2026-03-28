@@ -1,10 +1,8 @@
 # Naming And Signatures
 
-Source material:
-- Official page: https://swift.org/documentation/api-design-guidelines/
-- Source document: https://github.com/swiftlang/swift-org-website/blob/main/documentation/api-design-guidelines/index.md
-
-Use this reference when designing names, parameters, argument labels, defaults, and overloads.
+Use this summary when designing names, parameters, argument labels, defaults,
+and overloads. For the exact official examples, open
+[api-design-guidelines.md](../assets/api-design-guidelines.md).
 
 ## Naming patterns by API role
 
@@ -19,6 +17,7 @@ Examples:
 - `append(_:)`
 - `sort()`
 - `makeIterator()`
+- See `Naming` in the bundled source for the official good/bad examples.
 
 ### Mutating and nonmutating pairs
 
@@ -87,6 +86,7 @@ Examples:
 - `remove(at:)`
 - `dismiss(animated:)`
 - `split(maxSplits:)`
+- The detailed rationale lives in the bundled source under `Argument Labels`.
 
 Design test:
 - Read the full call out loud.
@@ -121,6 +121,8 @@ Avoid:
 - Prefer a single API with sensible default arguments over large method families.
 - Default values reduce noise for common cases.
 - Put defaulted parameters near the end of the parameter list.
+- The official method-family guidance is in the bundled source under
+  `Parameters`.
 
 Good use case:
 - optional configuration that most callers do not care about
@@ -144,3 +146,13 @@ Examples:
 - Prefer `#fileID` for production-facing APIs; use `#filePath` only when full paths are intentionally useful and the API is not end-user-facing.
 - Label tuple members in public return values when names improve clarity.
 - Name closure parameters that appear in your public API surface.
+
+## Fast Path
+
+- If you are still deciding the higher-level semantic role of the API, go back
+  to [core-principles.md](core-principles.md).
+- If you are cleaning up recurring smells such as raw `Bool` parameters,
+  stronger domain types, or options bags, go next to
+  [common-api-shaping-patterns.md](common-api-shaping-patterns.md).
+- If you are reviewing an existing declaration or diff, go next to
+  [review-checklist.md](review-checklist.md).

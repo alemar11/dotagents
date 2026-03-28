@@ -1,16 +1,15 @@
 # Core Principles
 
-Source material:
-- Official page: https://swift.org/documentation/api-design-guidelines/
-- Source document: https://github.com/swiftlang/swift-org-website/blob/main/documentation/api-design-guidelines/index.md
-
-This reference distills the official Swift API Design Guidelines into a practical set of decision rules for design and review work.
+Use this summary first when choosing between API shapes. For the full authored
+source and examples, open [api-design-guidelines.md](../assets/api-design-guidelines.md).
 
 ## 1. Optimize for clarity at the point of use
 
 - Judge APIs from usage sites, not from declarations in isolation.
 - A declaration is written once, but the usage is read repeatedly.
 - Prefer the shape that makes real code easiest to read correctly.
+- See the bundled source sections `Introduction` and `Fundamentals` for the
+  exact official framing.
 
 Design habit:
 - Write 2-3 realistic call sites before finalizing the API.
@@ -31,6 +30,8 @@ Good instinct:
 - Every declaration should have a doc comment, especially public API.
 - Writing the summary often exposes vague names, overloaded responsibilities, and hidden edge cases.
 - If the behavior is difficult to describe simply, the API may need redesign.
+- Open the `Fundamentals` section in the bundled source for the official
+  doc-comment guidance and examples.
 
 Summary guidelines:
 - Start with a short summary fragment.
@@ -47,6 +48,7 @@ Choose the API shape that matches the meaning:
 - Boolean properties and nonmutating boolean methods should read like assertions, such as `isEmpty` or `intersects(_:)`.
 - Protocols that describe what something is should be nouns.
 - Protocols that describe capabilities should typically end in `able`, `ible`, or `ing`.
+- The official details for these role-based patterns live under `Naming`.
 
 ## 5. Use established terminology
 
@@ -65,6 +67,8 @@ Abbreviations:
 - Use `UpperCamelCase` for types and protocols.
 - Use `lowerCamelCase` for functions, methods, properties, variables, constants, and enum cases.
 - Avoid overloading solely on return type.
+- See `Conventions`, `Parameters`, and `Argument Labels` in the bundled source
+  for the exact wording and examples.
 
 ## 7. Treat API design as evidence-driven
 
@@ -74,3 +78,10 @@ When recommending a change, anchor it in:
 - whether labels help or hurt fluency
 - whether naming matches side effects
 - whether the API is easy to document
+
+## Fast Path
+
+- If the issue is mostly naming, labels, defaults, or overloads, go next to
+  [naming-and-signatures.md](naming-and-signatures.md).
+- If the issue is a review or refactor pass on an existing API, go next to
+  [review-checklist.md](review-checklist.md).

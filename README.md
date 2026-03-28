@@ -10,7 +10,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
 - `postgres/` — Connect to Postgres databases, run queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
 - `skill-audit/` — Audit installed or user-specified Codex skills using repo evidence, memory, and current context to plan updates, merges, or disables.
-- `swift-api-design/` — Design or review Swift APIs using the official Swift API Design Guidelines, with focus on naming, argument labels, documentation, side effects, and call-site clarity.
+- `swift-api-design/` — Design or review Swift APIs using curated local summaries and a bundled upstream copy of the official Swift API Design Guidelines.
 - `swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
 
 ## Project Skills

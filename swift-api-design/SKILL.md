@@ -9,9 +9,10 @@ description: Design or review Swift APIs using the official Swift API Design Gui
 
 Design or review Swift APIs so they feel native to the language and are clear at the call site.
 
-This skill bundles a local reference of the official Swift API Design Guidelines, plus shorter navigation references:
-- https://swift.org/documentation/api-design-guidelines/
-- https://github.com/swiftlang/swift-org-website/blob/main/documentation/api-design-guidelines/index.md
+This skill uses:
+- hand-written local summary pages for fast routing
+- a bundled local copy of the upstream Swift API Design Guidelines in `assets/`
+- a small manifest that tracks which upstream revision is bundled locally
 
 ## Trigger rules
 
@@ -22,31 +23,43 @@ This skill bundles a local reference of the official Swift API Design Guidelines
 
 ## Quick workflow
 
-1. Start from the call site.
+1. Start with [references/README.md](references/README.md).
+2. Pick the shortest summary page that matches the task:
+   - [references/core-principles.md](references/core-principles.md)
+   - [references/naming-and-signatures.md](references/naming-and-signatures.md)
+   - [references/common-api-shaping-patterns.md](references/common-api-shaping-patterns.md)
+   - [references/review-checklist.md](references/review-checklist.md)
+   - [references/official-guidelines.md](references/official-guidelines.md)
+3. Start from the call site.
    - Sketch 2-3 realistic usages before judging the declaration.
    - Optimize for clarity at the point of use, not for declaration cleverness.
-2. Classify the API surface.
+4. Classify the API surface.
    - Is it a type, protocol, property, method, initializer, factory, boolean query, mutating operation, or nonmutating transformation?
    - Apply the naming pattern that matches that role before tweaking labels.
-3. Audit the signature.
+5. Audit the signature.
    - Check the base name, first argument label, remaining labels, default arguments, parameter names, and whether the API reads fluently in code.
-4. Audit semantics.
+6. Audit semantics.
    - Side-effecting operations should read like verb phrases.
    - Nonmutating queries and values should read like noun phrases or assertions.
    - Mutating/nonmutating pairs should use consistent naming.
-5. Write or review the doc comment.
+7. Write or review the doc comment.
    - Every public declaration should have a concise summary.
    - If the API is hard to explain simply, redesign it before polishing it.
-6. Present recommendations with evidence.
+8. Open [assets/api-design-guidelines.md](assets/api-design-guidelines.md) when you need the exact upstream wording or examples behind a recommendation.
+9. Present recommendations with evidence.
    - Show before/after call sites.
    - Explain the change in terms of clarity, fluency, and guideline fit.
 
 ## References
 
-- Read [official-guidelines.md](references/official-guidelines.md) when you need the local reference of the official Swift API Design Guidelines, including the good/bad examples.
+- Read [README.md](references/README.md) first for scope, provenance, and best entrypoints.
 - Read [core-principles.md](references/core-principles.md) first for the high-level design rules that should drive every decision.
 - Read [naming-and-signatures.md](references/naming-and-signatures.md) when choosing names, argument labels, defaults, or overload shapes.
+- Read [common-api-shaping-patterns.md](references/common-api-shaping-patterns.md) when cleaning up recurring API smells such as raw `Bool` parameters, weak domain types, options bags, or awkward method families.
 - Read [review-checklist.md](references/review-checklist.md) when auditing an existing API or summarizing recommended changes.
+- Read [official-guidelines.md](references/official-guidelines.md) when you want the local index page for the full bundled source.
+- Read [assets/api-design-guidelines.md](assets/api-design-guidelines.md) when you need the exact upstream wording, examples, or section structure.
+- Read [assets/manifest.json](assets/manifest.json) only when you need to confirm which upstream revision is bundled locally.
 
 ## Default review rubric
 

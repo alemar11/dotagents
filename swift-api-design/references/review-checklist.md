@@ -1,10 +1,8 @@
 # Review Checklist
 
-Source material:
-- Official page: https://swift.org/documentation/api-design-guidelines/
-- Source document: https://github.com/swiftlang/swift-org-website/blob/main/documentation/api-design-guidelines/index.md
-
-Use this checklist when reviewing or refactoring a Swift API.
+Use this checklist when reviewing or refactoring a Swift API. Open the bundled
+source in [api-design-guidelines.md](../assets/api-design-guidelines.md) when
+you need the exact official wording or examples behind a finding.
 
 ## Call-site clarity
 
@@ -62,3 +60,12 @@ When you recommend changes, prefer:
 - Split a confusing overload set into more explicit names.
 - Replace method families with defaulted parameters when the behavior is truly the same.
 - Rename protocol or type surfaces so they read naturally as identities or capabilities.
+
+## Cross-Checks
+
+- Use [core-principles.md](core-principles.md) when the problem is mostly about
+  semantics, terminology, or call-site clarity.
+- Use [common-api-shaping-patterns.md](common-api-shaping-patterns.md) when the
+  review keeps surfacing the same cleanup moves across different APIs.
+- Use [naming-and-signatures.md](naming-and-signatures.md) when the problem is
+  mostly about labels, defaults, overloads, or mutating/nonmutating pairing.

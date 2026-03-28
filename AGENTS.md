@@ -39,6 +39,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Route maintainer-only Swift-DocC refresh work through repo-level maintainer docs and the `skills-maintainer` skill workflow, not through runtime skill instructions.
 - Keep `swift-docc/references/*.md` biased toward thin, high-frequency task routes such as package API docs, async or stateful API docs, and local preview or render workflows. (Codex learning)
 
+### Swift API Design skill
+- Keep the runtime `swift-api-design` skill focused on the bundled upstream guideline source (`assets/api-design-guidelines.md`), `references/*.md` fast paths, and manifest metadata only.
+- The runtime `swift-api-design` skill must not describe or perform self-upgrade, bundled asset refresh, or reference-layer maintenance workflows.
+- Keep Swift API Design bundled-asset refresh and reference integrity checks in `.agents/skills/skills-maintainer`, and use `.agents/skills/skills-maintainer/references/swift-api-design-runbook.md` as the canonical procedure.
+- Route maintainer-only Swift API Design refresh work through repo-level maintainer docs and the `skills-maintainer` skill workflow, not through runtime skill instructions.
+- Refresh `swift-api-design` from `swiftlang/swift-org-website/documentation/api-design-guidelines/index.md` until the live Swift.org page demonstrably migrates to a different substantive source. (Codex learning)
+
 ### Skills Maintainer skill
 - The `.agents/skills/skills-maintainer` skill is the default maintainer for improving existing skills in this repository through shared upgrade tasks and skill-specific refresh workflows.
 - `skills-maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills in this repository.
