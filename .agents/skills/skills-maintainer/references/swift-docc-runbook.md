@@ -52,7 +52,7 @@ asset tree and maintaining the local fast-path reference layer from within the
 4. Review fast-path coverage manually:
    - `swift-docc/references/README.md`
    - `swift-docc/references/source-map.md`
-   - workflow pages such as `document-a-swift-package.md`, `document-public-symbols.md`, `add-a-docc-catalog.md`, `preview-and-publish.md`, and `tutorial-workflow.md`
+   - workflow pages such as `document-a-swift-package.md`, `document-public-symbols.md`, `document-async-and-stateful-apis.md`, `add-a-docc-catalog.md`, `preview-and-publish.md`, and `tutorial-workflow.md`
 5. If fast-path edits are needed, update those markdown files and rerun:
    - `python3 .agents/skills/skills-maintainer/scripts/swift_docc_refresh.py`
    - `python3 .agents/skills/skills-maintainer/scripts/swift_docc_check.py`

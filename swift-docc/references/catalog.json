@@ -421,6 +421,16 @@
       "primary_topic_id": "writing-symbol-documentation-in-your-source-files"
     },
     {
+      "question": "How do I document async, actor, or state-machine APIs?",
+      "summary_page": "document-async-and-stateful-apis.md",
+      "primary_topic_id": "writing-symbol-documentation-in-your-source-files"
+    },
+    {
+      "question": "How do I document retries, reconnection, lifecycle, or state transitions?",
+      "summary_page": "document-async-and-stateful-apis.md",
+      "primary_topic_id": "writing-symbol-documentation-in-your-source-files"
+    },
+    {
       "question": "How do I write symbol documentation comments?",
       "summary_page": "document-public-symbols.md",
       "primary_topic_id": "writing-symbol-documentation-in-your-source-files"
@@ -467,6 +477,16 @@
     },
     {
       "question": "How do I preview or publish DocC documentation?",
+      "summary_page": "preview-and-publish.md",
+      "primary_topic_id": "distributing-documentation-to-other-developers"
+    },
+    {
+      "question": "How do I preview DocC locally while working on a package?",
+      "summary_page": "preview-and-publish.md",
+      "primary_topic_id": "documenting-a-swift-framework-or-package"
+    },
+    {
+      "question": "How do I build a DocC archive locally?",
       "summary_page": "preview-and-publish.md",
       "primary_topic_id": "distributing-documentation-to-other-developers"
     },

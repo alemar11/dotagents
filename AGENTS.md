@@ -37,6 +37,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - The runtime `swift-docc` skill must not describe or perform self-upgrade, bundled asset refresh, or reference-layer maintenance workflows.
 - Keep Swift-DocC bundled-asset refresh and reference integrity checks in `.agents/skills/skills-maintainer`, and use `.agents/skills/skills-maintainer/references/swift-docc-runbook.md` as the canonical procedure.
 - Route maintainer-only Swift-DocC refresh work through repo-level maintainer docs and the `skills-maintainer` skill workflow, not through runtime skill instructions.
+- Keep `swift-docc/references/*.md` biased toward thin, high-frequency task routes such as package API docs, async or stateful API docs, and local preview or render workflows. (Codex learning)
 
 ### Skills Maintainer skill
 - The `.agents/skills/skills-maintainer` skill is the default maintainer for improving existing skills in this repository through shared upgrade tasks and skill-specific refresh workflows.
