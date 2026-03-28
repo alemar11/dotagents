@@ -52,7 +52,7 @@ Windows:
 Run these from the skill directory (the one that contains `scripts/`).
 Set `DB_PROJECT_ROOT` to the target project root (the directory that contains `.skills/postgres/postgres.toml`).
 
-This skill accepts only `DB_*` user-facing env vars. Legacy aliases such as `PROJECT_ROOT`, `DATABASE_URL`, `POSTGRES_URL`, and `PGHOST` are unsupported.
+Prefer the `DB_*` env vars for direct skill usage. Compatibility inputs such as `DATABASE_URL`, `POSTGRES_URL`, `POSTGRESQL_URL`, and standard libpq connection vars (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`) are also accepted when present.
 When using TOML profiles, new files use schema `1.1.0`. Legacy schema `1` / `1.0.0` still works temporarily, but run `./scripts/migrate_toml_schema.sh` to upgrade to the latest layout. One-off `DB_URL` usage bypasses TOML schema checks.
 
 Example:
@@ -61,7 +61,7 @@ export DB_PROJECT_ROOT="/path/to/project"
 DB_PROFILE=local ./scripts/test_connection.sh
 ```
 
-1) Ensure `psql` is on your PATH (only if `psql` is not found). If `[configuration].pg_bin_dir` is set, it is prepended automatically. Legacy `[configuration].pg_bin_path` is still read for older files. If the latest key is missing, scripts will try to locate `psql` and persist `pg_bin_dir` on schema `1.1.0` files. If the configured path is invalid, you will be prompted before updating it.
+1) Ensure `psql` is on your PATH (only if `psql` is not found). If `[configuration].pg_bin_dir` is set, it is prepended automatically. Legacy `[configuration].pg_bin_path` is still read for older files. If the latest key is missing, runtime scripts try to locate `psql` from PATH/common install locations for the current run only. Use `bootstrap_profile.sh` or update `postgres.toml` explicitly if you want to persist `pg_bin_dir`.
 
 macOS (Homebrew):
 ```sh
@@ -331,7 +331,7 @@ DB_CONFIRM=YES ./scripts/terminate_backend.sh 12345
 ```
 
 ## Script index (keep current)
-- `resolve_db_url.sh` — Resolves `DB_URL` from `postgres.toml` or `DB_URL` env for one-off use.
+- `resolve_db_url.sh` — Resolves `DB_URL` from `postgres.toml`, `DB_URL`, or compatibility connection env inputs for one-off use.
   - Example: `eval "$(./scripts/resolve_db_url.sh)"`
   - Perf: uses `DB_RESOLVE_CACHE=1` by default for faster repeated resolution.
 - `psql_with_ssl_fallback.sh` — Runs `psql` with automatic SSL retry when needed.

@@ -170,23 +170,6 @@ pg_env_confirm_update() {
   return 1
 }
 
-pg_env_prompt_install() {
-  local formula="$1"
-  if [[ -z "$formula" ]]; then
-    return 1
-  fi
-  if [[ -t 0 ]]; then
-    local reply
-    read -r -p "psql not found. Install ${formula} with Homebrew? [y/N] " reply
-    case "$reply" in
-      [yY]|[yY][eE][sS]) return 0 ;;
-      *) return 1 ;;
-    esac
-  fi
-  echo "psql not found. Install with: brew install ${formula}" >&2
-  return 1
-}
-
 pg_env_psql_path="$(command -v psql 2>/dev/null || true)"
 pg_env_project_root=""
 pg_env_toml_path=""
@@ -223,9 +206,6 @@ if [[ -z "$pg_env_psql_path" ]]; then
           if [[ -z "$pg_env_formula" ]]; then
             pg_env_formula="postgresql"
           fi
-          if pg_env_prompt_install "$pg_env_formula"; then
-            brew install "$pg_env_formula" || true
-          fi
         fi
         if [[ -n "$pg_env_formula" ]]; then
           pg_env_prefix="$(brew --prefix "$pg_env_formula" 2>/dev/null || true)"
@@ -259,19 +239,8 @@ fi
 
 if [[ -n "$pg_env_psql_path" ]]; then
   pg_env_found_bin="$(dirname "$pg_env_psql_path")"
-  if [[ -n "$pg_env_toml_path" && -f "$pg_env_toml_path" ]]; then
-    if [[ -z "$pg_env_config_bin" ]]; then
-      pg_env_write_pg_bin_dir "$pg_env_toml_path" "$pg_env_found_bin" || true
-    else
-      pg_env_config_key="$(pg_env_preferred_pg_bin_key "$pg_env_toml_path")"
-      pg_env_config_bin_dir="$(pg_env_normalize_bin_dir "$pg_env_config_bin")"
-      if [[ "$pg_env_found_bin" != "$pg_env_config_bin_dir" ]]; then
-        if pg_env_confirm_update "Configured ${pg_env_config_key} '${pg_env_config_bin}' does not resolve to psql. Update postgres.toml to '${pg_env_found_bin}'?"; then
-          pg_env_write_pg_bin_dir "$pg_env_toml_path" "$pg_env_found_bin" || true
-        fi
-      fi
-    fi
-  fi
+  # Runtime helpers may discover a usable psql binary for the current process,
+  # but persisting pg_bin_dir is reserved for explicit bootstrap/migration flows.
 fi
 
 if [[ -n "${DB_STATEMENT_TIMEOUT_MS:-}" || -n "${DB_LOCK_TIMEOUT_MS:-}" ]]; then

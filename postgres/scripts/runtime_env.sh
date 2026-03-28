@@ -118,6 +118,119 @@ postgres_runtime_normalize_bin_dir() {
   fi
 }
 
+postgres_runtime_normalize_sslmode() {
+  local raw="${1:-}"
+  local lowered=""
+  if [[ -z "$raw" ]]; then
+    return 0
+  fi
+  lowered="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  case "$lowered" in
+    true|t|1|yes|y|on|enable|enabled|require|required|verify-ca|verify-full)
+      echo "require"
+      ;;
+    false|f|0|no|n|off|disable|disabled)
+      echo "disable"
+      ;;
+    *)
+      echo "$raw"
+      ;;
+  esac
+}
+
+postgres_runtime_connection_sslmode() {
+  local conn="$1"
+  local query raw
+
+  if [[ -z "$conn" ]]; then
+    return 0
+  fi
+
+  if [[ "$conn" == *"://"* ]]; then
+    query="${conn#*\?}"
+    raw=""
+    if [[ "$query" != "$conn" ]]; then
+      query="${query%%#*}"
+      local pair
+      IFS='&' read -r -a pairs <<< "$query"
+      for pair in "${pairs[@]}"; do
+        case "$pair" in
+          sslmode=*)
+            raw="${pair#sslmode=}"
+            break
+            ;;
+        esac
+      done
+    fi
+    postgres_runtime_normalize_sslmode "$raw"
+    return 0
+  fi
+
+  postgres_runtime_python_exec "" - "$conn" <<'PY'
+import shlex
+import sys
+
+conn = sys.argv[1]
+
+try:
+    tokens = shlex.split(conn)
+except ValueError:
+    tokens = conn.split()
+
+for token in tokens:
+    if "=" not in token:
+        continue
+    key, value = token.split("=", 1)
+    if key == "sslmode":
+        print(value.strip())
+        break
+PY
+}
+
+postgres_runtime_connection_set_sslmode() {
+  local conn="$1"
+  local sslmode="$2"
+
+  postgres_runtime_python_exec "" - "$conn" "$sslmode" <<'PY'
+import shlex
+import sys
+import urllib.parse
+
+conn = sys.argv[1]
+sslmode = sys.argv[2]
+
+if "://" in conn:
+    parsed = urllib.parse.urlparse(conn)
+    if parsed.scheme:
+        query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+        query["sslmode"] = [sslmode]
+        new_query = urllib.parse.urlencode(query, doseq=True)
+        print(urllib.parse.urlunparse(parsed._replace(query=new_query)))
+        raise SystemExit(0)
+
+try:
+    tokens = shlex.split(conn)
+except ValueError:
+    tokens = conn.split()
+
+params = []
+seen = False
+for token in tokens:
+    if "=" not in token:
+        continue
+    key, value = token.split("=", 1)
+    if key == "sslmode":
+        value = sslmode
+        seen = True
+    params.append((key, value))
+
+if not seen:
+    params.append(("sslmode", sslmode))
+
+print(" ".join(f"{key}={shlex.quote(value)}" for key, value in params if value != ""))
+PY
+}
+
 postgres_runtime_add_python_candidate() {
   local candidate="$1"
   local label="$2"

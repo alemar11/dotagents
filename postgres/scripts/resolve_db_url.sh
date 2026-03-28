@@ -337,60 +337,117 @@ parse_resolved_output() {
 }
 
 normalize_sslmode_from_env_url() {
-  local url="$1"
-  local query="${url#*\?}"
-  local raw=""
-
-  if [[ "$query" != "$url" ]]; then
-    query="${query%%#*}"
-    local pair
-    IFS='&' read -r -a pairs <<< "$query"
-    for pair in "${pairs[@]}"; do
-      case "$pair" in
-        sslmode=*)
-          raw="${pair#sslmode=}"
-          break
-          ;;
-      esac
-    done
-  fi
-
-  if [[ -z "$raw" ]]; then
+  local conn="$1"
+  local sslmode=""
+  sslmode="$(postgres_runtime_connection_sslmode "$conn")"
+  if [[ -z "$sslmode" ]]; then
     echo "disable"
     return 0
   fi
+  echo "$sslmode"
+}
 
-  local lower
-  lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-  case "$lower" in
-    true|t|1|yes|y|on|enable|enabled|require|required|verify-ca|verify-full)
-      echo "require"
-      ;;
-    false|f|0|no|n|off|disable|disabled)
-      echo "disable"
-      ;;
-    *)
-      echo "$raw"
-      ;;
-  esac
+first_nonempty_env() {
+  local key
+  for key in "$@"; do
+    if [[ -n "${!key:-}" ]]; then
+      COMPAT_ENV_KEY="$key"
+      COMPAT_ENV_VALUE="${!key}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+conninfo_quote() {
+  local value="$1"
+  local escaped="$value"
+  if [[ -z "$value" || "$value" == *["'\\ ="]* ]]; then
+    escaped="${escaped//\\/\\\\}"
+    escaped="${escaped//\'/\\\'}"
+    printf "'%s'" "$escaped"
+    return 0
+  fi
+  printf '%s' "$escaped"
+}
+
+build_conninfo_from_env_bundle() {
+  local host="$1"
+  local port="$2"
+  local database="$3"
+  local user="$4"
+  local password="$5"
+  local sslmode="$6"
+  local parts=()
+
+  if [[ -n "$host" ]]; then
+    parts+=("host=$(conninfo_quote "$host")")
+  fi
+  if [[ -n "$port" ]]; then
+    parts+=("port=$(conninfo_quote "$port")")
+  fi
+  if [[ -n "$database" ]]; then
+    parts+=("dbname=$(conninfo_quote "$database")")
+  fi
+  if [[ -n "$user" ]]; then
+    parts+=("user=$(conninfo_quote "$user")")
+  fi
+  if [[ -n "$password" ]]; then
+    parts+=("password=$(conninfo_quote "$password")")
+  fi
+  if [[ -n "$sslmode" ]]; then
+    parts+=("sslmode=$(conninfo_quote "$sslmode")")
+  fi
+
+  printf '%s' "${parts[*]}"
+}
+
+resolve_compat_env_connection() {
+  local host=""
+  local port=""
+  local database=""
+  local user=""
+  local password=""
+  local sslmode=""
+  local has_split_env=0
+  local key
+
+  COMPAT_CONN=""
+  COMPAT_DB_SSLMODE=""
+  COMPAT_SOURCE=""
+
+  if first_nonempty_env DATABASE_URL POSTGRES_URL POSTGRESQL_URL; then
+    COMPAT_CONN="$COMPAT_ENV_VALUE"
+    COMPAT_DB_SSLMODE="$(normalize_sslmode_from_env_url "$COMPAT_CONN")"
+    COMPAT_SOURCE="env:${COMPAT_ENV_KEY}"
+    return 0
+  fi
+
+  for key in PGHOST PGPORT PGDATABASE PGUSER PGPASSWORD PGSSLMODE DB_HOST DB_PORT DB_DATABASE DB_NAME DB_USER DB_PASSWORD; do
+    if [[ -n "${!key:-}" ]]; then
+      has_split_env=1
+      break
+    fi
+  done
+
+  if [[ "$has_split_env" != "1" ]]; then
+    return 1
+  fi
+
+  host="${PGHOST:-${DB_HOST:-}}"
+  port="${PGPORT:-${DB_PORT:-}}"
+  database="${PGDATABASE:-${DB_DATABASE:-${DB_NAME:-}}}"
+  user="${PGUSER:-${DB_USER:-}}"
+  password="${PGPASSWORD:-${DB_PASSWORD:-}}"
+  sslmode="$(postgres_runtime_normalize_sslmode "${PGSSLMODE:-}")"
+
+  COMPAT_CONN="$(build_conninfo_from_env_bundle "$host" "$port" "$database" "$user" "$password" "$sslmode")"
+  COMPAT_DB_SSLMODE="${sslmode:-prefer}"
+  COMPAT_SOURCE="env:compat"
+  return 0
 }
 
 check_unsupported_env "PROJECT_ROOT" "DB_PROJECT_ROOT"
-check_unsupported_env "DATABASE_URL" "DB_URL"
-check_unsupported_env "POSTGRES_URL" "DB_URL"
-check_unsupported_env "POSTGRESQL_URL" "DB_URL"
-check_unsupported_env "PGHOST" "DB_URL"
-check_unsupported_env "PGPORT" "DB_URL"
-check_unsupported_env "PGDATABASE" "DB_URL"
-check_unsupported_env "PGUSER" "DB_URL"
-check_unsupported_env "PGPASSWORD" "DB_URL"
-check_unsupported_env "PGSSLMODE" "DB_URL"
-check_unsupported_env "DB_HOST" "DB_URL"
-check_unsupported_env "DB_PORT" "DB_URL"
-check_unsupported_env "DB_NAME" "DB_URL"
-check_unsupported_env "DB_DATABASE" "DB_URL"
-check_unsupported_env "DB_USER" "DB_URL"
-check_unsupported_env "DB_PASSWORD" "DB_URL"
 
 PROFILE="${DB_PROFILE:-}"
 if [[ -n "$PROFILE" && ! "$PROFILE" =~ ^[a-z0-9_-]+$ ]]; then
@@ -411,6 +468,21 @@ if [[ -n "${DB_URL:-}" ]]; then
   fi
 
   print_resolved "$DB_URL" "$db_sslmode" "$resolved_profile" "env" ""
+  exit 0
+fi
+
+if resolve_compat_env_connection; then
+  resolved_profile="${PROFILE:-$DEFAULT_PROFILE}"
+
+  if resolve_cache_enabled; then
+    cache_sig="$(resolve_signature "env" "$COMPAT_SOURCE" "$COMPAT_CONN" "$COMPAT_DB_SSLMODE" "$resolved_profile")"
+    if resolve_cache_load "$cache_sig"; then
+      exit 0
+    fi
+    resolve_cache_save "$cache_sig" "$COMPAT_CONN" "$COMPAT_DB_SSLMODE" "$resolved_profile" "$COMPAT_SOURCE" ""
+  fi
+
+  print_resolved "$COMPAT_CONN" "$COMPAT_DB_SSLMODE" "$resolved_profile" "$COMPAT_SOURCE" ""
   exit 0
 fi
 

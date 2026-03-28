@@ -39,7 +39,8 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 ## Workflow
 1) Confirm connection source:
    - If `DB_URL` is provided, use it for a one-off connection unless the user asks to persist it.
-   - Use only `DB_*` environment variables for this skill. Non-`DB_*` aliases (for example `PROJECT_ROOT`, `DATABASE_URL`, `PGHOST`) are unsupported.
+   - Prefer `DB_*` environment variables for this skill. Compatibility inputs such as `DATABASE_URL`, `POSTGRES_URL`, `POSTGRESQL_URL`, and standard libpq connection vars (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`) are also accepted when present.
+   - `PROJECT_ROOT` remains unsupported; use `DB_PROJECT_ROOT` instead.
    - Use `postgres.toml` when present; otherwise ask the user for the data required to create a profile.
    - If the user explicitly asks to bootstrap, repair, or refresh a saved profile, prefer `./scripts/bootstrap_profile.sh` over hand-editing TOML. It is interactive-only; run it from the target repo root or set `DB_PROJECT_ROOT`.
    - If a `postgres.toml` is already present under the current repo/root at `.skills/postgres/postgres.toml`, treat that repo/root as the project root and proceed without prompting for `DB_PROJECT_ROOT`.
@@ -177,24 +178,6 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - When releasing, remove related bullets from `WIP` and add one short summary under `RELEASED` (newest first).
 - After any schema change, run the least expensive query that confirms the change.
 - For full rules and migration workflow, read `references/postgres_guardrails.md` when doing schema changes.
-
-## Common requests
-- Bootstrap or refresh a saved profile (interactive):
-  - `DB_PROJECT_ROOT=/path/to/repo /path/to/postgres-skill/scripts/bootstrap_profile.sh`
-- Release a pending migration file:
-  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/release_migration.sh --summary "Add agent-context prompt sections"`
-- Dry-run a pending migration release:
-  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/release_migration.sh --summary "Add agent-context prompt sections" --dry-run`
-- Run SQL safely (inline):
-  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh -c "select 1;"`
-- Run SQL safely (heredoc):
-  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh <<'SQL'`
-  - `select current_database();`
-  - `SQL`
-- Check connection: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/test_connection.sh`
-- Postgres version: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/pg_version.sh`
-- Connection details: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/connection_info.sh`
-- Find objects by name: `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/find_objects.sh users`
 
 ## Examples
 

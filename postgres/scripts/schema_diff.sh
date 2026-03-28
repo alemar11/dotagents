@@ -13,7 +13,7 @@ Or via env:
   DB_PROFILE_A=local DB_PROFILE_B=staging ./scripts/schema_diff.sh
 
 Optional overrides:
-  DB_URL_A / DB_URL_B (full connection URLs)
+  DB_URL_A / DB_URL_B (full connection strings)
 EOF
 }
 
@@ -26,37 +26,17 @@ require_cmd() {
 }
 
 get_sslmode_from_url() {
-  postgres_runtime_python_exec "" - "$1" <<'PY'
-import sys
-import urllib.parse
-
-url = sys.argv[1]
-parsed = urllib.parse.urlparse(url)
-query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-raw = query.get("sslmode", ["disable"])[0] or "disable"
-lower = str(raw).strip().lower()
-if lower in {"true", "t", "1", "yes", "y", "on", "enable", "enabled", "require", "required", "verify-ca", "verify-full"}:
-    print("require")
-elif lower in {"false", "f", "0", "no", "n", "off", "disable", "disabled"}:
-    print("disable")
-else:
-    print(raw)
-PY
+  local sslmode=""
+  sslmode="$(postgres_runtime_connection_sslmode "$1")"
+  if [[ -z "$sslmode" ]]; then
+    echo "disable"
+    return 0
+  fi
+  echo "$sslmode"
 }
 
 set_sslmode_in_url() {
-  postgres_runtime_python_exec "" - "$1" "$2" <<'PY'
-import sys
-import urllib.parse
-
-url = sys.argv[1]
-sslmode = sys.argv[2]
-parsed = urllib.parse.urlparse(url)
-query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-query["sslmode"] = [sslmode]
-new_query = urllib.parse.urlencode(query, doseq=True)
-print(urllib.parse.urlunparse(parsed._replace(query=new_query)))
-PY
+  postgres_runtime_connection_set_sslmode "$1" "$2"
 }
 
 load_profile() {

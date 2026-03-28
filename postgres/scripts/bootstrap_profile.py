@@ -78,21 +78,6 @@ SSL_TRUE = {
 SSL_FALSE = {"false", "f", "0", "no", "n", "off", "disable", "disabled"}
 FORBIDDEN_ENV_ALIASES = {
     "PROJECT_ROOT": "DB_PROJECT_ROOT",
-    "DATABASE_URL": "DB_URL",
-    "POSTGRES_URL": "DB_URL",
-    "POSTGRESQL_URL": "DB_URL",
-    "PGHOST": "DB_URL",
-    "PGPORT": "DB_URL",
-    "PGDATABASE": "DB_URL",
-    "PGUSER": "DB_URL",
-    "PGPASSWORD": "DB_URL",
-    "PGSSLMODE": "DB_URL",
-    "DB_HOST": "DB_URL",
-    "DB_PORT": "DB_URL",
-    "DB_NAME": "DB_URL",
-    "DB_DATABASE": "DB_URL",
-    "DB_USER": "DB_URL",
-    "DB_PASSWORD": "DB_URL",
 }
 
 

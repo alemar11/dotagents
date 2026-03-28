@@ -4,37 +4,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/pg_env.sh"
 
-normalize_sslmode_from_url() {
-  local url="$1"
-  local query="${url#*\?}"
-  local raw=""
-  if [[ "$query" != "$url" ]]; then
-    query="${query%%#*}"
-    local pair
-    IFS='&' read -r -a pairs <<< "$query"
-    for pair in "${pairs[@]}"; do
-      case "$pair" in
-        sslmode=*)
-          raw="${pair#sslmode=}"
-          break
-          ;;
-      esac
-    done
-  fi
-  if [[ -z "$raw" ]]; then
-    echo "disable"
-    return 0
-  fi
-  case "${raw,,}" in
-    true|t|1|yes|y|on|enable|enabled|require|required|verify-ca|verify-full) echo "require" ;;
-    false|f|0|no|n|off|disable|disabled) echo "disable" ;;
-    *) echo "$raw" ;;
-  esac
-}
-
 resolve_runtime_context() {
   if [[ -n "${DB_URL:-}" ]]; then
-    DB_SSLMODE="${DB_SSLMODE:-$(normalize_sslmode_from_url "$DB_URL")}"
+    DB_SSLMODE="${DB_SSLMODE:-$(postgres_runtime_connection_sslmode "$DB_URL")}"
+    if [[ -z "$DB_SSLMODE" ]]; then
+      DB_SSLMODE="disable"
+    fi
     DB_PROFILE="${DB_PROFILE:-local}"
     DB_URL_SOURCE="${DB_URL_SOURCE:-env}"
     DB_TOML_PATH="${DB_TOML_PATH:-}"
@@ -101,19 +76,7 @@ if [[ $status -eq 0 ]]; then
 fi
 
 if [[ "${DB_SSLMODE:-}" == "disable" ]] && should_retry_with_ssl "$first_err_file"; then
-  SSL_URL="$(
-    postgres_runtime_python_exec "${DB_TOML_PATH:-}" - "$DB_URL" <<'PY'
-import sys
-import urllib.parse
-
-url = sys.argv[1]
-parsed = urllib.parse.urlparse(url)
-query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-query["sslmode"] = ["require"]
-new_query = urllib.parse.urlencode(query, doseq=True)
-print(urllib.parse.urlunparse(parsed._replace(query=new_query)))
-PY
-  )"
+  SSL_URL="$(postgres_runtime_connection_set_sslmode "$DB_URL" "require")"
 
   echo "Retrying with sslmode=require for profile '$DB_PROFILE'..." >&2
 

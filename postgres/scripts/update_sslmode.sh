@@ -37,7 +37,9 @@ if [[ -z "$PROFILE" || -z "$NEW_SSLMODE" ]]; then
 fi
 
 normalize_sslmode() {
-  case "${1,,}" in
+  local lowered=""
+  lowered="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$lowered" in
     true|t|1|yes|y|on|enable|enabled|require|required|verify-ca|verify-full)
       echo "true"
       ;;

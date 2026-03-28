@@ -52,7 +52,7 @@ order by idx_scan asc;
 ```
 
 ## 6) Enable slow-query and lock-wait logging
-Capture slow SQL and lock waits in logs so intermittent production issues are diagnosable.
+Capture slow SQL and lock waits in logs so intermittent production issues are diagnosable. `ALTER SYSTEM` is a privileged, cluster-level change, so use it only when you actually manage cluster-wide settings; otherwise apply the equivalent settings through your platform/config-management path.
 
 ```sql
 alter system set log_min_duration_statement = '250ms';

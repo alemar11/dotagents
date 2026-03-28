@@ -12,7 +12,7 @@ A pooler lets many clients share fewer database backends, improving resilience u
 If your workload depends on session state (for example named prepared statements or temp tables), use a compatible pooling mode.
 
 ## 4) Set timeouts at the narrowest practical scope
-Use timeouts to protect the cluster from runaway or abandoned sessions, but prefer role-, database-, or session-scoped defaults for application traffic. Cluster-wide defaults for `statement_timeout`, `transaction_timeout`, and `lock_timeout` can break maintenance or administrative work.
+Use timeouts to protect the cluster from runaway or abandoned sessions, but prefer role-, database-, or session-scoped defaults for application traffic. Cluster-wide defaults for `statement_timeout`, `transaction_timeout`, and `lock_timeout` can break maintenance or administrative work. If your PostgreSQL version does not support `transaction_timeout`, omit that setting rather than forcing a version-specific workaround into the general pattern.
 
 ```sql
 alter role app_user in database appdb set statement_timeout = '30s';

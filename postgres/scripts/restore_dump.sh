@@ -15,21 +15,6 @@ if [[ ! -f "$input" ]]; then
   exit 1
 fi
 
-set_sslmode_in_url() {
-  postgres_runtime_python_exec "${DB_TOML_PATH:-}" - "$1" "$2" <<'PY'
-import sys
-import urllib.parse
-
-url = sys.argv[1]
-sslmode = sys.argv[2]
-parsed = urllib.parse.urlparse(url)
-query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-query["sslmode"] = [sslmode]
-new_query = urllib.parse.urlencode(query, doseq=True)
-print(urllib.parse.urlunparse(parsed._replace(query=new_query)))
-PY
-}
-
 run_restore() {
   local url="$1"
   if [[ "$input" == *.sql ]]; then
@@ -39,16 +24,42 @@ run_restore() {
   fi
 }
 
+should_retry_with_ssl() {
+  local err_file="$1"
+  [[ -s "$err_file" ]] || return 1
+  grep -Eiq \
+    'SSL off|requires SSL|requires encryption|server requires|sslmode|TLS|certificate|no pg_hba\.conf entry.*SSL off' \
+    "$err_file"
+}
+
+run_restore_with_stderr_capture() {
+  local url="$1"
+  local err_file="$2"
+  set +e
+  run_restore "$url" 2>"$err_file"
+  local cmd_status=$?
+  set -e
+  if [[ -s "$err_file" ]]; then
+    cat "$err_file" >&2
+  fi
+  return $cmd_status
+}
+
+first_err_file="$(mktemp)"
+retry_err_file=""
+trap 'rm -f "$first_err_file" "$retry_err_file"' EXIT
+
 set +e
-run_restore "$DB_URL"
+run_restore_with_stderr_capture "$DB_URL" "$first_err_file"
 status=$?
 set -e
 
-if [[ $status -ne 0 && "$DB_SSLMODE" == "disable" ]]; then
-  retry_url="$(set_sslmode_in_url "$DB_URL" "require")"
+if [[ $status -ne 0 && "$DB_SSLMODE" == "disable" ]] && should_retry_with_ssl "$first_err_file"; then
+  retry_url="$(postgres_runtime_connection_set_sslmode "$DB_URL" "require")"
   echo "Retrying restore with sslmode=require for profile '${DB_PROFILE:-local}'..." >&2
+  retry_err_file="$(mktemp)"
   set +e
-  run_restore "$retry_url"
+  run_restore_with_stderr_capture "$retry_url" "$retry_err_file"
   retry_status=$?
   set -e
 

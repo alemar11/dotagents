@@ -1,8 +1,10 @@
 # Postgres Skill Environment Variables
 
-This skill exposes a `DB_*`-only user-facing environment contract.
+Prefer the `DB_*` variables below when invoking this skill directly. The runtime
+also accepts common compatibility inputs for connection setup so it can work
+cleanly in existing Postgres-oriented environments.
 
-## Supported user-facing variables
+## Preferred runtime variables
 - `DB_URL`
 - `DB_PROFILE`
 - `DB_PROJECT_ROOT`
@@ -29,32 +31,26 @@ This skill exposes a `DB_*`-only user-facing environment contract.
 - `DB_URL_B`
 - `DB_DOCS_SEARCH_URL`
 - `DB_DOCS_SEARCH_MAX_TIME`
-- `DB_MIGRATIONS_PATH` (for AGENTS.md guidance updates)
+
+## Compatibility connection inputs
+These are accepted as compatibility inputs when `DB_URL` is not set:
+- URL aliases: `DATABASE_URL`, `POSTGRES_URL`, `POSTGRESQL_URL`
+- libpq env vars: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`
+- split DB fields: `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+
+## Project metadata keys
+These are not runtime environment variables:
+- `DB_MIGRATIONS_PATH` is resolved from project `AGENTS.md` guidance, not from the shell environment.
 
 ## Internal bridge variables
 The skill may set PostgreSQL-native variables internally when invoking Postgres tools:
 - `PGAPPNAME` (from `DB_APPLICATION_NAME`)
 - `PGOPTIONS` (from timeout settings)
 
-Do not set these as part of the public skill configuration contract.
+Do not set these as part of the public skill configuration contract unless you
+are intentionally bypassing the skill.
 
-## Removed aliases
-These are intentionally unsupported and should be replaced:
+## Still unsupported aliases
 - `PROJECT_ROOT` -> `DB_PROJECT_ROOT`
-- `DATABASE_URL` -> `DB_URL`
-- `POSTGRES_URL` -> `DB_URL`
-- `POSTGRESQL_URL` -> `DB_URL`
-- `PGHOST` -> `DB_URL`
-- `PGPORT` -> `DB_URL`
-- `PGDATABASE` -> `DB_URL`
-- `PGUSER` -> `DB_URL`
-- `PGPASSWORD` -> `DB_URL`
-- `PGSSLMODE` -> `DB_URL`
-- `DB_HOST` -> `DB_URL`
-- `DB_PORT` -> `DB_URL`
-- `DB_NAME` -> `DB_URL`
-- `DB_DATABASE` -> `DB_URL`
-- `DB_USER` -> `DB_URL`
-- `DB_PASSWORD` -> `DB_URL`
 - `PG_DOCS_SEARCH_URL` -> `DB_DOCS_SEARCH_URL`
 - `PG_DOCS_SEARCH_MAX_TIME` -> `DB_DOCS_SEARCH_MAX_TIME`
