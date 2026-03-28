@@ -23,6 +23,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - In `references/` folders, keep `.md` filenames lowercase except for `README.md` and `AGENTS.md`.
 - If `brand_color` isn’t provided, pick a random hex color not already used by other skills in this repo and set it in `agents/openai.yaml`.
 - Runtime skills must stay unaware of `.agents/skills/skills-maintainer`: do not reference it, its runbooks, or maintainer-routing instructions from runtime `SKILL.md` files or runtime usage references. Keep that routing only in repo-level maintainer docs such as this `AGENTS.md`.
+- Runtime skills may surface runtime learnings or durable guidance candidates, but they must not perform self-upgrade, metadata-sync, reference-refresh, or other repo-maintenance workflows from their own runtime instructions.
+- Route skill-maintenance and repo-maintenance work through `.agents/skills/skills-maintainer` from repo-level maintainer docs, not from runtime `SKILL.md` files.
 
 ### Postgres skill
 - Keep Postgres runtime behavior and operator-facing rules in `postgres/SKILL.md` and `postgres/references/*` (not duplicated here).
@@ -32,6 +34,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Skills Maintainer skill
 - The `.agents/skills/skills-maintainer` skill is the default maintainer for improving existing skills in this repository through shared upgrade tasks and skill-specific refresh workflows.
+- `skills-maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills in this repository.
 - Keep `skills-maintainer` self-contained: workflow markdown guidance must live under `.agents/skills/skills-maintainer/references/`.
 - Keep the dependency direction one-way: runtime skills must not depend on, reference, or route users to `.agents/skills/skills-maintainer`; only repo-level maintainer docs may route work to `skills-maintainer`.
 - When updating skill metadata/docs across the repo, route through the `skills-maintainer` playbooks and keep README/openai metadata text aligned.
