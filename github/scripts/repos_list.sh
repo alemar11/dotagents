@@ -85,76 +85,131 @@ if [[ "$ALL" -eq 1 ]]; then
   LIMIT=1000
 fi
 
-"$SCRIPT_DIR/preflight_gh.sh" ${ALLOW_NON_PROJECT:+--allow-non-project}
+if [[ "$ALLOW_NON_PROJECT" -eq 1 ]]; then
+  "$SCRIPT_DIR/preflight_gh.sh" --allow-non-project >&2
+else
+  "$SCRIPT_DIR/preflight_gh.sh" >&2
+fi
+
+ENDPOINT=""
+API_TYPE="$TYPE"
+FILTER_MODE="$TYPE"
 
 if [[ -n "$OWNER" ]]; then
-  TARGET_ENDPOINT="users/$OWNER/repos"
-  TARGET_TYPE="$TYPE"
-  TARGET_FILTER='.'
+  ENDPOINT="users/$OWNER/repos"
 
-  if gh api "orgs/$OWNER" >/dev/null 2>&1; then
-    TARGET_ENDPOINT="orgs/$OWNER/repos"
+  if gh api "orgs/$OWNER" --silent >/dev/null 2>&1; then
+    ENDPOINT="orgs/$OWNER/repos"
+    if [[ "$TYPE" == "member" ]]; then
+      echo "--type member is only valid when listing repositories available to the authenticated user." >&2
+      exit 64
+    fi
   else
     case "$TYPE" in
-      all|owner|member)
-        TARGET_TYPE="$TYPE"
+      member)
+        echo "--type member is only valid when listing repositories available to the authenticated user." >&2
+        exit 64
+        ;;
+      all)
+        API_TYPE=""
+        FILTER_MODE="all"
         ;;
       public|private|forks|sources|archived)
-        TARGET_TYPE="all"
-        ;;
-    esac
-
-    case "$TYPE" in
-      public)
-        TARGET_FILTER='select(.private == false)'
-        ;;
-      private)
-        TARGET_FILTER='select(.private == true)'
-        ;;
-      forks)
-        TARGET_FILTER='select(.fork == true)'
-        ;;
-      sources)
-        TARGET_FILTER='select(.fork == false)'
-        ;;
-      archived)
-        TARGET_FILTER='select(.archived == true)'
+        API_TYPE="all"
         ;;
     esac
   fi
-
-  gh api "$TARGET_ENDPOINT" -X GET --paginate -F type="$TARGET_TYPE" -F per_page="$LIMIT" --jq ".[] | $TARGET_FILTER | {name: .name, full_name: .full_name, private: .private, visibility: .visibility, fork: .fork, archived: .archived, owner: .owner.login}"
 else
-  TARGET_ENDPOINT="user/repos"
-  TARGET_TYPE="$TYPE"
-  TARGET_FILTER='.'
-
+  ENDPOINT="user/repos"
   case "$TYPE" in
-    all|owner|member)
-      TARGET_TYPE="$TYPE"
-      ;;
     public|private|forks|sources|archived)
-      TARGET_TYPE="all"
+      API_TYPE="all"
       ;;
   esac
-
-  case "$TYPE" in
-    public)
-      TARGET_FILTER='select(.private == false)'
-      ;;
-    private)
-      TARGET_FILTER='select(.private == true)'
-      ;;
-    forks)
-      TARGET_FILTER='select(.fork == true)'
-      ;;
-    sources)
-      TARGET_FILTER='select(.fork == false)'
-      ;;
-    archived)
-      TARGET_FILTER='select(.archived == true)'
-      ;;
-  esac
-
-  gh api "$TARGET_ENDPOINT" -X GET --paginate -F type="$TARGET_TYPE" -F per_page="$LIMIT" --jq ".[] | $TARGET_FILTER | {name: .name, full_name: .full_name, private: .private, visibility: .visibility, fork: .fork, archived: .archived, owner: .owner.login}"
 fi
+
+python3 - "$LIMIT" "$FILTER_MODE" "$ENDPOINT" "$API_TYPE" <<'PY'
+import json
+import subprocess
+import sys
+
+limit = int(sys.argv[1])
+filter_mode = sys.argv[2]
+endpoint = sys.argv[3]
+api_type = sys.argv[4]
+
+def fetch_page(page: int, per_page: int) -> list[dict]:
+    cmd = [
+        "gh",
+        "api",
+        endpoint,
+        "-X",
+        "GET",
+        "-F",
+        f"per_page={per_page}",
+        "-F",
+        f"page={page}",
+    ]
+    if api_type:
+        cmd.extend(["-F", f"type={api_type}"])
+    proc = subprocess.run(cmd, text=True, capture_output=True)
+    if proc.returncode != 0:
+        message = (proc.stderr or proc.stdout or "").strip()
+        print(message or "gh api failed", file=sys.stderr)
+        raise SystemExit(proc.returncode)
+    try:
+        payload = json.loads(proc.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        print(f"Failed to parse gh api output: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    if not isinstance(payload, list):
+        print("Unexpected gh api response shape.", file=sys.stderr)
+        raise SystemExit(1)
+    return payload
+
+def matches(repo):
+    if filter_mode == "all":
+        return True
+    if filter_mode == "public":
+        return not repo.get("private", False)
+    if filter_mode == "private":
+        return bool(repo.get("private", False))
+    if filter_mode == "forks":
+        return bool(repo.get("fork", False))
+    if filter_mode == "sources":
+        return not repo.get("fork", False)
+    if filter_mode == "archived":
+        return bool(repo.get("archived", False))
+    if filter_mode == "member":
+        return True
+    return True
+
+server_filtered_modes = {"all", "member"}
+per_page = min(limit, 100) if filter_mode in server_filtered_modes else 100
+
+count = 0
+page = 1
+while count < limit:
+    items = fetch_page(page, per_page)
+    if not items:
+        break
+    for repo in items:
+        if not isinstance(repo, dict) or not matches(repo):
+            continue
+        payload = {
+            "name": repo.get("name"),
+            "full_name": repo.get("full_name"),
+            "private": repo.get("private"),
+            "visibility": repo.get("visibility"),
+            "fork": repo.get("fork"),
+            "archived": repo.get("archived"),
+            "owner": ((repo.get("owner") or {}).get("login")),
+        }
+        print(json.dumps(payload, separators=(",", ":")))
+        count += 1
+        if count >= limit:
+            break
+    if len(items) < per_page:
+        break
+    page += 1
+PY

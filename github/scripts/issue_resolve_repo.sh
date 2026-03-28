@@ -66,10 +66,8 @@ if [[ -z "$REMOTE" ]]; then
   exit 4
 fi
 
-REPO="$(printf '%s\n' "$REMOTE" \
-  | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#^ssh://[^/]+/##; s#^git://[^/]+/##; s#\\.git$##; s#/$##')"
-
-if [[ -z "$REPO" || "$REPO" != */* || "$REPO" == */ || "$REPO" == */*/* ]]; then
+REPO="$(github_repo_from_remote_url "$REMOTE" || true)"
+if [[ -z "$REPO" ]]; then
   echo "Could not resolve owner/repo from git remote: $REMOTE" >&2
   exit 5
 fi

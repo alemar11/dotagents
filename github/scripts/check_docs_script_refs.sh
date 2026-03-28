@@ -7,7 +7,8 @@ Usage: check_docs_script_refs.sh [--skill-dir <path>]
 
 Validate script references and documented flags for the GitHub skill:
 1) every scripts/<name>.<ext> reference in docs points to an existing file
-2) every --flag listed in references/script-summary.md appears in script --help output
+2) every referenced script is executable as documented
+3) every --flag listed in references/script-summary.md appears in script --help output
 EOF
 }
 
@@ -72,6 +73,11 @@ while IFS= read -r script_ref; do
   if [[ ! -f "$SKILL_DIR/$script_ref" ]]; then
     echo "Missing script reference: $script_ref" >&2
     ERRORS=$((ERRORS + 1))
+    continue
+  fi
+  if [[ ! -x "$SKILL_DIR/$script_ref" ]]; then
+    echo "Referenced script is not executable: $script_ref" >&2
+    ERRORS=$((ERRORS + 1))
   fi
 done <"$DOC_REFS"
 
@@ -95,6 +101,10 @@ while IFS= read -r entry; do
     echo "Missing script from script-summary.md: $script_ref" >&2
     ERRORS=$((ERRORS + 1))
     continue
+  fi
+  if [[ ! -x "$script_abs" ]]; then
+    echo "Script from script-summary.md is not executable: $script_ref" >&2
+    ERRORS=$((ERRORS + 1))
   fi
 
   flags_file="$TMP_DIR/flags.txt"

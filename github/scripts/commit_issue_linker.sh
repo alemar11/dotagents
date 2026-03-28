@@ -125,7 +125,8 @@ else
   REPO_PATH="."
 fi
 
-if ! OUTPUT="$(python3 - "$MESSAGE" "$CONTEXT" "$BRANCH" "$ISSUE_NUMBER" "$TOKEN" "$EXECUTE" "$OUTPUT_JSON" "$REPO" "$REPO_PATH" 2>&1 <<'PY'
+set +e
+OUTPUT="$(python3 - "$MESSAGE" "$CONTEXT" "$BRANCH" "$ISSUE_NUMBER" "$TOKEN" "$EXECUTE" "$OUTPUT_JSON" "$REPO" "$REPO_PATH" 2>&1 <<'PY'
 import json
 import re
 import subprocess
@@ -253,7 +254,7 @@ if existing_links:
     ]
     proposed = message
 else:
-    candidates = collect_candidates(explicit_issue, context, branch_name, branch_name)
+    candidates = collect_candidates(explicit_issue, context, branch, branch_name)
     candidate, decision_state = build_decision(candidates)
     proposed = message
     if candidate:
@@ -280,7 +281,7 @@ payload = {
 }
 
 if execute:
-    if decision_state != "single_candidate":
+    if decision_state not in {"single_candidate", "already_linked"}:
         payload["decision_state"] = "blocked"
         if output_json:
             print(json.dumps(payload, indent=2))
@@ -331,9 +332,11 @@ else:
     if payload.get("executed"):
         print("Commit executed.")
 PY
-)";
-then
-  RC=$?
+)"
+RC=$?
+set -e
+
+if [[ "$RC" -ne 0 ]]; then
   echo "$OUTPUT"
   exit "$RC"
 fi

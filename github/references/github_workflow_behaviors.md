@@ -79,6 +79,7 @@ Evaluate candidate issue IDs from the strongest source to weakest:
   - leave message unchanged and mark state as `no_candidate`.
 - If an existing close token already exists in the message:
   - preserve message and mark `already_linked`.
+  - allow execution because no extra close token needs to be added.
 
 ### Safety defaults
 

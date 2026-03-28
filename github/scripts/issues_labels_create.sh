@@ -86,7 +86,7 @@ fi
 
 TARGET_REPO="$(github_resolve_repo "$SCRIPT_DIR" "$REPO" "$ALLOW_NON_PROJECT")"
 
-CMD=(gh label create --repo "$TARGET_REPO" --name "$NAME")
+CMD=(gh label create "$NAME" --repo "$TARGET_REPO")
 if [[ -n "$COLOR" ]]; then
   CMD+=(--color "$COLOR")
 fi

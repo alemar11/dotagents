@@ -2,16 +2,25 @@
 
 Use this as the authoritative script catalog referenced by `github/SKILL.md`.
 
+## Fast helper picks
+
+- Use raw `gh` read-only commands for trivial inspection.
+- Use `scripts/inspect_pr_checks.py` for PR-associated CI failures.
+- Use `scripts/actions_run_inspect.sh` for non-PR Actions run listing, run inspection, job logs, and artifact downloads.
+- Use `scripts/release_plan.sh`, `scripts/release_notes_generate.sh`, and `scripts/release_create.sh` for release flows.
+
 ## Repository setup and preflight
 
 - `scripts/check_gh_installed.sh [--min-version <version>]`: Validate that `gh` is installed and meets a minimum version.
 - `scripts/check_gh_authenticated.sh [--host github.com]`: Verify active GitHub CLI authentication.
 - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
 - `scripts/release_plan.sh [--repo <owner/repo>] [--target-branch <branch>] [--allow-non-project]`: Resolve the default branch, chosen target branch, target HEAD commit, and latest published release tag before creating a release.
+- `scripts/release_notes_generate.sh --tag <tag> --target-ref <branch-or-sha> [--repo <owner/repo>] [--previous-tag <tag>] [--workdir <path>] [--title-file <path>] [--notes-file <path>] [--allow-non-project]`: Generate draft release title and notes through GitHub's release-notes API.
 - `scripts/release_create.sh --tag <tag> --target-ref <branch-or-sha> --notes-mode <infer|blank|user> [--repo <owner/repo>] [--title <text>|--title-file <path>] [--notes-file <path>|--notes-text <text>] [--previous-tag <tag>] [--allow-non-project]`: Create a release with an explicit target and explicit notes strategy. This helper refuses to run without `--notes-mode`.
 - `scripts/check_docs_script_refs.sh [--skill-dir <path>]`: Verify docs reference existing scripts and documented flags are present in `--help` output.
 - `scripts/issue_resolve_repo.sh [--repo <owner/repo>] [--allow-non-project]`: Resolve the target repository, defaulting to current git project.
 - `scripts/repos_list.sh [--owner <owner>] [--type all|public|private|forks|archived|sources|member] [--all] [--limit N] [--allow-non-project]`: List repositories available to current user or specified owner.
+- `scripts/actions_run_inspect.sh [--repo <owner/repo>] [--run-id <id>] [--job-id <id>] [--artifact-name <name>] [--download-dir <path>] [--branch <branch>] [--commit <sha>] [--workflow <name>] [--event <event>] [--status <status>] [--limit N] [--all] [--summary-only] [--allow-non-project]`: List recent non-PR workflow runs or inspect one run/job/artifact path in a single helper.
 
 ## Issue scripts
 
@@ -21,8 +30,8 @@ Use this as the authoritative script catalog referenced by `github/SKILL.md`.
 - `scripts/issues_create.sh --title <text> [--body <text>] [--labels <label1,label2>] [--assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/issues_copy.sh --issue <number> --source-repo <owner/repo> --target-repo <owner/repo> [--dry-run]`
 - `scripts/issues_move.sh --issue <number> --source-repo <owner/repo> --target-repo <owner/repo> [--dry-run]`
-- `scripts/issues_suggest_labels.sh --repo <owner/repo> --title <text> [--body <text>] [--max-suggestions N] [--min-score <float>] [--allow-new-label] [--new-label-color <rrggbb>] [--new-label-description <text>] [--json]`
-- `scripts/issues_update.sh --issue <number> [--title <text>] [--body <text>] [--state open|closed] [--type bug|task|none] [--milestone <name>|--milestone-id <number>] [--remove-milestone] [--type-label-bug <label>] [--type-label-task <label>] [--add-labels <label1,label2>] [--remove-labels <label1,label2>] [--assignees <user1,user2>] [--remove-assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`
+- `scripts/issues_suggest_labels.sh --repo <owner/repo> --title <text> [--body <text>] [--max-suggestions N] [--min-score <float>] [--allow-new-label] [--new-label-color <rrggbb>] [--new-label-description <text>] [--json]`: Suggest existing repo labels first; reusable fallback labels are explicit and opt-in.
+- `scripts/issues_update.sh --issue <number> [--title <text>] [--body <text>] [--state open|closed] [--type bug|task|none] [--milestone <name>|--milestone-id <number>] [--remove-milestone] [--type-label-bug <label>] [--type-label-task <label>] [--add-labels <label1,label2>] [--remove-labels <label1,label2>] [--assignees <user1,user2>] [--remove-assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`: Convenience wrapper for repos that use generic `bug` / `task` label taxonomies; override `--type-label-*` or use raw label edits for other schemes.
 - `scripts/issues_close_with_evidence.sh --issue <number> --commit-sha <sha> [--commit-url <url>] [--pr-url <url>] [--repo <owner/repo>] [--allow-non-project] [--dry-run]`
 - `scripts/issues_comment_add.sh --issue <number> --body <text> [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/issues_comments_list.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
@@ -55,5 +64,5 @@ Use this as the authoritative script catalog referenced by `github/SKILL.md`.
 - `scripts/prs_merge.sh --pr <number> [--merge|--squash|--rebase] [--delete-branch] [--admin] [--auto] [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/prs_close.sh --pr <number> [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/prs_reopen.sh --pr <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/inspect_pr_checks.py [--repo <path>] [--pr <number|url>] [--max-lines <N>] [--context <N>] [--json]`: PR-focused CI triage helper. For non-PR Actions runs, use `gh run ...` commands and the `actions-run-inspect` workflow template in `references/workflows.md`.
-- `scripts/commit_issue_linker.sh --message <text> [--context <text>] [--branch <name>] [--repo <path|owner/repo>] [--issue-number <number>] [--token <fixes|closes|resolves>] [--dry-run|--execute] [--json]`
+- `scripts/inspect_pr_checks.py [--repo <path>] [--pr <number|url>] [--max-lines <N>] [--context <N>] [--json]`: PR-focused CI triage helper. For non-PR Actions runs, prefer `scripts/actions_run_inspect.sh`.
+- `scripts/commit_issue_linker.sh --message <text> [--context <text>] [--branch <name>] [--repo <path|owner/repo>] [--issue-number <number>] [--token <fixes|closes|resolves>] [--dry-run|--execute] [--json]`: Preserve an existing close token when present, or infer one candidate and optionally execute the commit.

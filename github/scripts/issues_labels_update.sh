@@ -104,7 +104,7 @@ TARGET_REPO="$(github_resolve_repo "$SCRIPT_DIR" "$REPO" "$ALLOW_NON_PROJECT")"
 
 CMD=(gh label edit "$NAME" --repo "$TARGET_REPO")
 if [[ -n "$NEW_NAME" ]]; then
-  CMD+=(--new-name "$NEW_NAME")
+  CMD+=(--name "$NEW_NAME")
 fi
 if [[ -n "$COLOR" ]]; then
   CMD+=(--color "$COLOR")

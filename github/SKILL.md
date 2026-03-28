@@ -10,8 +10,9 @@ description: Use GitHub CLI (gh) for repository-scoped issues, pull requests, Ac
 Use this skill when the main job is repository-scoped GitHub work through
 `gh`, especially when the user needs issue, pull request, release, tag, or
 Actions run handling in the current repository. Keep the skill focused on the
-smallest command path that solves the request, and route to dedicated helper
-scripts when the workflow is already standardized.
+smallest command path that solves the request. For trivial reads, prefer raw
+`gh` fast paths. For standardized multi-step tasks, prefer the smallest
+dedicated helper script instead of replaying a long workflow template.
 
 ## Trigger rules
 
@@ -54,6 +55,14 @@ scripts when the workflow is already standardized.
 6. Run the narrowest `gh` command needed, then report only relevant output.
 7. If the operation fails, return the command error and propose the next retry command from the retry matrix below.
 
+## Speed defaults
+
+- Use raw read-only `gh` commands first for trivial inspection.
+- Prefer `scripts/inspect_pr_checks.py` for PR-associated CI failures.
+- Prefer `scripts/actions_run_inspect.sh` for non-PR Actions run inspection.
+- Prefer `scripts/release_plan.sh`, `scripts/release_notes_generate.sh`, and `scripts/release_create.sh` for release flows instead of rebuilding the same API steps ad hoc.
+- Use `references/script-summary.md` as the first helper picker; open `references/workflows.md` only when no helper already covers the task.
+
 ## Common operations
 
 - Repository actions
@@ -68,9 +77,10 @@ scripts when the workflow is already standardized.
 - Workflow actions
   - `gh run list`, `gh run view`, `gh run watch`, `gh run download`
   - For generic Actions investigation, prefer `gh run list` to resolve the run ID, then `gh run view <run-id> --log-failed`; use `gh run view --job <job-id> --log` for full job logs and `gh run download <run-id>` when artifacts matter.
+  - Prefer `scripts/actions_run_inspect.sh` when you want the generic non-PR Actions list/inspect/download flow in one reusable helper.
 - Release actions
   - `gh release list`, `gh release view`, `gh release create`, `gh release edit`, `gh release delete`
-  - `scripts/release_plan.sh`, `scripts/release_create.sh`
+  - `scripts/release_plan.sh`, `scripts/release_notes_generate.sh`, `scripts/release_create.sh`
 - General
   - `gh alias`, `gh api`, `gh extension`
 
@@ -198,6 +208,7 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
 ## Repository listing
 
 - Use `scripts/repos_list.sh` for repository discovery commands.
+- Outside a git repository, pass `--allow-non-project` explicitly for deliberate non-project discovery.
 
 ## Installation and setup
 
@@ -206,7 +217,9 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
 - `scripts/check_gh_authenticated.sh [--host github.com]`: Verify the active `gh` authentication session for the host.
 - `scripts/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
 - `scripts/release_plan.sh [--repo <owner/repo>] [--target-branch <branch>] [--allow-non-project]`: Resolve the default release target and latest published release tag before mutation.
+- `scripts/release_notes_generate.sh --tag <tag> --target-ref <branch-or-sha> [--repo <owner/repo>] [--previous-tag <tag>] [--workdir <path>] [--title-file <path>] [--notes-file <path>] [--allow-non-project]`: Generate draft release title and notes through GitHub's release-notes API before publishing.
 - `scripts/release_create.sh --tag <tag> --target-ref <branch-or-sha> --notes-mode <infer|blank|user> [--repo <owner/repo>] [--title <text>|--title-file <path>] [--notes-file <path>|--notes-text <text>] [--previous-tag <tag>] [--allow-non-project]`: Create a release with explicit target and explicit notes strategy.
+- `scripts/actions_run_inspect.sh [--repo <owner/repo>] [--run-id <id>] [--job-id <id>] [--artifact-name <name>] [--download-dir <path>] [--branch <branch>] [--commit <sha>] [--workflow <name>] [--event <event>] [--status <status>] [--limit N] [--all] [--summary-only] [--allow-non-project]`: List or inspect non-PR workflow runs with one helper.
 - `scripts/check_docs_script_refs.sh [--skill-dir <path>]`: Verify docs reference valid scripts and documented flags.
 
 ## Failure retry matrix
@@ -238,6 +251,9 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
 - Correction note (2026-03): release creation now uses dedicated helper scripts and explicitly distinguishes user silence from explicit delegation when choosing release notes strategy.
 - Correction note (2026-03): `gh pr edit` may require `read:project` even for simple metadata updates; `scripts/prs_update.sh` now falls back to `gh api` for title/body/base-only changes when that scope is missing.
 - Correction note (2026-03): generic GitHub Actions run inspection is not always tied to a PR; use `gh run list` / `gh run view` for branch, SHA, workflow, and explicit run-id investigations, and reserve `gh pr checks` for PR-associated runs.
+- Correction note (2026-03): repo resolution from git remotes must strip the trailing `.git`; helper scripts now share the same repo-normalization path.
+- Correction note (2026-03): `gh label create` takes the label name positionally and `gh label edit` uses `--name` for renames; keep label helper scripts aligned with live `gh --help`.
+- Correction note (2026-03): `commit_issue_linker.sh` now treats an existing close token as executable-safe and preserves the real exit code from its Python worker.
 - Correction note (2026-03): repo targeting is command-specific. `gh repo
   view` uses positional `owner/repo`, while many issue/PR/release commands and
   helper scripts use `--repo owner/repo`.

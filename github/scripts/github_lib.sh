@@ -66,6 +66,23 @@ github_normalize_hex_color() {
   echo "$normalized"
 }
 
+github_repo_from_remote_url() {
+  local remote="${1:-}"
+  if [[ -z "$remote" ]]; then
+    return 1
+  fi
+
+  local repo
+  repo="$(printf '%s\n' "$remote" \
+    | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#^ssh://[^/]+/##; s#^git://[^/]+/##; s#\.git$##; s#/$##')"
+
+  if [[ -z "$repo" || "$repo" != */* || "$repo" == */ || "$repo" == */*/* ]]; then
+    return 1
+  fi
+
+  echo "$repo"
+}
+
 github_resolve_repo() {
   local script_dir="${1:-}"
   local repo_ref="${2:-}"

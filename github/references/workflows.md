@@ -88,6 +88,7 @@ Purpose: create a release-backed tag or a tag-only ref without guessing the targ
 ### Preferred helper path
 
 - Use `scripts/release_plan.sh` first to resolve repository, default branch, target commit, and previous published release tag.
+- Use `scripts/release_notes_generate.sh` when the user wants option 1 (`infer`) and you want a concrete draft title/body before release creation.
 - Use `scripts/release_create.sh` for the mutation step because it requires explicit `--target-ref` and explicit `--notes-mode`.
 - `scripts/release_create.sh` intentionally refuses to run if `--notes-mode` is omitted, so accidental “silent defaulting” does not publish a release.
 
@@ -184,6 +185,17 @@ echo "Draft title:     $(cat "$WORKDIR/release_title.txt")"
 echo "Draft notes:     $WORKDIR/release_notes.md"
 echo
 sed -n '1,80p' "$WORKDIR/release_notes.md"
+```
+
+Helper alternative:
+
+```bash
+scripts/release_notes_generate.sh \
+  --tag <tag> \
+  --target-ref <branch-or-sha> \
+  [--repo <owner/repo>] \
+  [--previous-tag <tag>] \
+  [--workdir <path>]
 ```
 
 ### Paste and run (Phase 2A): create a release and create the tag if it is missing
@@ -744,6 +756,23 @@ Purpose: inspect GitHub Actions runs and logs when the failure is tied to a bran
 - Use `gh run view <run-id> --log-failed` for quick failure context.
 - Use `gh run view --job <job-id> --log` when a specific job needs the full log.
 - Use `gh run download <run-id>` only when artifacts matter.
+
+### Preferred helper path
+
+- Prefer `scripts/actions_run_inspect.sh` for the common reusable path:
+  - no `--run-id`: list recent runs with filters
+  - `--run-id`: inspect one run and failed log lines
+  - `--job-id`: inspect a specific job log
+  - `--artifact-name`: download one artifact for a known run
+- Use the manual phases below only when you need a copy-ready custom sequence that the helper does not already cover.
+
+Helper examples:
+
+```bash
+scripts/actions_run_inspect.sh --limit 10 [--repo <owner/repo>] [--branch <branch>] [--workflow <name>] [--event <event>] [--status <status>]
+scripts/actions_run_inspect.sh --run-id <run_id> [--repo <owner/repo>] [--job-id <job_id>] [--artifact-name <artifact>] [--download-dir <path>]
+scripts/actions_run_inspect.sh --job-id <job_id> [--repo <owner/repo>]
+```
 
 ### Paste and run (Phase 1): resolve recent runs
 

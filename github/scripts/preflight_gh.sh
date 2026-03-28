@@ -81,8 +81,12 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   if [[ -n "$REMOTE" ]]; then
     echo "origin remote: $REMOTE"
 
-    CURRENT_REPO="$(printf '%s\n' "$REMOTE" \
-      | sed -E 's#^git@[^:]+:##; s#^https?://[^/]+/##; s#^ssh://[^/]+/##; s#^git://[^/]+/##; s#\.git$##; s#/$##')"
+    CURRENT_REPO="$(github_repo_from_remote_url "$REMOTE" || true)"
+
+    if [[ -z "$CURRENT_REPO" ]]; then
+      echo "Could not resolve owner/repo from git remote: $REMOTE" >&2
+      exit 6
+    fi
 
     if [[ -n "$EXPECT_REPO" && "$CURRENT_REPO" != "$EXPECT_REPO" ]]; then
       echo "Current directory resolves to $CURRENT_REPO, but --expect-repo requires $EXPECT_REPO." >&2
