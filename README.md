@@ -11,6 +11,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `postgres/` — Connect to Postgres databases, run queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
 - `skill-audit/` — Audit installed or user-specified Codex skills using repo evidence, memory, and current context to plan updates, merges, or disables.
 - `swift-api-design/` — Design or review Swift APIs using the official Swift API Design Guidelines, with focus on naming, argument labels, documentation, side effects, and call-site clarity.
+- `swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
 
 ## Project Skills
 - `.agents/skills/skills-maintainer/` — Maintain and improve one or more skills in this repository with shared upgrade workflows and skill-specific refresh tasks.
@@ -22,7 +23,7 @@ Project skills are repository-local and are not included in the reusable install
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/skills --path commit ask-questions-if-underspecified codex-changelog github learn postgres skill-audit swift-api-design`
+- `Use $skill-installer to install skills from alemar11/skills --path commit ask-questions-if-underspecified codex-changelog github learn postgres skill-audit swift-api-design swift-docc`
 - `Use $skill-installer to install skills from alemar11/skills --path github`
 - `Use $skill-installer to install skills from alemar11/skills --path commit`
 - `Use $skill-installer to install skills from alemar11/skills --path ask-questions-if-underspecified`
@@ -31,6 +32,7 @@ Copy/paste one of these prompts:
 - `Use $skill-installer to install skills from alemar11/skills --path postgres`
 - `Use $skill-installer to install skills from alemar11/skills --path skill-audit`
 - `Use $skill-installer to install skills from alemar11/skills --path swift-api-design`
+- `Use $skill-installer to install skills from alemar11/skills --path swift-docc`
 
 ### Install With `npx skills` (Vercel Skills CLI)
 These commands use the [`vercel-labs/skills`](https://github.com/vercel-labs/skills) CLI and target Codex directly.
@@ -52,7 +54,8 @@ npx skills add alemar11/skills -a codex -g -y \
   --skill learn \
   --skill postgres \
   --skill skill-audit \
-  --skill swift-api-design
+  --skill swift-api-design \
+  --skill swift-docc
 ```
 
 Install a single skill globally for Codex:
@@ -63,6 +66,10 @@ npx skills add alemar11/skills -a codex -g -y --skill github
 
 ```sh
 npx skills add alemar11/skills -a codex -g -y --skill swift-api-design
+```
+
+```sh
+npx skills add alemar11/skills -a codex -g -y --skill swift-docc
 ```
 
 Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.

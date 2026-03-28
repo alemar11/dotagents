@@ -19,6 +19,7 @@ If the user asks what this skill can do, answer with these three capability grou
    - Run consistency checks and report `PASS`, `PASS (NOOP)`, or `FAIL`.
 2) Run skill-specific maintainer workflows:
    - Execute explicit specialist refresh tasks such as Postgres best-practices regeneration.
+   - Refresh bundled Swift-DocC authored sources and validate the fast-path reference layer.
    - Keep regeneration mechanics and maintainer-only internals out of runtime skills.
 3) Benchmark local skills against official OpenAI ecosystems when explicitly asked:
    - Download/update `openai/skills` and `openai/plugins`.
@@ -40,7 +41,9 @@ When the user asks what this skill can do, offer this task list:
    - Run structure, rules, and reference checks across the repo or the touched skills.
 5) `refresh postgres references`
    - Execute the maintainer-only Postgres best-practices refresh workflow.
-6) `benchmark against OpenAI`
+6) `refresh swift-docc references`
+   - Check the bundled Swift-DocC manifest, refresh the local `DocCDocumentation.docc` asset tree when stale, and validate or tighten the local `references/*.md` fast paths.
+7) `benchmark against OpenAI`
    - Compare local skills against official OpenAI skill ecosystems and generate per-skill `CHANGE` or `NOOP` decisions.
 
 ## Trigger Rules
@@ -51,6 +54,7 @@ Use this skill when users ask to:
 - Run a proactive skill maintenance pass before release
 - Sync `SKILL.md`, `agents/openai.yaml`, and repository docs for one or more skills
 - Refresh Postgres best-practices references
+- Refresh bundled Swift-DocC references and bundled source assets
 - Benchmark local skills against official OpenAI skill ecosystems
 - Integrate a newly scaffolded skill into repo metadata after `$skill-creator` has already created the package
 
@@ -62,7 +66,8 @@ Use this skill when users ask to:
 5) For structure and rules checks, follow `references/doc-consistency.md`.
 6) For upstream benchmarking and structure proposals, follow `references/openai-skill-benchmark.md`.
 7) For Postgres best-practices refresh, follow `references/postgres-refresh.md`.
-8) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
+8) For Swift-DocC bundled-reference refresh, follow `references/swift-docc-refresh.md`.
+9) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
 
 ## References
 
@@ -73,6 +78,8 @@ Use this skill when users ask to:
 - `references/doc-consistency.md`: use for repository-wide structure and policy checks.
 - `references/openai-skill-benchmark.md`: use for OpenAI-first benchmark analysis and proposal generation.
 - `references/postgres-refresh.md`: use for maintainer-only Postgres best-practices refresh work.
+- `references/swift-docc-refresh.md`: use for maintainer-only Swift-DocC bundled-reference refresh work.
+- `references/swift-docc-runbook.md`: canonical refresh and review procedure for the `swift-docc` skill.
 - `references/release-checklist.md`: use at the end of mixed or multi-step maintenance tasks.
 
 ## Subagent Usage

@@ -32,6 +32,12 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep best-practices regeneration orchestration in `.agents/skills/skills-maintainer` and use `.agents/skills/skills-maintainer/references/postgres-best-practices-runbook.md` as the canonical refresh procedure.
 - Route maintainer-only Postgres best-practices refresh work through repo-level maintainer docs and the `skills-maintainer` skill workflow, not through runtime skill instructions.
 
+### Swift-DocC skill
+- Keep the runtime `swift-docc` skill focused on bundled authored content (`assets/DocCDocumentation.docc`), `references/*.md` fast paths, and manifest metadata only.
+- The runtime `swift-docc` skill must not describe or perform self-upgrade, bundled asset refresh, or reference-layer maintenance workflows.
+- Keep Swift-DocC bundled-asset refresh and reference integrity checks in `.agents/skills/skills-maintainer`, and use `.agents/skills/skills-maintainer/references/swift-docc-runbook.md` as the canonical procedure.
+- Route maintainer-only Swift-DocC refresh work through repo-level maintainer docs and the `skills-maintainer` skill workflow, not through runtime skill instructions.
+
 ### Skills Maintainer skill
 - The `.agents/skills/skills-maintainer` skill is the default maintainer for improving existing skills in this repository through shared upgrade tasks and skill-specific refresh workflows.
 - `skills-maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills in this repository.

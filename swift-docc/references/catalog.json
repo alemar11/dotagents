@@ -1,0 +1,484 @@
+{
+  "repo": "swiftlang/swift-docc",
+  "ref": "main",
+  "source_subpath": "Sources/docc/DocCDocumentation.docc",
+  "topics": [
+    {
+      "id": "docc-overview",
+      "title": "DocC landing page",
+      "category": "overview",
+      "upstream_path": "DocC Documentation.md",
+      "asset_path": "assets/DocCDocumentation.docc/DocC Documentation.md",
+      "summary_page": "start-here.md"
+    },
+    {
+      "id": "documenting-a-swift-framework-or-package",
+      "title": "Documenting a Swift framework or package",
+      "category": "authoring",
+      "upstream_path": "documenting-a-swift-framework-or-package.md",
+      "asset_path": "assets/DocCDocumentation.docc/documenting-a-swift-framework-or-package.md",
+      "summary_page": "document-a-swift-package.md"
+    },
+    {
+      "id": "writing-symbol-documentation-in-your-source-files",
+      "title": "Writing symbol documentation in your source files",
+      "category": "symbol-docs",
+      "upstream_path": "writing-symbol-documentation-in-your-source-files.md",
+      "asset_path": "assets/DocCDocumentation.docc/writing-symbol-documentation-in-your-source-files.md",
+      "summary_page": "document-public-symbols.md"
+    },
+    {
+      "id": "adding-supplemental-content-to-a-documentation-catalog",
+      "title": "Adding supplemental content to a documentation catalog",
+      "category": "structure",
+      "upstream_path": "adding-supplemental-content-to-a-documentation-catalog.md",
+      "asset_path": "assets/DocCDocumentation.docc/adding-supplemental-content-to-a-documentation-catalog.md",
+      "summary_page": "add-a-docc-catalog.md"
+    },
+    {
+      "id": "linking-to-symbols-and-other-content",
+      "title": "Linking to symbols and other content",
+      "category": "linking",
+      "upstream_path": "linking-to-symbols-and-other-content.md",
+      "asset_path": "assets/DocCDocumentation.docc/linking-to-symbols-and-other-content.md",
+      "summary_page": "linking.md"
+    },
+    {
+      "id": "adding-code-snippets-to-your-content",
+      "title": "Adding code snippets to your content",
+      "category": "authoring",
+      "upstream_path": "adding-code-snippets-to-your-content.md",
+      "asset_path": "assets/DocCDocumentation.docc/adding-code-snippets-to-your-content.md",
+      "summary_page": "document-a-swift-package.md"
+    },
+    {
+      "id": "documenting-api-with-different-language-representations",
+      "title": "Documenting API with different language representations",
+      "category": "symbol-docs",
+      "upstream_path": "Documenting API with different language representations/documenting-api-with-different-language-representations.md",
+      "asset_path": "assets/DocCDocumentation.docc/Documenting API with different language representations/documenting-api-with-different-language-representations.md",
+      "summary_page": "document-public-symbols.md"
+    },
+    {
+      "id": "formatting-your-documentation-content",
+      "title": "Formatting your documentation content",
+      "category": "formatting",
+      "upstream_path": "formatting-your-documentation-content.md",
+      "asset_path": "assets/DocCDocumentation.docc/formatting-your-documentation-content.md",
+      "summary_page": "formatting-and-assets.md"
+    },
+    {
+      "id": "adding-tables-of-data",
+      "title": "Adding tables of data",
+      "category": "formatting",
+      "upstream_path": "adding-tables-of-data.md",
+      "asset_path": "assets/DocCDocumentation.docc/adding-tables-of-data.md",
+      "summary_page": "formatting-and-assets.md"
+    },
+    {
+      "id": "other-formatting-options",
+      "title": "Other formatting options",
+      "category": "formatting",
+      "upstream_path": "other-formatting-options.md",
+      "asset_path": "assets/DocCDocumentation.docc/other-formatting-options.md",
+      "summary_page": "formatting-and-assets.md"
+    },
+    {
+      "id": "adding-images",
+      "title": "Adding images",
+      "category": "formatting",
+      "upstream_path": "adding-images.md",
+      "asset_path": "assets/DocCDocumentation.docc/adding-images.md",
+      "summary_page": "formatting-and-assets.md"
+    },
+    {
+      "id": "adding-structure-to-your-documentation-pages",
+      "title": "Adding structure to your documentation pages",
+      "category": "structure",
+      "upstream_path": "adding-structure-to-your-documentation-pages.md",
+      "asset_path": "assets/DocCDocumentation.docc/adding-structure-to-your-documentation-pages.md",
+      "summary_page": "add-a-docc-catalog.md"
+    },
+    {
+      "id": "building-an-interactive-tutorial",
+      "title": "Building an interactive tutorial",
+      "category": "tutorials",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/building-an-interactive-tutorial.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/building-an-interactive-tutorial.md",
+      "summary_page": "tutorial-workflow.md"
+    },
+    {
+      "id": "customizing-the-appearance-of-your-documentation-pages",
+      "title": "Customizing the appearance of your documentation pages",
+      "category": "publishing",
+      "upstream_path": "customizing-the-appearance-of-your-documentation-pages.md",
+      "asset_path": "assets/DocCDocumentation.docc/customizing-the-appearance-of-your-documentation-pages.md",
+      "summary_page": "publishing-and-customization.md"
+    },
+    {
+      "id": "distributing-documentation-to-other-developers",
+      "title": "Distributing documentation to other developers",
+      "category": "publishing",
+      "upstream_path": "distributing-documentation-to-other-developers.md",
+      "asset_path": "assets/DocCDocumentation.docc/distributing-documentation-to-other-developers.md",
+      "summary_page": "preview-and-publish.md",
+      "example_url": true
+    },
+    {
+      "id": "api-reference-syntax",
+      "title": "API reference syntax",
+      "category": "api-reference",
+      "upstream_path": "Reference Syntax/API Reference Syntax/api-reference-syntax.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/API Reference Syntax/api-reference-syntax.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "displayname",
+      "title": "DisplayName",
+      "category": "api-reference",
+      "upstream_path": "Reference Syntax/API Reference Syntax/DisplayName.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/API Reference Syntax/DisplayName.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "documentationextension",
+      "title": "DocumentationExtension",
+      "category": "api-reference",
+      "upstream_path": "Reference Syntax/API Reference Syntax/DocumentationExtension.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/API Reference Syntax/DocumentationExtension.md",
+      "summary_page": "add-a-docc-catalog.md"
+    },
+    {
+      "id": "metadata",
+      "title": "Metadata",
+      "category": "api-reference",
+      "upstream_path": "Reference Syntax/API Reference Syntax/Metadata.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/API Reference Syntax/Metadata.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "titleheading",
+      "title": "TitleHeading",
+      "category": "api-reference",
+      "upstream_path": "Reference Syntax/API Reference Syntax/TitleHeading.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/API Reference Syntax/TitleHeading.md",
+      "summary_page": "formatting-and-assets.md"
+    },
+    {
+      "id": "comment",
+      "title": "Comment",
+      "category": "api-reference",
+      "upstream_path": "Reference Syntax/Shared Syntax/Comment.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Shared Syntax/Comment.md",
+      "summary_page": "document-public-symbols.md"
+    },
+    {
+      "id": "tutorial-syntax",
+      "title": "Tutorial syntax",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/tutorial-syntax.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/tutorial-syntax.md",
+      "summary_page": "tutorials.md"
+    },
+    {
+      "id": "tutorial-shared-directives",
+      "title": "Tutorial shared directives",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Shared Directives/tutorial-shared-directives.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Shared Directives/tutorial-shared-directives.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "chapter",
+      "title": "Chapter",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Shared Directives/Chapter/Chapter.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Shared Directives/Chapter/Chapter.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "tutorialreference",
+      "title": "TutorialReference",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Shared Directives/Chapter/TutorialReference.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Shared Directives/Chapter/TutorialReference.md",
+      "summary_page": "linking.md"
+    },
+    {
+      "id": "image",
+      "title": "Image",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Shared Directives/Image.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Shared Directives/Image.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "intro",
+      "title": "Intro",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Shared Directives/Intro.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Shared Directives/Intro.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "video",
+      "title": "Video",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Shared Directives/Video.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Shared Directives/Video.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "tutorials",
+      "title": "Tutorials",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Tutorials.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Tutorials.md",
+      "summary_page": "tutorials.md",
+      "example_url": true
+    },
+    {
+      "id": "volume",
+      "title": "Volume",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Volume.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Volume.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "resources",
+      "title": "Resources",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Resources.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Resources.md",
+      "summary_page": "tutorials.md",
+      "example_url": true
+    },
+    {
+      "id": "documentation-resource",
+      "title": "Documentation resource directive",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Documentation.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Documentation.md",
+      "summary_page": "directive-map.md",
+      "example_url": true
+    },
+    {
+      "id": "downloads",
+      "title": "Downloads",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Downloads.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Downloads.md",
+      "summary_page": "directive-map.md",
+      "example_url": true
+    },
+    {
+      "id": "forums",
+      "title": "Forums",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Forums.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Forums.md",
+      "summary_page": "directive-map.md",
+      "example_url": true
+    },
+    {
+      "id": "samplecode",
+      "title": "SampleCode",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/SampleCode.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/SampleCode.md",
+      "summary_page": "directive-map.md",
+      "example_url": true
+    },
+    {
+      "id": "videos",
+      "title": "Videos",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Videos.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorials/Resources/Videos.md",
+      "summary_page": "directive-map.md",
+      "example_url": true
+    },
+    {
+      "id": "tutorial",
+      "title": "Tutorial",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Tutorial.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Tutorial.md",
+      "summary_page": "tutorials.md"
+    },
+    {
+      "id": "article",
+      "title": "TutorialArticle",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/TutorialArticle.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/TutorialArticle.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "xcoderequirement",
+      "title": "XcodeRequirement",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/XcodeRequirement.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/XcodeRequirement.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "assessments",
+      "title": "Assessments",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/Assessments.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/Assessments.md",
+      "summary_page": "tutorials.md"
+    },
+    {
+      "id": "multiplechoice",
+      "title": "MultipleChoice",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/MultipleChoice/MultipleChoice.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/MultipleChoice/MultipleChoice.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "choice",
+      "title": "Choice",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/MultipleChoice/Choice/Choice.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/MultipleChoice/Choice/Choice.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "justification",
+      "title": "Justification",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/MultipleChoice/Choice/Justification.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Assessments/MultipleChoice/Choice/Justification.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "section",
+      "title": "Section",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section.md",
+      "summary_page": "tutorials.md"
+    },
+    {
+      "id": "contentandmedia",
+      "title": "ContentAndMedia",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/ContentAndMedia.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/ContentAndMedia.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "stack",
+      "title": "Stack",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Stack.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Stack.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "steps",
+      "title": "Steps",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Steps/Steps.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Steps/Steps.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "step",
+      "title": "Step",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Steps/Step/Step.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Steps/Step/Step.md",
+      "summary_page": "directive-map.md"
+    },
+    {
+      "id": "code",
+      "title": "Code",
+      "category": "tutorial-reference",
+      "upstream_path": "Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Steps/Step/Code.md",
+      "asset_path": "assets/DocCDocumentation.docc/Reference Syntax/Tutorials Syntax/Top-Level Directives/Tutorial/Section/Steps/Step/Code.md",
+      "summary_page": "directive-map.md"
+    }
+  ],
+  "intents": [
+    {
+      "question": "How do I document a Swift package or library API?",
+      "summary_page": "document-a-swift-package.md",
+      "primary_topic_id": "documenting-a-swift-framework-or-package"
+    },
+    {
+      "question": "How do I start documenting a Swift package or framework?",
+      "summary_page": "document-a-swift-package.md",
+      "primary_topic_id": "documenting-a-swift-framework-or-package"
+    },
+    {
+      "question": "How do I document public symbols in source?",
+      "summary_page": "document-public-symbols.md",
+      "primary_topic_id": "writing-symbol-documentation-in-your-source-files"
+    },
+    {
+      "question": "How do I write symbol documentation comments?",
+      "summary_page": "document-public-symbols.md",
+      "primary_topic_id": "writing-symbol-documentation-in-your-source-files"
+    },
+    {
+      "question": "How do I add a .docc catalog, landing page, or articles?",
+      "summary_page": "add-a-docc-catalog.md",
+      "primary_topic_id": "adding-supplemental-content-to-a-documentation-catalog"
+    },
+    {
+      "question": "How do I add articles or documentation extensions?",
+      "summary_page": "add-a-docc-catalog.md",
+      "primary_topic_id": "adding-supplemental-content-to-a-documentation-catalog"
+    },
+    {
+      "question": "How do I link to symbols and other content in DocC?",
+      "summary_page": "linking.md",
+      "primary_topic_id": "linking-to-symbols-and-other-content"
+    },
+    {
+      "question": "How do I add formatting, tables, images, or page structure?",
+      "summary_page": "formatting-and-assets.md",
+      "primary_topic_id": "formatting-your-documentation-content"
+    },
+    {
+      "question": "How do I add code snippets to DocC content?",
+      "summary_page": "document-a-swift-package.md",
+      "primary_topic_id": "adding-code-snippets-to-your-content"
+    },
+    {
+      "question": "How do I add tutorials to an existing package?",
+      "summary_page": "tutorial-workflow.md",
+      "primary_topic_id": "building-an-interactive-tutorial"
+    },
+    {
+      "question": "How do I build an interactive tutorial?",
+      "summary_page": "tutorial-workflow.md",
+      "primary_topic_id": "building-an-interactive-tutorial"
+    },
+    {
+      "question": "Which directives are available for API reference pages?",
+      "summary_page": "directive-map.md",
+      "primary_topic_id": "api-reference-syntax"
+    },
+    {
+      "question": "How do I preview or publish DocC documentation?",
+      "summary_page": "preview-and-publish.md",
+      "primary_topic_id": "distributing-documentation-to-other-developers"
+    },
+    {
+      "question": "How do I publish or host generated DocC documentation?",
+      "summary_page": "preview-and-publish.md",
+      "primary_topic_id": "distributing-documentation-to-other-developers"
+    },
+    {
+      "question": "How do I customize the appearance of DocC pages?",
+      "summary_page": "publishing-and-customization.md",
+      "primary_topic_id": "customizing-the-appearance-of-your-documentation-pages"
+    }
+  ]
+}
