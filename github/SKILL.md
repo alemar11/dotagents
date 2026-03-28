@@ -243,20 +243,8 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
 
 ## Learn
 
-- If command usage or output from `gh` differs from expected behavior, treat the skill as stale.
-- When stale behavior is found:
-  1. Update the relevant script(s) under `github/scripts/` first.
-  2. Update `github/SKILL.md` and `github/references/` docs in the same change set so the instructions stay current.
-  3. Record the correction in a short note in the updated docs so future runs use the new behavior.
-- Correction note (2026-03): release creation now uses dedicated helper scripts and explicitly distinguishes user silence from explicit delegation when choosing release notes strategy.
-- Correction note (2026-03): `gh pr edit` may require `read:project` even for simple metadata updates; `scripts/prs_update.sh` now falls back to `gh api` for title/body/base-only changes when that scope is missing.
-- Correction note (2026-03): generic GitHub Actions run inspection is not always tied to a PR; use `gh run list` / `gh run view` for branch, SHA, workflow, and explicit run-id investigations, and reserve `gh pr checks` for PR-associated runs.
-- Correction note (2026-03): repo resolution from git remotes must strip the trailing `.git`; helper scripts now share the same repo-normalization path.
-- Correction note (2026-03): `gh label create` takes the label name positionally and `gh label edit` uses `--name` for renames; keep label helper scripts aligned with live `gh --help`.
-- Correction note (2026-03): `commit_issue_linker.sh` now treats an existing close token as executable-safe and preserves the real exit code from its Python worker.
-- Correction note (2026-03): repo targeting is command-specific. `gh repo
-  view` uses positional `owner/repo`, while many issue/PR/release commands and
-  helper scripts use `--repo owner/repo`.
+- If repeated runtime GitHub work suggests a better helper script, routing rule, or reference update, treat that as a runtime learning signal; see `references/github_skill_learn.md`.
+- Prefer improving an existing helper before proposing a new script.
 - Keep user-facing guidance in `references/` and workflow logic in scripts aligned with tested real-world usage.
 
 ## Examples
