@@ -253,6 +253,37 @@ Note (2026-03): issue transfer is standardized with dedicated copy/move scripts 
   - `Implemented via PR <pr_url>.`
 - Prefer including both commit and PR links when available.
 
+## Issue implementation update standard
+
+- Use this when work has been implemented or partially implemented and the
+  issue should remain open.
+- Follow this sequence:
+  1. verify issue state is open,
+  2. gather implementation evidence,
+  3. post a concise update comment,
+  4. leave the issue open unless the user explicitly asks to close it.
+- Until a dedicated helper exists, prefer:
+  - `gh issue comment <number> --repo <owner/repo> --body-file <file>`
+  - `gh issue comment <number> --repo <owner/repo> --body <text>`
+- Standard implementation-update comment shape:
+  - short lead-in stating the work was implemented or prepared
+  - what has been done
+  - implementation evidence:
+    - branch name when useful
+    - commit SHA or commit URL
+    - PR URL when available
+  - validation run, if relevant
+  - manual follow-up or rollout steps, if any
+- Example evidence lines:
+  - `Implemented on branch <branch>.`
+  - `Implemented in commit <short_sha> (<commit_url>).`
+  - `Draft PR: <pr_url>.`
+  - `For existing databases, run:`
+  - fenced SQL block when schema catch-up is required
+- Do not use the issue-close workflow for this case.
+- If the comment includes operational follow-up steps, make those explicit and
+  separate from implementation evidence.
+
 ## Issue transfer standard
 
 - Prefer `scripts/issues_copy.sh` when the source issue should stay open and work should continue in both places.
