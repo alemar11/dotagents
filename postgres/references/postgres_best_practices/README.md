@@ -7,6 +7,8 @@ This folder contains generic, vendor-neutral PostgreSQL best practices.
 - Connection management: `connection-management.md`
 - Security & RLS: `security-rls.md`
 - Schema design: `schema-design.md`
+- Spatial / PostGIS: `postgis.md`
+- Vector search / pgvector: `pgvector.md`
 - Concurrency & locking: `concurrency-locking.md`
 - Data access patterns: `data-access-patterns.md`
 - Monitoring & diagnostics: `monitoring-diagnostics.md`

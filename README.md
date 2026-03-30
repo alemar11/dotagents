@@ -8,7 +8,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
 - `github/` — Handle repo-scoped GitHub triage, review follow-up, CI, reactions, releases, tags, and opening a PR from an already-pushed branch through repo-owned `gh` helpers.
 - `learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
-- `postgres/` — Connect to Postgres databases, run queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
+- `postgres/` — Connect to Postgres databases, design schemas and indexes, review SQL/query performance, and use common PostGIS or pgvector patterns.
 - `skill-audit/` — Audit installed or user-specified Codex skills using repo evidence, memory, and current context to plan updates, merges, or disables.
 - `swift-api-design/` — Design or review Swift APIs using curated local summaries and a bundled upstream copy of the official Swift API Design Guidelines.
 - `swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.

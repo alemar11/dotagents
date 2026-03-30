@@ -1,7 +1,7 @@
 interface:
   display_name: "Postgres"
-  short_description: "Connect to Postgres databases, run queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested."
+  short_description: "Connect to Postgres databases, design schemas and indexes, review SQL/query performance, and use common PostGIS or pgvector patterns."
   brand_color: "#0064a5"
   icon_small: "./assets/postgresql-small.svg"
   icon_large: "./assets/postgresql.png"
-  default_prompt: "Connect to the target Postgres database, run the requested query or performance review, inspect schema/index support when useful, and summarize results."
+  default_prompt: "Connect to the target Postgres database or inspect local schema code, guide schema/data-type/index decisions, review SQL/query performance, use common PostGIS or pgvector patterns when relevant, and summarize the result."

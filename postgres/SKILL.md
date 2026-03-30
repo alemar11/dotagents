@@ -1,12 +1,12 @@
 ---
 name: postgres
-description: Connect to Postgres databases, run queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
+description: Connect to Postgres databases, design schemas and indexes, review SQL/query performance, and use common PostGIS or pgvector patterns. Search official PostgreSQL docs only when explicitly requested.
 ---
 
 # Postgres
 
 ## Goal
-Use this skill to connect to Postgres, run user-requested queries/diagnostics, review backend SQL for performance, and search official PostgreSQL docs only when explicitly requested.
+Use this skill to connect to Postgres, run user-requested queries/diagnostics, design schemas and indexes, review backend SQL for performance, use common PostGIS or pgvector patterns when relevant, and search official PostgreSQL docs only when explicitly requested.
 
 ## Script location
 
@@ -54,7 +54,10 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
    - Treat invalid or newer-than-supported `schema_version` values as a hard stop for TOML profile usage. Legacy `1` / `1.0.0` and missing `schema_version` should be auto-migrated to `1.1.0` during normal runtime.
    - In `postgres.toml`, `sslmode` must be a boolean (`true`/`false`), not a string.
 2) Choose action:
-   - Connect/run a query, inspect schema, review backend SQL/query usage, or run a helper script.
+   - Connect/run a query, inspect schema, design tables/constraints/indexes, review backend SQL/query usage, or run a helper script.
+   - For schema or table design, start with `references/postgres_best_practices/schema-design.md` and `references/postgres_best_practices/advanced-features.md`.
+   - For geospatial tables, SRIDs, coordinates, radius search, nearest-neighbor lookups, or spatial indexing, use `references/postgres_best_practices/postgis.md`.
+   - For embeddings, semantic search, similarity search, vector indexes, or retrieval/RAG in Postgres, use `references/postgres_best_practices/pgvector.md`.
    - If the user wants to copy data from a dev/local DB into a production migration or seed SQL, treat that as a data-copy migration workflow: inspect the source rows, inspect target table defaults/constraints, generate SQL in the pending migration file, and expect follow-up edits to adapt values for production.
    - Default query runner: use `./scripts/psql_with_ssl_fallback.sh` (or `./scripts/run_sql.sh` for SQL text/file/stdin).
    - If the user says a pending migration file is "migrated", "released", or "run in production", prefer `./scripts/release_migration.sh` to release that pending migration file into `released/` and transition changelog notes from `WIP` to `RELEASED`. Fall back to the manual release workflow in `references/postgres_guardrails.md` only when the helper cannot be used cleanly.
@@ -70,10 +73,29 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 
 - For queries and diagnostics, return the answer first, then the minimum
   supporting context needed to trust it.
+- For schema or extension-aware design guidance, recommend the smallest set of
+  types, constraints, and indexes that make the workload safe and predictable.
 - For performance reviews, group findings by hotspot, scaling risk, and safe
   optimization path.
 - For migration or data-copy drafting, call out any values that were adapted or
   should be adapted before production use.
+
+## Schema and feature design
+- Use this path when the user asks to design or revise Postgres tables,
+  schemas, constraints, indexes, JSONB structures, full-text search, trigram
+  search, exclusion constraints, spatial tables, or vector-search tables.
+- Prefer repo-local runtime references over broad generic explanations:
+  - `references/postgres_best_practices/schema-design.md`
+  - `references/postgres_best_practices/advanced-features.md`
+  - `references/postgres_best_practices/postgis.md`
+  - `references/postgres_best_practices/pgvector.md`
+- Keep recommendations explicit about:
+  - chosen data types
+  - required constraints
+  - indexes that match the expected query pattern
+  - any extension prerequisites
+- Keep extension-aware guidance practical and scoped. Use PostGIS or pgvector
+  only when the user's workload clearly calls for spatial or vector features.
 
 ## Backend query performance review
 - Use this path when the user asks to review backend queries, inspect SQL for speed, improve loading time, or analyze schema/index support.
@@ -131,6 +153,9 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - Postgres version: `./scripts/pg_version.sh`
 - Find objects by name: `./scripts/find_objects.sh`
 - Schema introspection: `./scripts/schema_introspect.sh`
+- Table/schema design: `references/postgres_best_practices/schema-design.md`, `references/postgres_best_practices/advanced-features.md`
+- PostGIS design and query patterns: `references/postgres_best_practices/postgis.md`
+- pgvector design and query patterns: `references/postgres_best_practices/pgvector.md`
 - Data-copy migration drafting: use repo search plus `./scripts/run_sql.sh` for source-row extraction, schema/default inspection, and FK validation
 - Backend query review: use repo search plus `./scripts/run_sql.sh` for catalog inspection and validation
 - Slow/active query diagnostics: `./scripts/slow_queries.sh`, `./scripts/activity_overview.sh`, `./scripts/long_running_queries.sh`
@@ -163,6 +188,9 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 - If the user asks to copy rows from dev/local into a production SQL file, inspect both the source row values and the target table defaults/constraints before drafting the migration.
 - When drafting copied data for production, do not preserve generated PK values by default; rewrite dependent inserts to resolve FK targets via returned IDs or stable keys.
 - If the user asks for backend query optimization or performance review, inspect the application query code and separate read paths from write paths before recommending changes.
+- If the user asks to design or revise a schema, start with the schema-design and advanced-features references before inventing table shapes.
+- If the user asks about coordinates, SRIDs, radius search, nearest-neighbor search, or spatial indexes, route to the PostGIS reference.
+- If the user asks about embeddings, semantic search, similarity search, vector indexes, or retrieval/RAG in Postgres, route to the pgvector reference.
 - For migrations path resolution and schema-change workflow, follow the guardrails reference.
 - If the user explicitly marks a pending migration file as migrated/released/run in production, perform the release flow immediately with `./scripts/release_migration.sh` unless they ask for a dry run only.
 - If `CHANGELOG.md` is not in `WIP/RELEASED` format, migrate it to that template before writing new migration notes.
@@ -183,9 +211,13 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, r
 ## Examples
 
 - "Run this query against the local profile and summarize the results."
+- "Design a Postgres schema for orders and payments."
 - "Review this backend SQL for read-path performance problems."
+- "How should I store coordinates and query places within 5km?"
+- "How should I store embeddings and index semantic search in Postgres?"
 - "Copy these rows from dev into the pending migration file, but adapt anything that should not ship to production."
 
 ## Usage references
 - Setup, env defaults, and script catalog: `references/postgres_usage.md`
+- Design and extension-aware guidance: `references/postgres_best_practices/README.md`
 - Local/Docker recovery playbook: `references/postgres_local_recovery.md`
