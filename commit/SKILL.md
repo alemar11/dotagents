@@ -65,7 +65,8 @@ In the fast path, keep the workflow lightweight:
   - inspect the relevant `git diff -- <path>`
   - stage only those paths with `git add -- <path>`
   - commit with a short, well-formed message
-  - verify sequentially with `git status --short --branch` and `git log -1`
+  - verify sequentially with `git status --short --branch` and
+    `git log -1 --pretty=fuller`
 
 ### Safe Path
 
@@ -112,8 +113,8 @@ Use the safe path by default, and always use it when any of these apply:
     fix the index or revise the message before committing.
 13. After `git commit` succeeds, verify the result sequentially, not in
     parallel with the commit itself. Run `git status --short --branch` and
-    `git log -1` to confirm the worktree is clean and `HEAD` matches the new
-    commit.
+    `git log -1 --pretty=fuller` to confirm the worktree is clean and `HEAD`
+    matches the new commit.
 
 ## Speed Guidance
 
