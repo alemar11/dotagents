@@ -1,0 +1,7 @@
+interface:
+  display_name: "GitHub Publish"
+  short_description: "Open pull requests and manage PR lifecycle state without staging, committing, branching, or pushing."
+  brand_color: "#0891B2"
+  icon_small: "./assets/github-small.svg"
+  icon_large: "./assets/github.png"
+  default_prompt: "Use the repo-owned GitHub Publish skill to open pull requests and manage PR lifecycle state without taking over commit or push orchestration."
