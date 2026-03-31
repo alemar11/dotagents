@@ -3,7 +3,7 @@
 This directory contains reusable skills and project maintainer skills—task-specific packages of instructions, resources, and optional scripts that help agents follow workflows reliably.
 
 ## Skills
-- `commit/` — Create a well-formed git commit with rationale, explicit staging, and monorepo-safe scope.
+- `git-commit/` — Create a well-formed git commit with rationale, explicit staging, and monorepo-safe scope.
 - `ask-questions-if-underspecified/` — Clarify requirements before implementing when a request is underspecified or the user asks for clarification.
 - `codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
 - `github/` — Handle repo-scoped GitHub triage, issue lifecycle, reactions, and PR metadata inside the full GitHub suite.
@@ -30,13 +30,13 @@ Project skills are repository-local and are not included in the reusable install
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/skills --path commit ask-questions-if-underspecified codex-changelog github github-reviews github-ci github-releases github-publish learn postgres skill-audit swift-api-design swift-docc`
+- `Use $skill-installer to install skills from alemar11/skills --path git-commit ask-questions-if-underspecified codex-changelog github github-reviews github-ci github-releases github-publish learn postgres skill-audit swift-api-design swift-docc`
 - `Use $skill-installer to install skills from alemar11/skills --path github github-reviews github-ci github-releases github-publish`
 - `Use $skill-installer to install skills from alemar11/skills --path github-reviews`
 - `Use $skill-installer to install skills from alemar11/skills --path github-ci`
 - `Use $skill-installer to install skills from alemar11/skills --path github-releases`
 - `Use $skill-installer to install skills from alemar11/skills --path github-publish`
-- `Use $skill-installer to install skills from alemar11/skills --path commit`
+- `Use $skill-installer to install skills from alemar11/skills --path git-commit`
 - `Use $skill-installer to install skills from alemar11/skills --path ask-questions-if-underspecified`
 - `Use $skill-installer to install skills from alemar11/skills --path codex-changelog`
 - `Use $skill-installer to install skills from alemar11/skills --path learn`
@@ -58,7 +58,7 @@ Install all reusable skills globally for Codex:
 
 ```sh
 npx skills add alemar11/skills -a codex -g -y \
-  --skill commit \
+  --skill git-commit \
   --skill ask-questions-if-underspecified \
   --skill codex-changelog \
   --skill github \

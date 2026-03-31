@@ -12,7 +12,7 @@ state on GitHub. It owns current-branch PR opening, explicit PR creation, and
 PR lifecycle changes such as draft, ready, merge, close, reopen, and checkout.
 
 This skill is intentionally narrower than a full publish pipeline. Commit
-authoring, branch creation, staging, and pushing stay with `commit`.
+authoring, branch creation, staging, and pushing stay with `git-commit`.
 
 ## Trigger rules
 

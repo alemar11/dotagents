@@ -21,7 +21,7 @@ those workflows need to run.
 Prefer the maintained helper scripts first. Drop to raw `gh` or `gh api` only
 when the helper layer does not already cover the job.
 
-Keep commit authoring and staging discipline with the separate `commit` skill.
+Keep commit authoring and staging discipline with the separate `git-commit` skill.
 
 ## Ownership
 
