@@ -14,6 +14,8 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, d
   contains `postgres.toml` and does not contain helper scripts.
 - Helper scripts always live in the installed skill directory next to this
   `SKILL.md`, under `scripts/`.
+- `./scripts/postgres.sh` is an optional dispatcher for discoverability. It
+  forwards to the existing helper scripts rather than replacing them.
 - When the target repo has `.skills/postgres/postgres.toml`, point
   `DB_PROJECT_ROOT` at that repo root and invoke scripts from the installed
   skill directory.
@@ -21,8 +23,12 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, d
   installed skill directory, not the target project root.
 
 ## Fast path (copy/paste)
+- Discover grouped commands:
+  - `DB_PROJECT_ROOT=/path/to/repo /path/to/postgres-skill/scripts/postgres.sh help`
 - Interactive profile bootstrap:
   - `DB_PROJECT_ROOT=/path/to/repo /path/to/postgres-skill/scripts/bootstrap_profile.sh`
+- Ad-hoc read query via dispatcher:
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/postgres.sh query run -c "select now();"`
 - Ad-hoc read query:
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local /path/to/postgres-skill/scripts/run_sql.sh -c "select now();"`
 - DDL/DO block (safe quoting):
@@ -153,6 +159,8 @@ Use this skill to connect to Postgres, run user-requested queries/diagnostics, d
 
 ## Task to script map
 - Ad-hoc SQL query: `./scripts/run_sql.sh` (or `./scripts/psql_with_ssl_fallback.sh`)
+- Optional grouped front door: `./scripts/postgres.sh help`
+- Raw `psql` wrapper with SSL retry: `./scripts/postgres.sh query psql -c "select 1;"`
 - Profile bootstrap/update: `./scripts/bootstrap_profile.sh` (interactive)
 - Connection check: `./scripts/test_connection.sh`
 - Connection diagnostics: `./scripts/check_deps.sh`, `./scripts/connection_info.sh`

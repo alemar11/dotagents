@@ -107,6 +107,21 @@ If `DB_PROFILE` is unset and `postgres.toml` has multiple profiles, the resolver
 
 Note: use `./scripts/psql_with_ssl_fallback.sh` (or scripts that wrap it) if you want automatic SSL retry. If the retry succeeds, ask before updating `postgres.toml` unless `DB_AUTO_UPDATE_SSLMODE=1` is set.
 
+## Optional front door
+Use `./scripts/postgres.sh help` to browse grouped commands without replacing
+the underlying scripts. It is a thin dispatcher over the existing helpers, so
+power users can still call `./scripts/<name>.sh` directly.
+
+Examples:
+```sh
+./scripts/postgres.sh help
+DB_PROFILE=local ./scripts/postgres.sh query run -c "select now();"
+DB_PROFILE=local ./scripts/postgres.sh query psql -c "select current_database();"
+DB_PROFILE=local ./scripts/postgres.sh activity cancel --pid 12345
+DB_PROJECT_ROOT=/path/to/project ./scripts/postgres.sh profile bootstrap
+eval "$(./scripts/postgres.sh profile resolve)"
+```
+
 ## Safe SQL runner (recommended for ad-hoc SQL)
 Use `run_sql.sh` to avoid shell quoting mistakes and keep `ON_ERROR_STOP=1` by default.
 
@@ -350,6 +365,8 @@ DB_CONFIRM=YES ./scripts/query_action.sh terminate --pid 12345,12346
 ```
 
 ## Script index (keep current)
+- `postgres.sh` — Optional grouped dispatcher that forwards to the existing scripts for discoverability.
+  - Example: `DB_PROFILE=local ./scripts/postgres.sh query psql -c "select current_database();"`
 - `resolve_db_url.sh` — Resolves `DB_URL` from `postgres.toml`, `DB_URL`, or compatibility connection env inputs for one-off use.
   - Example: `eval "$(./scripts/resolve_db_url.sh)"`
   - Perf: uses `DB_RESOLVE_CACHE=1` by default for faster repeated resolution.
