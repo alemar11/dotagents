@@ -20,6 +20,8 @@ Use this playbook for repository-wide structure and policy checks.
 - AGENTS guidance matches current repository conventions.
 - Skill-specific rules (for example Postgres guardrails) are not contradicted by newer docs.
 - Benchmark playbook commands and script flags match the benchmark script contract.
+- Codex-dependent skills tracked in `AGENTS.md` match the current skill docs.
+- Portable skills do not accidentally hard-require Codex-only helpers when a generic fallback is intended.
 
 ## Severity Rules
 - `FAIL` (blocking):
@@ -38,6 +40,7 @@ Use this playbook for repository-wide structure and policy checks.
 - `find . -type f -path '*/references/*.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
 - `find . -type f -path '*/references/*.md' -not -path '*/.git/*' -not -path '*/.cache/*' | awk -F/ '{print $NF}'`
 - `rg -n "\./scripts/|agents/openai.yaml|SKILL.md|\\.agents/skills/" -S`
+- `rg -n "request_user_input|subagent|\\$CODEX_HOME|~/.codex|Codex CLI|Codex App|MEMORY.md|memory_summary.md" -S`
 
 ## Parallel Subagent Pattern
 - Use this only when subagent tools are available and the user explicitly asked for delegation or parallel agent work.

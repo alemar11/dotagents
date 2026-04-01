@@ -6,10 +6,12 @@ Run this checklist before finalizing maintainer updates.
 1. Metadata and docs
 - Confirm skill names/descriptions are aligned across `SKILL.md`, `agents/openai.yaml`, and README entries.
 - Confirm no stale references to removed or renamed skills.
+- If Codex-dependency boundaries changed, confirm `AGENTS.md` and the maintainer playbooks reflect the updated classification.
 
 2. Structural consistency
 - Confirm required skill files exist.
 - Confirm `references/` markdown naming policy is respected.
+- Confirm Codex-dependent skills name their required Codex tools/runtime contracts explicitly, and portable skills keep Codex-only helpers optional.
 
 3. Domain-specific workflows
 - If Postgres docs were refreshed, confirm runbook compliance and meaningful-change rationale.
@@ -20,6 +22,7 @@ Run this checklist before finalizing maintainer updates.
 - `find . -type f -name 'SKILL.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
 - `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
 - `rg -n "postgres-best-practices-runbook|openai-skill-benchmark|\\.agents/skills/skills-maintainer|agents/openai.yaml|SKILL.md" -S`
+- `rg -n "request_user_input|subagent|\\$CODEX_HOME|~/.codex|Codex CLI|Codex App|MEMORY.md|memory_summary.md" -S`
 - `test -f .agents/skills/skills-maintainer/artifacts/openai-skill-benchmark/per_skill_review.json`
 - `git diff --stat`
 - `git diff`

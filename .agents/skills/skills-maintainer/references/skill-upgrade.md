@@ -27,6 +27,7 @@ Use this playbook when a user asks to upgrade, modernize, tighten, or improve an
    - trigger clarity
    - workflow structure
    - guardrail precision
+   - Codex dependency labeling or portability-boundary clarity when relevant
    - metadata/doc sync
    - moving dense guidance into `references/` when that improves maintainability
 3. Apply minimal, meaningful edits that preserve each skill's current intent.
@@ -52,6 +53,7 @@ Use this playbook when a user asks to upgrade, modernize, tighten, or improve an
 - Each upgraded skill has a concrete rationale; avoid cosmetic rewrites with no practical gain.
 - Touched docs stay aligned across `SKILL.md`, `agents/openai.yaml`, and `README.md`.
 - `AGENTS.md` changes happen only when the upgrade introduces durable repository guidance.
+- If a touched skill is Codex-dependent, its required Codex tools/runtime contracts are named plainly; if it is portable, Codex-only helpers remain optional.
 - Return `PASS (NOOP)` when no meaningful improvement is needed after inspection.
 
 ## Reporting Contract

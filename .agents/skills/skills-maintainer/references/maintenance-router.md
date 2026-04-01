@@ -6,6 +6,7 @@ Use this file first to route maintenance requests to the right playbook.
 - `run`: proactive maintenance pass across one or more existing skills
 - `upgrade`: improve one or more existing skills' docs, metadata, or workflow clarity with minimal scope
 - `sync`: align metadata and docs
+- `codex-deps`: audit which skills are Codex-dependent versus portable and tighten Codex-tool/runtime wording
 - `audit`: run consistency/release checks
 - `refresh`: refresh domain best-practices content or bundled skill reference content
 - `benchmark`: compare local skills against upstream skill ecosystems and propose meaningful markdown/structure updates
@@ -22,19 +23,21 @@ Use this file first to route maintenance requests to the right playbook.
    - Do not infer `benchmark`, `refresh`, or new-skill creation.
 2. If the user asks to upgrade, modernize, tighten, or improve one or more existing skills, classify as `upgrade` and use `skill-upgrade.md`.
 3. If the user asks to align skill metadata, descriptions, or docs, classify as `sync` and use `metadata-sync.md`.
-4. If the user asks for repo health, policy compliance, structure checks, or pre-release validation, classify as `audit` and use `doc-consistency.md` plus `release-checklist.md`.
-5. If the user asks to refresh Postgres best-practices content, classify as `refresh` and use `postgres-refresh.md`.
-6. If the user asks to refresh bundled Swift-DocC references, review the `swift-docc` manifest, or re-sync the local DocC asset tree against upstream, classify as `refresh` and use `swift-docc-refresh.md`.
-7. If the user asks to refresh bundled Swift API Design references, review the `swift-api-design` manifest, or re-sync the local guideline source against upstream, classify as `refresh` and use `swift-api-design-refresh.md`.
-8. If the user asks to benchmark local skills against upstream repos (for example `openai/skills`, `openai/plugins`, with optional comparison repos), classify as `benchmark` and use `openai-skill-benchmark.md`.
-9. If the user asks to create or bootstrap a brand-new skill, route skill creation through `$skill-creator` first. Return to this maintainer skill only for repo integration or follow-up maintenance after the scaffold exists.
-10. If a request mixes categories, run in this deterministic order:
+4. If the user asks which skills are Codex-dependent versus portable, or asks to verify that Codex-dependent skills explicitly use the right Codex tools/runtime contracts, classify as `codex-deps` and use `codex-dependency-audit.md`.
+5. If the user asks for repo health, policy compliance, structure checks, or pre-release validation, classify as `audit` and use `doc-consistency.md` plus `release-checklist.md`.
+6. If the user asks to refresh Postgres best-practices content, classify as `refresh` and use `postgres-refresh.md`.
+7. If the user asks to refresh bundled Swift-DocC references, review the `swift-docc` manifest, or re-sync the local DocC asset tree against upstream, classify as `refresh` and use `swift-docc-refresh.md`.
+8. If the user asks to refresh bundled Swift API Design references, review the `swift-api-design` manifest, or re-sync the local guideline source against upstream, classify as `refresh` and use `swift-api-design-refresh.md`.
+9. If the user asks to benchmark local skills against upstream repos (for example `openai/skills`, `openai/plugins`, with optional comparison repos), classify as `benchmark` and use `openai-skill-benchmark.md`.
+10. If the user asks to create or bootstrap a brand-new skill, route skill creation through `$skill-creator` first. Return to this maintainer skill only for repo integration or follow-up maintenance after the scaffold exists.
+11. If a request mixes categories, run in this deterministic order:
    - `run` or `upgrade` -> `run-maintenance.md` or `skill-upgrade.md`
    - `sync` -> `metadata-sync.md`
+   - `codex-deps` -> `codex-dependency-audit.md`
    - `refresh` -> the specific routed refresh playbook (`postgres-refresh.md`, `swift-docc-refresh.md`, or `swift-api-design-refresh.md`)
    - `benchmark` -> `openai-skill-benchmark.md`
    - `audit` -> `doc-consistency.md`, then `release-checklist.md`
-11. Always end with `release-checklist.md` for mixed or multi-step maintenance tasks.
+12. Always end with `release-checklist.md` for mixed or multi-step maintenance tasks.
 
 ## Task Isolation Rule
 - Generic bare imperatives map only to `run`.

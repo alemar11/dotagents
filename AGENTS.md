@@ -26,6 +26,14 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Runtime skills must stay unaware of `.agents/skills/skills-maintainer`: do not reference it, its runbooks, or maintainer-routing instructions from runtime `SKILL.md` files or runtime usage references. Keep that routing only in repo-level maintainer docs such as this `AGENTS.md`.
 - Runtime skills may surface runtime learnings or durable guidance candidates, but they must not perform self-upgrade, metadata-sync, reference-refresh, or other repo-maintenance workflows from their own runtime instructions.
 - Route skill-maintenance and repo-maintenance work through `.agents/skills/skills-maintainer` from repo-level maintainer docs, not from runtime `SKILL.md` files.
+- Keep the repo-level source of truth for skill portability in this `AGENTS.md`: record which skills are Codex-dependent vs portable when that boundary matters for maintenance or runtime behavior.
+- Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
+
+### Codex Dependency Classification
+- Current Codex-dependent skills are `codex-changelog`, `learn`, `skill-audit`, and `.agents/skills/skills-maintainer`.
+- Treat `ask-questions-if-underspecified` and `plan-hard` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
+- When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
+- Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.
 
 ### Postgres skill
 - Keep Postgres runtime behavior and operator-facing rules in `postgres/SKILL.md` and `postgres/references/*` (not duplicated here).
@@ -62,6 +70,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - For brand-new skill creation, use `$skill-creator` first; use `skills-maintainer` afterward only for repo integration or follow-up maintenance. (Codex learning)
 - When delegation is explicitly requested and the runtime supports subagents, `skills-maintainer` may spawn multiple subagents only for independent analysis or disjoint write scopes; keep routing, final synthesis, and git verification in the main agent. (Codex learning)
 - For `skills-maintainer` benchmark work, make official OpenAI skills the primary benchmark source: use `openai/skills` and `openai/plugins` by default, inspect plugin-packaged skills under `plugins/*/skills/*`, and treat non-OpenAI repos only as optional comparison baselines.
+- Keep an explicit `audit codex dependencies` task in `skills-maintainer` for verifying which skills are Codex-dependent versus portable, updating this `AGENTS.md` inventory when that boundary changes, and tightening Codex-tool/runtime wording in affected `SKILL.md` files.
+- During Codex dependency audits, require Codex-dependent skills to name their required Codex tools or runtime contracts precisely, and require portable skills to keep Codex-only helpers optional with a generic fallback.
 
 ### Codex Changelog skill
 - Split `codex-changelog` output into `Codex CLI` and `Codex App` sections when reporting release notes. (Codex learning)
