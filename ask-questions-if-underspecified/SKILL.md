@@ -38,6 +38,7 @@ Ask 1-5 questions in the first pass. Prefer questions that eliminate whole branc
 Make questions easy to answer:
 - Optimize for scannability (short, numbered questions; avoid paragraphs)
 - Offer multiple-choice options when possible
+- When `request_user_input` is available, prefer it for 1-3 short structured questions with compact answer choices; fall back to normal chat when you need richer free-form input or more than 3 questions
 - Suggest reasonable defaults when appropriate (mark them clearly as the default/recommended choice; bold the recommended choice in the list, or if you present options in a code block, put a bold "Recommended" line immediately above the block and also tag defaults inside the block)
 - Include a fast-path response (e.g., reply `defaults` to accept all recommended/default choices)
 - Include a low-friction "not sure" option when helpful (e.g., "Not sure - use default")
