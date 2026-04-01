@@ -6,7 +6,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `git-commit/` — Create a well-formed git commit with rationale, explicit staging, and monorepo-safe scope.
 - `ask-questions-if-underspecified/` — Clarify requirements before implementing when a request is underspecified or the user asks for clarification.
 - `codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
-- `xcode-changelog/` — Resolve the active Xcode or a requested version, then print the matching Apple Xcode release notes.
+- `xcode-changelog/` — Resolve the active Xcode, look up a requested version, or list the available Apple Xcode release notes.
 - `plan-hard/` — Create a higher-rigor implementation plan with deeper clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
 - `github/` (`GitHub`) — Handle repo-scoped GitHub work across triage, reviews, CI, releases, and PR publish or lifecycle flows.
 - `yeet/` (`Yeet`) — Orchestrate full publish from a local checkout by choosing branch strategy, using `git-commit` for commit discipline, pushing, and handing off to `github` for PR opening or reuse against the right base branch.

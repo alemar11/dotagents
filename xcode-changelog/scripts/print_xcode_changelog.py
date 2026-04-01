@@ -219,6 +219,17 @@ def choose_same_major_fallback(
     return same_major[0]
 
 
+def choose_latest_fallback(
+    entries: list[ReleaseEntry], beta_requested: bool
+) -> ReleaseEntry:
+    if beta_requested:
+        return entries[0]
+    stable_entries = [entry for entry in entries if not entry.is_beta]
+    if stable_entries:
+        return stable_entries[0]
+    return entries[0]
+
+
 def match_release_entry(
     entries: list[ReleaseEntry], target: TargetSpec | None
 ) -> MatchResult:
@@ -280,7 +291,9 @@ def match_release_entry(
             attempted_versions=attempted_versions,
         )
 
-    fallback_entry = choose_same_major_fallback(entries, target) or entries[0]
+    fallback_entry = choose_same_major_fallback(
+        entries, target
+    ) or choose_latest_fallback(entries, target.beta_requested)
     fallback_message = "No exact Xcode release notes matched the requested version."
     return MatchResult(
         entry=fallback_entry,
@@ -304,6 +317,26 @@ def clean_release_markdown(markdown: str) -> str:
 def format_section(title: str, body: str) -> str:
     divider = "=" * len(title)
     return f"{title}\n{divider}\n{body.strip()}"
+
+
+def build_list_output(info: XcodeInfo, entries: list[ReleaseEntry]) -> str:
+    lines: list[str] = []
+    if info.version:
+        lines.append(f"Active Xcode: {info.version}")
+    if info.build_version:
+        lines.append(f"Active build version: {info.build_version}")
+    if info.developer_dir:
+        lines.append(f"Developer dir: {info.developer_dir}")
+    if info.app_path:
+        lines.append(f"App path: {info.app_path}")
+    lines.append(f"Available release notes: {len(entries)}")
+    lines.append("")
+
+    for entry in entries:
+        lines.append(f"- {entry.title}")
+        lines.append(f"  Source: {entry.source_url}")
+
+    return format_section("Xcode", "\n".join(lines))
 
 
 def build_output(
@@ -362,6 +395,11 @@ def parse_args() -> argparse.Namespace:
         description="Print Apple Xcode release notes for the active or requested version."
     )
     parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List the available Xcode release-note versions from Apple.",
+    )
+    parser.add_argument(
         "--version",
         help="Explicit Xcode version label to match, for example '26.5 beta' or '16.4'.",
     )
@@ -370,13 +408,20 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.list and args.version:
+        raise SystemExit("Use either --list or --version, not both.")
+
     info = get_active_xcode_info()
+    entries = parse_index_entries(fetch_text(INDEX_MARKDOWN_URL))
+
+    if args.list:
+        print(build_list_output(info, entries))
+        return 0
 
     target = parse_target(args.version) if args.version else None
     if target is None and info.version:
         target = parse_target(info.version)
 
-    entries = parse_index_entries(fetch_text(INDEX_MARKDOWN_URL))
     match_result = match_release_entry(entries, target)
     release_body = clean_release_markdown(fetch_text(match_result.entry.markdown_url))
 
