@@ -79,8 +79,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Fetch Codex App notes from `https://developers.openai.com/codex/changelog` and match the installed desktop app version when possible. (Codex learning)
 
 ### GitHub skill
-- Keep the runtime `github` skill as the umbrella entrypoint for repo triage, issue lifecycle, reactions, and PR metadata, and route specialist work to `github-reviews`, `github-ci`, `github-releases`, and `github-publish`.
-- Treat the GitHub split as intentionally breaking: the supported install path for specialist GitHub workflows is the full suite (`github`, `github-reviews`, `github-ci`, `github-releases`, and `github-publish`).
+- Keep the runtime `github` skill as the umbrella entrypoint for repo triage, issue lifecycle, reactions, and PR metadata, and route specialist work to `github-reviews`, `github-ci`, `github-releases`, `github-publish`, and `yeet`.
+- Treat the GitHub split as intentionally breaking: the supported install path for specialist GitHub workflows is the full suite (`github`, `github-reviews`, `github-ci`, `github-releases`, `github-publish`, and `yeet`), plus `git-commit` when `yeet` is part of the install.
 - Do not reintroduce standalone `github` install prompts or `--skill github` / `--path github` examples while review, CI, release, and PR publish workflows remain companion-owned.
 - Keep the runtime `github` skill self-owned and self-sufficient; do not require the upstream GitHub plugin for runtime routing or execution.
 - Benchmark GitHub-skill parity work against the upstream `openai/plugins` GitHub bundle when useful, but keep runtime instructions and helper flows fully repo-local.
@@ -88,10 +88,19 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep GitHub Actions investigation guidance in `github-ci/SKILL.md` and `github-ci/references/*`, not in the umbrella docs. (Codex learning)
 - Keep release/tag guidance in `github-releases/SKILL.md` and `github-releases/references/*`, not in the umbrella docs. (Codex learning)
 - Keep PR publish and lifecycle guidance in `github-publish/SKILL.md` and `github-publish/references/*`, not in the umbrella docs. (Codex learning)
+- Keep full publish-from-worktree guidance in `yeet/SKILL.md` and `yeet/references/*`, not in `github` or `github-publish`. (Codex learning)
 - For release-backed tag creation in `github-releases`, resolve the repository default branch explicitly and surface the exact target SHA before mutation; do not hardcode `main`.
 - For release creation in `github-releases`, standardize the notes choice as three options: infer from the last published release tag, keep blank, or use user-provided notes; recommend infer when the user leaves it unspecified.
 - For tag-creation requests in `github-releases`, distinguish "release-backed tag" (`gh release create`) from "tag-only" (`git tag` / `gh api`) before choosing commands.
 - For GitHub Actions investigations in `github-ci`, distinguish PR-associated failures from generic branch, SHA, workflow, schedule, manual, or explicit run-id runs; use `gh pr checks` only for PR-associated runs and prefer `gh run list` / `gh run view` otherwise.
+
+### GitHub Publish skill
+- Keep current-branch publish context inspection plus current-branch PR opening or reuse in `github-publish`; do not duplicate that helper logic in `yeet`. (Codex learning)
+- Keep `github-publish` limited to post-push PR work and lifecycle mutations; do not absorb branch creation, staging, commit authoring, or push orchestration. (Codex learning)
+
+### Yeet skill
+- Keep `yeet` focused on full publish from local checkout to draft PR while staying orchestration-only: branch strategy and push belong in `yeet`, commit discipline belongs in `git-commit`, and post-push PR logic belongs in `github-publish`. (Codex learning)
+- Keep `yeet` dependency-aware rather than runtime-independent: it should require `git-commit` and `github-publish` instead of vendoring a duplicate GitHub helper layer. (Codex learning)
 
 ### Learn skill
 - Keep `learn` scoped to `AGENTS.md` writes only; do not instruct it to write `MEMORY.md`, `memory_summary.md`, or other memory files.

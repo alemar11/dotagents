@@ -11,7 +11,8 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `github-reviews/` (`GitHub Reviews`) — Inspect unresolved PR review feedback, draft or post replies, and submit reviews with thread-aware context.
 - `github-ci/` (`GitHub CI`) — Inspect PR checks and GitHub Actions failures while keeping PR-check triage separate from generic run inspection.
 - `github-releases/` (`GitHub Releases`) — Plan and create GitHub releases and tags with explicit target resolution and notes strategy.
-- `github-publish/` (`GitHub Publish`) — Open pull requests and manage PR lifecycle state without staging, committing, branching, or pushing.
+- `github-publish/` (`GitHub Publish`) — Inspect current-branch publish context, open or reuse pull requests, and manage PR lifecycle state once the branch is already ready or pushed.
+- `yeet/` (`Yeet`) — Orchestrate full publish from a local checkout by choosing branch strategy, using `git-commit` for commit discipline, pushing, and handing off to `github-publish` for PR opening or reuse.
 - `learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
 - `postgres/` — Connect to Postgres databases, design schemas and indexes, review SQL/query performance, and use common PostGIS or pgvector patterns.
 - `skill-audit/` — Audit installed or user-specified Codex skills using repo evidence, memory, and current context to plan updates, merges, or disables.
@@ -19,7 +20,8 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
 
 ## Skill Dependencies
-- `github/` requires `github-reviews/`, `github-ci/`, `github-releases/`, and `github-publish/` for specialist GitHub workflows. The supported install path is the full GitHub suite.
+- `github/` requires `github-reviews/`, `github-ci/`, `github-releases/`, `github-publish/`, and `yeet/` for specialist GitHub workflows. The supported install path is the full GitHub suite.
+- `yeet/` requires `git-commit/` and `github-publish/` as companion skills for commit discipline and post-push PR handling.
 
 ## Project Skills
 - `.agents/skills/skills-maintainer/` — Maintain and improve one or more skills in this repository with shared upgrade workflows and skill-specific refresh tasks.
@@ -31,12 +33,13 @@ Project skills are repository-local and are not included in the reusable install
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/skills --path git-commit ask-questions-if-underspecified codex-changelog plan-hard github github-reviews github-ci github-releases github-publish learn postgres skill-audit swift-api-design swift-docc`
-- `Use $skill-installer to install skills from alemar11/skills --path github github-reviews github-ci github-releases github-publish`
+- `Use $skill-installer to install skills from alemar11/skills --path git-commit ask-questions-if-underspecified codex-changelog plan-hard github github-reviews github-ci github-releases github-publish yeet learn postgres skill-audit swift-api-design swift-docc`
+- `Use $skill-installer to install skills from alemar11/skills --path git-commit github github-reviews github-ci github-releases github-publish yeet`
 - `Use $skill-installer to install skills from alemar11/skills --path github-reviews`
 - `Use $skill-installer to install skills from alemar11/skills --path github-ci`
 - `Use $skill-installer to install skills from alemar11/skills --path github-releases`
 - `Use $skill-installer to install skills from alemar11/skills --path github-publish`
+- `Use $skill-installer to install skills from alemar11/skills --path git-commit github-publish yeet`
 - `Use $skill-installer to install skills from alemar11/skills --path git-commit`
 - `Use $skill-installer to install skills from alemar11/skills --path ask-questions-if-underspecified`
 - `Use $skill-installer to install skills from alemar11/skills --path codex-changelog`
@@ -69,6 +72,7 @@ npx skills add alemar11/skills -a codex -g -y \
   --skill github-ci \
   --skill github-releases \
   --skill github-publish \
+  --skill yeet \
   --skill learn \
   --skill postgres \
   --skill skill-audit \
@@ -80,17 +84,20 @@ Install the full GitHub suite globally for Codex:
 
 ```sh
 npx skills add alemar11/skills -a codex -g -y \
+  --skill git-commit \
   --skill github \
   --skill github-reviews \
   --skill github-ci \
   --skill github-releases \
-  --skill github-publish
+  --skill github-publish \
+  --skill yeet
 ```
 
 Breaking change: standalone `github` no longer covers review, CI, release/tag,
-or PR publish/lifecycle workflows. Install `github-reviews`, `github-ci`,
-`github-releases`, and `github-publish` alongside `github` for the supported
-GitHub suite layout.
+PR publish/lifecycle, or full publish-from-worktree workflows. Install
+`github-reviews`, `github-ci`, `github-releases`, `github-publish`, and
+`yeet` alongside `github`, plus `git-commit` because `yeet` depends on it, for
+the supported GitHub suite layout.
 
 Install an individual skill globally for Codex:
 
@@ -108,6 +115,10 @@ npx skills add alemar11/skills -a codex -g -y --skill github-releases
 
 ```sh
 npx skills add alemar11/skills -a codex -g -y --skill github-publish
+```
+
+```sh
+npx skills add alemar11/skills -a codex -g -y --skill git-commit --skill github-publish --skill yeet
 ```
 
 ```sh

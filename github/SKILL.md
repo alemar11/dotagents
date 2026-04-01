@@ -10,13 +10,15 @@ description: Handle repo-scoped GitHub triage, issue lifecycle, reactions, PR me
 Use this skill as the repo-owned umbrella entrypoint for repository-scoped
 GitHub work. It owns repository orientation, issue lifecycle work, reactions,
 PR patch inspection, and PR metadata edits. It also routes specialized review,
-CI, release/tag, and PR publish requests to the matching companion skills.
+CI, release/tag, PR lifecycle, and full publish-from-worktree requests to the
+matching companion skills.
 
 Breaking change: the GitHub split is intentional. Standalone `github` installs
 are no longer the supported path for review, CI, release/tag, or PR
-publish/lifecycle work. Install the full GitHub suite (`github`,
-`github-reviews`, `github-ci`, `github-releases`, and `github-publish`) when
-those workflows need to run.
+publish/lifecycle work, or full publish-from-worktree work. Install the full
+GitHub suite (`github`, `github-reviews`, `github-ci`, `github-releases`,
+`github-publish`, and `yeet`) plus `git-commit`, which `yeet` uses for commit
+discipline, when those workflows need to run.
 
 Prefer the maintained helper scripts first. Drop to raw `gh` or `gh api` only
 when the helper layer does not already cover the job.
@@ -32,7 +34,8 @@ Keep commit authoring and staging discipline with the separate `git-commit` skil
 | Review follow-up and review submission | `github-reviews` |
 | PR checks and GitHub Actions investigation | `github-ci` |
 | Release-backed tags and tag-only flows | `github-releases` |
-| PR opening and PR lifecycle mutations | `github-publish` |
+| PR opening after a branch is already ready, plus PR lifecycle mutations | `github-publish` |
+| Full publish from local checkout to draft PR | `yeet` |
 
 ## Trigger rules
 
@@ -41,8 +44,8 @@ Keep commit authoring and staging discipline with the separate `git-commit` skil
 - Use directly for repository orientation, issue or PR summaries, patch
   inspection, issue lifecycle mutations, reactions, and PR metadata edits.
 - Route review follow-up to `github-reviews`, CI debugging to `github-ci`,
-  release/tag work to `github-releases`, and PR publish/lifecycle work to
-  `github-publish`.
+  release/tag work to `github-releases`, PR lifecycle work to
+  `github-publish`, and full publish-from-worktree requests to `yeet`.
 - If a routed specialist skill is unavailable, name the missing companion
   skill, note that the split is intentionally breaking for standalone
   `github`, and stop instead of stretching the umbrella into that workflow.
@@ -144,3 +147,4 @@ Keep commit authoring and staging discipline with the separate `git-commit` skil
 - "Close issue 77 with the implementation evidence from this commit."
 - "Add a thumbs-up reaction to this PR review comment."
 - "Update the PR title and body without changing any review state."
+- "Yeet this worktree into a draft PR."

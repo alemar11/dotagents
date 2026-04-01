@@ -5,8 +5,9 @@ Use this as the authoritative script catalog referenced by
 
 ## Fast helper picks
 
+- Use `scripts/publish_context.sh` for already-pushed current-branch context.
 - Use `scripts/prs_open_current_branch.sh` for already-pushed current-branch
-  PR opening.
+  PR opening or reuse.
 - Use `scripts/prs_create.sh` for explicit PR creation.
 - Use the PR lifecycle helpers for draft, ready, merge, close, reopen, and
   checkout flows.
@@ -21,7 +22,8 @@ Use this as the authoritative script catalog referenced by
 
 ## Publish scripts
 
-- `scripts/prs_open_current_branch.sh --title <text> [--body <text>] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run] [--allow-non-project]`: Open a PR from the already-pushed current branch without staging, committing, or pushing.
+- `scripts/publish_context.sh [--repo <owner/repo>] [--json] [--allow-non-project]`: Show current repo, branch, upstream, change-count, and open-PR context for the local checkout.
+- `scripts/prs_open_current_branch.sh [--title <text>] [--body <text>] [--body-from-head] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run] [--allow-non-project]`: Open or reuse a PR from the already-pushed current branch without staging, committing, or pushing.
 - `scripts/prs_create.sh --title <text> [--body <text>] [--base <branch>] [--head <branch>] [--draft] [--labels <label1,label2>] [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/prs_draft.sh --pr <number> [--repo <owner/repo>] [--allow-non-project]`
 - `scripts/prs_ready.sh --pr <number> [--repo <owner/repo>] [--allow-non-project]`

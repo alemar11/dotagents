@@ -3,12 +3,13 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: prs_open_current_branch.sh --title <text> [--body <text>] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run] [--allow-non-project]
+Usage: prs_open_current_branch.sh [--title <text>] [--body <text>] [--body-from-head] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run] [--allow-non-project]
 EOF
 }
 
 TITLE=""
 BODY=""
+BODY_FROM_HEAD=0
 BASE=""
 DRAFT=0
 REPO=""
@@ -34,6 +35,10 @@ while [[ $# -gt 0 ]]; do
         exit 64
       fi
       shift 2
+      ;;
+    --body-from-head)
+      BODY_FROM_HEAD=1
+      shift
       ;;
     --base)
       BASE="${2:-}"
@@ -77,12 +82,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$TITLE" ]]; then
-  echo "Missing required --title" >&2
-  usage >&2
-  exit 64
-fi
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/github_lib.sh"
 
@@ -118,28 +117,66 @@ if ! git ls-remote --exit-code --heads "$REMOTE_NAME" "$CURRENT_BRANCH" >/dev/nu
   exit 5
 fi
 
+PR_ROW="$(gh pr list \
+  --repo "$TARGET_REPO" \
+  --head "$CURRENT_BRANCH" \
+  --state open \
+  --json number,url,title,baseRefName,headRefName,isDraft \
+  --limit 1 \
+  --jq '.[] | [.number, .url, .title, .baseRefName, .headRefName, (.isDraft|tostring)] | @tsv' \
+  2>/dev/null || true)"
+
+if [[ -n "$PR_ROW" ]]; then
+  IFS=$'\t' read -r PR_NUMBER PR_URL PR_TITLE PR_BASE PR_HEAD PR_DRAFT <<<"$PR_ROW"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    echo "Dry run: would reuse existing PR for $CURRENT_BRANCH in $TARGET_REPO."
+    echo "PR: #$PR_NUMBER $PR_TITLE"
+    echo "URL: $PR_URL"
+    echo "Create arguments are ignored because the PR already exists."
+    exit 0
+  fi
+
+  echo "Reusing existing PR #$PR_NUMBER: $PR_URL"
+  exit 0
+fi
+
 if [[ -z "$BASE" ]]; then
   BASE="$(gh repo view "$TARGET_REPO" --json defaultBranchRef -q .defaultBranchRef.name)"
 fi
 
-CMD=(gh pr create --repo "$TARGET_REPO" --title "$TITLE" --head "$CURRENT_BRANCH" --base "$BASE")
-if [[ -n "$BODY" ]]; then
-  CMD+=(--body "$BODY")
+if [[ -z "$TITLE" ]]; then
+  TITLE="$(git log -1 --format=%s)"
 fi
+
+if [[ -z "$TITLE" ]]; then
+  echo "Could not derive a PR title from HEAD. Pass --title explicitly." >&2
+  exit 6
+fi
+
+if [[ "$BODY_FROM_HEAD" -eq 1 && -z "$BODY" ]]; then
+  BODY="$(git log -1 --format=%b)"
+fi
+
+CMD=(gh pr create --repo "$TARGET_REPO" --title "$TITLE" --head "$CURRENT_BRANCH" --base "$BASE" --body "$BODY")
 if [[ "$DRAFT" -eq 1 ]]; then
   CMD+=(--draft)
 fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
-  printf 'Dry run: would open a PR for %s in %s.\n' "$CURRENT_BRANCH" "$TARGET_REPO"
-  printf 'Base: %s\n' "$BASE"
-  printf 'Title: %s\n' "$TITLE"
+  echo "Dry run: would open a PR for $CURRENT_BRANCH in $TARGET_REPO."
+  echo "Base: $BASE"
+  echo "Title: $TITLE"
   if [[ -n "$BODY" ]]; then
-    printf 'Body: %s\n' "$BODY"
+    if [[ "$BODY_FROM_HEAD" -eq 1 ]]; then
+      echo "Body source: latest commit body"
+    else
+      echo "Body source: provided"
+    fi
+    printf 'Body:\n%s\n' "$BODY"
   else
-    printf 'Body: (empty)\n'
+    echo "Body: (empty)"
   fi
-  printf 'Draft: %s\n' "$([[ "$DRAFT" -eq 1 ]] && echo yes || echo no)"
+  echo "Draft: $([[ "$DRAFT" -eq 1 ]] && echo yes || echo no)"
   printf 'Command:'
   printf ' %q' "${CMD[@]}"
   printf '\n'
