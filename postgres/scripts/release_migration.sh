@@ -207,10 +207,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-project_root="$(postgres_runtime_resolve_project_root)"
-if [[ -z "$project_root" ]]; then
-  die "Unable to resolve the target project root. Run from the target repo or set DB_PROJECT_ROOT."
-fi
+project_root="$(postgres_runtime_resolve_project_root_or_die)" || exit 1
 
 profile="${DB_PROFILE:-local}"
 toml_path="$(postgres_runtime_resolve_toml_path "$project_root")"

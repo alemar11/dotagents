@@ -346,6 +346,7 @@ DB_FIND_OBJECT_TYPES=table,column,view DB_PROFILE=local ./scripts/find_objects.s
 ./scripts/cancel_backend.sh 12345
 DB_CONFIRM=YES ./scripts/terminate_backend.sh 12345
 ./scripts/query_action.sh cancel --query "select * from events"
+DB_CONFIRM=YES ./scripts/query_action.sh terminate --pid 12345,12346
 ```
 
 ## Script index (keep current)
@@ -382,7 +383,7 @@ DB_CONFIRM=YES ./scripts/terminate_backend.sh 12345
 - `long_running_queries.sh` — Shows active queries exceeding a duration threshold.
 - `cancel_backend.sh` — Cancels a running query (prompts for confirmation).
 - `terminate_backend.sh` — Terminates a backend (prompts for confirmation).
-- `query_action.sh` — Lists matching active queries, then cancels or terminates selected PIDs.
+- `query_action.sh` — Lists matching active queries, then cancels or terminates selected PIDs; use `--pid` for non-interactive runs.
 - `explain_analyze.sh` — Runs `EXPLAIN (ANALYZE, BUFFERS)` for a provided SQL statement (use `--no-analyze` to avoid executing the query).
 - `pg_stat_statements_top.sh` — Shows top queries by total/mean execution time; defaults to current DB only. Supports `--all-dbs`, `--full-query`, and `--query-chars`.
 - `vacuum_analyze_status.sh` — Summarizes VACUUM/ANALYZE recency and dead tuples.

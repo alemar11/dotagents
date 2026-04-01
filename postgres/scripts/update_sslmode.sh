@@ -2,29 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-if [[ -n "${PROJECT_ROOT+x}" ]]; then
-  echo "Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead." >&2
-  exit 1
-fi
-
-ROOT_OVERRIDE="${DB_PROJECT_ROOT:-}"
-PROJECT_ROOT="$ROOT_OVERRIDE"
-if [[ -z "$PROJECT_ROOT" && -x "$(command -v git)" ]]; then
-  PROJECT_ROOT="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-fi
-if [[ -z "$PROJECT_ROOT" ]]; then
-  PROJECT_ROOT="$PWD"
-fi
-if [[ -z "$ROOT_OVERRIDE" ]]; then
-  case "$PROJECT_ROOT" in
-    "$SKILL_ROOT"|"$SKILL_ROOT"/*)
-      echo "Project root resolved to the postgres skill directory: $SKILL_ROOT" >&2
-      echo "Run this from the postgres skill directory with DB_PROJECT_ROOT set (or run from your project root)." >&2
-      exit 1
-      ;;
-  esac
-fi
+source "$SCRIPT_DIR/runtime_env.sh"
+PROJECT_ROOT="$(postgres_runtime_resolve_project_root_or_die)" || exit 1
 
 TOML_PATH="$PROJECT_ROOT/.skills/postgres/postgres.toml"
 

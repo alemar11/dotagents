@@ -68,6 +68,15 @@ postgres_runtime_read_configuration_value() {
   postgres_runtime_decode_toml_value "$raw"
 }
 
+postgres_runtime_require_env_unset() {
+  local key="$1"
+  local replacement="$2"
+  if [[ -n "${!key+x}" ]]; then
+    echo "Unsupported environment variable '$key'. Use '$replacement' instead." >&2
+    return 1
+  fi
+}
+
 postgres_runtime_resolve_project_root() {
   local root_override="${DB_PROJECT_ROOT:-}"
   local root="$root_override"
@@ -87,6 +96,20 @@ postgres_runtime_resolve_project_root() {
   fi
 
   printf '%s' "$root"
+}
+
+postgres_runtime_resolve_project_root_or_die() {
+  local project_root=""
+  postgres_runtime_require_env_unset "PROJECT_ROOT" "DB_PROJECT_ROOT" || return 1
+  project_root="$(postgres_runtime_resolve_project_root)"
+  if [[ -n "$project_root" ]]; then
+    printf '%s' "$project_root"
+    return 0
+  fi
+
+  echo "Project root resolved to the postgres skill directory: $POSTGRES_RUNTIME_SKILL_ROOT" >&2
+  echo "Run this from the postgres skill directory with DB_PROJECT_ROOT set (or run from your project root)." >&2
+  return 1
 }
 
 postgres_runtime_resolve_toml_path() {

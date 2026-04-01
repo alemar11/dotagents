@@ -5,11 +5,9 @@ if [[ -z "${PGAPPNAME:-}" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SKILL_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/runtime_env.sh"
 
-if [[ -n "${PROJECT_ROOT+x}" ]]; then
-  echo "Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead." >&2
+if ! postgres_runtime_require_env_unset "PROJECT_ROOT" "DB_PROJECT_ROOT"; then
   return 1 2>/dev/null || exit 1
 fi
 
