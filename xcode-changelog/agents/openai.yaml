@@ -1,7 +1,7 @@
 interface:
   display_name: "Xcode Changelog"
   short_description: "Resolve the active Xcode or a requested version, then print the matching Apple Xcode release notes."
-  icon_small: "./assets/xcode-small.png"
+  icon_small: "./assets/xcode-small.svg"
   icon_large: "./assets/xcode.png"
   brand_color: "#147EFB"
   default_prompt: "Use $xcode-changelog to print the Apple Xcode release notes for my active Xcode, or for an explicit Xcode version if I specify one."
