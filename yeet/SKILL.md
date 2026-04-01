@@ -1,6 +1,6 @@
 ---
 name: yeet
-description: Orchestrate the full publish flow from a local checkout by choosing branch strategy, using `git-commit` for intentional commits, pushing, and handing off to `github-publish` for draft PR opening or reuse.
+description: Orchestrate the full publish flow from a local checkout by choosing branch strategy, using `git-commit` for intentional commits, pushing, and handing off to `github` for draft PR opening or reuse.
 ---
 
 # Yeet
@@ -12,12 +12,12 @@ local checkout: inspect scope, create a branch if needed, stage intentionally,
 commit, push, and open or reuse a draft pull request.
 
 This skill is intentionally composed. It requires the `git-commit` and
-`github-publish` companion skills at runtime:
+`github` companion skills at runtime:
 
 - `git-commit` owns selective staging, commit authoring, and post-commit
   verification.
-- `github-publish` owns current-branch publish context inspection plus PR
-  opening or reuse after the branch is ready or pushed.
+- `github` owns current-branch publish context inspection plus PR opening or
+  reuse after the branch is ready or pushed.
 
 Keep v1 intentionally narrow:
 
@@ -35,9 +35,9 @@ Keep v1 intentionally narrow:
 - Keep the current branch when it is already a non-default local branch.
 - Create a new `topic/<slug>` branch only when starting from the repository
   default branch or detached `HEAD`.
-- Route directly to `github-publish` when commit and push are already done, or
-  when the request is PR-only lifecycle work.
-- If `git-commit` or `github-publish` is unavailable, name the missing
+- Route directly to `github` when commit and push are already done, or when
+  the request is PR-only lifecycle work.
+- If `git-commit` or `github` is unavailable, name the missing
   companion skill and stop instead of re-expanding `yeet` into a standalone
   helper surface.
 
@@ -62,9 +62,10 @@ Keep v1 intentionally narrow:
    - If there is no upstream, use `git push -u origin <branch>`.
    - Otherwise use `git push origin <branch>`.
 6. Open or reuse the draft PR.
-   - Hand off to `github-publish` for its `publish_context.sh` and
-     `prs_open_current_branch.sh --draft` helpers.
-   - Let `github-publish` reuse an existing open PR for the current branch
+   - Hand off to `github` for its `publish` domain helpers:
+     `scripts/publish/publish_context.sh` and
+     `scripts/publish/prs_open_current_branch.sh --draft`.
+   - Let `github` reuse an existing open PR for the current branch
      instead of creating a duplicate.
 
 ## Guardrails
@@ -75,14 +76,14 @@ Keep v1 intentionally narrow:
 - Never push without confirming scope when the worktree is mixed.
 - Default to a draft PR unless the user explicitly asks for a ready PR.
 - Stop if the repo is not connected to an accessible same-repo GitHub remote.
-- Do not vendor or duplicate the `git-commit` or `github-publish` helper
+- Do not vendor or duplicate the `git-commit` or `github` helper
   layers here.
 
 ## Fast paths
 
 - Use `git-commit` directly when the job is "make a good commit" without the
   surrounding publish flow.
-- Use `github-publish` directly when the branch is already pushed and the only
+- Use `github` directly when the branch is already pushed and the only
   remaining step is PR opening or reuse.
 - Use `references/workflows.md` for the full local-checkout publish sequence.
 

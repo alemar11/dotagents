@@ -1,7 +1,0 @@
-interface:
-  display_name: "GitHub Publish"
-  short_description: "Inspect current-branch publish context, open or reuse pull requests, and manage PR lifecycle state once the branch is already ready or pushed."
-  brand_color: "#0891B2"
-  icon_small: "./assets/github-small.svg"
-  icon_large: "./assets/github.png"
-  default_prompt: "Use the repo-owned GitHub Publish skill to inspect current-branch publish context, open or reuse pull requests, and manage PR lifecycle state after the branch is already ready or pushed; use Yeet for the full publish flow from a local checkout."

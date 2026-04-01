@@ -10,7 +10,7 @@ silently broadening scope.
 ### Preconditions
 
 - You are inside a local git checkout of the target repository.
-- `git-commit` and `github-publish` are installed as companion skills.
+- `git-commit` and `github` are installed as companion skills.
 - The target is the same repository as the current checkout.
 
 ### Operator policy
@@ -25,13 +25,14 @@ silently broadening scope.
   verification.
 - Push with `git push -u origin <branch>` when no upstream exists, otherwise
   `git push origin <branch>`.
-- Finish by handing off to `github-publish` for publish-context inspection and
+- Finish by handing off to `github` for publish-context inspection and
   current-branch PR opening or reuse.
 
 ### Companion skills
 
 - `git-commit`: stage intentionally, create the commit, and verify it.
-- `github-publish`: inspect post-push publish context and open or reuse the PR.
+- `github`: inspect post-push publish context and open or reuse the PR through
+  its `publish` domain.
 
 ### Canonical sequence
 
@@ -56,14 +57,14 @@ Push, then open or reuse the draft PR:
 
 ```bash
 git push -u origin "$(git branch --show-current)"
-# Then use `github-publish`:
-# 1. its `publish_context.sh` helper
-# 2. its `prs_open_current_branch.sh --draft --body-from-head` helper
+# Then use `github`:
+# 1. scripts/publish/publish_context.sh
+# 2. scripts/publish/prs_open_current_branch.sh --draft --body-from-head
 ```
 
 ### Retry notes
 
 - Current branch has no upstream yet: run `git push -u origin "$(git branch --show-current)"`.
-- Existing PR already open for this branch: `github-publish` should reuse it
-  instead of creating a duplicate.
+- Existing PR already open for this branch: `github` should reuse it instead
+  of creating a duplicate.
 - Mixed unrelated worktree changes: stop, narrow scope, and use explicit pathspec staging.

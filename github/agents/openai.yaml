@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub"
-  short_description: "Triage repo-scoped GitHub work, handle issue lifecycle and PR metadata, and route specialist review, CI, release, PR lifecycle, and full-publish workflows."
+  short_description: "Handle repo-scoped GitHub work across triage, reviews, CI, releases, and PR publish or lifecycle flows, with Yeet reserved for full local-worktree publish."
   brand_color: "#1F9D55"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the repo-owned GitHub skill to summarize repositories, issues, or PRs, handle issue/reaction/PR metadata work, and route review, CI, release, PR lifecycle, and full publish tasks to the required companion skills."
+  default_prompt: "Use the repo-owned GitHub skill to summarize repositories, issues, or PRs, handle issue, review, reaction, CI, release, and PR publish or lifecycle work through its internal domains, and reserve Yeet only for full local-worktree publish."
