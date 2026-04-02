@@ -171,3 +171,132 @@ github_resolve_repo() {
   "${preflight_cmd[@]}" >&2
   "${resolve_cmd[@]}"
 }
+
+github_core_dir() {
+  cd "$(dirname "${BASH_SOURCE[0]}")" && pwd
+}
+
+github_user_state_script_path() {
+  printf '%s/github_user_state.py\n' "$(github_core_dir)"
+}
+
+github_preflight_user_scope() {
+  local core_dir
+  core_dir="$(github_core_dir)"
+  "$core_dir/preflight_gh.sh" --allow-non-project >&2
+}
+
+github_require_readable_file() {
+  local field="${1:-file}"
+  local path="${2:-}"
+  if [[ -z "$path" ]]; then
+    echo "Missing value for --$field." >&2
+    exit 64
+  fi
+  if [[ ! -f "$path" ]]; then
+    echo "File for --$field was not found: $path" >&2
+    exit 66
+  fi
+  if [[ ! -r "$path" ]]; then
+    echo "File for --$field is not readable: $path" >&2
+    exit 66
+  fi
+}
+
+github_collect_repo_targets() {
+  local repo_file="${1:-}"
+  shift || true
+
+  if [[ -n "$repo_file" ]]; then
+    github_require_readable_file "repos-file" "$repo_file"
+  fi
+
+  GITHUB_REPO_FILE="$repo_file" python3 - "$@" <<'PY'
+import os
+import re
+import sys
+
+pattern = re.compile(r"^[^/\s]+/[^/\s]+$")
+seen = set()
+ordered = []
+
+def add_repo(value: str) -> None:
+    repo = value.strip()
+    if not repo:
+        return
+    if not pattern.match(repo):
+        print(f"Invalid repository reference '{repo}'. Use owner/repo.", file=sys.stderr)
+        raise SystemExit(64)
+    if repo not in seen:
+        seen.add(repo)
+        ordered.append(repo)
+
+for repo in sys.argv[1:]:
+    add_repo(repo)
+
+repo_file = os.environ.get("GITHUB_REPO_FILE", "")
+if repo_file:
+    with open(repo_file, "r", encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            add_repo(line)
+
+for repo in ordered:
+    print(repo)
+PY
+}
+
+github_repo_lookup_json() {
+  local repo="${1:-}"
+  github_require_repo_reference "$repo"
+  gh repo view "$repo" --json id,nameWithOwner,viewerHasStarred,url --jq '.'
+}
+
+github_viewer_starred_repositories_json() {
+  local limit="${1:-0}"
+  python3 "$(github_user_state_script_path)" viewer-stars --limit "$limit"
+}
+
+github_viewer_lists_json() {
+  local limit="${1:-0}"
+  python3 "$(github_user_state_script_path)" viewer-lists --limit "$limit"
+}
+
+github_resolve_list_json() {
+  local selector="${1:-}"
+  local list_id="${2:-}"
+  if [[ -n "$selector" && -n "$list_id" ]]; then
+    echo "Pass either a list selector or a list id, not both." >&2
+    exit 64
+  fi
+  if [[ -z "$selector" && -z "$list_id" ]]; then
+    echo "A list selector is required." >&2
+    exit 64
+  fi
+  if [[ -n "$list_id" ]]; then
+    python3 "$(github_user_state_script_path)" resolve-list --list-id "$list_id"
+  else
+    python3 "$(github_user_state_script_path)" resolve-list --list "$selector"
+  fi
+}
+
+github_list_items_json() {
+  local list_id="${1:-}"
+  local limit="${2:-0}"
+  if [[ -z "$list_id" ]]; then
+    echo "github_list_items_json requires a list id." >&2
+    exit 64
+  fi
+  python3 "$(github_user_state_script_path)" list-items --list-id "$list_id" --limit "$limit"
+}
+
+github_repo_list_memberships_json() {
+  local -a cmd=(python3 "$(github_user_state_script_path)" repo-memberships)
+  local repo_id
+  for repo_id in "$@"; do
+    cmd+=(--repo-id "$repo_id")
+  done
+  "${cmd[@]}"
+}

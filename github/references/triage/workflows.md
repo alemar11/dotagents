@@ -3,6 +3,44 @@
 Use this reference for triage-domain GitHub flows inside the consolidated
 `github` skill.
 
+## stars-manage
+
+Purpose: list, star, and unstar repositories for the authenticated GitHub user.
+
+### Operator policy
+
+- Treat stars as authenticated-user scope, not repository-scope mutations.
+- Allow non-project execution; explicit `owner/repo` targets are required for writes.
+- Keep batch star and unstar runs best-effort and report per-repo outcomes.
+
+### Preferred helper
+
+```bash
+scripts/triage/stars_manage.sh --list-stars [--by-list <slug-or-name>|--list-id <id>] [--limit N|--all] [--json]
+scripts/triage/stars_manage.sh --star|--unstar [--repo <owner/repo>]... [--repos-file <path>] [--dry-run] [--json]
+```
+
+## star-lists-manage
+
+Purpose: inspect, create, delete, and manage membership for GitHub star lists.
+
+### Operator policy
+
+- Treat star lists as authenticated-user scope and allow non-project execution.
+- Resolve `--list` by exact slug first, then exact name; require `--list-id` when the selector is ambiguous.
+- Use read-modify-write list membership updates so unrelated list memberships stay intact.
+- Keep batch assign and unassign runs best-effort and report per-repo outcomes.
+
+### Preferred helper
+
+```bash
+scripts/triage/lists_manage.sh --list-lists [--limit N|--all] [--json]
+scripts/triage/lists_manage.sh --list-items [--list <slug-or-name>|--list-id <id>] [--limit N|--all] [--json]
+scripts/triage/lists_manage.sh --create --name <text> [--description <text>] [--private|--public] [--dry-run] [--json]
+scripts/triage/lists_manage.sh --delete [--list <slug-or-name>|--list-id <id>] [--dry-run] [--json]
+scripts/triage/lists_manage.sh --assign|--unassign [--list <slug-or-name>|--list-id <id>] [--repo <owner/repo>]... [--repos-file <path>] [--dry-run] [--json]
+```
+
 ## pr-update-metadata
 
 Purpose: update PR title, body, or base without getting blocked by the recent

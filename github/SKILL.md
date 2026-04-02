@@ -1,6 +1,6 @@
 ---
 name: github
-description: Handle repo-scoped GitHub work through one repo-owned skill covering triage, reviews, CI, releases, and PR publish or lifecycle flows, with `yeet` reserved for full local-worktree publish.
+description: Handle repo-scoped GitHub work plus authenticated-user star and star-list workflows through one repo-owned skill covering triage, reviews, CI, releases, and PR publish or lifecycle flows, with `yeet` reserved for full local-worktree publish.
 ---
 
 # GitHub
@@ -8,9 +8,10 @@ description: Handle repo-scoped GitHub work through one repo-owned skill coverin
 ## Overview
 
 Use this skill as the repo-owned umbrella entrypoint for repository-scoped
-GitHub work. It owns repository orientation, issue lifecycle work, reactions,
-PR patch inspection, PR metadata edits, review follow-up, CI investigation,
-release or tag flows, and PR publish or lifecycle work.
+GitHub work plus authenticated-user star and star-list workflows. It owns
+repository orientation, issue lifecycle work, reactions, personal stars and
+star lists, PR patch inspection, PR metadata edits, review follow-up, CI
+investigation, release or tag flows, and PR publish or lifecycle work.
 
 Breaking change: the GitHub runtime surface is now consolidated. Install
 `github` for repo-scoped GitHub work, and add `yeet` plus `git-commit` only
@@ -26,7 +27,7 @@ skill, and keep full local-worktree publish in `yeet`.
 
 | Request type | Domain |
 | --- | --- |
-| Repository orientation, issue/PR summaries, patch inspection, issue lifecycle, reactions, PR metadata | `triage` |
+| Repository orientation, issue/PR summaries, personal stars and star lists, patch inspection, issue lifecycle, reactions, PR metadata | `triage` |
 | Review follow-up, reply, and review submission | `reviews` |
 | PR checks and GitHub Actions investigation | `ci` |
 | Release-backed tags and tag-only flows | `releases` |
@@ -35,8 +36,9 @@ skill, and keep full local-worktree publish in `yeet`.
 
 ## Trigger rules
 
-- Use for repository-scoped GitHub work in the current repository or an
-  explicitly provided `owner/repo`.
+- Use for repository-scoped GitHub work in the current repository, an
+  explicitly provided `owner/repo`, or authenticated-user star and star-list
+  workflows.
 - Classify each request into one internal domain: `triage`, `reviews`, `ci`,
   `releases`, or `publish`.
 - Route only full publish-from-worktree requests out to `yeet`.
@@ -44,15 +46,14 @@ skill, and keep full local-worktree publish in `yeet`.
 
 ## Quick workflow
 
-1. Determine project scope first.
-2. Enforce repository-only scope.
+1. Determine whether the request is repository-scoped or authenticated-user scoped.
+2. Enforce repository-only scope for repo mutations and authenticated-user-only scope for stars and star lists.
 3. Classify the request by internal domain.
 4. Choose the narrowest local helper inside that domain.
 5. Route only full local-worktree publish to `yeet`.
 6. Use the read-only fast path when it is enough.
 7. Run `scripts/core/preflight_gh.sh` before mutating `gh` actions.
-8. Restate the resolved target repository, PR, issue, or reaction target
-   before mutating anything.
+8. Restate the resolved target repository, list, PR, issue, or reaction target before mutating anything.
 
 ## Scope rules
 
@@ -61,6 +62,9 @@ skill, and keep full local-worktree publish in `yeet`.
   `owner/repo`.
   - Use each command's supported repo-targeting form or the matching helper's
     `--repo owner/repo` option.
+- Authenticated-user star and star-list helpers may run outside a git checkout.
+  - For repo-targeted star or list membership operations, require explicit
+    `owner/repo` targets.
 
 ## Issue mutation standard
 
@@ -81,6 +85,10 @@ skill, and keep full local-worktree publish in `yeet`.
 - Use `scripts/triage/repos_view.sh`,
   `scripts/triage/issues_view.sh --summary`, and
   `scripts/triage/prs_view.sh --summary` for routine triage and orientation.
+- Use `scripts/triage/stars_manage.sh` for listing, starring, and unstarring
+  repositories.
+- Use `scripts/triage/lists_manage.sh` for star-list reads, create/delete,
+  and repo-to-list membership changes.
 - Use `scripts/triage/prs_patch_inspect.sh` for changed-file inspection.
 - Use `scripts/reviews/prs_address_comments.sh` for actionable review-thread
   inspection.
@@ -114,6 +122,8 @@ skill, and keep full local-worktree publish in `yeet`.
   mutating anything.
 - For repository, issue, or PR triage, prefer concise normalized summaries over
   raw JSON or raw command output.
+- For star or star-list work, prefer normalized list summaries and per-repo
+  result reporting over raw GraphQL payloads.
 - For reaction mutations, report the exact selected targets and whether the run
   was a preview (`--dry-run`) or a real write.
 - For read-only requests, return the relevant facts and next useful command or
@@ -140,6 +150,10 @@ skill, and keep full local-worktree publish in `yeet`.
 
 - "Summarize this repo and tell me what matters first."
 - "Show me the open PRs for this repo and summarize which one needs attention."
+- "Show me my starred repos."
+- "Show me my GitHub star lists."
+- "Add these repositories to my Agent Skills list."
+- "Create a list for MCP repos and star this batch."
 - "Show me what changed in PR 482."
 - "Close issue 77 with the implementation evidence from this commit."
 - "Add a thumbs-up reaction to this PR review comment."

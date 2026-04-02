@@ -8,7 +8,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
 - `xcode-changelog/` — Resolve the active Xcode, look up a requested version, or list the available Apple Xcode release notes.
 - `plan-hard/` — Create a higher-rigor implementation plan with deeper clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
-- `github/` (`GitHub`) — Handle repo-scoped GitHub work across triage, reviews, CI, releases, and PR publish or lifecycle flows.
+- `github/` (`GitHub`) — Handle repo-scoped GitHub work plus authenticated-user stars and star lists across triage, reviews, CI, releases, and PR publish or lifecycle flows.
 - `yeet/` (`Yeet`) — Orchestrate full publish from a local checkout by choosing branch strategy, using `git-commit` for commit discipline, pushing, and handing off to `github` for PR opening or reuse against the right base branch.
 - `learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
 - `postgres/` — Connect to Postgres databases, design schemas and indexes, review SQL/query performance, and use common PostGIS or pgvector patterns.
@@ -80,7 +80,8 @@ npx skills add alemar11/skills -a codex -g -y \
 ```
 
 Breaking change: the GitHub runtime surface is now `github` plus `yeet`.
-Install `github` for repo-scoped GitHub work, and add `git-commit` plus
+Install `github` for repo-scoped GitHub work plus authenticated-user stars and
+star lists, and add `git-commit` plus
 `yeet` when full local-worktree publish is needed.
 
 Install an individual skill globally for Codex:
@@ -110,7 +111,8 @@ npx skills add alemar11/skills -a codex -g -y --skill plan-hard
 ```
 
 Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
-For GitHub workflows, install `github` for repo-scoped work and add
+For GitHub workflows, install `github` for repo-scoped work plus
+authenticated-user stars/lists and add
 `git-commit + yeet` for full publish.
 The repository-local `skills-maintainer` skill is intentionally excluded from these commands.
 

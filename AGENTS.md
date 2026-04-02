@@ -80,11 +80,14 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Fetch Codex App notes from `https://developers.openai.com/codex/changelog` and match the installed desktop app version when possible. (Codex learning)
 
 ### GitHub skill
-- Keep the runtime `github` skill as the single repo-scoped GitHub runtime entrypoint for triage, reviews, CI, releases, and PR publish or lifecycle work, and reserve `yeet` only for full local-worktree publish.
+- Keep the runtime `github` skill as the single GitHub runtime entrypoint for repo-scoped work plus authenticated-user star and star-list workflows across triage, reviews, CI, releases, and PR publish or lifecycle work, and reserve `yeet` only for full local-worktree publish.
 - Treat the GitHub consolidation as intentionally breaking: the supported install path for GitHub workflows is `github`, plus `git-commit` and `yeet` when full publish is needed.
 - Do not reintroduce `github-reviews`, `github-ci`, `github-releases`, or `github-publish` runtime install prompts or examples.
 - Keep the runtime `github` skill self-owned and self-sufficient; do not require the upstream GitHub plugin for runtime routing or execution.
 - Benchmark GitHub-skill parity work against the upstream `openai/plugins` GitHub bundle when useful, but keep runtime instructions and helper flows fully repo-local.
+- Keep authenticated-user star and star-list flows in the `triage` domain, not in a new top-level GitHub sub-skill. (Codex learning)
+- Resolve GitHub star-list selectors by exact slug first, then exact name; require `--list-id` when the selector is ambiguous. (Codex learning)
+- For GitHub star-list membership changes, read current memberships first and send the full desired list id set to `updateUserListsForItem` so unrelated memberships are preserved. (Codex learning)
 - Keep full publish-from-worktree guidance in `yeet/SKILL.md` and `yeet/references/*`, not in `github`. (Codex learning)
 - Organize `github/scripts/` and `github/references/` into domain slices: `core`, `triage`, `reviews`, `ci`, `releases`, and `publish`. (Codex learning)
 - Future extractable GitHub plugin skills must map cleanly to one domain slice under `github/scripts/<domain>/` and `github/references/<domain>/`. (Codex learning)

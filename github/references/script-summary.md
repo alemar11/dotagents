@@ -8,7 +8,7 @@ Each domain keeps its own authoritative script catalog and documented flags.
 - Core setup, auth, and retry helpers:
   `references/core/installation.md`
 - Triage helpers for repos, issues, PR metadata, patches, reactions, and
-  issue-link wording:
+  issue-link wording, plus authenticated-user stars and star lists:
   `references/triage/script-summary.md`
 - Review helpers for actionable review threads, replies, and review
   submission:
@@ -26,6 +26,8 @@ Each domain keeps its own authoritative script catalog and documented flags.
 - Routine triage: `scripts/triage/repos_view.sh`,
   `scripts/triage/issues_view.sh --summary`,
   `scripts/triage/prs_view.sh --summary`
+- Personal stars and star lists: `scripts/triage/stars_manage.sh --list-stars`,
+  `scripts/triage/lists_manage.sh --list-lists`
 - Actionable review feedback: `scripts/reviews/prs_address_comments.sh`
 - PR checks and Actions: `scripts/ci/prs_checks.sh`,
   `scripts/ci/actions_run_inspect.sh`

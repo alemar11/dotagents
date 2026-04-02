@@ -8,6 +8,13 @@ Use this as the authoritative triage-domain script catalog referenced by
 - Use `scripts/triage/repos_view.sh` for repository orientation and
   `scripts/triage/issues_view.sh --summary` / `scripts/triage/prs_view.sh --summary` for
   concise issue or PR triage.
+- Use `scripts/triage/stars_manage.sh --list-stars` for authenticated-user
+  starred repository reads and `scripts/triage/stars_manage.sh --star` /
+  `scripts/triage/stars_manage.sh --unstar` for star mutations.
+- Use `scripts/triage/lists_manage.sh --list-lists` and
+  `scripts/triage/lists_manage.sh --list-items` for star-list reads.
+- Use `scripts/triage/lists_manage.sh --create`, `--delete`, `--assign`, and
+  `--unassign` for star-list lifecycle and membership changes.
 - Use `scripts/triage/prs_patch_inspect.sh` for changed-file or per-file patch
   inspection.
 - Use `scripts/triage/reactions_manage.sh` for reactions, including PR review comment
@@ -27,6 +34,13 @@ Use this as the authoritative triage-domain script catalog referenced by
 - `scripts/core/issue_resolve_repo.sh [--repo <owner/repo>] [--allow-non-project]`: Resolve the target repository, defaulting to current git project.
 - `scripts/triage/repos_list.sh [--owner <owner>] [--type all|owner|member|public|private|forks|archived|sources] [--all] [--limit N] [--allow-non-project]`: List repositories available to current user or specified owner.
 - `scripts/triage/repos_view.sh [--repo <owner/repo>] [--json] [--allow-non-project]`: Show a normalized repository summary for triage and orientation work.
+- `scripts/triage/stars_manage.sh --list-stars [--by-list <slug-or-name>|--list-id <id>] [--limit N] [--all] [--json]`: List starred repositories for the authenticated user, optionally filtered to one star list.
+- `scripts/triage/stars_manage.sh --star|--unstar [--repo <owner/repo>]... [--repos-file <path>] [--dry-run] [--json]`: Star or unstar one or more repositories with best-effort batch reporting.
+- `scripts/triage/lists_manage.sh --list-lists [--limit N] [--all] [--json]`: List the authenticated user's GitHub star lists.
+- `scripts/triage/lists_manage.sh --list-items [--list <slug-or-name>|--list-id <id>] [--limit N] [--all] [--json]`: List repositories in one GitHub star list.
+- `scripts/triage/lists_manage.sh --create --name <text> [--description <text>] [--private|--public] [--dry-run] [--json]`: Create a GitHub star list.
+- `scripts/triage/lists_manage.sh --delete [--list <slug-or-name>|--list-id <id>] [--dry-run] [--json]`: Delete a GitHub star list.
+- `scripts/triage/lists_manage.sh --assign|--unassign [--list <slug-or-name>|--list-id <id>] [--repo <owner/repo>]... [--repos-file <path>] [--dry-run] [--json]`: Add or remove starred repositories from a GitHub star list with best-effort batch reporting.
 
 ## Issue scripts
 

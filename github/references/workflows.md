@@ -5,7 +5,8 @@ Choose the domain first, then open the matching detailed workflow document.
 
 ## Domain runbooks
 
-- Triage-owned repository, issue, PR metadata, reaction, and issue-link flows:
+- Triage-owned repository, authenticated-user star/list, issue, PR metadata,
+  reaction, and issue-link flows:
   `references/triage/workflows.md`
 - Review-thread inspection, reply, and review submission:
   `references/reviews/workflows.md`

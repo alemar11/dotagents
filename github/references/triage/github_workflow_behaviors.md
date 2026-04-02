@@ -88,6 +88,40 @@ Evaluate candidate issue IDs from the strongest source to weakest:
 - Default mode is dry-run/preview; commit execution is only performed with `--execute`.
 - Keep behavior repository-scoped and non-destructive unless explicitly executed.
 
+## Star list selector policy
+
+Goal: keep authenticated-user list targeting predictable across star and list flows.
+
+### Resolution order
+
+- Resolve `--list` by exact slug first.
+- If no slug matches, resolve by exact name.
+- If multiple exact name matches exist, require `--list-id`.
+- If `--list-id` is provided, treat it as authoritative and do not fall back to name matching.
+
+### Safety defaults
+
+- Do not fuzzy match list selectors.
+- Error on ambiguity instead of guessing.
+- Treat list operations as authenticated-user scope and allow them outside a git checkout.
+
+## Star list membership policy
+
+Goal: preserve unrelated list memberships when adding or removing repositories from one list.
+
+### Update semantics
+
+- Read the repository's current list memberships first.
+- Compute the full desired list id set after the add/remove request.
+- Send the full desired set to `updateUserListsForItem`.
+- Report per-repository `changed`, `noop`, `dry-run`, or `error` outcomes for batch runs.
+
+### Safety defaults
+
+- Batch assign and unassign flows are best-effort, not fail-fast.
+- Assignment requires the repository to already be starred by the authenticated user.
+- Unassigning a repository that is not starred is a no-op.
+
 ## Issue close evidence policy
 
 Goal: close issues with traceable implementation proof.
