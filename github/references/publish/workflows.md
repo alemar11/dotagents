@@ -56,6 +56,10 @@ staging, committing, or pushing.
 - If `yeet` branched from a long-lived branch such as `stable` or `release/*`,
   pass `--base <that-branch>` explicitly instead of letting the helper fall
   back to the repository default branch.
+- Prefer a structured, feature-level PR body with `Feature`, `Impact`,
+  `Validation`, and optional `Follow-ups`.
+- Use `--body-from-head` only when the latest commit body is intentionally
+  written in that PR-ready format; otherwise pass `--body` explicitly.
 - If an open PR already exists for the current branch but targets a different
   base than the requested `--base`, stop and update the PR base explicitly
   instead of silently reusing the wrong target.
@@ -68,6 +72,22 @@ staging, committing, or pushing.
 
 ```bash
 scripts/publish/prs_open_current_branch.sh [--title <text>] [--body <text>] [--body-from-head] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run]
+```
+
+Suggested PR body shape:
+
+```text
+Feature:
+- <macro summary of the feature, fix, or behavior change>
+
+Impact:
+- <user-facing effect, API behavior, or operational effect>
+
+Validation:
+- <command or "not run (reason)">
+
+Follow-ups:
+- <optional rollout note, TODO, or risk>
 ```
 
 ## pr-lifecycle

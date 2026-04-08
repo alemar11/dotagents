@@ -75,13 +75,23 @@ Keep v1 intentionally narrow:
 6. Open or reuse the draft PR.
    - Hand off to `github` for its `publish` domain helpers:
      `scripts/publish/publish_context.sh` and
-     `scripts/publish/prs_open_current_branch.sh --draft`.
+     `scripts/publish/prs_open_current_branch.sh --draft --body-from-head`.
    - Execute those helpers from the target repo root even when the helper path
      itself is absolute or lives in another checkout.
    - If step 2 captured an explicit PR base, pass it with `--base <branch>`
      instead of letting the helper fall back to the repository default branch.
    - Let `github` reuse an existing open PR for the current branch
      instead of creating a duplicate.
+   - When opening a new PR, prefer a structured, feature-level description
+     that explains the user-facing or system-level change rather than
+     restating commit-level implementation details.
+   - Prefer these sections:
+     - `Feature:` the main capability, fix, or behavior change
+     - `Impact:` what users, operators, or downstream code should notice
+     - `Validation:` tests run, checks run, or `not run (reason)`
+     - `Follow-ups:` optional risks, rollout notes, or remaining work
+   - Treat `--body-from-head` as a convenience only when the latest commit body
+     was written in that PR-ready format; otherwise pass `--body` explicitly.
 
 ## Guardrails
 
@@ -124,3 +134,26 @@ Keep v1 intentionally narrow:
 - "Publish my current branch as a draft PR."
 - "I'm on `main`; branch safely, commit this, and open the PR."
 - "Commit, push, and open or reuse the PR for these local changes."
+
+## PR Description Template
+
+Reuse this structure for the latest commit body when `yeet` will open the PR
+with `--body-from-head`, or pass it directly with `--body` when the latest
+commit body is not PR-ready.
+
+```text
+Feature:
+- <macro summary of the feature, fix, or behavior change>
+- <second high-level change when needed>
+
+Impact:
+- <user-facing effect, API behavior, or operational effect>
+- <important trade-off or migration note>
+
+Validation:
+- <command or check>
+- <command or "not run (reason)">
+
+Follow-ups:
+- <optional risk, rollout note, or TODO>
+```

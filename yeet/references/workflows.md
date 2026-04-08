@@ -32,6 +32,10 @@ silently broadening scope.
   `git push origin <branch>`.
 - Finish by handing off to `github` for publish-context inspection and
   current-branch PR opening or reuse from the target repo root.
+- Prefer a structured, feature-level PR description with `Feature`, `Impact`,
+  `Validation`, and optional `Follow-ups`.
+- Use `--body-from-head` only when the latest commit body already follows that
+  PR-ready structure; otherwise pass `--body` explicitly.
 
 ### Companion skills
 
@@ -72,6 +76,22 @@ git push -u origin "$(git branch --show-current)"
 # Then use `github`:
 # 1. scripts/publish/publish_context.sh
 # 2. scripts/publish/prs_open_current_branch.sh --draft --body-from-head [--base <branch>]
+```
+
+Suggested PR body shape when using `--body-from-head` or `--body`:
+
+```text
+Feature:
+- <macro summary of the feature, fix, or behavior change>
+
+Impact:
+- <user-facing effect, API behavior, or operational effect>
+
+Validation:
+- <command or "not run (reason)">
+
+Follow-ups:
+- <optional rollout note, TODO, or risk>
 ```
 
 ### Retry notes
