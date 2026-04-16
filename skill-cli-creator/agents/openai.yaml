@@ -1,0 +1,5 @@
+interface:
+  display_name: "Skill CLI Creator"
+  short_description: "Build embedded skill CLIs"
+  default_prompt: "Create or refactor an embedded CLI that lives inside a skill, keep `scripts/` as the runtime surface, reserve root `src/` for maintenance-only implementation code, and document the runtime path clearly."
+  brand_color: "#2563EB"
