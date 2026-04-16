@@ -7,7 +7,7 @@ This directory contains reusable skills and project maintainer skills—task-spe
 - `skill-cli-creator/` — Build composable embedded CLIs that live inside a skill, run from `scripts/`, and can grow into `projects/<tool>/`.
 - `codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
 - `xcode-changelog/` — Resolve the active Xcode, look up a requested version, or list the available Apple Xcode release notes.
-- `plan-hard/` — Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
+- `plan-harder/` — Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
 - `github/` (`GitHub`) — Handle repo-scoped GitHub work plus authenticated-user stars and star lists across triage, reviews, CI, releases, and PR publish or lifecycle flows.
 - `yeet/` (`Yeet`) — Orchestrate full publish from a local checkout by choosing branch strategy, using `git-commit` for commit discipline, pushing, and handing off to `github` for PR opening or reuse against the right base branch.
 - `learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
@@ -29,14 +29,14 @@ Project skills are repository-local and are not included in the reusable install
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/skills --path git-commit skill-cli-creator codex-changelog xcode-changelog plan-hard github yeet learn postgres skill-audit swift-api-design swift-docc`
+- `Use $skill-installer to install skills from alemar11/skills --path git-commit skill-cli-creator codex-changelog xcode-changelog plan-harder github yeet learn postgres skill-audit swift-api-design swift-docc`
 - `Use $skill-installer to install skills from alemar11/skills --path github`
 - `Use $skill-installer to install skills from alemar11/skills --path git-commit github yeet`
 - `Use $skill-installer to install skills from alemar11/skills --path git-commit`
 - `Use $skill-installer to install skills from alemar11/skills --path skill-cli-creator`
 - `Use $skill-installer to install skills from alemar11/skills --path codex-changelog`
 - `Use $skill-installer to install skills from alemar11/skills --path xcode-changelog`
-- `Use $skill-installer to install skills from alemar11/skills --path plan-hard`
+- `Use $skill-installer to install skills from alemar11/skills --path plan-harder`
 - `Use $skill-installer to install skills from alemar11/skills --path learn`
 - `Use $skill-installer to install skills from alemar11/skills --path postgres`
 - `Use $skill-installer to install skills from alemar11/skills --path skill-audit`
@@ -60,7 +60,7 @@ npx skills add alemar11/skills -a codex -g -y \
   --skill skill-cli-creator \
   --skill codex-changelog \
   --skill xcode-changelog \
-  --skill plan-hard \
+  --skill plan-harder \
   --skill github \
   --skill yeet \
   --skill learn \
@@ -111,7 +111,7 @@ npx skills add alemar11/skills -a codex -g -y --skill swift-docc
 ```
 
 ```sh
-npx skills add alemar11/skills -a codex -g -y --skill plan-hard
+npx skills add alemar11/skills -a codex -g -y --skill plan-harder
 ```
 
 Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.

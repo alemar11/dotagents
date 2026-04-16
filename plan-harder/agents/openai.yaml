@@ -1,0 +1,5 @@
+interface:
+  display_name: "Plan Harder"
+  short_description: "Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a reviewed `plans/<topic>-plan.md` output."
+  brand_color: "#4F46E5"
+  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then save a deeper phased implementation plan to `plans/<topic>-plan.md` in the current working directory after a gotcha pass and review."

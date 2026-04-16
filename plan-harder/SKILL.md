@@ -1,9 +1,9 @@
 ---
-name: plan-hard
+name: plan-harder
 description: Create a higher-rigor implementation plan when the user explicitly asks for deeper planning, a harder plan, or a stress-tested plan before coding. Use to research the codebase, ask focused clarifying questions, write a phased plan under `./plans/`, and review it for gaps before implementation starts.
 ---
 
-# Plan Hard
+# Plan Harder
 
 ## Goal
 
@@ -15,7 +15,7 @@ Only create the plan. Do not implement the work.
 
 ## Trigger Rules
 
-- Use when the user explicitly invokes `plan-hard` or asks for a harder,
+- Use when the user explicitly invokes `plan-harder` or asks for a harder,
   deeper, or more stress-tested plan.
 - Use when the task is ambiguous, high-risk, multi-phase, or likely to hide
   ordering problems or missing validation steps.
@@ -187,6 +187,6 @@ Examples:
 
 ## Example Requests
 
-- "Plan hard for this auth migration before we touch any code."
+- "Plan harder for this auth migration before we touch any code."
 - "Give me a deeper, stress-tested implementation plan for this feature."
 - "Make a harder plan for this refactor and save it under `plans/`."
