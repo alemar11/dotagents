@@ -1,16 +1,18 @@
 # Codex CLI Patterns
 
-Use this reference when designing the command surface for a new CLI Codex should run.
+Use this reference when designing the command surface for an embedded CLI Codex should run from a skill's `scripts/` directory.
 
 ## Mental model
 
-The CLI is Codex's command layer. It should turn a service, app, API, log source, or database into shell commands Codex can run repeatedly from any repo.
+The CLI is Codex's command layer inside a skill. It should turn a service, app, API, log source, or database into shell commands Codex can run repeatedly from that skill's `scripts/` surface.
 
 Good CLIs for Codex expose composable primitives. Avoid a single command that tries to "do the whole investigation" when smaller discover, read, resolve, download, inspect, draft, and upload commands would compose better.
 
+When the CLI lives inside a skill, keep the runtime surface in `scripts/` and treat any root `src/` tree as maintenance-only implementation detail.
+
 ## Help is interface
 
-Write `--help` for a future Codex thread that only has the binary and a vague task. Each command should have a short description and flags with literal names from the product or API.
+Write `--help` for a future Codex thread that only has the `scripts/...` entrypoint and a vague task. Each command should have a short description and flags with literal names from the product or API.
 
 Good top-level help should answer:
 
@@ -26,26 +28,35 @@ Good top-level help should answer:
 Use product nouns, then verbs:
 
 ```bash
-tool-name --json doctor
-tool-name --json accounts list
-tool-name --json projects list
-tool-name --json channels resolve --name codex
-tool-name --json messages search "exact phrase"
-tool-name --json messages context <message-id> --before 3 --after 3
-tool-name --json logs download <build-url> --failed --out ./logs
-tool-name --json media upload --file ./image.png
-tool-name --json drafts create --body-file draft.json
+scripts/tool-name --json doctor
+scripts/tool-name --json accounts list
+scripts/tool-name --json projects list
+scripts/tool-name --json channels resolve --name codex
+scripts/tool-name --json messages search "exact phrase"
+scripts/tool-name --json messages context <message-id> --before 3 --after 3
+scripts/tool-name --json logs download <build-url> --failed --out ./logs
+scripts/tool-name --json media upload --file ./image.png
+scripts/tool-name --json drafts create --body-file draft.json
 ```
 
 For APIs whose native noun is already strong, direct verbs can be fine:
 
 ```bash
-tool-name --json social-sets
-tool-name --json drafts list --social-set <id>
-tool-name --json request get /v2/me
+scripts/tool-name --json social-sets
+scripts/tool-name --json drafts list --social-set <id>
+scripts/tool-name --json request get /v2/me
 ```
 
 The important rule is consistency. Do not mix many styles unless the product vocabulary demands it.
+
+## Embedded skill runtime surface
+
+When the CLI is embedded inside a skill:
+
+- Run the tool from `scripts/...` during normal skill execution.
+- Do not inspect root `src/` during normal execution.
+- Open root `src/` only when fixing, improving, rebuilding, or extending the implementation behind the `scripts/...` surface.
+- Keep the command shape stable even if the implementation language or internal layout changes.
 
 ## Useful shapes from mature CLIs
 
@@ -53,17 +64,17 @@ Prefer these patterns over clever agent-only abstractions:
 
 ```bash
 # Field-selected structured output: make common reads scriptable.
-tool-name issues list --json number,title,url,state
-tool-name issues list --json number,title --jq '.[] | select(.state == "open")'
+scripts/tool-name issues list --json number,title,url,state
+scripts/tool-name issues list --json number,title --jq '.[] | select(.state == "open")'
 
 # Human text by default, full API object when requested.
-tool-name pods get <name>
-tool-name pods get <name> -o json
+scripts/tool-name pods get <name>
+scripts/tool-name pods get <name> -o json
 
 # Product workflow commands, not just REST nouns.
-tool-name logs tail
-tool-name webhooks listen --forward-to localhost:4242/webhooks
-tool-name webhooks trigger checkout.completed
+scripts/tool-name logs tail
+scripts/tool-name webhooks listen --forward-to localhost:4242/webhooks
+scripts/tool-name webhooks trigger checkout.completed
 ```
 
 Only implement filtering or templating if the user will actually need it. Stable JSON plus narrow read commands are the baseline.
@@ -106,9 +117,9 @@ For exit codes:
 Start shallow by default. Add explicit knobs for breadth:
 
 ```bash
-tool-name --json messages search "topic" --limit 10
-tool-name --json messages search "topic" --limit 50 --all-pages --max-pages 3
-tool-name --json drafts list --limit 20 --offset 40
+scripts/tool-name --json messages search "topic" --limit 10
+scripts/tool-name --json messages search "topic" --limit 50 --all-pages --max-pages 3
+scripts/tool-name --json drafts list --limit 20 --offset 40
 ```
 
 Return `next_cursor`, `next_url`, `offset`, `page_count`, or whatever is real for the provider.
@@ -122,32 +133,33 @@ Good raw commands still use configured auth, base URL, JSON parsing, redaction, 
 Make reads easy:
 
 ```bash
-tool-name --json request get /v2/me
+scripts/tool-name --json request get /v2/me
 ```
 
 Treat raw writes as live writes. Do not hide POST/PUT/PATCH/DELETE behind a "debug" command.
 
-## Companion skill pattern
+## Hosting skill pattern
 
-The companion skill should be smaller than the CLI README. It should teach the path through the tool:
+The hosting skill should teach the path through the embedded tool:
 
 ```md
 Start with:
 
-tool-name --json doctor
-tool-name --json accounts list
+scripts/tool-name --json doctor
+scripts/tool-name --json accounts list
 
 For [common job]:
 
-tool-name --json ...
-tool-name --json ...
+scripts/tool-name --json ...
+scripts/tool-name --json ...
 
 Rules:
 
-- Prefer installed `tool-name` on PATH.
+- Prefer the stable `scripts/tool-name` entrypoint.
 - Use --json when analyzing output.
 - Create drafts by default.
 - Do not publish/delete/retry/submit unless the user asked.
+- Do not inspect `src/` during normal execution.
 - Use `request get ...` only when high-level commands are missing.
 ```
 

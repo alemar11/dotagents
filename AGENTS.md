@@ -79,6 +79,16 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Always fetch Codex CLI notes from `openai/codex` GitHub releases, even if the OpenAI Codex changelog page also lists CLI entries. (Codex learning)
 - Fetch Codex App notes from `https://developers.openai.com/codex/changelog` and match the installed desktop app version when possible. (Codex learning)
 
+### Skill CLI Creator skill
+- Standardize embedded CLIs around a two-surface model: `scripts/` is the public runtime surface, and root `src/` is optional maintenance-only implementation detail. (Codex learning)
+- For embedded skill CLIs, require normal runtime usage to execute from `scripts/...`; do not direct normal skill users to run code from `src/`. (Codex learning)
+- In embedded skill CLIs, inspect root `src/` only when fixing, improving, rebuilding, or extending the implementation behind the `scripts/...` surface. (Codex learning)
+- Use root `src/` only when the embedded CLI is large enough to benefit from a conventional implementation tree; keep small wrappers entirely in `scripts/`. (Codex learning)
+- If root `src/` exists for an embedded CLI, require `src/AGENTS.md` with build, test, rebuild, runtime-prerequisite, and safe-maintenance instructions for the implementation behind `scripts/...`. (Codex learning)
+- Keep persisted embedded-CLI config in `<project-root>/.skills/<hosting-skill>/<hosting-skill>.toml`; treat `<project-root>/.skills/<hosting-skill>/` as config-only, not a place for helper scripts or implementation code. (Codex learning)
+- For embedded skill CLIs, prefer project-local `.skills/...` config first, allow environment variables for one-off runs, and use external config paths only when the user explicitly asks. (Codex learning)
+- Do not standardize alternative generic implementation folder names such as `code/`, `impl/`, or `source/` for embedded CLIs; prefer `src/` when a private implementation tree is needed. (Codex learning)
+
 ### GitHub skill
 - Keep the runtime `github` skill as the single GitHub runtime entrypoint for repo-scoped work plus authenticated-user star and star-list workflows across triage, reviews, CI, releases, and PR publish or lifecycle work, and reserve `yeet` only for full local-worktree publish.
 - Treat the GitHub consolidation as intentionally breaking: the supported install path for GitHub workflows is `github`, plus `git-commit` and `yeet` when full publish is needed.
