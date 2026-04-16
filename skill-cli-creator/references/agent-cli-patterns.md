@@ -4,15 +4,15 @@ Use this reference when designing the command surface for an embedded CLI Codex 
 
 ## Mental model
 
-The CLI is Codex's command layer inside a skill. It should turn a service, app, API, log source, or database into shell commands Codex can run repeatedly from that skill's `scripts/` surface.
+The CLI is Codex's command layer inside a skill. It should turn a service, app, API, log source, or database into shell commands Codex can run repeatedly from the shipped runnable artifact stored in that skill's `scripts/` directory.
 
 Good CLIs for Codex expose composable primitives. Avoid a single command that tries to "do the whole investigation" when smaller discover, read, resolve, download, inspect, draft, and upload commands would compose better.
 
-When the CLI lives inside a skill, keep the runtime surface in `scripts/` and treat any root `src/` tree as maintenance-only implementation detail.
+When the CLI lives inside a skill, keep the shipped runnable artifact in `scripts/` and treat any root `src/` tree as maintenance-only implementation detail.
 
 ## Help is interface
 
-Write `--help` for a future Codex thread that only has the `scripts/...` entrypoint and a vague task. Each command should have a short description and flags with literal names from the product or API.
+Write `--help` for a future Codex thread that only has the shipped artifact in `scripts/...` and a vague task. Each command should have a short description and flags with literal names from the product or API.
 
 Good top-level help should answer:
 
@@ -23,11 +23,16 @@ Good top-level help should answer:
 - Which write actions exist?
 - What is the raw escape hatch?
 
+Treat `--version` as part of that top-level interface, not an afterthought.
+Future Codex threads should be able to check whether the shipped CLI matches
+the latest built implementation without opening `src/`.
+
 ## Prefer this command shape
 
 Use product nouns, then verbs:
 
 ```bash
+scripts/tool-name --version
 scripts/tool-name --json doctor
 scripts/tool-name --json accounts list
 scripts/tool-name --json projects list
@@ -54,9 +59,29 @@ The important rule is consistency. Do not mix many styles unless the product voc
 When the CLI is embedded inside a skill:
 
 - Run the tool from `scripts/...` during normal skill execution.
+- Treat `scripts/<tool>` as the shipped runnable artifact for normal execution.
+- Use `scripts/<tool> --version` as the stable version check.
 - Do not inspect root `src/` during normal execution.
 - Open root `src/` only when fixing, improving, rebuilding, or extending the implementation behind the `scripts/...` surface.
 - Keep the command shape stable even if the implementation language or internal layout changes.
+- Do not treat `target/`, `dist/`, virtualenv paths, or other build directories as supported runtime entrypoints.
+
+Keep one semver source of truth. Use the runtime-native manifest version when
+available, otherwise keep one explicit version constant or file and have
+`--version` read from it.
+
+If the runtime produces a compiled executable, copy, install, or generate the
+shipped artifact into `scripts/`. Script-native runtimes may keep the shipped
+script itself in `scripts/` when that script is the real artifact.
+
+When the scaffold also creates skill-local generated state, keep that ignore
+policy close to the hosting skill:
+
+- create or update `<hosting-skill>/.gitignore` only when the CLI introduces
+  build, cache, module, or environment directories inside the skill folder
+- keep the local `.gitignore` limited to those skill-local generated paths
+- do not create a no-op local `.gitignore` when there is nothing skill-local to
+  ignore
 
 ## Useful shapes from mature CLIs
 
@@ -93,6 +118,10 @@ Do not force Codex to repeatedly search when it already has a stable ID.
 ## Text, JSON, files, exit codes
 
 Support human text by default if it helps. Support `--json` everywhere Codex will parse or pipe results.
+
+Version reporting stays separate from `--json`: running `scripts/<tool> --version`
+should print the current CLI semver cleanly, and `doctor --json` should include
+that same version in its structured diagnostics.
 
 For `--json`:
 
@@ -145,6 +174,7 @@ The hosting skill should teach the path through the embedded tool:
 ```md
 Start with:
 
+scripts/tool-name --version
 scripts/tool-name --json doctor
 scripts/tool-name --json accounts list
 
@@ -155,7 +185,8 @@ scripts/tool-name --json ...
 
 Rules:
 
-- Prefer the stable `scripts/tool-name` entrypoint.
+- Prefer the shipped artifact at `scripts/tool-name`.
+- Check `scripts/tool-name --version` when confirming the shipped CLI matches the latest built implementation.
 - Use --json when analyzing output.
 - Create drafts by default.
 - Do not publish/delete/retry/submit unless the user asked.
@@ -164,3 +195,16 @@ Rules:
 ```
 
 Include JSON shape notes only when Codex needs them to choose the next command.
+
+Add a `CLI Maintenance` section in the hosting skill when the tool has a
+maintained implementation behind `scripts/...`. That section should say:
+
+- normal runtime work stays on `scripts/...`
+- `src/` is for bug fixes, performance work, rebuilds, and feature additions
+- shipped CLI changes must update the implementation, rebuild the shipped
+  artifact in `scripts/...`, and re-run `--help`, `--version`, and `--json doctor`
+- compiled outputs in `target/`, `dist/`, virtualenvs, or similar paths are
+  build intermediates rather than supported runtime entrypoints
+- skill-local generated state should be ignored through the hosting skill's
+  `.gitignore` when those paths live inside the skill folder
+- the CLI follows semver from one declared version source of truth

@@ -16,9 +16,9 @@ Name the hosting skill, the CLI source material, and the first real jobs it shou
 - Host skill: the skill directory that will own the CLI surface.
 - Source: API docs, OpenAPI JSON, SDK docs, curl examples, browser app, existing internal script, article, or working shell history.
 - Jobs: literal reads/writes such as `list drafts`, `download failed job logs`, `search messages`, `upload media`, `read queue schedule`.
-- Entrypoint path: a short script or wrapper path such as `scripts/ci-logs`, `scripts/slack-cli`, or `scripts/buildkite-logs`.
+- Artifact path: the shipped runnable artifact path such as `scripts/ci-logs`, `scripts/slack-cli`, or `scripts/buildkite-logs`.
 
-Before scaffolding, check whether the proposed entrypoint already exists inside the hosting skill:
+Before scaffolding, check whether the proposed shipped artifact path already exists inside the hosting skill:
 
 ```bash
 test -e scripts/<tool-name> && echo "exists"
@@ -30,7 +30,7 @@ If it exists, choose a clearer entry name or evolve the existing command instead
 
 Keep the layout model short and explicit:
 
-- `scripts/` is the public runtime surface.
+- `scripts/` contains the shipped runnable artifacts used during normal skill execution.
 - Root `src/` is an optional maintenance-only implementation detail.
 - `<project-root>/.skills/<hosting-skill>/` is project-local config only.
 
@@ -39,15 +39,51 @@ Keep these invariants explicit in the hosting skill and CLI docs:
 - Run the tool from `scripts/...` during normal skill execution.
 - Do not inspect root `src/` during normal execution.
 - Do not require normal skill users to run code directly from root `src/`.
-- Treat `scripts/<tool>` or `scripts/<tool>.<ext>` as the canonical command surface regardless of language.
+- Treat `scripts/<tool>` or `scripts/<tool>.<ext>` as the shipped runnable artifact regardless of language.
+- Require `scripts/<tool> --version` as part of the stable runtime surface.
 - Open root `src/` only when fixing, improving, rebuilding, or extending the implementation behind `scripts/...`.
-- Keep small wrappers entirely in `scripts/`; introduce root `src/` only when the implementation grows enough to justify it.
-- For larger multi-file implementations, keep the runnable entrypoint in `scripts/` and the maintenance-oriented implementation in root `src/`.
-- If root `src/` exists, require `src/AGENTS.md` with build, test, rebuild, runtime prerequisites, and safe-maintenance instructions for the implementation behind `scripts/...`.
+- Keep script-native runnable artifacts entirely in `scripts/`; introduce root `src/` only when the implementation grows enough to justify it.
+- For larger multi-file implementations, keep the shipped runnable artifact in `scripts/` and the maintenance-oriented implementation in root `src/`.
+- Do not execute compiled CLIs from `target/`, `dist/`, virtualenv paths, or other build directories during normal skill usage.
+- If the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/` before considering the CLI ready.
+- If root `src/` exists, require `src/AGENTS.md` with build, test, rebuild, runtime prerequisites, safe-maintenance instructions, the version source of truth, the semver bump policy, and rebuild instructions for restoring the shipped artifact in `scripts/...`.
 - Treat `<project-root>/.skills/<hosting-skill>/` as config-only, not a place for helper scripts or implementation code.
+- If the scaffold introduces skill-local generated state that must not be committed, create or update `<hosting-skill>/.gitignore` and keep it scoped to that skill's CLI artifacts only.
+- Do not rely on the repo root `.gitignore` for skill-folder-generated build, cache, or module directories when those artifacts live inside the hosting skill.
+- Do not create an empty or no-op skill-local `.gitignore` when the CLI introduces no skill-local generated state.
 - Do not introduce alternative generic implementation folders such as `code/`, `impl/`, or `source/`.
 
 For the detailed command-shape, runtime-surface, JSON, and hosting-skill examples, read [references/agent-cli-patterns.md](references/agent-cli-patterns.md).
+
+## Skill-Local Ignore Policy
+
+Use a skill-local `.gitignore` only when the embedded CLI introduces generated
+state inside the hosting skill that should not be committed.
+
+- Create or update `<hosting-skill>/.gitignore` when the scaffold introduces
+  skill-local build, cache, module, or environment directories.
+- Keep the local `.gitignore` scoped to CLI-local generated state rather than
+  duplicating repo-wide ignore rules.
+- Verify that shipped artifacts in `scripts/` remain tracked when appropriate,
+  while uncommitted intermediates are ignored close to the hosting skill.
+- Typical examples include `node_modules/`, `dist/`, `target/`, `.venv/`,
+  `.uv-cache/`, `__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, and similar
+  tool-specific local directories when they live inside the skill folder.
+
+## CLI Versioning
+
+Versioning is required for every embedded CLI produced through this skill, even
+when the implementation is small.
+
+- Support `scripts/<tool> --version` on the public runtime surface.
+- Keep one semver source of truth for the CLI version.
+- Use the artifact stored in `scripts/` as the only supported normal-execution surface.
+- Use the runtime-native manifest version when one exists, such as
+  `Cargo.toml`, `package.json`, or `pyproject.toml`.
+- When no native manifest exists, keep the version in one explicit code
+  constant or a dedicated version file rather than scattering literals.
+- Treat doc-only updates as no-version-bump changes unless they accompany
+  shipped CLI behavior changes.
 
 ## Choose the Runtime
 
@@ -62,7 +98,7 @@ Then choose the least surprising toolchain:
 - Default to **Rust** when the embedded CLI needs a larger maintained implementation and benefits from a real `src/` tree.
 - Use **TypeScript/Node** when the official SDK, auth helper, browser automation library, or existing repo tooling is the reason the embedded CLI can be better.
 - Use **Python** when the source is data science, local file transforms, notebooks, SQLite/CSV/JSON analysis, or Python-heavy admin tooling.
-- Use **shell** for thin wrappers and small orchestration surfaces that can stay entirely in `scripts/`.
+- Use **shell** for thin orchestration surfaces whose shipped runnable script can live entirely in `scripts/`.
 
 Do not pick a language that adds setup friction unless it materially improves the CLI. If the best language is not installed, either install the missing toolchain with the user's approval or choose the next-best installed option.
 
@@ -70,13 +106,15 @@ State the choice in one sentence before scaffolding, including the reason and th
 
 ## Command Contract
 
-Sketch the command surface in chat before coding. Include the `scripts/...` entrypoint, discovery commands, resolve or ID-lookup commands, read commands, write commands, raw escape hatch, auth/config choice, and any rebuild or wrapper behavior needed behind the surface.
+Sketch the command surface in chat before coding. Include the `scripts/...` artifact path, discovery commands, resolve or ID-lookup commands, read commands, write commands, raw escape hatch, auth/config choice, and any rebuild behavior needed to restore the shipped artifact in `scripts/`.
 
 Use [references/agent-cli-patterns.md](references/agent-cli-patterns.md) for the expected composable CLI shape, command ordering, JSON conventions, pagination patterns, and hosting-skill examples.
 
 Build toward a surface where:
 
 - `scripts/<tool> --help` exposes the major capabilities.
+- `scripts/<tool> --version` reports the current CLI semver from the single
+  source of truth.
 - `scripts/<tool> --json doctor` verifies config, auth, version, endpoint reachability, and missing setup.
 - `scripts/<tool> init ...` stores local config when env-only auth is painful.
 - Discovery commands find accounts, projects, workspaces, teams, queues, channels, repos, dashboards, or other top-level containers.
@@ -117,11 +155,16 @@ Use screenshots to infer workflow, UI vocabulary, fields, and confirmation point
 1. Read the source just enough to inventory resources, auth, pagination, IDs, media/file flows, rate limits, and dangerous write actions. If the docs expose OpenAPI, download or inspect it before naming commands.
 2. Sketch the command list in chat. Keep names short and shell-friendly.
 3. Scaffold the CLI inside the hosting skill using the two-surface layout: `scripts/` for runtime, optional root `src/` for maintenance.
-   - If `src/` is introduced, create `src/AGENTS.md` with build, test, rebuild, runtime prerequisites, and safe-maintenance instructions for the implementation behind `scripts/...`.
+   - Add or wire the single semver source of truth before the CLI contract is considered complete.
+   - Ensure the shipped runnable artifact lives in `scripts/`; treat build outputs elsewhere as intermediates only.
+   - If the runtime produces a compiled executable, copy, install, or generate that executable into `scripts/`.
+   - Inspect which skill-local generated directories the chosen runtime will create and create or update `<hosting-skill>/.gitignore` only when those directories should remain uncommitted.
+   - If `src/` is introduced, create `src/AGENTS.md` with build, test, rebuild, runtime prerequisites, safe-maintenance instructions, the version source of truth, the semver bump policy, and exact steps to restore the shipped artifact in `scripts/...`.
 4. Implement `doctor`, discovery, resolve, read commands, one narrow draft or dry-run write path if requested, and the raw escape hatch.
-5. Expose the runtime surface as a stable runnable entrypoint under `scripts/`.
-6. Smoke test from the `scripts/...` surface, not only via toolchain wrappers. Run `scripts/<tool> --help` and `scripts/<tool> --json doctor`, and confirm the task can be completed without opening `src/`.
-7. Run format, typecheck/build, unit tests for request builders, pagination/request-body builders, no-auth `doctor`, help output, and at least one fixture, dry-run, or live read-only API call.
+5. Expose the shipped runnable artifact under `scripts/` and treat outputs in `target/`, `dist/`, virtualenvs, or similar locations as build intermediates rather than supported runtime entrypoints.
+6. Verify the ignore policy before finalizing the scaffold: confirm intended skill-local generated paths are ignored and the shipped artifact in `scripts/` remains tracked when appropriate.
+7. Smoke test against the artifact stored in `scripts/...`. Run `scripts/<tool> --help`, `scripts/<tool> --version`, and `scripts/<tool> --json doctor`, and confirm the task can be completed without opening `src/`.
+8. Run format, typecheck/build, unit tests for request builders, pagination/request-body builders, no-auth `doctor`, help output, and at least one fixture, dry-run, or live read-only API call.
 
 If a live write is needed for confidence, ask first and make it reversible or draft-only.
 
@@ -145,8 +188,15 @@ When building in Rust, use established crates instead of custom parsers:
 - `toml` for small config files
 - `anyhow` for CLI-shaped error context
 
-Keep the runnable entrypoint in `scripts/`. Use root `src/` only when the Rust implementation is large enough to benefit from a conventional source tree, and keep normal skill usage on the `scripts/...` surface.
-If `src/` exists, document the Rust build/test workflow in `src/AGENTS.md`.
+Keep the shipped compiled executable in `scripts/`. Use root `src/` only when the Rust implementation is large enough to benefit from a conventional source tree, and keep normal skill usage on the artifact in `scripts/...` rather than `target/`.
+Use `Cargo.toml` as the default semver source of truth and wire `--version` to
+that version.
+If Rust build outputs or local caches live inside the hosting skill, create or
+update a skill-local `.gitignore` for entries such as `target/` while keeping
+the shipped artifact in `scripts/` tracked when appropriate.
+If `src/` exists, document the Rust build/test workflow, version source of
+truth, semver bump policy, and the rebuild step that restores the shipped
+artifact in `scripts/` in `src/AGENTS.md`.
 
 ## TypeScript/Node Defaults
 
@@ -157,8 +207,16 @@ When building in TypeScript/Node:
 - `zod` only where external payload validation prevents real breakage
 - `tsup`, `tsx`, or `tsc` using the hosting skill's convention
 
-Keep the stable entrypoint in `scripts/` and use root `src/` only for maintenance-oriented implementation code when the Node project becomes multi-file.
-If `src/` exists, document the Node build/test workflow in `src/AGENTS.md`.
+Keep the shipped runnable artifact in `scripts/` and use root `src/` only for maintenance-oriented implementation code when the Node project becomes multi-file. If the Node tool is bundled or compiled, do not run it from `dist/` during normal execution.
+Use `package.json` as the default semver source of truth and wire `--version`
+to that version.
+If Node tooling creates skill-local generated state, create or update a
+skill-local `.gitignore` for entries such as `node_modules/`, `dist/`,
+`.tsbuildinfo`, and runtime-specific cache directories that should remain
+uncommitted.
+If `src/` exists, document the Node build/test workflow, version source of
+truth, semver bump policy, and the rebuild step that restores the shipped
+artifact in `scripts/` in `src/AGENTS.md`.
 
 ## Python Defaults
 
@@ -169,16 +227,46 @@ When building in Python, prefer boring standard-library pieces unless the workfl
 - `json`, `csv`, `sqlite3`, `pathlib`, and `subprocess` for local files, exports, databases, and existing scripts
 - `uv` or a virtualenv only when dependencies are actually needed
 
-For embedded skill CLIs, keep small Python entrypoints directly in `scripts/`. Introduce root `src/` only when the implementation grows beyond a simple wrapper or small module.
-If `src/` exists, document the Python build/test workflow in `src/AGENTS.md`.
+For embedded skill CLIs, keep small Python runnable artifacts directly in `scripts/`. Introduce root `src/` only when the implementation grows beyond a simple script or small module. Do not treat virtualenv paths or external build directories as supported runtime entrypoints.
+When the Python project has packaging metadata, use that manifest as the semver
+source of truth; otherwise keep one explicit version constant or file and wire
+`--version` to it.
+If Python tooling creates skill-local generated state, create or update a
+skill-local `.gitignore` for entries such as `.venv/`, `.uv-cache/`,
+`__pycache__/`, `.pytest_cache/`, `.mypy_cache/`, and similar local tooling
+directories that should remain uncommitted.
+If `src/` exists, document the Python build/test workflow, version source of
+truth, semver bump policy, and the rebuild step that restores the shipped
+artifact in `scripts/` in `src/AGENTS.md`.
 
 ## Hosting Skill Integration
 
 After the embedded CLI works, update the hosting skill so future Codex threads:
 
 - execute from `scripts/...` during normal runtime usage
+- expose and trust `scripts/<tool> --version` as the runtime version check
+- treat `scripts/<tool>` as the shipped runnable artifact rather than a pointer to `target/`, `dist/`, or other build directories
 - treat root `src/` as maintenance-only
 - know the safe read path, intended draft/write path, and raw escape hatch
 - have copy-pasteable examples that stay on the `scripts/...` surface
+
+Add a `CLI Maintenance` section to the hosting skill. Require that section to:
+
+- keep normal execution on `scripts/...`
+- tell future threads to open `src/` only when fixing bugs, improving
+  performance, rebuilding, or extending the CLI
+- direct maintenance changes into `src/` when it exists, then rebuild the
+  shipped artifact in `scripts/...` and re-verify through that artifact
+- mention the version source of truth and the expectation that shipped CLI
+  changes follow semver
+- state that compiled outputs in `target/`, `dist/`, virtualenvs, or similar
+  build locations are intermediates, not supported runtime entrypoints
+- update the hosting skill's local `.gitignore` whenever new skill-local build,
+  cache, module, or environment directories are introduced
+- define the bump policy explicitly:
+  major for breaking CLI contract changes,
+  minor for backward-compatible new features or meaningful capability
+  additions,
+  and patch for backward-compatible bug fixes and corrections
 
 Keep API reference details in the CLI docs or a skill reference file. Keep the skill focused on ordering, safety, and examples future Codex threads should actually run. For embedded skill CLIs, keep normal runtime examples on the `scripts/...` surface and reserve `src/` for maintenance-oriented examples only.
