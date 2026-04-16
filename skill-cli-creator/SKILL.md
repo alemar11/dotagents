@@ -14,9 +14,14 @@ Build for embedded skill use only. Do not use this skill for standalone global C
 Name the hosting skill, the CLI source material, and the first real jobs it should do:
 
 - Host skill: the skill directory that will own the CLI surface.
+- CLI/tool name: the runtime command name that will own `scripts/<tool>` and,
+  when needed, `projects/<tool>/`.
 - Source: API docs, OpenAPI JSON, SDK docs, curl examples, browser app, existing internal script, article, or working shell history.
 - Jobs: literal reads/writes such as `list drafts`, `download failed job logs`, `search messages`, `upload media`, `read queue schedule`.
 - Artifact path: the shipped runnable artifact path such as `scripts/ci-logs`, `scripts/slack-cli`, or `scripts/buildkite-logs`.
+
+Choose the hosting skill and CLI/tool name independently by default. Reuse the
+skill name only when it is intentionally the clearest runtime command name.
 
 Before scaffolding, check whether the proposed shipped artifact path already exists inside the hosting skill:
 
@@ -25,6 +30,32 @@ test -e scripts/<tool-name> && echo "exists"
 ```
 
 If it exists, choose a clearer entry name or evolve the existing command instead of creating a competing surface.
+
+## Naming Convention
+
+Treat the hosting skill and the CLI/tool name as different design decisions:
+
+- Hosting skill name: the guidance/package container.
+- CLI/tool name: the runtime command noun used in `scripts/<tool>` and
+  `projects/<tool>/`.
+
+Use this naming rule:
+
+- By default, choose the CLI/tool name independently when the runtime command is
+  a narrower operational surface than the hosting skill.
+- Reuse the skill name only when matching is intentionally justified because it
+  is already the clearest ecosystem-standard runtime noun.
+- Use the chosen CLI/tool name consistently in `scripts/<tool>`,
+  `projects/<tool>/`, runtime examples, and maintenance docs.
+
+Naming rubric:
+
+- Prefer short, task- or domain-oriented names.
+- Avoid names that imply broader scope than the CLI actually covers.
+- Avoid generic suffix-only names such as `-cli` or `-tool` unless they
+  materially improve clarity.
+- If the CLI/tool name matches the hosting skill name, state the justification
+  explicitly before scaffolding.
 
 ## Embedded Skill Layout
 
@@ -41,10 +72,13 @@ Keep these invariants explicit in the hosting skill and CLI docs:
 - Do not require normal skill users to run code directly from `projects/<tool>/`.
 - Treat `scripts/<tool>` or `scripts/<tool>.<ext>` as the shipped runnable artifact regardless of language.
 - Require `scripts/<tool> --version` as part of the stable runtime surface.
+- Let the chosen CLI/tool name govern both `scripts/<tool>` and
+  `projects/<tool>/`; do not silently derive one from the hosting skill name
+  later.
 - Open `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind `scripts/...`.
 - Keep script-native runnable artifacts entirely in `scripts/`; introduce `projects/<tool>/` only when the implementation grows enough to justify a real maintenance project.
 - For larger multi-file implementations, keep the shipped runnable artifact in `scripts/` and the maintenance-oriented implementation in `projects/<tool>/`.
-- Keep the CLI project self-contained inside `projects/<tool>/`. Put manifests, lockfiles, dependency installs, caches, intermediate build outputs, project-local test/build config, and source there unless the user explicitly asks for a different wrapper layout.
+- Keep the CLI project self-contained inside `projects/<tool>/`. Put manifests, lockfiles, dependency installs, caches, intermediate build outputs, project-local test/build config, and source there by default. Do not introduce repo-root or skill-root wrappers unless the user explicitly asks for that non-standard layout.
 - Do not execute compiled CLIs from `target/`, `dist/`, virtualenv paths, or other build directories during normal skill usage.
 - If the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/` before considering the CLI ready.
 - If `projects/<tool>/` exists, require `projects/<tool>/AGENTS.md` with build, test, rebuild, runtime prerequisites, safe-maintenance instructions, the version source of truth, the semver bump policy, and rebuild instructions for restoring the shipped artifact in `scripts/...`.
@@ -109,6 +143,10 @@ State the choice in one sentence before scaffolding, including the reason and th
 ## Command Contract
 
 Sketch the command surface in chat before coding. Include the `scripts/...` artifact path, discovery commands, resolve or ID-lookup commands, read commands, write commands, raw escape hatch, auth/config choice, and any rebuild behavior needed to restore the shipped artifact in `scripts/`.
+
+Before finalizing the command contract, confirm that the CLI/tool name is the
+best runtime noun for the planned jobs rather than defaulting to the hosting
+skill name out of symmetry.
 
 Use [references/agent-cli-patterns.md](references/agent-cli-patterns.md) for the expected composable CLI shape, command ordering, JSON conventions, pagination patterns, and hosting-skill examples.
 

@@ -10,6 +10,30 @@ Good CLIs for Codex expose composable primitives. Avoid a single command that tr
 
 When the CLI lives inside a skill, keep the shipped runnable artifact in `scripts/` and treat any `projects/<tool>/` directory as the maintenance/build project behind that runtime surface.
 
+## Naming the skill vs the CLI
+
+Treat these as separate names:
+
+- skill name: the guidance/package container
+- CLI/tool name: the runtime command noun used in `scripts/<tool>` and
+  `projects/<tool>/`
+
+Default to different names when the runtime command is narrower than the skill.
+Only reuse the skill name when it is intentionally the clearest standard
+runtime noun.
+
+Good divergent examples:
+
+- `postgres` skill -> `scripts/pgops` with `projects/pgops/`
+- `github` skill -> `scripts/ghtriage` with `projects/ghtriage/` when the
+  embedded CLI focuses on repo triage, reviews, and CI
+
+Allowed matching-name exception:
+
+- reuse the skill name when the runtime noun is already the clearest standard
+  surface and inventing a different command would be more awkward or more
+  misleading than helpful
+
 ## Help is interface
 
 Write `--help` for a future Codex thread that only has the shipped artifact in `scripts/...` and a vague task. Each command should have a short description and flags with literal names from the product or API.
@@ -61,11 +85,15 @@ When the CLI is embedded inside a skill:
 - Run the tool from `scripts/...` during normal skill execution.
 - Treat `scripts/<tool>` as the shipped runnable artifact for normal execution.
 - Use `scripts/<tool> --version` as the stable version check.
+- Choose the CLI/tool name intentionally; do not assume it must match the
+  hosting skill name.
+- Use the same CLI/tool name consistently for `scripts/<tool>` and
+  `projects/<tool>/`.
 - Do not inspect `projects/<tool>/` during normal execution.
 - Open `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind the `scripts/...` surface.
 - Keep the command shape stable even if the implementation language or internal layout changes.
 - Do not treat `target/`, `dist/`, virtualenv paths, or other build directories as supported runtime entrypoints.
-- Keep manifests, lockfiles, dependency installs, caches, intermediate build outputs, and project-local build/test config inside `projects/<tool>/` when a real maintenance project exists.
+- Keep manifests, lockfiles, dependency installs, caches, intermediate build outputs, and project-local build/test config inside `projects/<tool>/` when a real maintenance project exists. Do not introduce repo-root or skill-root wrappers unless the user explicitly asks for that non-standard layout.
 
 Keep one semver source of truth. Use the runtime-native manifest version when
 available, otherwise keep one explicit version constant or file and have
