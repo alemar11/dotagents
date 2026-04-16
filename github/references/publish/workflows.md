@@ -15,7 +15,7 @@ an open PR already exists.
 
 ### Operator policy
 
-- Use this helper before mutation when the branch, upstream, or open-PR state
+- Use this command before mutation when the branch, upstream, or open-PR state
   is not already known.
 - Prefer it as the post-push handoff point from `yeet`.
 - Run it from the target repository root so the local checkout and resolved
@@ -24,10 +24,10 @@ an open PR already exists.
   carry the right PR base forward when `yeet` branched off a long-lived
   integration branch.
 
-### Preferred helper
+### Preferred command
 
 ```bash
-scripts/publish/publish_context.sh [--repo <owner/repo>] [--json]
+scripts/ghops --json publish context [--repo <owner/repo>]
 ```
 
 ## pr-open-current-branch
@@ -38,23 +38,22 @@ staging, committing, or pushing.
 ### Preconditions
 
 - `gh` installed and authenticated.
-- Run `scripts/core/preflight_gh.sh --expect-repo <owner/repo>` from the target repo
-  root before mutation.
+- Run `scripts/ghops --json doctor` first when repo context is uncertain.
 - The current branch is pushed to a same-name remote branch.
 
 ### Operator policy
 
-- Prefer `scripts/publish/publish_context.sh` first when the branch, upstream, or
+- Prefer `scripts/ghops publish context` first when the branch, upstream, or
   open-PR state is not already obvious.
-- Prefer `scripts/publish/prs_open_current_branch.sh` when the request is about the
-  current pushed branch.
-- Run the helper from the target repository root.
+- Prefer `scripts/ghops publish open` when the request is about the current
+  pushed branch.
+- Run the command from the target repository root.
 - Stop when the branch has no upstream or the upstream branch name differs from
   the local branch name.
 - Reuse an existing open PR for the current branch instead of creating a
   duplicate.
 - If `yeet` branched from a long-lived branch such as `stable` or `release/*`,
-  pass `--base <that-branch>` explicitly instead of letting the helper fall
+  pass `--base <that-branch>` explicitly instead of letting the command fall
   back to the repository default branch.
 - Prefer a structured, feature-level PR body with `Feature`, `Impact`,
   `Validation`, and optional `Follow-ups`.
@@ -68,10 +67,10 @@ staging, committing, or pushing.
 - If the user wants the full local-checkout publish flow, route to `yeet`
   instead of composing it from this skill.
 
-### Preferred helper
+### Preferred command
 
 ```bash
-scripts/publish/prs_open_current_branch.sh [--title <text>] [--body <text>] [--body-from-head] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run]
+scripts/ghops publish open [--title <text>] [--body <text>] [--body-from-head] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run]
 ```
 
 Suggested PR body shape:
@@ -96,34 +95,33 @@ Purpose: create a PR from explicit refs or mutate existing PR lifecycle state.
 
 ### Operator policy
 
-- Use `scripts/publish/prs_create.sh` when `head` and `base` are explicit.
-- Use `scripts/publish/prs_draft.sh`, `scripts/publish/prs_ready.sh`, `scripts/publish/prs_merge.sh`,
-  `scripts/publish/prs_close.sh`, and `scripts/publish/prs_reopen.sh` for remote lifecycle
-  mutations.
-- Use `scripts/publish/prs_checkout.sh` only when the local checkout side effect is
-  acceptable and has been restated to the user.
+- Use `scripts/ghops publish create` when `head` and `base` are explicit.
+- Use `scripts/ghops publish draft`, `scripts/ghops publish ready`,
+  `scripts/ghops publish merge`, `scripts/ghops publish close`, and
+  `scripts/ghops publish reopen` for remote lifecycle mutations.
+- Use `scripts/ghops publish checkout` only when the local checkout side effect
+  is acceptable and has been restated to the user.
 - Keep PR metadata edits in umbrella `github`.
 
-### Preferred helpers
+### Preferred commands
 
 ```bash
-scripts/publish/prs_create.sh --title <text> [--body <text>] [--base <branch>] [--head <branch>] [--draft] [--labels <label1,label2>] [--repo <owner/repo>]
-scripts/publish/prs_ready.sh --pr <number> [--repo <owner/repo>]
-scripts/publish/prs_draft.sh --pr <number> [--repo <owner/repo>]
-scripts/publish/prs_merge.sh --pr <number> [--merge|--squash|--rebase] [--delete-branch] [--admin] [--auto] [--repo <owner/repo>]
-scripts/publish/prs_close.sh --pr <number> [--repo <owner/repo>]
-scripts/publish/prs_reopen.sh --pr <number> [--repo <owner/repo>]
-scripts/publish/prs_checkout.sh --pr <number> [--branch <name>] [--detach] [--force] [--recurse-submodules] [--repo <owner/repo>]
+scripts/ghops publish create --title <text> [--body <text>] [--base <branch>] [--head <branch>] [--draft] [--labels <label1,label2>] [--repo <owner/repo>]
+scripts/ghops publish ready --pr <number> [--repo <owner/repo>]
+scripts/ghops publish draft --pr <number> [--repo <owner/repo>]
+scripts/ghops publish merge --pr <number> [--merge|--squash|--rebase] [--delete-branch] [--admin] [--auto] [--repo <owner/repo>]
+scripts/ghops publish close --pr <number> [--repo <owner/repo>]
+scripts/ghops publish reopen --pr <number> [--repo <owner/repo>]
+scripts/ghops publish checkout --pr <number> [--branch <name>] [--detach] [--force] [--recurse-submodules] [--repo <owner/repo>]
 ```
 
 ## Retry notes
 
-- Auth/session errors: `gh auth login && scripts/core/preflight_gh.sh --host github.com`
-- Repository mismatch errors: rerun
-  `scripts/core/preflight_gh.sh --host github.com --expect-repo owner/repo` from
-  the target repo root.
+- Auth/session errors: `gh auth login && scripts/ghops --json doctor`
+- Repository mismatch errors: rerun the command from the target repo root or
+  pass `--repo owner/repo` explicitly.
 - Current branch has no upstream or same-name remote branch: run
   `git push -u origin $(git branch --show-current)` from the target repo root,
-  then rerun `scripts/publish/publish_context.sh` or `scripts/publish/prs_open_current_branch.sh`.
+  then rerun `scripts/ghops publish context` or `scripts/ghops publish open`.
 - Detached HEAD during current-branch PR opening: switch back to a branch
-  first, then rerun the helper.
+  first, then rerun `scripts/ghops publish open`.

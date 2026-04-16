@@ -1,4 +1,4 @@
-# GitHub CLI (`gh`) Installation
+# GitHub CLI setup for `ghops`
 
 ## Check whether `gh` is installed
 
@@ -30,10 +30,11 @@ gh auth status
 
 Use `gh auth status` to confirm the session before running write operations.
 
-## Run preflight before operations
+## Check `ghops` readiness before operations
 
 ```bash
-scripts/core/preflight_gh.sh --host github.com --min-version 2.0.0
+scripts/ghops --json doctor
 ```
 
-Use `--allow-non-project` only for explicit non-project workflows.
+Use `--allow-non-project` only on `ghops` commands that explicitly support
+non-project workflows.

@@ -4,4 +4,4 @@ interface:
   brand_color: "#1F9D55"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the repo-owned GitHub skill to summarize repositories, issues, or PRs, manage authenticated-user stars and star lists, handle issue, review, reaction, CI, release, and PR publish or lifecycle work through its internal domains, and reserve Yeet only for full local-worktree publish."
+  default_prompt: "Use the repo-owned GitHub skill through scripts/ghops to summarize repositories, issues, or PRs, manage authenticated-user stars and star lists, handle issue, review, reaction, checks, Actions, release, and PR publish or lifecycle work, and reserve Yeet only for full local-worktree publish."

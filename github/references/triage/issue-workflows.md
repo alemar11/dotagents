@@ -15,13 +15,13 @@ should no longer remain open.
   2. gather implementation evidence,
   3. post a concise closure note,
   4. close the issue.
-- Prefer the dedicated helper script over manual `gh issue comment` plus
+- Prefer the dedicated `ghops` command over manual `gh issue comment` plus
   `gh issue close` sequences.
 
-### Preferred helper
+### Preferred command
 
 ```bash
-scripts/triage/issues_close_with_evidence.sh --issue <number> --commit-sha <sha> [--commit-url <url>] [--pr-url <url>] [--repo <owner/repo>] [--allow-non-project] [--dry-run]
+scripts/ghops issues close-with-evidence --issue <number> --commit-sha <sha> [--commit-url <url>] [--pr-url <url>] [--repo <owner/repo>] [--allow-non-project] [--dry-run]
 ```
 
 ### Closure note template
@@ -42,9 +42,8 @@ open.
   2. gather implementation evidence,
   3. post a concise update comment,
   4. leave the issue open unless the user explicitly asks to close it.
-- Until a dedicated helper exists, prefer:
-  - `gh issue comment <number> --repo <owner/repo> --body-file <file>`
-  - `gh issue comment <number> --repo <owner/repo> --body <text>`
+- Use `scripts/ghops issues comment --issue <number> --repo <owner/repo> --body <text>`
+  when you want to stay on the repo-owned runtime surface.
 - Keep operational follow-up steps explicit and separate from the
   implementation evidence.
 
@@ -74,10 +73,10 @@ backlinks and source-state behavior.
 
 ### Operator policy
 
-- Prefer `scripts/triage/issues_copy.sh` when the source issue should stay open and
+- Prefer `scripts/ghops issues copy` when the source issue should stay open and
   work should continue in both places.
-- Prefer `scripts/triage/issues_move.sh` when work should continue only in the target
-  repository.
+- Prefer `scripts/ghops issues move` when work should continue only in the
+  target repository.
 
 ### Standard target-body notes
 

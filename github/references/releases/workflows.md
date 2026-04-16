@@ -12,9 +12,8 @@ target branch or commit.
 
 - `gh` installed and authenticated.
 - Repository scope is known.
-- If working from a local clone, run
-  `scripts/core/preflight_gh.sh --expect-repo <owner/repo>` from the target repo
-  root before mutation.
+- If working from a local clone, run `scripts/ghops --json doctor` first when
+  repo context is uncertain.
 - For tag-only creation with `git tag`, work from a local clone of the target
   repository.
 
@@ -27,29 +26,28 @@ target branch or commit.
 - Keep the exact three notes choices for releases:
   infer from the last published release tag, keep blank, or use user-provided
   notes.
-- Use `scripts/releases/release_notes_generate.sh` when the user wants inferred notes
-  and should see the draft before publishing.
-- Use `scripts/releases/release_create.sh` for release publication because it requires
-  explicit `--target-ref` and explicit `--notes-mode`.
+- Use `scripts/ghops releases notes` when the user wants inferred notes and
+  should see the draft before publishing.
+- Use `scripts/ghops releases create` for release publication because it
+  requires explicit `--target-ref` and explicit `--notes-mode`.
 - For tag-only creation from a local clone, use `git tag` plus
   `git push origin <tag>`.
 - Use `gh api` for tag-only creation only when the user explicitly wants the
   API path.
 
-### Preferred helper path
+### Preferred command path
 
 ```bash
-scripts/releases/release_plan.sh [--repo <owner/repo>] [--target-branch <branch>]
-scripts/releases/release_notes_generate.sh --tag <tag> --target-ref <branch-or-sha> [--repo <owner/repo>] [--previous-tag <tag>]
-scripts/releases/release_create.sh --tag <tag> --target-ref <branch-or-sha> --notes-mode <infer|blank|user> [--repo <owner/repo>]
+scripts/ghops releases plan [--repo <owner/repo>] [--target-branch <branch>]
+scripts/ghops releases notes --tag <tag> --target-ref <branch-or-sha> [--repo <owner/repo>] [--previous-tag <tag>]
+scripts/ghops releases create --tag <tag> --target-ref <branch-or-sha> --notes-mode <infer|blank|user> [--repo <owner/repo>]
 ```
 
 ## Retry notes
 
-- Auth/session errors: `gh auth login && scripts/core/preflight_gh.sh --host github.com`
-- Repository mismatch errors: rerun
-  `scripts/core/preflight_gh.sh --host github.com --expect-repo owner/repo` from
-  the target repo root.
+- Auth/session errors: `gh auth login && scripts/ghops --json doctor`
+- Repository mismatch errors: rerun the command from the target repo root or
+  pass `--repo owner/repo` explicitly.
 - Release notes generation failures: rerun
-  `scripts/releases/release_notes_generate.sh --tag <tag> --target-ref <branch-or-sha> [--repo <owner/repo>]`
+  `scripts/ghops releases notes --tag <tag> --target-ref <branch-or-sha> [--repo <owner/repo>]`
   after confirming the previous tag and target ref.

@@ -1,7 +1,15 @@
 # GitHub script summary
 
-Use this as the top-level helper index referenced by `github/SKILL.md`.
-Each domain keeps its own authoritative script catalog and documented flags.
+Use this as the top-level runtime and command-map index referenced by
+`github/SKILL.md`.
+
+## Public runtime
+
+- `scripts/ghops` is the only supported runtime entrypoint.
+- Start with `scripts/ghops --version` and
+  `scripts/ghops --json doctor`.
+- Treat the domain catalogs below as `ghops` command maps and runbooks, not as
+  separate runtime entrypoints.
 
 ## Domain catalogs
 
@@ -23,14 +31,15 @@ Each domain keeps its own authoritative script catalog and documented flags.
 
 ## Fast picks
 
-- Routine triage: `scripts/triage/repos_view.sh`,
-  `scripts/triage/issues_view.sh --summary`,
-  `scripts/triage/prs_view.sh --summary`
-- Personal stars and star lists: `scripts/triage/stars_manage.sh --list-stars`,
-  `scripts/triage/lists_manage.sh --list-lists`
-- Actionable review feedback: `scripts/reviews/prs_address_comments.sh`
-- PR checks and Actions: `scripts/ci/prs_checks.sh`,
-  `scripts/ci/actions_run_inspect.sh`
-- Release planning: `scripts/releases/release_plan.sh`
-- Already-pushed branch to PR: `scripts/publish/publish_context.sh`,
-  `scripts/publish/prs_open_current_branch.sh`
+- Runtime readiness: `scripts/ghops --json doctor`
+- Routine triage: `scripts/ghops repos view`,
+  `scripts/ghops issues view --issue <n>`,
+  `scripts/ghops prs view --pr <n>`
+- Personal stars and star lists: `scripts/ghops --json stars list`,
+  `scripts/ghops --json lists list`
+- Actionable review feedback: `scripts/ghops reviews address --pr <n>`
+- PR checks and Actions: `scripts/ghops --json checks pr --pr <n>`,
+  `scripts/ghops --json actions list`
+- Release planning: `scripts/ghops releases plan`
+- Already-pushed branch to PR: `scripts/ghops --json publish context`,
+  `scripts/ghops publish open`

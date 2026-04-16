@@ -1,7 +1,8 @@
 # GitHub workflows
 
 Use this as the top-level runbook index referenced by `github/SKILL.md`.
-Choose the domain first, then open the matching detailed workflow document.
+Choose the `ghops` runtime path first, then open the matching detailed workflow
+document when the domain needs deeper guidance.
 
 ## Domain runbooks
 
@@ -19,8 +20,8 @@ Choose the domain first, then open the matching detailed workflow document.
 
 ## Routing rules
 
-- Stay in `github` for triage, reviews, CI, releases, and publish or
-  lifecycle work.
+- Stay on `scripts/ghops` for runtime execution across triage, reviews,
+  checks, generic Actions, releases, and publish or lifecycle work.
 - Route only full local-worktree publish to `yeet`.
-- Use `references/core/failure-retries.md` when the chosen helper fails and
-  you need the next retry path quickly.
+- Use `references/core/failure-retries.md` when the chosen `ghops` command
+  fails and you need the next retry path quickly.

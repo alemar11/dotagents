@@ -15,18 +15,18 @@ Purpose: inspect failing checks tied to an open PR.
 
 ### Operator policy
 
-- Start with `scripts/ci/prs_checks.sh` for a quick check-state view.
-- Prefer `scripts/ci/inspect_pr_checks.py` when you need log snippets plus run
+- Start with `scripts/ghops checks pr` for a quick check-state view.
+- Prefer `scripts/ghops actions inspect` when you need log snippets plus run
   metadata in one step.
 - Keep non-GitHub Actions providers report-only and state that clearly in the
   summary.
 - Summarize the likely root cause before proposing a fix plan.
 
-### Preferred helpers
+### Preferred commands
 
 ```bash
-scripts/ci/prs_checks.sh --pr <number> [--repo <owner/repo>]
-python3 scripts/ci/inspect_pr_checks.py --repo . --pr <number-or-url>
+scripts/ghops --json checks pr --pr <number> [--repo <owner/repo>]
+scripts/ghops --json actions inspect --repo <owner/repo> --run-id <id>
 ```
 
 ## actions-run-inspect
@@ -38,26 +38,24 @@ an open PR.
 
 - Use this path for branch, SHA, workflow, scheduled/manual, or explicit
   run-id investigations.
-- Start with `gh run list` behavior through
-  `scripts/ci/actions_run_inspect.sh --summary-only` when you only need recent
-  candidates.
-- Use `gh run view --job ... --log` behavior through the helper when job-level
-  logs matter more than run-level summary output.
+- Start with `scripts/ghops actions list` when you only need recent candidate
+  runs.
+- Use `scripts/ghops actions inspect` when run-level summary output or log
+  snippets matter more than a raw `gh run` dump.
 - Do not fall back to `gh pr checks` when no PR exists.
 
-### Preferred helper
+### Preferred commands
 
 ```bash
-scripts/ci/actions_run_inspect.sh [--repo <owner/repo>] [--run-id <id>] [--job-id <id>] [--branch <branch>] [--commit <sha>] [--workflow <name>] [--event <event>] [--status <status>]
+scripts/ghops --json actions list [--repo <owner/repo>] [--branch <branch>] [--commit <sha>] [--workflow <name>] [--event <event>] [--status <status>]
+scripts/ghops --json actions inspect [--repo <owner/repo>] --run-id <id>
 ```
 
 ## Retry notes
 
-- Auth/session errors: `gh auth login && scripts/core/preflight_gh.sh --host github.com`
-- Repository mismatch errors: rerun
-  `scripts/core/preflight_gh.sh --host github.com --expect-repo owner/repo` from
-  the target repo root.
+- Auth/session errors: `gh auth login && scripts/ghops --json doctor`
+- Repository mismatch errors: rerun the command from the target repo root or
+  pass `--repo owner/repo` explicitly.
 - Actions log retrieval limitations: rerun
-  `scripts/ci/actions_run_inspect.sh --run-id <id> --job-id <job-id> [--repo <owner/repo>]`
-  or use `gh run download <run-id> -n <artifact>` when artifacts matter more
-  than logs.
+  `scripts/ghops --json actions inspect --run-id <id>` after confirming the
+  target run id.

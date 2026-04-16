@@ -1,82 +1,73 @@
-# GitHub triage script summary
+# GitHub triage command summary
 
-Use this as the authoritative triage-domain script catalog referenced by
+Use this as the authoritative triage-domain `ghops` command map referenced by
 `github/SKILL.md`.
 
-## Fast helper picks
+## Fast picks
 
-- Use `scripts/triage/repos_view.sh` for repository orientation and
-  `scripts/triage/issues_view.sh --summary` / `scripts/triage/prs_view.sh --summary` for
-  concise issue or PR triage.
-- Use `scripts/triage/stars_manage.sh --list-stars` for authenticated-user
-  starred repository reads and `scripts/triage/stars_manage.sh --star` /
-  `scripts/triage/stars_manage.sh --unstar` for star mutations.
-- Use `scripts/triage/lists_manage.sh --list-lists` and
-  `scripts/triage/lists_manage.sh --list-items` for star-list reads.
-- Use `scripts/triage/lists_manage.sh --create`, `--delete`, `--assign`, and
-  `--unassign` for star-list lifecycle and membership changes.
-- Use `scripts/triage/prs_patch_inspect.sh` for changed-file or per-file patch
-  inspection.
-- Use `scripts/triage/reactions_manage.sh` for reactions, including PR review comment
-  reactions.
-- Use `scripts/triage/prs_update.sh` for PR metadata edits.
-- Use `scripts/triage/issues_close_with_evidence.sh` for a close-with-evidence issue
-  path.
-- Use `scripts/triage/issues_suggest_labels.sh` for issue label suggestions.
-- Use `scripts/triage/commit_issue_linker.sh` for commit-close wording previews.
+- Repository orientation: `scripts/ghops repos view`
+- Issue triage: `scripts/ghops issues list`, `scripts/ghops issues view`
+- Pull request triage: `scripts/ghops prs list`, `scripts/ghops prs view`,
+  `scripts/ghops prs patch`
+- Authenticated-user stars: `scripts/ghops stars list`,
+  `scripts/ghops stars add`, `scripts/ghops stars remove`
+- Authenticated-user lists: `scripts/ghops lists list`,
+  `scripts/ghops lists items`, `scripts/ghops lists create`,
+  `scripts/ghops lists delete`, `scripts/ghops lists assign`,
+  `scripts/ghops lists unassign`
+- Reactions: `scripts/ghops reactions list`,
+  `scripts/ghops reactions add`, `scripts/ghops reactions remove`
 
-## Repository setup and preflight
+## Repositories
 
-- `scripts/core/check_gh_installed.sh [--min-version <version>]`: Validate that `gh` is installed and meets a minimum version.
-- `scripts/core/check_gh_authenticated.sh [--host github.com]`: Verify active GitHub CLI authentication.
-- `scripts/core/preflight_gh.sh [--host github.com] [--min-version <version>] [--expect-repo <owner/repo>] [--allow-non-project]`: Run prerequisite checks before other `gh` operations.
-- `scripts/core/check_docs_script_refs.sh [--skill-dir <path>]`: Verify docs reference existing scripts and documented flags are present in `--help` output.
-- `scripts/core/issue_resolve_repo.sh [--repo <owner/repo>] [--allow-non-project]`: Resolve the target repository, defaulting to current git project.
-- `scripts/triage/repos_list.sh [--owner <owner>] [--type all|owner|member|public|private|forks|archived|sources] [--all] [--limit N] [--allow-non-project]`: List repositories available to current user or specified owner.
-- `scripts/triage/repos_view.sh [--repo <owner/repo>] [--json] [--allow-non-project]`: Show a normalized repository summary for triage and orientation work.
-- `scripts/triage/stars_manage.sh --list-stars [--by-list <slug-or-name>|--list-id <id>] [--limit N] [--all] [--json]`: List starred repositories for the authenticated user, optionally filtered to one star list.
-- `scripts/triage/stars_manage.sh --star|--unstar [--repo <owner/repo>]... [--repos-file <path>] [--dry-run] [--json]`: Star or unstar one or more repositories with best-effort batch reporting.
-- `scripts/triage/lists_manage.sh --list-lists [--limit N] [--all] [--json]`: List the authenticated user's GitHub star lists.
-- `scripts/triage/lists_manage.sh --list-items [--list <slug-or-name>|--list-id <id>] [--limit N] [--all] [--json]`: List repositories in one GitHub star list.
-- `scripts/triage/lists_manage.sh --create --name <text> [--description <text>] [--private|--public] [--dry-run] [--json]`: Create a GitHub star list.
-- `scripts/triage/lists_manage.sh --delete [--list <slug-or-name>|--list-id <id>] [--dry-run] [--json]`: Delete a GitHub star list.
-- `scripts/triage/lists_manage.sh --assign|--unassign [--list <slug-or-name>|--list-id <id>] [--repo <owner/repo>]... [--repos-file <path>] [--dry-run] [--json]`: Add or remove starred repositories from a GitHub star list with best-effort batch reporting.
+- `scripts/ghops repos list`
+- `scripts/ghops repos view`
 
-## Issue scripts
+## Issues
 
-- Recommended close sequence:
-  `scripts/triage/issues_close_with_evidence.sh` (single-step
-  verify/comment/close).
-- `scripts/triage/issues_list.sh [--state open|closed|all] [--labels <label1,label2>] [--limit N] [--repo <owner/repo>] [--allow-non-project]` (default state: open)
-- `scripts/triage/issues_view.sh --issue <number> [--summary] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_create.sh --title <text> [--body <text>] [--labels <label1,label2>] [--assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_copy.sh --issue <number> --source-repo <owner/repo> --target-repo <owner/repo> [--dry-run]`
-- `scripts/triage/issues_move.sh --issue <number> --source-repo <owner/repo> --target-repo <owner/repo> [--dry-run]`
-- `scripts/triage/issues_suggest_labels.sh --repo <owner/repo> --title <text> [--body <text>] [--max-suggestions N] [--min-score <float>] [--allow-new-label] [--new-label-color <rrggbb>] [--new-label-description <text>] [--json]`: Suggest existing repo labels first; reusable fallback labels are explicit and opt-in.
-- `scripts/triage/issues_update.sh --issue <number> [--title <text>] [--body <text>] [--state open|closed] [--type bug|task|none] [--milestone <name>|--milestone-id <number>] [--remove-milestone] [--type-label-bug <label>] [--type-label-task <label>] [--add-labels <label1,label2>] [--remove-labels <label1,label2>] [--assignees <user1,user2>] [--remove-assignees <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`: Convenience wrapper for repos that use generic `bug` / `task` label taxonomies; override `--type-label-*` or use raw label edits for other schemes.
-- `scripts/triage/issues_close_with_evidence.sh --issue <number> --commit-sha <sha> [--commit-url <url>] [--pr-url <url>] [--repo <owner/repo>] [--allow-non-project] [--dry-run]`
-- `scripts/triage/issues_comment_add.sh --issue <number> --body <text> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_comments_list.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_lock.sh --issue <number> [--reason <reason>] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_unlock.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_pin.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_unpin.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_close.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_reopen.sh --issue <number> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_labels.sh [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_labels_create.sh --name <label> [--color <rrggbb>] [--description <text>] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_labels_update.sh --name <label> [--new-name <label>] [--color <rrggbb>] [--description <text>] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_labels_delete.sh --name <label> [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/issues_milestones_list.sh [--repo <owner/repo>] [--state open|closed|all] [--limit N] [--allow-non-project]`
+- `scripts/ghops issues list`
+- `scripts/ghops issues view`
+- `scripts/ghops issues create`
+- `scripts/ghops issues update`
+- `scripts/ghops issues comment`
+- `scripts/ghops issues comments`
+- `scripts/ghops issues close`
+- `scripts/ghops issues reopen`
+- `scripts/ghops issues close-with-evidence`
+- `scripts/ghops issues copy`
+- `scripts/ghops issues move`
+- `scripts/ghops issues lock`
+- `scripts/ghops issues unlock`
+- `scripts/ghops issues pin`
+- `scripts/ghops issues unpin`
+- `scripts/ghops issues suggest-labels`
+- `scripts/ghops issues labels list`
+- `scripts/ghops issues labels create`
+- `scripts/ghops issues labels update`
+- `scripts/ghops issues labels delete`
+- `scripts/ghops issues milestones list`
 
-## Pull request scripts
+## Pull requests
 
-- `scripts/triage/prs_list.sh [--state open|closed|merged|all] [--author <user>] [--label <label>] [--base <branch>] [--head <branch>] [--search <query>] [--limit N] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/prs_view.sh --pr <number> [--summary] [--repo <owner/repo>] [--allow-non-project]`
-- `scripts/triage/prs_patch_inspect.sh --pr <number> [--repo <owner/repo>] [--path <file>] [--include-patch] [--json] [--allow-non-project]`: Inspect changed files for a PR, optionally narrowed to one path and including patch text.
-- `scripts/triage/prs_update.sh --pr <number> [--title <text>] [--body <text>] [--base <branch>] [--milestone <name>] [--remove-milestone] [--add-labels <label1,label2>] [--remove-labels <label1,label2>] [--add-assignees <user1,user2>] [--remove-assignees <user1,user2>] [--add-reviewers <user1,user2>] [--remove-reviewers <user1,user2>] [--repo <owner/repo>] [--allow-non-project]`: Update PR metadata. When `gh pr edit` fails with `missing required scopes [read:project]`, this helper retries via `gh api` for title/body/base-only updates.
-- `scripts/triage/commit_issue_linker.sh --message <text> [--context <text>] [--branch <name>] [--repo <path|owner/repo>] [--issue-number <number>] [--token <fixes|closes|resolves>] [--dry-run|--execute] [--json]`: Preserve an existing close token when present, or infer one candidate and optionally execute the commit.
+- `scripts/ghops prs list`
+- `scripts/ghops prs view`
+- `scripts/ghops prs patch`
+- `scripts/ghops prs update`
+
+## Stars and lists
+
+- `scripts/ghops stars list`
+- `scripts/ghops stars add`
+- `scripts/ghops stars remove`
+- `scripts/ghops lists list`
+- `scripts/ghops lists items`
+- `scripts/ghops lists create`
+- `scripts/ghops lists delete`
+- `scripts/ghops lists assign`
+- `scripts/ghops lists unassign`
 
 ## Reactions
 
-- `scripts/triage/reactions_manage.sh --resource pr|issue|issue-comment|pr-review-comment --repo <owner/repo> [--number <n>|--comment-id <id>] [--list|--add <reaction>|--remove <reaction-id>] [--dry-run] [--json] [--allow-non-project]`: List, add, or remove reactions through one normalized helper.
+- `scripts/ghops reactions list`
+- `scripts/ghops reactions add`
+- `scripts/ghops reactions remove`
