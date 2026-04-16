@@ -52,6 +52,8 @@ Keep v1 intentionally narrow:
    - Start with `git status -sb`.
    - Resolve the current branch, detached-HEAD state, and whether you are still
      on the repository default branch.
+   - Run `github/scripts/core/preflight_gh.sh` from the target repo root before
+     creating branches, commits, or pushes that are intended to end in a PR.
    - When useful, run `github/scripts/publish/publish_context.sh --json` from
      the target repo root to confirm whether the current branch is long-lived
      and what PR base should be carried forward.
@@ -82,6 +84,9 @@ Keep v1 intentionally narrow:
      instead of letting the helper fall back to the repository default branch.
    - Let `github` reuse an existing open PR for the current branch
      instead of creating a duplicate.
+   - Prefer a PR title that summarizes the full branch-level change, not just
+     the latest commit. Pass `--title <text>` when the latest commit subject is
+     narrower than the intended PR scope.
    - When opening a new PR, prefer a structured, feature-level description
      that explains the user-facing or system-level change rather than
      restating commit-level implementation details.
@@ -101,8 +106,13 @@ Keep v1 intentionally narrow:
 - Never publish directly from a long-lived branch such as `stable` or
   `release/*`; branch off it and keep that branch as the PR base.
 - Never push without confirming scope when the worktree is mixed.
+- Never start branch, commit, or push mutations for a PR-intended publish flow
+  until `github/scripts/core/preflight_gh.sh` has passed from the target repo
+  root.
 - Default to a draft PR unless the user explicitly asks for a ready PR.
 - Stop if the repo is not connected to an accessible same-repo GitHub remote.
+- Never assume the latest commit subject is a good PR title for a multi-commit
+  or wider-scope branch; pass `--title` explicitly when needed.
 - Do not vendor or duplicate the `git-commit` or `github` helper
   layers here.
 
@@ -140,6 +150,12 @@ Keep v1 intentionally narrow:
 Reuse this structure for the latest commit body when `yeet` will open the PR
 with `--body-from-head`, or pass it directly with `--body` when the latest
 commit body is not PR-ready.
+
+Suggested PR title shape:
+
+```text
+<macro summary of the full branch-level change>
+```
 
 ```text
 Feature:
