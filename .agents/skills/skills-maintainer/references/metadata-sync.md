@@ -1,6 +1,8 @@
 # Metadata Sync Playbook
 
-Use this playbook to keep one or more targeted skills' `SKILL.md`, `agents/openai.yaml`, and top-level docs aligned.
+Use this playbook as the metadata-only mode of the unified `maintain skills`
+task to keep one or more targeted skills' `SKILL.md`, `agents/openai.yaml`,
+and top-level docs aligned.
 
 ## Task Boundary (Sync Only)
 - `sync` aligns metadata and docs only.

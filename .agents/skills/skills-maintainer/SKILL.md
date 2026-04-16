@@ -7,43 +7,48 @@ description: Maintain and improve one or more skills in this repository with sha
 
 ## Goal
 Use this project-maintainer skill to maintain existing skills in this repository. Its primary job is to inspect one or more local skills, apply concrete docs, metadata, and workflow improvements, and keep repo-level maintainer docs aligned.
-When a user invokes `$skills-maintainer` with a bare imperative such as `run` or `run your tasks` and does not name a task or target, inspect the local skills, choose the ones with clear actionable drift, apply safe scoped upgrades, then run sync, audit, and release-style checks.
+Treat maintenance as one unified task:
+- repo-wide pass when the user invokes `$skills-maintainer` generically with a bare imperative such as `run` or `run your tasks`
+- targeted maintenance when the user names one or more existing skills
+- metadata-only maintenance when the user explicitly asks to align or sync docs/metadata
+
+For the repo-wide pass, inspect the local skills, choose the ones with clear actionable drift, apply safe scoped upgrades, then run sync, audit, and release-style checks.
 Treat domain-refresh work as explicit tasks, not default behavior. For brand-new skills, start with `$skill-creator`; this skill is for maintaining and integrating existing skill packages.
 
 ## User-facing Capability Summary
 If the user asks what this skill can do, answer with these two capability groups:
 1) Maintain one or more existing skills:
    - Inspect reusable and project-local skills for actionable drift.
-   - Upgrade targeted skills through `SKILL.md`, `agents/openai.yaml`, `references/*.md`, and directly coupled repo docs.
-   - Keep `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md` aligned.
+   - Maintain targeted skills through `SKILL.md`, `agents/openai.yaml`, `references/*.md`, and directly coupled repo docs.
+   - Compare and update local `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md` when drift is found.
    - Audit which skills are Codex-dependent versus portable and tighten runtime-tool wording where needed.
    - Run consistency checks and report `PASS`, `PASS (NOOP)`, or `FAIL`.
 2) Run skill-specific maintainer workflows:
    - Refresh bundled Swift-DocC authored sources and validate the fast-path reference layer.
    - Refresh the bundled Swift API Design guideline source and validate the thin reference layer.
    - Keep regeneration mechanics and maintainer-only internals out of runtime skills.
+
 ## Available Tasks (User Menu)
 When the user asks what this skill can do, offer this task list:
-1) `run`
-   - Inspect one or more skills, choose the ones with clear actionable drift, and apply safe upgrades automatically.
-   - If no skill names are given, default scope is all local skills in this repository.
-   - Finish with sync, audit, and release-style reporting.
-2) `upgrade skill`
-   - Improve one or more named existing skills with deeper docs, metadata, or workflow changes while preserving intent.
-3) `sync metadata/docs`
-   - Align `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md` for the targeted skills.
-4) `audit consistency`
+1) `maintain skills`
+   - Inspect one or more skills, ensure there is no meaningful drift, and compare or update local `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md` as needed.
+   - With no named targets, default scope is all local skills in this repository.
+   - With named skills, keep the pass targeted to those skills.
+   - With explicit metadata/docs wording, stay in metadata-only alignment mode.
+   - Finish with audit and release-style reporting when the scope is broader than metadata-only alignment.
+2) `audit consistency`
    - Run structure, rules, and reference checks across the repo or the touched skills.
-5) `audit codex dependencies`
+3) `audit codex dependencies`
    - Verify which skills are Codex-dependent versus portable, keep the repo inventory current, and ensure Codex-specific tools or filesystem contracts are named precisely.
-6) `refresh swift-docc references`
+4) `refresh swift-docc references`
    - Check the bundled Swift-DocC manifest, refresh the local `DocCDocumentation.docc` asset tree when stale, and validate or tighten the local `references/*.md` fast paths.
-7) `refresh swift-api-design references`
+5) `refresh swift-api-design references`
    - Check the bundled Swift API Design manifest, refresh the local guideline source file when stale, and validate the local `references/*.md` routing layer.
+
 ## Trigger Rules
 Use this skill when users ask to:
 - Invoke `$skills-maintainer` generically to maintain existing skills in this repository
-- Maintain, upgrade, tighten, or clean up one or more existing skills
+- Maintain, upgrade, sync, tighten, or clean up one or more existing skills
 - Optimize skill docs, metadata, workflow clarity, or maintainability
 - Run a proactive skill maintenance pass before release
 - Sync `SKILL.md`, `agents/openai.yaml`, and repository docs for one or more skills
@@ -54,14 +59,15 @@ Use this skill when users ask to:
 
 ## Workflow
 1) Route the request with `references/maintenance-router.md`.
-2) For proactive `run`, follow `references/run-maintenance.md`.
-3) For targeted upgrades, follow `references/skill-upgrade.md`.
-4) For metadata/docs alignment, follow `references/metadata-sync.md`.
-5) For structure and rules checks, follow `references/doc-consistency.md`.
-6) For Codex dependency audits and portability-boundary checks, follow `references/codex-dependency-audit.md`.
-7) For Swift-DocC bundled-reference refresh, follow `references/swift-docc-refresh.md`.
-8) For Swift API Design bundled-reference refresh, follow `references/swift-api-design-refresh.md`.
-9) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
+2) For unified maintenance requests, let the router choose the internal mode:
+   - repo-wide pass -> `references/run-maintenance.md`
+   - targeted maintenance -> `references/skill-upgrade.md`
+   - metadata-only alignment -> `references/metadata-sync.md`
+3) For structure and rules checks, follow `references/doc-consistency.md`.
+4) For Codex dependency audits and portability-boundary checks, follow `references/codex-dependency-audit.md`.
+5) For Swift-DocC bundled-reference refresh, follow `references/swift-docc-refresh.md`.
+6) For Swift API Design bundled-reference refresh, follow `references/swift-api-design-refresh.md`.
+7) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
 
 ## References
 
@@ -81,15 +87,15 @@ Use this skill when users ask to:
 - If the runtime exposes subagent tools and the user explicitly asks for delegation or parallel agent work, spawn multiple subagents for independent analysis slices or disjoint write scopes.
 - Prefer explorer subagents for read-only inspection and worker subagents only when file ownership is clearly split.
 - Good candidates for parallel delegation in this skill:
-  - `run`: split reusable skills, project-local skills, and coupled repo-doc inspection into disjoint analysis buckets.
-  - `sync` / `audit`: split metadata drift, README/install prompt drift, and script/reference or policy checks.
-  - `upgrade`: split target skill packages from directly coupled repo docs only when write scopes do not overlap.
+  - unified maintenance: split reusable skills, project-local skills, coupled repo-doc inspection, or metadata-only verification into disjoint analysis buckets.
+  - `audit`: split metadata drift, README/install prompt drift, and script/reference or policy checks.
+  - targeted maintenance: split target skill packages from directly coupled repo docs only when write scopes do not overlap.
 - Keep routing, final edit integration, final severity/result synthesis, and final git verification in the main agent.
 
 ## Guardrails
 - Keep this skill focused on maintaining existing skills in this repository.
 - Prefer concrete skill-level improvements over neutral orchestration language.
-- Do not infer `refresh` or new-skill creation from bare `run`.
+- Do not infer `refresh` or new-skill creation from generic maintenance requests.
 - Use `$skill-creator` first when the user wants to create a brand-new skill.
 - Keep changes scoped to the selected or discovered skills.
 - Only spawn subagents when delegation is explicitly allowed in the current run.

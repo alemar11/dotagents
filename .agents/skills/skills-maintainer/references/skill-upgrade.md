@@ -1,6 +1,8 @@
 # Skill Upgrade Playbook
 
-Use this playbook when a user asks to upgrade, modernize, tighten, or improve an existing skill.
+Use this playbook as the targeted-maintenance mode of the unified `maintain
+skills` task when a user asks to upgrade, modernize, tighten, or improve one
+or more existing skills.
 
 ## Purpose
 - Improve one or more existing skills with meaningful, scoped documentation or metadata updates.

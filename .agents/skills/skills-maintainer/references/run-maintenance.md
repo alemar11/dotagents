@@ -1,6 +1,8 @@
 # Run Maintenance Playbook
 
-Use this playbook when the user invokes the maintainer skill generically with `run`, `run your tasks`, or another default maintenance imperative.
+Use this playbook for the repo-wide pass of the unified `maintain skills`
+task, including bare maintainer imperatives such as `run`, `run your tasks`,
+or other default maintenance requests.
 
 ## Purpose
 - Keep one or more existing skills healthy with proactive, low-ambiguity improvements.
