@@ -34,15 +34,33 @@ Only create the plan. Do not implement the work.
 
 - Ask focused clarifying questions before drafting the plan when ambiguity
   could materially change the work.
+- Ask only the minimum question batch needed to eliminate wrong plan branches.
 - Prefer `request_user_input` when available.
 - Respect the runtime limit of 1-3 questions per `request_user_input` call;
   if more clarification is needed, ask only the highest-signal next batch.
+- Prefer short numbered questions over paragraphs.
+- Offer multiple-choice options when practical.
+- Suggest reasonable defaults when appropriate.
+- Include a fast-path reply such as `defaults` when the recommended choices are
+  acceptable.
+- Include a low-friction "not sure - use default" option when that meaningfully
+  reduces back-and-forth.
+- Do not ask questions that a quick, low-risk discovery read can answer from
+  the repo, config, or nearby docs.
 - Prioritize questions about:
   - scope and non-goals
   - success criteria
   - compatibility constraints
   - rollout/rollback expectations
   - validation expectations
+- Use this underspecification checklist when deciding whether clarification is
+  required before the plan is final:
+  - the objective is unclear
+  - "done" is unclear
+  - scope boundaries are unclear
+  - constraints are unclear
+  - the target environment is unclear
+  - safety or reversibility is unclear
 
 ### 3. Fetch Official Docs When Needed
 
@@ -163,6 +181,8 @@ Examples:
 - Return the final saved plan path.
 - Summarize the main phases, the riskiest assumptions, and any open questions
   that remain.
+- If clarification was needed, restate the resolved interpretation before
+  summarizing the plan.
 - Do not implement the plan.
 
 ## Example Requests

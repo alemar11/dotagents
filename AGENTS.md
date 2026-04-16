@@ -32,7 +32,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Codex Dependency Classification
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
 - Current Codex-dependent skills are `codex-changelog`, `learn`, and `skill-audit`.
-- Treat `ask-questions-if-underspecified` and `plan-hard` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
+- Treat `plan-hard` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `.agents/skills/skills-maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
 - When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
@@ -59,6 +59,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Plan Hard skill
 - Keep the runtime `plan-hard` skill planning-only: it must create and refine plans, not implement the requested work. (Codex learning)
 - By default, `plan-hard` must save generated plans inside `plans/` under the current working directory and create that directory if it does not exist. (Codex learning)
+- Keep `plan-hard` as the single reusable home for higher-rigor clarification before planning; do not reintroduce a separate lightweight clarification skill unless that standalone contract is intentionally restored. (Codex learning)
+- In `plan-hard`, ask only the minimum high-signal clarification batch, prefer compact defaults-friendly question formats, and avoid asking questions that a quick repo or config read can answer. (Codex learning)
 
 ### Skills Maintainer skill
 - The `.agents/skills/skills-maintainer` skill is the default maintainer for improving existing skills in this repository through shared upgrade tasks and skill-specific refresh workflows.
