@@ -1,6 +1,6 @@
 interface:
   display_name: "Postgres"
-  short_description: "Connect to Postgres databases, design schemas and indexes, review SQL/query performance, and use common PostGIS or pgvector patterns."
+  short_description: "Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns."
   brand_color: "#0064a5"
   icon_small: "./assets/postgresql-small.svg"
   icon_large: "./assets/postgresql.png"

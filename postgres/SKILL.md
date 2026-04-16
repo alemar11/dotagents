@@ -1,3 +1,8 @@
+---
+name: postgres
+description: Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns.
+---
+
 # Postgres
 
 ## Goal
