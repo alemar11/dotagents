@@ -30,8 +30,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
 
 ### Codex Dependency Classification
-- Current Codex-dependent skills are `codex-changelog`, `learn`, `skill-audit`, and `.agents/skills/skills-maintainer`.
+- Current Codex-dependent skills are `codex-changelog`, `learn`, and `skill-audit`.
 - Treat `ask-questions-if-underspecified` and `plan-hard` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
+- Treat `.agents/skills/skills-maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
 - When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
 - Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.

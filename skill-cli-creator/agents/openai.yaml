@@ -1,5 +1,5 @@
 interface:
   display_name: "Skill CLI Creator"
-  short_description: "Build embedded skill CLIs"
-  default_prompt: "Create or refactor an embedded CLI that lives inside a skill, choose the hosting skill name and CLI/tool name explicitly instead of assuming they match, keep the shipped runnable artifact in `scripts/`, reserve `projects/<tool>/` for the maintenance/build project when the implementation grows, require `--version` with one semver source of truth, and add a hosting-skill `CLI Maintenance` section."
+  short_description: "Build composable embedded CLIs that live inside a skill, run from `scripts/`, and can grow into `projects/<tool>/`."
+  default_prompt: "Create or refactor an embedded CLI that lives inside a skill, choose the hosting skill name and CLI/tool name explicitly instead of assuming they match, keep the shipped runnable artifact in `scripts/`, reserve `projects/<tool>/` for the maintenance/build project when the implementation grows, require `--version` with one semver source of truth, add a hosting-skill `CLI Maintenance` section, and create `projects/<tool>/AGENTS.md` plus a scoped `projects/<tool>/.gitignore` when that project layout is introduced."
   brand_color: "#2563EB"
