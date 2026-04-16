@@ -28,26 +28,22 @@ If it exists, choose a clearer entry name or evolve the existing command instead
 
 ## Embedded Skill Layout
 
-Standardize the layout around two code surfaces plus a separate project-local config path:
+Keep the layout model short and explicit:
 
-- `scripts/` is the public runtime surface. Run the embedded CLI from `scripts/...` during normal skill use.
-- `src/` is optional private implementation detail. Open `src/` only when fixing, improving, rebuilding, or extending the CLI implementation that supports the surface in `scripts/`.
-- `<project-root>/.skills/<hosting-skill>/` is project-local config only. It does not contain helper scripts or implementation code.
+- `scripts/` is the public runtime surface.
+- Root `src/` is optional maintenance-only implementation detail.
+- `<project-root>/.skills/<hosting-skill>/` is project-local config only.
 
-Keep these rules explicit:
+Keep these invariants explicit in the hosting skill and CLI docs:
 
-- Do not inspect `src/` during normal execution.
-- Do not require normal skill users to run code directly from `src/`.
-- Treat `scripts/<tool>` or `scripts/<tool>.<ext>` as the canonical command surface regardless of language.
-- For small embedded CLIs, keep everything in `scripts/`.
-- For larger multi-file implementations, keep the runnable entrypoint in `scripts/` and the maintenance-oriented implementation in `src/`.
-- If `src/` exists, require `src/AGENTS.md` with build, test, rebuild, and safe-maintenance instructions for the implementation behind `scripts/...`.
-- Do not introduce alternative generic folder names such as `code/`, `impl/`, or `source/`.
+- Run the tool from `scripts/...` during normal skill execution.
+- Open root `src/` only when fixing, improving, rebuilding, or extending the implementation behind `scripts/...`.
+- Keep small wrappers entirely in `scripts/`; introduce root `src/` only when the implementation grows enough to justify it.
+- If root `src/` exists, require `src/AGENTS.md` with build, test, rebuild, runtime-prerequisite, and safe-maintenance instructions for the implementation behind `scripts/...`.
+- Treat `<project-root>/.skills/<hosting-skill>/` as config-only, not a place for helper scripts or implementation code.
+- Do not standardize alternative generic implementation folders such as `code/`, `impl/`, or `source/`.
 
-Preferred patterns:
-
-- Small embedded CLI: `scripts/<tool>.sh` or `scripts/<tool>.py`
-- Larger embedded CLI: `scripts/<tool>` plus root `src/`
+For the detailed command-shape, runtime-surface, JSON, and hosting-skill examples, read [references/agent-cli-patterns.md](references/agent-cli-patterns.md).
 
 ## Choose the Runtime
 
@@ -72,21 +68,14 @@ State the choice in one sentence before scaffolding, including the reason and th
 
 Sketch the command surface in chat before coding. Include the `scripts/...` entrypoint, discovery commands, resolve or ID-lookup commands, read commands, write commands, raw escape hatch, auth/config choice, and any rebuild or wrapper behavior needed behind the surface.
 
-When designing the command surface, read [references/agent-cli-patterns.md](references/agent-cli-patterns.md) for the expected composable CLI shape.
+Use [references/agent-cli-patterns.md](references/agent-cli-patterns.md) for the expected composable CLI shape, command ordering, JSON conventions, pagination patterns, and hosting-skill examples.
 
-Build toward this surface:
+Build toward a surface where:
 
-- `scripts/<tool> --help` shows every major capability.
-- `scripts/<tool> --json doctor` verifies config, auth, version, endpoint reachability, and missing setup.
-- `scripts/<tool> init ...` stores local config when env-only auth is painful.
-- Discovery commands find accounts, projects, workspaces, teams, queues, channels, repos, dashboards, or other top-level containers.
-- Resolve commands turn names, URLs, slugs, permalinks, customer input, or build links into stable IDs so future commands do not repeat broad searches.
-- Read commands fetch exact objects and list/search collections. Paginated lists support a bounded `--limit`, cursor, offset, or clearly documented default.
-- Write commands do one named action each: create, update, delete, upload, schedule, retry, comment, draft. They accept the narrowest stable resource ID, support `--dry-run`, `draft`, or `preview` first when the service allows it, and do not hide writes inside broad commands such as `fix`, `debug`, or `auto`.
-- `--json` returns stable machine-readable output.
-- A raw escape hatch exists: `request`, `tool-call`, `api`, or the nearest honest name.
-
-Do not expose only a generic `request` command. Give Codex high-level verbs for the repeated jobs.
+- `scripts/<tool> --help` exposes the major capabilities.
+- `scripts/<tool> --json doctor` verifies config, auth, reachability, and missing setup.
+- Repeated jobs get high-level verbs rather than only a generic `request` command.
+- The raw escape hatch exists, but it stays secondary to the high-level commands.
 
 Document the JSON policy in the hosting skill's `SKILL.md` or reference files: API pass-through versus CLI envelope, success shape, error shape, and one example for each command family. Under `--json`, errors must be machine-readable and must not contain credentials.
 
