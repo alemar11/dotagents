@@ -30,6 +30,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
 
 ### Codex Dependency Classification
+- In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
 - Current Codex-dependent skills are `codex-changelog`, `learn`, and `skill-audit`.
 - Treat `ask-questions-if-underspecified` and `plan-hard` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `.agents/skills/skills-maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
@@ -65,6 +66,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `skills-maintainer` self-contained: workflow markdown guidance must live under `.agents/skills/skills-maintainer/references/`.
 - Keep the dependency direction one-way: runtime skills must not depend on, reference, or route users to `.agents/skills/skills-maintainer`; only repo-level maintainer docs may route work to `skills-maintainer`.
 - When updating skill metadata/docs across the repo, route through the `skills-maintainer` playbooks and keep README/openai metadata text aligned.
+- Treat `maintain skills` as the single public maintenance task; repo-wide pass, targeted maintenance, and metadata-only alignment are internal modes of that task.
 - Treat plain-language "maintain this skill", "upgrade this skill", and "sync metadata/docs" requests as one unified maintenance entrypoint whose internal mode depends on scope: repo-wide pass, targeted maintenance, or metadata-only alignment.
 - Treat generic `$skills-maintainer` imperatives like "run" or "run your tasks" as the repo-wide pass of that unified maintenance task: inspect the repo, choose skills with clear actionable drift, update local `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md` as needed, then run audit and `release-checklist.md`; do not infer new-skill creation or `refresh`. (Codex learning)
 - For brand-new skill creation, use `$skill-creator` first; use `skills-maintainer` afterward only for repo integration or follow-up maintenance. (Codex learning)
