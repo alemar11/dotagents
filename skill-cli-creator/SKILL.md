@@ -1,6 +1,6 @@
 ---
 name: skill-cli-creator
-description: Build a composable embedded CLI that lives inside a skill. Use when Codex needs to create or refactor a skill-owned command surface under `scripts/`, keep normal runtime usage on that `scripts/...` surface, and optionally maintain one or more larger CLI projects under `projects/`.
+description: Build a composable embedded CLI that lives inside a skill. Use when Codex needs to create or refactor a skill-owned command surface under `scripts/`, keep normal runtime usage on that `scripts/...` surface, and optionally maintain one or more larger CLI implementations in a maintenance-only project under `projects/`.
 ---
 
 # Skill CLI Creator
@@ -15,7 +15,7 @@ Name the hosting skill, the CLI source material, and the first real jobs it shou
 
 - Host skill: the skill directory that will own the CLI surface.
 - CLI/tool name: the runtime command name that will own `scripts/<tool>` and,
-  when needed, `projects/<tool>/`.
+  when needed, the maintenance-only build project at `projects/<tool>/`.
 - Source: API docs, OpenAPI JSON, SDK docs, curl examples, browser app, existing internal script, article, or working shell history.
 - Jobs: literal reads/writes such as `list drafts`, `download failed job logs`, `search messages`, `upload media`, `read queue schedule`.
 - Artifact path: the shipped runnable artifact path such as `scripts/ci-logs`, `scripts/slack-cli`, or `scripts/buildkite-logs`.
@@ -36,8 +36,8 @@ If it exists, choose a clearer entry name or evolve the existing command instead
 Treat the hosting skill and the CLI/tool name as different design decisions:
 
 - Hosting skill name: the guidance/package container.
-- CLI/tool name: the runtime command noun used in `scripts/<tool>` and
-  `projects/<tool>/`.
+- CLI/tool name: the runtime command noun used in `scripts/<tool>` and, when
+  needed, the maintenance-only project at `projects/<tool>/`.
 
 Use this naming rule:
 
@@ -62,7 +62,8 @@ Naming rubric:
 Keep the layout model short and explicit:
 
 - `scripts/` contains the shipped runnable artifacts used during normal skill execution.
-- `projects/<tool>/` is the full maintenance/build project behind one shipped CLI.
+- `projects/<tool>/` is the maintenance-only build project behind one shipped
+  CLI.
 - `<project-root>/.skills/<hosting-skill>/` is project-local config only.
 
 Keep these invariants explicit in the hosting skill and CLI docs:
@@ -70,12 +71,14 @@ Keep these invariants explicit in the hosting skill and CLI docs:
 - Run the tool from `scripts/...` during normal skill execution.
 - Do not inspect `projects/<tool>/` during normal execution.
 - Do not require normal skill users to run code directly from `projects/<tool>/`.
+- Do not treat `projects/<tool>/` as part of the normal runtime surface.
 - Treat `scripts/<tool>` or `scripts/<tool>.<ext>` as the shipped runnable artifact regardless of language.
 - Require `scripts/<tool> --version` as part of the stable runtime surface.
 - Let the chosen CLI/tool name govern both `scripts/<tool>` and
   `projects/<tool>/`; do not silently derive one from the hosting skill name
   later.
-- Open `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind `scripts/...`.
+- Open `projects/<tool>/` only when fixing, improving, rebuilding, or
+  extending the implementation behind `scripts/...`.
 - Keep script-native runnable artifacts entirely in `scripts/`; introduce `projects/<tool>/` only when the implementation grows enough to justify a real maintenance project.
 - For larger multi-file implementations, keep the shipped runnable artifact in `scripts/` and the maintenance-oriented implementation in `projects/<tool>/`.
 - Keep the CLI project self-contained inside `projects/<tool>/`. Put manifests, lockfiles, dependency installs, caches, intermediate build outputs, project-local test/build config, and source there by default. Do not introduce repo-root or skill-root wrappers unless the user explicitly asks for that non-standard layout.
@@ -195,7 +198,9 @@ Use screenshots to infer workflow, UI vocabulary, fields, and confirmation point
 
 1. Read the source just enough to inventory resources, auth, pagination, IDs, media/file flows, rate limits, and dangerous write actions. If the docs expose OpenAPI, download or inspect it before naming commands.
 2. Sketch the command list in chat. Keep names short and shell-friendly.
-3. Scaffold the CLI inside the hosting skill using the two-surface layout: `scripts/` for runtime, optional `projects/<tool>/` for maintenance.
+3. Scaffold the CLI inside the hosting skill using the two-surface layout:
+   `scripts/` for runtime, optional `projects/<tool>/` for the maintenance-only
+   build project.
    - Add or wire the single semver source of truth before the CLI contract is considered complete.
    - Ensure the shipped runnable artifact lives in `scripts/`; treat build outputs elsewhere as intermediates only.
    - If `projects/<tool>/` exists, put the CLI's maintained unit and integration tests under that project rather than at the hosting-skill root.
@@ -297,7 +302,8 @@ After the embedded CLI works, update the hosting skill so future Codex threads:
 - execute from `scripts/...` during normal runtime usage
 - expose and trust `scripts/<tool> --version` as the runtime version check
 - treat `scripts/<tool>` as the shipped runnable artifact rather than a pointer to `target/`, `dist/`, or other build directories
-- treat `projects/<tool>/` as the maintenance/build project when one exists
+- treat `projects/<tool>/` as the maintenance-only build project when one
+  exists, not part of the normal runtime surface
 - know the safe read path, intended draft/write path, and raw escape hatch
 - have copy-pasteable examples that stay on the `scripts/...` surface
 

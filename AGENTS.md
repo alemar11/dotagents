@@ -82,9 +82,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Fetch Codex App notes from `https://developers.openai.com/codex/changelog` and match the installed desktop app version when possible. (Codex learning)
 
 ### Skill CLI Creator skill
-- Standardize embedded CLIs around a two-surface model: `scripts/` contains the shipped runnable artifacts used in normal execution, and `projects/<tool>/` is the optional full maintenance/build project behind one shipped CLI. (Codex learning)
+- Standardize embedded CLIs around a two-surface model: `scripts/` contains the shipped runnable artifacts used in normal execution, and `projects/<tool>/` is the optional maintenance-only build project behind one shipped CLI. (Codex learning)
 - For embedded skill CLIs, require normal runtime usage to execute from `scripts/...`; do not direct normal skill users to run code from `projects/<tool>/`. (Codex learning)
-- In embedded skill CLIs, inspect `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind the `scripts/...` surface. (Codex learning)
+- In embedded skill CLIs, inspect `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind the `scripts/...` surface; do not treat it as part of the normal runtime surface. (Codex learning)
 - Use `projects/<tool>/` only when the embedded CLI is large enough to benefit from a conventional project layout; keep script-native shipped artifacts entirely in `scripts/`. (Codex learning)
 - Require all embedded skill CLIs to expose `scripts/<tool> --version` and keep one semver source of truth, using the runtime-native manifest version when available and a single explicit code or file source otherwise. (Codex learning)
 - Do not treat `target/`, `dist/`, virtualenv paths, or similar build locations as supported runtime entrypoints for embedded CLIs; compiled outputs must be restored into `scripts/` before normal use. (Codex learning)
