@@ -9,6 +9,7 @@ public runtime entrypoint at `postgres/scripts/postgres`.
 - Do not tell normal skill users to run `cargo`, `rustc`, or binaries from
   `target/` directly.
 - `Cargo.toml` is the single source of truth for the CLI version.
+- Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 
 ## Build and test
 
@@ -34,8 +35,11 @@ public runtime entrypoint at `postgres/scripts/postgres`.
   `doctor`, `profile`, `query`, `activity`, `schema`, `dump`, `migration`,
   and `docs`.
 - Prefer adding behavior in Rust over reintroducing per-task shell wrappers.
+- Keep config migration one-way from legacy `postgres.toml` to canonical
+  `config.toml`; do not reintroduce writes to the legacy path.
 - If a feature needs PostgreSQL client tools, route it through the managed
-  tool backend instead of restoring a Homebrew-first assumption.
+  tool backend only. Do not restore PATH probing or persisted binary-dir
+  config.
 - Rebuild `../../scripts/postgres` after any change that affects runtime
   behavior or operator-facing output, then verify through that shipped artifact
   rather than `target/` binaries.

@@ -26,27 +26,22 @@ pub fn build_release_plan(
         .project_root
         .clone()
         .ok_or_else(|| anyhow!("Project root is required for migration release."))?;
-    let toml_path = ctx
-        .toml_path
+    let config_path = ctx
+        .config_path
         .clone()
-        .ok_or_else(|| anyhow!("postgres.toml is required for migration release."))?;
-    let config = load_and_migrate_config(&toml_path)?;
+        .ok_or_else(|| anyhow!("config.toml is required for migration release."))?;
+    let config = load_and_migrate_config(&config_path)?;
     let profile = ctx.profile_name.clone();
+    let postgres = &config.tools.postgres;
 
     let migrations_path = if let Some(path) = args.migrations_path.clone() {
         absolutize(&project_root, &path)
-    } else if let Some(profile_cfg) = config.database.profiles.get(&profile) {
+    } else if let Some(profile_cfg) = postgres.profiles.get(&profile) {
         profile_cfg
             .migrations_path
             .as_ref()
             .map(|value| absolutize(&project_root, &PathBuf::from(value)))
-            .or_else(|| {
-                config
-                    .migrations
-                    .as_ref()
-                    .and_then(|migrations| migrations.path.as_ref())
-                    .map(|value| absolutize(&project_root, &PathBuf::from(value)))
-            })
+            .or_else(|| postgres.migrations_path.as_ref().map(|value| absolutize(&project_root, &PathBuf::from(value))))
             .unwrap_or_else(|| project_root.join("db/migrations"))
     } else {
         project_root.join("db/migrations")

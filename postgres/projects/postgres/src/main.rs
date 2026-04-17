@@ -2,8 +2,8 @@ use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use postgres_skill_cli::cli::*;
 use postgres_skill_cli::config::{
-    RuntimeOptions, application_name, bootstrap_profile, load_and_migrate_config, runtime_context,
-    update_sslmode,
+    RuntimeOptions, application_name, bootstrap_profile, canonical_config_path,
+    load_and_migrate_config, runtime_context, update_sslmode,
 };
 use postgres_skill_cli::db::{
     DbClient, QueryTable, escape_literal, expect_non_empty, table_to_json,
@@ -134,13 +134,14 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
                 cli.project_root.clone(),
                 skill_root,
             )?;
-            let toml_path = project_root.join(".skills/postgres/postgres.toml");
-            let resolved = bootstrap_profile(&toml_path, args.save)?;
+            let config_path = canonical_config_path(&project_root);
+            let resolved = bootstrap_profile(&config_path, args.save)?;
             let output = json!({
                 "profile": resolved.name,
                 "url": resolved.url,
                 "saved": args.save,
-                "toml_path": toml_path,
+                "config_path": config_path,
+                "toml_path": config_path,
             });
             if cli.json {
                 print_json(&output)
@@ -154,11 +155,12 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
                 cli.project_root.clone(),
                 skill_root,
             )?;
-            let toml_path = project_root.join(".skills/postgres/postgres.toml");
-            let config = load_and_migrate_config(&toml_path)?;
+            let config_path = canonical_config_path(&project_root);
+            let config = load_and_migrate_config(&config_path)?;
             let output = json!({
-                "toml_path": toml_path,
-                "schema_version": config.configuration.schema_version,
+                "config_path": config_path,
+                "toml_path": config_path,
+                "schema_version": config.schema_version,
             });
             if cli.json {
                 print_json(&output)
@@ -172,11 +174,12 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
                 cli.project_root.clone(),
                 skill_root,
             )?;
-            let toml_path = project_root.join(".skills/postgres/postgres.toml");
+            let config_path = canonical_config_path(&project_root);
             let enabled = postgres_skill_cli::config::parse_sslmode_bool(&args.sslmode)?;
-            update_sslmode(&toml_path, &args.profile, enabled)?;
+            update_sslmode(&config_path, &args.profile, enabled)?;
             let output = json!({
-                "toml_path": toml_path,
+                "config_path": config_path,
+                "toml_path": config_path,
                 "profile": args.profile,
                 "sslmode": if enabled { "require" } else { "disable" },
             });
@@ -203,8 +206,8 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
                 println!("DB_SSLMODE={}", ctx.sslmode);
                 println!("DB_PROFILE={}", ctx.profile_name);
                 println!("DB_URL_SOURCE={}", ctx.url_source);
-                if let Some(path) = ctx.toml_path {
-                    println!("DB_TOML_PATH={}", path.display());
+                if let Some(path) = ctx.config_path {
+                    println!("DB_CONFIG_PATH={}", path.display());
                 }
                 Ok(())
             }
@@ -739,11 +742,7 @@ fn run_restore(
     input: &Path,
 ) -> Result<()> {
     let builder = PgRestoreBuilder::new()
-        .program_dir(
-            backend
-                .binary_dir()
-                .ok_or_else(|| anyhow!("Managed backend did not expose a binary dir"))?,
-        )
+        .program_dir(backend.binary_dir())
         .dbname(&ctx.url)
         .file(input)
         .no_owner()
@@ -757,11 +756,9 @@ fn pg_dump_builder(
     ctx: &postgres_skill_cli::config::RuntimeContext,
     backend: &ToolBackend,
 ) -> PgDumpBuilder {
-    let mut builder = PgDumpBuilder::new();
-    if let Some(binary_dir) = backend.binary_dir() {
-        builder = builder.program_dir(binary_dir);
-    }
-    builder.dbname(&ctx.url)
+    PgDumpBuilder::new()
+        .program_dir(backend.binary_dir())
+        .dbname(&ctx.url)
 }
 
 async fn destructive_activity(

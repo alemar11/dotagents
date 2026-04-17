@@ -8,12 +8,15 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
 
-pub const LATEST_SCHEMA_VERSION: &str = "1.1.0";
+pub const LATEST_SCHEMA_VERSION: &str = "2.0.0";
 const DEFAULT_PROFILE: &str = "local";
+const CONFIG_FILENAME: &str = "config.toml";
+const LEGACY_CONFIG_FILENAME: &str = "postgres.toml";
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RuntimeContext {
     pub project_root: Option<PathBuf>,
+    pub config_path: Option<PathBuf>,
     pub toml_path: Option<PathBuf>,
     pub profile_name: String,
     pub url: String,
@@ -32,33 +35,27 @@ pub struct RuntimeOptions {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SkillConfig {
     #[serde(default)]
-    pub configuration: Configuration,
-    #[serde(default)]
-    pub database: DatabaseConfig,
-    #[serde(default)]
-    pub migrations: Option<MigrationsConfig>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Configuration {
-    #[serde(default)]
     pub schema_version: Option<String>,
     #[serde(default)]
-    pub pg_bin_dir: Option<String>,
+    pub defaults: DefaultsConfig,
     #[serde(default)]
-    pub pg_bin_path: Option<String>,
-    #[serde(default)]
-    pub python_bin: Option<String>,
+    pub tools: ToolCollection,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MigrationsConfig {
+pub struct DefaultsConfig {
     #[serde(default)]
-    pub path: Option<String>,
+    pub profile: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DatabaseConfig {
+pub struct ToolCollection {
+    #[serde(default)]
+    pub postgres: PostgresToolConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PostgresToolConfig {
     #[serde(default)]
     pub host: Option<String>,
     #[serde(default)]
@@ -77,7 +74,7 @@ pub struct DatabaseConfig {
     pub description: Option<String>,
     #[serde(default)]
     pub migrations_path: Option<String>,
-    #[serde(flatten)]
+    #[serde(default)]
     pub profiles: BTreeMap<String, ProfileConfig>,
 }
 
@@ -103,6 +100,58 @@ pub struct ProfileConfig {
     pub sslmode: Option<BoolLike>,
     #[serde(default)]
     pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct LegacySkillConfig {
+    #[serde(default)]
+    configuration: LegacyConfiguration,
+    #[serde(default)]
+    database: LegacyDatabaseConfig,
+    #[serde(default)]
+    migrations: Option<LegacyMigrationsConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct LegacyConfiguration {
+    #[serde(default)]
+    schema_version: Option<String>,
+    #[serde(default)]
+    pg_bin_dir: Option<String>,
+    #[serde(default)]
+    pg_bin_path: Option<String>,
+    #[serde(default)]
+    python_bin: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct LegacyMigrationsConfig {
+    #[serde(default)]
+    path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct LegacyDatabaseConfig {
+    #[serde(default)]
+    host: Option<String>,
+    #[serde(default)]
+    port: Option<u16>,
+    #[serde(default)]
+    database: Option<String>,
+    #[serde(default)]
+    user: Option<String>,
+    #[serde(default)]
+    password: Option<String>,
+    #[serde(default)]
+    sslmode: Option<BoolLike>,
+    #[serde(default)]
+    url: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    migrations_path: Option<String>,
+    #[serde(flatten)]
+    profiles: BTreeMap<String, ProfileConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -133,10 +182,25 @@ pub struct ResolvedProfile {
     pub migrations_path: Option<String>,
 }
 
+pub fn canonical_config_path(project_root: &Path) -> PathBuf {
+    project_root.join(".skills/postgres").join(CONFIG_FILENAME)
+}
+
+pub fn legacy_config_path(project_root: &Path) -> PathBuf {
+    project_root
+        .join(".skills/postgres")
+        .join(LEGACY_CONFIG_FILENAME)
+}
+
 pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<RuntimeContext> {
     if env::var("PROJECT_ROOT").is_ok() {
         bail!("Unsupported environment variable 'PROJECT_ROOT'. Use 'DB_PROJECT_ROOT' instead.");
     }
+
+    let override_project_root = options
+        .project_root_override
+        .clone()
+        .or_else(|| env::var("DB_PROJECT_ROOT").ok().map(PathBuf::from));
 
     if let Some(url) = options
         .url_override
@@ -149,12 +213,13 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
             .clone()
             .or_else(|| env::var("DB_PROFILE").ok())
             .unwrap_or_else(|| DEFAULT_PROFILE.to_string());
+        let config_path = override_project_root
+            .as_ref()
+            .map(|root| canonical_config_path(root));
         return Ok(RuntimeContext {
-            project_root: options.project_root_override.clone(),
-            toml_path: options
-                .project_root_override
-                .as_ref()
-                .map(|root| root.join(".skills/postgres/postgres.toml")),
+            project_root: override_project_root,
+            config_path: config_path.clone(),
+            toml_path: config_path,
             profile_name,
             url,
             sslmode,
@@ -164,15 +229,15 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
     }
 
     let project_root = resolve_project_root(options.project_root_override.clone(), skill_root)?;
-    let toml_path = project_root.join(".skills/postgres/postgres.toml");
-    if !toml_path.exists() {
+    let config_path = canonical_config_path(&project_root);
+    if !config_path.exists() && !legacy_config_path(&project_root).exists() {
         bail!(
-            "postgres.toml not found at {}. Set DB_URL for a one-off connection or bootstrap a profile.",
-            toml_path.display()
+            "config.toml not found at {}. Set DB_URL for a one-off connection or bootstrap a profile.",
+            config_path.display()
         );
     }
 
-    let mut config = load_and_migrate_config(&toml_path)?;
+    let config = load_and_migrate_config(&config_path)?;
     let profile_name = choose_profile(
         &config,
         options
@@ -182,14 +247,10 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
     )?;
     let resolved = resolve_profile(&config, &profile_name)?;
 
-    if config.configuration.schema_version.as_deref() != Some(LATEST_SCHEMA_VERSION) {
-        config.configuration.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
-        save_config(&toml_path, &config)?;
-    }
-
     Ok(RuntimeContext {
         project_root: Some(project_root),
-        toml_path: Some(toml_path),
+        config_path: Some(config_path.clone()),
+        toml_path: Some(config_path),
         profile_name: resolved.name,
         url: resolved.url,
         sslmode: if resolved.sslmode {
@@ -198,58 +259,138 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
             "disable"
         }
         .to_string(),
-        url_source: "toml".to_string(),
+        url_source: "config".to_string(),
         application_name: application_name(),
     })
 }
 
 pub fn load_and_migrate_config(path: &Path) -> Result<SkillConfig> {
-    let raw = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read postgres config at {}", path.display()))?;
-    let mut config: SkillConfig = toml::from_str(&raw).context("Failed to parse postgres.toml")?;
+    let read_path = if path.exists() {
+        path.to_path_buf()
+    } else if let Some(legacy_path) = sibling_legacy_config_path(path).filter(|p| p.exists()) {
+        legacy_path
+    } else {
+        bail!(
+            "config.toml not found at {}. Set DB_URL for a one-off connection or bootstrap a profile.",
+            path.display()
+        );
+    };
+
+    let raw = fs::read_to_string(&read_path)
+        .with_context(|| format!("Failed to read postgres config at {}", read_path.display()))?;
+    let mut config = parse_config(&raw)?;
     migrate_config_in_place(&mut config)?;
     save_config(path, &config)?;
     Ok(config)
 }
 
 pub fn save_config(path: &Path, config: &SkillConfig) -> Result<()> {
-    let content = toml::to_string_pretty(config).context("Failed to serialize postgres.toml")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let content = toml::to_string_pretty(config).context("Failed to serialize postgres config")?;
     fs::write(path, content)
         .with_context(|| format!("Failed to write postgres config at {}", path.display()))
 }
 
-pub fn migrate_config_in_place(config: &mut SkillConfig) -> Result<()> {
-    let schema_version = config
-        .configuration
-        .schema_version
-        .clone()
-        .unwrap_or_default();
-    if schema_version.is_empty() || schema_version == "1" || schema_version == "1.0.0" {
-        if config.configuration.pg_bin_dir.is_none() {
-            config.configuration.pg_bin_dir = config.configuration.pg_bin_path.take();
-        }
-        normalize_sslmodes(config)?;
-        config.configuration.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
-        return Ok(());
-    }
+fn parse_config(raw: &str) -> Result<SkillConfig> {
+    let value: toml::Value = toml::from_str(raw).context("Failed to parse postgres config")?;
+    let table = value
+        .as_table()
+        .ok_or_else(|| anyhow!("Postgres config must be a TOML table."))?;
 
-    if schema_version != LATEST_SCHEMA_VERSION {
+    if table.contains_key("tools") || table.contains_key("defaults") || table.contains_key("schema_version") {
+        value
+            .try_into()
+            .context("Failed to decode config.toml into the canonical postgres config schema")
+    } else {
+        let legacy: LegacySkillConfig = value
+            .try_into()
+            .context("Failed to decode postgres.toml into the legacy postgres config schema")?;
+        migrate_legacy_config(legacy)
+    }
+}
+
+pub fn migrate_config_in_place(config: &mut SkillConfig) -> Result<()> {
+    let schema_version = config.schema_version.clone().unwrap_or_default();
+    if !schema_version.is_empty() && schema_version != LATEST_SCHEMA_VERSION {
         bail!("Unsupported schema_version: {schema_version}");
     }
 
-    normalize_sslmodes(config)?;
+    if config.defaults.profile.as_deref() == Some("") {
+        config.defaults.profile = None;
+    }
+
+    normalize_canonical_sslmodes(config)?;
+    config.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
     Ok(())
 }
 
-fn normalize_sslmodes(config: &mut SkillConfig) -> Result<()> {
-    if config.database.sslmode.is_none() {
-        config.database.sslmode = Some(BoolLike::Bool(false));
-    }
-    if let Some(sslmode) = config.database.sslmode.clone() {
-        config.database.sslmode = Some(BoolLike::Bool(sslmode.as_bool()?.unwrap_or(false)));
+fn migrate_legacy_config(mut legacy: LegacySkillConfig) -> Result<SkillConfig> {
+    let schema_version = legacy.configuration.schema_version.take().unwrap_or_default();
+    if !schema_version.is_empty()
+        && schema_version != "1"
+        && schema_version != "1.0.0"
+        && schema_version != "1.1.0"
+    {
+        bail!("Unsupported schema_version: {schema_version}");
     }
 
-    for profile in config.database.profiles.values_mut() {
+    if let Some(value) = legacy.database.sslmode.clone() {
+        legacy.database.sslmode = Some(BoolLike::Bool(value.as_bool()?.unwrap_or(false)));
+    } else {
+        legacy.database.sslmode = Some(BoolLike::Bool(false));
+    }
+    for profile in legacy.database.profiles.values_mut() {
+        if let Some(value) = profile.sslmode.clone() {
+            profile.sslmode = Some(BoolLike::Bool(value.as_bool()?.unwrap_or(false)));
+        }
+    }
+
+    let default_profile = if legacy.database.profiles.len() == 1 {
+        legacy.database.profiles.keys().next().cloned()
+    } else if legacy.database.profiles.contains_key(DEFAULT_PROFILE) {
+        Some(DEFAULT_PROFILE.to_string())
+    } else {
+        None
+    };
+
+    let mut config = SkillConfig {
+        schema_version: Some(LATEST_SCHEMA_VERSION.to_string()),
+        defaults: DefaultsConfig {
+            profile: default_profile,
+        },
+        tools: ToolCollection {
+            postgres: PostgresToolConfig {
+                host: legacy.database.host,
+                port: legacy.database.port,
+                database: legacy.database.database,
+                user: legacy.database.user,
+                password: legacy.database.password,
+                sslmode: legacy.database.sslmode,
+                url: legacy.database.url,
+                description: legacy.database.description,
+                migrations_path: legacy
+                    .database
+                    .migrations_path
+                    .or_else(|| legacy.migrations.and_then(|migrations| migrations.path)),
+                profiles: legacy.database.profiles,
+            },
+        },
+    };
+    migrate_config_in_place(&mut config)?;
+    Ok(config)
+}
+
+fn normalize_canonical_sslmodes(config: &mut SkillConfig) -> Result<()> {
+    if config.tools.postgres.sslmode.is_none() {
+        config.tools.postgres.sslmode = Some(BoolLike::Bool(false));
+    }
+    if let Some(sslmode) = config.tools.postgres.sslmode.clone() {
+        config.tools.postgres.sslmode = Some(BoolLike::Bool(sslmode.as_bool()?.unwrap_or(false)));
+    }
+
+    for profile in config.tools.postgres.profiles.values_mut() {
         if let Some(value) = profile.sslmode.clone() {
             profile.sslmode = Some(BoolLike::Bool(value.as_bool()?.unwrap_or(false)));
         }
@@ -260,15 +401,16 @@ fn normalize_sslmodes(config: &mut SkillConfig) -> Result<()> {
 
 fn choose_profile(config: &SkillConfig, requested: Option<String>) -> Result<String> {
     if let Some(requested) = requested {
-        if config.database.profiles.contains_key(&requested) {
+        if config.tools.postgres.profiles.contains_key(&requested) {
             return Ok(requested);
         }
-        bail!("Profile '{requested}' not found in postgres.toml.");
+        bail!("Profile '{requested}' not found in config.toml.");
     }
 
-    if config.database.profiles.len() == 1 {
+    if config.tools.postgres.profiles.len() == 1 {
         return Ok(config
-            .database
+            .tools
+            .postgres
             .profiles
             .keys()
             .next()
@@ -276,13 +418,19 @@ fn choose_profile(config: &SkillConfig, requested: Option<String>) -> Result<Str
             .to_string());
     }
 
-    if config.database.profiles.contains_key(DEFAULT_PROFILE) {
+    if let Some(default_profile) = &config.defaults.profile
+        && config.tools.postgres.profiles.contains_key(default_profile)
+    {
+        return Ok(default_profile.clone());
+    }
+
+    if config.tools.postgres.profiles.contains_key(DEFAULT_PROFILE) {
         return Ok(DEFAULT_PROFILE.to_string());
     }
 
     if io::stdin().is_terminal() {
-        eprintln!("Multiple profiles found in postgres.toml:");
-        for (name, profile) in &config.database.profiles {
+        eprintln!("Multiple profiles found in config.toml:");
+        for (name, profile) in &config.tools.postgres.profiles {
             let description = profile.description.clone().unwrap_or_default();
             let suffix = if description.is_empty() {
                 String::new()
@@ -296,49 +444,49 @@ fn choose_profile(config: &SkillConfig, requested: Option<String>) -> Result<Str
         let _ = io::stderr().flush();
         io::stdin().read_line(&mut input)?;
         let selected = input.trim();
-        if config.database.profiles.contains_key(selected) {
+        if config.tools.postgres.profiles.contains_key(selected) {
             return Ok(selected.to_string());
         }
     }
 
-    bail!("DB_PROFILE is required when postgres.toml contains multiple profiles.")
+    bail!("DB_PROFILE is required when config.toml contains multiple profiles.")
 }
 
 pub fn resolve_profile(config: &SkillConfig, name: &str) -> Result<ResolvedProfile> {
-    let profile = config
-        .database
+    let tool = &config.tools.postgres;
+    let profile = tool
         .profiles
         .get(name)
-        .ok_or_else(|| anyhow!("Profile '{name}' not found in postgres.toml."))?;
+        .ok_or_else(|| anyhow!("Profile '{name}' not found in config.toml."))?;
 
-    let url = if let Some(url) = profile.url.clone().or_else(|| config.database.url.clone()) {
+    let url = if let Some(url) = profile.url.clone().or_else(|| tool.url.clone()) {
         url
     } else {
         let host = profile
             .host
             .clone()
-            .or_else(|| config.database.host.clone())
+            .or_else(|| tool.host.clone())
             .unwrap_or_else(|| "localhost".to_string());
-        let port = profile.port.or(config.database.port).unwrap_or(5432);
+        let port = profile.port.or(tool.port).unwrap_or(5432);
         let database = profile
             .database
             .clone()
-            .or_else(|| config.database.database.clone())
+            .or_else(|| tool.database.clone())
             .ok_or_else(|| anyhow!("Profile '{name}' is missing database."))?;
         let user = profile
             .user
             .clone()
-            .or_else(|| config.database.user.clone())
+            .or_else(|| tool.user.clone())
             .ok_or_else(|| anyhow!("Profile '{name}' is missing user."))?;
         let password = profile
             .password
             .clone()
-            .or_else(|| config.database.password.clone())
+            .or_else(|| tool.password.clone())
             .ok_or_else(|| anyhow!("Profile '{name}' is missing password."))?;
         let sslmode = profile
             .sslmode
             .clone()
-            .or_else(|| config.database.sslmode.clone())
+            .or_else(|| tool.sslmode.clone())
             .unwrap_or(BoolLike::Bool(false))
             .as_bool()?
             .unwrap_or(false);
@@ -356,30 +504,34 @@ pub fn resolve_profile(config: &SkillConfig, name: &str) -> Result<ResolvedProfi
     let sslmode = profile
         .sslmode
         .clone()
-        .or_else(|| config.database.sslmode.clone())
+        .or_else(|| tool.sslmode.clone())
         .unwrap_or(BoolLike::Bool(false))
         .as_bool()?
         .unwrap_or(false);
 
     Ok(ResolvedProfile {
         name: name.to_string(),
-        description: profile.description.clone(),
+        description: profile
+            .description
+            .clone()
+            .or_else(|| tool.description.clone()),
         url,
         sslmode,
         migrations_path: profile
             .migrations_path
             .clone()
-            .or_else(|| config.migrations.as_ref().and_then(|m| m.path.clone())),
+            .or_else(|| tool.migrations_path.clone()),
     })
 }
 
 pub fn update_sslmode(path: &Path, profile_name: &str, enabled: bool) -> Result<()> {
     let mut config = load_and_migrate_config(path)?;
     let profile = config
-        .database
+        .tools
+        .postgres
         .profiles
         .get_mut(profile_name)
-        .ok_or_else(|| anyhow!("Profile '{profile_name}' not found in postgres.toml."))?;
+        .ok_or_else(|| anyhow!("Profile '{profile_name}' not found in config.toml."))?;
     profile.sslmode = Some(BoolLike::Bool(enabled));
     save_config(path, &config)
 }
@@ -518,7 +670,8 @@ pub fn prompt(text: &str, default: Option<&str>, secret: bool) -> Result<String>
 }
 
 pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
-    let mut config = if path.exists() {
+    let mut config = if path.exists() || sibling_legacy_config_path(path).is_some_and(|p| p.exists())
+    {
         load_and_migrate_config(path)?
     } else {
         SkillConfig::default()
@@ -561,8 +714,15 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
     };
 
     if save {
-        config.configuration.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
-        config.database.profiles.insert(
+        config.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
+        config.defaults.profile = Some(profile_name.clone());
+        if config.tools.postgres.sslmode.is_none() {
+            config.tools.postgres.sslmode = Some(BoolLike::Bool(false));
+        }
+        if config.tools.postgres.migrations_path.is_none() && !migrations_path.is_empty() {
+            config.tools.postgres.migrations_path = Some(migrations_path.clone());
+        }
+        config.tools.postgres.profiles.insert(
             profile_name.clone(),
             ProfileConfig {
                 description: resolved.description.clone(),
@@ -577,42 +737,183 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
                 ..ProfileConfig::default()
             },
         );
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
         save_config(path, &config)?;
     }
 
     Ok(resolved)
 }
 
+fn sibling_legacy_config_path(path: &Path) -> Option<PathBuf> {
+    (path.file_name().and_then(|name| name.to_str()) == Some(CONFIG_FILENAME))
+        .then(|| path.with_file_name(LEGACY_CONFIG_FILENAME))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+    use tempfile::tempdir;
 
     #[test]
-    fn migrates_legacy_schema() {
-        let mut config = SkillConfig {
-            configuration: Configuration {
-                schema_version: Some("1.0.0".into()),
-                pg_bin_dir: None,
-                pg_bin_path: Some("/tmp/pg".into()),
-                python_bin: None,
-            },
-            database: DatabaseConfig {
-                sslmode: Some(BoolLike::String("require".into())),
-                ..DatabaseConfig::default()
-            },
-            migrations: None,
-        };
-        migrate_config_in_place(&mut config).unwrap();
+    fn migrates_legacy_schema_to_canonical_config() {
+        let temp = tempdir().unwrap();
+        let project_root = temp.path();
+        let legacy_path = legacy_config_path(project_root);
+        fs::create_dir_all(legacy_path.parent().unwrap()).unwrap();
+        fs::write(
+            &legacy_path,
+            r#"[configuration]
+schema_version = "1.1.0"
+pg_bin_dir = "/tmp/pg"
+python_bin = "/usr/bin/python3"
+
+[database]
+sslmode = "require"
+
+[database.local]
+description = "Local"
+host = "127.0.0.1"
+port = 5432
+database = "app"
+user = "postgres"
+password = "postgres"
+sslmode = "disable"
+migrations_path = "db/migrations"
+
+[migrations]
+path = "db/migrations"
+"#,
+        )
+        .unwrap();
+
+        let canonical_path = canonical_config_path(project_root);
+        let config = load_and_migrate_config(&canonical_path).unwrap();
+        let written = fs::read_to_string(&canonical_path).unwrap();
+
+        assert_eq!(config.schema_version.as_deref(), Some(LATEST_SCHEMA_VERSION));
+        assert_eq!(config.defaults.profile.as_deref(), Some("local"));
         assert_eq!(
-            config.configuration.schema_version.as_deref(),
-            Some(LATEST_SCHEMA_VERSION)
+            config.tools.postgres.migrations_path.as_deref(),
+            Some("db/migrations")
         );
-        assert_eq!(config.configuration.pg_bin_dir.as_deref(), Some("/tmp/pg"));
-        assert_eq!(config.database.sslmode, Some(BoolLike::Bool(true)));
+        assert_eq!(
+            config.tools.postgres.profiles["local"].sslmode,
+            Some(BoolLike::Bool(false))
+        );
+        assert!(written.contains("schema_version = \"2.0.0\""));
+        assert!(written.contains("[defaults]"));
+        assert!(written.contains("[tools.postgres]"));
+        assert!(written.contains("[tools.postgres.profiles.local]"));
+        assert!(!written.contains("pg_bin_dir"));
+        assert!(!written.contains("python_bin"));
+    }
+
+    #[test]
+    fn migrates_missing_legacy_schema_and_normalizes_sslmode() {
+        let temp = tempdir().unwrap();
+        let project_root = temp.path();
+        let legacy_path = legacy_config_path(project_root);
+        fs::create_dir_all(legacy_path.parent().unwrap()).unwrap();
+        fs::write(
+            &legacy_path,
+            r#"[database]
+sslmode = "require"
+
+[database.alpha]
+database = "app"
+user = "postgres"
+password = "postgres"
+sslmode = "require"
+"#,
+        )
+        .unwrap();
+
+        let config = load_and_migrate_config(&canonical_config_path(project_root)).unwrap();
+        assert_eq!(config.schema_version.as_deref(), Some(LATEST_SCHEMA_VERSION));
+        assert_eq!(
+            config.tools.postgres.sslmode,
+            Some(BoolLike::Bool(true))
+        );
+        assert_eq!(
+            config.tools.postgres.profiles["alpha"].sslmode,
+            Some(BoolLike::Bool(true))
+        );
+    }
+
+    #[test]
+    fn canonical_config_wins_over_legacy_file() {
+        let temp = tempdir().unwrap();
+        let project_root = temp.path();
+        let canonical_path = canonical_config_path(project_root);
+        let legacy_path = legacy_config_path(project_root);
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        fs::write(
+            &canonical_path,
+            r#"schema_version = "2.0.0"
+
+[defaults]
+profile = "local"
+
+[tools.postgres]
+sslmode = false
+
+[tools.postgres.profiles.local]
+database = "canonical"
+user = "postgres"
+password = "postgres"
+"#,
+        )
+        .unwrap();
+        fs::write(
+            &legacy_path,
+            r#"[database]
+sslmode = false
+
+[database.local]
+database = "legacy"
+user = "postgres"
+password = "postgres"
+"#,
+        )
+        .unwrap();
+
+        let config = load_and_migrate_config(&canonical_path).unwrap();
+        assert_eq!(
+            config.tools.postgres.profiles["local"].database.as_deref(),
+            Some("canonical")
+        );
+    }
+
+    #[test]
+    fn update_sslmode_rewrites_canonical_config() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        fs::write(
+            &canonical_path,
+            r#"schema_version = "2.0.0"
+
+[defaults]
+profile = "local"
+
+[tools.postgres]
+sslmode = false
+
+[tools.postgres.profiles.local]
+database = "app"
+user = "postgres"
+password = "postgres"
+sslmode = false
+"#,
+        )
+        .unwrap();
+
+        update_sslmode(&canonical_path, "local", true).unwrap();
+        let config = load_and_migrate_config(&canonical_path).unwrap();
+        assert_eq!(
+            config.tools.postgres.profiles["local"].sslmode,
+            Some(BoolLike::Bool(true))
+        );
     }
 
     #[test]

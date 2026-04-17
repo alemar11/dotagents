@@ -63,11 +63,11 @@ impl DbClient {
             {
                 let retry_url = set_sslmode(&self.ctx.url, "require")?;
                 let messages = self.run_once(&retry_url, sql).await?;
-                if self.ctx.url_source == "toml"
+                if self.ctx.url_source == "config"
                     && std::env::var("DB_AUTO_UPDATE_SSLMODE").ok().as_deref() == Some("1")
-                    && let Some(toml_path) = &self.ctx.toml_path
+                    && let Some(config_path) = &self.ctx.config_path
                 {
-                    let _ = update_sslmode(toml_path, &self.ctx.profile_name, true);
+                    let _ = update_sslmode(config_path, &self.ctx.profile_name, true);
                 }
                 Ok(messages)
             }

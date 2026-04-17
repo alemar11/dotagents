@@ -1,0 +1,19 @@
+schema_version = "2.0.0"
+
+[defaults]
+profile = "local"
+
+[tools.postgres]
+sslmode = false
+migrations_path = "db/migrations"
+
+[tools.postgres.profiles.local]
+project = "app"
+description = "local dev"
+host = "localhost"
+port = 5432
+database = "app_local"
+user = "postgres"
+password = "postgres"
+sslmode = false
+migrations_path = "db/migrations"

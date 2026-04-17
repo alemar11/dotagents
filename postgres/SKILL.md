@@ -19,6 +19,8 @@ patterns, and manage migration release flow from one canonical CLI:
   surface.
 - The implementation lives in `projects/postgres/` and is maintenance-only.
   Normal usage stays on the `scripts/postgres` surface.
+- Canonical persisted config lives at
+  `<project-root>/.skills/postgres/config.toml`.
 
 ## Fast path
 
@@ -54,11 +56,12 @@ patterns, and manage migration release flow from one canonical CLI:
      (`PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`)
      are also accepted.
    - `PROJECT_ROOT` remains unsupported; use `DB_PROJECT_ROOT`.
-   - If `<project-root>/.skills/postgres/postgres.toml` exists, use it.
+   - If `<project-root>/.skills/postgres/config.toml` exists, use it.
+   - Else if legacy `<project-root>/.skills/postgres/postgres.toml` exists,
+     runtime migrates it one-way into canonical `config.toml` and continues on
+     the canonical path.
    - If the user explicitly asks to create or refresh a saved profile, use
      `./scripts/postgres profile bootstrap`.
-   - If runtime detects legacy schema `1` / `1.0.0`, it upgrades it to `1.1.0`
-     before use.
 2) Choose action:
    - Query / inspect data
    - Inspect schema / indexes / roles / activity
@@ -71,9 +74,11 @@ patterns, and manage migration release flow from one canonical CLI:
    - Be explicit when an operation uses managed PostgreSQL client tools for
      dump / restore / diff behavior.
 4) Persist only if asked:
-   - Update `postgres.toml` only with explicit user approval, except
-     schema-version normalization and explicit profile bootstrap / `set-ssl`
-     flows.
+   - Update `config.toml` only with explicit user approval, except canonical
+     config migration plus explicit profile bootstrap / `set-ssl` flows.
+   - Treat `<project-root>/.skills/postgres/config.toml` as local persisted
+     operator config; consuming repos should gitignore it just as they
+     previously gitignored legacy `postgres.toml`.
 
 ## Command map
 
@@ -90,7 +95,8 @@ patterns, and manage migration release flow from one canonical CLI:
 - `profile version`
   - Show server version.
 - `profile migrate-toml`
-  - Normalize legacy TOML schema to `1.1.0`.
+  - Migrate legacy `postgres.toml` into canonical `config.toml` using schema
+    `2.0.0`.
 - `profile set-ssl <profile> <true|false>`
   - Persist `sslmode` for a saved profile.
 - `query run`
@@ -109,6 +115,42 @@ patterns, and manage migration release flow from one canonical CLI:
   - Move a pending migration into `released/` and update `CHANGELOG.md`.
 - `docs search`
   - Search official PostgreSQL current docs.
+
+## Config shape
+
+Canonical persisted config uses owner-level `config.toml`:
+
+```toml
+schema_version = "2.0.0"
+
+[defaults]
+profile = "local"
+
+[tools.postgres]
+sslmode = false
+migrations_path = "db/migrations"
+
+[tools.postgres.profiles.local]
+description = "Local development DB"
+host = "127.0.0.1"
+port = 5432
+database = "app"
+user = "postgres"
+password = "postgres"
+sslmode = false
+migrations_path = "db/migrations"
+```
+
+Rules:
+
+- `schema_version` is top-level and required in canonical saved configs.
+- Do not add or rely on `[meta]`.
+- Do not persist `pg_bin_dir`, `pg_bin_path`, or `python_bin`.
+- Canonical `config.toml` is local persisted operator config, not normal repo
+  content; consuming repos should gitignore `.skills/postgres/config.toml`.
+- `[defaults]` stores the default saved profile.
+- `[tools.postgres]` stores shared Postgres defaults.
+- `[tools.postgres.profiles.<name>]` stores per-profile overrides.
 
 ## Schema and feature design
 
@@ -152,11 +194,13 @@ patterns, and manage migration release flow from one canonical CLI:
 
 ## Trigger rules
 
-- If `.skills/postgres/postgres.toml` exists, use it without scanning unless
-  the user asks to bootstrap or refresh.
+- If `.skills/postgres/config.toml` exists, use it without scanning unless the
+  user asks to bootstrap or refresh.
+- Else if only legacy `.skills/postgres/postgres.toml` exists, use it as
+  migration input to generate canonical `config.toml`.
 - If `DB_PROFILE` is unset and exactly one profile exists, use it.
-- If multiple profiles exist, prefer `local` when present; otherwise require an
-  explicit profile or interactive selection.
+- If multiple profiles exist, prefer the saved `[defaults].profile` when
+  present; otherwise require an explicit profile or interactive selection.
 - If the user asks to bootstrap or refresh a saved profile, use
   `profile bootstrap`.
 - Do not run `docs search` unless the user explicitly asks for official docs
@@ -209,6 +253,10 @@ patterns, and manage migration release flow from one canonical CLI:
   - `./scripts/postgres --help`
   - `./scripts/postgres --version`
   - `DB_PROJECT_ROOT=/path/to/repo ./scripts/postgres --json doctor`
+- Keep config migration one-way from legacy `postgres.toml` to canonical
+  `config.toml`.
+- Route dump / restore / schema diff through the managed PostgreSQL backend
+  only. Do not restore PATH probing or persisted binary-dir config.
 
 ## Usage references
 

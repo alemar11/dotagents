@@ -8,16 +8,18 @@ command surface.
 - `./scripts/postgres` is the only supported runtime entrypoint.
 - The CLI is implemented in Rust under `../projects/postgres/`.
 - Normal query / inspection paths use Rust-native PostgreSQL access.
-- Dump / restore / schema-diff paths prefer local PostgreSQL client tools when
-  available and otherwise bootstrap managed PostgreSQL binaries automatically.
-- Homebrew is not the required setup path anymore.
+- Dump / restore / schema-diff paths always bootstrap managed PostgreSQL
+  binaries automatically.
+- Homebrew and local `PATH` PostgreSQL client tools are not part of the runtime
+  contract anymore.
+- Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 
 ## Prerequisites
 
 - `./scripts/postgres` must exist as the shipped runtime artifact.
 - A running target Postgres database is still required for live DB operations.
-- Managed client-tools fallback needs outbound network access the first time it
-  downloads PostgreSQL binaries.
+- Managed client-tools provisioning needs outbound network access the first time
+  it downloads PostgreSQL binaries.
 - `cargo` and a recent Rust toolchain are only required when maintaining or
   rebuilding the shipped artifact from `../projects/postgres/`.
 
@@ -129,16 +131,17 @@ Doctor success:
   "runtime": {
     "profile_name": "local",
     "project_root": "/path/to/project",
+    "config_path": "/path/to/project/.skills/postgres/config.toml",
+    "toml_path": "/path/to/project/.skills/postgres/config.toml",
     "sslmode": "disable",
-    "toml_path": "/path/to/project/.skills/postgres/postgres.toml",
     "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
-    "url_source": "toml"
+    "url_source": "config"
   },
   "managed_tools": {
-    "binary_dir": "/opt/homebrew/opt/postgresql@18/bin",
+    "binary_dir": "/path/to/.managed-postgresql/16/bin",
     "pg_dump": true,
     "pg_restore": true,
-    "source": "local"
+    "source": "managed"
   }
 }
 ```
@@ -147,11 +150,12 @@ Profile success:
 ```json
 {
   "project_root": "/path/to/project",
-  "toml_path": "/path/to/project/.skills/postgres/postgres.toml",
+  "config_path": "/path/to/project/.skills/postgres/config.toml",
+  "toml_path": "/path/to/project/.skills/postgres/config.toml",
   "profile_name": "local",
   "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
   "sslmode": "disable",
-  "url_source": "toml",
+  "url_source": "config",
   "application_name": "codex-postgres-skill"
 }
 ```
@@ -167,35 +171,11 @@ Query success:
 }
 ```
 
-Schema success:
-```json
-{
-  "table_sizes": {
-    "columns": [
-      "schemaname",
-      "relname",
-      "total_size",
-      "table_size",
-      "index_size"
-    ],
-    "rows": [
-      {
-        "schemaname": "public",
-        "relname": "report_store_rs",
-        "total_size": "1037 MB",
-        "table_size": "963 MB",
-        "index_size": "74 MB"
-      }
-    ]
-  }
-}
-```
-
 Error example:
 ```json
 {
   "error": {
-    "message": "Profile 'missing' not found in postgres.toml."
+    "message": "Profile 'missing' not found in config.toml."
   }
 }
 ```
@@ -209,7 +189,9 @@ The CLI resolves connections in this order:
 3. compatibility URL vars: `DATABASE_URL`, `POSTGRES_URL`, `POSTGRESQL_URL`
 4. libpq vars: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`,
    `PGSSLMODE`
-5. `<project-root>/.skills/postgres/postgres.toml`
+5. `<project-root>/.skills/postgres/config.toml`
+6. legacy `<project-root>/.skills/postgres/postgres.toml` as one-way migration
+   input when canonical `config.toml` is absent
 
 Project-root precedence:
 
@@ -233,7 +215,7 @@ Project-root precedence:
 - `profile version`
   - Show server version.
 - `profile migrate-toml`
-  - Normalize legacy TOML schema.
+  - Migrate legacy `postgres.toml` into canonical `config.toml`.
 - `profile set-ssl <profile> <true|false>`
   - Persist `sslmode`.
 - `query run`
@@ -257,11 +239,10 @@ Project-root precedence:
 
 For dump / restore / schema diff:
 
-- If local `pg_dump` / `pg_restore` are available, the CLI uses them.
-- Otherwise the CLI bootstraps managed PostgreSQL binaries under the skill
-  directory or `DB_MANAGED_PG_DIR`.
+- The CLI always bootstraps and uses managed PostgreSQL binaries under the
+  skill directory or `DB_MANAGED_PG_DIR`.
 - This is intentional: the runtime should not depend on `brew install
-  postgresql`.
+  postgresql` or local `PATH` tooling.
 
 ## Scratch validation guidance
 

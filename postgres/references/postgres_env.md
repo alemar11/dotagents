@@ -5,9 +5,9 @@ Use these environment variables with `./scripts/postgres`.
 ## Primary runtime vars
 
 - `DB_PROJECT_ROOT`
-  - Target project root containing `.skills/postgres/postgres.toml`.
+  - Target project root containing `.skills/postgres/config.toml`.
 - `DB_PROFILE`
-  - Saved profile name from `postgres.toml`.
+  - Saved profile name from `config.toml`.
 - `DB_URL`
   - One-off connection URL. Takes precedence over saved profiles.
 - `DB_APPLICATION_NAME`
@@ -18,7 +18,7 @@ Use these environment variables with `./scripts/postgres`.
   - Session lock timeout.
 - `DB_AUTO_UPDATE_SSLMODE=1`
   - Auto-persist `sslmode=true` after a successful retry against a saved
-    profile.
+    profile in canonical `config.toml`.
 - `DB_MANAGED_PG_DIR`
   - Override the cache / install root for managed PostgreSQL client tools.
 
