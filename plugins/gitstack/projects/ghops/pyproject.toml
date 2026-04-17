@@ -1,6 +1,6 @@
 [project]
 name = "ghops"
-version = "1.0.0"
+version = "1.0.1"
 description = "Embedded GitHub CLI runtime for the gitstack plugin"
 requires-python = ">=3.11"
 

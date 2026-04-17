@@ -1,7 +1,7 @@
 {
   "name": "gitstack",
-  "version": "1.0.0",
-  "description": "Bundle git authoring, GitHub operations, and publish workflows around a shared ghops CLI.",
+  "version": "1.0.1",
+  "description": "Bundle git authoring, GitHub operations, and publish workflows around a shared ghops CLI and the required GitHub CLI dependency.",
   "author": {
     "name": "alemar11",
     "email": "",
@@ -19,7 +19,7 @@
   "interface": {
     "displayName": "GitStack",
     "shortDescription": "Bundle git commit, GitHub, and publish workflows in one plugin.",
-    "longDescription": "GitStack bundles git-commit, GitHub specialist skills, and Yeet around one shared ghops runtime so commit, review, release, and publish flows stay aligned.",
+    "longDescription": "GitStack bundles git-commit, GitHub specialist skills, and Yeet around one shared ghops runtime, with GitHub CLI `gh` required on the host so commit, review, release, and publish flows stay aligned.",
     "developerName": "alemar11",
     "category": "Productivity",
     "capabilities": [

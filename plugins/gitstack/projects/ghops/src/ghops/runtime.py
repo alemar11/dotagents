@@ -25,14 +25,33 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 PROJECT_SRC_DIR = Path(__file__).resolve().parents[1]
 SKILL_DIR = Path(__file__).resolve().parents[4]
 PYPROJECT_PATH = PROJECT_DIR / "pyproject.toml"
+GH_INSTALL_URL = "https://github.com/cli/cli#installation"
+GH_RELEASES_URL = "https://github.com/cli/cli/releases/latest"
+GH_INSTALL_HINTS = {
+    "macos": {
+        "label": "macOS",
+        "primary": "brew install gh",
+        "fallback": f"Download the installer from {GH_RELEASES_URL}",
+    },
+    "windows": {
+        "label": "Windows",
+        "primary": "winget install --id GitHub.cli",
+        "fallback": f"Download the .msi or .exe from {GH_RELEASES_URL}",
+    },
+    "linux": {
+        "label": "Linux",
+        "primary": "Follow the distro-specific commands at https://github.com/cli/cli/blob/trunk/docs/install_linux.md",
+        "fallback": "If Homebrew is already installed, run brew install gh",
+    },
+}
 
 
 def load_version() -> str:
     if not PYPROJECT_PATH.exists():
-        return "1.0.0"
+        return "1.0.1"
     with PYPROJECT_PATH.open("rb") as handle:
         payload = tomllib.load(handle)
-    return str(payload.get("project", {}).get("version", "1.0.0"))
+    return str(payload.get("project", {}).get("version", "1.0.1"))
 
 
 VERSION = load_version()
@@ -683,7 +702,17 @@ def collect_doctor_data() -> dict[str, object]:
 
     ready = bool(gh_installed and auth_authenticated)
     return {
-        "gh": {"installed": gh_installed, "path": gh_path, "version": gh_version, "error": gh_error},
+        "gh": {
+            "installed": gh_installed,
+            "path": gh_path,
+            "version": gh_version,
+            "error": gh_error,
+            "install": {
+                "guide_url": GH_INSTALL_URL,
+                "releases_url": GH_RELEASES_URL,
+                "platforms": GH_INSTALL_HINTS,
+            },
+        },
         "auth": {"host": HOST, "authenticated": auth_authenticated, "login": auth_login, "source": "gh", "error": auth_error},
         "project": {
             "is_git_repo": git_repo,
@@ -710,6 +739,18 @@ def render_doctor_text(data: dict[str, object]) -> str:
         f"Allow non-project: {'yes' if project_data['allow_non_project'] else 'no'}",
         f"Ready: {'yes' if data['ready'] else 'no'}",
     ]
+    if not gh_data["installed"]:
+        install_data = gh_data["install"]
+        lines.extend(
+            [
+                "",
+                "Install gh before using gitstack:",
+                f"- macOS: {install_data['platforms']['macos']['primary']}",
+                f"- Windows: {install_data['platforms']['windows']['primary']}",
+                f"- Linux: {install_data['platforms']['linux']['primary']}",
+                f"- Full guide: {install_data['guide_url']}",
+            ]
+        )
     return "\n".join(lines) + "\n"
 
 

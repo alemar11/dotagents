@@ -3,7 +3,7 @@
 This directory contains reusable skills, repo-local plugins, and project maintainer skills—task-specific packages of instructions, resources, and optional scripts that help agents follow workflows reliably.
 
 ## Plugins
-- `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, GitHub workflows, and Yeet around the shared `ghops` CLI.
+- `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, GitHub workflows, and Yeet around the shared `ghops` CLI, with host `gh` required for GitHub-backed operations.
   Bundled skills: `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
 
 ## Skills
@@ -27,6 +27,12 @@ Project skills are repository-local and are not included in the reusable install
 The preferred full-stack surface for linked git + GitHub workflows is the
 repo-local `plugins/gitstack/` plugin, registered through
 `.agents/plugins/marketplace.json`.
+
+`plugins/gitstack/` expects GitHub CLI `gh` to be installed on the host before
+GitHub-backed commands run. Use
+`plugins/gitstack/skills/github/references/core/installation.md` for the
+cross-platform install paths and `command -v gh && gh --version` to confirm the
+binary is on `PATH`.
 
 For a global local-plugin install from this repo, run `./link.sh`. It keeps
 the existing skill symlink behavior, creates per-plugin symlinks under

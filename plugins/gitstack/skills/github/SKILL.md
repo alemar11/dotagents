@@ -26,6 +26,10 @@ lifecycle work on already-pushed branches, or any time the user just says
 
 ## Runtime surface
 
+- `gh` is a required host dependency for every bundled GitHub flow.
+- Confirm it is on `PATH` with `command -v gh && gh --version`.
+- If it is missing, install it with `references/core/installation.md` before
+  running `ghops`.
 - Resolve the installed plugin root first, then run `ghops`.
 - `ghops --version` is the runtime version check.
 - `ghops --json doctor` is the runtime readiness check.
@@ -59,11 +63,13 @@ lifecycle work on already-pushed branches, or any time the user just says
 
 ## Quick workflow
 
-1. Resolve the plugin-owned `ghops` artifact.
-2. Start with `ghops --json doctor` when auth or repo context is uncertain.
-3. Choose the narrowest `ghops` noun or verb for the task.
-4. Prefer `--json` when parsing or relaying structured output.
-5. Route full local-worktree publish to `yeet`, not to a new `github-publish`
+1. Ensure `gh` is installed and authenticated; use
+   `references/core/installation.md` if not.
+2. Resolve the plugin-owned `ghops` artifact.
+3. Start with `ghops --json doctor` when auth or repo context is uncertain.
+4. Choose the narrowest `ghops` noun or verb for the task.
+5. Prefer `--json` when parsing or relaying structured output.
+6. Route full local-worktree publish to `yeet`, not to a new `github-publish`
    skill.
 
 ## Fast path

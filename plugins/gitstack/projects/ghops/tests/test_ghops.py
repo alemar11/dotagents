@@ -75,6 +75,7 @@ class DoctorTests(unittest.TestCase):
                 run_mock.return_value = runtime.RunResult(1, "", "")
                 data = runtime.collect_doctor_data()
         self.assertFalse(data["gh"]["installed"])
+        self.assertEqual(data["gh"]["install"]["guide_url"], runtime.GH_INSTALL_URL)
         self.assertFalse(data["auth"]["authenticated"])
         self.assertFalse(data["ready"])
 
@@ -149,6 +150,15 @@ class UtilityTests(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 help_text = runtime.render_noun_help(prefix)
                 self.assertTrue(help_text.startswith("Usage:\n"))
+
+    def test_render_doctor_text_adds_install_hints_when_gh_missing(self) -> None:
+        with mock.patch.object(runtime, "shutil_which", return_value=None):
+            with mock.patch.object(runtime, "run") as run_mock:
+                run_mock.return_value = runtime.RunResult(1, "", "")
+                text = runtime.render_doctor_text(runtime.collect_doctor_data())
+        self.assertIn("Install gh before using gitstack:", text)
+        self.assertIn("brew install gh", text)
+        self.assertIn("winget install --id GitHub.cli", text)
 
 
 if __name__ == "__main__":
