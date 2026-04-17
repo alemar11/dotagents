@@ -52,9 +52,9 @@ Keep v1 intentionally narrow:
    - Start with `git status -sb`.
    - Resolve the current branch, detached-HEAD state, and whether you are still
      on the repository default branch.
-   - Run `github/scripts/core/preflight_gh.sh` from the target repo root before
+   - Run `skills/github/scripts/core/preflight_gh.sh` from the target repo root before
      creating branches, commits, or pushes that are intended to end in a PR.
-   - When useful, run `github/scripts/publish/publish_context.sh --json` from
+   - When useful, run `skills/github/scripts/publish/publish_context.sh --json` from
      the target repo root to confirm whether the current branch is long-lived
      and what PR base should be carried forward.
 2. Pick branch strategy.
@@ -107,7 +107,7 @@ Keep v1 intentionally narrow:
   `release/*`; branch off it and keep that branch as the PR base.
 - Never push without confirming scope when the worktree is mixed.
 - Never start branch, commit, or push mutations for a PR-intended publish flow
-  until `github/scripts/core/preflight_gh.sh` has passed from the target repo
+  until `skills/github/scripts/core/preflight_gh.sh` has passed from the target repo
   root.
 - Default to a draft PR unless the user explicitly asks for a ready PR.
 - Stop if the repo is not connected to an accessible same-repo GitHub remote.

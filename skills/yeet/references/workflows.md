@@ -16,7 +16,7 @@ silently broadening scope.
 ### Operator policy
 
 - Start with `git status -sb`.
-- Run `github/scripts/core/preflight_gh.sh` from the target repo root before
+- Run `skills/github/scripts/core/preflight_gh.sh` from the target repo root before
   creating branches, commits, or pushes that are intended to end in a PR.
 - If the worktree contains unrelated changes, do not default to `git add -A`.
 - If on the default branch or detached `HEAD`, create a new short-lived branch
@@ -52,13 +52,13 @@ silently broadening scope.
 
 ```bash
 git status -sb
-github/scripts/core/preflight_gh.sh
+skills/github/scripts/core/preflight_gh.sh
 ```
 
 Inspect publish context when branch strategy or PR base is not already obvious:
 
 ```bash
-github/scripts/publish/publish_context.sh --json
+skills/github/scripts/publish/publish_context.sh --json
 ```
 
 If on the default branch, detached `HEAD`, or a long-lived integration branch,
@@ -109,7 +109,7 @@ Follow-ups:
 ### Retry notes
 
 - `gh` install or auth checks fail before mutation: stop, fix the failure, then
-  rerun `github/scripts/core/preflight_gh.sh` from the target repo root before
+  rerun `skills/github/scripts/core/preflight_gh.sh` from the target repo root before
   continuing.
 - Current branch has no upstream yet: run `git push -u origin "$(git branch --show-current)"`.
 - Existing PR already open for this branch: `github` should reuse it instead
