@@ -286,9 +286,10 @@ For dump / restore / schema diff:
 - `DB_PG_BIN_DIR` is the only supported host-tools override.
 - If `DB_PG_BIN_DIR` is unset, the CLI uses managed PostgreSQL binaries.
 - Default managed root:
-  `<user-cache-dir>/dotagents/skills/postgres/postgresql`
+  - Unix: `~/.cache/dotagents/skills/postgres/postgresql`
+  - Windows: `%LOCALAPPDATA%\\dotagents\\skills\\postgres\\postgresql`
 - Example resolved roots:
-  - macOS: `~/Library/Caches/dotagents/skills/postgres/postgresql`
+  - macOS: `~/.cache/dotagents/skills/postgres/postgresql`
   - Linux: `~/.cache/dotagents/skills/postgres/postgresql`
   - Windows: `%LOCALAPPDATA%\\dotagents\\skills\\postgres\\postgresql`
 - `DB_MANAGED_PG_DIR` overrides the managed root only.

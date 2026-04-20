@@ -25,12 +25,14 @@ Use these environment variables with `./scripts/postgres`.
 - `DB_MANAGED_PG_DIR`
   - Override the managed PostgreSQL install root.
   - This is a raw path override; the CLI does not shell-expand `~` itself.
-  - Default root: `<user-cache-dir>/dotagents/skills/postgres/postgresql`
+  - Default root:
+    - Unix: `~/.cache/dotagents/skills/postgres/postgresql`
+    - Windows: `%LOCALAPPDATA%\\dotagents\\skills\\postgres\\postgresql`
 
 Resolved examples:
 
 - macOS:
-  - `~/Library/Caches/dotagents/skills/postgres/postgresql`
+  - `~/.cache/dotagents/skills/postgres/postgresql`
 - Linux:
   - `~/.cache/dotagents/skills/postgres/postgresql`
 - Windows:

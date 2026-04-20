@@ -106,8 +106,8 @@ struct ManagedRoot {
     root: PathBuf,
 }
 
-fn default_managed_root(cache_dir: PathBuf) -> PathBuf {
-    cache_dir
+fn default_managed_root(cache_base_dir: PathBuf) -> PathBuf {
+    cache_base_dir
         .join("dotagents")
         .join("skills")
         .join("postgres")
@@ -119,12 +119,29 @@ fn resolve_managed_root() -> Result<Option<ManagedRoot>> {
         return Ok(Some(ManagedRoot { root }));
     }
 
-    let Some(cache_dir) = dirs::cache_dir() else {
+    let Some(cache_base_dir) = default_cache_base_dir() else {
         return Ok(None);
     };
     Ok(Some(ManagedRoot {
-        root: default_managed_root(cache_dir),
+        root: default_managed_root(cache_base_dir),
     }))
+}
+
+#[cfg(unix)]
+fn default_cache_base_dir() -> Option<PathBuf> {
+    if let Some(path) = env::var_os("XDG_CACHE_HOME").filter(|value| !value.is_empty()) {
+        return Some(PathBuf::from(path));
+    }
+
+    env::var_os("HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .map(|home| home.join(".cache"))
+}
+
+#[cfg(not(unix))]
+fn default_cache_base_dir() -> Option<PathBuf> {
+    dirs::cache_dir()
 }
 
 fn managed_settings(install_root: &Path) -> Settings {
@@ -394,6 +411,58 @@ mod tests {
             root,
             PathBuf::from("/tmp/cache/dotagents/skills/postgres/postgresql")
         );
+    }
+
+    #[test]
+    fn unix_cache_base_prefers_xdg_cache_home() {
+        let old_home = env::var_os("HOME");
+        let old_xdg = env::var_os("XDG_CACHE_HOME");
+        unsafe {
+            env::set_var("HOME", "/tmp/home");
+            env::set_var("XDG_CACHE_HOME", "/tmp/xdg-cache");
+        }
+
+        let resolved = default_cache_base_dir();
+
+        match old_home {
+            Some(value) => unsafe { env::set_var("HOME", value) },
+            None => unsafe { env::remove_var("HOME") },
+        }
+        match old_xdg {
+            Some(value) => unsafe { env::set_var("XDG_CACHE_HOME", value) },
+            None => unsafe { env::remove_var("XDG_CACHE_HOME") },
+        }
+
+        #[cfg(unix)]
+        assert_eq!(resolved, Some(PathBuf::from("/tmp/xdg-cache")));
+        #[cfg(not(unix))]
+        let _ = resolved;
+    }
+
+    #[test]
+    fn unix_cache_base_falls_back_to_home_dot_cache() {
+        let old_home = env::var_os("HOME");
+        let old_xdg = env::var_os("XDG_CACHE_HOME");
+        unsafe {
+            env::set_var("HOME", "/tmp/home");
+            env::remove_var("XDG_CACHE_HOME");
+        }
+
+        let resolved = default_cache_base_dir();
+
+        match old_home {
+            Some(value) => unsafe { env::set_var("HOME", value) },
+            None => unsafe { env::remove_var("HOME") },
+        }
+        match old_xdg {
+            Some(value) => unsafe { env::set_var("XDG_CACHE_HOME", value) },
+            None => unsafe { env::remove_var("XDG_CACHE_HOME") },
+        }
+
+        #[cfg(unix)]
+        assert_eq!(resolved, Some(PathBuf::from("/tmp/home/.cache")));
+        #[cfg(not(unix))]
+        let _ = resolved;
     }
 
     #[test]
