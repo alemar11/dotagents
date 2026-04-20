@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Query"
+  short_description: "Review and refactor TanStack Query usage with strong guidance on keys, queryOptions, invalidation, and cache policy."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0891B2"
+  default_prompt: "Use the bundled TanStack Query skill to review or implement query key design, queryOptions reuse, invalidation, optimistic updates, and SSR-safe data fetching patterns."

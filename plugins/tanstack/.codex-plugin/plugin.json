@@ -1,0 +1,43 @@
+{
+  "name": "tanstack",
+  "version": "0.1.2",
+  "description": "Bundle TanStack React Query, React Router, React Start, and cross-stack integration guidance in one repo-local plugin.",
+  "author": {
+    "name": "alemar11",
+    "email": "",
+    "url": "https://github.com/alemar11"
+  },
+  "homepage": "https://github.com/alemar11/skills",
+  "repository": "https://github.com/alemar11/skills",
+  "license": "MIT",
+  "keywords": [
+    "tanstack",
+    "query",
+    "router",
+    "start",
+    "skills"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "TanStack",
+    "shortDescription": "Bundle TanStack React Query, Router, Start, and integration guidance in one plugin.",
+    "longDescription": "TanStack bundles focused React skills for TanStack Query, TanStack Router, TanStack Start, and the integration patterns that connect them, with guidance biased toward current TanStack React conventions and official skill surfaces when available.",
+    "developerName": "alemar11",
+    "category": "Development",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/alemar11/skills",
+    "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
+    "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
+    "defaultPrompt": [
+      "Review this TanStack React Query code for cache key, invalidation, and queryOptions issues.",
+      "Help me refactor this TanStack React Router tree for typed search params, loaders, and lazy routes.",
+      "Wire TanStack React Start, Router, and Query together with server functions and SSR-safe data loading."
+    ],
+    "brandColor": "#0F172A",
+    "composerIcon": "./assets/tanstack-small.svg",
+    "logo": "./assets/tanstack.png"
+  }
+}

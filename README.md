@@ -5,6 +5,8 @@ This directory contains reusable skills, repo-local plugins, and project maintai
 ## Plugins
 - `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, GitHub workflows, and Yeet around the shared `ghops` CLI, with host `gh` required for GitHub-backed operations.
   Bundled skills: `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
+- `plugins/tanstack/` — Bundled TanStack React install surface for Query, Router, Start, and cross-stack integration guidance, biased toward current TanStack React APIs and official skill surfaces when available.
+  Bundled skills: `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-integration`.
 
 ## Skills
 - `skills/skill-cli-creator/` — Build host-aware embedded CLIs that live inside a skill or plugin, run from `scripts/`, and can grow into a maintenance-only project at `projects/<tool>/`.
@@ -33,6 +35,10 @@ GitHub-backed commands run. Use
 `plugins/gitstack/skills/github/references/core/installation.md` for the
 cross-platform install paths and `command -v gh && gh --version` to confirm the
 binary is on `PATH`.
+
+For TanStack React application work, install the repo-local `plugins/tanstack/`
+plugin to get the bundled Query, Router, Start, and integration skills from one
+surface instead of copying advice piecemeal from mixed community sources.
 
 For a global local-plugin install from this repo, run `./link.sh`. It keeps
 the existing skill symlink behavior, creates per-plugin symlinks under

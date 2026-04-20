@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start"
+  short_description: "Review and refactor TanStack Start apps for execution-model correctness, server functions, middleware, and SSR safety."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#DC2626"
+  default_prompt: "Use the bundled TanStack Start skill to review or implement server functions, execution-model boundaries, middleware, auth, environment handling, and SSR-safe TanStack Start patterns."

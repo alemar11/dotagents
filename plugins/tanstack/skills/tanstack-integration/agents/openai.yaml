@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Integration"
+  short_description: "Review how TanStack Query, Router, and Start compose around QueryClient ownership, loaders, and SSR hydration."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#059669"
+  default_prompt: "Use the bundled TanStack Integration skill to wire or review QueryClient ownership, loader prefetch with ensureQueryData, useSuspenseQuery reads, and SSR dehydration or hydration across TanStack Query, Router, and Start."

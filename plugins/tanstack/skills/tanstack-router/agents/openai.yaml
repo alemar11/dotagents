@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router"
+  short_description: "Review and refactor TanStack Router usage for typed routes, search params, loaders, and code splitting."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#7C3AED"
+  default_prompt: "Use the bundled TanStack Router skill to review or implement route registration, validated search params, loaders, beforeLoad auth, navigation, and lazy route structure."
