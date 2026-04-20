@@ -1,6 +1,6 @@
 use crate::config::RuntimeContext;
 use anyhow::Result;
-use postgresql_embedded::{PostgreSQL, SettingsBuilder, VersionReq};
+use postgresql_embedded::{LATEST, PostgreSQL, SettingsBuilder};
 use serde::Serialize;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -44,7 +44,7 @@ async fn ensure_managed_binary_dir(skill_root: &Path) -> Result<PathBuf> {
         .unwrap_or_else(|_| skill_root.join(".managed-postgresql"));
     let settings = SettingsBuilder::new()
         .installation_dir(install_root)
-        .version(VersionReq::parse("=16").expect("valid version"))
+        .version(LATEST.clone())
         .temporary(true)
         .timeout(Some(std::time::Duration::from_secs(30)))
         .build();

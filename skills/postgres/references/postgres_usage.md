@@ -138,7 +138,7 @@ Doctor success:
     "url_source": "config"
   },
   "managed_tools": {
-    "binary_dir": "/path/to/.managed-postgresql/16/bin",
+    "binary_dir": "/path/to/.managed-postgresql/<version>/bin",
     "pg_dump": true,
     "pg_restore": true,
     "source": "managed"
