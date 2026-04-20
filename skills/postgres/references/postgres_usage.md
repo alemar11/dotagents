@@ -8,10 +8,9 @@ command surface.
 - `./scripts/postgres` is the only supported runtime entrypoint.
 - The CLI is implemented in Rust under `../projects/postgres/`.
 - Normal query / inspection paths use Rust-native PostgreSQL access.
-- Dump / restore / schema-diff paths always bootstrap managed PostgreSQL
-  binaries automatically.
-- Homebrew and local `PATH` PostgreSQL client tools are not part of the runtime
-  contract anymore.
+- Tool-backed paths (`schema diff`, dump, and non-SQL restore) use either:
+  - `DB_PG_BIN_DIR` when explicitly set and valid
+  - otherwise managed PostgreSQL binaries from the embedded cache
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 
 ## Prerequisites
@@ -28,6 +27,16 @@ command surface.
 Doctor:
 ```sh
 DB_PROJECT_ROOT=/path/to/project ./scripts/postgres --json doctor
+```
+
+Tooling status:
+```sh
+./scripts/postgres --json tools status
+```
+
+Tooling install:
+```sh
+./scripts/postgres --json tools install
 ```
 
 Bootstrap and save a profile:
@@ -71,6 +80,12 @@ DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local \
   ./scripts/postgres profile test
 ```
 
+Schema diff with explicit host tools:
+```sh
+DB_PG_BIN_DIR=/path/to/bin \
+  ./scripts/postgres schema diff local staging
+```
+
 Schema introspection:
 ```sh
 DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local \
@@ -111,8 +126,10 @@ Rules:
 
 Contract:
 
-- `doctor` returns a runtime-status object with `application_name`, `runtime`,
-  and `managed_tools`.
+- `doctor` returns `application_name`, `runtime`, and `tooling`.
+- `tools status` returns the shared tooling-status object only.
+- `tools install` provisions managed tools and returns the same tooling-status
+  object after installation.
 - `profile` commands return profile- or connection-specific objects such as the
   resolved runtime context or `{ "status": "ok", ... }` for connection checks.
 - `query` commands return query-specific objects such as
@@ -137,11 +154,33 @@ Doctor success:
     "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
     "url_source": "config"
   },
-  "managed_tools": {
-    "binary_dir": "/path/to/.managed-postgresql/<version>/bin",
-    "pg_dump": true,
-    "pg_restore": true,
-    "source": "managed"
+  "tooling": {
+    "active_backend": "managed",
+    "host": {
+      "configured_dir": null,
+      "valid": false,
+      "pg_dump": {
+        "path": null,
+        "present": false,
+        "executable": false
+      },
+      "pg_restore": {
+        "path": null,
+        "present": false,
+        "executable": false
+      },
+      "error": null
+    },
+    "managed": {
+      "root": "<user-cache-dir>/dotagents/skills/postgres/postgresql",
+      "version_requirement": "*",
+      "expected_version": "18.0.0",
+      "binary_dir": "<user-cache-dir>/dotagents/skills/postgres/postgresql/18.0.0/bin",
+      "matching_installed_version": "18.0.0",
+      "stale_installed_versions": ["17.6.0"],
+      "error": null
+    },
+    "would_download": false
   }
 }
 ```
@@ -203,7 +242,11 @@ Project-root precedence:
 ## Canonical commands
 
 - `doctor`
-  - Check config resolution and managed-tools readiness.
+  - Check config resolution and tooling status without provisioning downloads.
+- `tools status`
+  - Inspect the local Postgres tool backend without requiring DB config.
+- `tools install`
+  - Explicitly provision the managed PostgreSQL backend.
 - `profile resolve`
   - Show active profile / URL / source.
 - `profile bootstrap [--save]`
@@ -240,10 +283,19 @@ Project-root precedence:
 
 For dump / restore / schema diff:
 
-- The CLI always bootstraps and uses managed PostgreSQL binaries under the
-  skill directory or `DB_MANAGED_PG_DIR`.
-- This is intentional: the runtime should not depend on `brew install
-  postgresql` or local `PATH` tooling.
+- `DB_PG_BIN_DIR` is the only supported host-tools override.
+- If `DB_PG_BIN_DIR` is unset, the CLI uses managed PostgreSQL binaries.
+- Default managed root:
+  `<user-cache-dir>/dotagents/skills/postgres/postgresql`
+- Example resolved roots:
+  - macOS: `~/Library/Caches/dotagents/skills/postgres/postgresql`
+  - Linux: `~/.cache/dotagents/skills/postgres/postgresql`
+  - Windows: `%LOCALAPPDATA%\\dotagents\\skills\\postgres\\postgresql`
+- `DB_MANAGED_PG_DIR` overrides the managed root only.
+- `doctor` and `tools status` are read-only and never provision binaries.
+- `tools install` provisions the managed backend explicitly.
+- Tool-backed commands still provision managed tools on demand when host tools
+  are not selected.
 
 ## Scratch validation guidance
 

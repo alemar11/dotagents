@@ -23,6 +23,7 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Doctor,
+    Tools(ToolsCommand),
     Profile(ProfileCommand),
     Query(QueryCommand),
     Activity(ActivityCommand),
@@ -30,6 +31,18 @@ pub enum Command {
     Dump(DumpCommand),
     Migration(MigrationCommand),
     Docs(DocsCommand),
+}
+
+#[derive(Debug, Args)]
+pub struct ToolsCommand {
+    #[command(subcommand)]
+    pub command: ToolsSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ToolsSubcommand {
+    Status,
+    Install,
 }
 
 #[derive(Debug, Args)]

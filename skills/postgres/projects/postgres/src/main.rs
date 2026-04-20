@@ -11,7 +11,9 @@ use postgres_skill_cli::db::{
 use postgres_skill_cli::docs;
 use postgres_skill_cli::migration::{apply_release, build_release_plan};
 use postgres_skill_cli::output::{print_json, render_table};
-use postgres_skill_cli::tooling::{ToolBackend, ensure_backend};
+use postgres_skill_cli::tooling::{
+    ToolBackend, ensure_backend, install_managed_tools, tooling_status,
+};
 use postgresql_commands::pg_dump::PgDumpBuilder;
 use postgresql_commands::pg_restore::PgRestoreBuilder;
 use postgresql_commands::{CommandBuilder, CommandExecutor};
@@ -50,6 +52,7 @@ async fn run(cli: &Cli) -> Result<()> {
 
     match &cli.command {
         Command::Doctor => doctor(&cli, skill_root).await,
+        Command::Tools(command) => tools(&cli, command).await,
         Command::Profile(command) => profile(&cli, command, skill_root).await,
         Command::Query(command) => query(&cli, command, skill_root).await,
         Command::Activity(command) => activity(&cli, command, skill_root).await,
@@ -108,21 +111,31 @@ async fn doctor(cli: &Cli, skill_root: &Path) -> Result<()> {
         Err(_) => None,
     };
 
-    let tools = if let Some(ctx) = &runtime_info {
-        Some(ensure_backend(ctx, skill_root).await?.status())
-    } else {
-        None
-    };
+    let tools = tooling_status().await?;
 
     let output = json!({
         "application_name": application_name(),
         "runtime": runtime_info,
-        "managed_tools": tools,
+        "tooling": tools,
     });
     if cli.json {
         print_json(&output)
     } else {
         println!("{}", serde_json::to_string_pretty(&output)?);
+        Ok(())
+    }
+}
+
+async fn tools(cli: &Cli, command: &ToolsCommand) -> Result<()> {
+    let payload = match &command.command {
+        ToolsSubcommand::Status => serde_json::to_value(tooling_status().await?)?,
+        ToolsSubcommand::Install => serde_json::to_value(install_managed_tools().await?)?,
+    };
+
+    if cli.json {
+        print_json(&payload)
+    } else {
+        println!("{}", serde_json::to_string_pretty(&payload)?);
         Ok(())
     }
 }
@@ -606,8 +619,8 @@ async fn schema_diff(cli: &Cli, skill_root: &Path, args: &SchemaDiffArgs) -> Res
         },
         skill_root,
     )?;
-    let dump_a = dump_schema_to_string(skill_root, &ctx_a).await?;
-    let dump_b = dump_schema_to_string(skill_root, &ctx_b).await?;
+    let dump_a = dump_schema_to_string(&ctx_a).await?;
+    let dump_b = dump_schema_to_string(&ctx_b).await?;
     let diff = similar::TextDiff::from_lines(&dump_a, &dump_b)
         .unified_diff()
         .header(&ctx_a.profile_name, &ctx_b.profile_name)
@@ -648,7 +661,7 @@ async fn dump_schema(
             PathBuf::from(format!("data_{profile}_{timestamp}.dump"))
         }
     };
-    let backend = ensure_backend(&ctx, skill_root).await?;
+    let backend = ensure_backend().await?;
     run_dump(&ctx, &backend, &output, schema_only)?;
     if cli.json {
         print_json(&json!({ "output": output, "schema_only": schema_only }))
@@ -675,7 +688,7 @@ async fn dump_restore(cli: &Cli, skill_root: &Path, args: &RestoreArgs) -> Resul
         let sql = fs::read_to_string(&args.input)?;
         db.execute(&sql).await?;
     } else {
-        let backend = ensure_backend(&ctx, skill_root).await?;
+        let backend = ensure_backend().await?;
         run_restore(&ctx, &backend, &args.input)?;
     }
     if cli.json {
@@ -686,11 +699,8 @@ async fn dump_restore(cli: &Cli, skill_root: &Path, args: &RestoreArgs) -> Resul
     }
 }
 
-async fn dump_schema_to_string(
-    skill_root: &Path,
-    ctx: &postgres_skill_cli::config::RuntimeContext,
-) -> Result<String> {
-    let backend = ensure_backend(ctx, skill_root).await?;
+async fn dump_schema_to_string(ctx: &postgres_skill_cli::config::RuntimeContext) -> Result<String> {
+    let backend = ensure_backend().await?;
     let builder = pg_dump_builder(ctx, &backend)
         .schema_only()
         .no_owner()

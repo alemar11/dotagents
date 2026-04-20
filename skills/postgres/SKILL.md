@@ -26,6 +26,10 @@ patterns, and manage migration release flow from one canonical CLI:
 
 - Doctor / setup status:
   - `DB_PROJECT_ROOT=/path/to/repo ./scripts/postgres --json doctor`
+- Local tool backend status:
+  - `./scripts/postgres --json tools status`
+- Install managed PostgreSQL tools explicitly:
+  - `./scripts/postgres --json tools install`
 - Bootstrap and save a profile:
   - `DB_PROJECT_ROOT=/path/to/repo ./scripts/postgres profile bootstrap --save`
 - Resolve the active connection:
@@ -74,8 +78,8 @@ patterns, and manage migration release flow from one canonical CLI:
 3) Execute and report:
    - Return the answer first, then only the supporting context needed to trust
      it.
-   - Be explicit when an operation uses managed PostgreSQL client tools for
-     dump / restore / diff behavior.
+   - Be explicit when an operation uses host tools from `DB_PG_BIN_DIR` versus
+     managed PostgreSQL client tools for dump / restore / diff behavior.
 4) Persist only if asked:
    - Update `config.toml` only with explicit user approval, except canonical
      config migration plus explicit profile bootstrap / `set-ssl` flows.
@@ -86,7 +90,13 @@ patterns, and manage migration release flow from one canonical CLI:
 ## Command map
 
 - `doctor`
-  - Validate config resolution, runtime readiness, and managed-tools status.
+  - Validate config resolution and report tool-backend status without
+    provisioning downloads.
+- `tools status`
+  - Report the local PostgreSQL tool-backend status without requiring DB
+    config.
+- `tools install`
+  - Explicitly provision the managed PostgreSQL tool backend.
 - `profile resolve`
   - Show the active URL / profile / source.
 - `profile bootstrap [--save]`
@@ -259,10 +269,13 @@ Rules:
   - `./scripts/postgres --help`
   - `./scripts/postgres --version`
   - `DB_PROJECT_ROOT=/path/to/repo ./scripts/postgres --json doctor`
+- When a change touches tool-backed behavior, also verify:
+  - `./scripts/postgres --json tools status`
 - Keep config migration one-way from legacy `postgres.toml` to canonical
   `config.toml`.
-- Route dump / restore / schema diff through the managed PostgreSQL backend
-  only. Do not restore PATH probing or persisted binary-dir config.
+- Route dump / restore / schema diff through either explicit `DB_PG_BIN_DIR`
+  host tools or the managed PostgreSQL backend. Do not restore PATH probing or
+  persisted binary-dir config.
 
 ## Usage references
 

@@ -20,6 +20,7 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 - Verify help: `skills/postgres/scripts/postgres --help`
 - Verify version: `skills/postgres/scripts/postgres --version`
 - Verify JSON doctor: `DB_PROJECT_ROOT=/path/to/repo skills/postgres/scripts/postgres --json doctor`
+- Verify tooling status: `skills/postgres/scripts/postgres --json tools status`
 
 ## Semver policy
 
@@ -32,14 +33,14 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 ## Safe maintenance
 
 - Keep the CLI contract stable around the top-level nouns:
-  `doctor`, `profile`, `query`, `activity`, `schema`, `dump`, `migration`,
-  and `docs`.
+  `doctor`, `tools`, `profile`, `query`, `activity`, `schema`, `dump`,
+  `migration`, and `docs`.
 - Prefer adding behavior in Rust over reintroducing per-task shell wrappers.
 - Keep config migration one-way from legacy `postgres.toml` to canonical
   `config.toml`; do not reintroduce writes to the legacy path.
 - If a feature needs PostgreSQL client tools, route it through the managed
-  tool backend only. Do not restore PATH probing or persisted binary-dir
-  config.
+  backend or the explicit `DB_PG_BIN_DIR` host override only. Do not restore
+  PATH probing or persisted binary-dir config.
 - Rebuild `../../scripts/postgres` after any change that affects runtime
   behavior or operator-facing output, then verify through that shipped artifact
   rather than `target/` binaries.

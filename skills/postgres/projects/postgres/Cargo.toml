@@ -16,6 +16,7 @@ dirs = "6.0.0"
 rustls = "0.23.35"
 rustls-native-certs = "0.8.2"
 postgresql_commands = "0.20.2"
+postgresql_archive = { version = "0.20.2", default-features = false, features = ["github", "rustls", "sha2", "tar-gz", "theseus"] }
 postgresql_embedded = { version = "0.20.2", features = ["tokio", "rustls"] }
 regex = "1.12.2"
 reqwest = { version = "0.12.24", default-features = false, features = ["brotli", "deflate", "gzip", "http2", "json", "rustls-tls"] }

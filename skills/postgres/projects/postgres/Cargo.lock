@@ -1713,6 +1713,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "dirs",
+ "postgresql_archive",
  "postgresql_commands",
  "postgresql_embedded",
  "pretty_assertions",
