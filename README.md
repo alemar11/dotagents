@@ -15,7 +15,7 @@ This directory contains reusable skills, repo-local plugins, and project maintai
 - `skills/plan-harder/` — Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
 - `skills/learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
 - `skills/postgres/` — Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns.
-- `skills/skill-audit/` — Audit installed Codex skills, plugin packages, and bundled plugin skills using repo evidence, memory, sessions, and current context to plan updates, merges, or disables.
+- `skills/skill-audit/` — Audit installed Codex skills, plugin packages, and bundled plugin skills using repo evidence, memory, sessions, and current context to plan updates, additions, merges, or disables.
 - `skills/swift-api-design/` — Design or review Swift APIs using curated local summaries and a bundled upstream copy of the official Swift API Design Guidelines.
 - `skills/swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
 
