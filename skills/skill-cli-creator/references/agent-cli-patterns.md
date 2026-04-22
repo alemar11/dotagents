@@ -17,6 +17,7 @@ Keep one shared owner model:
 ## Path vocabulary
 
 - `owner root`: the directory from which canonical executable examples run
+- `project root`: the root of the consuming workspace or repository where local operator config is stored; this is distinct from the `owner root`
 - `artifact path`: the owner-root-relative shipped runnable artifact, usually `scripts/<tool>` or `scripts/<tool>.<ext>`
 - `public runtime noun`: optional shorthand such as `<tool>` only when the owning docs explicitly define how that command becomes executable
 
@@ -163,7 +164,7 @@ Rules:
 - `schema_version` is the config format version
 - owner-wide settings live only in explicitly documented shared sections such as `[defaults]`, `[auth]`, or `[profiles]`
 - `[tools.<tool>]` stores tool-specific persisted settings
-- when multiple CLIs share one `config.toml`, each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it explicitly owns
+- when multiple CLIs share one `config.toml`, each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it uniquely owns as the documented single writer
 - `[meta]` is optional provenance only
 - do not use top-level `version` as normative config state
 - do not require per-tool version fields
@@ -298,7 +299,7 @@ Rules:
 
 Include JSON shape notes only when Codex needs them to choose the next command.
 
-Add a `CLI Maintenance` section in the owning runtime docs when the tool has a maintained implementation behind `<artifact-path>`. That section should say:
+Add a `CLI Maintenance` section in the owning runtime docs for every embedded CLI. That section should say:
 
 - normal runtime work stays on `<artifact-path>`
 - `projects/<tool>/` is for bug fixes, performance work, rebuilds, and feature additions
@@ -306,3 +307,4 @@ Add a `CLI Maintenance` section in the owning runtime docs when the tool has a m
 - compiled outputs in `target/`, `dist/`, virtualenvs, or similar paths are build intermediates rather than supported runtime entrypoints
 - project-local generated state should be ignored through `projects/<tool>/.gitignore`
 - the CLI follows semver from one declared version source of truth
+- when a bundled skill points to a plugin-shared CLI, introduce the execution context explicitly before the command, such as `From the plugin root, run ...`

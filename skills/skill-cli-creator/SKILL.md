@@ -11,6 +11,8 @@ Build for embedded host use only. Do not use this skill for standalone global CL
 
 ## Start
 
+This skill assumes the owning skill or plugin already exists. If the host does not exist yet, scaffold it first with [$skill-creator](/Users/alessandro/.codex/skills/.system/skill-creator/SKILL.md) or [$plugin-creator](/Users/alessandro/.codex/skills/.system/plugin-creator/SKILL.md), then return here once the host boundary is real.
+
 Name the host, the CLI source material, and the first real jobs it should do:
 
 - Host mode: `skill` or `plugin`
@@ -20,7 +22,7 @@ Name the host, the CLI source material, and the first real jobs it should do:
 - CLI/tool name: the runtime command name that will own `scripts/<tool>` and, when needed, the maintenance-only build project at `projects/<tool>/`
 - Source: API docs, OpenAPI JSON, SDK docs, curl examples, browser app, existing internal script, article, or working shell history
 - Jobs: literal reads and writes such as `list drafts`, `download failed job logs`, `search messages`, `upload media`, `read queue schedule`
-- Artifact path: the shipped runnable artifact path such as `scripts/ci-logs`, `scripts/slack-cli`, or `skills/example/scripts/buildkite-logs`
+- Artifact path: the shipped runnable artifact path such as `scripts/ci-logs`, `scripts/slack-cli`, or `scripts/buildkite-logs`
 
 Choose the host owner and the CLI/tool name independently by default. Reuse the skill or plugin name only when it is intentionally the clearest runtime command name.
 
@@ -32,6 +34,7 @@ Resolve these terms before writing commands or examples:
   - for `host=skill`: `<skill-root>`
   - for `host=plugin` when exactly one bundled skill owns the CLI: `<plugin-root>/skills/<skill>`
   - for `host=plugin` when the CLI is shared: `<plugin-root>`
+- `project root`: the root of the consuming workspace or repository where local operator config is stored; this is distinct from the `owner root`
 - `artifact path`: the owner-root-relative path to the shipped runnable artifact, usually `scripts/<tool>` or `scripts/<tool>.<ext>`
 - `public runtime noun`: optional shorthand such as `<tool>` only when the host docs explicitly define a wrapper, alias, or PATH setup that makes that form executable
 
@@ -108,12 +111,13 @@ After promotion, document one deterministic read path and do not silently read b
 - `.plugins/<plugin>/skills/<skill>/config.toml`
 - `.plugins/<plugin>/config.toml`
 
-Promotion is a storage migration, not a permanent dual-read fallback:
+Promotion changes both the config namespace and the canonical executable surface, not just storage:
 
 - normal read commands must use only the new config path
-- a one-time import from the old config path is allowed only during an explicit mutating flow such as `init`, `login`, `configure`, or `migrate-config`
-- only perform that import when the new config path is absent
-- preserve only the CLI-owned `[tools.<tool>]` subtree plus any shared section that the CLI explicitly owns
+- owning docs must update executable examples from the old artifact path to the new artifact path in the same rollout
+- the promoted CLI should handle any old-to-new config import during an explicit mutating flow such as `init`, `login`, `configure`, or `migrate-config`
+- preserve only the CLI-owned `[tools.<tool>]` subtree plus any shared section that the CLI uniquely owns
+- if the new config file already exists, import or merge only keys that are still absent; never silently overwrite existing keys in the new file
 - update ignore rules for the new config path in the same rollout
 
 Treat plugin-root `scripts/` as a repository convention supported by this skill, not as an officially documented Codex plugin manifest component.
@@ -171,6 +175,7 @@ Keep these invariants explicit in the host docs and CLI docs:
 - in user-facing skill docs, examples, and runbooks, make executable examples use `<artifact-path> ...` unless the host docs explicitly define a wrapper, alias, or PATH contract for bare `<tool> ...`
 - bare `<tool> ...` can appear only as optional shorthand after that executable contract is documented
 - do not tell bundled skills to run `scripts/<tool>` unless that path is actually the artifact path from that skill's `owner root`
+- when a bundled skill documents a plugin-shared CLI that runs from `<plugin-root>`, introduce that execution context explicitly before the command, such as `From the plugin root, run <artifact-path> ...`
 
 For detailed command-shape, runtime-surface, JSON, and host-owned examples, read [references/agent-cli-patterns.md](references/agent-cli-patterns.md).
 
@@ -235,7 +240,7 @@ Rules:
 - `schema_version` is the config format version and the only required version field
 - owner-wide settings live only in explicitly documented shared sections such as `[defaults]`, `[auth]`, or `[profiles]`
 - `[tools.<tool>]` stores tool-specific persisted settings
-- when multiple CLIs share one `config.toml`, each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it explicitly owns
+- when multiple CLIs share one `config.toml`, each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it uniquely owns as the documented single writer
 - `[meta]` is optional provenance only and must not drive runtime behavior
 - do not require top-level `version`
 - do not require `tools.<tool>.version`
@@ -243,12 +248,13 @@ Rules:
 
 ## Config Migrations
 
-Promotion from plugin single-skill ownership to plugin-shared ownership is a storage migration:
+Promotion from plugin single-skill ownership to plugin-shared ownership changes both config storage and the canonical artifact path:
 
 - normal read commands must use only the new config path under `.plugins/<plugin>/config.toml`
-- a one-time import from `.plugins/<plugin>/skills/<skill>/config.toml` is allowed only during an explicit mutating flow such as `init`, `login`, `configure`, or `migrate-config`
-- only import when the new config file is absent
-- preserve the CLI-owned `[tools.<tool>]` subtree plus any shared section that the CLI explicitly owns
+- update owning docs and examples to the new artifact path under the plugin root in the same rollout
+- the promoted CLI should handle any old-to-new import from `.plugins/<plugin>/skills/<skill>/config.toml` only during an explicit mutating flow such as `init`, `login`, `configure`, or `migrate-config`
+- if `.plugins/<plugin>/config.toml` already exists, import or merge only keys that are still absent and never silently overwrite existing keys
+- preserve the CLI-owned `[tools.<tool>]` subtree plus any shared section that the CLI uniquely owns as the documented single writer
 - keep ignore rules aligned with the new canonical path in the same rollout
 
 ## CLI Versioning
@@ -313,7 +319,7 @@ Document the JSON policy in the owning skill docs, plugin docs, or reference fil
 Support the boring paths first, in this precedence order:
 
 1. environment variable using the service's standard name, such as `GITHUB_TOKEN`
-2. project-local config under the owner-specific `config.toml` when env-only auth is painful
+2. project-local config under the owner-specific `config.toml` for repeated local use when env-only auth is painful
 3. `--api-key` or a tool-specific token flag only for explicit one-off tests
 
 Never print full tokens. `doctor --json` should say whether a token is available, the auth source category (`flag`, `env`, `config`, provider default, or missing), and what setup step is missing.
@@ -431,6 +437,7 @@ After the embedded CLI works, update the owning skill docs or plugin docs so fut
 Add a `CLI Maintenance` section to the owning runtime docs. Require that section to:
 
 - keep normal execution on `<artifact-path>`
+- when a bundled skill points to a plugin-shared CLI, introduce the execution context explicitly before the command, such as `From the plugin root, run ...`
 - tell future threads to open `projects/<tool>/` only when fixing bugs, improving performance, rebuilding, or extending the CLI
 - direct maintenance changes into `projects/<tool>/` when it exists, then rebuild the shipped artifact at `<artifact-path>` and re-verify through that artifact
 - mention the version source of truth and the expectation that shipped CLI changes follow semver
