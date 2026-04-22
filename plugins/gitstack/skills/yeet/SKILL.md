@@ -1,6 +1,6 @@
 ---
 name: yeet
-description: Orchestrate the full publish flow from a local checkout by choosing branch strategy, using bundled `git-commit` for intentional commits, pushing, and handing off to bundled `github` plus the shared `ghops` CLI for draft PR opening or reuse against the right base branch.
+description: Orchestrate the full publish flow from a local checkout by using `git` for branch and push work, bundled `git-commit` for commit discipline, and bundled `github` plus shared `ghflow` publish helpers only where repo-aware PR orchestration is justified.
 ---
 
 # Yeet
@@ -15,10 +15,9 @@ Inside `gitstack`, this skill is intentionally composed:
 
 - `git-commit` owns selective staging, commit authoring, and post-commit
   verification.
-- `github` owns publish-context inspection plus PR opening or reuse after the
-  branch is ready or pushed.
-- `ghops` is the shared runtime for publish-context and
-  publish-open operations.
+- `github` owns already-pushed-branch PR lifecycle work.
+- `ghflow` is the shared helper for publish-context and
+  publish-open operations that multiple GitStack skills reuse.
 
 Keep v1 intentionally narrow:
 
@@ -47,11 +46,12 @@ Keep v1 intentionally narrow:
    - Start with `git status -sb`.
    - Resolve the current branch, detached-HEAD state, and whether you are still
      on the repository default branch.
-   - Run `ghops --json publish context` from the target
+   - Run `ghflow --json publish context` from the target
      repo root before creating branches, commits, or pushes that are intended
      to end in a PR.
-   - Use `ghops --json doctor` only when `gh` install,
-     auth, or general runtime readiness is uncertain.
+   - If `git` or `gh` readiness is uncertain, confirm it directly with
+     `command -v git`, `git --version`, `command -v gh`, `gh --version`, and
+     `gh auth status`.
 2. Pick branch strategy.
    - If on the repo default branch or detached `HEAD`, create a new short-lived
      branch before staging and treat the repo default branch as the PR base.
@@ -71,7 +71,7 @@ Keep v1 intentionally narrow:
    - Otherwise use `git push origin <branch>`.
 6. Open or reuse the draft PR.
    - Hand off to `github` for publish-context inspection plus current-branch PR
-     opening or reuse through `ghops publish open`.
+     opening or reuse through `ghflow publish open`.
    - If step 2 captured an explicit PR base, pass it with `--base <branch>`
      instead of letting the helper fall back to the repository default branch.
    - Let `github` reuse an existing open PR for the current branch
@@ -90,7 +90,7 @@ Keep v1 intentionally narrow:
   `release/*`; branch off it and keep that branch as the PR base.
 - Never push without confirming scope when the worktree is mixed.
 - Never start branch, commit, or push mutations for a PR-intended flow until
-  `ghops --json publish context` has passed from the
+  `ghflow --json publish context` has passed from the
   target repo root.
 - Default to a draft PR unless the user explicitly asks for a ready PR.
 - Stop if the repo is not connected to an accessible same-repo GitHub remote.
@@ -103,6 +103,8 @@ Keep v1 intentionally narrow:
   surrounding publish flow.
 - Use `github` directly when the branch is already pushed and the only
   remaining step is PR opening or reuse.
+- Use plain `git` and `gh` directly for one-off branch or PR tasks that do not
+  need the full publish orchestration.
 - Use `references/workflows.md` for the full local-checkout publish sequence.
 
 ## Examples

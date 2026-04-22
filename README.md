@@ -3,7 +3,7 @@
 This directory contains reusable skills, repo-local plugins, and project maintainer skills—task-specific packages of instructions, resources, and optional scripts that help agents follow workflows reliably.
 
 ## Plugins
-- `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, GitHub workflows, and Yeet around the shared `ghops` CLI, with host `gh` required for GitHub-backed operations.
+- `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, git/gh-first GitHub workflows, and Yeet, with shared `ghflow` helpers reserved for review-thread routing, authenticated-user stars and star lists, and current-branch publish flows.
   Bundled skills: `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
 - `plugins/tanstack/` — Bundled TanStack React install surface for Query, Router, Start, and cross-stack integration guidance, biased toward current TanStack React APIs and official skill surfaces when available.
   Bundled skills: `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-integration`.
@@ -30,11 +30,15 @@ The preferred full-stack surface for linked git + GitHub workflows is the
 repo-local `plugins/gitstack/` plugin, registered through
 `.agents/plugins/marketplace.json`.
 
-`plugins/gitstack/` expects GitHub CLI `gh` to be installed on the host before
-GitHub-backed commands run. Use
+`plugins/gitstack/` expects both `git` and GitHub CLI `gh` to be installed on
+the host before GitHub-backed commands run. Use
 `plugins/gitstack/skills/github/references/core/installation.md` for the
-cross-platform install paths and `command -v gh && gh --version` to confirm the
-binary is on `PATH`.
+cross-platform install paths and:
+
+- `command -v git && git --version`
+- `command -v gh && gh --version`
+
+to confirm both binaries are on `PATH`.
 
 For TanStack React application work, install the repo-local `plugins/tanstack/`
 plugin to get the bundled Query, Router, Start, and integration skills from one

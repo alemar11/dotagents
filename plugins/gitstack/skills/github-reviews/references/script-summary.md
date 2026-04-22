@@ -1,20 +1,14 @@
 # GitHub review command summary
 
-Use this as the authoritative reviews-domain `ghops` command map referenced by
-the bundled `github` skill.
+Use this as the authoritative reviews-domain command map referenced by the
+bundled `github-reviews` skill.
 
-## Fast picks
+## Direct `gh` first
 
-- Review-thread triage: `ghops reviews address`
-- Top-level PR comment follow-up: `ghops reviews comment`
-- PR conversation reads: `ghops reviews comments`
-- PR review-comment reads: `ghops reviews review-comments`
-- Review submission: `ghops reviews review`
+- `gh pr comment <n> --repo <owner/repo> --body <text>`
+- `gh pr review <n> --repo <owner/repo> --approve`
+- `gh pr review <n> --repo <owner/repo> --request-changes --body <text>`
 
-## Commands
+## Shared `ghflow` helper kept in reviews
 
-- `ghops reviews address`
-- `ghops reviews comment`
-- `ghops reviews comments`
-- `ghops reviews review-comments`
-- `ghops reviews review`
+- `ghflow reviews address`

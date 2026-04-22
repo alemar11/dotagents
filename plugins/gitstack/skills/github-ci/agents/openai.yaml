@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub CI"
-  short_description: "Use the shared ghops CLI for PR checks and generic GitHub Actions investigation."
+  short_description: "Use plain `gh` for PR checks and Actions inspection; this skill is guidance-first and does not rely on a dedicated `ghflow` CI surface."
   brand_color: "#4338CA"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub CI skill through the shared ghops CLI for PR checks, Actions runs, and log-oriented failure triage."
+  default_prompt: "Use the bundled GitHub CI skill to prefer direct `gh` commands for PR checks and Actions inspection, keep PR-associated runs on `gh pr checks`, and use `gh run ...` for generic run investigation."

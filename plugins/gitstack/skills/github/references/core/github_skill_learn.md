@@ -1,12 +1,12 @@
 # GitHub Skill Learn
 
 Use this reference when repeated runtime GitHub work uncovers a pattern that
-may deserve promotion into a durable `ghops` command improvement, routing rule,
+may deserve promotion into a durable `ghflow` command improvement, routing rule,
 or reference update.
 
-## Improve an existing `ghops` command when
+## Improve an existing `ghflow` command when
 
-- The repeated workflow already overlaps a current `ghops` noun/verb.
+- The repeated workflow already overlaps a current `ghflow` noun/verb.
 - The gap is about CLI flag drift, repo resolution, retries, output shape, or
   another natural extension of the current command.
 - Extending the command keeps its interface focused instead of turning it into
@@ -20,7 +20,7 @@ or reference update.
   sessions.
 - The workflow is generic to GitHub repositories rather than tied to one repo's
   labels, branch naming, or org policy.
-- A `ghops` command would materially improve speed, safety, or reuse compared
+- A `ghflow` command would materially improve speed, safety, or reuse compared
   with replaying raw `gh` commands by hand.
 - No existing command is a clean fit without blurring its responsibility.
 - The command can expose a small, explicit interface and use the shared
@@ -30,7 +30,7 @@ or reference update.
 
 - The learning changes command routing, the fast pick, or another runtime
   decision point.
-- Users need the correction before they choose between raw `gh` and a `ghops`
+- Users need the correction before they choose between raw `gh` and a `ghflow`
   command.
 - The workflow should become part of the standard runtime path for future runs.
 
@@ -52,7 +52,7 @@ or reference update.
 
 ## Packaging rules
 
-- Prefer improving an existing `ghops` command before adding a new one.
+- Prefer improving an existing `ghflow` command before adding a new one.
 - Keep commands repository-scoped; do not expand this runtime skill toward
   organization-level mutations.
 - Favor explicit flags, predictable output, and one clear job per command.
@@ -65,18 +65,19 @@ or reference update.
 
 ## Current promoted learnings
 
-- Release creation now uses dedicated `ghops releases plan|notes|create`
-  commands with explicit notes strategy handling.
-- `gh pr edit` may require `read:project`; `ghops prs update` should
-  stay the fallback for title/body/base-only updates when that scope is
-  missing.
+- Release creation should stay `git`/`gh`-first; prefer explicit `gh release`
+  and `gh api repos/.../releases/generate-notes` flows over rebuilding thin
+  wrappers in `ghflow`.
+- `gh pr edit` may require `read:project`; when the change is only
+  title/body/base, prefer a narrow `gh api -X PATCH repos/.../pulls/...`
+  fallback instead of growing a dedicated wrapper surface.
 - Generic Actions triage is not always PR-based; keep that split in the `ci`
   domain and reserve `gh pr checks` for PR-associated runs.
 - Repo resolution from git remotes must strip the trailing `.git`, and shared
   repo normalization should live in the project implementation rather than
   diverging per command.
-- Label-related command help and docs must stay aligned with the shipped
-  `ghops --help` behavior.
-- New runtime-command proposals should first answer: can an existing `ghops`
+- `ghflow` should stay limited to shared higher-level helpers such as publish
+  context, review-thread routing, and authenticated-user stars or star lists.
+- New runtime-command proposals should first answer: can an existing `ghflow`
   command absorb this cleanly, or is a new focused command the better reusable
   match?

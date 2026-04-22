@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub Releases"
-  short_description: "Use the shared ghops CLI for release planning, notes generation, and release publication."
+  short_description: "Use plain `git` and `gh` for release-backed tags, notes generation, and publication; this skill is guidance-first and does not rely on a dedicated `ghflow` release surface."
   brand_color: "#B45309"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub Releases skill through the shared ghops CLI for release planning, notes generation, and release publication without guessing target refs."
+  default_prompt: "Use the bundled GitHub Releases skill to prefer direct `git` and `gh` commands for release-backed tag planning, notes generation, and publication without guessing target refs."

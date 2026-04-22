@@ -17,11 +17,12 @@ silently broadening scope.
 ### Operator policy
 
 - Start with `git status -sb`.
-- Run `ghops --json publish context` from the target repo
+- Run `ghflow --json publish context` from the target repo
   root before creating branches, commits, or pushes that are intended to end in
   a PR.
-- Use `ghops --json doctor` only when `gh` install, auth,
-  or general runtime readiness is uncertain.
+- If `git` or `gh` readiness is uncertain, confirm it directly with
+  `command -v git`, `git --version`, `command -v gh`, `gh --version`, and
+  `gh auth status`.
 - If the worktree contains unrelated changes, do not default to `git add -A`.
 - If on the default branch or detached `HEAD`, create a new short-lived branch
   before staging and keep the default branch as the PR base.
@@ -35,7 +36,7 @@ silently broadening scope.
 - Push with `git push -u origin <branch>` when no upstream exists, otherwise
   `git push origin <branch>`.
 - Finish by handing off to `github` for publish-context inspection and
-  current-branch PR opening or reuse through the shared `ghops` runtime.
+  current-branch PR opening or reuse through the shared `ghflow` runtime.
 - Prefer a PR title that summarizes the full branch-level change.
 - Prefer a structured, feature-level PR description with `Feature`, `Impact`,
   `Validation`, and optional `Follow-ups`.
@@ -46,13 +47,15 @@ silently broadening scope.
 
 ```bash
 git status -sb
-ghops --json publish context
+ghflow --json publish context
 ```
 
-Use `doctor` only when the runtime itself is suspect:
+Use direct readiness checks only when the runtime itself is suspect:
 
 ```bash
-ghops --json doctor
+command -v git && git --version
+command -v gh && gh --version
+gh auth status
 ```
 
 If on the default branch, detached `HEAD`, or a long-lived integration branch,
@@ -67,15 +70,15 @@ or reuse the draft PR:
 
 ```bash
 git push -u origin "$(git branch --show-current)"
-ghops publish open --draft [--title <text>] [--body-from-head] [--base <branch>]
+ghflow publish open --draft [--title <text>] [--body-from-head] [--base <branch>]
 ```
 
 ### Retry notes
 
 - `gh` install or auth checks fail before mutation: stop, fix the failure, then
-  rerun `ghops --json doctor` from the target repo root.
+  rerun the direct readiness checks from the target repo root.
 - Repo or remote publishability checks fail before mutation: fix the checkout or
-  remote wiring, then rerun `ghops --json publish context`
+  remote wiring, then rerun `ghflow --json publish context`
   before continuing.
 - Current branch has no upstream yet: run
   `git push -u origin "$(git branch --show-current)"`.

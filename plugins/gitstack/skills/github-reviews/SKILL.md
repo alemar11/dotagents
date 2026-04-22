@@ -1,6 +1,6 @@
 ---
 name: github-reviews
-description: Use the shared `ghops` CLI bundled in the `gitstack` plugin for review-thread inspection, replies, top-level PR comment follow-up, and review submission.
+description: Handle focused PR review work inside `gitstack`. Prefer plain `gh` for straightforward review submission and comments, and use shared `ghflow` helpers for review-thread triage, reply routing, and higher-level comment handling.
 ---
 
 # GitHub Reviews
@@ -10,15 +10,30 @@ description: Use the shared `ghops` CLI bundled in the `gitstack` plugin for rev
 Use this bundled skill when the request is clearly about review comments,
 review threads, replies, or submitting a review.
 
-The shared runtime lives at `ghops`. Keep reactions and
+Prefer direct `gh` commands for simple review submission or top-level PR
+comments. Use `ghflow` when the job needs thread selection, reply routing, or
+shared higher-level behavior. Keep reactions and
 mixed-domain GitHub work in the umbrella `github` skill.
+
+## Direct commands first
+
+- `gh pr comment <n> --repo <owner/repo> --body <text>`
+- `gh pr review <n> --repo <owner/repo> --approve`
+- `gh pr review <n> --repo <owner/repo> --request-changes --body <text>`
+
+## Use `ghflow` when
+
+- the task is about review-thread inspection rather than a single top-level
+  review submission
+- the task needs reply routing to selected comments or thread rows
+- the task benefits from shared fallback handling across review comment
+  transports
 
 ## Fast path
 
-- `ghops --json doctor`
-- `ghops --json reviews address --pr <n> --repo <owner/repo>`
-- `ghops reviews comment --pr <n> --body <text> --repo <owner/repo>`
-- `ghops reviews review --pr <n> --approve --repo <owner/repo>`
+- `ghflow --json reviews address --pr <n> --repo <owner/repo>`
+- `gh pr comment <n> --repo <owner/repo> --body <text>`
+- `gh pr review <n> --repo <owner/repo> --approve`
 
 ## Trigger rules
 

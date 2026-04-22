@@ -128,29 +128,32 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Owning runtime docs must include a `CLI Maintenance` section that keeps normal runtime work on the shipped artifact path and routes bug fixes, performance work, rebuilds, and feature additions through the maintained implementation. (Codex learning)
 - If `projects/<tool>/` exists for an embedded CLI, require `projects/<tool>/AGENTS.md` with build, test, rebuild, runtime-prerequisite, safe-maintenance instructions, the version source of truth, the semver bump policy, and rebuild steps that restore the shipped artifact at the resolved artifact path. (Codex learning)
 - Embedded CLI `projects/<tool>/AGENTS.md` files must define semver bumps as: major for breaking CLI contract changes, minor for backward-compatible new features or meaningful capability additions, and patch for backward-compatible bug fixes or corrections. (Codex learning)
-- Keep persisted embedded-CLI config owner-aligned: skill-owned CLIs use `<project-root>/.skills/<skill>/config.toml`, shared plugin-owned CLIs use `<project-root>/.plugins/<plugin>/config.toml`, and plugin-owned single-skill CLIs use `<project-root>/.plugins/<plugin>/skills/<skill>/config.toml` so plugin identity remains explicit. (Codex learning)
+- Keep persisted embedded-CLI config owner-aligned: skill-owned CLIs use `<project-root>/.skills/<skill>/config.toml`, shared plugin-owned CLIs use `<project-root>/.plugins/<plugin>/config.toml`, and plugin-owned single-skill CLIs use `<project-root>/.plugins/<plugin>/skills/<skill>/config.toml` so plugin identity remains explicit; define `<project-root>` in runtime docs as the consuming workspace or repository root, distinct from the CLI owner root. (Codex learning)
 - Treat `<project-root>/.skills/<skill>/` and `<project-root>/.plugins/<plugin>/` as config-only; do not place helper scripts or implementation code there. (Codex learning)
 - Treat owner-level `config.toml` files under `.skills/...`, `.plugins/...`, or `.plugins/<plugin>/skills/...` as local persisted operator config, not repo content; consuming repos should gitignore those files, and migrations from legacy `<skill>.toml` names must update ignore rules in the same rollout. (Codex learning)
-- For embedded CLIs, prefer owner-aligned project-local config first, allow environment variables for one-off runs, and use external config paths only when the user explicitly asks. (Codex learning)
+- For embedded CLIs, prefer environment variables first, fall back to owner-aligned project-local config for repeated local use when env-only auth is painful, and use external config paths only when the user explicitly asks. (Codex learning)
 - Standardize persisted config on owner-level `config.toml` with required `schema_version` and optional non-authoritative `[meta]`; do not require top-level `version` or per-tool version fields as normative config state. (Codex learning)
-- When multiple embedded CLIs share one `config.toml`, shared sections must be explicit and each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it explicitly owns. (Codex learning)
-- When a plugin-owned single-skill CLI becomes shared across bundled skills, move the shipped artifact, maintenance project, and config namespace together, keep one deterministic read path, and allow old-to-new config import only during an explicit mutating migration flow. (Codex learning)
+- When multiple embedded CLIs share one `config.toml`, shared sections must be explicit, each shared section must have one documented single writer, and each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it uniquely owns. (Codex learning)
+- When a plugin-owned single-skill CLI becomes shared across bundled skills, move the shipped artifact, maintenance project, and config namespace together, keep one deterministic read path, update docs to the new artifact path in the same rollout, and let the promoted CLI handle old-to-new config import only during an explicit mutating migration flow without silently overwriting existing keys in the new file. (Codex learning)
 - Treat plugin-root `scripts/` as a repo convention for plugin-owned shared CLIs, not as an officially documented Codex plugin manifest component. (Codex learning)
 - Do not standardize alternative generic maintenance folder names such as `src/`, `code/`, `impl/`, or `source/` for embedded CLIs; prefer `projects/<tool>/` when a private implementation tree is needed. (Codex learning)
 - In embedded-CLI docs, separate the artifact path from the public runtime noun: make executable examples use the shipped artifact path by default, and use bare `<tool> ...` only when the docs also define the wrapper, alias, or PATH contract that makes that shorthand executable. (Codex learning)
+- When bundled skills document plugin-shared CLIs that run from plugin root, introduce that execution context explicitly before the command instead of implying the command runs from the bundled skill directory. (Codex learning)
 - Keep validation guidance split between a shared core and runtime-specific lanes so API-backed CLIs, local/offline CLIs, and hybrid CLIs are not forced into the same placeholder-heavy checklist. (Codex learning)
 
 ### GitStack plugin
 - Keep `plugins/gitstack/` as the preferred full-stack install surface for linked git authoring, GitHub operations, and publish orchestration.
-- Keep `plugins/gitstack/scripts/ghops` as the shared runtime for bundled GitHub skills; do not add bundled skill-local runtime copies.
+- Keep `plugins/gitstack/scripts/ghflow` as the shared runtime for bundled GitHub skills; do not add bundled skill-local runtime copies.
+- Keep `ghflow` intentionally narrow: prefer plain `git` and `gh` for routine repo, issue, PR, CI, and release work, and reserve `ghflow` for shared higher-level helpers such as review-thread routing, authenticated-user stars and star lists, and current-branch publish context or open-or-reuse flows. (Codex learning)
 - Bundle `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, and `yeet` under `plugins/gitstack/skills/`.
 - Do not keep standalone reusable copies of `git-commit`, `github`, or `yeet` under `skills/`; GitStack is the supported distributable surface for those workflows in this repo. (Codex learning)
-- Keep `git-commit` bundled as skill-only in `gitstack`; do not add a `ghops commit ...` surface in v1.
+- Keep `git-commit` bundled as skill-only in `gitstack`; do not add a `ghflow commit ...` surface in v1.
 - Keep bundled `github` as the umbrella skill and allow the specialist bundled skills only when they map cleanly to one existing GitHub domain slice.
 - Do not add `github-publish`; keep publish or lifecycle work in bundled `github` and full local publish in bundled `yeet`. (Codex learning)
 
 ### GitHub skill
 - Keep the bundled `github` skill under `plugins/gitstack/skills/github/` as the single GitHub runtime entrypoint for repo-scoped work plus authenticated-user star and star-list workflows across triage, reviews, CI, releases, and PR publish or lifecycle work, and reserve bundled `yeet` only for full local-worktree publish.
+- The umbrella `github` skill must treat both `git` and `gh` as required host dependencies, verify both when readiness is uncertain, and keep shared install guidance centralized in `plugins/gitstack/skills/github/references/core/installation.md`. (Codex learning)
 - Treat the GitHub consolidation as intentionally breaking: the supported install surface for GitHub workflows in this repo is `plugins/gitstack`, not parallel reusable skills under `skills/`.
 - Do not reintroduce `github-reviews`, `github-ci`, `github-releases`, or `github-publish` as standalone reusable skills, install prompts, or examples.
 - Keep the bundled `github` skill self-owned and self-sufficient; do not require the upstream GitHub plugin for runtime routing or execution.
@@ -159,9 +162,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Resolve GitHub star-list selectors by exact slug first, then exact name; require `--list-id` when the selector is ambiguous. (Codex learning)
 - For GitHub star-list membership changes, read current memberships first and send the full desired list id set to `updateUserListsForItem` so unrelated memberships are preserved. (Codex learning)
 - Keep full publish-from-worktree guidance in `plugins/gitstack/skills/yeet/SKILL.md` and `plugins/gitstack/skills/yeet/references/*`, not in `plugins/gitstack/skills/github`. (Codex learning)
-- Organize bundled GitHub references under `plugins/gitstack/skills/github/references/` into domain slices: `core`, `triage`, `reviews`, `ci`, `releases`, and `publish`, and keep the shared runtime under `plugins/gitstack/scripts/ghops`. (Codex learning)
+- Organize bundled GitHub references under `plugins/gitstack/skills/github/references/` into domain slices: `core`, `triage`, `reviews`, `ci`, `releases`, and `publish`, and keep the shared runtime under `plugins/gitstack/scripts/ghflow`. (Codex learning)
 - Future extractable GitHub plugin skills must map cleanly to one domain slice under `plugins/gitstack/skills/github/references/<domain>/`. (Codex learning)
-- Domain docs and helpers may depend only on the shared `plugins/gitstack/scripts/ghops` runtime plus same-domain reference material; do not create cross-domain helper dependencies. (Codex learning)
+- Domain docs and helpers may depend only on the shared `plugins/gitstack/scripts/ghflow` runtime plus same-domain reference material; do not create cross-domain helper dependencies. (Codex learning)
 - Run `github` publish-domain helpers from the target repository root, even
   when the helper path itself lives in another checkout. (Codex learning)
 - When `prs_open_current_branch.sh` is asked to use an explicit `--base`, do
@@ -173,12 +176,12 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - For GitHub Actions investigations in the `ci` domain, distinguish PR-associated failures from generic branch, SHA, workflow, schedule, manual, or explicit run-id runs; use `gh pr checks` only for PR-associated runs and prefer `gh run list` / `gh run view` otherwise.
 
 ### Git Commit skill
-- `git-commit` may be bundled inside `plugins/gitstack`, but keep its contract unchanged: selective staging, commit authoring, and post-commit verification stay skill-owned rather than moving into `ghops`. (Codex learning)
+- `git-commit` may be bundled inside `plugins/gitstack`, but keep its contract unchanged: selective staging, commit authoring, and post-commit verification stay skill-owned rather than moving into `ghflow`. (Codex learning)
 
 ### Yeet skill
 - Keep `yeet` focused on full publish from local checkout to draft PR while staying orchestration-only: branch strategy and push belong in `yeet`, commit discipline belongs in `git-commit`, and post-push PR logic belongs in `github`. (Codex learning)
 - Keep `yeet` dependency-aware rather than runtime-independent: it should require `git-commit` and `github` instead of vendoring a duplicate GitHub helper layer. (Codex learning)
-- Within `plugins/gitstack`, keep `yeet` wired to bundled `git-commit` plus the shared `ghops publish ...` runtime surface instead of legacy helper-script paths. (Codex learning)
+- Within `plugins/gitstack`, keep `yeet` wired to bundled `git-commit` plus the shared `ghflow publish ...` runtime surface instead of legacy helper-script paths. (Codex learning)
 - Treat long-lived branches such as `stable`, `release/*`, `develop`, or
   `main` as PR bases, not publish branches: create a fresh short-lived branch
   from them and open the PR back against that long-lived branch. (Codex learning)

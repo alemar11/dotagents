@@ -1,16 +1,11 @@
 # GitHub CI command summary
 
-Use this as the authoritative CI-domain `ghops` command map referenced by
-the bundled `github` skill.
+Use this as the authoritative CI-domain command map referenced by the bundled
+`github-ci` skill.
 
-## Fast picks
+## Direct `gh` commands
 
-- PR checks: `ghops checks pr`
-- Generic Actions list: `ghops actions list`
-- Generic Actions inspect: `ghops actions inspect`
-
-## Commands
-
-- `ghops checks pr`
-- `ghops actions list`
-- `ghops actions inspect`
+- `gh pr checks <n> --repo <owner/repo>`
+- `gh run list --repo <owner/repo>`
+- `gh run view <run-id> --repo <owner/repo>`
+- `gh run view <run-id> --repo <owner/repo> --log-failed`

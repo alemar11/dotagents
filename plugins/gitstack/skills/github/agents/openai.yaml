@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub"
-  short_description: "Use the shared ghops CLI for mixed GitHub work, with bundled specialist skills for triage, reviews, CI, and releases."
+  short_description: "Use `git` and `gh` first for mixed GitHub work, and fall back to shared `ghflow` helpers when the workflow needs extra orchestration."
   brand_color: "#1F9D55"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub skill through the plugin-owned ghops CLI for mixed GitHub work, publish lifecycle tasks, and routing into the triage, reviews, CI, or releases specialist skills when the request is focused."
+  default_prompt: "Use the bundled GitHub skill to ensure both `git` and `gh` are installed, prefer direct `gh` commands for straightforward GitHub work, and use shared `ghflow` helpers only for publish-context inspection, review-thread routing, authenticated-user stars or star lists, or other higher-level shared behavior."

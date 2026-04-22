@@ -1,6 +1,6 @@
 ---
 name: github-ci
-description: Use the shared `ghops` CLI bundled in the `gitstack` plugin for PR checks and generic GitHub Actions investigation.
+description: Handle focused GitHub CI work inside `gitstack`. Use plain `gh` for PR checks, Actions run inspection, and logs; this skill is guidance-first and does not rely on a dedicated `ghflow` CI surface.
 ---
 
 # GitHub CI
@@ -10,15 +10,23 @@ description: Use the shared `ghops` CLI bundled in the `gitstack` plugin for PR 
 Use this bundled skill when the request is about failing checks, GitHub Actions
 runs, or log-oriented CI triage.
 
-The shared runtime lives at `ghops`. Keep review-thread
-work in `github-reviews` and publish lifecycle work in the umbrella `github`.
+Use plain `gh` commands for check reads, run inspection, and logs. This skill
+now exists as routing and workflow guidance rather than a separate `ghflow`
+command surface. Keep review-thread work in `github-reviews` and publish
+lifecycle work in the umbrella `github`.
+
+## Direct commands first
+
+- `gh pr checks <n> --repo <owner/repo>`
+- `gh run list --repo <owner/repo>`
+- `gh run view <run-id> --repo <owner/repo>`
 
 ## Fast path
 
-- `ghops --json doctor`
-- `ghops --json checks pr --pr <n> --repo <owner/repo>`
-- `ghops --json actions list --repo <owner/repo>`
-- `ghops --json actions inspect --repo <owner/repo> --run-id <id>`
+- `gh pr checks <n> --repo <owner/repo>`
+- `gh run list --repo <owner/repo>`
+- `gh run view <run-id> --repo <owner/repo>`
+- `gh run view <run-id> --repo <owner/repo> --log-failed`
 
 ## Trigger rules
 

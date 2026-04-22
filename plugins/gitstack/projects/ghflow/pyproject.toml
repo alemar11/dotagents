@@ -1,11 +1,11 @@
 [project]
-name = "ghops"
-version = "1.0.1"
+name = "ghflow"
+version = "3.0.0"
 description = "Embedded GitHub CLI runtime for the gitstack plugin"
 requires-python = ">=3.11"
 
 [project.scripts]
-ghops = "ghops:main"
+ghflow = "ghflow:main"
 
 [build-system]
 requires = ["setuptools>=68"]

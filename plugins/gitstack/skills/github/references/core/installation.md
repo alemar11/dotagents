@@ -1,12 +1,47 @@
-# GitHub CLI setup for `ghops`
+# Git and GitHub CLI setup for GitStack
 
-## Check whether `gh` is installed
+## Check whether `git` and `gh` are installed
 
 ```bash
+command -v git && git --version
 command -v gh && gh --version
 ```
 
-If `command -v gh` returns a path and `gh --version` prints output, the CLI is installed.
+If each `command -v ...` returns a path and the matching `--version` prints
+output, that binary is installed and available on `PATH`.
+
+## Install Git by OS
+
+Prefer the official Git download page:
+
+- Downloads and platform guidance: <https://git-scm.com/downloads>
+
+### macOS
+
+```bash
+brew install git
+```
+
+Or install Xcode Command Line Tools if that is the host standard for the
+machine.
+
+### Windows
+
+```powershell
+winget install --id Git.Git
+```
+
+Or download Git for Windows from the official downloads page.
+
+### Linux
+
+Use the distro package manager that matches the host:
+
+```bash
+sudo apt install git
+```
+
+Or use the package instructions linked from the official downloads page.
 
 ## Install GitHub CLI by OS
 
@@ -121,11 +156,17 @@ gh auth status
 
 Use `gh auth status` to confirm the session before running write operations.
 
-## Check `ghops` readiness before operations
+## Check readiness before operations
 
 ```bash
-ghops --json doctor
+command -v git && git --version
+command -v gh && gh --version
+gh auth status
 ```
 
-Use `--allow-non-project` only on `ghops` commands that explicitly support
-non-project workflows.
+Before GitStack write operations, confirm directly that:
+
+- `git` is installed
+- `gh` is installed
+- `gh` authentication is available
+- you are in the correct repo root when the workflow is repo-scoped

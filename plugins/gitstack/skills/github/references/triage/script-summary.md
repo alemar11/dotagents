@@ -1,73 +1,28 @@
 # GitHub triage command summary
 
-Use this as the authoritative triage-domain `ghops` command map referenced by
-the bundled `github` skill.
+Use this as the authoritative triage-domain command map referenced by the
+bundled `github` skill.
 
-## Fast picks
+## Direct `gh` first
 
-- Repository orientation: `ghops repos view`
-- Issue triage: `ghops issues list`, `ghops issues view`
-- Pull request triage: `ghops prs list`, `ghops prs view`,
-  `ghops prs patch`
-- Authenticated-user stars: `ghops stars list`,
-  `ghops stars add`, `ghops stars remove`
-- Authenticated-user lists: `ghops lists list`,
-  `ghops lists items`, `ghops lists create`,
-  `ghops lists delete`, `ghops lists assign`,
-  `ghops lists unassign`
-- Reactions: `ghops reactions list`,
-  `ghops reactions add`, `ghops reactions remove`
+- Repository orientation: `gh repo view`
+- Issue reads and writes: `gh issue view`, `gh issue create`, `gh issue edit`
+- PR reads and metadata edits: `gh pr view`, `gh pr edit`
 
-## Repositories
+## Shared `ghflow` helpers kept in triage
 
-- `ghops repos list`
-- `ghops repos view`
+- `ghflow stars list`
+- `ghflow stars add`
+- `ghflow stars remove`
+- `ghflow stars lists list`
+- `ghflow stars lists items`
+- `ghflow stars lists delete`
+- `ghflow stars lists assign`
+- `ghflow stars lists unassign`
 
-## Issues
+## Raw `gh` workflows
 
-- `ghops issues list`
-- `ghops issues view`
-- `ghops issues create`
-- `ghops issues update`
-- `ghops issues comment`
-- `ghops issues comments`
-- `ghops issues close`
-- `ghops issues reopen`
-- `ghops issues close-with-evidence`
-- `ghops issues copy`
-- `ghops issues move`
-- `ghops issues lock`
-- `ghops issues unlock`
-- `ghops issues pin`
-- `ghops issues unpin`
-- `ghops issues suggest-labels`
-- `ghops issues labels list`
-- `ghops issues labels create`
-- `ghops issues labels update`
-- `ghops issues labels delete`
-- `ghops issues milestones list`
-
-## Pull requests
-
-- `ghops prs list`
-- `ghops prs view`
-- `ghops prs patch`
-- `ghops prs update`
-
-## Stars and lists
-
-- `ghops stars list`
-- `ghops stars add`
-- `ghops stars remove`
-- `ghops lists list`
-- `ghops lists items`
-- `ghops lists create`
-- `ghops lists delete`
-- `ghops lists assign`
-- `ghops lists unassign`
-
-## Reactions
-
-- `ghops reactions list`
-- `ghops reactions add`
-- `ghops reactions remove`
+- `gh issue comment` + `gh issue close` for close-with-evidence
+- `gh issue view` + `gh issue create` for cross-repo copy
+- `gh issue create` + `gh issue comment` + `gh issue close` for cross-repo move
+- `gh api graphql` with `createUserList` for star-list creation

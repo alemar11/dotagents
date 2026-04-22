@@ -81,38 +81,6 @@ def _print_mutation(payload: dict[str, object]) -> int:
     return 0
 
 
-def _create_list(name: str, description: str | None, is_private: bool) -> dict[str, object]:
-    query = """
-    mutation($name: String!, $description: String, $isPrivate: Boolean) {
-      createUserList(
-        input: {name: $name, description: $description, isPrivate: $isPrivate}
-      ) {
-        list {
-          id
-          name
-          slug
-          description
-          isPrivate
-          createdAt
-          updatedAt
-          lastAddedAt
-        }
-      }
-    }
-    """
-    payload = graphql(
-        query,
-        {"name": name, "description": description, "isPrivate": is_private},
-    )
-    try:
-        created_list = payload["data"]["createUserList"]["list"]
-    except (TypeError, KeyError) as exc:
-        raise GhError("Unexpected create list response shape.") from exc
-    if not isinstance(created_list, dict):
-        raise GhError("GitHub did not return the created list.")
-    return created_list
-
-
 def _delete_list(list_id: str) -> None:
     query = """
     mutation($listId: ID!) {
@@ -187,23 +155,6 @@ def _run_list_items(args: argparse.Namespace) -> int:
     if args.json:
         return _emit(payload)
     return _print_list_items(payload)
-
-
-def _run_create(args: argparse.Namespace) -> int:
-    list_payload = {
-        "name": args.name,
-        "slug": None,
-        "description": args.description or "",
-        "isPrivate": args.visibility == "private",
-    }
-    if args.dry_run:
-        payload = {"action": "create", "status": "dry-run", "list": list_payload}
-    else:
-        created = _create_list(args.name, args.description, args.visibility == "private")
-        payload = {"action": "create", "status": "created", "list": created}
-    if args.json:
-        return _emit(payload)
-    return _print_mutation(payload)
 
 
 def _run_delete(args: argparse.Namespace) -> int:
@@ -315,28 +266,22 @@ def _run_membership(args: argparse.Namespace, assign: bool) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Manage GitHub star lists and repository membership for the authenticated account."
+        prog="ghflow-stars-lists",
+        description="Inspect and update GitHub star lists for the authenticated account.",
     )
     action_group = parser.add_mutually_exclusive_group(required=True)
     action_group.add_argument("--list-lists", action="store_true")
     action_group.add_argument("--list-items", action="store_true")
-    action_group.add_argument("--create", action="store_true")
     action_group.add_argument("--delete", action="store_true")
     action_group.add_argument("--assign", action="store_true")
     action_group.add_argument("--unassign", action="store_true")
 
     parser.add_argument("--list", help="Exact list slug or exact list name.")
     parser.add_argument("--list-id", help="Exact GitHub user list id.")
-    parser.add_argument("--name", help="List name for create.")
-    parser.add_argument("--description", help="Optional list description for create.")
     parser.add_argument("--repo", action="append", default=[], help="Repository in owner/repo format.")
     parser.add_argument("--repos-file", help="Newline-delimited file of owner/repo entries.")
     parser.add_argument("--limit", type=_positive_int, default=100, help="Maximum number of items to return.")
     parser.add_argument("--all", action="store_true", help="Fetch all available items for read actions.")
-    visibility_group = parser.add_mutually_exclusive_group()
-    visibility_group.add_argument("--private", dest="visibility", action="store_const", const="private")
-    visibility_group.add_argument("--public", dest="visibility", action="store_const", const="public")
-    parser.set_defaults(visibility="public")
     parser.add_argument("--json", action="store_true", help="Emit normalized JSON output.")
     parser.add_argument("--dry-run", action="store_true", help="Preview write actions without mutating GitHub.")
     return parser
@@ -349,31 +294,20 @@ def _ensure_selector(args: argparse.Namespace) -> None:
 
 def _validate_args(args: argparse.Namespace) -> None:
     if args.list_lists:
-        if args.list or args.list_id or args.repo or args.repos_file or args.name or args.description:
+        if args.list or args.list_id or args.repo or args.repos_file:
             raise GhError("--list-lists only supports read flags.", 64)
         return
 
     if args.list_items:
         _ensure_selector(args)
-        if args.repo or args.repos_file or args.name or args.description:
+        if args.repo or args.repos_file:
             raise GhError("--list-items only supports a list selector and read flags.", 64)
-        return
-
-    if args.create:
-        if not args.name:
-            raise GhError("--create requires --name.", 64)
-        if args.list or args.list_id or args.repo or args.repos_file:
-            raise GhError("--create does not accept existing list selectors or repo targets.", 64)
-        if args.all:
-            raise GhError("--all is only valid with read actions.", 64)
-        if args.limit != 100:
-            raise GhError("--limit is only valid with read actions.", 64)
         return
 
     if args.delete:
         _ensure_selector(args)
-        if args.repo or args.repos_file or args.name or args.description:
-            raise GhError("--delete does not accept repo targets or create-only flags.", 64)
+        if args.repo or args.repos_file:
+            raise GhError("--delete does not accept repo targets.", 64)
         if args.all:
             raise GhError("--all is only valid with read actions.", 64)
         if args.limit != 100:
@@ -382,8 +316,6 @@ def _validate_args(args: argparse.Namespace) -> None:
 
     if args.assign or args.unassign:
         _ensure_selector(args)
-        if args.name or args.description:
-            raise GhError("--assign and --unassign do not accept create-only flags.", 64)
         if args.all:
             raise GhError("--all is only valid with read actions.", 64)
         if args.limit != 100:
@@ -400,8 +332,6 @@ def main(argv: list[str] | None = None) -> int:
             return _run_list_lists(args)
         if args.list_items:
             return _run_list_items(args)
-        if args.create:
-            return _run_create(args)
         if args.delete:
             return _run_delete(args)
         if args.assign:
