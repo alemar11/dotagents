@@ -246,6 +246,40 @@ Rules:
 - do not require `tools.<tool>.version`
 - create parent directories only when the user actually persists config
 
+## Runtime Cache
+
+Use a per-user runtime cache only when the embedded CLI needs reusable
+downloaded or generated runtime artifacts that should survive across consuming
+repos, such as fetched toolchains, unpacked helper binaries, model files, or
+other rebuildable runtime assets.
+
+Do not use the runtime cache for:
+
+- owner-aligned operator config, which belongs in `config.toml` under
+  `.skills/...` or `.plugins/...`
+- maintenance-only build outputs or dependency caches that belong inside
+  `projects/<tool>/`
+- normal repo content or tracked fixtures
+
+When a runtime cache is truly needed, scope it by owner:
+
+- skill-owned: `~/.cache/dotagents/skills/<skill-name>/...`
+- plugin-owned shared: `~/.cache/dotagents/plugins/<plugin-name>/...`
+- plugin-owned but local to one skill:
+  `~/.cache/dotagents/plugins/<plugin-name>/skills/<skill-name>/...`
+
+Runtime-cache rules:
+
+- create the cache lazily from the explicit runtime flow that needs it, not on
+  install and not during unrelated reads
+- treat cache contents as disposable and rebuildable; they must never be the
+  sole source of truth for user state
+- version or namespace cache subdirectories when format or upstream-version
+  changes matter
+- document the cache purpose and location only when the CLI actually needs one;
+  if the CLI does not need reusable runtime artifacts, do not invent a cache
+  layer
+
 ## Config Migrations
 
 Promotion from plugin single-skill ownership to plugin-shared ownership changes both config storage and the canonical artifact path:
