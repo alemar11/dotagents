@@ -60,7 +60,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `.codex-plugin/plugin.json` as the plugin-local source of truth for plugin name, version, assets, and bundled-skill exposure.
 - Keep plugin-bundled skills discoverable under `plugins/<plugin>/skills/` and keep any plugin-owned shared runtime surfaces under `plugins/<plugin>/scripts/`.
 - When a plugin grows a maintenance-only implementation tree, keep it under `plugins/<plugin>/projects/<tool>/` and document rebuild/runtime rules there with a local `AGENTS.md`.
-- Keep `link.sh` as the canonical local install helper for this repo: it links reusable skills from `skills/` into `~/.agents/skills`, creates per-plugin symlinks under `~/.agents/plugins/plugins/`, and merges this repo's entries into `~/.agents/plugins/marketplace.json` without clobbering other personal plugin sources. (Codex learning)
+- Keep `skills-link.sh` as the canonical local install helper for this repo's reusable skills: it links `skills/` into `~/.agents/skills` only and must not install, mirror, or rewrite plugin marketplace entries. (Codex learning)
 
 ### Plugin Lifecycle and Versioning
 - Treat `.agents/plugins/marketplace.json` as the repo discovery surface for local plugins: Codex can discover a plugin from the workspace marketplace file and resolve each plugin `source.path` relative to the repo root.

@@ -44,12 +44,10 @@ For TanStack React application work, install the repo-local `plugins/tanstack/`
 plugin to get the bundled Query, Router, Start, and integration skills from one
 surface instead of copying advice piecemeal from mixed community sources.
 
-For a global local-plugin install from this repo, run `./link.sh`. It keeps
-the existing skill symlink behavior, creates per-plugin symlinks under
-`~/.agents/plugins/plugins/`, and merges this repo's plugin entries into
-`~/.agents/plugins/marketplace.json` instead of replacing that personal
-marketplace file. Each marketplace entry points directly at the symlinked
-plugin path, which keeps the installed plugin paths live against this checkout.
+Run `./skills-link.sh` only to link the reusable skills from this repo into
+`~/.agents/skills`. Repo-local plugins are exposed from this checkout through
+`.agents/plugins/marketplace.json`; `skills-link.sh` does not install or mirror
+plugin entries into your personal plugin marketplace.
 
 ### Install Reusable Skills With skill-installer (Codex-only)
 These prompts are for use inside Codex only.
