@@ -197,6 +197,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `skill-audit` workflow-first and mixed by default: start with relevant local discovery surfaces, then widen to shared/global surfaces only when the current workflow or explicit user scope requires it.
 - When a gap is project-specific but lightweight, prefer project docs, `AGENTS.md`, repo references, or memory over proposing a project-local specialization.
 - Recommend a project-local specialization only as a last resort when the workflow is highly stable, repeatedly needed, and too project-specific to fit cleanly in the reusable skill or repo docs.
+- Require `skill-audit` self-audit to be explicit-scope only: unless the user names `skill-audit`, do not audit it or add it implicitly to the audited set. (Codex learning)
 - In full-portfolio audits, require `skill-audit` to ignore itself by default, propose suggestions for the other audited skills first, then ask the user whether they want a follow-up audit of `skill-audit` too.
 - In user-targeted audits, require `skill-audit` to audit only the explicitly requested skills and ignore itself unless `skill-audit` was explicitly requested too.
 - Do not make `skill-audit` jump straight to `$CODEX_HOME/skills`, `~/.codex/skills`, `~/.agents/skills`, or cache snapshots before checking project-local discovery surfaces and current workflow evidence first; widen only when needed for the audit scope. (Codex learning)

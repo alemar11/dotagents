@@ -33,6 +33,10 @@ If the user explicitly names one or more targets, such as `audit skill $foo`,
 targets as the required audit scope and resolve them before any broader
 workflow discovery.
 
+Treat `skill-audit` self-audit as opt-in only. Unless the user explicitly
+names `skill-audit`, do not audit it, do not add it implicitly because it
+appears relevant, and do not include it in the audited set.
+
 In full-portfolio audits, exclude `skill-audit` from the audited set by
 default. After presenting the suggestions for the other audited targets,
 explicitly ask the user whether they want a follow-up audit of `skill-audit`
@@ -53,8 +57,8 @@ too.
 - Keep targeted audits targeted.
   - If the user names specific targets, do not expand to a wider portfolio
     scan.
-  - In that mode, do not auto-include `skill-audit` unless it was explicitly
-    requested.
+  - In that mode, never auto-include `skill-audit`; include it only when it
+    was explicitly requested.
   - Only bring in non-requested targets when needed to explain overlap, merge
     candidates, or ownership conflicts.
 - Keep full-portfolio audits scoped too.
@@ -136,6 +140,8 @@ Return a compact audit with these sections:
 - Audit installed surfaces before proposing new ones.
 - Audit project-local surfaces before widening to shared/global surfaces.
 - Keep default full-scope audits workflow-first and mixed.
+- Treat `skill-audit` self-audit as explicit-scope only; never include it
+  unless the user names it.
 - When the user names specific targets, treat those named targets as the
   primary and usually exclusive audit scope.
 - Prefer improving an existing installed surface before adding a new one.
@@ -156,6 +162,8 @@ Return a compact audit with these sections:
   bucket; keep ownership decisions explicit.
 - Do not jump to new-surface recommendations before evaluating existing
   installed surfaces as possible owners.
+- Do not audit `skill-audit` unless the user explicitly requested
+  `skill-audit` in scope.
 - Do not bulk-load all rollout summaries or raw sessions; stay targeted.
 - Do not silently expand a user-targeted audit into a wider portfolio review.
 
