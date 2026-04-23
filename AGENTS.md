@@ -182,6 +182,16 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `yeet` focused on full publish from local checkout to draft PR while staying orchestration-only: branch strategy and push belong in `yeet`, commit discipline belongs in `git-commit`, and post-push PR logic belongs in `github`. (Codex learning)
 - Keep `yeet` dependency-aware rather than runtime-independent: it should require `git-commit` and `github` instead of vendoring a duplicate GitHub helper layer. (Codex learning)
 - Within `plugins/gitstack`, keep `yeet` wired to bundled `git-commit` plus the shared `ghflow publish ...` runtime surface instead of legacy helper-script paths. (Codex learning)
+- When `yeet` gets explicit PR-base intent from the user request or branch
+  strategy, keep that base locked through publish, pass it on PR create or
+  reuse, and verify the final PR base before closing the workflow. (Codex learning)
+- Treat GitStack plugin cache artifacts as the installed runtime surface for
+  shared CLIs such as `ghflow`; do not assume bare command resolution on
+  `PATH` unless the runtime exposes it. (Codex learning)
+- In `yeet` and GitStack publish flows, resolve the installed `ghflow`
+  artifact path explicitly when bare `ghflow` is unavailable, and treat
+  failure to resolve that artifact as broken install or runtime drift rather
+  than a normal direct-`gh` fallback branch. (Codex learning)
 - Treat long-lived branches such as `stable`, `release/*`, `develop`, or
   `main` as PR bases, not publish branches: create a fresh short-lived branch
   from them and open the PR back against that long-lived branch. (Codex learning)

@@ -46,7 +46,9 @@ lifecycle work on already-pushed branches, or any time the user just says
 - Confirm the authenticated GitHub session before writes:
   - `gh auth status`
 - If either is missing, use `references/core/installation.md`.
-- `ghflow --version` is the shared-helper version check.
+- Prefer `ghflow --version` when bare `ghflow` is already resolvable; otherwise
+  run the installed GitStack artifact path directly for the shared-helper
+  version check.
 - The maintained shared implementation lives under
   `<plugin-root>/projects/ghflow/src/ghflow/`.
 - Specialist bundled skills are routing layers only; they do not own separate
@@ -157,7 +159,7 @@ Use `ghflow` when one of these applies:
   helper artifact:
   - `git`
   - `gh`
-  - `ghflow`
+  - resolved installed `ghflow`
 - Treat `<plugin-root>/projects/ghflow/` as the maintained Python project
   behind that artifact.
 - Keep runtime logic in `<plugin-root>/projects/ghflow/src/ghflow/`.
@@ -171,8 +173,8 @@ Use `ghflow` when one of these applies:
   - `git --version`
   - `gh --version`
   - `gh auth status`
-  - `ghflow --help`
-  - `ghflow --version`
+  - `<resolved-ghflow> --help`
+  - `<resolved-ghflow> --version`
 
 ## Examples
 
