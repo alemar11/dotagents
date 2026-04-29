@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Migrate From Nextjs"
+  short_description: "Review migrations from Next.js App Router patterns to TanStack Start equivalents."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#F87171"
+  default_prompt: "Use the bundled TanStack Start Migrate From Nextjs skill to review or plan migrations from Next.js App Router patterns to TanStack Start."

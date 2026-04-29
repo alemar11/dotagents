@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack CLI"
+  short_description: "Review TanStack CLI workflows for scaffolding, add-ons, ecosystem discovery, custom add-ons, and docs lookup."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0284C7"
+  default_prompt: "Use the bundled TanStack CLI skill to choose the right TanStack CLI workflow for scaffolding, add-ons, ecosystem discovery, custom add-on authoring, or machine-readable docs lookup."

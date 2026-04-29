@@ -7,6 +7,8 @@ description: Review, design, and refactor TanStack Query usage with emphasis on 
 
 Use this skill when a task involves `@tanstack/react-query`, `QueryClient`, `useQuery`, `useSuspenseQuery`, `useMutation`, `queryOptions`, cache invalidation, optimistic updates, or persistence.
 
+This plugin currently owns TanStack Query guidance as a local gap-filler. As of the current observed TanStack Intent registry state, TanStack does not publish a first-party Query Intent package.
+
 ## What to Optimize For
 
 - Stable, predictable query keys.
@@ -47,6 +49,12 @@ Use this skill when a task involves `@tanstack/react-query`, `QueryClient`, `use
 - Are `staleTime` and `gcTime` chosen intentionally rather than left implicit everywhere?
 - Is server data being copied into local component state without a clear reason?
 
+## Routing
+
+- Keep this skill as the broad entrypoint for Query work.
+- If the task is really about Router or Start boundaries, hand off to `tanstack-router`, `tanstack-start`, or `tanstack-integration`.
+- If the task is about Query plus Router loader prefetch or Start SSR hydration, prefer `tanstack-integration`.
+
 ## Avoid
 
 - String query keys.
@@ -57,4 +65,4 @@ Use this skill when a task involves `@tanstack/react-query`, `QueryClient`, `use
 
 ## Verification
 
-When exact current API names matter, prefer an installed TanStack Intent skill for Query if the project provides one; otherwise verify against the current TanStack Query docs before claiming a pattern is authoritative.
+When exact current API names matter, verify against the current TanStack Query docs before claiming a pattern is authoritative. Do not imply there is a first-party TanStack Query Intent package unless one is actually present in the installed project or current upstream registry.

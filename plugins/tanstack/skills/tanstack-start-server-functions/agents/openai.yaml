@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Server Functions"
+  short_description: "Review createServerFn usage, validation, server-only helpers, and request or response utilities in TanStack Start."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#DC2626"
+  default_prompt: "Use the bundled TanStack Start Server Functions skill to review createServerFn usage, validation, server-only helper placement, and request or response utilities in TanStack Start."

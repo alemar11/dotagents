@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Search Params"
+  short_description: "Review validated search params, typed updates, and URL state boundaries in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#7C3AED"
+  default_prompt: "Use the bundled TanStack Router Search Params skill to review validateSearch usage, typed URL query state, and safe search param updates in TanStack Router."

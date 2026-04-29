@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Not Found And Errors"
+  short_description: "Review not-found handling, route error boundaries, and failure ownership in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#5B21B6"
+  default_prompt: "Use the bundled TanStack Router Not Found And Errors skill to review not-found routing, route error boundaries, and failure-path ownership in TanStack Router."

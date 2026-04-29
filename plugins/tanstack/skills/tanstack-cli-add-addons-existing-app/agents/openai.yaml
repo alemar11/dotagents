@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack CLI Add Addons Existing App"
+  short_description: "Use tanstack add for existing projects, including add-on resolution and project metadata preconditions."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0284C7"
+  default_prompt: "Use the bundled TanStack CLI Add Addons Existing App skill to apply add-ons to an existing TanStack project with the right add-on ids and project metadata preconditions."

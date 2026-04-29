@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Code Splitting"
+  short_description: "Review lazy route files, split boundaries, and route config placement in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#DDD6FE"
+  default_prompt: "Use the bundled TanStack Router Code Splitting skill to review lazy route files, route-level split boundaries, and route config placement in TanStack Router."

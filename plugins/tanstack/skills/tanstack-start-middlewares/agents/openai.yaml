@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Middlewares"
+  short_description: "Review middleware chains for auth, cookies, headers, and reusable request concerns in TanStack Start."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#7F1D1D"
+  default_prompt: "Use the bundled TanStack Start Middlewares skill to review auth, cookies, headers, and reusable middleware concerns in TanStack Start."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Navigation"
+  short_description: "Review typed links, imperative navigation, and route-aware hook narrowing in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#9333EA"
+  default_prompt: "Use the bundled TanStack Router Navigation skill to review Link usage, imperative navigation, and route-aware hook narrowing in TanStack Router."

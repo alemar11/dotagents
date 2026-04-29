@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Auth And Guards"
+  short_description: "Review beforeLoad auth gates, redirects, and route-level preconditions in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#C084FC"
+  default_prompt: "Use the bundled TanStack Router Auth And Guards skill to review beforeLoad auth gates, redirects, and route-level preconditions in TanStack Router."

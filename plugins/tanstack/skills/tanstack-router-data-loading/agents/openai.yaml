@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Data Loading"
+  short_description: "Review loaders, loaderDeps, preload behavior, and route-owned data loading in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#A855F7"
+  default_prompt: "Use the bundled TanStack Router Data Loading skill to review loaders, loaderDeps, route-owned fetching, and preload behavior in TanStack Router."

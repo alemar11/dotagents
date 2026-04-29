@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack React Start Server Components"
+  short_description: "Review experimental TanStack Start server component setup, composition rules, and caveats."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#EF4444"
+  default_prompt: "Use the bundled TanStack React Start Server Components skill to review experimental server component setup, composition rules, and caching caveats in TanStack Start."

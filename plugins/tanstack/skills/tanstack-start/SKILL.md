@@ -7,6 +7,8 @@ description: Review, design, and refactor TanStack Start apps with emphasis on t
 
 Use this skill when a task involves `@tanstack/react-start`, `createServerFn`, middleware, server routes, SSR, hydration, environment variables, cookies, or auth flows in a TanStack Start app.
 
+Use this umbrella skill when the Start scope spans multiple framework concerns or when the exact subdomain is still unclear. For targeted work, route to the matching focused bundled skill instead of solving every Start concern from one broad prompt.
+
 ## What to Optimize For
 
 - Correct server/client boundaries.
@@ -28,6 +30,15 @@ Use this skill when a task involves `@tanstack/react-start`, `createServerFn`, m
 5. Recheck SSR and hydration safety.
    Watch for browser-only APIs, module-level env leaks, and server/client mismatch patterns.
 
+## Macro Guides
+
+- `references/framework-and-execution.md`: framework setup, isomorphic boundaries, and deciding where code should live.
+- `references/server-functions-and-routes.md`: `createServerFn`, validation, server helpers, and server routes.
+- `references/middlewares-and-server-core.md`: middleware ownership, shared request concerns, and server-runtime boundaries.
+- `references/server-components-and-migrations.md`: experimental server components and Next.js App Router migrations.
+- `references/deployments.md`: deployment targets, packaging assumptions, and runtime-sensitive tradeoffs.
+- `references/README.md`: quick map from Start problem shape to the right macro guide or focused skill.
+
 ## Default Rules
 
 - Treat loaders as isomorphic unless the current framework docs prove otherwise.
@@ -36,6 +47,19 @@ Use this skill when a task involves `@tanstack/react-start`, `createServerFn`, m
 - Verify the current server-function validator API for the installed version instead of copying stale examples.
 - Keep server-only files and shared files clearly separated.
 - Use middleware for reusable request concerns rather than repeating auth and header logic.
+
+## Focused Skills
+
+- `tanstack-react-start`: broad React Start app setup and framework-level guidance.
+- `tanstack-react-start-server-components`: experimental server component setup and caveats.
+- `tanstack-start-migrate-from-nextjs`: Next.js App Router migration work.
+- `tanstack-start-core`: Start core runtime patterns when React-specific wrapping is not the main issue.
+- `tanstack-start-execution-model`: isomorphic boundaries and runtime placement.
+- `tanstack-start-middlewares`: request shaping, auth, cookies, and cross-cutting middleware.
+- `tanstack-start-server-functions`: `createServerFn`, validation, and server-only helpers.
+- `tanstack-start-server-routes`: server endpoints defined alongside route files.
+- `tanstack-start-deployments`: deployment targets and deployment-sensitive constraints.
+- `tanstack-start-server-core`: server runtime behavior and server-only boundaries.
 
 ## Review Checklist
 

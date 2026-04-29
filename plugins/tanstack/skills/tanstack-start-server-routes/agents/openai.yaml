@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Server Routes"
+  short_description: "Review server routes, raw HTTP handling, and file-route alignment for API-style endpoints in TanStack Start."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#FCA5A5"
+  default_prompt: "Use the bundled TanStack Start Server Routes skill to review server routes, raw HTTP handling, and file-route alignment for API-style endpoints in TanStack Start."

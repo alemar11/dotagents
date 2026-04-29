@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Core"
+  short_description: "Review the core TanStack Router route tree, route ownership, and overall Router structure."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#6D28D9"
+  default_prompt: "Use the bundled TanStack Router Core skill to review or design the overall TanStack Router route tree, layout ownership, and core router structure before narrowing into search params, navigation, or loader details."

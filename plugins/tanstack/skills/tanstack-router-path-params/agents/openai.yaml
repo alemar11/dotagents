@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Path Params"
+  short_description: "Review TanStack Router path params, path structure, and file-route alignment."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#8B5CF6"
+  default_prompt: "Use the bundled TanStack Router Path Params skill to review route param naming, path structure, and typed file-route alignment in TanStack Router."

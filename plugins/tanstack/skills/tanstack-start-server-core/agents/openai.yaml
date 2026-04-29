@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Server Core"
+  short_description: "Review server runtime behavior and server-only boundaries in TanStack Start."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#450A0A"
+  default_prompt: "Use the bundled TanStack Start Server Core skill to review server runtime behavior, server-only module boundaries, and non-client execution concerns in TanStack Start."

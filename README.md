@@ -5,8 +5,8 @@ This directory contains reusable skills, repo-local plugins, and project maintai
 ## Plugins
 - `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, git/gh-first GitHub workflows, and Yeet, with shared `ghflow` helpers reserved for review-thread routing, authenticated-user stars and star lists, and current-branch publish flows.
   Bundled skills: `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
-- `plugins/tanstack/` — Bundled TanStack React install surface for Query, Router, Start, and cross-stack integration guidance, biased toward current TanStack React APIs and official skill surfaces when available.
-  Bundled skills: `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-integration`.
+- `plugins/tanstack/` — Bundled TanStack React + CLI install surface organized around macro-area umbrellas for Query, Router, Start, CLI workflows, and cross-stack integration guidance, biased toward current TanStack APIs and official skill surfaces when available.
+  Bundled skill families: umbrellas `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-cli`, `tanstack-integration`; Router family `tanstack-router-core`, `tanstack-router-search-params`, `tanstack-router-path-params`, `tanstack-router-navigation`, `tanstack-router-data-loading`, `tanstack-router-auth-and-guards`, `tanstack-router-code-splitting`, `tanstack-router-not-found-and-errors`, `tanstack-router-type-safety`, `tanstack-router-ssr`, `tanstack-router-plugin`; Start family `tanstack-react-start`, `tanstack-react-start-server-components`, `tanstack-start-migrate-from-nextjs`, `tanstack-start-core`, `tanstack-start-execution-model`, `tanstack-start-middlewares`, `tanstack-start-server-functions`, `tanstack-start-server-routes`, `tanstack-start-deployments`, `tanstack-start-server-core`; CLI family `tanstack-cli-create-app-scaffold`, `tanstack-cli-add-addons-existing-app`, `tanstack-cli-choose-ecosystem-integrations`, `tanstack-cli-maintain-custom-addons-dev-watch`, `tanstack-cli-query-docs-library-metadata`.
 
 ## Skills
 - `skills/skill-cli-creator/` — Build host-aware embedded CLIs that live inside a skill or plugin, run from an owner-root-relative shipped artifact under `scripts/`, and can grow into a maintenance-only project at `projects/<tool>/`.
@@ -40,9 +40,10 @@ cross-platform install paths and:
 
 to confirm both binaries are on `PATH`.
 
-For TanStack React application work, install the repo-local `plugins/tanstack/`
-plugin to get the bundled Query, Router, Start, and integration skills from one
-surface instead of copying advice piecemeal from mixed community sources.
+For TanStack React application and TanStack CLI work, install the repo-local
+`plugins/tanstack/` plugin to get bundled Query, Router, Start, CLI, and
+integration skills from one surface instead of copying advice piecemeal from
+mixed community sources.
 
 Run `./skills-link.sh` only to link the reusable skills from this repo into
 `~/.agents/skills`. Repo-local plugins are exposed from this checkout through

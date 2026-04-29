@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router SSR"
+  short_description: "Review Router SSR patterns, hydration boundaries, and Start handoff decisions in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#581C87"
+  default_prompt: "Use the bundled TanStack Router SSR skill to review TanStack Router SSR patterns, hydration boundaries, and when Router SSR should defer to TanStack Start."

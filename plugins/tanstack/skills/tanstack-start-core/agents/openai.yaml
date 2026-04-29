@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Core"
+  short_description: "Review TanStack Start core runtime patterns and non-React-specific framework behavior."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#B91C1C"
+  default_prompt: "Use the bundled TanStack Start Core skill to review TanStack Start core runtime patterns and non-React-specific framework behavior."

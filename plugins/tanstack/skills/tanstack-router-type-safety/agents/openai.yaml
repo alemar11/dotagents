@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Type Safety"
+  short_description: "Review type registration, inference flow, and unnecessary annotations in TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#4C1D95"
+  default_prompt: "Use the bundled TanStack Router Type Safety skill to review router registration, type inference flow, and unnecessary annotations or casts in TanStack Router."

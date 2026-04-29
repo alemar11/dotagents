@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack CLI Create App Scaffold"
+  short_description: "Use tanstack create to scaffold apps with framework, template, toolchain, deployment, and add-on choices."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0369A1"
+  default_prompt: "Use the bundled TanStack CLI Create App Scaffold skill to construct a tanstack create command with the right framework, template, deployment, toolchain, and add-on choices."

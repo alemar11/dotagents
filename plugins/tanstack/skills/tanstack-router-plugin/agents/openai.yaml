@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Router Plugin"
+  short_description: "Review generated routes, build wiring, and router-specific plugin setup for TanStack Router."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#7E22CE"
+  default_prompt: "Use the bundled TanStack Router Plugin skill to review generated routes, bundler wiring, and TanStack Router plugin setup."

@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack CLI Query Docs Library Metadata"
+  short_description: "Use the TanStack CLI to query machine-readable docs, library metadata, and discovery surfaces before making claims."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#7DD3FC"
+  default_prompt: "Use the bundled TanStack CLI Query Docs Library Metadata skill to query TanStack docs, library metadata, and discovery surfaces before making library-specific claims."

@@ -1,7 +1,7 @@
 {
   "name": "tanstack",
-  "version": "0.1.2",
-  "description": "Bundle TanStack React Query, React Router, React Start, and cross-stack integration guidance in one repo-local plugin.",
+  "version": "0.3.0",
+  "description": "Bundle TanStack React Query, Router, Start, CLI, and cross-stack integration guidance in one repo-local plugin with macro-area umbrellas and focused sub-skills.",
   "author": {
     "name": "alemar11",
     "email": "",
@@ -12,6 +12,7 @@
   "license": "MIT",
   "keywords": [
     "tanstack",
+    "cli",
     "query",
     "router",
     "start",
@@ -20,8 +21,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "TanStack",
-    "shortDescription": "Bundle TanStack React Query, Router, Start, and integration guidance in one plugin.",
-    "longDescription": "TanStack bundles focused React skills for TanStack Query, TanStack Router, TanStack Start, and the integration patterns that connect them, with guidance biased toward current TanStack React conventions and official skill surfaces when available.",
+    "shortDescription": "Bundle TanStack Query, Router, Start, CLI, and integration guidance in one plugin.",
+    "longDescription": "TanStack bundles macro-area umbrella skills plus focused React and CLI sub-skills for Query, Router, Start, and the integration patterns that connect them, with references-based routing for broader workflow entrypoints.",
     "developerName": "alemar11",
     "category": "Development",
     "capabilities": [
@@ -33,8 +34,8 @@
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
       "Review this TanStack React Query code for cache key, invalidation, and queryOptions issues.",
-      "Help me refactor this TanStack React Router tree for typed search params, loaders, and lazy routes.",
-      "Wire TanStack React Start, Router, and Query together with server functions and SSR-safe data loading."
+      "Help me refactor this TanStack React Router tree for typed search params, loaders, and lazy routes or route plugin wiring.",
+      "Wire TanStack React Start, Router, and Query together with server functions and SSR-safe data loading, or scaffold a TanStack app with the CLI."
     ],
     "brandColor": "#0F172A",
     "composerIcon": "./assets/tanstack-small.svg",

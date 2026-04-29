@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Execution Model"
+  short_description: "Review isomorphic execution boundaries and server versus client responsibilities in TanStack Start."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#991B1B"
+  default_prompt: "Use the bundled TanStack Start Execution Model skill to review isomorphic execution boundaries and server versus client responsibilities in TanStack Start."

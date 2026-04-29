@@ -7,6 +7,8 @@ description: Review and design how TanStack Query, Router, and Start work togeth
 
 Use this skill when a task spans more than one TanStack layer, especially Query + Router, or Query + Router + Start together.
 
+Use this skill for cross-stack composition, not as a substitute for a focused Router or Start skill when the task is confined to one domain.
+
 ## What to Optimize For
 
 - One coherent data-loading model across the stack.
@@ -43,6 +45,13 @@ Use this skill when a task spans more than one TanStack layer, especially Query 
 - Is `defaultPreloadStaleTime` or equivalent router preload behavior aligned with Query ownership?
 - Is SSR dehydration/hydration wired to the actual `QueryClient` in use?
 - Are data dependencies duplicated across loader and component code?
+
+## Routing
+
+- If the issue is only Query, route to `tanstack-query`.
+- If the issue is only Router, route to `tanstack-router` or one of its focused sub-skills.
+- If the issue is only Start, route to `tanstack-start` or one of its focused sub-skills.
+- Keep this skill for Query + Router + Start ownership, loader-prefetch alignment, and hydration-boundary decisions.
 
 ## Avoid
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack CLI Choose Ecosystem Integrations"
+  short_description: "Inspect ecosystem add-ons, integration metadata, and installable option sets before choosing a TanStack CLI add-on."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0EA5E9"
+  default_prompt: "Use the bundled TanStack CLI Choose Ecosystem Integrations skill to inspect ecosystem add-ons, compare integration metadata, and choose installable TanStack CLI options."

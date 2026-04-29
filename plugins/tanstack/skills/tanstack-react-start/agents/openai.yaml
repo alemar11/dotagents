@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack React Start"
+  short_description: "Review framework-level TanStack React Start app structure and high-level full-stack React patterns."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#DC2626"
+  default_prompt: "Use the bundled TanStack React Start skill to review framework-level TanStack React Start app setup, structure, and high-level full-stack React patterns."

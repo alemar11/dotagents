@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack CLI Maintain Custom Addons Dev Watch"
+  short_description: "Use the TanStack CLI to build and iterate custom add-ons or templates with dev-watch workflows."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#38BDF8"
+  default_prompt: "Use the bundled TanStack CLI Maintain Custom Addons Dev Watch skill to build and iterate custom TanStack CLI add-ons or templates with the right dev-watch workflow."

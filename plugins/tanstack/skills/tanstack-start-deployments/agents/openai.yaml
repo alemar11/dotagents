@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Start Deployments"
+  short_description: "Review deployment-sensitive constraints and runtime packaging tradeoffs for TanStack Start."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#FECACA"
+  default_prompt: "Use the bundled TanStack Start Deployments skill to review deployment-sensitive constraints, target-specific assumptions, and runtime packaging tradeoffs in TanStack Start."
