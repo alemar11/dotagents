@@ -37,8 +37,6 @@ pub enum Command {
     Activity(ActivityCommand),
     #[command(about = "Inspect schema, indexes, roles, and vacuum state")]
     Schema(SchemaCommand),
-    #[command(about = "Run SQL-backed MCP Toolbox-style Postgres commands")]
-    Toolbox(ToolboxCommand),
     #[command(about = "Release pending migration files into released migrations")]
     Migration(MigrationCommand),
     #[command(about = "Search official PostgreSQL documentation")]
@@ -61,6 +59,10 @@ pub enum ProfileSubcommand {
     Test,
     #[command(about = "Print connection details and key server settings")]
     Info,
+    #[command(about = "Summarize database identity, object counts, activity, and key settings")]
+    Overview,
+    #[command(about = "Inspect PostgreSQL runtime settings")]
+    Settings(ProfileSettingsCommand),
     #[command(about = "Show the PostgreSQL server version")]
     Version,
     #[command(about = "Migrate legacy postgres.toml to config.toml")]
@@ -84,6 +86,20 @@ pub struct SetSslArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct ProfileSettingsCommand {
+    #[command(subcommand)]
+    pub command: ProfileSettingsSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfileSettingsSubcommand {
+    #[command(about = "List autovacuum settings and table-level overrides")]
+    Autovacuum,
+    #[command(about = "List memory-related PostgreSQL settings")]
+    Memory,
+}
+
+#[derive(Debug, Args)]
 pub struct QueryCommand {
     #[command(subcommand)]
     pub command: QuerySubcommand,
@@ -95,6 +111,8 @@ pub enum QuerySubcommand {
     Run(SqlInputArgs),
     #[command(about = "Run EXPLAIN for SQL, defaulting to ANALYZE")]
     Explain(ExplainArgs),
+    #[command(about = "Return a JSON query plan without executing by default")]
+    Plan(QueryPlanArgs),
     #[command(about = "Search schemas, tables, columns, views, and routines by name")]
     Find(FindArgs),
 }
@@ -118,6 +136,15 @@ pub struct ExplainArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct QueryPlanArgs {
+    #[command(flatten)]
+    pub sql: SqlInputArgs,
+
+    #[arg(long, action = ArgAction::SetTrue, help = "Run EXPLAIN ANALYZE")]
+    pub analyze: bool,
+}
+
+#[derive(Debug, Args)]
 pub struct FindArgs {
     #[arg(help = "Case-insensitive object-name search pattern")]
     pub pattern: String,
@@ -136,6 +163,8 @@ pub struct ActivityCommand {
 pub enum ActivitySubcommand {
     #[command(about = "List non-idle sessions in pg_stat_activity")]
     Overview(LimitArgs),
+    #[command(about = "List active sessions in pg_stat_activity")]
+    ActiveQueries(LimitArgs),
     #[command(about = "Show blocked and blocking sessions")]
     Locks,
     #[command(about = "List top pg_stat_statements entries by total time")]
@@ -152,6 +181,8 @@ pub enum ActivitySubcommand {
     TerminatePid(PidArgs),
     #[command(about = "Alias for top pg_stat_statements entries")]
     PgStatTop(LimitArgs),
+    #[command(about = "List replication slots")]
+    ReplicationSlots,
 }
 
 #[derive(Debug, Args)]
@@ -208,10 +239,18 @@ pub enum SchemaSubcommand {
         about = "Inspect tables, columns, constraints, indexes, views, routines, and extensions"
     )]
     Inspect,
+    #[command(about = "List focused schema object groups")]
+    List(SchemaListCommand),
+    #[command(about = "List available or installed extensions")]
+    Extensions(ExtensionListArgs),
     #[command(about = "List largest user tables by total relation size")]
     TableSizes(LimitArgs),
     #[command(about = "Show missing-index candidates and unused indexes")]
     IndexHealth(LimitArgs),
+    #[command(about = "List indexes that are invalid, not ready, or not live")]
+    InvalidIndexes,
+    #[command(about = "Estimate top user tables by dead tuples")]
+    TopBloatedTables(LimitArgs),
     #[command(about = "Find foreign keys without a supporting leading index")]
     MissingFkIndexes,
     #[command(about = "Show vacuum and analyze status for user tables")]
@@ -221,86 +260,38 @@ pub enum SchemaSubcommand {
 }
 
 #[derive(Debug, Args)]
-pub struct ToolboxCommand {
+pub struct SchemaListCommand {
     #[command(subcommand)]
-    pub command: ToolboxSubcommand,
+    pub command: SchemaListSubcommand,
 }
 
 #[derive(Debug, Subcommand)]
-pub enum ToolboxSubcommand {
-    #[command(alias = "execute_sql", about = "Execute SQL from -c, -f, or stdin")]
-    ExecuteSql(SqlInputArgs),
-    #[command(
-        alias = "get_query_plan",
-        about = "Return a JSON query plan without executing by default"
-    )]
-    GetQueryPlan(ToolboxQueryPlanArgs),
-    #[command(
-        alias = "database_overview",
-        about = "Summarize database identity, object counts, activity, and key settings"
-    )]
-    DatabaseOverview,
-    #[command(
-        alias = "list_active_queries",
-        about = "List active sessions in pg_stat_activity"
-    )]
-    ListActiveQueries(LimitArgs),
-    #[command(
-        alias = "list_tables",
-        about = "List user-visible base, partitioned, and foreign tables"
-    )]
-    ListTables,
-    #[command(alias = "list_views", about = "List user-visible views")]
-    ListViews,
-    #[command(alias = "list_schemas", about = "List user-visible schemas")]
-    ListSchemas,
-    #[command(alias = "list_triggers", about = "List user-defined triggers")]
-    ListTriggers,
-    #[command(alias = "list_indexes", about = "List user-visible indexes")]
-    ListIndexes,
-    #[command(alias = "list_sequences", about = "List user-visible sequences")]
-    ListSequences,
-    #[command(
-        alias = "list_available_extensions",
-        about = "List extensions available to install"
-    )]
-    ListAvailableExtensions,
-    #[command(
-        alias = "list_installed_extensions",
-        about = "List installed extensions"
-    )]
-    ListInstalledExtensions,
-    #[command(
-        alias = "list_autovacuum_configurations",
-        about = "List autovacuum settings and table overrides"
-    )]
-    ListAutovacuumConfigurations,
-    #[command(
-        alias = "list_memory_configurations",
-        about = "List memory-related PostgreSQL settings"
-    )]
-    ListMemoryConfigurations,
-    #[command(
-        alias = "list_top_bloated_tables",
-        about = "Estimate top user tables by dead tuples"
-    )]
-    ListTopBloatedTables(LimitArgs),
-    #[command(alias = "list_replication_slots", about = "List replication slots")]
-    ListReplicationSlots,
-    #[command(
-        alias = "list_invalid_indexes",
-        about = "List indexes that are invalid, not ready, or not live"
-    )]
-    ListInvalidIndexes,
+pub enum SchemaListSubcommand {
+    #[command(about = "List user-visible base, partitioned, and foreign tables")]
+    Tables,
+    #[command(about = "List user-visible views")]
+    Views,
+    #[command(about = "List user-visible schemas")]
+    Schemas,
+    #[command(about = "List user-defined triggers")]
+    Triggers,
+    #[command(about = "List user-visible indexes")]
+    Indexes,
+    #[command(about = "List user-visible sequences")]
+    Sequences,
 }
 
 #[derive(Debug, Args)]
-pub struct ToolboxQueryPlanArgs {
-    #[command(flatten)]
-    pub sql: SqlInputArgs,
+pub struct ExtensionListArgs {
+    #[arg(
+        long,
+        conflicts_with = "installed",
+        help = "List extensions available to install"
+    )]
+    pub available: bool,
 
-    #[arg(long, action = ArgAction::SetTrue, help = "Run EXPLAIN ANALYZE")]
-    pub analyze: bool,
+    #[arg(long, conflicts_with = "available", help = "List installed extensions")]
+    pub installed: bool,
 }
 
 #[derive(Debug, Args)]

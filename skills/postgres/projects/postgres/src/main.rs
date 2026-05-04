@@ -52,7 +52,6 @@ async fn run(cli: &Cli) -> Result<()> {
         Command::Query(command) => query(&cli, command, skill_root).await,
         Command::Activity(command) => activity(&cli, command, skill_root).await,
         Command::Schema(command) => schema(&cli, command, skill_root).await,
-        Command::Toolbox(command) => toolbox(&cli, command, skill_root).await,
         Command::Migration(command) => migration(&cli, command, skill_root).await,
         Command::Docs(command) => docs_command(&cli, command).await,
     }
@@ -245,6 +244,24 @@ union all select 'application_name', current_setting('application_name');",
                 &[("Connection Info", table)],
             )
         }
+        ProfileSubcommand::Overview => {
+            let db = db_client(cli, skill_root).await?;
+            let sections = tools::database_overview(&db).await?;
+            render_named_sections(cli.json, "overview", &sections)
+        }
+        ProfileSubcommand::Settings(args) => {
+            let db = db_client(cli, skill_root).await?;
+            match &args.command {
+                ProfileSettingsSubcommand::Autovacuum => {
+                    let sections = tools::list_autovacuum_configurations(&db).await?;
+                    render_named_sections(cli.json, "autovacuum_settings", &sections)
+                }
+                ProfileSettingsSubcommand::Memory => {
+                    let table = tools::list_memory_configurations(&db).await?;
+                    render_named_table(cli.json, "memory_settings", "Memory Settings", table)
+                }
+            }
+        }
         ProfileSubcommand::Version => {
             let db = db_client(cli, skill_root).await?;
             let table = db.query("show server_version;").await?;
@@ -265,7 +282,7 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
     match &command.command {
         QuerySubcommand::Run(args) => {
             let sql = read_sql_input(args)?;
-            let execution = db.simple_query(&sql).await?;
+            let execution = tools::execute_sql(&db, &sql).await?;
             render_query_run(cli.json, &sql, &execution)
         }
         QuerySubcommand::Explain(args) => {
@@ -281,6 +298,11 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
                 json!({"plan": table_to_json(&table)}),
                 &[("Explain", table)],
             )
+        }
+        QuerySubcommand::Plan(args) => {
+            let sql = read_sql_input(&args.sql)?;
+            let table = tools::get_query_plan(&db, &sql, args.analyze).await?;
+            render_named_table(cli.json, "plan", "Query Plan", table)
         }
         QuerySubcommand::Find(args) => {
             let pattern = escape_literal(&format!("%{}%", args.pattern));
@@ -351,6 +373,10 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
                 &[("Activity", table)],
             )
         }
+        ActivitySubcommand::ActiveQueries(args) => {
+            let table = tools::list_active_queries(&db, args.limit).await?;
+            render_named_table(cli.json, "active_queries", "Active Queries", table)
+        }
         ActivitySubcommand::Locks => {
             let table = db.query("select blocked.pid as blocked_pid, blocked.usename as blocked_user, blocking.pid as blocking_pid, blocking.usename as blocking_user, now() - blocked.query_start as blocked_duration, blocked.query as blocked_query, blocking.query as blocking_query from pg_stat_activity blocked join pg_stat_activity blocking on blocking.pid = any(pg_blocking_pids(blocked.pid)) order by blocked_duration desc;").await?;
             render(
@@ -396,6 +422,10 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
         ActivitySubcommand::TerminatePid(args) => {
             destructive_pids(cli, &db, "pg_terminate_backend", &args.pid, args.yes).await
         }
+        ActivitySubcommand::ReplicationSlots => {
+            let table = tools::list_replication_slots(&db).await?;
+            render_named_table(cli.json, "replication_slots", "Replication Slots", table)
+        }
     }
 }
 
@@ -403,6 +433,51 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
     let db = db_client(cli, skill_root).await?;
     match &command.command {
         SchemaSubcommand::Inspect => schema_inspect(cli, &db).await,
+        SchemaSubcommand::List(args) => match &args.command {
+            SchemaListSubcommand::Tables => {
+                let table = tools::list_tables(&db).await?;
+                render_named_table(cli.json, "tables", "Tables", table)
+            }
+            SchemaListSubcommand::Views => {
+                let table = tools::list_views(&db).await?;
+                render_named_table(cli.json, "views", "Views", table)
+            }
+            SchemaListSubcommand::Schemas => {
+                let table = tools::list_schemas(&db).await?;
+                render_named_table(cli.json, "schemas", "Schemas", table)
+            }
+            SchemaListSubcommand::Triggers => {
+                let table = tools::list_triggers(&db).await?;
+                render_named_table(cli.json, "triggers", "Triggers", table)
+            }
+            SchemaListSubcommand::Indexes => {
+                let table = tools::list_indexes(&db).await?;
+                render_named_table(cli.json, "indexes", "Indexes", table)
+            }
+            SchemaListSubcommand::Sequences => {
+                let table = tools::list_sequences(&db).await?;
+                render_named_table(cli.json, "sequences", "Sequences", table)
+            }
+        },
+        SchemaSubcommand::Extensions(args) => {
+            if args.available {
+                let table = tools::list_available_extensions(&db).await?;
+                render_named_table(
+                    cli.json,
+                    "available_extensions",
+                    "Available Extensions",
+                    table,
+                )
+            } else {
+                let table = tools::list_installed_extensions(&db).await?;
+                render_named_table(
+                    cli.json,
+                    "installed_extensions",
+                    "Installed Extensions",
+                    table,
+                )
+            }
+        }
         SchemaSubcommand::TableSizes(args) => {
             let table = db.query(&format!("with sized_tables as (select schemaname, relname, relid, pg_total_relation_size(relid) as total_bytes, pg_relation_size(relid) as table_bytes from pg_stat_user_tables) select schemaname, relname, pg_size_pretty(total_bytes) as total_size, pg_size_pretty(table_bytes) as table_size, pg_size_pretty(total_bytes - table_bytes) as index_size from sized_tables order by total_bytes desc limit {};", args.limit)).await?;
             render(
@@ -429,6 +504,14 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
                 Ok(())
             }
         }
+        SchemaSubcommand::InvalidIndexes => {
+            let table = tools::list_invalid_indexes(&db).await?;
+            render_named_table(cli.json, "invalid_indexes", "Invalid Indexes", table)
+        }
+        SchemaSubcommand::TopBloatedTables(args) => {
+            let table = tools::list_top_bloated_tables(&db, args.limit).await?;
+            render_named_table(cli.json, "top_bloated_tables", "Top Bloated Tables", table)
+        }
         SchemaSubcommand::MissingFkIndexes => {
             let table = db.query("with fk_constraints as (select c.oid as constraint_oid, c.conrelid, c.conname, c.conkey as fk_attnums, array_agg(a.attname order by cols.ordinality) as fk_columns from pg_constraint c join lateral unnest(c.conkey) with ordinality as cols(attnum, ordinality) on true join pg_attribute a on a.attrelid = c.conrelid and a.attnum = cols.attnum and a.attisdropped = false where c.contype = 'f' group by c.oid, c.conrelid, c.conname, c.conkey), supporting_indexes as (select i.indrelid as conrelid, array_agg(idx_col.attnum order by idx_col.ordinality) filter (where idx_col.ordinality <= i.indnkeyatts and idx_col.attnum > 0) as index_key_attnums from pg_index i cross join lateral unnest(i.indkey::smallint[]) with ordinality as idx_col(attnum, ordinality) where i.indpred is null and i.indisvalid and i.indisready group by i.indrelid, i.indexrelid, i.indnkeyatts) select fk.conrelid::regclass as table_name, fk.conname as constraint_name, array_to_string(fk.fk_columns, ', ') as fk_columns from fk_constraints fk where not exists (select 1 from supporting_indexes si where si.conrelid = fk.conrelid and array_length(si.index_key_attnums, 1) >= array_length(fk.fk_attnums, 1) and si.index_key_attnums[1:array_length(fk.fk_attnums, 1)] = fk.fk_attnums) order by table_name::text, constraint_name;").await?;
             render(
@@ -452,107 +535,6 @@ async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result
                 json!({"roles": table_to_json(&table)}),
                 &[("Roles", table)],
             )
-        }
-    }
-}
-
-async fn toolbox(cli: &Cli, command: &ToolboxCommand, skill_root: &Path) -> Result<()> {
-    let db = db_client(cli, skill_root).await?;
-    match &command.command {
-        ToolboxSubcommand::ExecuteSql(args) => {
-            let sql = read_sql_input(args)?;
-            let execution = tools::execute_sql(&db, &sql).await?;
-            render_tool_query_run(cli.json, "execute_sql", &sql, &execution)
-        }
-        ToolboxSubcommand::GetQueryPlan(args) => {
-            let sql = read_sql_input(&args.sql)?;
-            let table = tools::get_query_plan(&db, &sql, args.analyze).await?;
-            render_tool_table(cli.json, "get_query_plan", "Query Plan", table)
-        }
-        ToolboxSubcommand::DatabaseOverview => {
-            let sections = tools::database_overview(&db).await?;
-            render_tool_sections(cli.json, "database_overview", &sections)
-        }
-        ToolboxSubcommand::ListActiveQueries(args) => {
-            let table = tools::list_active_queries(&db, args.limit).await?;
-            render_tool_table(cli.json, "list_active_queries", "Active Queries", table)
-        }
-        ToolboxSubcommand::ListTables => {
-            let table = tools::list_tables(&db).await?;
-            render_tool_table(cli.json, "list_tables", "Tables", table)
-        }
-        ToolboxSubcommand::ListViews => {
-            let table = tools::list_views(&db).await?;
-            render_tool_table(cli.json, "list_views", "Views", table)
-        }
-        ToolboxSubcommand::ListSchemas => {
-            let table = tools::list_schemas(&db).await?;
-            render_tool_table(cli.json, "list_schemas", "Schemas", table)
-        }
-        ToolboxSubcommand::ListTriggers => {
-            let table = tools::list_triggers(&db).await?;
-            render_tool_table(cli.json, "list_triggers", "Triggers", table)
-        }
-        ToolboxSubcommand::ListIndexes => {
-            let table = tools::list_indexes(&db).await?;
-            render_tool_table(cli.json, "list_indexes", "Indexes", table)
-        }
-        ToolboxSubcommand::ListSequences => {
-            let table = tools::list_sequences(&db).await?;
-            render_tool_table(cli.json, "list_sequences", "Sequences", table)
-        }
-        ToolboxSubcommand::ListAvailableExtensions => {
-            let table = tools::list_available_extensions(&db).await?;
-            render_tool_table(
-                cli.json,
-                "list_available_extensions",
-                "Available Extensions",
-                table,
-            )
-        }
-        ToolboxSubcommand::ListInstalledExtensions => {
-            let table = tools::list_installed_extensions(&db).await?;
-            render_tool_table(
-                cli.json,
-                "list_installed_extensions",
-                "Installed Extensions",
-                table,
-            )
-        }
-        ToolboxSubcommand::ListAutovacuumConfigurations => {
-            let sections = tools::list_autovacuum_configurations(&db).await?;
-            render_tool_sections(cli.json, "list_autovacuum_configurations", &sections)
-        }
-        ToolboxSubcommand::ListMemoryConfigurations => {
-            let table = tools::list_memory_configurations(&db).await?;
-            render_tool_table(
-                cli.json,
-                "list_memory_configurations",
-                "Memory Configurations",
-                table,
-            )
-        }
-        ToolboxSubcommand::ListTopBloatedTables(args) => {
-            let table = tools::list_top_bloated_tables(&db, args.limit).await?;
-            render_tool_table(
-                cli.json,
-                "list_top_bloated_tables",
-                "Top Bloated Tables",
-                table,
-            )
-        }
-        ToolboxSubcommand::ListReplicationSlots => {
-            let table = tools::list_replication_slots(&db).await?;
-            render_tool_table(
-                cli.json,
-                "list_replication_slots",
-                "Replication Slots",
-                table,
-            )
-        }
-        ToolboxSubcommand::ListInvalidIndexes => {
-            let table = tools::list_invalid_indexes(&db).await?;
-            render_tool_table(cli.json, "list_invalid_indexes", "Invalid Indexes", table)
         }
     }
 }
@@ -629,13 +611,13 @@ fn render(json_mode: bool, payload: Value, sections: &[(&str, QueryTable)]) -> R
     }
 }
 
-fn render_tool_table(json_mode: bool, key: &str, title: &str, table: QueryTable) -> Result<()> {
+fn render_named_table(json_mode: bool, key: &str, title: &str, table: QueryTable) -> Result<()> {
     let mut payload = serde_json::Map::new();
     payload.insert(key.to_string(), table_to_json(&table));
     render(json_mode, Value::Object(payload), &[(title, table)])
 }
 
-fn render_tool_sections(json_mode: bool, key: &str, sections: &[ToolSection]) -> Result<()> {
+fn render_named_sections(json_mode: bool, key: &str, sections: &[ToolSection]) -> Result<()> {
     if json_mode {
         let sections_payload = sections
             .iter()
@@ -652,27 +634,6 @@ fn render_tool_sections(json_mode: bool, key: &str, sections: &[ToolSection]) ->
             println!("{}", render_table(&section.table, Some(section.title)));
         }
         Ok(())
-    }
-}
-
-fn render_tool_query_run(
-    json_mode: bool,
-    key: &str,
-    sql: &str,
-    execution: &QueryExecution,
-) -> Result<()> {
-    if json_mode {
-        let mut payload = serde_json::Map::new();
-        payload.insert(
-            key.to_string(),
-            json!({
-                "query": sql,
-                "statements": execution_to_json(execution)["statements"].clone(),
-            }),
-        );
-        print_json(&Value::Object(payload))
-    } else {
-        render_query_run(false, sql, execution)
     }
 }
 

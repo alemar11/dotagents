@@ -59,9 +59,10 @@ patterns, and manage migration release flow through the shipped
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" profile test`
 - Schema introspection:
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" schema inspect`
-- Toolbox-style catalog and diagnostic commands:
-  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" toolbox database-overview`
-  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" toolbox list-tables`
+- Focused catalog and diagnostic commands:
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" profile overview`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" schema list tables`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" query plan -c "select * from public.users limit 10;"`
 - Object search:
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" query find users --types table,column`
 - Release a pending migration file:
@@ -117,6 +118,10 @@ patterns, and manage migration release flow through the shipped
   - Quick connection check.
 - `profile info`
   - Print connection details and key server settings.
+- `profile overview`
+  - Summarize database identity, object counts, activity, and key settings.
+- `profile settings autovacuum|memory`
+  - Inspect focused PostgreSQL runtime settings.
 - `profile version`
   - Show server version.
 - `profile migrate-toml`
@@ -128,23 +133,19 @@ patterns, and manage migration release flow through the shipped
   - Execute SQL from `-c`, `-f`, or stdin, preserving per-statement results.
 - `query explain`
   - Run `EXPLAIN`, defaulting to `ANALYZE`.
+- `query plan`
+  - Return a non-executing JSON query plan by default; use `--analyze` to run
+    `EXPLAIN ANALYZE`.
 - `query find <pattern> [--types ...]`
   - Search schemas, tables, columns, views, and functions by name.
-- `activity overview|locks|slow|long-running|cancel|terminate|cancel-pid|terminate-pid|pg-stat-top`
+- `activity overview|active-queries|locks|slow|long-running|cancel|terminate|cancel-pid|terminate-pid|pg-stat-top|replication-slots`
   - Runtime diagnostics and query-control operations.
-- `schema inspect|table-sizes|index-health|missing-fk-indexes|vacuum-status|roles`
+- `schema inspect|list|extensions|table-sizes|index-health|invalid-indexes|top-bloated-tables|missing-fk-indexes|vacuum-status|roles`
   - Schema and catalog inspection.
-- `toolbox <command>`
-  - SQL-backed compatibility commands for common MCP Toolbox-style Postgres
-    catalog and diagnostic surfaces. Underscore aliases such as
-    `execute_sql` are also accepted.
-  - Supported commands: `execute-sql`, `get-query-plan`,
-    `database-overview`, `list-active-queries`, `list-tables`, `list-views`,
-    `list-schemas`, `list-triggers`, `list-indexes`, `list-sequences`,
-    `list-available-extensions`, `list-installed-extensions`,
-    `list-autovacuum-configurations`, `list-memory-configurations`,
-    `list-top-bloated-tables`, `list-replication-slots`, and
-    `list-invalid-indexes`.
+  - `schema list` supports `tables`, `views`, `schemas`, `triggers`,
+    `indexes`, and `sequences`.
+  - `schema extensions` supports `--installed` and `--available`; installed
+    extensions are the default when neither flag is provided.
 - `migration release`
   - Move a pending migration into `released/` and update `CHANGELOG.md`.
 - `docs search`
