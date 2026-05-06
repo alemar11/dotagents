@@ -36,6 +36,19 @@ Keep `github` as the default for mixed or ambiguous requests, publish or
 lifecycle work on already-pushed branches, or any time the user just says
 "GitHub."
 
+## Skill Selection
+
+- Use `git-commit` when the request is only to stage and commit local changes.
+- Use `yeet` when local work must become a pushed branch and draft PR.
+- Use `github` when the branch is already pushed, the GitHub task is mixed, or
+  the user asks generically for GitHub work.
+- Use `github-triage`, `github-reviews`, `github-ci`, or `github-releases`
+  only when the request is clearly confined to that domain.
+- Use plain `git` and `gh` when one command or a short direct sequence expresses
+  the job clearly. Use `ghflow` when the workflow needs normalized JSON,
+  cross-session reuse, review-thread routing, authenticated-user stars or star
+  lists, focused failing-PR CI inspection, or current-branch publish helpers.
+
 ## Host prerequisites
 
 - `git` and `gh` are required host dependencies for umbrella GitHub work in
@@ -64,6 +77,11 @@ lifecycle work on already-pushed branches, or any time the user just says
 | PR checks and GitHub Actions investigation | `github-ci` |
 | Release planning, notes, and publication with plain `git`/`gh` | `github-releases` |
 | Full publish from local checkout to draft PR | `yeet` |
+
+Do not open every GitStack bundled skill during normal GitHub work. Pick the
+smallest owning surface from this table, then use `ghflow` only when the helper
+adds behavior that plain `git` or `gh` would otherwise need repeated shell glue
+to reproduce.
 
 ## Trigger rules
 
