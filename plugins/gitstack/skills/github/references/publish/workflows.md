@@ -11,9 +11,9 @@ Use this reference for the current-branch publish helpers that still justify
 
 Run this from the target repo root before branch, push, or PR decisions when
 upstream state or open-PR state is uncertain.
-Resolve `<resolved-ghflow>` by preferring bare `ghflow` when it is already on
-`PATH`, otherwise by using the installed GitStack artifact path directly. If
-neither can be resolved, stop and treat it as broken install or runtime drift.
+Resolve `<resolved-ghflow>` with `../core/ghflow-resolution.md`. Do not assume
+the bare `ghflow` command is on `PATH`; if the installed artifact cannot be
+resolved, stop and treat it as broken install or runtime drift.
 
 ## Open Or Reuse Current Branch PR
 

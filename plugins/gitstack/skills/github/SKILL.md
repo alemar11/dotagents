@@ -16,10 +16,10 @@ Default command preference:
 
 - plain `gh` for straightforward repo, issue, PR, and release operations
 - plain `git` for local checkout state and branch operations
-- shared `ghflow` helpers only when the job needs extra orchestration, shared
-  JSON contracts, authenticated-user star or list GraphQL behavior, or the
-  repo-aware publish helpers or focused CI inspector that multiple bundled
-  skills reuse
+- shared `ghflow` helpers, run through the resolved installed artifact, only
+  when the job needs extra orchestration, shared JSON contracts,
+  authenticated-user star or list GraphQL behavior, or the repo-aware publish
+  helpers or focused CI inspector that multiple bundled skills reuse
 
 `gitstack` bundles one shared helper runtime:
 
@@ -45,9 +45,10 @@ lifecycle work on already-pushed branches, or any time the user just says
 - Use `github-triage`, `github-reviews`, `github-ci`, or `github-releases`
   only when the request is clearly confined to that domain.
 - Use plain `git` and `gh` when one command or a short direct sequence expresses
-  the job clearly. Use `ghflow` when the workflow needs normalized JSON,
-  cross-session reuse, review-thread routing, authenticated-user stars or star
-  lists, focused failing-PR CI inspection, or current-branch publish helpers.
+  the job clearly. Use the resolved `ghflow` artifact when the workflow needs
+  normalized JSON, cross-session reuse, review-thread routing,
+  authenticated-user stars or star lists, focused failing-PR CI inspection, or
+  current-branch publish helpers.
 
 ## Host prerequisites
 
@@ -59,9 +60,11 @@ lifecycle work on already-pushed branches, or any time the user just says
 - Confirm the authenticated GitHub session before writes:
   - `gh auth status`
 - If either is missing, use `references/core/installation.md`.
-- Prefer `ghflow --version` when bare `ghflow` is already resolvable; otherwise
-  run the installed GitStack artifact path directly for the shared-helper
-  version check.
+- `ghflow` is an embedded plugin artifact, not a host dependency. Resolve it
+  with `references/core/ghflow-resolution.md` before use, then run the resolved
+  installed artifact path directly.
+- Treat bare `ghflow` as display shorthand only after an explicit wrapper,
+  alias, or `PATH` contract has already been verified for the current shell.
 - The maintained shared implementation lives under
   `<plugin-root>/projects/ghflow/src/ghflow/`.
 - Specialist bundled skills are routing layers only; they do not own separate
@@ -79,9 +82,9 @@ lifecycle work on already-pushed branches, or any time the user just says
 | Full publish from local checkout to draft PR | `yeet` |
 
 Do not open every GitStack bundled skill during normal GitHub work. Pick the
-smallest owning surface from this table, then use `ghflow` only when the helper
-adds behavior that plain `git` or `gh` would otherwise need repeated shell glue
-to reproduce.
+smallest owning surface from this table, then use the resolved `ghflow`
+artifact only when the helper adds behavior that plain `git` or `gh` would
+otherwise need repeated shell glue to reproduce.
 
 ## Trigger rules
 
@@ -110,7 +113,7 @@ Use direct commands first when they already express the job clearly:
 - Release reads:
   - `gh release view <tag> --repo <owner/repo>`
 
-Use `ghflow` when one of these applies:
+Use the resolved `ghflow` artifact when one of these applies:
 
 - the workflow is reused across multiple bundled skills
 - the job needs repo-aware publish context or PR open-or-reuse behavior
@@ -145,11 +148,11 @@ Use `ghflow` when one of these applies:
   - `gh issue create --repo <owner/repo> ...`
   - `gh pr edit <n> --repo <owner/repo> ...`
 - Shared helper workflows:
-  - `ghflow ci inspect --pr <number-or-url>`
-  - `ghflow --json publish context`
-  - `ghflow publish open --draft`
-  - `ghflow --json stars list`
-  - `ghflow --json stars lists list`
+  - `<resolved-ghflow> ci inspect --pr <number-or-url>`
+  - `<resolved-ghflow> --json publish context`
+  - `<resolved-ghflow> publish open --draft`
+  - `<resolved-ghflow> --json stars list`
+  - `<resolved-ghflow> --json stars lists list`
 - Triage specialist:
   - `../github-triage/references/script-summary.md`
 - Reviews specialist:
@@ -161,7 +164,8 @@ Use `ghflow` when one of these applies:
 
 ## References navigation
 
-- Start at `references/script-summary.md` for the shared `ghflow` entrypoint.
+- Start at `references/core/ghflow-resolution.md` for the shared `ghflow`
+  artifact path, then use `references/script-summary.md` for the command map.
 - Open `references/workflows.md` when you need the full umbrella runbook.
 - For pure domain work, jump into the specialist skill references:
   - `../github-triage/references/`
@@ -181,9 +185,9 @@ Use `ghflow` when one of these applies:
 - Treat `<plugin-root>/projects/ghflow/` as the maintained Python project
   behind that artifact.
 - Keep runtime logic in `<plugin-root>/projects/ghflow/src/ghflow/`.
-- Keep skill docs sample-first around `git` and `gh`; use `ghflow` only for
-  shared higher-level behavior such as failing-PR CI inspection, review-thread
-  routing, stars, lists, and publish helpers.
+- Keep skill docs sample-first around `git` and `gh`; use the resolved
+  `ghflow` artifact only for shared higher-level behavior such as failing-PR CI
+  inspection, review-thread routing, stars, lists, and publish helpers.
 - Do not add skill-local runtime copies under bundled GitHub skills.
 - Do not add compatibility aliases or reintroduce public per-domain script
   entrypoints.

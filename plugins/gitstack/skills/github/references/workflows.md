@@ -21,9 +21,13 @@ shared `ghflow` helpers is actually justified.
 
 ## Routing rules
 
-- Stay on direct `gh` or `git` commands by default, and switch to `ghflow`
-  only for focused failing-PR CI inspection, review-thread routing,
-  authenticated-user stars or star lists, and current-branch publish helpers.
+- Stay on direct `gh` or `git` commands by default, and switch to the resolved
+  `ghflow` artifact only for focused failing-PR CI inspection,
+  review-thread routing, authenticated-user stars or star lists, and
+  current-branch publish helpers.
+- Before running any shared helper command, resolve the installed artifact with
+  `references/core/ghflow-resolution.md`; bare `ghflow` is not assumed to be
+  on `PATH`.
 - Route only full local-worktree publish to `yeet`.
 - Use `references/core/failure-retries.md` when the chosen `ghflow` command
   fails and you need the next retry path quickly.

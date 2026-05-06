@@ -11,14 +11,16 @@ bundled `github` skill.
 
 ## Shared `ghflow` helpers kept in triage
 
-- `ghflow stars list`
-- `ghflow stars add`
-- `ghflow stars remove`
-- `ghflow stars lists list`
-- `ghflow stars lists items`
-- `ghflow stars lists delete`
-- `ghflow stars lists assign`
-- `ghflow stars lists unassign`
+- Resolve the artifact with `../core/ghflow-resolution.md` before running
+  helper commands.
+- `<resolved-ghflow> stars list`
+- `<resolved-ghflow> stars add`
+- `<resolved-ghflow> stars remove`
+- `<resolved-ghflow> stars lists list`
+- `<resolved-ghflow> stars lists items`
+- `<resolved-ghflow> stars lists delete`
+- `<resolved-ghflow> stars lists assign`
+- `<resolved-ghflow> stars lists unassign`
 
 ## Raw `gh` workflows
 

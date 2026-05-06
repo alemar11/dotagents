@@ -18,9 +18,13 @@ skill.
 ## Shared helper workflows
 
 - Stars:
-  `ghflow --json stars list|add|remove ...`
+  `<resolved-ghflow> --json stars list|add|remove ...`
 - Star lists:
-  `ghflow --json stars lists list|items|delete|assign|unassign ...`
+  `<resolved-ghflow> --json stars lists list|items|delete|assign|unassign ...`
+
+Resolve `<resolved-ghflow>` with
+`../../github/references/core/ghflow-resolution.md` first; bare `ghflow` is not
+assumed to be on `PATH`.
 
 ## Raw `gh` workflows that replaced older wrappers
 

@@ -38,6 +38,14 @@ Resolve these terms before writing commands or examples:
 - `artifact path`: the owner-root-relative path to the shipped runnable artifact, usually `scripts/<tool>` or `scripts/<tool>.<ext>`
 - `public runtime noun`: optional shorthand such as `<tool>` only when the host docs explicitly define a wrapper, alias, or PATH setup that makes that form executable
 
+Do not assume embedded CLIs are installed as bare shell commands. Runtime
+instructions, examples, and troubleshooting paths must be artifact-first:
+use `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed
+artifact path unless the host docs have already established an executable
+wrapper, alias, or `PATH` contract for bare `<tool> ...`. A missing bare command
+is expected in embedded-host usage; treat a missing shipped artifact as the real
+runtime failure.
+
 Use `/` separators for repository-relative template paths such as
 `scripts/<tool>` and `projects/<tool>/`. Use OS-specific home-directory
 notation only for real per-user filesystem paths:
@@ -187,6 +195,9 @@ Keep these invariants explicit in the host docs and CLI docs:
 - do not standardize alternative generic maintenance folders such as `src/`, `code/`, `impl/`, or `source/` for the full project layout
 - in user-facing skill docs, examples, and runbooks, make executable examples use `<artifact-path> ...` unless the host docs explicitly define a wrapper, alias, or PATH contract for bare `<tool> ...`
 - bare `<tool> ...` can appear only as optional shorthand after that executable contract is documented
+- when maintaining existing embedded CLI docs, rewrite PATH-first examples such
+  as `command -v <tool>` or `<tool> --version` into artifact-resolution examples
+  unless the host deliberately ships a PATH-level wrapper
 - do not tell bundled skills to run `scripts/<tool>` unless that path is actually the artifact path from that skill's `owner root`
 - when a bundled skill documents a plugin-shared CLI that runs from `<plugin-root>`, introduce that execution context explicitly before the command, such as `From the plugin root, run <artifact-path> ...`
 

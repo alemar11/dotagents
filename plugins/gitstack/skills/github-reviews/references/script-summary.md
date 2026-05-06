@@ -11,4 +11,6 @@ bundled `github-reviews` skill.
 
 ## Shared `ghflow` helper kept in reviews
 
-- `ghflow reviews address`
+- Resolve the artifact with `../../github/references/core/ghflow-resolution.md`
+  before running helper commands.
+- `<resolved-ghflow> reviews address`

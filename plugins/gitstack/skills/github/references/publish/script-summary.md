@@ -5,5 +5,7 @@ the bundled `github` skill.
 
 ## Shared helpers kept in publish
 
-- `ghflow publish context`
-- `ghflow publish open`
+- Resolve the artifact with `../core/ghflow-resolution.md` before running
+  helper commands.
+- `<resolved-ghflow> publish context`
+- `<resolved-ghflow> publish open`

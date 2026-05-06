@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub Triage"
-  short_description: "Prefer `gh` for repo, issue, and PR triage, and use shared `ghflow` helpers only for authenticated-user stars and star lists."
+  short_description: "Prefer `gh` for repo, issue, and PR triage, and resolve the installed `ghflow` artifact only for authenticated-user stars and star lists."
   brand_color: "#0F766E"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub Triage skill to prefer direct `gh` commands for repository, issue, and PR work, use raw `gh issue ...` sequences for cross-repo issue copy or move and close-with-evidence flows, and reserve shared `ghflow` helpers for authenticated-user stars and star lists."
+  default_prompt: "Use the bundled GitHub Triage skill to prefer direct `gh` commands for repository, issue, and PR work, use raw `gh issue ...` sequences for cross-repo issue copy or move and close-with-evidence flows, and resolve the installed `ghflow` artifact only for authenticated-user stars and star lists."

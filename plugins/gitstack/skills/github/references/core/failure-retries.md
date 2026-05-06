@@ -5,9 +5,9 @@ next retry command without re-deriving the fallback path.
 
 - Runtime path errors (`ghflow`: no such file or directory):
   - Retry command:
-    rerun the same command through the resolved installed GitStack artifact
-    path instead of assuming the current checkout or shell `PATH` already owns
-    `ghflow`.
+    use `ghflow-resolution.md` and rerun the same command through the resolved
+    installed GitStack artifact path. Missing bare `ghflow` is expected in
+    embedded-host usage and is not itself a publish blocker.
 - Installed `ghflow` artifact cannot be resolved:
   - Retry command:
     inspect the installed plugin cache and stop the publish flow; this is a
@@ -38,7 +38,7 @@ next retry command without re-deriving the fallback path.
     title/body/base fields.
 - Existing current-branch PR targets the wrong base during publish:
   - Retry command:
-    rerun the resolved `ghflow publish open --base <locked-base>` command to
+    rerun `<resolved-ghflow> publish open --base <locked-base>` to
     surface the mismatch,
     then correct the target with
     `gh pr edit <n> --base <locked-base>` or

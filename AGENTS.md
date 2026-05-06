@@ -107,11 +107,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Repo-level embedded-CLI invariants are: shipped artifacts live under `scripts/`, maintenance-only implementations live under `projects/<tool>/`, and ownership stays aligned when a CLI is skill-owned, plugin-shared, or owned by one bundled plugin skill. (Codex learning)
 - Persist embedded-CLI config in owner-aligned `config.toml` files under `<project-root>/.skills/...` or `<project-root>/.plugins/...`, and treat those directories as config-only. (Codex learning)
 - Require the shipped artifact to expose `--version` with one semver source of truth, and if `projects/<tool>/` exists require `projects/<tool>/AGENTS.md` plus a scoped `projects/<tool>/.gitignore` when generated state exists. (Codex learning)
+- Keep embedded-CLI docs artifact-first: examples must run `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed artifact path unless the host explicitly documents a wrapper, alias, or `PATH` contract for bare `<tool> ...`. (Codex learning)
 
 ### GitStack plugin
 - Keep `plugins/gitstack/` as the preferred full-stack install surface for linked git authoring, GitHub operations, and publish orchestration.
 - Keep `plugins/gitstack/scripts/ghflow` as the shared runtime for bundled GitHub skills; do not add bundled skill-local runtime copies.
 - Keep `ghflow` intentionally narrow in implementation scope; avoid expanding it into wrappers for routine `git` or `gh` operations that do not need shared higher-level behavior. (Codex learning)
+- Treat bare `ghflow` as display shorthand only in GitStack runtime docs; executable examples must resolve and run the installed `scripts/ghflow` artifact unless a shell wrapper or `PATH` contract has already been verified. (Codex learning)
 - Bundle `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, and `yeet` under `plugins/gitstack/skills/`.
 - Keep GitHub-oriented skills distributed through `plugins/gitstack/`, not duplicated as standalone reusable skills under `skills/`. (Codex learning)
 

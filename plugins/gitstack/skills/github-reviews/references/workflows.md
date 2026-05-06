@@ -13,5 +13,9 @@ Use this reference for review-domain GitHub flows.
 ## Shared helper
 
 - Review-thread triage and reply routing:
-  `ghflow --json reviews address --pr <n> --repo <owner/repo>`
-  `ghflow reviews address --pr <n> --repo <owner/repo> --selection <rows> --reply-body <text>`
+  `<resolved-ghflow> --json reviews address --pr <n> --repo <owner/repo>`
+  `<resolved-ghflow> reviews address --pr <n> --repo <owner/repo> --selection <rows> --reply-body <text>`
+
+Resolve `<resolved-ghflow>` with
+`../../github/references/core/ghflow-resolution.md` first; bare `ghflow` is not
+assumed to be on `PATH`.

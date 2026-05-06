@@ -11,9 +11,11 @@ Use this bundled skill when the request is clearly about review comments,
 review threads, replies, or submitting a review.
 
 Prefer direct `gh` commands for simple review submission or top-level PR
-comments. Use `ghflow` when the job needs thread selection, reply routing, or
-shared higher-level behavior. Keep reactions and
-mixed-domain GitHub work in the umbrella `github` skill.
+comments. Use the resolved GitStack `ghflow` artifact when the job needs thread
+selection, reply routing, or shared higher-level behavior. Resolve it with
+`../github/references/core/ghflow-resolution.md`; do not assume bare `ghflow`
+is on `PATH`. Keep reactions and mixed-domain GitHub work in the umbrella
+`github` skill.
 
 ## Direct commands first
 
@@ -21,7 +23,7 @@ mixed-domain GitHub work in the umbrella `github` skill.
 - `gh pr review <n> --repo <owner/repo> --approve`
 - `gh pr review <n> --repo <owner/repo> --request-changes --body <text>`
 
-## Use `ghflow` when
+## Use Resolved `ghflow` When
 
 - the task is about review-thread inspection rather than a single top-level
   review submission
@@ -31,7 +33,7 @@ mixed-domain GitHub work in the umbrella `github` skill.
 
 ## Fast path
 
-- `ghflow --json reviews address --pr <n> --repo <owner/repo>`
+- `<resolved-ghflow> --json reviews address --pr <n> --repo <owner/repo>`
 - `gh pr comment <n> --repo <owner/repo> --body <text>`
 - `gh pr review <n> --repo <owner/repo> --approve`
 

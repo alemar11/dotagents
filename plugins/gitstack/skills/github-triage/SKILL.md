@@ -11,9 +11,11 @@ Use this bundled skill when the request is clearly about repo orientation,
 issues, PR metadata, authenticated-user stars, or star lists.
 
 Prefer direct `gh` commands for straightforward repo, issue, and PR work.
-Use `ghflow` for the parts that are API-heavy, cross-session standardized, or
-shared with other bundled skills. Route mixed-domain or publish-lifecycle work
-back to the umbrella `github` skill.
+Use the resolved GitStack `ghflow` artifact for the parts that are API-heavy,
+cross-session standardized, or shared with other bundled skills. Resolve it
+with `../github/references/core/ghflow-resolution.md`; do not assume bare
+`ghflow` is on `PATH`. Route mixed-domain or publish-lifecycle work back to the
+umbrella `github` skill.
 
 ## Direct commands first
 
@@ -24,7 +26,7 @@ back to the umbrella `github` skill.
 - `gh issue edit <n> --repo <owner/repo> ...`
 - `gh pr edit <n> --repo <owner/repo> ...`
 
-## Use `ghflow` when
+## Use Resolved `ghflow` When
 
 - the workflow needs normalized JSON across repos or domains
 - the job is about authenticated-user stars or star lists
@@ -34,8 +36,8 @@ back to the umbrella `github` skill.
 - `gh repo view --json nameWithOwner,description,defaultBranchRef,url`
 - `gh issue view <n> --repo <owner/repo>`
 - `gh pr view <n> --repo <owner/repo>`
-- `ghflow --json stars list`
-- `ghflow --json stars lists list`
+- `<resolved-ghflow> --json stars list`
+- `<resolved-ghflow> --json stars lists list`
 
 ## Trigger rules
 

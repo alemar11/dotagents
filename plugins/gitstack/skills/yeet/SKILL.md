@@ -46,18 +46,18 @@ Keep v1 intentionally narrow:
    - Start with `git status -sb`.
    - Resolve the current branch, detached-HEAD state, and whether you are still
      on the repository default branch.
-   - Resolve the installed `ghflow` artifact first. Prefer bare `ghflow` only
-     when `command -v ghflow` succeeds; otherwise resolve the installed
-     GitStack artifact path and run that path directly.
-   - Run the resolved `ghflow --json publish context` command from the target
+   - Resolve the installed `ghflow` artifact first with
+     `../github/references/core/ghflow-resolution.md`; do not assume the bare
+     command is on `PATH`.
+   - Run `<resolved-ghflow> --json publish context` from the target
      repo root before creating branches, commits, or pushes that are intended
      to end in a PR.
    - If the user already named a PR base such as `stable`, treat that as
      locked publish intent for the rest of the workflow instead of letting a
      later helper choose a different base.
-   - If neither bare `ghflow` nor the installed artifact path can be resolved,
-     stop and treat the runtime as a broken GitStack install instead of
-     continuing with an alternate publish path.
+   - If the installed artifact path cannot be resolved, stop and treat the
+     runtime as a broken GitStack install instead of continuing with an
+     alternate publish path.
    - If `git` or `gh` readiness is uncertain, confirm it directly with
      `command -v git`, `git --version`, `command -v gh`, `gh --version`, and
      `gh auth status`.
@@ -83,7 +83,7 @@ Keep v1 intentionally narrow:
    - Otherwise use `git push origin <branch>`.
 6. Open or reuse the draft PR.
    - Hand off to `github` for publish-context inspection plus current-branch PR
-     opening or reuse through the resolved `ghflow publish open` artifact.
+     opening or reuse through the `<resolved-ghflow> publish open` artifact.
    - If step 1 or step 2 captured a locked PR base, always pass it with
      `--base <branch>` on create or reuse flows instead of letting the helper
      fall back to the repository default branch.
@@ -111,11 +111,11 @@ Keep v1 intentionally narrow:
   verification.
 - Never push without confirming scope when the worktree is mixed.
 - Never start branch, commit, or push mutations for a PR-intended flow until
-  the resolved `ghflow --json publish context` command has passed from the
+  `<resolved-ghflow> --json publish context` has passed from the
   target repo root.
-- Never treat missing bare `ghflow` as a normal publish branch. Resolve the
-  installed GitStack artifact path explicitly; if that also fails, stop and
-  treat it as broken install or runtime drift.
+- Never treat missing bare `ghflow` as a normal publish branch or a meaningful
+  warning by itself. Resolve the installed GitStack artifact path explicitly;
+  if that fails, stop and treat it as broken install or runtime drift.
 - Default to a draft PR unless the user explicitly asks for a ready PR.
 - Stop if the repo is not connected to an accessible same-repo GitHub remote.
 - Do not vendor or duplicate the bundled `git-commit` or `github` helper

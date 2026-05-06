@@ -17,16 +17,16 @@ silently broadening scope.
 ### Operator policy
 
 - Start with `git status -sb`.
-- Resolve the installed `ghflow` artifact first. Prefer bare `ghflow` only when
-  `command -v ghflow` succeeds; otherwise use the installed GitStack artifact
-  path directly.
-- Run the resolved `ghflow --json publish context` command from the target repo
+- Resolve the installed `ghflow` artifact first with
+  `../../github/references/core/ghflow-resolution.md`; do not assume the bare
+  command is on `PATH`.
+- Run `<resolved-ghflow> --json publish context` from the target repo
   root before creating branches, commits, or pushes that are intended to end in
   a PR.
 - If the user named an explicit PR base, lock it immediately and carry it
   through the rest of the publish flow.
-- If neither bare `ghflow` nor the installed artifact path can be resolved,
-  stop and treat the runtime as a broken GitStack install.
+- If the installed artifact path cannot be resolved, stop and treat the
+  runtime as a broken GitStack install.
 - If `git` or `gh` readiness is uncertain, confirm it directly with
   `command -v git`, `git --version`, `command -v gh`, `gh --version`, and
   `gh auth status`.
@@ -59,15 +59,13 @@ silently broadening scope.
 
 ```bash
 git status -sb
-<resolved-ghflow> --json publish context
+resolved_ghflow="$(find "$HOME/.codex/plugins/cache" -path '*/gitstack/*/scripts/ghflow' -type f 2>/dev/null | sort | tail -n 1)"
+test -n "$resolved_ghflow" && test -x "$resolved_ghflow"
+"$resolved_ghflow" --json publish context
 ```
 
-Resolve `<resolved-ghflow>` in this order:
-
-```bash
-command -v ghflow
-find ~/.codex/plugins/cache -path '*/gitstack/*/scripts/ghflow' -type f | sort | tail -n 1
-```
+Use `"$resolved_ghflow" ...` for later commands shown as
+`<resolved-ghflow> ...`.
 
 Use direct readiness checks only when the runtime itself is suspect:
 
@@ -98,12 +96,12 @@ gh pr view --json baseRefName,url,isDraft
 - `gh` install or auth checks fail before mutation: stop, fix the failure, then
   rerun the direct readiness checks from the target repo root.
 - Bare `ghflow` is unavailable in the current shell:
-  resolve the installed GitStack artifact path and rerun the same command
-  through that path.
-- Neither bare `ghflow` nor the installed artifact path can be resolved:
+  this is expected in embedded-host usage; run the resolved installed artifact
+  path instead.
+- The installed artifact path cannot be resolved:
   stop and treat the runtime as broken install or plugin exposure drift.
 - Repo or remote publishability checks fail before mutation: fix the checkout or
-  remote wiring, then rerun the resolved `ghflow --json publish context`
+  remote wiring, then rerun `<resolved-ghflow> --json publish context`
   before continuing.
 - Current branch has no upstream yet: run
   `git push -u origin "$(git branch --show-current)"`.
