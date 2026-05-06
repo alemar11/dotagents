@@ -1,0 +1,434 @@
+#!/usr/bin/env python3
+"""Extract focused skill/plugin evidence from Codex session JSONL files."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+VERSION = "0.1.0"
+SKILL_INJECTION_RE = re.compile(r"<skill>\s*<name>([^<]+)</name>", re.S)
+
+
+@dataclass(frozen=True)
+class Target:
+    name: str
+    aliases: tuple[str, ...]
+    paths: tuple[str, ...]
+    runtime_patterns: tuple[re.Pattern[str], ...]
+
+
+@dataclass
+class SessionMeta:
+    session_id: str | None = None
+    timestamp: str | None = None
+    cwd: str | None = None
+    path: str | None = None
+
+
+@dataclass
+class Evidence:
+    target: str
+    source: str
+    timestamp: str | None
+    session_id: str | None
+    cwd: str | None
+    path: str | None
+    prompt: str = ""
+    detail: str = ""
+
+
+def default_roots() -> list[Path]:
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser()
+    return [codex_home / "sessions", codex_home / "archived_sessions"]
+
+
+def normalize_text(value: str) -> str:
+    return " ".join(value.split())
+
+
+def read_message_text(payload: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for item in payload.get("content") or []:
+        if isinstance(item, dict) and item.get("type") in {"input_text", "text"}:
+            text = item.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
+def parse_targets(
+    targets: list[str],
+    paths: list[str],
+    runtime_patterns: list[str],
+) -> list[Target]:
+    by_name: dict[str, dict[str, set[str] | list[re.Pattern[str]]]] = {}
+
+    for raw in targets:
+        name = raw.strip()
+        if not name:
+            continue
+        aliases = {name}
+        if ":" in name:
+            aliases.add(name.rsplit(":", 1)[-1])
+        by_name.setdefault(name, {"aliases": set(), "paths": set(), "patterns": []})
+        by_name[name]["aliases"].update(aliases)  # type: ignore[union-attr]
+
+    for raw_path in paths:
+        path = str(Path(raw_path).expanduser())
+        path_alias = Path(path).parent.name
+        if not path_alias:
+            continue
+        name = path_alias
+        for candidate, values in by_name.items():
+            aliases = {str(alias) for alias in values["aliases"]}  # type: ignore[index]
+            if path_alias in aliases:
+                name = candidate
+                break
+        by_name.setdefault(name, {"aliases": set(), "paths": set(), "patterns": []})
+        by_name[name]["aliases"].add(path_alias)  # type: ignore[union-attr]
+        by_name[name]["paths"].add(path.lower())  # type: ignore[union-attr]
+
+    default_patterns: list[re.Pattern[str]] = []
+    for pattern in runtime_patterns:
+        if "=" in pattern:
+            raw_target, raw_pattern = pattern.split("=", 1)
+            raw_target = raw_target.strip()
+            raw_pattern = raw_pattern.strip()
+            if raw_target and raw_pattern:
+                owner = raw_target
+                for candidate, values in by_name.items():
+                    aliases = {str(alias) for alias in values["aliases"]}  # type: ignore[index]
+                    if raw_target == candidate or raw_target in aliases:
+                        owner = candidate
+                        break
+                by_name.setdefault(
+                    owner, {"aliases": {owner}, "paths": set(), "patterns": []}
+                )
+                by_name[owner]["patterns"].append(re.compile(raw_pattern, re.I))  # type: ignore[union-attr]
+            continue
+        default_patterns.append(re.compile(pattern, re.I))
+
+    parsed: list[Target] = []
+    for name, values in by_name.items():
+        aliases = tuple(sorted(str(alias).lower() for alias in values["aliases"]))  # type: ignore[index]
+        lower_paths = tuple(sorted(str(path) for path in values["paths"]))  # type: ignore[index]
+        parsed.append(
+            Target(
+                name=name,
+                aliases=aliases,
+                paths=lower_paths,
+                runtime_patterns=tuple(default_patterns + list(values["patterns"])),  # type: ignore[arg-type]
+            )
+        )
+    return parsed
+
+
+def iter_jsonl_files(roots: list[Path]) -> list[Path]:
+    files: list[Path] = []
+    for root in roots:
+        root = root.expanduser()
+        if root.is_file():
+            files.append(root)
+        elif root.exists():
+            files.extend(root.rglob("*.jsonl"))
+    return sorted(files)
+
+
+def timestamp_date(timestamp: str | None) -> str | None:
+    if not timestamp:
+        return None
+    return timestamp[:10]
+
+
+def session_is_before(meta: SessionMeta, since: str | None) -> bool:
+    if not since:
+        return False
+    current = timestamp_date(meta.timestamp)
+    return bool(current and current < since)
+
+
+def alias_in_user_text(text: str, target: Target) -> bool:
+    lower = text.lower()
+    if any(path and path in lower for path in target.paths):
+        return True
+    for alias in target.aliases:
+        checks = (
+            f"${alias}",
+            f"[{alias}]",
+            f"<name>{alias}</name>",
+            f"/{alias}/skill.md",
+            f"{alias}/skill.md",
+        )
+        if any(check in lower for check in checks):
+            return True
+    return False
+
+
+def injection_matches(text: str, target: Target) -> bool:
+    names = {name.strip().lower() for name in SKILL_INJECTION_RE.findall(text)}
+    return bool(names.intersection(target.aliases))
+
+
+def opened_skill_doc(text: str, target: Target) -> bool:
+    lower = text.lower()
+    if any(path and path in lower for path in target.paths):
+        return True
+    return any(f"/{alias}/skill.md" in lower for alias in target.aliases)
+
+
+def runtime_matches(text: str, target: Target) -> bool:
+    return any(pattern.search(text) for pattern in target.runtime_patterns)
+
+
+def scan_file(path: Path, targets: list[Target], since: str | None) -> list[Evidence]:
+    evidence: list[Evidence] = []
+    meta = SessionMeta(path=str(path))
+    last_user_prompt = ""
+
+    try:
+        handle = path.open("r", encoding="utf-8", errors="replace")
+    except OSError:
+        return evidence
+
+    with handle:
+        for line in handle:
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            item_type = item.get("type")
+            payload = item.get("payload") or {}
+
+            if item_type == "session_meta":
+                meta.session_id = payload.get("id")
+                meta.timestamp = payload.get("timestamp") or item.get("timestamp")
+                meta.cwd = payload.get("cwd")
+                continue
+
+            if session_is_before(meta, since):
+                continue
+
+            if item_type == "event_msg" and payload.get("type") == "user_message":
+                prompt = payload.get("message") or ""
+                last_user_prompt = prompt
+                for target in targets:
+                    if alias_in_user_text(prompt, target):
+                        evidence.append(
+                            Evidence(
+                                target=target.name,
+                                source="explicit-user",
+                                timestamp=meta.timestamp or item.get("timestamp"),
+                                session_id=meta.session_id,
+                                cwd=meta.cwd,
+                                path=meta.path,
+                                prompt=normalize_text(prompt),
+                            )
+                        )
+                continue
+
+            if item_type != "response_item":
+                continue
+
+            response_type = payload.get("type")
+            if response_type == "message" and payload.get("role") == "user":
+                text = read_message_text(payload)
+                for target in targets:
+                    if injection_matches(text, target):
+                        evidence.append(
+                            Evidence(
+                                target=target.name,
+                                source="skill-injection",
+                                timestamp=meta.timestamp or item.get("timestamp"),
+                                session_id=meta.session_id,
+                                cwd=meta.cwd,
+                                path=meta.path,
+                                prompt=normalize_text(last_user_prompt),
+                            )
+                        )
+                continue
+
+            if response_type != "function_call":
+                continue
+
+            detail = f"{payload.get('name') or ''} {payload.get('arguments') or ''}"
+            for target in targets:
+                if opened_skill_doc(detail, target):
+                    evidence.append(
+                        Evidence(
+                            target=target.name,
+                            source="opened-skill-doc",
+                            timestamp=meta.timestamp or item.get("timestamp"),
+                            session_id=meta.session_id,
+                            cwd=meta.cwd,
+                            path=meta.path,
+                            prompt=normalize_text(last_user_prompt),
+                            detail=normalize_text(detail),
+                        )
+                    )
+                if runtime_matches(detail, target):
+                    evidence.append(
+                        Evidence(
+                            target=target.name,
+                            source="runtime-command",
+                            timestamp=meta.timestamp or item.get("timestamp"),
+                            session_id=meta.session_id,
+                            cwd=meta.cwd,
+                            path=meta.path,
+                            prompt=normalize_text(last_user_prompt),
+                            detail=normalize_text(detail),
+                        )
+                    )
+
+    return evidence
+
+
+def dedupe(records: list[Evidence]) -> list[Evidence]:
+    seen: set[tuple[str, str, str | None, str]] = set()
+    result: list[Evidence] = []
+    for record in records:
+        key = (record.target, record.source, record.session_id, record.prompt[:180])
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(record)
+    return result
+
+
+def summarize(records: list[Evidence], limit: int) -> dict[str, Any]:
+    grouped: dict[str, list[Evidence]] = defaultdict(list)
+    for record in records:
+        grouped[record.target].append(record)
+
+    summary: dict[str, Any] = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "version": VERSION,
+        "targets": {},
+    }
+
+    for target, items in sorted(grouped.items()):
+        timestamps = sorted(item.timestamp for item in items if item.timestamp)
+        sessions = {item.session_id for item in items if item.session_id}
+        summary["targets"][target] = {
+            "events": len(items),
+            "sessions": len(sessions),
+            "first": timestamps[0] if timestamps else None,
+            "last": timestamps[-1] if timestamps else None,
+            "sources": dict(Counter(item.source for item in items).most_common()),
+            "cwd": dict(Counter(item.cwd or "" for item in items).most_common(8)),
+            "examples": [
+                {
+                    "timestamp": item.timestamp,
+                    "source": item.source,
+                    "session_id": item.session_id,
+                    "cwd": item.cwd,
+                    "path": item.path,
+                    "prompt": item.prompt[:500],
+                }
+                for item in sorted(items, key=lambda value: value.timestamp or "")[-limit:]
+            ],
+        }
+    return summary
+
+
+def print_text(summary: dict[str, Any]) -> None:
+    print(f"session-evidence {summary['version']}")
+    for target, data in summary["targets"].items():
+        print(f"\n## {target}")
+        print(
+            "events={events} sessions={sessions} first={first} last={last}".format(
+                **data
+            )
+        )
+        sources = ", ".join(f"{name}={count}" for name, count in data["sources"].items())
+        print(f"sources: {sources or 'none'}")
+        cwds = ", ".join(
+            f"{cwd or '<unknown>'} ({count})" for cwd, count in data["cwd"].items()
+        )
+        print(f"cwd: {cwds or 'none'}")
+        for example in data["examples"]:
+            print(
+                f"- {example['timestamp']} {example['source']} "
+                f"{example['cwd'] or '<unknown>'} {example['session_id'] or '<unknown>'}"
+            )
+            if example["prompt"]:
+                print(f"  prompt: {example['prompt']}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Extract focused skill/plugin invocation evidence from Codex session JSONL files."
+    )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
+    parser.add_argument(
+        "--target",
+        action="append",
+        default=[],
+        help="Skill or plugin name to scan for. Repeat for multiple targets.",
+    )
+    parser.add_argument(
+        "--target-path",
+        action="append",
+        default=[],
+        help="Concrete SKILL.md path to treat as evidence for a target.",
+    )
+    parser.add_argument(
+        "--runtime-pattern",
+        action="append",
+        default=[],
+        help=(
+            "Regex for runtime commands. Use TARGET=REGEX to bind a pattern to "
+            "one target, or a bare regex to apply it to all targets."
+        ),
+    )
+    parser.add_argument(
+        "--root",
+        action="append",
+        type=Path,
+        default=[],
+        help="Session JSONL file or directory. Defaults to CODEX_HOME sessions and archived_sessions.",
+    )
+    parser.add_argument(
+        "--since",
+        help="Only include sessions from this date or later, formatted as YYYY-MM-DD.",
+    )
+    parser.add_argument("--limit", type=int, default=8, help="Examples per target.")
+    parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+
+    if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
+        parser.error("--since must be formatted as YYYY-MM-DD")
+
+    targets = parse_targets(args.target, args.target_path, args.runtime_pattern)
+    if not targets:
+        parser.error("provide at least one --target or --target-path")
+
+    roots = args.root or default_roots()
+    records: list[Evidence] = []
+    for path in iter_jsonl_files(roots):
+        records.extend(scan_file(path, targets, args.since))
+
+    summary = summarize(dedupe(records), args.limit)
+    if args.json:
+        print(json.dumps(summary, indent=2, sort_keys=True))
+    else:
+        print_text(summary)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

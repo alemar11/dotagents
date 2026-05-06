@@ -37,8 +37,8 @@ itself, not just its bundled skills.
   runtime versus maintenance split
 - whether assets and repo-relative paths are valid from the plugin root
 - whether versioning and cache-awareness rules are reflected in the package
-- whether gaps belong in the plugin package, a bundled skill, repo docs, or
-  `Maintainer`
+- whether gaps belong in the plugin package, a bundled skill, repo docs, or an
+  owner-specific maintenance workflow
 
 ## Evidence Workflow
 
@@ -52,6 +52,10 @@ itself, not just its bundled skills.
    - Use `git log -- <plugin-dir>` and compare repo docs against the package.
 4. Use raw sessions when package behavior is in question, and as a fallback
    otherwise.
+   - For repeated checks, run `scripts/session-evidence` from the
+     `skill-audit` owner root with explicit plugin or bundled-skill targets,
+     cached `SKILL.md` paths as `--target-path` values, and only meaningful
+     target-bound runtime patterns.
    - Search by plugin name, `.codex-plugin/plugin.json`, marketplace path,
      exact `cwd`, thread ID, or specific failure text.
 

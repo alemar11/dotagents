@@ -51,6 +51,10 @@ skill roots.
    - If the skill lives outside the current repo, use `git -C <skills-root> log
      -- <relative-skill-dir>` when the owning repo is available.
 4. Use raw sessions when behavior is in question, and as a fallback otherwise.
+   - For repeated checks, run `scripts/session-evidence` from the
+     `skill-audit` owner root with explicit `--target`, optional
+     `--target-path`, and target-bound `--runtime-pattern TARGET=REGEX`
+     arguments before falling back to ad hoc parsing.
    - Search by skill name, `SKILL.md` path, `agents/openai.yaml` path, prompt
      text such as `Use $skill-name`, exact `cwd`, repo basename, thread ID from
      a rollout summary, or specific failure text.

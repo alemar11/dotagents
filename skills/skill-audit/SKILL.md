@@ -27,11 +27,15 @@ This skill is Codex-dependent. It may use Codex prompt context, Codex memory
 artifacts, rollout summaries, and session JSONL when those are available.
 Treat those surfaces as evidence only; the editable source of truth lives in
 the owning checkout or install root.
+When raw session behavior matters, the skill-owned helper
+`scripts/session-evidence` can extract target-specific invocation evidence
+from Codex session JSONL files. It is a shipped runtime helper for audit work;
+do not edit or route fixes to session archives themselves.
 
-If the user explicitly names one or more targets, such as `audit skill $foo`,
-`audit plugin $gitstack`, or `audit [$gitstack:yeet](...)`, treat those named
-targets as the required audit scope and resolve them before any broader
-workflow discovery.
+If the user explicitly names one or more targets, such as `audit skill
+$my-skill`, `audit plugin $my-plugin`, or `audit [$my-plugin:publish](...)`,
+treat those named targets as the required audit scope and resolve them before
+any broader workflow discovery.
 
 Treat `skill-audit` self-audit as opt-in only. Unless the user explicitly
 names `skill-audit`, do not audit it, do not add it implicitly because it
@@ -47,8 +51,9 @@ too.
 - Resolve user-provided scope first.
   - If the user names one or more targets explicitly, those names define the
     primary audit target set.
-  - Accept singular or plural phrasing such as `audit skill $foo`, `audit
-    plugin $bar`, `audit [$gitstack:yeet](...)`, or `review only $foo`.
+  - Accept singular or plural phrasing such as `audit skill $my-skill`, `audit
+    plugin $my-plugin`, `audit [$my-plugin:publish](...)`, or `review only
+    $my-skill`.
 - Detect target kind before going deep.
   - Treat a standalone skill root or skill path as `skill`.
   - Treat a plugin root or plugin name as `plugin`.
@@ -89,6 +94,25 @@ After detecting the target kind, open the matching workflow reference:
 Open only the references needed for the current target and questions. Do not
 bulk-load all reference files by default.
 
+## Session Evidence Helper
+
+Use `scripts/session-evidence` when a raw-session scan would otherwise require
+custom parsing. Keep targets explicit and pass concrete paths from the skill,
+plugin, workspace, or installed cache being audited:
+
+```bash
+scripts/session-evidence \
+  --target my-skill \
+  --target-path /path/to/my-skill/SKILL.md \
+  --runtime-pattern 'my-skill=my-tool|my-command' \
+  --root "$CODEX_HOME/sessions" \
+  --since 2026-04-01
+```
+
+The helper reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
+`runtime-command` buckets. Treat its output as evidence to interpret, not as a
+replacement for reading a representative trace when a claim is high-risk.
+
 ## Shared Evidence Rules
 
 - Start from relevant local surfaces first, then widen only when needed.
@@ -99,6 +123,12 @@ bulk-load all reference files by default.
 - If the audit is making a behavior, correctness, false-positive,
   false-negative, or low-value claim and raw sessions exist, inspect at least
   one representative session trace when practical.
+- For repeated or portfolio-style raw-session checks, prefer
+  `scripts/session-evidence` before ad hoc shell scripts. Pass explicit
+  `--target` values, optional `--target-path` values for installed or cached
+  `SKILL.md` files, and target-bound `--runtime-pattern TARGET=REGEX`
+  arguments only for runtime commands that are truly meaningful for the
+  audited surface.
 - If representative invocation evidence cannot be found, say that explicitly
   instead of implying runtime behavior from docs or summaries alone.
 - Treat cache copies as verification-only evidence. Never route fixes to
@@ -181,10 +211,10 @@ the owning project's maintenance workflow.
 
 - "Audit the installed skills used in this workflow and tell me which ones
   should be updated first."
-- "Audit plugin $gitstack and suggest the highest-value improvements."
-- "Audit [$gitstack:yeet](...) and tell me whether the bundled skill or the
+- "Audit plugin $my-plugin and suggest the highest-value improvements."
+- "Audit [$my-plugin:publish](...) and tell me whether the bundled skill or the
   plugin package is the real owner of the problems."
 - "Before we add a new skill, check whether an existing installed surface or
   repo docs should own this workflow instead."
-- "Audit only $Maintainer and $skill-audit and call out any overlap or weak
-  guardrails."
+- "Audit only $my-planning-skill and $skill-audit and call out any overlap or
+  weak guardrails."

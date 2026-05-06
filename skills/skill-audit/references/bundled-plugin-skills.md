@@ -49,6 +49,9 @@ Do not assume the problem belongs to the bundled skill alone.
    - Use `git log -- <bundled-skill-dir>` and `git log -- <plugin-dir>` when
      both are available.
 4. Use raw sessions when behavior is in question, and as a fallback otherwise.
+   - For repeated checks, run `scripts/session-evidence` from the
+     `skill-audit` owner root with both the bundled skill target and the
+     installed or cached `SKILL.md` path when available.
    - Search by bundled skill name, skill path, plugin name, `.codex-plugin`,
      exact `cwd`, thread ID, or failure text.
 
