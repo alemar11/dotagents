@@ -8,6 +8,9 @@ description: Review, design, and refactor TanStack Query usage with emphasis on 
 Use this skill when a task involves `@tanstack/react-query`, `QueryClient`, `useQuery`, `useSuspenseQuery`, `useMutation`, `queryOptions`, cache invalidation, optimistic updates, or persistence.
 
 This plugin currently owns TanStack Query guidance as a local gap-filler. As of the current observed TanStack Intent registry state, TanStack does not publish a first-party Query Intent package.
+Because recent sessions mainly use the macro Query/Router/Start surfaces, keep
+this skill as the Query entrypoint and route out only when Router, Start, or
+cross-stack ownership becomes the actual problem.
 
 ## What to Optimize For
 

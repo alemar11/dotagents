@@ -8,6 +8,9 @@ description: Review, design, and refactor TanStack Start apps with emphasis on t
 Use this skill when a task involves `@tanstack/react-start`, `createServerFn`, middleware, server routes, SSR, hydration, environment variables, cookies, or auth flows in a TanStack Start app.
 
 Use this umbrella skill when the Start scope spans multiple framework concerns or when the exact subdomain is still unclear. For targeted work, route to the matching focused bundled skill instead of solving every Start concern from one broad prompt.
+Recent session evidence favors this umbrella for real Start app work; use the
+focused Start skills only when the request has already narrowed to one Start
+subdomain.
 
 ## What to Optimize For
 
@@ -38,6 +41,17 @@ Use this umbrella skill when the Start scope spans multiple framework concerns o
 - `references/server-components-and-migrations.md`: experimental server components and Next.js App Router migrations.
 - `references/deployments.md`: deployment targets, packaging assumptions, and runtime-sensitive tradeoffs.
 - `references/README.md`: quick map from Start problem shape to the right macro guide or focused skill.
+
+## Focused-Skill Routing
+
+- Stay here for mixed Start app reviews, server/client boundary audits, or
+  framework-level implementation changes that touch several concerns.
+- Route to exactly one focused Start skill for isolated server-function,
+  middleware, execution-model, server-route, deployment, migration, or
+  experimental server-component work.
+- Do not open every Start focused skill during normal implementation; open the
+  umbrella reference map first, then use a focused skill only when it will
+  reduce ambiguity.
 
 ## Default Rules
 

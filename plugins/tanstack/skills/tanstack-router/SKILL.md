@@ -8,6 +8,9 @@ description: Review, design, and refactor TanStack Router usage with emphasis on
 Use this skill when a task involves `@tanstack/react-router`, route trees, `createFileRoute`, `createRouter`, `beforeLoad`, `loader`, `loaderDeps`, `validateSearch`, `Link`, `useNavigate`, or lazy route files.
 
 Use this umbrella skill when the Router scope is broad, mixed, or still unclear. When the task collapses to one Router concern, route to the matching focused bundled skill instead of keeping the whole problem here.
+Recent session evidence shows this umbrella is the common useful entrypoint;
+open focused Router skills only when the request is already specific enough to
+benefit from a narrower contract.
 
 ## What to Optimize For
 
@@ -38,6 +41,16 @@ Use this umbrella skill when the Router scope is broad, mixed, or still unclear.
 - `references/auth-and-failures.md`: `beforeLoad`, redirects, not-found paths, and route error ownership.
 - `references/plugin-and-splitting.md`: router plugin wiring, generated routes, and lazy-route code splitting.
 - `references/README.md`: quick map from Router problem shape to the right macro guide or focused skill.
+
+## Focused-Skill Routing
+
+- Stay here for mixed route-tree work, route migrations, breadcrumb/design
+  questions, or implementation reviews that touch several Router features.
+- Route to exactly one focused Router skill when the request is plainly about
+  search params, path params, navigation, loaders, auth guards, code splitting,
+  not-found/error handling, type registration, SSR, or plugin wiring.
+- Do not fan out across the entire Router family for ordinary app work; use the
+  macro guides first and open focused skills only for the narrow issue at hand.
 
 ## Default Rules
 

@@ -1,6 +1,6 @@
 {
   "name": "tanstack",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Bundle TanStack React Query, Router, Start, CLI, and cross-stack integration guidance in one repo-local plugin with macro-area umbrellas and focused sub-skills.",
   "author": {
     "name": "alemar11",

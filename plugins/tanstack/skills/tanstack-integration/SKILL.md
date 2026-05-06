@@ -9,6 +9,22 @@ Use this skill when a task spans more than one TanStack layer, especially Query 
 
 Use this skill for cross-stack composition, not as a substitute for a focused Router or Start skill when the task is confined to one domain.
 
+## Skill Selection
+
+Start with the macro-area umbrellas unless the user names a narrower concern:
+
+- `tanstack-query` for cache keys, `queryOptions`, mutations, invalidation, and stale-time policy.
+- `tanstack-router` for route trees, file routes, search params, loaders, navigation, auth guards, and code splitting.
+- `tanstack-start` for server functions, middleware, SSR, hydration, env boundaries, and deployment-sensitive framework behavior.
+- `tanstack-cli` for scaffolding, add-ons, library metadata, and custom add-on workflows.
+- `tanstack-integration` for Query + Router + Start ownership, loader prefetch, and hydration boundaries.
+
+Use the focused bundled skills only after the task has collapsed to one
+specific concern, such as Router search params or Start server functions. Do
+not open every focused skill in a normal audit or implementation pass; use the
+umbrella reference map first, then jump to a focused skill when it can reduce
+prompt weight or sharpen exact guidance.
+
 ## What to Optimize For
 
 - One coherent data-loading model across the stack.
@@ -51,6 +67,8 @@ Use this skill for cross-stack composition, not as a substitute for a focused Ro
 - If the issue is only Query, route to `tanstack-query`.
 - If the issue is only Router, route to `tanstack-router` or one of its focused sub-skills.
 - If the issue is only Start, route to `tanstack-start` or one of its focused sub-skills.
+- If the issue is only CLI scaffolding, add-ons, or package metadata discovery,
+  route to `tanstack-cli` or one of its focused CLI skills.
 - Keep this skill for Query + Router + Start ownership, loader-prefetch alignment, and hydration-boundary decisions.
 
 ## Avoid
