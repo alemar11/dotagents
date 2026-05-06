@@ -68,6 +68,23 @@ patterns, and manage migration release flow through the shipped
 - Release a pending migration file:
   - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" migration release --summary "Add agent-context prompt sections"`
 
+## Session-Proven Replacement Patterns
+
+- Search for a feature's tables and columns before writing SQL:
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" query find welcome --types table,column`
+- Apply a pending local migration through the profile-backed connection, then
+  verify the changed column through SQL catalog queries:
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" query run -f db/migrations/prerelease.sql`
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" query run -c "select column_name, data_type from information_schema.columns where table_schema = 'public' and table_name = 'example' order by ordinal_position;"`
+- Inspect or edit JSONB payloads with a heredoc and a `RETURNING` clause so the
+  command output proves the exact stored value:
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" query run <<'SQL'`
+  - `update public.example set payload = jsonb_set(payload, '{enabled}', 'true'::jsonb, true) where id = 1 returning id, jsonb_pretty(payload);`
+  - `SQL`
+- After a migration has been applied and checked, move it through the skill
+  release flow instead of manually moving files:
+  - `DB_PROJECT_ROOT=/path/to/repo DB_PROFILE=local "$POSTGRES_CLI" migration release --summary "Add example payload field"`
+
 ## Workflow
 1) Confirm connection source:
    - If `DB_URL` is provided, use it for a one-off connection unless the user
