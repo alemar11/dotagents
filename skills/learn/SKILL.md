@@ -17,6 +17,8 @@ description: Capture durable corrections or preferences and write confirmed lear
 
 ## Trigger rules
 - Use when the user states a durable correction, preference, or policy that should persist across future work.
+- Treat phrases such as "hard rule", "always", "never", "default", "from now on", "remember", or "for AGENTS.md" as strong signals that the user is setting durable guidance.
+- If the user asks for a docs or reference file and also calls a behavior a "hard rule", run this learn flow for the agent-facing rule even when the docs file should also be updated.
 - Do not use for one-off instructions limited to the current task or files.
 - This skill only writes to `AGENTS.md`; never write or update `MEMORY.md`, `memory_summary.md`, or other memory files.
 - Always confirm the target AGENTS.md and intended wording before writing durable guidance.
@@ -25,13 +27,15 @@ description: Capture durable corrections or preferences and write confirmed lear
 - Find the most recent **durable** correction/avoidance/preference in the current conversation.
 - Determine scope before proposing a target:
   - If the rule is clearly **project-specific** (e.g., tied to repo structure, tooling, or workflows), suggest **project** AGENTS.md first.
-  - Otherwise, default to **global** unless the user explicitly says "project", "project-root", or "workspace".
+  - If the scope is unclear, ask the user where to save it and make an `AGENTS.md` target the recommended option.
+  - Otherwise, use **global** only when the rule is not tied to the current repo.
   - Do not pick local just because it exists.
+- Default persistence surface is always `AGENTS.md`; if another docs file is useful, treat it as a companion update, not as a replacement for the durable agent rule.
 - If the learning is new (not already in AGENTS.md), propose:
   - Short summary (1 line)
   - Detailed instruction (1–3 bullets)
 - Confirmation should be lightweight: state what you will write and where.
-- Assume it is durable and that global is OK unless the user says otherwise. User can reply "no", "stop", "project", or similar to change/cancel.
+- Assume strong durable-language signals are durable, but do not assume global scope when the target is unclear. User can reply "no", "stop", "project", "global", or similar to change/cancel.
 - If nothing new is found in context (or it already exists), run the shipped
   helper script from this skill package, scan the JSONL from the last user
   message backward to find the most recent **durable** correction, then repeat
@@ -47,10 +51,11 @@ description: Capture durable corrections or preferences and write confirmed lear
   - Global: “Always use `rg` for file search,” “Ask before writing to AGENTS.md.”
 
 ## Docs vs AGENTS
-- Before proposing an `AGENTS.md` write, check whether the guidance is better owned elsewhere.
-- Prefer repo docs when the guidance should be visible to humans, is tightly coupled to current tooling/workflows, or is likely to change with the codebase.
-- Use `AGENTS.md` only when the rule is both durable and agent-facing for that scope.
-- If repo docs are the better owner, recommend that path instead of writing `AGENTS.md`.
+- Before proposing an `AGENTS.md` write, check whether companion repo docs should also be updated.
+- Do not let docs ownership suppress this skill when the user is setting a durable agent-facing rule.
+- Prefer `AGENTS.md` for durable agent behavior, especially when the user says "hard rule", "always", "never", or mentions `AGENTS.md`.
+- Use repo docs instead of `AGENTS.md` only when the guidance is human-facing documentation and not a durable rule for future agent behavior.
+- If ownership is unclear, ask where to save it and recommend the most appropriate `AGENTS.md` target by default.
 
 ## AGENTS.md write
 - Prefer the most appropriate existing section for the rule's topic or scope.
@@ -61,7 +66,8 @@ description: Capture durable corrections or preferences and write confirmed lear
 - Skip duplicates. If a conflict exists, ask how to resolve before writing.
 
 ## Target labels
-- **global** (default): `~/.codex/AGENTS.md`
+- Default suggested target: the narrowest appropriate `AGENTS.md`.
+- **global**: `~/.codex/AGENTS.md`
 - **project**: `AGENTS.md` at repo root (or cwd if no repo)
 - If both repo root and cwd have AGENTS.md, label them **project-root** and **workspace**.
 - If multiple AGENTS.md exist in subfolders, consider whether the rule is better scoped to a sub-area:
