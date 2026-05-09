@@ -46,6 +46,27 @@ default. After presenting the suggestions for the other audited targets,
 explicitly ask the user whether they want a follow-up audit of `skill-audit`
 too.
 
+## Non-negotiables
+
+- **Audits are read-only by default.**
+  - Do not modify files under the audited target (including its `SKILL.md` or
+    `references/*`) while performing an audit.
+  - Record findings in the audit output; make file changes only after the user
+    explicitly asks to apply updates to that specific target.
+- **Do not “fix as you audit”.**
+  - Audits should not create PRs/commits or edit audited target docs unless the
+    user explicitly transitions the request from *audit* to *implementation*.
+- **When implementing changes to an audited target, avoid “append-only” edits.**
+  - Re-read the whole `SKILL.md` and reorganize sections if needed so it stays
+    a compact entrypoint.
+  - Prefer moving long-form guidance into `references/*` and linking to it from
+    `SKILL.md` rather than growing `SKILL.md` indefinitely.
+- **Cache copies are verification-only evidence.**
+  - Never route fixes to `~/.codex/plugins/cache/...`.
+- **Stay compact.**
+  - Keep audit findings decision-oriented; prefer dedicated reference files for
+    long-form content.
+
 ## Target Resolution
 
 - Resolve user-provided scope first.
@@ -121,11 +142,6 @@ replacement for reading a representative trace when a claim is high-risk.
   summaries.
 - Check cheap maintenance signals such as `git log` and adjacent docs before
   deep session scans.
-- Treat audits as read-only by default.
-  - Do not modify files under the audited target (including its `SKILL.md` or
-    `references/*`) while performing an audit.
-  - Record findings in the audit output; make file changes only after the user
-    explicitly asks to apply updates to that specific target.
 - If the audit is making a behavior, correctness, false-positive,
   false-negative, or low-value claim and raw sessions exist, inspect at least
   one representative session trace when practical.
@@ -137,39 +153,11 @@ replacement for reading a representative trace when a claim is high-risk.
   audited surface.
 - If representative invocation evidence cannot be found, say that explicitly
   instead of implying runtime behavior from docs or summaries alone.
-- Treat cache copies as verification-only evidence. Never route fixes to
-  `~/.codex/plugins/cache/...`.
 
 ## Output Expectations
 
-Return a compact audit with these sections:
-
-1. `Audited targets`
-   List the audited targets and the role each one plays.
-2. `Evidence summary`
-   Summarize the strongest repo, memory, session, cache-verification, and
-   live-context signals that informed the audit.
-3. `Per-target update roadmap`
-   For each audited target, include:
-   - target name
-   - target kind: `skill`, `plugin`, or `bundled plugin skill`
-   - observed strengths
-   - missing or weak behavior
-   - behavior evidence status: session-confirmed, summary-only, or no
-     invocation evidence found
-   - evidence source
-   - highest-value next update
-   - owning surface for the fix: `skill`, `bundled plugin skill`, `plugin`,
-     or `docs`
-4. `Add / merge / disable candidates`
-   List only candidates justified by evidence after reviewing the audited
-   scope.
-5. `Priority order`
-   Rank the top recommendations by expected value.
-6. `Follow-up question`
-   In full-portfolio audits where `skill-audit` was not explicitly requested,
-   end by asking whether the user wants a follow-up audit of `skill-audit`
-   too.
+Return a compact audit using the format in
+`references/output-format.md`.
 
 ## Decision Rules
 
@@ -194,14 +182,6 @@ Return a compact audit with these sections:
 - Do not confuse recurrence with effectiveness.
 - Do not claim runtime behavior, correctness, or low-value triggering from docs
   or rollout summaries alone when raw session evidence is available.
-- Do not “fix as you audit”.
-  - Audits should not create PRs/commits or edit audited target docs unless the
-    user explicitly transitions the request from *audit* to *implementation*.
-- When implementing changes to an audited target, avoid “append-only” edits.
-  - Re-read the whole `SKILL.md` and reorganize sections if needed so it stays
-    a compact entrypoint.
-  - Prefer moving long-form guidance into `references/*` and linking to it from
-    `SKILL.md` rather than growing `SKILL.md` indefinitely.
 - Do not flatten skill, bundled plugin skill, plugin, and docs issues into one
   bucket; keep ownership decisions explicit.
 - Do not jump to new-surface recommendations before evaluating existing
@@ -210,11 +190,6 @@ Return a compact audit with these sections:
   `skill-audit` in scope.
 - Do not bulk-load all rollout summaries or raw sessions; stay targeted.
 - Do not silently expand a user-targeted audit into a wider portfolio review.
-- Do not bloat audited docs through audit output.
-  - Keep audit findings compact and decision-oriented.
-  - If an audited target needs substantial new guidance, prefer putting the
-    long-form content in a dedicated reference file under that target and keep
-    its `SKILL.md` as an entrypoint.
 
 ## Follow-up
 
