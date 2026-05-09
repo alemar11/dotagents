@@ -197,6 +197,11 @@ Return a compact audit with these sections:
 - Do not “fix as you audit”.
   - Audits should not create PRs/commits or edit audited target docs unless the
     user explicitly transitions the request from *audit* to *implementation*.
+- When implementing changes to an audited target, avoid “append-only” edits.
+  - Re-read the whole `SKILL.md` and reorganize sections if needed so it stays
+    a compact entrypoint.
+  - Prefer moving long-form guidance into `references/*` and linking to it from
+    `SKILL.md` rather than growing `SKILL.md` indefinitely.
 - Do not flatten skill, bundled plugin skill, plugin, and docs issues into one
   bucket; keep ownership decisions explicit.
 - Do not jump to new-surface recommendations before evaluating existing
