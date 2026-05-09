@@ -189,15 +189,18 @@ def runtime_matches(text: str, target: Target) -> bool:
     return any(pattern.search(text) for pattern in target.runtime_patterns)
 
 
-def scan_file(path: Path, targets: list[Target], since: str | None) -> list[Evidence]:
+def scan_file(
+    path: Path, targets: list[Target], since: str | None
+) -> tuple[list[Evidence], str | None]:
     evidence: list[Evidence] = []
     meta = SessionMeta(path=str(path))
     last_user_prompt = ""
+    should_skip = False
 
     try:
         handle = path.open("r", encoding="utf-8", errors="replace")
     except OSError:
-        return evidence
+        return evidence, None
 
     with handle:
         for line in handle:
@@ -213,9 +216,11 @@ def scan_file(path: Path, targets: list[Target], since: str | None) -> list[Evid
                 meta.session_id = payload.get("id")
                 meta.timestamp = payload.get("timestamp") or item.get("timestamp")
                 meta.cwd = payload.get("cwd")
+                if session_is_before(meta, since):
+                    should_skip = True
                 continue
 
-            if session_is_before(meta, since):
+            if should_skip:
                 continue
 
             if item_type == "event_msg" and payload.get("type") == "user_message":
@@ -289,7 +294,7 @@ def scan_file(path: Path, targets: list[Target], since: str | None) -> list[Evid
                         )
                     )
 
-    return evidence
+    return evidence, meta.session_id
 
 
 def dedupe(records: list[Evidence]) -> list[Evidence]:
@@ -304,7 +309,17 @@ def dedupe(records: list[Evidence]) -> list[Evidence]:
     return result
 
 
-def summarize(records: list[Evidence], limit: int) -> dict[str, Any]:
+def summarize(
+    targets: list[Target],
+    records: list[Evidence],
+    limit: int,
+    *,
+    include_zero: bool,
+    since: str | None,
+    roots: list[Path],
+    files_scanned: int,
+    sessions_scanned: int,
+) -> dict[str, Any]:
     grouped: dict[str, list[Evidence]] = defaultdict(list)
     for record in records:
         grouped[record.target].append(record)
@@ -312,10 +327,20 @@ def summarize(records: list[Evidence], limit: int) -> dict[str, Any]:
     summary: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "version": VERSION,
+        "scan": {
+            "since": since,
+            "roots": [str(root) for root in roots],
+            "files_scanned": files_scanned,
+            "sessions_scanned": sessions_scanned,
+        },
         "targets": {},
     }
 
-    for target, items in sorted(grouped.items()):
+    target_names = [target.name for target in targets]
+    for target in (target_names if include_zero else sorted(grouped.keys())):
+        items = grouped.get(target, [])
+        if not items and not include_zero:
+            continue
         timestamps = sorted(item.timestamp for item in items if item.timestamp)
         sessions = {item.session_id for item in items if item.session_id}
         summary["targets"][target] = {
@@ -333,6 +358,7 @@ def summarize(records: list[Evidence], limit: int) -> dict[str, Any]:
                     "cwd": item.cwd,
                     "path": item.path,
                     "prompt": item.prompt[:500],
+                    "detail": item.detail[:500] if item.detail else "",
                 }
                 for item in sorted(items, key=lambda value: value.timestamp or "")[-limit:]
             ],
@@ -403,6 +429,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--limit", type=int, default=8, help="Examples per target.")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of text.")
+    parser.add_argument(
+        "--include-zero",
+        action="store_true",
+        help="Include targets with zero evidence in the output.",
+    )
     return parser
 
 
@@ -419,10 +450,24 @@ def main() -> int:
 
     roots = args.root or default_roots()
     records: list[Evidence] = []
-    for path in iter_jsonl_files(roots):
-        records.extend(scan_file(path, targets, args.since))
+    session_ids: set[str] = set()
+    files = iter_jsonl_files(roots)
+    for path in files:
+        file_records, session_id = scan_file(path, targets, args.since)
+        records.extend(file_records)
+        if session_id:
+            session_ids.add(session_id)
 
-    summary = summarize(dedupe(records), args.limit)
+    summary = summarize(
+        targets,
+        dedupe(records),
+        args.limit,
+        include_zero=args.include_zero,
+        since=args.since,
+        roots=roots,
+        files_scanned=len(files),
+        sessions_scanned=len(session_ids),
+    )
     if args.json:
         print(json.dumps(summary, indent=2, sort_keys=True))
     else:

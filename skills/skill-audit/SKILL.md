@@ -106,7 +106,8 @@ scripts/session-evidence \
   --target-path /path/to/my-skill/SKILL.md \
   --runtime-pattern 'my-skill=my-tool|my-command' \
   --root "$CODEX_HOME/sessions" \
-  --since 2026-04-01
+  --since 2026-04-01 \
+  --include-zero
 ```
 
 The helper reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
