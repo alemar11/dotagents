@@ -39,6 +39,18 @@ patterns, and manage migration release flow through the shipped
 
 ## Fast path
 
+- Common installed locations for the shipped runtime:
+  - `~/.agents/skills/postgres/scripts/postgres` (typical when this repo’s
+    `skills/` are linked into `~/.agents/skills`)
+  - `<dotagents>/skills/postgres/scripts/postgres` (when running from this
+    workspace checkout)
+- Minimal happy path (inside the repo that owns the DB config):
+  - `export DB_PROJECT_ROOT="$PWD"`
+  - `export POSTGRES_CLI="$HOME/.agents/skills/postgres/scripts/postgres"`
+  - `"$POSTGRES_CLI" --json doctor`
+  - `DB_PROFILE=local "$POSTGRES_CLI" profile test`
+  - `DB_PROFILE=local "$POSTGRES_CLI" query run -c "select now();"`
+
 - Resolve the shipped CLI once and reuse it in commands below:
   - `POSTGRES_CLI=/path/to/postgres-skill/scripts/postgres`
 - Doctor / setup status:
