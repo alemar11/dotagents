@@ -7,6 +7,17 @@ description: Review and use TanStack CLI workflows for scaffolding, add-ons, eco
 
 Use this umbrella skill when a task involves the TanStack CLI broadly, or when the exact CLI workflow is not yet narrowed to scaffolding, existing-app add-ons, ecosystem discovery, custom add-on authoring, or docs queries.
 
+## Which TanStack Skill Should I Use?
+
+Use this quick map when you know the intent but not the skill name:
+
+- **CLI scaffolding / templates / deployments** → `tanstack-cli-create-app-scaffold`
+- **Add-ons to an existing app** → `tanstack-cli-add-addons-existing-app`
+- **Compare integrations / pick options** → `tanstack-cli-choose-ecosystem-integrations`
+- **Author a custom add-on / dev-watch loop** → `tanstack-cli-maintain-custom-addons-dev-watch`
+- **Ask “what does the CLI support?” / machine-readable docs** → `tanstack-cli-query-docs-library-metadata`
+- **Framework architecture (not CLI)** → `tanstack-router`, `tanstack-react-start`, `tanstack-query`, `tanstack-integration`
+
 ## What to Optimize For
 
 - Correct CLI workflow selection before constructing commands.
