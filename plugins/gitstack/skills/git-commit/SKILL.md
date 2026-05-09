@@ -42,6 +42,23 @@ In these repos:
 - if one change truly spans subprojects, confirm that bundling is intentional
   or split the work into sequential commits
 
+### Split vs Single Commit (Decision Rule)
+
+Default to **splitting** when any of these apply:
+
+- changes touch more than one top-level “root” (apps/packages/services/tools)
+- changes include multiple independent concerns (e.g. feature + refactor + docs)
+- any root has generated/untracked files that need separate verification
+
+Default to **one commit** when all of these apply:
+
+- changes are cohesive and belong to the same narrow intent
+- changes stay within one root (or one clearly coupled set of files)
+- the resulting message reads like one change, not a changelog
+
+When in doubt, split. If the user asked for “one commit”, keep it one commit
+unless it would mix clearly unrelated roots.
+
 ### Fast Path
 
 Use the fast path when the change is tiny, low-risk, and clearly scoped.
@@ -59,6 +76,7 @@ In the fast path, keep the workflow lightweight:
 - stage explicit paths if needed
 - write a shorter but still well-formed commit message
 - skip extra ceremony that does not materially reduce risk
+- use docs-only/config-only changes as the canonical fast-path case
 - Example fast path:
   - one or two already-validated files changed
   - run `git status --short --branch`
