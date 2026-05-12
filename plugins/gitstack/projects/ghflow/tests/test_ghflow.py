@@ -4,13 +4,16 @@ import contextlib
 import io
 import json
 import sys
+import tomllib
 import unittest
 import zipfile
 from pathlib import Path
 from unittest import mock
 
 
-PROJECT_SRC = Path(__file__).resolve().parents[1] / "src"
+GHFLOW_PROJECT = Path(__file__).resolve().parents[1]
+PLUGIN_ROOT = GHFLOW_PROJECT.parents[1]
+PROJECT_SRC = GHFLOW_PROJECT / "src"
 if str(PROJECT_SRC) not in sys.path:
     sys.path.insert(0, str(PROJECT_SRC))
 
@@ -65,6 +68,14 @@ class ParseRootArgsTests(unittest.TestCase):
 
 
 class ContractTests(unittest.TestCase):
+    def test_plugin_manifest_and_cli_metadata_versions_match(self) -> None:
+        with (PLUGIN_ROOT / ".codex-plugin" / "plugin.json").open() as handle:
+            plugin_manifest = json.load(handle)
+        with (GHFLOW_PROJECT / "pyproject.toml").open("rb") as handle:
+            cli_metadata = tomllib.load(handle)
+        self.assertEqual(plugin_manifest["version"], cli_metadata["project"]["version"])
+        self.assertEqual(runtime.VERSION, cli_metadata["project"]["version"])
+
     def test_reviews_address_requires_selection_when_replying(self) -> None:
         spec = runtime.COMMAND_SPECS[("reviews", "address")]
         with self.assertRaises(runtime.GhflowError) as ctx:

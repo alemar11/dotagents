@@ -12,7 +12,22 @@ first, then run that path directly.
 From any consuming repository, resolve the installed GitStack artifact:
 
 ```bash
-resolved_ghflow="$(find "$HOME/.codex/plugins/cache" -path '*/gitstack/*/scripts/ghflow' -type f 2>/dev/null | sort | tail -n 1)"
+resolved_ghflow="$(
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+cache = Path.home() / ".codex" / "plugins" / "cache"
+semver = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+candidates = []
+for path in cache.glob("*/gitstack/*/scripts/ghflow"):
+    match = semver.match(path.parent.parent.name)
+    if match and path.is_file():
+        candidates.append((tuple(int(part) for part in match.groups()), str(path)))
+if candidates:
+    print(max(candidates)[1])
+PY
+)"
 test -n "$resolved_ghflow" && test -x "$resolved_ghflow"
 "$resolved_ghflow" --version
 ```
