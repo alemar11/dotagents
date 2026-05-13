@@ -179,16 +179,17 @@ Keep these invariants explicit in the host docs and CLI docs:
 - do not inspect `projects/<tool>/` during normal execution
 - do not require normal users to run code directly from `projects/<tool>/`
 - do not treat `projects/<tool>/` as part of the normal runtime surface
-- treat `<artifact-path>` as the shipped runnable artifact regardless of language
+- treat `<artifact-path>` as the shipped runnable artifact or launcher regardless of language
 - require `<artifact-path> --version` as part of the stable runtime surface
 - let the chosen CLI/tool name govern both `<artifact-path>` and `projects/<tool>/`
 - open `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind `<artifact-path>`
 - keep script-native runnable artifacts entirely in `scripts/`; introduce `projects/<tool>/` only when the implementation grows enough to justify a real maintenance project
 - keep the CLI project self-contained inside `projects/<tool>/`; put manifests, lockfiles, dependency installs, caches, intermediate build outputs, project-local test/build config, and source there by default
 - do not introduce host-root wrappers unless the user explicitly asks for that non-standard layout
+- use `scripts/bin/` only for shipped platform-specific runtime files behind a stable `scripts/<tool>` launcher
 - if `projects/<tool>/` exists, keep CLI-specific tests inside `projects/<tool>/tests/` or an equivalently project-local test directory
 - do not execute compiled CLIs from `target/`, `dist/`, virtualenv paths, or other build directories during normal usage
-- if the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/` before considering the CLI ready
+- if the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/` before considering the CLI ready; for multi-OS compiled runtimes, copy platform binaries into `scripts/bin/` and keep `scripts/<tool>` as the launcher
 - if `projects/<tool>/` exists, require `projects/<tool>/AGENTS.md` with build, test, rebuild, runtime prerequisites, safe-maintenance instructions, the version source of truth, the semver bump policy, and rebuild instructions for restoring the shipped artifact at `<artifact-path>`
 - if the scaffold introduces project-local generated state that must not be committed, create or update `projects/<tool>/.gitignore` and keep it scoped to that tool's generated paths
 - do not create an empty or no-op `projects/<tool>/.gitignore` when the CLI introduces no project-local generated state
@@ -202,6 +203,31 @@ Keep these invariants explicit in the host docs and CLI docs:
 - when a bundled skill documents a plugin-shared CLI that runs from `<plugin-root>`, introduce that execution context explicitly before the command, such as `From the plugin root, run <artifact-path> ...`
 
 For detailed command-shape, runtime-surface, JSON, and host-owned examples, read [references/agent-cli-patterns.md](references/agent-cli-patterns.md).
+
+## Multi-OS Compiled Runtime
+
+Use this pattern only when a compiled CLI must support more than one operating
+system or CPU architecture:
+
+- keep `scripts/<tool>` as the stable executable surface normal users run
+- make `scripts/<tool>` a portable launcher that detects OS and architecture
+- store shipped platform binaries under `scripts/bin/` as
+  `<tool>-<os>-<arch>`
+- for a `postgres` tool, the same naming style would produce
+  `postgres-<os>-<arch>` binaries
+- use `darwin-arm64`, `darwin-x86_64`, `linux-arm64`, and
+  `linux-x86_64` as the standard platform suffixes
+- make the launcher fail clearly when the current platform binary is missing,
+  naming the expected `scripts/bin/<tool>-<os>-<arch>` path
+- keep script-native or intentionally single-platform CLIs as a direct
+  `scripts/<tool>` artifact; do not add `scripts/bin/` without a concrete
+  multi-OS packaging need
+
+For multi-OS compiled runtimes, add a maintainer install helper under
+`projects/<tool>/scripts/`, usually `install-runtime-binary`. It should build
+the current platform or requested target and copy the result to
+`scripts/bin/<tool>-<os>-<arch>`. Cross-build paths may require target-specific
+toolchains, such as a Linux linker when building Linux binaries from macOS.
 
 ## Config Rules
 
@@ -407,7 +433,7 @@ Use screenshots to infer workflow, UI vocabulary, fields, and confirmation point
 4. Add or wire the single semver source of truth before the CLI contract is considered complete.
 5. Expose the shipped runnable artifact under `scripts/` and treat outputs in `target/`, `dist/`, virtualenvs, or similar locations as build intermediates rather than supported runtime entrypoints.
 6. If `projects/<tool>/` exists, put the CLI's maintained unit and integration tests under that project rather than at the owner root.
-7. If the runtime produces a compiled executable, copy, install, or generate that executable into `scripts/`.
+7. If the runtime produces a compiled executable, copy, install, or generate that executable into `scripts/`; when multi-OS support is required, install platform binaries into `scripts/bin/` and keep `scripts/<tool>` as the launcher.
 8. Inspect which project-local generated directories the chosen runtime will create and create or update `projects/<tool>/.gitignore` only when those directories should remain uncommitted.
 9. Create config only through explicit init/login/configure flows. Do not write config during reads or health checks.
 10. Smoke test against `<artifact-path>`. Run `<artifact-path> --help`, `<artifact-path> --version`, and `<artifact-path> --json doctor`, and confirm the task can be completed without opening `projects/<tool>/`.
@@ -451,11 +477,12 @@ When building in Rust, use established crates instead of custom parsers:
 - `toml` for small config files
 - `anyhow` for CLI-shaped error context
 
-Keep the shipped compiled executable in `scripts/`. Use `projects/<tool>/` when the Rust implementation is large enough to benefit from a conventional project layout, and keep normal usage on the artifact in `scripts/...` rather than `target/`.
+Keep the shipped compiled executable in `scripts/`, or use a `scripts/<tool>` launcher plus `scripts/bin/<tool>-<os>-<arch>` binaries when multi-OS support is required. Use `projects/<tool>/` when the Rust implementation is large enough to benefit from a conventional project layout, and keep normal usage on the artifact in `scripts/...` rather than `target/`.
 Use `Cargo.toml` as the default semver source of truth and wire `--version` to that version.
 Keep `Cargo.toml`, `Cargo.lock`, local caches, and build outputs inside `projects/<tool>/`.
 If Rust build outputs or local caches live inside `projects/<tool>/`, create or update `projects/<tool>/.gitignore` for entries such as `target/` while keeping the shipped artifact in `scripts/` tracked when appropriate.
-If `projects/<tool>/` exists, document the Rust build/test workflow, version source of truth, semver bump policy, and the rebuild step that restores the shipped artifact in `scripts/` in `projects/<tool>/AGENTS.md`.
+For multi-OS Rust CLIs, add a helper such as `projects/<tool>/scripts/install-runtime-binary` that builds the current or requested target and copies the binary to `scripts/bin/<tool>-<os>-<arch>`.
+If `projects/<tool>/` exists, document the Rust build/test workflow, version source of truth, semver bump policy, and the rebuild step that restores the shipped artifact or platform binaries in `projects/<tool>/AGENTS.md`.
 
 ## TypeScript/Node Defaults
 

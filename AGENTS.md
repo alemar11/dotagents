@@ -106,6 +106,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Skill CLI Creator skill
 - Route embedded-CLI design and layout work through `$skill-cli-creator`; keep detailed host, execution, and migration doctrine in `skills/skill-cli-creator/SKILL.md` and its references.
 - Repo-level embedded-CLI invariants are: shipped artifacts live under `scripts/`, maintenance-only implementations live under `projects/<tool>/`, and ownership stays aligned when a CLI is skill-owned, plugin-shared, or owned by one bundled plugin skill. (Codex learning)
+- Multi-OS compiled CLIs keep the stable executable surface at `scripts/<tool>` and place platform binaries under `scripts/bin/<tool>-<os>-<arch>`; use `projects/<tool>/scripts/` for build/install helpers when needed. (Codex learning)
 - Persist embedded-CLI config in owner-aligned `config.toml` files under `<project-root>/.skills/...` or `<project-root>/.plugins/...`, and treat those directories as config-only. (Codex learning)
 - Require the shipped artifact to expose `--version` with one semver source of truth, and if `projects/<tool>/` exists require `projects/<tool>/AGENTS.md` plus a scoped `projects/<tool>/.gitignore` when generated state exists. (Codex learning)
 - Keep embedded-CLI docs artifact-first: examples must run `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed artifact path unless the host explicitly documents a wrapper, alias, or `PATH` contract for bare `<tool> ...`. (Codex learning)

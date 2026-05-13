@@ -123,7 +123,7 @@ The important rule is consistency. Do not mix many styles unless the product voc
 When the CLI is embedded inside a host:
 
 - run the tool from `<artifact-path>` during normal execution
-- treat `<artifact-path>` as the shipped runnable artifact for normal execution
+- treat `<artifact-path>` as the shipped runnable artifact or launcher for normal execution
 - use `<artifact-path> --version` as the stable version check
 - choose the CLI/tool name intentionally; do not assume it must match the host name
 - use the same CLI/tool name consistently for `<artifact-path>` and `projects/<tool>/`
@@ -135,7 +135,14 @@ When the CLI is embedded inside a host:
 
 Keep one semver source of truth. Use the runtime-native manifest version when available, otherwise keep one explicit version constant or file and have `--version` read from it.
 
-If the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/`. Script-native runtimes may keep the shipped script itself in `scripts/` when that script is the real artifact.
+If the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/`. For multi-OS compiled runtimes, keep `<artifact-path>` as a launcher and store platform binaries in `scripts/bin/<tool>-<os>-<arch>` using suffixes such as `darwin-arm64`, `darwin-x86_64`, `linux-arm64`, and `linux-x86_64`; for example, a `postgres` tool would use the `postgres-<os>-<arch>` naming style. Script-native runtimes may keep the shipped script itself in `scripts/` when that script is the real artifact.
+
+For multi-OS compiled runtimes, add a maintainer helper under
+`projects/<tool>/scripts/`, usually `install-runtime-binary`, that builds the
+current platform or requested target and copies the result to
+`scripts/bin/<tool>-<os>-<arch>`. Cross-builds may need OS-specific toolchains,
+such as a Linux linker when building Linux binaries from macOS. The launcher
+must fail clearly when the current platform binary is missing.
 
 If the scaffold also creates project-local generated state, keep that ignore policy close to `projects/<tool>/`:
 
@@ -268,6 +275,7 @@ Always validate the shared core from `<artifact-path>`:
 - `--json doctor`
 - executable invocation from the resolved `owner root`
 - exit codes and at least one safe fixture, dry-run, or read-only end-to-end check
+- for launcher-based compiled CLIs, shell syntax checks for the launcher and `file` checks for shipped binaries
 
 Then add the lane that matches the CLI:
 
@@ -335,7 +343,8 @@ Add a `CLI Maintenance` section in the owning runtime docs for every embedded CL
 
 - normal runtime work stays on `<artifact-path>`
 - `projects/<tool>/` is for bug fixes, performance work, rebuilds, and feature additions
-- shipped CLI changes must update the implementation, rebuild the shipped artifact at `<artifact-path>`, and re-run `--help`, `--version`, and `--json doctor`
+- shipped CLI changes must update the implementation, rebuild the shipped artifact at `<artifact-path>` or platform binaries under `scripts/bin/`, and re-run `--help`, `--version`, and `--json doctor`
+- multi-OS compiled CLIs keep `<artifact-path>` as the stable launcher and document rebuild commands such as `projects/<tool>/scripts/install-runtime-binary`
 - compiled outputs in `target/`, `dist/`, virtualenvs, or similar paths are build intermediates rather than supported runtime entrypoints
 - project-local generated state should be ignored through `projects/<tool>/.gitignore`
 - the CLI follows semver from one declared version source of truth
