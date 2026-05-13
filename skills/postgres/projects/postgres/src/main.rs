@@ -21,7 +21,7 @@ use std::path::Path;
 
 #[tokio::main]
 async fn main() {
-    let cli = Cli::parse();
+    let cli = Cli::parse_from(std::iter::once("postgres".to_string()).chain(env::args().skip(1)));
     if let Err(error) = run(&cli).await {
         if cli.json {
             let payload = json!({

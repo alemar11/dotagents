@@ -6,7 +6,9 @@ command surface in the skill package.
 ## Runtime model
 
 - The only supported runtime entrypoint is the shipped `scripts/postgres`
-  artifact in the skill package.
+  launcher in the skill package.
+- The launcher dispatches to platform-specific binaries in `scripts/bin/` using
+  `postgres-<os>-<arch>` names.
 - The CLI is implemented in Rust under `../projects/postgres/`.
 - Runtime operations use direct PostgreSQL connections through the Rust client.
 - The skill is intentionally scoped to connection resolution, SQL execution,
@@ -17,10 +19,16 @@ command surface in the skill package.
 
 ## Prerequisites
 
-- The shipped CLI artifact must exist at `<postgres-skill-root>/scripts/postgres`.
+- The shipped CLI launcher must exist at `<postgres-skill-root>/scripts/postgres`.
+- The current platform's Rust binary must exist and be executable under
+  `<postgres-skill-root>/scripts/bin/`.
 - A running target Postgres database is still required for live DB operations.
 - `cargo` and a recent Rust toolchain are only required when maintaining or
-  rebuilding the shipped artifact from `../projects/postgres/`.
+  rebuilding shipped binaries from `../projects/postgres/`.
+- Maintainers can install the current platform's binary with
+  `projects/postgres/scripts/install-runtime-binary`; pass a Rust target triple
+  such as `x86_64-unknown-linux-gnu` only when the matching cross toolchain is
+  already configured.
 
 ## Start here
 

@@ -9,18 +9,24 @@ description: Connect to Postgres databases, run SQL and diagnostics, inspect sch
 Use this skill to connect to Postgres, run SQL, inspect schemas, review query
 performance, design tables and indexes, work with common PostGIS or pgvector
 patterns, and manage migration release flow through the shipped
-`scripts/postgres` artifact in the skill package.
+`scripts/postgres` launcher in the skill package.
 
 ## Runtime surface
 
 - The only supported runtime entrypoint is the shipped `scripts/postgres`
-  artifact inside this skill package.
+  launcher inside this skill package.
 - If your current working directory is the skill root, run it as
   `./scripts/postgres`.
 - If you are invoking the skill from another repo, resolve the skill package
   path first and run `<postgres-skill-root>/scripts/postgres`.
 - `<postgres-skill-root>/scripts/postgres --version` is the runtime version
   check.
+- `scripts/postgres` dispatches to platform-specific Rust binaries under
+  `scripts/bin/`, currently named `postgres-<os>-<arch>`.
+- Supported shipped binary names are `postgres-darwin-arm64`,
+  `postgres-darwin-x86_64`, `postgres-linux-arm64`, and
+  `postgres-linux-x86_64`; a platform is usable only when its executable is
+  present.
 - Do not use or reintroduce per-task helper scripts from the pre-Rust runtime
   surface.
 - The implementation lives in `projects/postgres/` and is maintenance-only.
@@ -31,11 +37,11 @@ patterns, and manage migration release flow through the shipped
   workflows. Keep those operator tasks outside this skill.
 - If a target repo has `.skills/postgres/config.toml` or legacy
   `.skills/postgres/postgres.toml`, use the shipped `scripts/postgres`
-  artifact for normal app-database work instead of raw `psql`.
+  launcher for normal app-database work instead of raw `psql`.
 - Bare `psql` is allowed only as an explicit exception for container-local
   runbooks such as `docker compose exec pg psql ...`, repo-documented smoke
   checks, unsupported operator workflows outside this skill's runtime surface,
-  or emergency fallback when the shipped artifact cannot run.
+  or emergency fallback when the shipped launcher cannot run.
 
 ## Fast path
 
@@ -114,7 +120,7 @@ patterns, and manage migration release flow through the shipped
      `.skills/postgres/config.toml` too; do not leave the canonical file
      unignored when the legacy `postgres.toml` had ignore coverage.
    - If the user explicitly asks to create or refresh a saved profile, use the
-     shipped `scripts/postgres` artifact from the skill package, for example
+     shipped `scripts/postgres` launcher from the skill package, for example
      `<postgres-skill-root>/scripts/postgres profile bootstrap`.
 2) Choose action:
    - Query or inspect data
@@ -330,14 +336,14 @@ ORDER BY ordinal_position;
 
 ## CLI Maintenance
 
-- Keep normal execution on the shipped `scripts/postgres` artifact.
+- Keep normal execution on the shipped `scripts/postgres` launcher.
 - Treat `projects/postgres/Cargo.toml` as the single source of truth for the
   CLI semver, and use the shipped `scripts/postgres --version` to verify the
   runtime version.
 - Open `projects/postgres/` only when fixing bugs, improving performance,
   rebuilding the shipped binary, or extending the CLI contract.
-- Make maintenance changes in `projects/postgres/`, then rebuild
-  `scripts/postgres` so the shipped artifact stays current.
+- Make maintenance changes in `projects/postgres/`, then rebuild the affected
+  `scripts/bin/postgres-<os>-<arch>` binaries so shipped runtimes stay current.
 - Treat compiled outputs in `projects/postgres/target/` as intermediates, not
   supported runtime entrypoints.
 - Keep project-local ignore rules in `projects/postgres/.gitignore`. Only add a
@@ -347,7 +353,7 @@ ORDER BY ordinal_position;
   - minor for backward-compatible new features or meaningful capability
     additions
   - patch for backward-compatible bug fixes and corrections
-- After maintenance changes, re-verify through the shipped artifact with:
+- After maintenance changes, re-verify through the shipped launcher with:
   - from the skill root: `./scripts/postgres --help`
   - from the skill root: `./scripts/postgres --version`
   - from any cwd: `DB_PROJECT_ROOT=/path/to/repo <postgres-skill-root>/scripts/postgres --json doctor`

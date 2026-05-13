@@ -5,17 +5,23 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 
 ## Runtime surface
 
-- Normal usage must go through the shipped artifact at `../../scripts/postgres`.
+- Normal usage must go through the shipped launcher at `../../scripts/postgres`.
 - Do not tell normal skill users to run `cargo`, `rustc`, or binaries from
   `target/` directly.
 - `Cargo.toml` is the single source of truth for the CLI version.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
+- Platform-specific release binaries live under `../../scripts/bin/` and use
+  `postgres-<os>-<arch>` names, such as `postgres-darwin-arm64` and
+  `postgres-linux-x86_64`.
 
 ## Build and test
 
 - Build: `cargo build --release --manifest-path skills/postgres/projects/postgres/Cargo.toml`
-- Rebuild runtime binary:
-  `cargo build --release --manifest-path skills/postgres/projects/postgres/Cargo.toml && cp skills/postgres/projects/postgres/target/release/postgres skills/postgres/scripts/postgres && chmod +x skills/postgres/scripts/postgres`
+- Rebuild and install the runtime binary for the current platform:
+  `skills/postgres/projects/postgres/scripts/install-runtime-binary`
+- Rebuild and install a cross-targeted runtime binary when the Rust target and
+  linker are available:
+  `skills/postgres/projects/postgres/scripts/install-runtime-binary x86_64-unknown-linux-gnu`
 - Run tests: `cargo test --manifest-path skills/postgres/projects/postgres/Cargo.toml`
 - Verify help: `skills/postgres/scripts/postgres --help`
 - Verify version: `skills/postgres/scripts/postgres --version`
@@ -39,9 +45,9 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 - Keep the runtime surface focused on SQL, inspection, diagnostics, and
   migration release; do not reintroduce dump, restore, export, or schema-diff
   flows into this CLI.
-- Rebuild `../../scripts/postgres` after any change that affects runtime
-  behavior or operator-facing output, then verify through that shipped artifact
-  rather than `target/` binaries.
+- Rebuild the relevant `../../scripts/bin/postgres-<os>-<arch>` artifacts after
+  any change that affects runtime behavior or operator-facing output, then
+  verify through `../../scripts/postgres` rather than `target/` binaries.
 - Keep project-local generated state scoped to `projects/postgres/.gitignore`.
 - Delete stale pre-`skills/` layout artifacts if they
   reappear, including `skills/postgres/.build/`, `skills/postgres/target/`, `skills/postgres/src/`,
