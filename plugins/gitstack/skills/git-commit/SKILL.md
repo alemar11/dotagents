@@ -5,6 +5,11 @@ description: Create a well-formed git commit from current changes using session 
 
 # Git Commit
 
+## Happy Paths (Commit / Commit And Push)
+
+- `commit`: inspect `git status`, stage explicit paths, verify `git diff --staged`, then `git commit`.
+- `commit and push`: do the above, then `git push` (use `git push -u origin HEAD` when setting upstream).
+
 ## Goals
 
 - Produce a commit that reflects the actual code changes and the session
