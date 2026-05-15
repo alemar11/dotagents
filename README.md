@@ -11,7 +11,7 @@ This directory contains reusable skills, repo-local plugins, and project maintai
 ## Skills
 - `skills/skill-cli-creator/` — Build host-aware embedded CLIs that live inside a skill or plugin, run from an owner-root-relative shipped artifact under `scripts/`, and can grow into a maintenance-only project at `projects/<tool>/`.
 - `skills/codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
-- `skills/xcode-changelog/` — Resolve the active Xcode, look up a requested version, or list the available Apple Xcode release notes.
+- `skills/xcode-changelog/` — Resolve active Xcode notes, include latest notes when behind, look up a requested version, or list Apple Xcode release notes.
 - `skills/plan-harder/` — Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
 - `skills/learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
 - `skills/postgres/` — Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns.

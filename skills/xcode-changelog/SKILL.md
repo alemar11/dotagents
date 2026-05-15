@@ -1,13 +1,16 @@
 ---
 name: xcode-changelog
-description: Resolve the active Xcode version, a requested Xcode version, or list available Xcode release notes from the official Apple release-notes site.
+description: Resolve the active Xcode version, include latest available notes when the installed Xcode is behind, look up a requested Xcode version, or list available Xcode release notes from the official Apple release-notes site.
 ---
 
 # Xcode Changelog
 
 ## Goal
 
-Resolve the active Xcode version, a user-requested version, or list the available Apple Xcode Release Notes entries.
+Resolve the active Xcode version, a user-requested version, or list the
+available Apple Xcode Release Notes entries. For active local Xcode reports,
+include the installed version's release notes and also include the latest
+available release notes when that latest version is not installed.
 
 ## Runtime surface
 
@@ -22,6 +25,7 @@ Resolve the active Xcode version, a user-requested version, or list the availabl
 ## Trigger rules
 
 - Use when the user asks for Xcode changelog details, Xcode release notes, or what changed in their current Xcode.
+- Use when the user wants to compare their installed Xcode changelog against the latest available Apple release notes.
 - Use when the user wants release notes for a specific Xcode version such as `26.4`, `26.5 beta`, or `16.4`.
 - Use when the user asks which Xcode versions have release notes or wants the available Xcode release-note versions listed.
 - Prefer this skill over ad-hoc browsing when the task is to match the active Xcode or a named version to Apple’s official release notes.
@@ -30,6 +34,9 @@ Resolve the active Xcode version, a user-requested version, or list the availabl
 
 1. Run the shipped helper for the active local Xcode:
    `python3 <xcode-changelog-skill-root>/scripts/print_xcode_changelog.py`.
+   The default report prints the installed Xcode release notes and, when the
+   latest available Apple release-note entry is not installed, appends those
+   latest release notes too.
 2. If the user requested a specific version, run
    `python3 <xcode-changelog-skill-root>/scripts/print_xcode_changelog.py --version "<version label>"`.
 3. If the user asked which versions are available, run
@@ -49,5 +56,6 @@ Resolve the active Xcode version, a user-requested version, or list the availabl
   lookups and `--list` for index listings, fetches Apple’s official Xcode
   Release Notes index from the markdown-backed documentation endpoint, matches
   the best release-notes entry by title/version, and prints one `Xcode`
-  section with either the cleaned note body or the available version list plus
-  source URLs.
+  section with either the cleaned installed note body, the installed notes plus
+  latest available notes when the installed Xcode is behind, or the available
+  version list plus source URLs.

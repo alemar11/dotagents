@@ -230,6 +230,14 @@ def choose_latest_fallback(
     return entries[0]
 
 
+def choose_latest_available_entry(entries: list[ReleaseEntry]) -> ReleaseEntry:
+    return entries[0]
+
+
+def is_same_release_entry(left: ReleaseEntry, right: ReleaseEntry) -> bool:
+    return left.page_path.lower() == right.page_path.lower()
+
+
 def match_release_entry(
     entries: list[ReleaseEntry], target: TargetSpec | None
 ) -> MatchResult:
@@ -340,9 +348,15 @@ def build_list_output(info: XcodeInfo, entries: list[ReleaseEntry]) -> str:
 
 
 def build_output(
-    info: XcodeInfo, requested_version: str | None, match_result: MatchResult, body: str
+    info: XcodeInfo,
+    requested_version: str | None,
+    match_result: MatchResult,
+    body: str,
+    latest_entry: ReleaseEntry | None = None,
+    latest_body: str | None = None,
 ) -> str:
     lines: list[str] = []
+    include_latest = latest_entry is not None and latest_body is not None
 
     if requested_version:
         lines.append(f"Requested version: {requested_version}")
@@ -374,7 +388,9 @@ def build_output(
         )
 
     if match_result.attempted_versions and match_result.fallback_message:
-        lines.append(f"Attempted versions: {', '.join(match_result.attempted_versions)}")
+        lines.append(
+            f"Attempted versions: {', '.join(match_result.attempted_versions)}"
+        )
 
     if info.resolution_errors and not info.version:
         lines.append(f"Resolution note: {info.resolution_errors[0]}")
@@ -383,10 +399,28 @@ def build_output(
         [
             f"Matched release notes: {match_result.entry.title}",
             f"Source: {match_result.entry.source_url}",
-            "",
-            body,
         ]
     )
+
+    if include_latest:
+        lines.extend(
+            [
+                f"Latest available release notes: {latest_entry.title}",
+                "Latest available version is not installed.",
+                f"Source: {latest_entry.source_url}",
+                "",
+                "## Installed Xcode Release Notes",
+                "",
+                body,
+                "",
+                "## Latest Available Xcode Release Notes",
+                "",
+                latest_body,
+            ]
+        )
+    else:
+        lines.extend(["", body])
+
     return format_section("Xcode", "\n".join(lines))
 
 
@@ -424,8 +458,21 @@ def main() -> int:
 
     match_result = match_release_entry(entries, target)
     release_body = clean_release_markdown(fetch_text(match_result.entry.markdown_url))
+    latest_entry = choose_latest_available_entry(entries) if not args.version else None
+    latest_body = None
+    if latest_entry and not is_same_release_entry(match_result.entry, latest_entry):
+        latest_body = clean_release_markdown(fetch_text(latest_entry.markdown_url))
 
-    print(build_output(info, args.version, match_result, release_body))
+    print(
+        build_output(
+            info,
+            args.version,
+            match_result,
+            release_body,
+            latest_entry,
+            latest_body,
+        )
+    )
     return 0
 
 
