@@ -1,0 +1,515 @@
+#!/usr/bin/env python3
+"""Small helper CLI for the code-wiki skill."""
+
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import os
+import re
+import shutil
+import sys
+from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import urlparse
+
+VERSION = "0.1.0"
+
+SKIP_DIR_NAMES = {
+    ".git",
+    ".hg",
+    ".svn",
+    ".cache",
+    ".next",
+    ".nuxt",
+    ".turbo",
+    ".venv",
+    "venv",
+    "env",
+    "__pycache__",
+    "build",
+    "coverage",
+    "dist",
+    "node_modules",
+    "target",
+    "vendor",
+}
+
+MANIFEST_NAMES = {
+    "AGENTS.md",
+    "Cargo.toml",
+    "Gemfile",
+    "Package.swift",
+    "Podfile",
+    "README.md",
+    "bun.lockb",
+    "composer.json",
+    "deno.json",
+    "docker-compose.yml",
+    "go.mod",
+    "gradle.properties",
+    "package-lock.json",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pyproject.toml",
+    "requirements.txt",
+    "setup.cfg",
+    "setup.py",
+    "tsconfig.json",
+    "uv.lock",
+    "yarn.lock",
+}
+
+DOC_NAMES = {
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+}
+
+SOURCE_DIR_NAMES = {
+    "app",
+    "apps",
+    "cmd",
+    "components",
+    "lib",
+    "packages",
+    "server",
+    "src",
+    "sources",
+}
+
+TEST_DIR_NAMES = {
+    "__tests__",
+    "spec",
+    "specs",
+    "test",
+    "tests",
+}
+
+ENTRYPOINT_NAMES = {
+    "app.go",
+    "app.py",
+    "app.ts",
+    "app.tsx",
+    "cli.py",
+    "index.js",
+    "index.ts",
+    "index.tsx",
+    "main.go",
+    "main.py",
+    "main.rs",
+    "main.swift",
+    "main.ts",
+    "main.tsx",
+    "server.js",
+    "server.py",
+    "server.ts",
+}
+
+EXT_LANGUAGE = {
+    ".c": "C",
+    ".cc": "C++",
+    ".cpp": "C++",
+    ".cs": "C#",
+    ".css": "CSS",
+    ".go": "Go",
+    ".h": "C/C++ Header",
+    ".hpp": "C++ Header",
+    ".html": "HTML",
+    ".java": "Java",
+    ".js": "JavaScript",
+    ".json": "JSON",
+    ".jsx": "JavaScript React",
+    ".kt": "Kotlin",
+    ".m": "Objective-C",
+    ".md": "Markdown",
+    ".mm": "Objective-C++",
+    ".php": "PHP",
+    ".py": "Python",
+    ".rb": "Ruby",
+    ".rs": "Rust",
+    ".sh": "Shell",
+    ".sql": "SQL",
+    ".swift": "Swift",
+    ".toml": "TOML",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript React",
+    ".vue": "Vue",
+    ".xml": "XML",
+    ".yaml": "YAML",
+    ".yml": "YAML",
+}
+
+REQUIRED_PAGES = [
+    "index.html",
+    "pages/overview.html",
+    "pages/architecture.html",
+    "pages/dependencies.html",
+    "pages/code-patterns.html",
+    "pages/flows-basic.html",
+    "pages/flows-advanced.html",
+    "pages/testing-and-ops.html",
+    "pages/file-map.html",
+]
+
+NAV_ITEMS = [
+    ("index", "Home", "index.html"),
+    ("overview", "Overview", "pages/overview.html"),
+    ("architecture", "Architecture", "pages/architecture.html"),
+    ("dependencies", "Dependencies", "pages/dependencies.html"),
+    ("code-patterns", "Code Patterns", "pages/code-patterns.html"),
+    ("flows-basic", "Basic Flows", "pages/flows-basic.html"),
+    ("flows-advanced", "Advanced Flows", "pages/flows-advanced.html"),
+    ("testing-and-ops", "Testing & Ops", "pages/testing-and-ops.html"),
+    ("file-map", "File Map", "pages/file-map.html"),
+]
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def normalize_rel(path: Path) -> str:
+    return path.as_posix()
+
+
+def iter_repo_files(repo: Path) -> list[str]:
+    files: list[str] = []
+    for dirpath, dirnames, filenames in os.walk(repo):
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if name not in SKIP_DIR_NAMES and not name.endswith(".egg-info")
+        ]
+        current = Path(dirpath)
+        for filename in filenames:
+            full_path = current / filename
+            if full_path.is_symlink():
+                continue
+            rel = full_path.relative_to(repo)
+            if any(part in SKIP_DIR_NAMES for part in rel.parts):
+                continue
+            files.append(normalize_rel(rel))
+    return sorted(files)
+
+
+def paths_containing_parts(files: list[str], names: set[str]) -> list[str]:
+    found: set[str] = set()
+    for file_path in files:
+        parts = Path(file_path).parts[:-1]
+        for index, part in enumerate(parts):
+            if part in names:
+                found.add("/".join(parts[: index + 1]))
+    return sorted(found)
+
+
+def build_inventory(repo_arg: str) -> dict[str, object]:
+    repo = Path(repo_arg).expanduser().resolve()
+    if not repo.is_dir():
+        raise SystemExit(f"repo is not a directory: {repo}")
+
+    files = iter_repo_files(repo)
+    extensions = Counter(Path(path).suffix.lower() or "[no extension]" for path in files)
+    languages = Counter()
+    for path in files:
+        suffix = Path(path).suffix.lower()
+        languages[EXT_LANGUAGE.get(suffix, "Other")] += 1
+
+    manifests = [
+        path
+        for path in files
+        if Path(path).name in MANIFEST_NAMES
+        or Path(path).suffix.lower() in {".csproj", ".fsproj", ".sln"}
+    ]
+    docs = [
+        path
+        for path in files
+        if Path(path).name in DOC_NAMES
+        or path.startswith("docs/")
+        or path.startswith("documentation/")
+    ]
+    entrypoints = [
+        path
+        for path in files
+        if Path(path).name.lower() in ENTRYPOINT_NAMES
+        or re.search(r"(^|/)(cli|server|main|index)\.[cm]?[jt]sx?$", path)
+    ]
+
+    return {
+        "schema_version": 1,
+        "generated_at": utc_now(),
+        "repo": {
+            "path": str(repo),
+            "name": repo.name,
+            "has_git_directory": (repo / ".git").exists(),
+        },
+        "counts": {
+            "files": len(files),
+            "extensions": dict(sorted(extensions.items())),
+            "languages": dict(sorted(languages.items())),
+        },
+        "manifests": manifests,
+        "source_roots": paths_containing_parts(files, SOURCE_DIR_NAMES),
+        "test_roots": paths_containing_parts(files, TEST_DIR_NAMES),
+        "docs": docs,
+        "entrypoint_candidates": entrypoints[:100],
+        "sample_files": files[:250],
+    }
+
+
+def write_json(path_arg: str, data: dict[str, object]) -> None:
+    path = Path(path_arg).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def skill_root() -> Path:
+    return Path(__file__).resolve().parents[1]
+
+
+def page_title_from_slug(slug: str) -> str:
+    return slug.replace("-", " ").title().replace("And", "and")
+
+
+def nav_html(prefix: str, active: str) -> str:
+    links = []
+    for slug, label, href in NAV_ITEMS:
+        target = href if prefix == "" else ("../index.html" if slug == "index" else href.replace("pages/", ""))
+        if prefix:
+            target = target if slug != "index" else "../index.html"
+        class_name = ' class="active"' if slug == active else ""
+        links.append(f'<a{class_name} href="{html.escape(target)}">{html.escape(label)}</a>')
+    return "\n".join(links)
+
+
+def render_page(title: str, body: str, prefix: str, active: str) -> str:
+    css = f"{prefix}assets/style.css"
+    js = f"{prefix}assets/app.js"
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(title)}</title>
+  <link rel="stylesheet" href="{css}">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">Code Wiki</div>
+    <nav>
+{nav_html(prefix, active)}
+    </nav>
+  </aside>
+  <main>
+{body}
+  </main>
+  <script src="{js}"></script>
+</body>
+</html>
+"""
+
+
+def placeholder_body(title: str, description: str) -> str:
+    return f"""    <header class="page-header">
+      <p class="eyebrow">Evidence-backed repository guide</p>
+      <h1>{html.escape(title)}</h1>
+      <p>{html.escape(description)}</p>
+    </header>
+    <section class="panel">
+      <h2>What to Fill In</h2>
+      <p>Replace this placeholder with synthesized findings from repo inventory, source inspection, and subagent research. Keep claims tied to file evidence.</p>
+    </section>
+"""
+
+
+def copy_template_assets(out_dir: Path) -> None:
+    template_dir = skill_root() / "assets" / "wiki-template"
+    assets_dir = out_dir / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    required_assets = ("style.css", "app.js")
+    missing_assets = [name for name in required_assets if not (template_dir / name).is_file()]
+    if missing_assets:
+        missing = ", ".join(missing_assets)
+        raise SystemExit(f"missing required template asset(s) in {template_dir}: {missing}")
+
+    for name in required_assets:
+        source = template_dir / name
+        destination = assets_dir / name
+        shutil.copyfile(source, destination)
+
+
+def scaffold(out_arg: str, title: str) -> None:
+    out_dir = Path(out_arg).expanduser().resolve()
+    (out_dir / "pages").mkdir(parents=True, exist_ok=True)
+    (out_dir / "assets" / "diagrams").mkdir(parents=True, exist_ok=True)
+    (out_dir / "assets" / "images").mkdir(parents=True, exist_ok=True)
+    (out_dir / "data").mkdir(parents=True, exist_ok=True)
+    copy_template_assets(out_dir)
+
+    index_body = f"""    <header class="hero">
+      <p class="eyebrow">Code Wiki</p>
+      <h1>{html.escape(title)}</h1>
+      <p>A linked repository guide for architecture, dependencies, patterns, flows, tests, and operations.</p>
+    </header>
+    <section class="grid">
+      <a class="card" href="pages/overview.html"><span>01</span><strong>Overview</strong><p>Purpose, runtime shape, and key concepts.</p></a>
+      <a class="card" href="pages/architecture.html"><span>02</span><strong>Architecture</strong><p>Modules, boundaries, and core diagrams.</p></a>
+      <a class="card" href="pages/dependencies.html"><span>03</span><strong>Dependencies</strong><p>Manifests, frameworks, and build/runtime tools.</p></a>
+      <a class="card" href="pages/code-patterns.html"><span>04</span><strong>Code Patterns</strong><p>Conventions, abstractions, and recurring implementation shapes.</p></a>
+      <a class="card" href="pages/flows-basic.html"><span>05</span><strong>Basic Flows</strong><p>Primary user and request flows.</p></a>
+      <a class="card" href="pages/flows-advanced.html"><span>06</span><strong>Advanced Flows</strong><p>Edge cases, background jobs, integrations, and failure paths.</p></a>
+      <a class="card" href="pages/testing-and-ops.html"><span>07</span><strong>Testing & Ops</strong><p>Validation, deployment, observability, and operator notes.</p></a>
+      <a class="card" href="pages/file-map.html"><span>08</span><strong>File Map</strong><p>Where to look for each responsibility.</p></a>
+    </section>
+"""
+    (out_dir / "index.html").write_text(
+        render_page(title, index_body, "", "index"), encoding="utf-8"
+    )
+
+    page_specs = {
+        "overview": "Explain what the repository does, who it serves, and how the main runtime pieces fit together.",
+        "architecture": "Document modules, ownership boundaries, data stores, external services, and deterministic diagrams.",
+        "dependencies": "Explain dependency manifests, build tooling, runtime frameworks, and noteworthy version constraints.",
+        "code-patterns": "Summarize naming, layering, error handling, configuration, and extension conventions.",
+        "flows-basic": "Walk through the main happy-path flows with links to source evidence.",
+        "flows-advanced": "Cover edge cases, retries, async work, integrations, and failure modes.",
+        "testing-and-ops": "Explain tests, local run commands, deployments, observability, and operational caveats.",
+        "file-map": "Map important directories and files to responsibilities.",
+    }
+    for slug, description in page_specs.items():
+        path = out_dir / "pages" / f"{slug}.html"
+        title_text = page_title_from_slug(slug)
+        path.write_text(
+            render_page(title_text, placeholder_body(title_text, description), "../", slug),
+            encoding="utf-8",
+        )
+
+    print(f"scaffolded wiki at {out_dir}")
+
+
+def is_external_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https", "mailto", "tel", "data", "javascript"}
+
+
+def local_target(value: str) -> str:
+    return value.split("#", 1)[0].split("?", 1)[0]
+
+
+def validate(wiki_arg: str) -> int:
+    wiki_dir = Path(wiki_arg).expanduser().resolve()
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if not wiki_dir.is_dir():
+        errors.append(f"wiki directory does not exist: {wiki_dir}")
+        print_report(errors, warnings)
+        return 1
+
+    for rel in REQUIRED_PAGES:
+        if not (wiki_dir / rel).is_file():
+            errors.append(f"missing required page: {rel}")
+
+    for rel in ("assets/style.css", "assets/app.js"):
+        if not (wiki_dir / rel).is_file():
+            errors.append(f"missing required asset: {rel}")
+
+    inventory_path = wiki_dir / "data" / "inventory.json"
+    if not inventory_path.is_file():
+        errors.append("missing required data file: data/inventory.json")
+    else:
+        try:
+            json.loads(inventory_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            errors.append(f"invalid data/inventory.json: {exc}")
+
+    html_files = list(wiki_dir.rglob("*.html"))
+    attr_re = re.compile(r"""(?:href|src)=["']([^"']+)["']""", re.IGNORECASE)
+    for html_file in html_files:
+        text = html_file.read_text(encoding="utf-8", errors="replace")
+        for value in attr_re.findall(text):
+            if value.startswith("#") or is_external_url(value):
+                continue
+            target = local_target(value)
+            if not target:
+                continue
+            resolved = (html_file.parent / target).resolve()
+            try:
+                resolved.relative_to(wiki_dir)
+            except ValueError:
+                errors.append(f"{html_file.relative_to(wiki_dir)} links outside wiki: {value}")
+                continue
+            if not resolved.exists():
+                errors.append(f"{html_file.relative_to(wiki_dir)} has missing link or asset: {value}")
+
+    if not any((wiki_dir / "assets" / "diagrams").glob("*")):
+        warnings.append("assets/diagrams is empty")
+    if not any((wiki_dir / "assets" / "images").glob("*")):
+        warnings.append("assets/images is empty")
+
+    print_report(errors, warnings)
+    return 1 if errors else 0
+
+
+def print_report(errors: list[str], warnings: list[str]) -> None:
+    if errors:
+        print("FAIL")
+        for error in errors:
+            print(f"ERROR: {error}")
+    else:
+        print("PASS")
+    for warning in warnings:
+        print(f"WARN: {warning}")
+
+
+def cmd_inventory(args: argparse.Namespace) -> int:
+    inventory = build_inventory(args.repo)
+    write_json(args.out, inventory)
+    print(f"wrote inventory to {Path(args.out).expanduser()}")
+    return 0
+
+
+def cmd_scaffold(args: argparse.Namespace) -> int:
+    scaffold(args.out, args.title)
+    return 0
+
+
+def cmd_validate(args: argparse.Namespace) -> int:
+    return validate(args.wiki)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="code-wiki")
+    parser.add_argument("--version", action="version", version=f"code-wiki {VERSION}")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    inventory_parser = subparsers.add_parser("inventory", help="scan a repo and write inventory JSON")
+    inventory_parser.add_argument("--repo", required=True, help="local repository path")
+    inventory_parser.add_argument("--out", required=True, help="output JSON path")
+    inventory_parser.set_defaults(func=cmd_inventory)
+
+    scaffold_parser = subparsers.add_parser("scaffold", help="create a static HTML wiki shell")
+    scaffold_parser.add_argument("--out", required=True, help="output wiki directory")
+    scaffold_parser.add_argument("--title", required=True, help="wiki title")
+    scaffold_parser.set_defaults(func=cmd_scaffold)
+
+    validate_parser = subparsers.add_parser("validate", help="validate a generated wiki")
+    validate_parser.add_argument("--wiki", required=True, help="wiki directory")
+    validate_parser.set_defaults(func=cmd_validate)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

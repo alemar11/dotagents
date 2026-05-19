@@ -50,7 +50,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Dependency Classification
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
-- Current Codex-dependent skills are `codex-changelog`, `learn`, and `skill-audit`.
+- Current Codex-dependent skills are `codex-changelog`, `code-wiki`, `learn`, and `skill-audit`.
+- Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `.agents/skills/Maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
@@ -102,6 +103,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Changelog skill
 - Keep `codex-changelog` as a Codex-dependent reusable skill under `skills/codex-changelog/`; release-source selection and output formatting belong in its own `SKILL.md` and references, not in this `AGENTS.md`.
+
+### Code Wiki skill
+- Keep `code-wiki` as a Codex-dependent reusable skill under `skills/code-wiki/`; runtime repo-study workflow, HTML contract, and image rules belong in `skills/code-wiki/SKILL.md` and its references, not in this `AGENTS.md`.
+- Keep `code-wiki` final wiki outputs outside `.cache`; only git clones and temporary analysis artifacts belong under `~/.cache/dotagents/skills/code-wiki/`. (Codex learning)
 
 ### Skill CLI Creator skill
 - Route embedded-CLI design and layout work through `$skill-cli-creator`; keep detailed host, execution, and migration doctrine in `skills/skill-cli-creator/SKILL.md` and its references.

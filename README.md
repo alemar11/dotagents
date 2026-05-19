@@ -9,6 +9,7 @@ This directory contains reusable skills, repo-local plugins, and project maintai
   Bundled skill families: umbrellas `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-cli`, `tanstack-integration`; Router family `tanstack-router-core`, `tanstack-router-search-params`, `tanstack-router-path-params`, `tanstack-router-navigation`, `tanstack-router-data-loading`, `tanstack-router-auth-and-guards`, `tanstack-router-code-splitting`, `tanstack-router-not-found-and-errors`, `tanstack-router-type-safety`, `tanstack-router-ssr`, `tanstack-router-plugin`; Start family `tanstack-react-start`, `tanstack-react-start-server-components`, `tanstack-start-migrate-from-nextjs`, `tanstack-start-core`, `tanstack-start-execution-model`, `tanstack-start-middlewares`, `tanstack-start-server-functions`, `tanstack-start-server-routes`, `tanstack-start-deployments`, `tanstack-start-server-core`; CLI family `tanstack-cli-create-app-scaffold`, `tanstack-cli-add-addons-existing-app`, `tanstack-cli-choose-ecosystem-integrations`, `tanstack-cli-maintain-custom-addons-dev-watch`, `tanstack-cli-query-docs-library-metadata`.
 
 ## Skills
+- `skills/code-wiki/` — Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki from that analysis.
 - `skills/skill-cli-creator/` — Build host-aware embedded CLIs that live inside a skill or plugin, run from an owner-root-relative shipped artifact under `scripts/`, and can grow into a maintenance-only project at `projects/<tool>/`.
 - `skills/codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
 - `skills/xcode-changelog/` — Resolve active Xcode notes, include latest notes when behind, look up a requested version, or list Apple Xcode release notes.
@@ -18,6 +19,9 @@ This directory contains reusable skills, repo-local plugins, and project maintai
 - `skills/skill-audit/` — Audit installed Codex skills, plugin packages, and bundled plugin skills using repo evidence, memory, sessions, the `scripts/session-evidence` helper, and current context to plan updates, additions, merges, or disables.
 - `skills/swift-api-design/` — Design or review Swift APIs using curated local summaries and a bundled upstream copy of the official Swift API Design Guidelines.
 - `skills/swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
+
+## Skill Dependencies
+- `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 
 ## Project Skills
 - `.agents/skills/Maintainer/` — Maintain and improve one or more skills or plugins in this repository with shared upgrade workflows and skill-specific refresh tasks.
@@ -54,7 +58,8 @@ plugin entries into your personal plugin marketplace.
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc`
+- `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc`
+- `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/skill-cli-creator`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-changelog`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/xcode-changelog`
@@ -78,6 +83,7 @@ Install all reusable skills globally for Codex:
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
+  --skill code-wiki \
   --skill skill-cli-creator \
   --skill codex-changelog \
   --skill xcode-changelog \
@@ -90,6 +96,10 @@ npx skills add alemar11/dotagents -a codex -g -y \
 ```
 
 Install an individual skill globally for Codex:
+
+```sh
+npx skills add alemar11/dotagents -a codex -g -y --skill code-wiki
+```
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y --skill skill-cli-creator
