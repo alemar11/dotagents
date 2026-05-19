@@ -167,6 +167,47 @@ p {
   padding: 24px;
 }
 
+.section-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin: 18px 0;
+}
+
+.summary-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.summary-item {
+  background: #f8fbfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.summary-item strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.diagram-frame {
+  background: #f8fbfd;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 14px 0;
+  overflow-x: auto;
+  padding: 14px;
+}
+
+.diagram-frame img,
+.diagram-frame svg {
+  display: block;
+  min-width: min(760px, 100%);
+}
+
 code,
 pre {
   color: var(--code);
@@ -186,9 +227,13 @@ code {
 }
 
 .evidence {
+  background: #f8fbfd;
+  border: 1px solid #cfe7ee;
   border-left: 3px solid var(--accent);
+  border-radius: 8px;
   color: var(--muted);
-  padding-left: 12px;
+  margin-top: 18px;
+  padding: 12px 14px;
   overflow-wrap: anywhere;
 }
 
@@ -202,20 +247,40 @@ code {
 
 .evidence-chip {
   align-items: center;
-  background: #eef7fa;
+  background: #ffffff;
   border: 1px solid #b9dfe5;
-  border-radius: 999px;
+  border-radius: 7px;
   color: var(--accent-dark);
   display: inline-flex;
-  max-width: 100%;
-  padding: 4px 8px;
+  gap: 7px;
+  max-width: min(100%, 260px);
+  min-height: 28px;
+  padding: 3px 7px;
   text-decoration: none;
 }
 
-.evidence-chip code {
-  background: transparent;
+.evidence-chip:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgb(8 145 178 / 0.12);
+}
+
+.evidence-file {
   color: inherit;
-  white-space: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence-lines {
+  background: var(--accent-soft);
+  border-radius: 5px;
+  color: var(--accent-dark);
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 1px 5px;
 }
 
 .table-wrap {
@@ -344,6 +409,14 @@ svg {
 
   .page-nav a {
     min-width: 0;
+  }
+
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .diagram-frame {
+    padding: 10px;
   }
 
   .table-wrap {

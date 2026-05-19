@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 SKIP_DIR_NAMES = {
     ".git",
@@ -292,6 +292,117 @@ NAV_ITEMS = [
 PLACEHOLDER_MARKERS = (
     "What to Fill In",
     "Replace this placeholder",
+)
+
+GENERIC_PROSE_PATTERNS = (
+    r"\ba good onboarding wiki\b",
+    r"\ba useful wiki\b",
+    r"\bthis page should\b",
+    r"\bthe page should\b",
+    r"\bshould help a developer\b",
+    r"\bshould be read as\b",
+    r"\bit is still too thin\b",
+    r"\blanguage-neutral terms\b",
+    r"\bscalable across languages\b",
+    r"\bif the flow cannot identify\b",
+)
+
+COMPREHENSION_PAGE_RULES = {
+    "pages/overview.html": {
+        "min_words": 250,
+        "min_sections": 3,
+        "min_evidence": 2,
+        "min_evidence_links": 5,
+        "patterns": (
+            r"\bscope\b|\bmental model\b",
+            r"\bboundar|\bown(?:s|ed|ership)?\b|\bexternal\b|\bout of scope\b",
+            r"\buse(?:d|s|r)?\b|\bconsumer\b|\bcaller\b|\bentrypoint\b|\bexample\b",
+        ),
+    },
+    "pages/architecture.html": {
+        "min_words": 425,
+        "min_sections": 3,
+        "min_evidence": 2,
+        "min_evidence_links": 8,
+        "patterns": (
+            r"\bcomponent\b|\bmodule\b|\bsubsystem\b|\bboundar",
+            r"\binteract|\bcollaborat|\bcall path\b|\blifecycle\b|\bsequence\b",
+            r"\bclass\b|\bstruct\b|\bprotocol\b|\btrait\b|\binterface\b|\bfunction\b|\btype\b",
+            r"\bcreate[sd]?\b|\bcall(?:s|ed)?\b|\bown(?:s|ed)?\b|\bmutat(?:e|es|ed)\b|\bregister",
+        ),
+    },
+    "pages/dependencies.html": {
+        "min_words": 220,
+        "min_sections": 2,
+        "min_evidence": 2,
+        "min_evidence_links": 5,
+        "patterns": (
+            r"\bdependency\b|\bdependencies\b|\bmanifest\b|\bbuild\b",
+            r"\bruntime\b|\bboundar|\btarget\b|\bpackage\b|\bprovider\b",
+        ),
+    },
+    "pages/code-patterns.html": {
+        "min_words": 300,
+        "min_sections": 3,
+        "min_evidence": 2,
+        "min_evidence_links": 6,
+        "patterns": (
+            r"\bpattern\b|\bconvention\b|\babstraction\b|\blayer\b",
+            r"\bstate\b|\berror\b|\bconfiguration\b|\bextension\b|\bpublic API\b",
+        ),
+    },
+    "pages/flows-basic.html": {
+        "min_words": 330,
+        "min_sections": 3,
+        "min_evidence": 2,
+        "min_evidence_links": 5,
+        "patterns": (
+            r"\bentry\b|\bhappy\b|\bbasic\b|\brequest\b|\bcommand\b|\bstartup\b|\bflow\b",
+            r"\bstep\b|\bsequence\b|\blifecycle\b|\bcall path\b",
+            r"\bcall(?:s|ed)?\b|\breturn(?:s|ed)?\b|\bstate\b|\bcallback\b|\bhandler\b|\boutput\b",
+        ),
+    },
+    "pages/flows-advanced.html": {
+        "min_words": 360,
+        "min_sections": 3,
+        "min_evidence": 2,
+        "min_evidence_links": 6,
+        "patterns": (
+            r"\bfailure\b|\bedge\b|\bretry\b|\basync\b|\bbackground\b|\badvanced\b|\berror\b",
+            r"\bstate\b|\bintegration\b|\bconcurrency\b|\bcache\b|\bstorage\b|\bcleanup\b",
+            r"\bbranch\b|\bcondition\b|\bcancel|\babort|\btimeout|\boverload|\bshutdown\b|\bfallback\b",
+        ),
+    },
+    "pages/testing-and-ops.html": {
+        "min_words": 260,
+        "min_sections": 2,
+        "min_evidence": 2,
+        "min_evidence_links": 5,
+        "patterns": (
+            r"\btest\b|\bvalidation\b|\bCI\b|\bworkflow\b",
+            r"\boperat|\bdeploy|\bobservab|\brun command\b|\benvironment\b",
+            r"\bchange\b|\bcommand\b|\bmatrix\b|\bpackage\b|\brelease\b|\blint\b",
+        ),
+    },
+    "pages/file-map.html": {
+        "min_words": 330,
+        "min_sections": 3,
+        "min_evidence": 2,
+        "min_evidence_links": 6,
+        "patterns": (
+            r"\bresponsibilit|\bownership\b|\bdirectory\b|\bfile\b",
+            r"\bchange guide\b|\bwhere to start\b|\bmodify\b|\bextend\b|\bdebug\b",
+            r"\btest\b|\bvalidate\b|\bcommand\b|\bcommon changes\b|\bstart in\b|\bstart with\b",
+        ),
+    },
+}
+
+GENERIC_DIAGRAM_EDGE_SETS = (
+    frozenset({"owns", "feeds", "supports"}),
+    frozenset({"calls", "returns", "extends"}),
+    frozenset({"starts", "dispatches", "emits"}),
+    frozenset({"branches", "recovers", "cleans"}),
+    frozenset({"declares", "selects", "validates"}),
 )
 
 EVIDENCE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
@@ -779,11 +890,23 @@ def render_evidence_chip(repo_arg: str, evidence: str) -> tuple[str | None, str]
     url, reason = source_url_for_evidence(repo_arg, evidence)
     if not url:
         return None, reason
-    label = html.escape(evidence)
+    parsed = parse_evidence_ref(evidence)
+    if not parsed:
+        return None, f"invalid evidence reference: {evidence}"
+    path = str(parsed["path"])
+    file_label = Path(path).name
+    if len(file_label) > 34:
+        file_label = f"...{file_label[-31:]}"
+    line_label = f"L{parsed['start']}"
+    if parsed["end"] != parsed["start"]:
+        line_label += f"-L{parsed['end']}"
+    data_evidence = html.escape(evidence, quote=True)
     href = html.escape(url, quote=True)
     return (
-        f'<a class="evidence-chip" href="{href}" target="_blank" '
-        f'rel="noopener noreferrer"><code>{label}</code></a>',
+        f'<a class="evidence-chip" href="{href}" data-evidence="{data_evidence}" '
+        f'title="{data_evidence}" target="_blank" rel="noopener noreferrer">'
+        f'<span class="evidence-file">{html.escape(file_label)}</span>'
+        f'<span class="evidence-lines">{html.escape(line_label)}</span></a>',
         "",
     )
 
@@ -918,14 +1041,14 @@ def scaffold(out_arg: str, title: str, local_source_cache: bool = False) -> None
       <p>A linked repository guide for architecture, dependencies, patterns, flows, tests, and operations.</p>
     </header>
     <section class="grid">
-      <a class="card" href="pages/overview.html"><span>01</span><strong>Overview</strong><p>Purpose, runtime shape, and key concepts.</p></a>
-      <a class="card" href="pages/architecture.html"><span>02</span><strong>Architecture</strong><p>Modules, boundaries, and core diagrams.</p></a>
-      <a class="card" href="pages/dependencies.html"><span>03</span><strong>Dependencies</strong><p>Manifests, frameworks, and build/runtime tools.</p></a>
-      <a class="card" href="pages/code-patterns.html"><span>04</span><strong>Code Patterns</strong><p>Conventions, abstractions, and recurring implementation shapes.</p></a>
-      <a class="card" href="pages/flows-basic.html"><span>05</span><strong>Basic Flows</strong><p>Primary user and request flows.</p></a>
-      <a class="card" href="pages/flows-advanced.html"><span>06</span><strong>Advanced Flows</strong><p>Edge cases, background jobs, integrations, and failure paths.</p></a>
-      <a class="card" href="pages/testing-and-ops.html"><span>07</span><strong>Testing & Ops</strong><p>Validation, deployment, observability, and operator notes.</p></a>
-      <a class="card" href="pages/file-map.html"><span>08</span><strong>File Map</strong><p>Where to look for each responsibility.</p></a>
+      <a class="card" href="pages/overview.html"><span>01</span><strong>Overview</strong><p>Scope, ownership boundaries, runtime shape, and mental model.</p></a>
+      <a class="card" href="pages/architecture.html"><span>02</span><strong>Architecture</strong><p>Modules, boundaries, interaction maps, and key collaborators.</p></a>
+      <a class="card" href="pages/dependencies.html"><span>03</span><strong>Dependencies</strong><p>Manifests, build/runtime tools, and dependency boundary impact.</p></a>
+      <a class="card" href="pages/code-patterns.html"><span>04</span><strong>Code Patterns</strong><p>Conventions, state ownership, abstractions, and extension points.</p></a>
+      <a class="card" href="pages/flows-basic.html"><span>05</span><strong>Basic Flows</strong><p>Primary entrypoint-to-collaborator happy paths.</p></a>
+      <a class="card" href="pages/flows-advanced.html"><span>06</span><strong>Advanced Flows</strong><p>State transitions, failure modes, async work, and cleanup.</p></a>
+      <a class="card" href="pages/testing-and-ops.html"><span>07</span><strong>Testing & Ops</strong><p>Validation, CI, run commands, deployment, and operator notes.</p></a>
+      <a class="card" href="pages/file-map.html"><span>08</span><strong>File Map</strong><p>Responsibility map and developer change guide.</p></a>
     </section>
 """
     (out_dir / "index.html").write_text(
@@ -933,14 +1056,14 @@ def scaffold(out_arg: str, title: str, local_source_cache: bool = False) -> None
     )
 
     page_specs = {
-        "overview": "Explain what the repository does, who it serves, and how the main runtime pieces fit together.",
-        "architecture": "Document modules, ownership boundaries, data stores, external services, and deterministic diagrams.",
-        "dependencies": "Explain dependency manifests, build tooling, runtime frameworks, and noteworthy version constraints.",
-        "code-patterns": "Summarize naming, layering, error handling, configuration, and extension conventions.",
-        "flows-basic": "Walk through the main happy-path flows with links to source evidence.",
-        "flows-advanced": "Cover edge cases, retries, async work, integrations, and failure modes.",
-        "testing-and-ops": "Explain tests, local run commands, deployments, observability, and operational caveats.",
-        "file-map": "Map important directories and files to responsibilities.",
+        "overview": "Explain repository scope, ownership boundaries, audience, runtime shape, and the shortest mental model for a new developer.",
+        "architecture": "Document modules, ownership boundaries, public APIs, component diagrams, and class/type/function interaction maps.",
+        "dependencies": "Explain dependency manifests, build tooling, runtime frameworks, and how dependencies shape repository boundaries.",
+        "code-patterns": "Summarize naming, layering, state ownership, error handling, configuration, and extension conventions.",
+        "flows-basic": "Walk through the main happy-path flows from entrypoint to collaborators with source evidence.",
+        "flows-advanced": "Cover state transitions, edge cases, retries, async work, integrations, failure modes, and cleanup.",
+        "testing-and-ops": "Explain tests, local run commands, CI, deployments, observability, environment, and operational caveats.",
+        "file-map": "Map important directories and files to responsibilities and common developer changes.",
     }
     for slug, description in page_specs.items():
         path = out_dir / "pages" / f"{slug}.html"
@@ -1014,6 +1137,19 @@ def validate(wiki_arg: str) -> int:
         for index, block in enumerate(evidence_blocks, start=1):
             validate_evidence_block(rel_html.as_posix(), index, block, inventory, errors, warnings)
 
+        if rel_html.as_posix() in COMPREHENSION_PAGE_RULES:
+            evidence_link_count = sum(
+                len(list(ANCHOR_RE.finditer(block))) for block in evidence_blocks
+            )
+            validate_comprehension_depth(
+                rel_html.as_posix(),
+                text,
+                len(evidence_blocks),
+                evidence_link_count,
+                errors,
+                warnings,
+            )
+
         if "<table" in text.lower() and "table-wrap" not in text and not runtime_wraps_tables:
             warnings.append(f"{rel_html} has table markup without an explicit table-wrap container")
 
@@ -1034,6 +1170,8 @@ def validate(wiki_arg: str) -> int:
 
     if not any((wiki_dir / "assets" / "diagrams").glob("*")):
         warnings.append("assets/diagrams is empty")
+    else:
+        validate_diagrams(wiki_dir, errors, warnings)
 
     print_report(errors, warnings)
     return 1 if errors else 0
@@ -1045,6 +1183,99 @@ def parse_attrs(attrs: str) -> dict[str, str]:
 
 def strip_tags(value: str) -> str:
     return html.unescape(TAG_RE.sub("", value)).strip()
+
+
+def main_html_fragment(value: str) -> str:
+    match = re.search(r"<main\b[^>]*>(?P<body>.*?)</main>", value, re.IGNORECASE | re.DOTALL)
+    return match.group("body") if match else value
+
+
+def visible_text(value: str) -> str:
+    fragment = main_html_fragment(value)
+    fragment = re.sub(r"<script\b.*?</script>", " ", fragment, flags=re.IGNORECASE | re.DOTALL)
+    fragment = re.sub(r"<style\b.*?</style>", " ", fragment, flags=re.IGNORECASE | re.DOTALL)
+    return re.sub(r"\s+", " ", strip_tags(fragment)).strip()
+
+
+def word_count(value: str) -> int:
+    return len(re.findall(r"\b[\w./:-]+\b", value))
+
+
+def validate_comprehension_depth(
+    html_rel_path: str,
+    text: str,
+    evidence_count: int,
+    evidence_link_count: int,
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    rule = COMPREHENSION_PAGE_RULES[html_rel_path]
+    main_text = visible_text(text)
+    main_text_lower = main_text.lower()
+    section_count = len(re.findall(r"<section\b", main_html_fragment(text), re.IGNORECASE))
+    words = word_count(main_text)
+
+    if words < int(rule["min_words"]):
+        errors.append(
+            f"{html_rel_path} is too thin for developer onboarding "
+            f"({words} words, expected at least {rule['min_words']})"
+        )
+    if section_count < int(rule["min_sections"]):
+        errors.append(
+            f"{html_rel_path} has too few substantive sections "
+            f"({section_count}, expected at least {rule['min_sections']})"
+        )
+    if evidence_count < int(rule["min_evidence"]):
+        errors.append(
+            f"{html_rel_path} has too few evidence-backed sections "
+            f"({evidence_count}, expected at least {rule['min_evidence']})"
+        )
+    if evidence_link_count < int(rule["min_evidence_links"]):
+        errors.append(
+            f"{html_rel_path} has too few source evidence links "
+            f"({evidence_link_count}, expected at least {rule['min_evidence_links']})"
+        )
+
+    for pattern in rule["patterns"]:
+        if not re.search(str(pattern), main_text_lower, re.IGNORECASE):
+            errors.append(
+                f"{html_rel_path} is missing required comprehension topic matching /{pattern}/"
+            )
+
+    for pattern in GENERIC_PROSE_PATTERNS:
+        if re.search(pattern, main_text_lower, re.IGNORECASE):
+            errors.append(
+                f"{html_rel_path} contains generic wiki meta-prose matching /{pattern}/; "
+                "replace it with repo-specific explanation"
+            )
+
+
+def validate_diagrams(wiki_dir: Path, errors: list[str], warnings: list[str]) -> None:
+    for rel in (
+        "assets/diagrams/architecture.svg",
+        "assets/diagrams/interaction-map.svg",
+        "assets/diagrams/basic-flow.svg",
+        "assets/diagrams/advanced-flow.svg",
+        "assets/diagrams/dependency-map.svg",
+    ):
+        path = wiki_dir / rel
+        if not path.is_file():
+            warnings.append(f"missing recommended diagram: {rel}")
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        text_nodes = [
+            strip_tags(match.group(0)).lower()
+            for match in re.finditer(r"<text\b[^>]*>.*?</text>", text, re.IGNORECASE | re.DOTALL)
+        ]
+        normalized = {node.strip() for node in text_nodes if node.strip()}
+        for generic_edges in GENERIC_DIAGRAM_EDGE_SETS:
+            if generic_edges.issubset(normalized):
+                errors.append(
+                    f"{rel} uses generic relationship labels {sorted(generic_edges)}; "
+                    "replace label-map arrows with repo-specific relationship verbs"
+                )
+        if len(normalized) < 8:
+            warnings.append(f"{rel} has very few diagram labels; verify it is more than a label map")
 
 
 def validate_evidence_block(
@@ -1075,14 +1306,15 @@ def validate_evidence_block(
 
     for attrs, label in anchors:
         href = attrs.get("href", "")
-        parsed_ref = parse_evidence_ref(label)
+        evidence_label = attrs.get("data-evidence") or attrs.get("title") or label
+        parsed_ref = parse_evidence_ref(evidence_label)
         if parsed_ref and source_repo:
             validate_evidence_file(source_repo, parsed_ref, html_rel_path, errors)
         if host == "github" and web_url and commit and parsed_ref:
             expected_prefix = f"{web_url}/blob/{commit}/"
             if not href.startswith(expected_prefix):
                 errors.append(
-                    f"{html_rel_path} evidence link for {label} is not pinned to analyzed commit"
+                    f"{html_rel_path} evidence link for {evidence_label} is not pinned to analyzed commit"
                 )
 
 

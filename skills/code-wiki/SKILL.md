@@ -1,6 +1,6 @@
 ---
 name: code-wiki
-description: Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki from that analysis. Use when the user asks to study, understand, document, explain, map, or onboard onto a repo in depth, including architecture, dependencies, code patterns, basic and advanced flows, diagrams, optional conceptual images, and a browsable wiki artifact.
+description: Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki that gives a developer a comprehensive mental model of the codebase. Use when the user asks to study, understand, document, explain, map, or onboard onto a repo in depth, including repository scope, ownership boundaries, major modules, class/type/function interactions, call paths, dependencies, code patterns, basic and advanced flows, testing/ops, deterministic diagrams, optional conceptual images, and a browsable wiki artifact.
 ---
 
 # Code Wiki
@@ -11,6 +11,26 @@ Create a linked static HTML wiki that explains a repository from source
 evidence. Cover what the repo does, how it is structured, which dependencies
 matter, what patterns it uses, how the important flows work, and where a future
 maintainer should look first.
+
+The wiki must be useful to a developer who has never seen the codebase. It is
+not enough to describe directories or list files. Build a mental model of:
+
+- repository scope: what this repo owns, what it delegates to dependencies or
+  external systems, and what is intentionally out of scope
+- architecture: runtime components, ownership boundaries, public API surfaces,
+  storage/network/process boundaries, and deployment/runtime shape
+- interaction model: which classes, structs, protocols, traits, interfaces,
+  modules, or key functions collaborate, who calls whom, and where state moves
+- lifecycle and flows: startup, request/command/API/call paths, state
+  transitions, failure paths, retries, async/background work, and cleanup
+- developer change map: where to start for common changes, which tests protect
+  those areas, and which extension points are intended versus incidental
+
+Do not satisfy these sections with generic meta-prose about what a wiki should
+do. Write repo-specific facts: concrete usage paths, public API contracts,
+callers and callees, state carriers, branch conditions, cleanup owners, test
+commands, and change recipes. If a sentence could apply to any repository,
+replace it with a source-backed statement from this repository.
 
 This skill is Codex-dependent. It can use:
 
@@ -79,6 +99,8 @@ When delegation is explicitly authorized and allowed by the current runtime, use
 read-only parallel explorer subagents for:
 
 - architecture and module boundaries
+- repository scope and ownership boundaries
+- class/type/function collaboration and call paths
 - dependencies, build, runtime, and tooling
 - APIs, data flow, and user/business flows
 - code patterns, conventions, risks, and extension points
@@ -120,10 +142,23 @@ Required output:
 - `assets/images/`
 - `data/inventory.json`
 
-Use deterministic local SVG or HTML diagrams for factual architecture and flow
-content. Keep page and asset links local so the wiki opens from `index.html`
-without a server. For evidence references, prefer online commit-pinned source
-links when the analyzed repo has a supported hosted remote.
+Use deterministic local SVG or HTML diagrams for factual architecture, type or
+module collaboration, and flow content. Every non-trivial wiki should include at
+least:
+
+- one component/module boundary diagram
+- one interaction or call-path diagram showing how important types/modules
+  collaborate
+- one flow or lifecycle diagram for the primary runtime path
+
+Diagrams must show relationships, not just labels. Use arrows with short
+relationship verbs and readable labels. If a diagram truncates important text or
+only repeats section headings, fix the diagram before reporting the wiki
+complete.
+
+Keep page and asset links local so the wiki opens from `index.html` without a
+server. For evidence references, prefer online commit-pinned source links when
+the analyzed repo has a supported hosted remote.
 
 For GitHub repos, generate source links with:
 
@@ -154,10 +189,17 @@ scripts/code-wiki validate --wiki <wiki-out>
 ```
 
 Fix broken local links, missing pages, missing required assets, invalid
-`data/inventory.json`, scaffold placeholders, missing clickable evidence links,
-and invalid evidence paths. Warnings about empty diagrams are acceptable only if
-the user explicitly asked for a minimal wiki; otherwise add deterministic
-diagram assets. Do not add filler raster images only to satisfy validation.
+`data/inventory.json`, scaffold placeholders, thin or non-comprehensive page
+content, missing clickable evidence links, and invalid evidence paths. Warnings
+about empty diagrams are acceptable only if the user explicitly asked for a
+minimal wiki; otherwise add deterministic diagram assets. Do not add filler
+raster images only to satisfy validation.
+
+When the user explicitly asks for subagent-based validation, use reader
+subagents after generation. They should read only the generated HTML/SVG wiki
+and report whether it is enough for expert developer onboarding. Treat a reader
+FAIL as a real failure and iterate on the wiki or skill instructions before
+claiming success.
 
 ## Output
 
@@ -172,4 +214,5 @@ cloned, say `Source was not cloned; analyzed local path:
 <absolute-repo-path>`.
 
 Do not claim the wiki is complete unless each major page has evidence-backed
-content and validation passes.
+developer-grade content, the wiki explains scope and interactions rather than
+only file layout, and validation passes.

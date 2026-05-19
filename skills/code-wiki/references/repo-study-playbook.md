@@ -44,6 +44,78 @@ against the target repo until the output wiki path is resolved.
    - `rg --files`
    - `rg -n "TODO|FIXME|route|router|controller|service|handler|main|server|config|env"`
 
+## Developer Comprehension Model
+
+Before synthesis, build these notes from source evidence. The final wiki should
+teach these models directly instead of only presenting an inventory:
+
+1. **Repository scope**
+   - What product, library, service, CLI, protocol, or app surface does this
+     repo own?
+   - Which responsibilities are delegated to dependencies, generated code,
+     platform SDKs, network services, databases, or vendored code?
+   - Which directories are first-party runtime source, tests, examples,
+     fixtures, docs, generated assets, ops, or vendored dependencies?
+2. **Public and internal API surfaces**
+   - Identify exported classes, structs, protocols, traits, interfaces, public
+     functions, routes, commands, package targets, entrypoints, or headers.
+   - Separate stable public extension points from incidental internal helpers.
+   - Capture one usage-shaped path through the public surface. Examples:
+     CLI command invocation, library initialization, HTTP request registration,
+     C handle/request lifecycle, plugin registration, store creation, or package
+     entrypoint import.
+3. **Interaction model**
+   - Map the important collaborators: who creates whom, who calls whom, who
+     owns state, who observes callbacks/events, and who performs I/O.
+   - Include at least one collaboration map for the dominant language style:
+     class diagram, protocol/type relationship, module dependency graph,
+     route/controller/service graph, C header/source call path, CLI command
+     tree, or package target graph.
+   - Avoid diagram-only label maps. Every edge should explain a relationship
+     with a verb such as creates, calls, mutates, registers, observes, wraps,
+     renders, polls, emits, cancels, or cleans up.
+   - Prefer repo-specific edge labels such as "allocates call slot",
+     "hydrates storage", "parses summary", "starts epoll watcher", or
+     "wraps StateCreator" over generic labels like "owns", "feeds", or
+     "supports".
+4. **Runtime lifecycle**
+   - Trace startup/initialization, main request or command path, state changes,
+     failure handling, async/background work, and cleanup/shutdown.
+   - Prefer narrow source-backed call paths over vague architecture prose.
+   - For advanced flows, name branch conditions and failure triggers. Examples:
+     invalid config, missing file, route miss, binding error, canceled task,
+     unavailable handle slot, subprocess failure, storage migration mismatch,
+     connection reset, timeout, overload, or shutdown ordering.
+5. **Developer change guide**
+   - For common future changes, identify the first file to read, the nearby
+     collaborators, the tests to run, and the operational caveats.
+   - Include task-specific recipes. Broad statements like "start in src" are
+     not enough for large repos.
+
+## Synthesis Quality Gate
+
+Before writing final pages, draft a pass/fail checklist as if an expert
+developer will read only the wiki:
+
+- Can they use the project at least through one concrete public entry path?
+- Can they name the main public API contracts and the internal owners behind
+  them?
+- Can they trace the primary call path from entry to output/callback/state?
+- Can they explain at least three advanced branches or failure modes?
+- Can they choose files and tests for several common changes?
+- Do diagrams show relationships with arrows and verbs rather than label lists?
+- Do the diagrams use repo-specific relationship labels and avoid visible text
+  truncation?
+- Is every relationship backed by evidence that proves the relationship?
+
+If any answer is "no", keep studying and writing. Do not pad with meta text
+such as "a useful wiki should..." or "this page should...". Replace that with
+specific repository facts and evidence.
+
+If the repo is large, prioritize the most important product/runtime path and
+make the scoping explicit. It is better to say which subtrees are outside the
+current deep dive than to imply the whole repo was studied equally.
+
 ## Dependency Manifests
 
 Inspect these when present:
@@ -98,8 +170,19 @@ Architecture prompt:
 
 ```text
 Study this repo read-only for architecture and module boundaries. Return the
-main runtime components, ownership boundaries, important entrypoints, and the
-best evidence paths/line numbers. Do not edit files.
+main runtime components, repository scope, ownership boundaries, public API
+surfaces, important entrypoints, and the best evidence paths/line numbers. Do
+not edit files.
+```
+
+Interaction prompt:
+
+```text
+Study this repo read-only for class/type/function/module interactions. Identify
+the key collaborators, who calls or owns whom, where state is created or
+mutated, and which files prove those relationships. Use the language's native
+concepts: classes, structs, protocols, traits, interfaces, routes, commands,
+C headers/functions, or package targets. Do not edit files.
 ```
 
 Dependencies prompt:
@@ -114,8 +197,9 @@ Flows prompt:
 
 ```text
 Study this repo read-only for user-facing, API, CLI, background, or data flows.
-Identify basic happy paths and advanced/failure paths with evidence paths/line
-numbers. Do not edit files.
+Identify startup, basic happy paths, advanced/failure paths, state transitions,
+and cleanup/shutdown behavior with evidence paths/line numbers. Do not edit
+files.
 ```
 
 Patterns prompt:
@@ -126,12 +210,36 @@ handling, configuration, tests, risks, and extension points. Return
 evidence-backed findings with paths/line numbers. Do not edit files.
 ```
 
+Change-guide prompt:
+
+```text
+Study this repo read-only for a developer change guide. For common changes,
+identify where to start, which collaborators are nearby, which tests or
+commands validate the change, and which areas are risky or intentionally
+out-of-scope. Return evidence-backed findings with paths/line numbers. Do not
+edit files.
+```
+
+Reader-evaluator prompt for post-generation QA:
+
+```text
+Read only the generated wiki HTML/SVG files, not the source repo. Decide
+PASS/FAIL for expert developer onboarding. Can you understand project scope,
+usage, public APIs, important classes/structs/types/functions/modules and their
+interactions, basic flows, advanced/failure flows, dependencies/build,
+testing/ops, and task-specific change recipes? Report concrete missing areas.
+Do not edit files.
+```
+
 If delegation is unavailable or not explicitly authorized, run these slices
 sequentially in the main agent.
 
 ## Evidence Rules
 
 - Tie factual claims to source files, manifests, docs, or observed commands.
+- Evidence should support relationships, not just existence. Prefer citations
+  that prove calls, ownership, registration, inheritance/conformance,
+  dependency wiring, state mutation, or lifecycle transitions.
 - Prefer exact local file paths and line numbers while studying.
 - In generated pages, render source evidence as clickable chips. For GitHub
   repos, use commit-pinned online blob links from the analyzed commit.
