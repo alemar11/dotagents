@@ -128,19 +128,45 @@ Then replace placeholders using `references/wiki-html-contract.md`.
 Required output:
 
 - `index.html`
+- `pages/project-context.html`
 - `pages/overview.html`
+- `pages/public-interfaces.html`
 - `pages/architecture.html`
+- `pages/runtime-state.html`
 - `pages/dependencies.html`
 - `pages/code-patterns.html`
 - `pages/flows-basic.html`
 - `pages/flows-advanced.html`
 - `pages/testing-and-ops.html`
-- `pages/file-map.html`
+- `pages/change-guide.html`
+- `pages/source-map.html`
+- `pages/deep-dives/index.html`
 - `assets/style.css`
 - `assets/app.js`
 - `assets/diagrams/`
 - `assets/images/`
 - `data/inventory.json`
+
+For large or multi-surface repositories, create two to five adaptive deep-dive
+pages under `pages/deep-dives/`. Choose these pages from source evidence, not a
+fixed taxonomy. Good deep dives usually follow the repo's natural subsystems:
+public API families, protocol/runtime layers, plugin systems, storage models,
+build matrices, language bindings, worker/event loops, or failure-prone
+integration paths. Link every deep dive from `pages/deep-dives/index.html`.
+
+Every non-trivial wiki must include structured, source-backed decision aids:
+
+- a project context/use-case table with adoption constraints, governance,
+  support, license, and official docs signals when present
+- a public surface matrix that helps readers choose the right API, command,
+  package export, route, plugin hook, schema, binding, or module surface
+- a runtime state/lifecycle table naming state carriers, creators, mutators,
+  observers, and cleanup owners
+- an advanced failure table with triggers, detection branches, owner,
+  caller/user effect, recovery, retry, fallback, abort, or rollback behavior
+- exact validation command tables for testing and operations
+- a change safety matrix with compatibility risk, validation, and rollback
+  notes for common changes
 
 Use deterministic local SVG or HTML diagrams for factual architecture, type or
 module collaboration, and flow content. Every non-trivial wiki should include at

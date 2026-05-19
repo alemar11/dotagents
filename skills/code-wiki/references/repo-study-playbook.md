@@ -40,6 +40,10 @@ against the target repo until the output wiki path is resolved.
    - dependency manifests and lockfiles
    - entrypoints found by inventory
    - config files that define routing, build, runtime, or deployment
+   - governance and adoption files when present: `LICENSE*`, `COPYING*`,
+     `NOTICE*`, `SECURITY*`, `SUPPORT*`, `CODEOWNERS`, `MAINTAINERS*`,
+     `CHANGELOG*`, release notes, compatibility policies, and generated
+     artifact instructions
 5. Use fast search before deep reads:
    - `rg --files`
    - `rg -n "TODO|FIXME|route|router|controller|service|handler|main|server|config|env"`
@@ -56,6 +60,9 @@ teach these models directly instead of only presenting an inventory:
      platform SDKs, network services, databases, or vendored code?
    - Which directories are first-party runtime source, tests, examples,
      fixtures, docs, generated assets, ops, or vendored dependencies?
+   - What can a user or downstream integrator build with the project, which
+     responsibilities remain outside the repo, and which official docs should
+     they read next?
 2. **Public and internal API surfaces**
    - Identify exported classes, structs, protocols, traits, interfaces, public
      functions, routes, commands, package targets, entrypoints, or headers.
@@ -64,6 +71,9 @@ teach these models directly instead of only presenting an inventory:
      CLI command invocation, library initialization, HTTP request registration,
      C handle/request lifecycle, plugin registration, store creation, or package
      entrypoint import.
+   - Build a public surface matrix that helps readers choose between commands,
+     package exports, routes, schemas, bindings, plugin hooks, low-level APIs,
+     high-level wrappers, generated clients, or samples.
 3. **Interaction model**
    - Map the important collaborators: who creates whom, who calls whom, who
      owns state, who observes callbacks/events, and who performs I/O.
@@ -86,11 +96,28 @@ teach these models directly instead of only presenting an inventory:
      invalid config, missing file, route miss, binding error, canceled task,
      unavailable handle slot, subprocess failure, storage migration mismatch,
      connection reset, timeout, overload, or shutdown ordering.
+   - When the source exposes runtime or protocol states, extract the actual
+     enum/state names, transition triggers, callbacks/events, cleanup owners,
+     and tests. Prefer state-machine tables or diagrams over prose-only
+     summaries.
 5. **Developer change guide**
    - For common future changes, identify the first file to read, the nearby
      collaborators, the tests to run, and the operational caveats.
    - Include task-specific recipes. Broad statements like "start in src" are
      not enough for large repos.
+   - Include exact copy-paste validation commands, compatibility risks,
+     generated artifacts, downstream surfaces, and rollback/backout notes.
+6. **Adaptive deep dives**
+   - For large or multi-surface repositories, choose two to five subsystems
+     that deserve their own pages. Prefer areas with public API surface,
+     runtime complexity, high change frequency, failure-prone integrations, or
+     non-obvious state and lifecycle behavior.
+   - Name why each deep dive exists, which entrypoints lead into it, what state
+     or dependencies it owns, how it fails, and which tests or examples protect
+     common changes.
+   - Do not choose deep dives from a fixed global list. Derive them from source
+     roots, interface roots, manifests, docs, examples, tests, and the primary
+     runtime path.
 
 ## Synthesis Quality Gate
 
@@ -98,11 +125,19 @@ Before writing final pages, draft a pass/fail checklist as if an expert
 developer will read only the wiki:
 
 - Can they use the project at least through one concrete public entry path?
+- Can they name common use cases, adoption constraints, license/security/support
+  signals, and official upstream docs?
 - Can they name the main public API contracts and the internal owners behind
   them?
+- Can they choose the right public surface for a major consumer scenario?
 - Can they trace the primary call path from entry to output/callback/state?
+- Can they see real state names or lifecycle states where the source has them?
 - Can they explain at least three advanced branches or failure modes?
-- Can they choose files and tests for several common changes?
+- Can they choose files and exact validation commands for several common
+  changes?
+- Can they identify compatibility risk, generated artifacts, and rollback paths
+  for cross-surface changes?
+- Can they identify which subsystems deserve deep dives and why?
 - Do diagrams show relationships with arrows and verbs rather than label lists?
 - Do the diagrams use repo-specific relationship labels and avoid visible text
   truncation?

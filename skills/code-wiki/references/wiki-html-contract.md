@@ -9,14 +9,21 @@ The `code-wiki` output is a static, linked HTML folder. It should open from
 <wiki-out>/
   index.html
   pages/
+    project-context.html
     overview.html
+    public-interfaces.html
     architecture.html
+    runtime-state.html
     dependencies.html
     code-patterns.html
     flows-basic.html
     flows-advanced.html
     testing-and-ops.html
-    file-map.html
+    change-guide.html
+    source-map.html
+    deep-dives/
+      index.html
+      <adaptive-subsystem>.html   # required for large or multi-surface repos
   assets/
     style.css
     app.js
@@ -36,15 +43,32 @@ that ignores everything except itself.
 ## Page Responsibilities
 
 - `index.html`: navigation hub, repo name, generation context, and page cards.
+- `project-context.html`: product or project use cases, target audiences,
+  capabilities, non-goals, adoption responsibilities, official upstream docs,
+  and governance/support constraints. Include a table that helps a stakeholder
+  answer what the project is for, what can be built with it, which surface to
+  start from, and what license/security/support/platform constraints matter.
 - `overview.html`: repository scope, what the repo owns, what it delegates or
   leaves out of scope, audience, runtime shape, core concepts, and the shortest
   mental model for a new developer. Include how the project is used by a
   consumer, caller, CLI user, library user, application, or downstream package.
+- `public-interfaces.html`: public or exported APIs, commands, routes,
+  headers, package targets, bindings, schemas, plugin hooks, samples, and
+  extension contracts. Include a public surface matrix with the surface name,
+  consumer entry, owner file/module, stability/contract status, and evidence.
+  Separate stable surfaces from incidental internals and include at least one
+  usage-shaped path through the public surface.
 - `architecture.html`: modules, boundaries, data stores, external systems, and
   deterministic diagrams. Must include a component/module map and a
   class/type/function interaction map that explains important collaborators,
   not only directories. The text must name who creates, calls, owns, mutates,
   registers, or observes whom.
+- `runtime-state.html`: state carriers, lifecycle ownership, persistence,
+  caches, handles, globals, context objects, concurrency/threading, resource
+  cleanup, and shutdown ordering. Include a state/lifecycle table naming each
+  state carrier, who creates it, who mutates it, who observes it, and who
+  cleans it up. Explain where state is created, mutated, observed, handed
+  across boundaries, and released.
 - `dependencies.html`: dependency manifests, frameworks, build/runtime tools,
   package managers, noteworthy version constraints, and how dependencies shape
   runtime behavior or repo boundaries.
@@ -59,15 +83,29 @@ that ignores everything except itself.
   integrations, failure modes, state transitions, cleanup, and operational
   hazards. Identify branch conditions, failure triggers, cancellation/abort
   ownership, timeout/retry/fallback behavior, overload handling, and shutdown or
-  resource cleanup where present.
+  resource cleanup where present. Include a failure-path table with trigger,
+  detection branch, owner, caller/user effect, recovery/retry/fallback/abort,
+  cleanup owner, and test surface where applicable.
 - `testing-and-ops.html`: local run, tests, CI, deployment, observability,
   environment variables, and operator caveats. Map common change types to the
   exact validation commands, test files, CI matrix entries, release checks, or
-  package checks that protect them.
-- `file-map.html`: directory/file responsibilities and where to start for
-  common changes. Include a developer change guide that maps likely change
-  requests to files, collaborators, and tests. For large repos, include several
-  task-specific recipes instead of broad "start here" advice.
+  package checks that protect them. Include copy-paste command snippets plus a
+  command matrix with task, command, source, when to run it, and expected
+  signal or artifact.
+- `change-guide.html`: task-specific recipes for likely future changes. Each
+  recipe should name the first file to read, nearby collaborators, tests or
+  commands to run, and risks or compatibility caveats. Include a change safety
+  matrix with change type, compatibility risk, validation, rollback/backout
+  path, and generated artifacts or downstream surfaces affected.
+- `source-map.html`: directory/file responsibilities and source/test/docs/
+  examples/generated/vendor boundaries. Keep this as an appendix-style map;
+  do not use it as a substitute for architecture or change recipes.
+- `deep-dives/index.html`: index of repo-specific deep-dive pages. For large
+  or multi-surface repositories, create two to five leaf pages under
+  `pages/deep-dives/` and link them here. Deep-dive topics should come from the
+  inventory and source study, such as protocol layers, runtime engines, public
+  API families, storage models, build systems, bindings, worker/event loops, or
+  failure-prone integrations.
 
 ## Comprehension Bar
 
@@ -76,11 +114,20 @@ Each major page should contain multiple evidence-backed sections and explain
 relationships between code units. A complete wiki should answer:
 
 - What is in scope for this repo, and what is out of scope?
+- What can a user, integrator, operator, or downstream developer build with
+  this project, and what must they provide outside the repo?
+- What are the public APIs, extension points, commands, bindings, or package
+  surfaces, and which ones are stable versus incidental?
+- Which public surface should a new consumer choose for each major use case?
 - Which modules/classes/types/functions collaborate on the primary runtime path?
-- What are the public APIs or extension points?
 - Where is state created, mutated, persisted, or handed across boundaries?
-- What happens on startup, the main happy path, failure paths, and shutdown?
+- What state machines, lifecycle states, retries, failure paths, and shutdown
+  branches matter?
 - Where should a developer start for common changes, and how should they test?
+- What are the compatibility, rollback, generated-artifact, ownership,
+  license, security, support, and official-doc constraints?
+- Which repo-specific subsystems deserve deeper treatment beyond the global
+  overview pages?
 
 Do not fill pages with generic prose, dependency lists, or directory summaries
 alone. Every architectural claim should be backed by evidence that proves the
@@ -97,6 +144,11 @@ For non-trivial repositories, include a compact usage example or usage-shaped
 walkthrough. This does not need to be executable code, but it must answer how a
 developer or downstream consumer enters the system and which public APIs,
 commands, routes, structs, classes, modules, or functions they touch first.
+
+Follow a mixed documentation model: overview and architecture pages explain the
+system, public interface and source map pages act as reference, testing and
+change-guide pages act as how-to material, and adaptive deep dives connect the
+reader to the repo's most important subsystem internals.
 
 ## HTML Rules
 
@@ -179,6 +231,9 @@ Unsupported remotes may fall back to local source references, but do not guess
 host-specific URL formats.
 
 If exact line numbers are unavailable, cite the narrowest path and explain why.
+Prefer evidence ranges under 120 lines. Broader ranges are acceptable only when
+paired with narrower chips for the exact function, branch, command, or state
+transition being discussed.
 
 ## Validation Expectations
 
@@ -201,5 +256,13 @@ interactions, lifecycle, state/failure handling, and change-guide coverage.
 It also rejects known generic wiki meta-prose because word count alone is not
 evidence of developer-grade content.
 Major pages are expected to carry multiple source links, not only one broad
-evidence block. Advanced flow and file-map pages should cite the specific
-functions, branches, tests, and owner files they discuss.
+evidence block. Advanced flow and change-guide pages should cite the specific
+functions, branches, tests, and owner files they discuss. When inventory shows
+a large or multi-surface repository, validation also expects at least two
+adaptive leaf pages under `pages/deep-dives/`.
+Validation checks required structured tables on project context, public
+interfaces, runtime state, advanced failures, exact commands, and change
+safety. It also checks that source/interface/test roots from inventory are
+covered in the source map, warns when governance docs are not surfaced, warns
+when evidence ranges are too broad for review, and warns if the analyzed source
+dirty state drifts after inventory generation.

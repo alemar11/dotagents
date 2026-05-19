@@ -6,8 +6,13 @@
   if (here) {
     for (const link of links) {
       const target = (link.getAttribute("href") || "").split("#")[0].split("?")[0];
-      const targetFile = target.split("/").filter(Boolean).pop() || "index.html";
-      if (targetFile === here) {
+      let targetPath = "";
+      try {
+        targetPath = new URL(target || "index.html", window.location.href).pathname;
+      } catch (_) {
+        targetPath = "";
+      }
+      if (targetPath === window.location.pathname) {
         link.classList.add("active");
       }
     }
