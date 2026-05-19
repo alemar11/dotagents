@@ -7,8 +7,18 @@ against the target repo until the output wiki path is resolved.
 
 1. Confirm target type.
    - Local path: resolve to an absolute path.
-   - Git URL: shallow-clone into
+   - Git URL by default: clone or update a real Git checkout under
      `~/.cache/dotagents/skills/code-wiki/repos/<repo-slug>-<hash>/`.
+   - Git URL when the user asks to store cloned source locally beside the wiki:
+     clone into `code-wiki/.cache/sources/<repo-slug>/` under the
+     selected wiki root.
+   - For local wiki source storage, create `code-wiki/.cache/.gitignore` with:
+     ```gitignore
+     *
+     !.gitignore
+     ```
+   - Record the exact resolved source path immediately. For git URLs, this is
+     the clone path and must be reported at the end of the flow.
 2. Check repository state without changing it:
    - `git status --short` when `.git/` exists.
    - Do not revert, format, or modify the target repo.
@@ -100,3 +110,60 @@ If the target repo has uncommitted changes:
   the current working tree state.
 - If changes directly affect the explained behavior, describe that the evidence
   came from the working tree, not necessarily the committed branch.
+
+## Source Clone Storage
+
+Default remote-source clones live under
+`~/.cache/dotagents/skills/code-wiki/repos/` because they are disposable and
+recoverable from the git URL.
+
+Use project-local source storage only when the user asks for wording such as
+"store the repo locally", "keep the source beside the wiki", "self-contained
+wiki", or "put the cloned repos in code-wiki". In that mode:
+
+- Use `<wiki-root>/.cache/sources/<repo-slug>/` for cloned source.
+- Keep `<wiki-root>/.cache/.gitignore` committed or present with:
+  ```gitignore
+  *
+  !.gitignore
+  ```
+- Do not put final HTML pages, diagrams, images, or `data/inventory.json` under
+  `.cache/`.
+- Exclude `code-wiki/` and `.cache/` from future source inventories to avoid
+  recursively studying generated wiki output or cached clone copies.
+
+## Git Clone Policy
+
+For git URLs, use a real Git clone instead of archive downloads so future wiki
+refinement can fetch updates, pull branch changes, and inspect commit history.
+
+Default first clone:
+
+```bash
+git clone <git-url> <clone-path>
+```
+
+Default refresh for an existing clone:
+
+```bash
+git -C <clone-path> fetch --all --prune --tags
+git -C <clone-path> pull --ff-only
+```
+
+If `pull --ff-only` fails because the clone is detached, on a different branch,
+or has local changes, do not force-reset. Report the current branch/HEAD and use
+the fetched checkout as-is unless the user asks to change refs.
+
+Do not use `git archive`, source ZIP downloads, or shallow clones by default.
+Use `--depth`, `--filter`, or another reduced-history clone only when the repo is
+too large or the user explicitly asks for a fast snapshot; label the wiki as
+based on limited history in that case.
+
+At completion, always report the cloned source path for every git URL. Expand
+`~` to the actual absolute home path in the final response:
+
+- Default mode: `Cloned source path: <absolute-home>/.cache/dotagents/skills/code-wiki/repos/<repo-slug>-<hash>/`
+- Local mode: `Cloned source path: <wiki-root>/.cache/sources/<repo-slug>/`
+
+If the target was a local path and no clone happened, report the analyzed local
+source path instead of pretending there is a cloned source.

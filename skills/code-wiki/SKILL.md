@@ -17,11 +17,13 @@ This skill is Codex-dependent. It relies on:
 - Codex subagents for parallel read-only repo study when the current runtime
   allows delegation.
 - `$imagegen` for selected raster overview or conceptual images.
-- `~/.cache/dotagents/skills/code-wiki/` for disposable git clones and
-  temporary analysis artifacts only.
+- `~/.cache/dotagents/skills/code-wiki/` for default disposable git clones and
+  temporary analysis artifacts.
 
 Never put the final wiki in the cache. The durable wiki belongs in the
-user-chosen output folder.
+user-chosen output folder. If the user explicitly asks to store cloned source
+locally beside the wiki, use the local wiki cache pattern instead of the global
+cache.
 
 ## Workflow
 
@@ -29,8 +31,27 @@ user-chosen output folder.
 
 - Accept either a local repository path or a git URL.
 - For a local path, analyze the repo in place without moving it.
-- For a git URL, create or refresh a shallow clone under
+- For a git URL, create or update a real Git clone under
   `~/.cache/dotagents/skills/code-wiki/repos/<repo-slug>-<hash>/`.
+- Do not use archive downloads for git repos. Keep `.git/` metadata so the
+  source can be fetched, pulled, and inspected with history.
+- Do not use shallow clones by default because repo history may be useful for
+  understanding architecture and evolution. If the repo is very large or the
+  user asks for a fast snapshot, ask before using a shallow or partial clone.
+- On repeat runs, update the clone with `git fetch --all --prune --tags` and
+  fast-forward the checked-out branch when safe.
+- If the user asks to store the cloned repo locally, clone under the
+  selected wiki root at `code-wiki/.cache/sources/<repo-slug>/` and keep
+  `code-wiki/.cache/.gitignore` as:
+  ```gitignore
+  *
+  !.gitignore
+  ```
+  For multi-repo wiki output, keep one shared `code-wiki/.cache/sources/`
+  folder with one source clone per repo slug.
+- For every cloned git URL, record the exact clone path. This path must be
+  included in the final response whether the clone lives in the global cache or
+  in the wiki-local `.cache/sources/` folder.
 - If the user did not provide an output path, ask where to write the wiki before
   creating files.
 - Treat the output as a static HTML folder. Do not default to Markdown.
@@ -68,6 +89,12 @@ Run:
 
 ```bash
 scripts/code-wiki scaffold --out <wiki-out> --title <repo-name>
+```
+
+If the user asked to store cloned source locally beside the wiki, add:
+
+```bash
+scripts/code-wiki scaffold --out <wiki-out> --title <repo-name> --local-source-cache
 ```
 
 Then replace placeholders using `references/wiki-html-contract.md`.
@@ -122,6 +149,12 @@ expected assets.
 Return the final wiki path, the analyzed repo path or git URL, validation
 status, and any important caveats such as skipped image generation or missing
 subagent support.
+
+For every git URL that was cloned, include a `Cloned source path:
+<absolute-clone-path>` line. Do this for both default global-cache clones and
+user-requested wiki-local clones. If the source was a local path and nothing was
+cloned, say `Source was not cloned; analyzed local path:
+<absolute-repo-path>`.
 
 Do not claim the wiki is complete unless each major page has evidence-backed
 content and validation passes.

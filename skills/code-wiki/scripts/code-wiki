@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 SKIP_DIR_NAMES = {
     ".git",
@@ -30,6 +30,7 @@ SKIP_DIR_NAMES = {
     "env",
     "__pycache__",
     "build",
+    "code-wiki",
     "coverage",
     "dist",
     "node_modules",
@@ -343,13 +344,22 @@ def copy_template_assets(out_dir: Path) -> None:
         shutil.copyfile(source, destination)
 
 
-def scaffold(out_arg: str, title: str) -> None:
+def init_local_source_cache(out_dir: Path) -> None:
+    cache_dir = out_dir / ".cache"
+    sources_dir = cache_dir / "sources"
+    sources_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / ".gitignore").write_text("*\n!.gitignore\n", encoding="utf-8")
+
+
+def scaffold(out_arg: str, title: str, local_source_cache: bool = False) -> None:
     out_dir = Path(out_arg).expanduser().resolve()
     (out_dir / "pages").mkdir(parents=True, exist_ok=True)
     (out_dir / "assets" / "diagrams").mkdir(parents=True, exist_ok=True)
     (out_dir / "assets" / "images").mkdir(parents=True, exist_ok=True)
     (out_dir / "data").mkdir(parents=True, exist_ok=True)
     copy_template_assets(out_dir)
+    if local_source_cache:
+        init_local_source_cache(out_dir)
 
     index_body = f"""    <header class="hero">
       <p class="eyebrow">Code Wiki</p>
@@ -475,7 +485,7 @@ def cmd_inventory(args: argparse.Namespace) -> int:
 
 
 def cmd_scaffold(args: argparse.Namespace) -> int:
-    scaffold(args.out, args.title)
+    scaffold(args.out, args.title, args.local_source_cache)
     return 0
 
 
@@ -496,6 +506,11 @@ def build_parser() -> argparse.ArgumentParser:
     scaffold_parser = subparsers.add_parser("scaffold", help="create a static HTML wiki shell")
     scaffold_parser.add_argument("--out", required=True, help="output wiki directory")
     scaffold_parser.add_argument("--title", required=True, help="wiki title")
+    scaffold_parser.add_argument(
+        "--local-source-cache",
+        action="store_true",
+        help="create <wiki-out>/.cache/sources/ with an ignore-all .gitignore",
+    )
     scaffold_parser.set_defaults(func=cmd_scaffold)
 
     validate_parser = subparsers.add_parser("validate", help="validate a generated wiki")

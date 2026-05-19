@@ -106,7 +106,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Code Wiki skill
 - Keep `code-wiki` as a Codex-dependent reusable skill under `skills/code-wiki/`; runtime repo-study workflow, HTML contract, and image rules belong in `skills/code-wiki/SKILL.md` and its references, not in this `AGENTS.md`.
-- Keep `code-wiki` final wiki outputs outside `.cache`; only git clones and temporary analysis artifacts belong under `~/.cache/dotagents/skills/code-wiki/`. (Codex learning)
+- Keep `code-wiki` final wiki outputs outside `.cache`; default git clones and temporary analysis artifacts belong under `~/.cache/dotagents/skills/code-wiki/`, while user-requested self-contained source storage belongs under `<wiki-root>/.cache/sources/` with an ignore-all `.gitignore`. (Codex learning)
 
 ### Skill CLI Creator skill
 - Route embedded-CLI design and layout work through `$skill-cli-creator`; keep detailed host, execution, and migration doctrine in `skills/skill-cli-creator/SKILL.md` and its references.

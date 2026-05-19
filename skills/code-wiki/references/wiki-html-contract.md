@@ -22,9 +22,16 @@ The `code-wiki` output is a static, linked HTML folder. It should open from
     app.js
     diagrams/
     images/
+  .cache/              # optional local source cache when explicitly requested
+    .gitignore
+    sources/
   data/
     inventory.json
 ```
+
+The `.cache/` folder is optional. Create it only when the user asks to keep
+cloned source repos locally beside the wiki. It must contain a `.gitignore`
+that ignores everything except itself.
 
 ## Page Responsibilities
 
