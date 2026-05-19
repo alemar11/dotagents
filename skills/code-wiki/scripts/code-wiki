@@ -9,13 +9,14 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 
 SKIP_DIR_NAMES = {
     ".git",
@@ -66,8 +67,14 @@ MANIFEST_NAMES = {
 DOC_NAMES = {
     "AGENTS.md",
     "CHANGELOG.md",
+    "COPYING",
     "CONTRIBUTING.md",
     "LICENSE",
+    "LICENSE.md",
+    "LICENSE.txt",
+    "NOTICE",
+    "NOTICE.md",
+    "NOTICE.txt",
     "README.md",
     "SECURITY.md",
 }
@@ -77,6 +84,7 @@ SOURCE_DIR_NAMES = {
     "apps",
     "cmd",
     "components",
+    "examples",
     "lib",
     "packages",
     "server",
@@ -170,6 +178,20 @@ NAV_ITEMS = [
     ("file-map", "File Map", "pages/file-map.html"),
 ]
 
+PLACEHOLDER_MARKERS = (
+    "What to Fill In",
+    "Replace this placeholder",
+)
+
+EVIDENCE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
+EVIDENCE_BLOCK_RE = re.compile(
+    r"""<aside\b[^>]*class=["'][^"']*\bevidence\b[^"']*["'][^>]*>(?P<body>.*?)</aside>""",
+    re.IGNORECASE | re.DOTALL,
+)
+ANCHOR_RE = re.compile(r"""<a\b(?P<attrs>[^>]*)>(?P<body>.*?)</a>""", re.IGNORECASE | re.DOTALL)
+ATTR_RE = re.compile(r"""(?P<name>[\w:-]+)=["'](?P<value>[^"']+)["']""", re.IGNORECASE)
+TAG_RE = re.compile(r"<[^>]+>")
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -177,6 +199,71 @@ def utc_now() -> str:
 
 def normalize_rel(path: Path) -> str:
     return path.as_posix()
+
+
+def git_output(repo: Path, *args: str) -> str | None:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    output = completed.stdout.strip()
+    return output or None
+
+
+def normalize_github_web_url(remote_url: str | None) -> tuple[str | None, str | None]:
+    if not remote_url:
+        return None, None
+
+    value = remote_url.strip()
+    path: str | None = None
+
+    if value.startswith("git@github.com:"):
+        path = value.split(":", 1)[1]
+    elif value.startswith("ssh://"):
+        parsed = urlparse(value)
+        if parsed.hostname and parsed.hostname.lower() == "github.com":
+            path = parsed.path.lstrip("/")
+    else:
+        parsed = urlparse(value)
+        if parsed.hostname and parsed.hostname.lower() in {"github.com", "www.github.com"}:
+            path = parsed.path.lstrip("/")
+
+    if not path:
+        return None, None
+
+    path = path.removesuffix(".git").strip("/")
+    parts = [part for part in path.split("/") if part]
+    if len(parts) < 2:
+        return None, None
+
+    return f"https://github.com/{parts[0]}/{parts[1]}", "github"
+
+
+def git_metadata(repo: Path) -> dict[str, object]:
+    inside = git_output(repo, "rev-parse", "--is-inside-work-tree") == "true"
+    commit = git_output(repo, "rev-parse", "HEAD") if inside else None
+    branch = git_output(repo, "rev-parse", "--abbrev-ref", "HEAD") if inside else None
+    if branch == "HEAD":
+        branch = None
+    remote_url = git_output(repo, "config", "--get", "remote.origin.url") if inside else None
+    web_url, host = normalize_github_web_url(remote_url)
+    dirty = bool(git_output(repo, "status", "--short")) if inside else None
+
+    return {
+        "has_git_directory": (repo / ".git").exists(),
+        "is_git_worktree": inside,
+        "remote_url": remote_url,
+        "web_url": web_url,
+        "host": host,
+        "commit": commit,
+        "branch": branch,
+        "dirty": dirty,
+    }
 
 
 def iter_repo_files(repo: Path) -> list[str]:
@@ -201,12 +288,26 @@ def iter_repo_files(repo: Path) -> list[str]:
 
 def paths_containing_parts(files: list[str], names: set[str]) -> list[str]:
     found: set[str] = set()
+    normalized_names = {name.lower() for name in names}
     for file_path in files:
         parts = Path(file_path).parts[:-1]
         for index, part in enumerate(parts):
-            if part in names:
+            if part.lower() in normalized_names:
                 found.add("/".join(parts[: index + 1]))
+                break
     return sorted(found)
+
+
+def is_doc_path(path: str) -> bool:
+    name = Path(path).name
+    name_upper = name.upper()
+    return (
+        name in DOC_NAMES
+        or name_upper in {doc.upper() for doc in DOC_NAMES}
+        or name_upper.startswith(("LICENSE.", "NOTICE.", "COPYING."))
+        or path.startswith("docs/")
+        or path.startswith("documentation/")
+    )
 
 
 def build_inventory(repo_arg: str) -> dict[str, object]:
@@ -230,9 +331,7 @@ def build_inventory(repo_arg: str) -> dict[str, object]:
     docs = [
         path
         for path in files
-        if Path(path).name in DOC_NAMES
-        or path.startswith("docs/")
-        or path.startswith("documentation/")
+        if is_doc_path(path)
     ]
     entrypoints = [
         path
@@ -241,13 +340,15 @@ def build_inventory(repo_arg: str) -> dict[str, object]:
         or re.search(r"(^|/)(cli|server|main|index)\.[cm]?[jt]sx?$", path)
     ]
 
+    metadata = git_metadata(repo)
+
     return {
         "schema_version": 1,
         "generated_at": utc_now(),
         "repo": {
             "path": str(repo),
             "name": repo.name,
-            "has_git_directory": (repo / ".git").exists(),
+            **metadata,
         },
         "counts": {
             "files": len(files),
@@ -261,6 +362,72 @@ def build_inventory(repo_arg: str) -> dict[str, object]:
         "entrypoint_candidates": entrypoints[:100],
         "sample_files": files[:250],
     }
+
+
+def parse_evidence_ref(value: str) -> dict[str, object] | None:
+    candidate = html.unescape(value).strip()
+    match = EVIDENCE_REF_RE.fullmatch(candidate)
+    if not match:
+        return None
+
+    rel_path = match.group("path").strip()
+    start = int(match.group("start"))
+    end = int(match.group("end") or start)
+    if not rel_path or start < 1 or end < start:
+        return None
+    path_parts = Path(rel_path).parts
+    if Path(rel_path).is_absolute() or ".." in path_parts:
+        return None
+
+    return {
+        "label": candidate,
+        "path": rel_path,
+        "start": start,
+        "end": end,
+    }
+
+
+def source_url_for_evidence(repo_arg: str, evidence: str) -> tuple[str | None, str]:
+    repo = Path(repo_arg).expanduser().resolve()
+    if not repo.is_dir():
+        return None, f"repo is not a directory: {repo}"
+
+    parsed = parse_evidence_ref(evidence)
+    if not parsed:
+        return None, f"invalid evidence reference: {evidence}"
+
+    source_file = (repo / str(parsed["path"])).resolve()
+    try:
+        source_file.relative_to(repo)
+    except ValueError:
+        return None, f"evidence path escapes repo: {parsed['path']}"
+    if not source_file.is_file():
+        return None, f"evidence path does not exist: {parsed['path']}"
+
+    metadata = git_metadata(repo)
+    if metadata.get("host") != "github" or not metadata.get("web_url"):
+        return None, "no supported online source remote found; use local source fallback"
+    if not metadata.get("commit"):
+        return None, "repo has no analyzed commit SHA"
+
+    rel_path = quote(str(parsed["path"]), safe="/")
+    line_fragment = f"#L{parsed['start']}"
+    if parsed["end"] != parsed["start"]:
+        line_fragment += f"-L{parsed['end']}"
+    return f"{metadata['web_url']}/blob/{metadata['commit']}/{rel_path}{line_fragment}", ""
+
+
+def render_evidence_chip(repo_arg: str, evidence: str) -> tuple[str | None, str]:
+    url, reason = source_url_for_evidence(repo_arg, evidence)
+    if not url:
+        return None, reason
+    label = html.escape(evidence)
+    href = html.escape(url, quote=True)
+    return (
+        f'<a class="evidence-chip" href="{href}" target="_blank" '
+        f'rel="noopener noreferrer"><code>{label}</code></a>',
+        "",
+    )
 
 
 def write_json(path_arg: str, data: dict[str, object]) -> None:
@@ -288,6 +455,28 @@ def nav_html(prefix: str, active: str) -> str:
     return "\n".join(links)
 
 
+def page_nav_html(prefix: str, active: str) -> str:
+    active_index = next(
+        (index for index, item in enumerate(NAV_ITEMS) if item[0] == active),
+        None,
+    )
+    if active_index is None:
+        return ""
+
+    links = []
+    for rel_index, direction in ((active_index - 1, "Previous"), (active_index + 1, "Next")):
+        if rel_index < 0 or rel_index >= len(NAV_ITEMS):
+            continue
+        slug, label, href = NAV_ITEMS[rel_index]
+        target = href if prefix == "" else ("../index.html" if slug == "index" else href.replace("pages/", ""))
+        links.append(
+            f'<a href="{html.escape(target)}"><span>{direction}</span><strong>{html.escape(label)}</strong></a>'
+        )
+    if not links:
+        return ""
+    return '    <nav class="page-nav" aria-label="Page navigation">\n      ' + "\n      ".join(links) + "\n    </nav>"
+
+
 def render_page(title: str, body: str, prefix: str, active: str) -> str:
     css = f"{prefix}assets/style.css"
     js = f"{prefix}assets/app.js"
@@ -301,13 +490,17 @@ def render_page(title: str, body: str, prefix: str, active: str) -> str:
 </head>
 <body>
   <aside class="sidebar">
-    <div class="brand">Code Wiki</div>
-    <nav>
+    <div class="brand-row">
+      <div class="brand">Code Wiki</div>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="wiki-nav">Menu</button>
+    </div>
+    <nav id="wiki-nav" class="site-nav">
 {nav_html(prefix, active)}
     </nav>
   </aside>
   <main>
 {body}
+{page_nav_html(prefix, active)}
   </main>
   <script src="{js}"></script>
 </body>
@@ -428,20 +621,44 @@ def validate(wiki_arg: str) -> int:
     for rel in ("assets/style.css", "assets/app.js"):
         if not (wiki_dir / rel).is_file():
             errors.append(f"missing required asset: {rel}")
+    app_js_text = ""
+    app_js_path = wiki_dir / "assets" / "app.js"
+    if app_js_path.is_file():
+        app_js_text = app_js_path.read_text(encoding="utf-8", errors="replace")
+    runtime_wraps_tables = "table-wrap" in app_js_text and "querySelectorAll(\"main table\")" in app_js_text
 
     inventory_path = wiki_dir / "data" / "inventory.json"
+    inventory: dict[str, object] = {}
     if not inventory_path.is_file():
         errors.append("missing required data file: data/inventory.json")
     else:
         try:
-            json.loads(inventory_path.read_text(encoding="utf-8"))
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             errors.append(f"invalid data/inventory.json: {exc}")
 
-    html_files = list(wiki_dir.rglob("*.html"))
+    html_files = [
+        path
+        for path in wiki_dir.rglob("*.html")
+        if ".cache" not in path.relative_to(wiki_dir).parts
+    ]
     attr_re = re.compile(r"""(?:href|src)=["']([^"']+)["']""", re.IGNORECASE)
     for html_file in html_files:
+        rel_html = html_file.relative_to(wiki_dir)
         text = html_file.read_text(encoding="utf-8", errors="replace")
+        for marker in PLACEHOLDER_MARKERS:
+            if marker in text:
+                errors.append(f"{rel_html} still contains scaffold placeholder text: {marker}")
+
+        evidence_blocks = [match.group("body") for match in EVIDENCE_BLOCK_RE.finditer(text)]
+        if rel_html.as_posix() in REQUIRED_PAGES and not evidence_blocks:
+            errors.append(f"{rel_html} has no evidence block")
+        for index, block in enumerate(evidence_blocks, start=1):
+            validate_evidence_block(rel_html.as_posix(), index, block, inventory, errors, warnings)
+
+        if "<table" in text.lower() and "table-wrap" not in text and not runtime_wraps_tables:
+            warnings.append(f"{rel_html} has table markup without an explicit table-wrap container")
+
         for value in attr_re.findall(text):
             if value.startswith("#") or is_external_url(value):
                 continue
@@ -452,18 +669,91 @@ def validate(wiki_arg: str) -> int:
             try:
                 resolved.relative_to(wiki_dir)
             except ValueError:
-                errors.append(f"{html_file.relative_to(wiki_dir)} links outside wiki: {value}")
+                errors.append(f"{rel_html} links outside wiki: {value}")
                 continue
             if not resolved.exists():
-                errors.append(f"{html_file.relative_to(wiki_dir)} has missing link or asset: {value}")
+                errors.append(f"{rel_html} has missing link or asset: {value}")
 
     if not any((wiki_dir / "assets" / "diagrams").glob("*")):
         warnings.append("assets/diagrams is empty")
-    if not any((wiki_dir / "assets" / "images").glob("*")):
-        warnings.append("assets/images is empty")
 
     print_report(errors, warnings)
     return 1 if errors else 0
+
+
+def parse_attrs(attrs: str) -> dict[str, str]:
+    return {match.group("name").lower(): html.unescape(match.group("value")) for match in ATTR_RE.finditer(attrs)}
+
+
+def strip_tags(value: str) -> str:
+    return html.unescape(TAG_RE.sub("", value)).strip()
+
+
+def validate_evidence_block(
+    html_rel_path: str,
+    block_index: int,
+    block: str,
+    inventory: dict[str, object],
+    errors: list[str],
+    warnings: list[str],
+) -> None:
+    anchors = [
+        (parse_attrs(match.group("attrs")), strip_tags(match.group("body")))
+        for match in ANCHOR_RE.finditer(block)
+    ]
+    if not anchors:
+        errors.append(f"{html_rel_path} evidence block {block_index} has no clickable evidence links")
+        return
+
+    if "evidence-chip" not in block:
+        warnings.append(f"{html_rel_path} evidence block {block_index} uses links without evidence-chip styling")
+
+    repo_info = inventory.get("repo") if isinstance(inventory.get("repo"), dict) else {}
+    repo_path = repo_info.get("path") if isinstance(repo_info, dict) else None
+    source_repo = Path(str(repo_path)).expanduser().resolve() if repo_path else None
+    web_url = repo_info.get("web_url") if isinstance(repo_info, dict) else None
+    commit = repo_info.get("commit") if isinstance(repo_info, dict) else None
+    host = repo_info.get("host") if isinstance(repo_info, dict) else None
+
+    for attrs, label in anchors:
+        href = attrs.get("href", "")
+        parsed_ref = parse_evidence_ref(label)
+        if parsed_ref and source_repo:
+            validate_evidence_file(source_repo, parsed_ref, html_rel_path, errors)
+        if host == "github" and web_url and commit and parsed_ref:
+            expected_prefix = f"{web_url}/blob/{commit}/"
+            if not href.startswith(expected_prefix):
+                errors.append(
+                    f"{html_rel_path} evidence link for {label} is not pinned to analyzed commit"
+                )
+
+
+def validate_evidence_file(
+    repo: Path,
+    parsed_ref: dict[str, object],
+    html_rel_path: str,
+    errors: list[str],
+) -> None:
+    source_file = (repo / str(parsed_ref["path"])).resolve()
+    try:
+        source_file.relative_to(repo)
+    except ValueError:
+        errors.append(f"{html_rel_path} evidence path escapes repo: {parsed_ref['path']}")
+        return
+    if not source_file.is_file():
+        errors.append(f"{html_rel_path} evidence path does not exist: {parsed_ref['path']}")
+        return
+
+    try:
+        line_count = len(source_file.read_text(encoding="utf-8", errors="replace").splitlines())
+    except OSError as exc:
+        errors.append(f"{html_rel_path} cannot read evidence path {parsed_ref['path']}: {exc}")
+        return
+    if int(parsed_ref["end"]) > line_count:
+        errors.append(
+            f"{html_rel_path} evidence line range exceeds file length: "
+            f"{parsed_ref['label']} has {line_count} lines"
+        )
 
 
 def print_report(errors: list[str], warnings: list[str]) -> None:
@@ -493,6 +783,21 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return validate(args.wiki)
 
 
+def cmd_evidence_link(args: argparse.Namespace) -> int:
+    if args.html:
+        rendered, reason = render_evidence_chip(args.repo, args.evidence)
+        if rendered:
+            print(rendered)
+            return 0
+    else:
+        url, reason = source_url_for_evidence(args.repo, args.evidence)
+        if url:
+            print(url)
+            return 0
+    print(f"NO_LINK: {reason}")
+    return 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="code-wiki")
     parser.add_argument("--version", action="version", version=f"code-wiki {VERSION}")
@@ -516,6 +821,23 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser = subparsers.add_parser("validate", help="validate a generated wiki")
     validate_parser.add_argument("--wiki", required=True, help="wiki directory")
     validate_parser.set_defaults(func=cmd_validate)
+
+    evidence_parser = subparsers.add_parser(
+        "evidence-link",
+        help="render a commit-pinned online source URL for one evidence reference",
+    )
+    evidence_parser.add_argument("--repo", required=True, help="local repository path")
+    evidence_parser.add_argument(
+        "--evidence",
+        required=True,
+        help="evidence reference formatted as path:line or path:start-end",
+    )
+    evidence_parser.add_argument(
+        "--html",
+        action="store_true",
+        help="print an HTML evidence chip instead of only the URL",
+    )
+    evidence_parser.set_defaults(func=cmd_evidence_link)
 
     return parser
 

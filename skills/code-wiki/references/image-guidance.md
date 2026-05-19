@@ -1,7 +1,8 @@
 # Image Guidance
 
 Use `$imagegen` only when a raster image improves the wiki beyond what local
-HTML/SVG diagrams can do.
+HTML/SVG diagrams can do. It is optional; do not generate filler images only
+because the wiki has an `assets/images/` folder.
 
 ## When to Generate Images
 
@@ -19,7 +20,9 @@ Avoid raster images for:
 - API paths or database schemas
 - details that must be mechanically accurate
 
-Use local SVG or HTML diagrams for factual content instead.
+Use local SVG or HTML diagrams for factual content instead. Exact architecture,
+dependency graphs, and source-level flows should remain deterministic and
+reviewable.
 
 ## Built-In Imagegen Path
 
@@ -67,3 +70,4 @@ Before referencing an image from HTML:
 - verify the file path used by HTML exists
 - make sure the page text carries the factual explanation, not the bitmap alone
 - note in the final response if images were skipped or intentionally limited
+- state whether `$imagegen` was used

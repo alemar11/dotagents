@@ -52,9 +52,11 @@ listing every transitive package unless it shapes architecture or operations.
 
 ## Parallel Study Slices
 
-When subagents are available and allowed, use independent read-only explorer
-prompts. Do not ask subagents to write files. Ask for concise findings with
-evidence paths and line numbers.
+Use independent read-only explorer prompts only when the user explicitly asks for
+subagents/delegation/parallel agent work and the current runtime allows it. Do
+not treat ordinary `$code-wiki` invocation as implicit delegation permission. Do
+not ask subagents to write files. Ask for concise findings with evidence paths
+and line numbers.
 
 Architecture prompt:
 
@@ -88,17 +90,31 @@ handling, configuration, tests, risks, and extension points. Return
 evidence-backed findings with paths/line numbers. Do not edit files.
 ```
 
-If delegation is unavailable, run these slices sequentially in the main agent.
+If delegation is unavailable or not explicitly authorized, run these slices
+sequentially in the main agent.
 
 ## Evidence Rules
 
 - Tie factual claims to source files, manifests, docs, or observed commands.
-- Prefer exact local file paths and line numbers in page evidence callouts.
+- Prefer exact local file paths and line numbers while studying.
+- In generated pages, render source evidence as clickable chips. For GitHub
+  repos, use commit-pinned online blob links from the analyzed commit.
+- Use `scripts/code-wiki evidence-link --repo <repo-path> --evidence
+  <path:start-end> --html` to create GitHub evidence chips when supported.
 - Distinguish inference from confirmed behavior.
 - Do not claim production behavior from comments alone unless no better source
   exists and the page labels it as a comment-derived inference.
 - Do not expose secrets from `.env`, config, or credentials. Mention only key
   names when environment shape matters.
+
+## Completion Notes
+
+The final response must state:
+
+- whether subagents were used
+- whether `$imagegen` was used
+- the analyzed commit or dirty working-tree caveat when available
+- the cloned source path for every cloned git URL
 
 ## Dirty Worktrees
 

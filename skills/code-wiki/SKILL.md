@@ -1,6 +1,6 @@
 ---
 name: code-wiki
-description: Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki from that analysis. Use when the user asks to study, understand, document, explain, map, or onboard onto a repo in depth, including architecture, dependencies, code patterns, basic and advanced flows, diagrams, selected generated images, and a browsable wiki artifact produced through parallel repo-study subagents when available.
+description: Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki from that analysis. Use when the user asks to study, understand, document, explain, map, or onboard onto a repo in depth, including architecture, dependencies, code patterns, basic and advanced flows, diagrams, optional conceptual images, and a browsable wiki artifact.
 ---
 
 # Code Wiki
@@ -12,11 +12,12 @@ evidence. Cover what the repo does, how it is structured, which dependencies
 matter, what patterns it uses, how the important flows work, and where a future
 maintainer should look first.
 
-This skill is Codex-dependent. It relies on:
+This skill is Codex-dependent. It can use:
 
-- Codex subagents for parallel read-only repo study when the current runtime
-  allows delegation.
-- `$imagegen` for selected raster overview or conceptual images.
+- Codex subagents for parallel read-only repo study only when the user and
+  current runtime explicitly allow delegation.
+- `$imagegen` for selected raster overview or conceptual images when a bitmap
+  adds value beyond deterministic local diagrams.
 - `~/.cache/dotagents/skills/code-wiki/` for default disposable git clones and
   temporary analysis artifacts.
 
@@ -52,8 +53,9 @@ cache.
 - For every cloned git URL, record the exact clone path. This path must be
   included in the final response whether the clone lives in the global cache or
   in the wiki-local `.cache/sources/` folder.
-- If the user did not provide an output path, ask where to write the wiki before
-  creating files.
+- If the user did not provide an output path but clearly asks for the chat
+  folder/current workspace, default to `<cwd>/code-wiki` and state that
+  assumption. Otherwise ask where to write the wiki before creating files.
 - Treat the output as a static HTML folder. Do not default to Markdown.
 
 ### 2. Build Inventory
@@ -65,23 +67,25 @@ scripts/code-wiki inventory --repo <repo-path> --out <wiki-out>/data/inventory.j
 ```
 
 Use the inventory to identify manifests, source roots, test roots, docs,
-entrypoint candidates, and language/file counts. Then inspect the real files
-that matter; the inventory is a routing aid, not the final explanation.
+entrypoint candidates, git metadata, and language/file counts. Then inspect the
+real files that matter; the inventory is a routing aid, not the final
+explanation.
 
 ### 3. Study the Repo
 
 Open `references/repo-study-playbook.md` before a non-trivial wiki run.
 
-When delegation is available and allowed for the request, use read-only
-parallel explorer subagents for:
+When delegation is explicitly authorized and allowed by the current runtime, use
+read-only parallel explorer subagents for:
 
 - architecture and module boundaries
 - dependencies, build, runtime, and tooling
 - APIs, data flow, and user/business flows
 - code patterns, conventions, risks, and extension points
 
-If subagents are unavailable, perform the same slices sequentially. In all
-cases, require file-backed evidence and keep synthesis in the main agent.
+If subagents are unavailable or not explicitly authorized, perform the same
+slices sequentially. In all cases, require file-backed evidence and keep
+synthesis in the main agent.
 
 ### 4. Scaffold and Fill the Wiki
 
@@ -117,7 +121,17 @@ Required output:
 - `data/inventory.json`
 
 Use deterministic local SVG or HTML diagrams for factual architecture and flow
-content. Keep links local so the wiki opens from `index.html` without a server.
+content. Keep page and asset links local so the wiki opens from `index.html`
+without a server. For evidence references, prefer online commit-pinned source
+links when the analyzed repo has a supported hosted remote.
+
+For GitHub repos, generate source links with:
+
+```bash
+scripts/code-wiki evidence-link --repo <repo-path> --evidence <path:start-end> --html
+```
+
+Use the emitted evidence chip in wiki evidence blocks.
 
 ### 5. Use Images Selectively
 
@@ -139,16 +153,17 @@ Before finishing, run:
 scripts/code-wiki validate --wiki <wiki-out>
 ```
 
-Fix broken local links, missing pages, missing assets, or invalid
-`data/inventory.json`. Warnings about empty diagrams or images are acceptable
-only if the user explicitly asked for a minimal wiki; otherwise add the
-expected assets.
+Fix broken local links, missing pages, missing required assets, invalid
+`data/inventory.json`, scaffold placeholders, missing clickable evidence links,
+and invalid evidence paths. Warnings about empty diagrams are acceptable only if
+the user explicitly asked for a minimal wiki; otherwise add deterministic
+diagram assets. Do not add filler raster images only to satisfy validation.
 
 ## Output
 
 Return the final wiki path, the analyzed repo path or git URL, validation
-status, and any important caveats such as skipped image generation or missing
-subagent support.
+status, whether subagents were used, whether `$imagegen` was used, and any
+important caveats.
 
 For every git URL that was cloned, include a `Cloned source path:
 <absolute-clone-path>` line. Do this for both default global-cache clones and

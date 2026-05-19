@@ -53,9 +53,11 @@ that ignores everything except itself.
 
 ## HTML Rules
 
-- Use semantic HTML with local links only.
+- Use semantic HTML.
 - Link pages through relative paths.
 - Link assets under `assets/`.
+- Use online commit-pinned links for source evidence when the analyzed source
+  has a supported hosted remote.
 - Keep CSS and JavaScript local.
 - Do not require Mermaid CDN or remote scripts at view time.
 - Escape source-derived text before putting it into HTML.
@@ -80,14 +82,28 @@ Recommended diagram set:
 
 ## Evidence Callouts
 
-Each major section should include an evidence block with links or textual
-references to the files that support the claim. Use compact phrasing:
+Each major section should include an evidence block with clickable links to the
+files that support the claim. For GitHub-hosted repos, use commit-pinned blob
+URLs generated from the analyzed commit:
 
 ```html
 <aside class="evidence">
-  Evidence: <code>src/server.ts:18</code>, <code>package.json:6</code>
+  Evidence:
+  <span class="evidence-list">
+    <a class="evidence-chip" href="https://github.com/org/repo/blob/<commit>/src/server.ts#L18" target="_blank" rel="noopener noreferrer"><code>src/server.ts:18</code></a>
+    <a class="evidence-chip" href="https://github.com/org/repo/blob/<commit>/package.json#L6" target="_blank" rel="noopener noreferrer"><code>package.json:6</code></a>
+  </span>
 </aside>
 ```
+
+For GitHub sources, generate chips with:
+
+```bash
+scripts/code-wiki evidence-link --repo <repo-path> --evidence <path:start-end> --html
+```
+
+Unsupported remotes may fall back to local source references, but do not guess
+host-specific URL formats.
 
 If exact line numbers are unavailable, cite the narrowest path and explain why.
 
@@ -100,4 +116,7 @@ scripts/code-wiki validate --wiki <wiki-out>
 ```
 
 Validation must pass before the wiki is reported complete. Fix missing pages,
-broken local links, missing assets, and invalid `data/inventory.json`.
+broken local links, missing assets, invalid `data/inventory.json`, scaffold
+placeholders, missing clickable evidence links, invalid evidence paths, and
+evidence links that are not pinned to the analyzed commit when a supported
+remote exists.
