@@ -24,6 +24,17 @@ against the target repo until the output wiki path is resolved.
    - Do not revert, format, or modify the target repo.
 3. Generate inventory:
    - `scripts/code-wiki inventory --repo <repo-path> --out <wiki-out>/data/inventory.json`
+   - Treat `source_roots` as primary study hints. Use `root_candidates`
+     to separate source, test, docs, examples, fixtures, and vendored roots
+     before assigning study work.
+   - Treat `interface_roots` as public API hints for C-family and similar
+     repos. They are usually headers or interface definitions, not secondary
+     documentation.
+   - Treat `generated-docs` roots as secondary evidence. They can help explain
+     public API surfaces, but they should not outweigh source, manifests, or
+     authored docs.
+   - Include `ops` roots in testing-and-ops study slices so CI workflows and
+     release automation are not lost behind source-only scans.
 4. Read high-signal files first:
    - `README*`, `AGENTS.md`, `CONTRIBUTING*`, `docs/**`
    - dependency manifests and lockfiles
@@ -44,11 +55,36 @@ Inspect these when present:
 - Swift: `Package.swift`, `.xcodeproj`, `.xcworkspace`, `Podfile`.
 - Go: `go.mod`, `go.sum`.
 - Rust: `Cargo.toml`, `Cargo.lock`.
+- C/C++ and native builds: `CMakeLists.txt`, `configure`, `configure.ac`,
+  `Makefile*`, `meson.build`, `BUILD.bazel`, Visual Studio solutions/projects.
 - JVM/Android: `build.gradle*`, `settings.gradle*`, `gradle.properties`.
 - Docker/runtime: `Dockerfile*`, `docker-compose*`, deployment manifests.
 
 For each dependency family, explain why it matters to runtime behavior. Avoid
 listing every transitive package unless it shapes architecture or operations.
+
+## Language-Specific Root Checks
+
+Before synthesis, sanity-check the inventory against language conventions:
+
+- Go libraries may keep primary `.go` files and `*_test.go` tests at repo
+  root; do not require `src/` or `tests/`.
+- Rust workspaces may define binaries outside `src/main.rs`, especially in
+  `crates/<name>/main.rs` or manifest-declared paths.
+- JavaScript and TypeScript monorepos often contain `packages/*/src`,
+  `playground/*`, templates, and generated `dist`; classify these before
+  treating every `src` as product source.
+- C and C++ projects frequently split implementation under `src/` or `lib/`
+  from public API under `include/`. They may also vendor large `deps/`,
+  `third_party/`, or `vendor/` trees; inspect build files to decide which
+  bundled dependencies shape runtime behavior without promoting vendored source
+  roots to primary architecture.
+- Ruby projects may use `exe/`, `lib/`, gemspecs, Rake tasks, Cucumber
+  features, and dynamic registration through `autoload` or DSLs.
+- Swift packages may include `Sources/`, `Tests/`, `Examples/`, plugins, tools,
+  DocC bundles, and path names with spaces.
+- Swift libraries may also use singular `Source/` and generated Jazzy docs
+  under `docs/`; prefer source and authored documentation for architecture.
 
 ## Parallel Study Slices
 

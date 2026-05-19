@@ -62,6 +62,9 @@ that ignores everything except itself.
 - Do not require Mermaid CDN or remote scripts at view time.
 - Escape source-derived text before putting it into HTML.
 - Keep long code excerpts short. Prefer paraphrase plus file links/evidence.
+- Wrap tables in `.table-wrap`. The default template stacks table rows on
+  narrow Codex split-pane widths; do not rely on body-level horizontal
+  scrolling for important content.
 
 ## Diagrams
 

@@ -224,8 +224,23 @@ code {
 }
 
 .table-wrap table {
+  border-collapse: collapse;
   margin: 0;
   min-width: 640px;
+  width: 100%;
+}
+
+.table-wrap th,
+.table-wrap td {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table-wrap th {
+  color: var(--text);
+  width: 30%;
 }
 
 .toc {
@@ -329,5 +344,30 @@ svg {
 
   .page-nav a {
     min-width: 0;
+  }
+
+  .table-wrap {
+    overflow-x: visible;
+  }
+
+  .table-wrap table,
+  .table-wrap tbody,
+  .table-wrap tr,
+  .table-wrap th,
+  .table-wrap td {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .table-wrap tr {
+    border-top: 1px solid var(--line);
+    padding: 10px 0;
+  }
+
+  .table-wrap th,
+  .table-wrap td {
+    border-top: 0;
+    padding: 2px 0;
   }
 }
