@@ -6,9 +6,11 @@ import json
 import os
 import re
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
-from common import (
+from code_wiki.git import git_metadata
+from code_wiki.inventory_rules import (
     CODE_EXTENSIONS,
     DOC_NAMES,
     ENTRYPOINT_NAMES,
@@ -23,10 +25,16 @@ from common import (
     SKIP_DIR_NAMES,
     TEST_DIR_NAMES,
     VENDORED_ROOT_PARTS,
-    git_metadata,
-    normalize_rel,
-    utc_now,
 )
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def normalize_rel(path: Path) -> str:
+    return path.as_posix()
+
 
 def iter_repo_files(repo: Path) -> list[str]:
     files: list[str] = []

@@ -6,10 +6,11 @@ import html
 import shutil
 from pathlib import Path
 
-from common import NAV_ITEMS
+from code_wiki.wiki_contract import NAV_ITEMS
+
 
 def skill_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+    return Path(__file__).resolve().parents[2]
 
 
 def page_title_from_slug(slug: str) -> str:

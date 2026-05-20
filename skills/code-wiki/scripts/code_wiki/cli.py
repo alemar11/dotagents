@@ -6,11 +6,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from common import VERSION
-from evidence import render_evidence_chip, source_url_for_evidence
-from inventory import build_inventory, write_json
-from scaffold import scaffold
-from validate import validate
+from code_wiki.evidence import render_evidence_chip, source_url_for_evidence
+from code_wiki.inventory import build_inventory, write_json
+from code_wiki.scaffold import scaffold
+from code_wiki.validation import validate
+from code_wiki.version import VERSION
 
 
 def cmd_inventory(args: argparse.Namespace) -> int:

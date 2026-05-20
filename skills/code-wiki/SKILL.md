@@ -86,6 +86,10 @@ Run the bundled helper from the skill root or with an absolute path:
 scripts/code-wiki inventory --repo <repo-path> --out <wiki-out>/data/inventory.json
 ```
 
+`scripts/code-wiki` is the only public helper artifact. The Python package
+under `scripts/code_wiki/` is shipped internal runtime code; do not run those
+module files directly in normal skill usage.
+
 Use the inventory to identify manifests, source roots, test roots, docs,
 entrypoint candidates, git metadata, and language/file counts. Then inspect the
 real files that matter; the inventory is a routing aid, not the final

@@ -6,7 +6,9 @@ import html
 from pathlib import Path
 from urllib.parse import quote
 
-from common import EVIDENCE_REF_RE, git_metadata
+from code_wiki.git import git_metadata
+from code_wiki.wiki_contract import EVIDENCE_REF_RE
+
 
 def parse_evidence_ref(value: str) -> dict[str, object] | None:
     candidate = html.unescape(value).strip()
