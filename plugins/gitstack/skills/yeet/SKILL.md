@@ -11,6 +11,26 @@ Use this skill when the user explicitly wants the full publish flow from a
 local checkout: inspect scope, create a branch if needed, stage intentionally,
 commit, push, and open or reuse a draft pull request.
 
+## Trigger phrases
+
+Prefer `yeet` when the user intent includes publishing a branch or opening a PR, for example:
+
+- “commit and open PR”
+- “commit, push, and open a PR”
+- “publish”
+- “publish branch”
+- “draft PR”
+- “turn these local changes into a PR”
+
+If the user says “commit and push” but does not mention PRs/publishing, ask:
+“PR or push-only?” and default to **push-only** when unclear.
+
+## Hand-off map
+
+- `yeet` (this skill): branch strategy + push + open/reuse a draft PR.
+- `git-commit`: selective staging + commit authoring + post-commit verification.
+- `github`: PR lifecycle work when the branch is already pushed (open/reuse/edit/close).
+
 Inside `gitstack`, this skill is intentionally composed:
 
 - `git-commit` owns selective staging, commit authoring, and post-commit

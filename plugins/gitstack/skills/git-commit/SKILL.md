@@ -5,6 +5,23 @@ description: Create a well-formed git commit from current changes using session 
 
 # Git Commit
 
+## When to use this
+
+Use `git-commit` when the work is commit-centric:
+
+| User intent / prompt | Use |
+| --- | --- |
+| “commit”, “make a commit”, “prepare a commit message” | `git-commit` |
+| “stage only these paths and commit” | `git-commit` |
+| “split into multiple commits” | `git-commit` |
+| “commit and push (no PR)” | `git-commit` |
+| “open PR”, “draft PR”, “publish branch” | Route to `yeet` |
+| “commit, push, and open PR”, “turn these local changes into a PR” | Route to `yeet` |
+
+Disambiguation rule for “commit and push”:
+
+- If PR intent is not explicit, ask “PR or push-only?” and default to **push-only** unless the user mentions PR / publish / draft PR.
+
 ## Happy Paths (Commit / Commit And Push)
 
 - `commit`: inspect `git status`, stage explicit paths, verify `git diff --staged`, then `git commit`.
