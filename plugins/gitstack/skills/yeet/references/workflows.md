@@ -50,10 +50,17 @@ silently broadening scope.
   `gh pr view --json baseRefName,url,isDraft` or an equivalent
   current-branch lookup.
 - Prefer a PR title that summarizes the full branch-level change.
-- Prefer a structured, feature-level PR description with `Feature`, `Impact`,
-  `Validation`, and optional `Follow-ups`.
-- Use `--body-from-head` only when the latest commit body already follows that
-  PR-ready structure; otherwise pass `--body` explicitly.
+- Run `<resolved-ghflow> --json publish template [--base <locked-base>]` before
+  creating a new PR body.
+- If one template is found, compose the final body from that template and write
+  it to a temp file; preserve required headings/checklists and fill placeholders
+  with net-diff content or `N/A`.
+- If multiple templates are found, stop before PR creation and choose the
+  template explicitly.
+- If no template exists, use a structured, feature-level PR description with
+  `Feature`, `Impact`, `Validation`, and optional `Follow-ups`.
+- Use `--body-file <file>` for the final composed body. Use `--body-from-head`
+  only when no template exists and the latest commit body is already PR-ready.
 
 ### Canonical sequence
 
@@ -102,7 +109,10 @@ or reuse the draft PR:
 
 ```bash
 git push -u origin "$(git branch --show-current)"
-<resolved-ghflow> publish open --draft [--title <text>] [--body-from-head] [--base <branch>]
+<resolved-ghflow> --json publish template [--base <branch>]
+pr_body_file="$(mktemp)"
+# Write the final template-aware PR body to "$pr_body_file".
+<resolved-ghflow> publish open --draft [--title <text>] --body-file "$pr_body_file" [--base <branch>]
 gh pr view --json baseRefName,url,isDraft
 ```
 

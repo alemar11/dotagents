@@ -113,10 +113,20 @@ Keep v1 intentionally narrow:
      explicitly instead of silently reusing it with the wrong target.
    - Prefer a PR title that summarizes the full branch-level change, not just
      the latest commit.
-   - Prefer a structured, feature-level description with `Feature`, `Impact`,
-     `Validation`, and optional `Follow-ups`.
-   - Use `--body-from-head` only when the latest commit body already follows
-     that PR-ready structure; otherwise pass `--body` explicitly.
+   - Before creating a new PR body, run
+     `<resolved-ghflow> --json publish template [--base <branch>]` using the
+     locked PR base when one exists.
+   - If exactly one template is found, compose the final PR body from that
+     template: preserve meaningful headings, required checklists, and
+     repo-specific prompts, replace placeholders with net-diff-specific content
+     or `N/A`, and write the final Markdown to a temp file.
+   - If multiple templates are reported, stop before PR creation and choose the
+     template explicitly with the user or repo owner.
+   - If no template exists, use a structured, feature-level description with
+     `Feature`, `Impact`, `Validation`, and optional `Follow-ups`.
+   - Open the PR with `<resolved-ghflow> publish open --body-file <file>` once a
+     final body file exists. Use `--body-from-head` only when there is no
+     template to preserve and the latest commit body is already PR-ready.
    - Before closing the workflow, verify the final PR target with
      `gh pr view --json baseRefName,url,isDraft` or an equivalent
      current-branch lookup.

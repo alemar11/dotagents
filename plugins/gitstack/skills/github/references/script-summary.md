@@ -21,8 +21,10 @@ bundled `github` skill.
 - Authenticated-user stars and star lists:
   `<resolved-ghflow> stars <list|add|remove>`,
   `<resolved-ghflow> stars lists <list|items|delete|assign|unassign>`
-- Already-pushed current-branch PR context and open-or-reuse:
-  `<resolved-ghflow> publish context`, `<resolved-ghflow> publish open`
+- Already-pushed current-branch PR context, template discovery, and
+  open-or-reuse:
+  `<resolved-ghflow> publish context`, `<resolved-ghflow> publish template`,
+  `<resolved-ghflow> publish open`
 
 ## Domain catalogs
 

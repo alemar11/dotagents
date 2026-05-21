@@ -8,4 +8,5 @@ the bundled `github` skill.
 - Resolve the artifact with `../core/ghflow-resolution.md` before running
   helper commands.
 - `<resolved-ghflow> publish context`
+- `<resolved-ghflow> publish template`
 - `<resolved-ghflow> publish open`

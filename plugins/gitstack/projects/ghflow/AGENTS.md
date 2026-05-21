@@ -37,6 +37,8 @@
 - `python3 -m unittest discover -s plugins/gitstack/projects/ghflow/tests -p 'test_*.py'`
 - `plugins/gitstack/scripts/ghflow --help`
 - `plugins/gitstack/scripts/ghflow --version`
+- `plugins/gitstack/scripts/ghflow publish open --help`
+- `plugins/gitstack/scripts/ghflow publish template --help`
 - `PYTHONPATH=plugins/gitstack/projects/ghflow/src python3 -m ghflow --help`
 
 ## Rebuild

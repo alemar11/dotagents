@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import re
+import shlex
 import subprocess
 import sys
 import tomllib
@@ -42,6 +43,9 @@ def load_version() -> str:
 VERSION = load_version()
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 TOKEN_RE = re.compile(r"[a-z0-9]+")
+PR_TEMPLATE_FILE_RE = re.compile(r"^pull[-_]request[-_]template\.md$", re.IGNORECASE)
+PR_TEMPLATE_DIR_RE = re.compile(r"^pull[-_]request[-_]template$", re.IGNORECASE)
+PR_TEMPLATE_SEARCH_DIRS = (".github", "", "docs")
 
 
 @dataclass(frozen=True)
@@ -638,6 +642,181 @@ def current_repo_root() -> Path | None:
     return Path(value) if value else None
 
 
+def join_repo_path(parent: str, child: str) -> str:
+    return f"{parent}/{child}" if parent else child
+
+
+def template_candidate(path: str, *, kind: str, source: str, source_ref: str) -> dict[str, Any]:
+    return {
+        "path": path,
+        "name": Path(path).name,
+        "kind": kind,
+        "source": source,
+        "source_ref": source_ref,
+    }
+
+
+def git_tree_entries(ref: str, repo_path: str) -> list[dict[str, str]]:
+    target = f"{ref}:{repo_path}" if repo_path else ref
+    result = run_git_text(["ls-tree", target])
+    if result.returncode != 0:
+        return []
+    entries: list[dict[str, str]] = []
+    for line in result.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        meta, name = line.split("\t", 1)
+        parts = meta.split()
+        if len(parts) >= 2:
+            entries.append({"name": name, "type": parts[1]})
+    return entries
+
+
+def local_tree_entries(root: Path, repo_path: str) -> list[dict[str, str]]:
+    directory = root / repo_path if repo_path else root
+    if not directory.is_dir():
+        return []
+    entries: list[dict[str, str]] = []
+    for entry in sorted(directory.iterdir(), key=lambda item: item.name.lower()):
+        if entry.is_symlink():
+            continue
+        entries.append({"name": entry.name, "type": "tree" if entry.is_dir() else "blob"})
+    return entries
+
+
+def discover_template_candidates_from_entries(
+    list_entries: Callable[[str], list[dict[str, str]]],
+    *,
+    source: str,
+    source_ref: str,
+) -> list[dict[str, Any]]:
+    for directory in PR_TEMPLATE_SEARCH_DIRS:
+        entries = list_entries(directory)
+        if not entries:
+            continue
+
+        candidates: list[dict[str, Any]] = []
+        for entry in entries:
+            if entry["type"] != "tree" and PR_TEMPLATE_FILE_RE.fullmatch(entry["name"]):
+                candidates.append(
+                    template_candidate(join_repo_path(directory, entry["name"]), kind="default", source=source, source_ref=source_ref)
+                )
+
+        for entry in entries:
+            if entry["type"] == "tree" and PR_TEMPLATE_DIR_RE.fullmatch(entry["name"]):
+                template_dir = join_repo_path(directory, entry["name"])
+                for nested in list_entries(template_dir):
+                    if nested["type"] != "tree" and nested["name"].lower().endswith(".md"):
+                        candidates.append(
+                            template_candidate(join_repo_path(template_dir, nested["name"]), kind="named", source=source, source_ref=source_ref)
+                        )
+
+        if candidates:
+            return candidates
+    return []
+
+
+def discover_git_template_candidates(ref: str) -> list[dict[str, Any]]:
+    return discover_template_candidates_from_entries(
+        lambda repo_path: git_tree_entries(ref, repo_path),
+        source="base_ref",
+        source_ref=ref,
+    )
+
+
+def discover_local_template_candidates(root: Path) -> list[dict[str, Any]]:
+    return discover_template_candidates_from_entries(
+        lambda repo_path: local_tree_entries(root, repo_path),
+        source="worktree",
+        source_ref="worktree",
+    )
+
+
+def read_git_file(ref: str, repo_path: str) -> str | None:
+    result = run_git_text(["show", f"{ref}:{repo_path}"])
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def read_local_file(root: Path, repo_path: str) -> str | None:
+    try:
+        return (root / repo_path).read_text()
+    except OSError:
+        return None
+
+
+def template_payload(
+    *,
+    status: str,
+    base: str,
+    source: str,
+    source_ref: str,
+    candidates: list[dict[str, Any]],
+    template: dict[str, Any] | None = None,
+    fallback_used: bool = False,
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "base": base,
+        "source": source,
+        "source_ref": source_ref,
+        "fallback_used": fallback_used,
+        "template": template,
+        "candidates": candidates,
+    }
+
+
+def resolve_pr_template(base: str, *, command_path: tuple[str, ...]) -> dict[str, Any]:
+    require_git_repo(command_path)
+    root = current_repo_root()
+    if root is None:
+        raise GhflowError(
+            "Could not resolve the repository root.",
+            code="repo_context_missing",
+            exit_code=3,
+            command_path=command_path,
+        )
+
+    if base:
+        base_candidates = discover_git_template_candidates(base)
+        if len(base_candidates) > 1:
+            return template_payload(status="ambiguous", base=base, source="base_ref", source_ref=base, candidates=base_candidates)
+        if len(base_candidates) == 1:
+            candidate = dict(base_candidates[0])
+            content = read_git_file(base, candidate["path"])
+            if content is not None:
+                candidate["content"] = content
+                return template_payload(status="found", base=base, source="base_ref", source_ref=base, candidates=base_candidates, template=candidate)
+
+    local_candidates = discover_local_template_candidates(root)
+    if len(local_candidates) > 1:
+        return template_payload(
+            status="ambiguous",
+            base=base,
+            source="worktree",
+            source_ref="worktree",
+            candidates=local_candidates,
+            fallback_used=bool(base),
+        )
+    if len(local_candidates) == 1:
+        candidate = dict(local_candidates[0])
+        content = read_local_file(root, candidate["path"])
+        if content is not None:
+            candidate["content"] = content
+            return template_payload(
+                status="found",
+                base=base,
+                source="worktree",
+                source_ref="worktree",
+                candidates=local_candidates,
+                template=candidate,
+                fallback_used=bool(base),
+            )
+
+    return template_payload(status="missing", base=base, source="none", source_ref="", candidates=[], fallback_used=bool(base))
+
+
 def tracking_remote_name(branch: str) -> str | None:
     result = run_git_text(["config", "--get", f"branch.{branch}.remote"])
     if result.returncode != 0:
@@ -1095,10 +1274,42 @@ def publish_context_handler(spec: CommandSpec, tail: list[str], json_mode: bool)
     return text_response("\n".join(lines) + "\n")
 
 
+def publish_template_handler(spec: CommandSpec, tail: list[str], json_mode: bool) -> CommandResponse:
+    opts = parse_options(spec.command_path, tail, {"--base": value("base"), "--repo": value("repo")})
+    require_git_repo(spec.command_path)
+    local_repo = resolve_repo(None, False, command_path=spec.command_path)
+    if opts["repo"] and str(opts["repo"]) != local_repo:
+        raise GhflowError(
+            f"Cross-repo PR template discovery is not supported. Current checkout resolves to {local_repo}.",
+            code="repo_context_mismatch",
+            exit_code=2,
+            command_path=spec.command_path,
+        )
+    repo = local_repo
+    base = str(opts["base"] or gh_json(["repo", "view", repo, "--json", "defaultBranchRef"], command_path=spec.command_path).get("defaultBranchRef", {}).get("name") or "")
+    payload = resolve_pr_template(base, command_path=spec.command_path)
+    if json_mode:
+        return json_response(payload)
+
+    status = payload["status"]
+    if status == "found" and payload["template"]:
+        template = payload["template"]
+        fallback = " (local fallback)" if payload["fallback_used"] else ""
+        return text_response(f"Pull request template: {template['path']} from {payload['source_ref']}{fallback}\n")
+    if status == "ambiguous":
+        lines = [f"Multiple pull request templates found from {payload['source_ref']}; choose one before composing the PR body:"]
+        for candidate in payload["candidates"]:
+            lines.append(f"- {candidate['path']}")
+        return text_response("\n".join(lines) + "\n")
+    base_label = base or "the default branch"
+    return text_response(f"No pull request template found from {base_label} or the local worktree.\n")
+
+
 def publish_open_handler(spec: CommandSpec, tail: list[str], json_mode: bool) -> CommandResponse:
     opts = parse_options(spec.command_path, tail, {
         "--title": value("title"),
         "--body": value("body"),
+        "--body-file": value("body_file"),
         "--body-from-head": flag("body_from_head"),
         "--base": value("base"),
         "--draft": flag("draft"),
@@ -1106,6 +1317,8 @@ def publish_open_handler(spec: CommandSpec, tail: list[str], json_mode: bool) ->
         "--dry-run": flag("dry_run"),
         "--allow-non-project": flag("allow_non_project"),
     })
+    if opts["body_file"] and (opts["body"] or opts["body_from_head"]):
+        raise GhflowError("Use only one of --body-file, --body, or --body-from-head.", code="invalid_arguments", exit_code=64, command_path=spec.command_path)
     branch = current_branch(spec.command_path)
     local_repo = resolve_repo(None, False, command_path=spec.command_path)
     if opts["repo"] and str(opts["repo"]) != local_repo:
@@ -1144,9 +1357,22 @@ def publish_open_handler(spec: CommandSpec, tail: list[str], json_mode: bool) ->
     if not title:
         raise GhflowError("Could not derive a PR title from HEAD. Pass --title explicitly.", code="invalid_arguments", exit_code=6, command_path=spec.command_path)
     body = str(opts["body"] or "")
+    body_file = str(opts["body_file"] or "")
+    body_source = "provided" if body else "empty"
+    if body_file:
+        try:
+            body = Path(body_file).read_text()
+        except OSError as exc:
+            raise GhflowError(f"Could not read --body-file '{body_file}': {exc}", code="invalid_arguments", exit_code=64, command_path=spec.command_path) from exc
+        body_source = f"file {body_file}"
     if opts["body_from_head"] and not body:
         body = run_git_text(["log", "-1", "--format=%b"]).stdout
-    args = ["pr", "create", "--repo", repo, "--title", title, "--head", branch, "--base", base, "--body", body]
+        body_source = "latest commit body" if body else "empty"
+    args = ["pr", "create", "--repo", repo, "--title", title, "--head", branch, "--base", base]
+    if body_file:
+        args.extend(["--body-file", body_file])
+    else:
+        args.extend(["--body", body])
     if opts["draft"]:
         args.append("--draft")
     if opts["dry_run"]:
@@ -1154,12 +1380,12 @@ def publish_open_handler(spec: CommandSpec, tail: list[str], json_mode: bool) ->
             f"Dry run: would open a PR for {branch} in {repo}.",
             f"Base: {base}",
             f"Title: {title}",
-            "Body source: latest commit body" if body and opts["body_from_head"] else ("Body source: provided" if body else "Body: (empty)"),
+            f"Body source: {body_source}",
         ]
         if body:
             lines.append("Body:")
             lines.append(body.rstrip())
-        lines.extend([f"Draft: {'yes' if opts['draft'] else 'no'}", f"Command: {' '.join(args)}", ""])
+        lines.extend([f"Draft: {'yes' if opts['draft'] else 'no'}", f"Command: {shlex.join(args)}", ""])
         return text_response("\n".join(lines))
     return CommandResponse(run_gh_text(args), "text")
 
@@ -1200,7 +1426,8 @@ COMMAND_LIST = [
     CommandSpec(("stars", "lists", "assign"), handler=lists_handler),
     CommandSpec(("stars", "lists", "unassign"), handler=lists_handler),
     CommandSpec(("publish", "context"), handler=publish_context_handler),
-    CommandSpec(("publish", "open"), handler=publish_open_handler),
+    CommandSpec(("publish", "template"), usage_tail="[--base <branch>] [--repo <owner/repo>]", handler=publish_template_handler),
+    CommandSpec(("publish", "open"), usage_tail="[--title <text>] [--body <text>] [--body-file <path>] [--body-from-head] [--base <branch>] [--draft] [--repo <owner/repo>] [--dry-run] [--allow-non-project]", handler=publish_open_handler),
 ]
 
 COMMAND_ORDER = [spec.command_path for spec in COMMAND_LIST]
@@ -1210,7 +1437,7 @@ ROOT_NOUN_DESCRIPTIONS = {
     "ci": "failing PR check inspection for GitHub Actions",
     "reviews": "PR review-thread work",
     "stars": "authenticated-user stars and star lists",
-    "publish": "current-branch PR context and open-or-reuse flows",
+    "publish": "current-branch PR context, template discovery, and open-or-reuse flows",
 }
 ROOT_NOUN_ORDER = ("ci", "reviews", "stars", "publish")
 ROOT_NOUNS = tuple(noun for noun in ROOT_NOUN_ORDER if any(command_path[0] == noun for command_path in COMMAND_ORDER))

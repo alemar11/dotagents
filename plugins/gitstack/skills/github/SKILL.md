@@ -150,6 +150,7 @@ Use the resolved `ghflow` artifact when one of these applies:
 - Shared helper workflows:
   - `<resolved-ghflow> ci inspect --pr <number-or-url>`
   - `<resolved-ghflow> --json publish context`
+  - `<resolved-ghflow> --json publish template`
   - `<resolved-ghflow> publish open --draft`
   - `<resolved-ghflow> --json stars list`
   - `<resolved-ghflow> --json stars lists list`

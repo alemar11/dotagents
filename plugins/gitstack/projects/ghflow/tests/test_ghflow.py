@@ -3,7 +3,10 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import subprocess
 import sys
+import tempfile
 import tomllib
 import unittest
 import zipfile
@@ -20,6 +23,29 @@ if str(PROJECT_SRC) not in sys.path:
 import ghflow  # noqa: E402
 from ghflow import checks  # noqa: E402
 from ghflow import runtime  # noqa: E402
+
+
+@contextlib.contextmanager
+def working_directory(path: Path):
+    original = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(original)
+
+
+def git(repo: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=repo, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+def init_git_repo(repo: Path) -> None:
+    git(repo, "init", "-b", "main")
+    git(repo, "config", "user.email", "test@example.com")
+    git(repo, "config", "user.name", "Test User")
+    (repo / "README.md").write_text("test\n")
+    git(repo, "add", "README.md")
+    git(repo, "commit", "-m", "init")
 
 
 class ParseRootArgsTests(unittest.TestCase):
@@ -55,6 +81,12 @@ class ParseRootArgsTests(unittest.TestCase):
     def test_render_ci_help_mentions_inspect(self) -> None:
         help_text = runtime.render_noun_help(("ci",))
         self.assertIn("ghflow [--json] ci inspect", help_text)
+
+    def test_render_publish_help_mentions_template_and_body_file(self) -> None:
+        help_text = runtime.render_noun_help(("publish",))
+        self.assertIn("ghflow [--json] publish <context|template|open>", help_text)
+        open_help = runtime.render_noun_help(("publish", "open"))
+        self.assertIn("--body-file <path>", open_help)
 
     def test_removed_doctor_command_fails(self) -> None:
         with self.assertRaises(runtime.GhflowError) as ctx:
@@ -121,6 +153,111 @@ class UtilityTests(unittest.TestCase):
             with self.subTest(prefix=prefix):
                 help_text = runtime.render_noun_help(prefix)
                 self.assertTrue(help_text.startswith("Usage:\n"))
+
+
+class PublishTemplateTests(unittest.TestCase):
+    def test_base_ref_template_wins_over_worktree_edit(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            init_git_repo(repo)
+            template = repo / ".github" / "pull_request_template.md"
+            template.parent.mkdir()
+            template.write_text("base template\n")
+            git(repo, "add", ".github/pull_request_template.md")
+            git(repo, "commit", "-m", "add template")
+            template.write_text("worktree template\n")
+
+            with working_directory(repo):
+                payload = runtime.resolve_pr_template("main", command_path=("publish", "template"))
+
+        self.assertEqual(payload["status"], "found")
+        self.assertEqual(payload["source"], "base_ref")
+        self.assertEqual(payload["template"]["path"], ".github/pull_request_template.md")
+        self.assertEqual(payload["template"]["content"], "base template\n")
+
+    def test_local_template_fallback_when_base_has_none(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            init_git_repo(repo)
+            template = repo / "docs" / "pull_request_template.md"
+            template.parent.mkdir()
+            template.write_text("local docs template\n")
+
+            with working_directory(repo):
+                payload = runtime.resolve_pr_template("main", command_path=("publish", "template"))
+
+        self.assertEqual(payload["status"], "found")
+        self.assertEqual(payload["source"], "worktree")
+        self.assertTrue(payload["fallback_used"])
+        self.assertEqual(payload["template"]["path"], "docs/pull_request_template.md")
+        self.assertEqual(payload["template"]["content"], "local docs template\n")
+
+    def test_local_template_discovery_prefers_github_then_root_then_docs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "docs").mkdir()
+            (repo / ".github").mkdir()
+            (repo / "docs" / "pull_request_template.md").write_text("docs\n")
+            (repo / "pull_request_template.md").write_text("root\n")
+            (repo / ".github" / "PULL_REQUEST_TEMPLATE.md").write_text("github\n")
+
+            candidates = runtime.discover_local_template_candidates(repo)
+
+        self.assertEqual([candidate["path"] for candidate in candidates], [".github/PULL_REQUEST_TEMPLATE.md"])
+
+    def test_multiple_named_templates_are_ambiguous(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            init_git_repo(repo)
+            template_dir = repo / ".github" / "PULL_REQUEST_TEMPLATE"
+            template_dir.mkdir(parents=True)
+            (template_dir / "bug.md").write_text("bug\n")
+            (template_dir / "feature.md").write_text("feature\n")
+
+            with working_directory(repo):
+                payload = runtime.resolve_pr_template("main", command_path=("publish", "template"))
+
+        self.assertEqual(payload["status"], "ambiguous")
+        self.assertEqual([candidate["path"] for candidate in payload["candidates"]], [".github/PULL_REQUEST_TEMPLATE/bug.md", ".github/PULL_REQUEST_TEMPLATE/feature.md"])
+
+    def test_missing_template_reports_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            init_git_repo(repo)
+
+            with working_directory(repo):
+                payload = runtime.resolve_pr_template("main", command_path=("publish", "template"))
+
+        self.assertEqual(payload["status"], "missing")
+        self.assertIsNone(payload["template"])
+
+
+class PublishOpenTests(unittest.TestCase):
+    def test_publish_open_rejects_body_file_with_body(self) -> None:
+        spec = runtime.COMMAND_SPECS[("publish", "open")]
+        with self.assertRaises(runtime.GhflowError) as ctx:
+            spec.handler(spec, ["--body-file", "body.md", "--body", "body"], False)
+        self.assertEqual(ctx.exception.code, "invalid_arguments")
+
+    def test_publish_open_dry_run_uses_body_file_argument(self) -> None:
+        spec = runtime.COMMAND_SPECS[("publish", "open")]
+        with tempfile.TemporaryDirectory() as temp:
+            body_file = Path(temp) / "body.md"
+            body_file.write_text("template-aware body\n")
+            with (
+                mock.patch.object(runtime, "current_branch", return_value="feature"),
+                mock.patch.object(runtime, "resolve_repo", return_value="OWNER/REPO"),
+                mock.patch.object(runtime, "tracking_remote_name", return_value="origin"),
+                mock.patch.object(runtime, "tracking_branch_name", return_value="feature"),
+                mock.patch.object(runtime, "run_git_text", return_value=runtime.RunResult(0, "", "")),
+                mock.patch.object(runtime, "gh_json", side_effect=[[], {"defaultBranchRef": {"name": "main"}}]),
+            ):
+                response = spec.handler(spec, ["--title", "Test PR", "--body-file", str(body_file), "--dry-run"], False)
+
+        self.assertEqual(response.result.returncode, 0)
+        self.assertIn(f"Body source: file {body_file}", response.result.stdout)
+        self.assertIn("--body-file", response.result.stdout)
+        self.assertIn("template-aware body", response.result.stdout)
 
 
 class CiInspectRuntimeTests(unittest.TestCase):
