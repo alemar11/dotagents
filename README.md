@@ -14,6 +14,7 @@ This directory contains reusable skills, repo-local plugins, and project maintai
 - `skills/codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
 - `skills/xcode-changelog/` — Resolve active Xcode notes, include latest notes when behind, look up a requested version, or list Apple Xcode release notes.
 - `skills/plan-harder/` — Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
+- `skills/grill-me/` — Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action.
 - `skills/learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
 - `skills/postgres/` — Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns.
 - `skills/skill-audit/` — Audit installed Codex skills, plugin packages, and bundled plugin skills using repo evidence, memory, sessions, the `scripts/session-evidence` helper, and current context to plan updates, additions, merges, or disables.
@@ -58,12 +59,13 @@ plugin entries into your personal plugin marketplace.
 These prompts are for use inside Codex only.
 Copy/paste one of these prompts:
 
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc`
+- `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/skill-cli-creator`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-changelog`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/xcode-changelog`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/plan-harder`
+- `Use $skill-installer to install skills from alemar11/dotagents --path skills/grill-me`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/learn`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/postgres`
 - `Use $skill-installer to install skills from alemar11/dotagents --path skills/skill-audit`
@@ -88,6 +90,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill plan-harder \
+  --skill grill-me \
   --skill learn \
   --skill postgres \
   --skill skill-audit \
@@ -119,6 +122,10 @@ npx skills add alemar11/dotagents -a codex -g -y --skill swift-docc
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y --skill plan-harder
+```
+
+```sh
+npx skills add alemar11/dotagents -a codex -g -y --skill grill-me
 ```
 
 Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
