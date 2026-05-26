@@ -2,7 +2,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use clap::Parser;
 use postgres_skill_cli::cli::*;
 use postgres_skill_cli::config::{
-    RuntimeOptions, application_name, bootstrap_profile, canonical_config_path,
+    AccessMode, RuntimeOptions, application_name, bootstrap_profile, canonical_config_path,
     load_and_migrate_config, runtime_context, update_sslmode,
 };
 use postgres_skill_cli::db::{
@@ -68,9 +68,171 @@ fn sanitize_error_message(message: &str) -> String {
     masked_password.into_owned()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AccessRequirement {
+    Read,
+    Write,
+    ReadWrite,
+}
+
+impl AccessRequirement {
+    fn as_str(&self) -> &'static str {
+        match self {
+            AccessRequirement::Read => "read",
+            AccessRequirement::Write => "write",
+            AccessRequirement::ReadWrite => "read_write",
+        }
+    }
+}
+
+fn require_db_access(db: &DbClient, requirement: AccessRequirement, operation: &str) -> Result<()> {
+    ensure_access(
+        &db.context().profile_name,
+        db.context().access,
+        requirement,
+        operation,
+    )
+}
+
+fn ensure_access(
+    profile_name: &str,
+    access: AccessMode,
+    requirement: AccessRequirement,
+    operation: &str,
+) -> Result<()> {
+    let allowed = match (access, requirement) {
+        (AccessMode::ReadWrite, _) => true,
+        (AccessMode::Read, AccessRequirement::Read) => true,
+        (AccessMode::Write, AccessRequirement::Write) => true,
+        _ => false,
+    };
+    if allowed {
+        return Ok(());
+    }
+
+    if requirement == AccessRequirement::ReadWrite {
+        bail!(
+            "{operation} requires access = \"read_write\" because the SQL access intent is ambiguous or mixes reads and writes; profile '{profile_name}' has access = \"{}\". Use a read_write profile or rely on PostgreSQL roles/grants for authoritative enforcement.",
+            access.as_str()
+        );
+    }
+
+    bail!(
+        "{operation} requires {} access; profile '{profile_name}' has access = \"{}\". Use a profile with access = \"{}\" or \"read_write\", and keep PostgreSQL roles/grants as the authoritative enforcement boundary.",
+        requirement.as_str(),
+        access.as_str(),
+        requirement.as_str()
+    )
+}
+
+fn classify_sql_access(sql: &str) -> AccessRequirement {
+    let mut requirement = None;
+    for statement in sql.split(';') {
+        let Some(statement_requirement) = classify_sql_statement_access(statement) else {
+            continue;
+        };
+        requirement = Some(match requirement {
+            None => statement_requirement,
+            Some(existing) if existing == statement_requirement => existing,
+            Some(_) => AccessRequirement::ReadWrite,
+        });
+        if requirement == Some(AccessRequirement::ReadWrite) {
+            return AccessRequirement::ReadWrite;
+        }
+    }
+    requirement.unwrap_or(AccessRequirement::ReadWrite)
+}
+
+fn classify_sql_statement_access(statement: &str) -> Option<AccessRequirement> {
+    let trimmed = trim_leading_sql_trivia(statement);
+    let (keyword, _) = first_sql_keyword(trimmed)?;
+    Some(keyword_access_requirement(&keyword, trimmed))
+}
+
+fn keyword_access_requirement(keyword: &str, statement: &str) -> AccessRequirement {
+    match keyword {
+        "select" | "show" | "values" | "table" => AccessRequirement::Read,
+        "explain" => classify_explain_access(statement),
+        "insert" | "update" | "delete" | "merge" | "create" | "alter" | "drop" | "truncate"
+        | "grant" | "revoke" | "call" | "do" | "refresh" | "reindex" | "vacuum" | "analyze" => {
+            AccessRequirement::Write
+        }
+        _ => AccessRequirement::ReadWrite,
+    }
+}
+
+fn classify_explain_access(statement: &str) -> AccessRequirement {
+    let Some((_, mut rest)) = first_sql_keyword(statement) else {
+        return AccessRequirement::ReadWrite;
+    };
+
+    loop {
+        rest = trim_leading_sql_trivia(rest);
+        if rest.is_empty() {
+            return AccessRequirement::Read;
+        }
+
+        if let Some(after_open) = rest.strip_prefix('(') {
+            let Some(close_index) = after_open.find(')') else {
+                return AccessRequirement::ReadWrite;
+            };
+            rest = &after_open[close_index + 1..];
+            continue;
+        }
+
+        let Some((keyword, next)) = first_sql_keyword(rest) else {
+            return AccessRequirement::ReadWrite;
+        };
+        match keyword.as_str() {
+            "analyze" | "analyse" | "verbose" | "costs" | "buffers" | "format" | "settings"
+            | "wal" | "timing" | "summary" | "memory" | "serialize" | "generic_plan" | "true"
+            | "false" | "text" | "json" | "yaml" | "xml" => {
+                rest = next;
+            }
+            _ => return keyword_access_requirement(&keyword, rest),
+        }
+    }
+}
+
+fn first_sql_keyword(statement: &str) -> Option<(String, &str)> {
+    let trimmed = trim_leading_sql_trivia(statement);
+    let first = trimmed.chars().next()?;
+    if !first.is_ascii_alphabetic() {
+        return None;
+    }
+    let keyword = trimmed
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphabetic() || *ch == '_')
+        .collect::<String>();
+    let rest = &trimmed[keyword.len()..];
+    Some((keyword.to_ascii_lowercase(), rest))
+}
+
+fn trim_leading_sql_trivia(mut statement: &str) -> &str {
+    loop {
+        statement = statement.trim_start();
+        if let Some(rest) = statement.strip_prefix("--") {
+            statement = rest.split_once('\n').map(|(_, rest)| rest).unwrap_or("");
+            continue;
+        }
+        if let Some(rest) = statement.strip_prefix("/*") {
+            let Some(end) = rest.find("*/") else {
+                return "";
+            };
+            statement = &rest[end + 2..];
+            continue;
+        }
+        return statement;
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_query_text_max_chars, sanitize_error_message};
+    use super::{
+        AccessRequirement, classify_sql_access, ensure_access, parse_query_text_max_chars,
+        sanitize_error_message,
+    };
+    use postgres_skill_cli::config::AccessMode;
 
     #[test]
     fn masks_password_in_postgres_url() {
@@ -95,6 +257,68 @@ mod tests {
         assert_eq!(parse_query_text_max_chars(None).unwrap(), 300);
         assert_eq!(parse_query_text_max_chars(Some("512")).unwrap(), 512);
         assert!(parse_query_text_max_chars(Some("bad")).is_err());
+    }
+
+    #[test]
+    fn sql_access_classifier_detects_obvious_read_write_and_ambiguous_sql() {
+        assert_eq!(classify_sql_access("select 1"), AccessRequirement::Read);
+        assert_eq!(
+            classify_sql_access("-- comment\nshow server_version"),
+            AccessRequirement::Read
+        );
+        assert_eq!(
+            classify_sql_access("insert into users(id) values (1)"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("create table example(id int)"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("explain (analyze, buffers) update users set active = true"),
+            AccessRequirement::Write
+        );
+        assert_eq!(
+            classify_sql_access("explain select * from users"),
+            AccessRequirement::Read
+        );
+        assert_eq!(
+            classify_sql_access("select 1; update users set active = true"),
+            AccessRequirement::ReadWrite
+        );
+        assert_eq!(
+            classify_sql_access("with x as (select 1) select * from x"),
+            AccessRequirement::ReadWrite
+        );
+    }
+
+    #[test]
+    fn access_guard_allows_only_matching_access_modes() {
+        assert!(ensure_access("local", AccessMode::Read, AccessRequirement::Read, "query").is_ok());
+        assert!(
+            ensure_access("local", AccessMode::Read, AccessRequirement::Write, "query").is_err()
+        );
+        assert!(
+            ensure_access(
+                "local",
+                AccessMode::Write,
+                AccessRequirement::Write,
+                "query"
+            )
+            .is_ok()
+        );
+        assert!(
+            ensure_access("local", AccessMode::Write, AccessRequirement::Read, "query").is_err()
+        );
+        assert!(
+            ensure_access(
+                "local",
+                AccessMode::ReadWrite,
+                AccessRequirement::ReadWrite,
+                "query"
+            )
+            .is_ok()
+        );
     }
 }
 
@@ -136,6 +360,7 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
             let output = json!({
                 "profile": resolved.name,
                 "url": resolved.url,
+                "access": resolved.access,
                 "saved": args.save,
                 "config_path": config_path,
                 "toml_path": config_path,
@@ -201,6 +426,7 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
             } else {
                 println!("DB_URL={:?}", ctx.url);
                 println!("DB_SSLMODE={}", ctx.sslmode);
+                println!("DB_ACCESS={}", ctx.access.as_str());
                 println!("DB_PROFILE={}", ctx.profile_name);
                 println!("DB_URL_SOURCE={}", ctx.url_source);
                 if let Some(path) = ctx.config_path {
@@ -225,6 +451,7 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
         }
         ProfileSubcommand::Info => {
             let db = db_client(cli, skill_root).await?;
+            require_db_access(&db, AccessRequirement::Read, "profile info")?;
             let table = db
                 .query(
                     "select 'database' as key, current_database() as value
@@ -246,11 +473,13 @@ union all select 'application_name', current_setting('application_name');",
         }
         ProfileSubcommand::Overview => {
             let db = db_client(cli, skill_root).await?;
+            require_db_access(&db, AccessRequirement::Read, "profile overview")?;
             let sections = tools::database_overview(&db).await?;
             render_named_sections(cli.json, "overview", &sections)
         }
         ProfileSubcommand::Settings(args) => {
             let db = db_client(cli, skill_root).await?;
+            require_db_access(&db, AccessRequirement::Read, "profile settings")?;
             match &args.command {
                 ProfileSettingsSubcommand::Autovacuum => {
                     let sections = tools::list_autovacuum_configurations(&db).await?;
@@ -264,6 +493,7 @@ union all select 'application_name', current_setting('application_name');",
         }
         ProfileSubcommand::Version => {
             let db = db_client(cli, skill_root).await?;
+            require_db_access(&db, AccessRequirement::Read, "profile version")?;
             let table = db.query("show server_version;").await?;
             expect_non_empty(&table, "No version returned.")?;
             let version = table.rows[0][0].clone().unwrap_or_default();
@@ -282,11 +512,13 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
     match &command.command {
         QuerySubcommand::Run(args) => {
             let sql = read_sql_input(args)?;
+            require_db_access(&db, classify_sql_access(&sql), "query run")?;
             let execution = tools::execute_sql(&db, &sql).await?;
             render_query_run(cli.json, &sql, &execution)
         }
         QuerySubcommand::Explain(args) => {
             let sql = read_sql_input(&args.sql)?;
+            require_db_access(&db, classify_sql_access(&sql), "query explain")?;
             let prefix = if args.no_analyze {
                 "EXPLAIN (VERBOSE, COSTS, BUFFERS, FORMAT TEXT)"
             } else {
@@ -301,10 +533,12 @@ async fn query(cli: &Cli, command: &QueryCommand, skill_root: &Path) -> Result<(
         }
         QuerySubcommand::Plan(args) => {
             let sql = read_sql_input(&args.sql)?;
+            require_db_access(&db, classify_sql_access(&sql), "query plan")?;
             let table = tools::get_query_plan(&db, &sql, args.analyze).await?;
             render_named_table(cli.json, "plan", "Query Plan", table)
         }
         QuerySubcommand::Find(args) => {
+            require_db_access(&db, AccessRequirement::Read, "query find")?;
             let pattern = escape_literal(&format!("%{}%", args.pattern));
             let types = args.types.clone().unwrap_or_default();
             let table = db
@@ -364,6 +598,14 @@ order by object_type, object_schema, object_name;"
 
 async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Result<()> {
     let db = db_client(cli, skill_root).await?;
+    let requirement = match &command.command {
+        ActivitySubcommand::Cancel(_)
+        | ActivitySubcommand::Terminate(_)
+        | ActivitySubcommand::CancelPid(_)
+        | ActivitySubcommand::TerminatePid(_) => AccessRequirement::Write,
+        _ => AccessRequirement::Read,
+    };
+    require_db_access(&db, requirement, "activity command")?;
     match &command.command {
         ActivitySubcommand::Overview(args) => {
             let table = db.query(&format!("select pid, usename as user_name, datname as db, state, wait_event_type, wait_event, now() - query_start as query_age, now() - xact_start as xact_age, left(query, 200) as query from pg_stat_activity where pid <> pg_backend_pid() and state <> 'idle' order by query_start desc nulls last limit {};", args.limit)).await?;
@@ -431,6 +673,7 @@ async fn activity(cli: &Cli, command: &ActivityCommand, skill_root: &Path) -> Re
 
 async fn schema(cli: &Cli, command: &SchemaCommand, skill_root: &Path) -> Result<()> {
     let db = db_client(cli, skill_root).await?;
+    require_db_access(&db, AccessRequirement::Read, "schema command")?;
     match &command.command {
         SchemaSubcommand::Inspect => schema_inspect(cli, &db).await,
         SchemaSubcommand::List(args) => match &args.command {
@@ -549,6 +792,12 @@ async fn migration(cli: &Cli, command: &MigrationCommand, skill_root: &Path) -> 
                     url_override: cli.url.clone(),
                 },
                 skill_root,
+            )?;
+            ensure_access(
+                &ctx.profile_name,
+                ctx.access,
+                AccessRequirement::Write,
+                "migration release",
             )?;
             let plan = build_release_plan(&ctx, args)?;
             if !plan.dry_run {

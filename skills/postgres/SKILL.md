@@ -31,6 +31,9 @@ patterns, and manage migration release flow through the shipped
 - The implementation lives in `projects/postgres/` and is maintenance-only.
   Normal usage stays on the `scripts/postgres` surface.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
+- Profile `access` modes are local CLI safety guards with values `read`,
+  `write`, and `read_write`; they do not replace PostgreSQL roles, grants, RLS,
+  or server-side read-only settings.
 - This runtime skill does not provide dump, restore, export, or schema-diff
   workflows. Keep those operator tasks outside this skill.
 - If a target repo has `.skills/postgres/config.toml` or legacy

@@ -174,6 +174,7 @@ Doctor success:
     "config_path": "/path/to/project/.skills/postgres/config.toml",
     "toml_path": "/path/to/project/.skills/postgres/config.toml",
     "sslmode": "disable",
+    "access": "read_write",
     "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
     "url_source": "config"
   }
@@ -190,6 +191,7 @@ Profile success:
   "profile_name": "local",
   "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
   "sslmode": "disable",
+  "access": "read_write",
   "url_source": "config",
   "application_name": "codex-postgres-skill"
 }
@@ -243,12 +245,32 @@ Project-root precedence:
 3. current git top-level unless that resolves to the skill repo itself
 4. current working directory
 
+## Access modes
+
+Profiles may declare `access = "read"`, `access = "write"`, or
+`access = "read_write"` under `[tools.postgres.profiles.<name>]`.
+
+- Missing `access` values are backward compatible and resolve to `read_write`.
+- Loading a `2.0.0` config or a `2.1.0` config with missing access values
+  performs a light migration to `schema_version = "2.1.0"` and writes explicit
+  per-profile `access` values.
+- `[tools.postgres].access` is allowed only as an inheritance/default source;
+  prefer explicit per-profile access.
+- `read` permits read-oriented profile, query, activity, and schema inspection
+  commands, and rejects obvious write SQL or write-control commands.
+- `write` permits write-oriented SQL/control operations and rejects read-only
+  inspection commands, except neutral connection commands such as `doctor`,
+  `profile resolve`, and `profile test`.
+- Ambiguous SQL or SQL that mixes reads and writes requires `read_write`.
+- Access modes are CLI safety guards only. PostgreSQL roles, grants, RLS, and
+  server-side read-only settings remain authoritative.
+
 ## Canonical commands
 
 - `doctor`
   - Check config resolution and runtime readiness without mutating config.
 - `profile resolve`
-  - Show active profile, URL, and source.
+  - Show active profile, URL, access mode, and source.
 - `profile bootstrap [--save]`
   - Interactively create or print a profile.
 - `profile test`
