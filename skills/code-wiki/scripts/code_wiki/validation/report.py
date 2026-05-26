@@ -8,8 +8,9 @@ def print_report(errors: list[str], warnings: list[str]) -> None:
         print("FAIL")
         for error in errors:
             print(f"ERROR: {error}")
+    elif warnings:
+        print("PASS_WITH_WARNINGS")
     else:
         print("PASS")
     for warning in warnings:
         print(f"WARN: {warning}")
-

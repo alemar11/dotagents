@@ -164,6 +164,14 @@ reader to the repo's most important subsystem internals.
 - Wrap tables in `.table-wrap`. The default template stacks table rows on
   narrow Codex split-pane widths; do not rely on body-level horizontal
   scrolling for important content.
+- Use `class="lead"` for the opening page summary, `class="meta-bar"` for
+  compact repo/run facts, and `class="doc-section"` for main content sections
+  that should read as documentation tools rather than loose prose.
+- Put factual diagrams inside `figure.diagram-frame` or
+  `figure.hybrid-diagram`.
+- When a page has many evidence chips, prefer collapsible
+  `<details class="evidence">` blocks with a concise `<summary>` so source
+  proof stays available without dominating the reading flow.
 
 ## Diagrams
 
@@ -171,9 +179,12 @@ Use deterministic diagrams for facts:
 
 - Local SVG files under `assets/diagrams/` are preferred for architecture and
   request/data flows.
+- For polished factual visuals, render and validate deterministic SVG first,
+  then use a generated raster only as an overview layer that points back to the
+  SVG/spec with `data-source-diagram`.
 - `.mmd` files may be kept beside rendered SVG as editable source, but pages
   should embed or link a rendered local asset.
-- Do not rely on generated raster images for exact topology.
+- Do not rely on generated raster images alone for exact topology.
 
 Recommended diagram set:
 
@@ -192,6 +203,19 @@ short verb labels such as "creates", "dispatches", "mutates", "renders",
 "polls", "calls", "wraps", "emits", or "cancels". Split long labels across
 lines and test narrow viewport rendering; truncated diagram text is a content
 defect, not only a styling issue.
+
+Hybrid imagegen diagrams are allowed only after the deterministic diagram is
+correct. Store polished raster outputs in `assets/images/`, keep the canonical
+SVG in `assets/diagrams/`, and mark the raster image like:
+
+```html
+<img src="../assets/images/architecture-overview.png"
+     alt="Polished architecture overview"
+     data-source-diagram="../assets/diagrams/architecture.svg">
+```
+
+The raster can improve hierarchy, spacing, and visual polish, but source-backed
+claims, exact labels, and validation attach to the deterministic SVG/spec.
 
 Avoid generic edge-label sets like `owns/feeds/supports`,
 `calls/returns/extends`, `starts/dispatches/emits`, or

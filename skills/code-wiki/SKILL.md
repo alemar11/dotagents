@@ -95,7 +95,19 @@ entrypoint candidates, git metadata, and language/file counts. Then inspect the
 real files that matter; the inventory is a routing aid, not the final
 explanation.
 
-### 3. Study the Repo
+Then create the claim matrix scaffold:
+
+```bash
+scripts/code-wiki synthesize --repo <repo-path> --inventory <wiki-out>/data/inventory.json --out <wiki-out>/data/claim-matrix.json
+```
+
+The claim matrix is the synthesis contract. Fill it with concrete, repo-specific
+claims before or while writing HTML. Mark a claim `ready` only after it has a
+target page, source evidence, and a maintainer-focused `why_it_matters`. Do not
+use `synthesize` as a substitute for repo study; it only creates deterministic
+structure from inventory.
+
+### 3. Study the Repo and Fill the Claim Matrix
 
 Open `references/repo-study-playbook.md` before a non-trivial wiki run.
 
@@ -113,6 +125,12 @@ If subagents are unavailable or not explicitly authorized, perform the same
 slices sequentially. In all cases, require file-backed evidence and keep
 synthesis in the main agent.
 
+For multi-repo runs, strict runs, or repositories with `data/inventory.json`
+`counts.files >= 500`, use reader subagents by default after generation unless
+the user explicitly declines. Reader subagents must inspect only the generated
+HTML/SVG wiki and report whether it is sufficient for expert developer
+onboarding. Treat a reader FAIL as a real failure and iterate.
+
 ### 4. Scaffold and Fill the Wiki
 
 Run:
@@ -127,7 +145,11 @@ If the user asked to store cloned source locally beside the wiki, add:
 scripts/code-wiki scaffold --out <wiki-out> --title <repo-name> --local-source-cache
 ```
 
-Then replace placeholders using `references/wiki-html-contract.md`.
+Then replace placeholders using `references/wiki-html-contract.md`. Use the
+template's documentation UI patterns: `lead` for page summaries, `meta-bar` for
+compact repo/run facts, `doc-section` for substantive sections,
+`diagram-frame` or `hybrid-diagram` for diagrams, and collapsible
+`details.evidence` blocks when a section carries many source links.
 
 Required output:
 
@@ -186,6 +208,20 @@ relationship verbs and readable labels. If a diagram truncates important text or
 only repeats section headings, fix the diagram before reporting the wiki
 complete.
 
+For polished architecture or flow visuals, use a hybrid diagram path:
+
+1. Build the source-backed diagram as deterministic SVG/HTML first.
+2. Validate the exact nodes, arrows, labels, and layout.
+3. Use `$imagegen` only as a visual polish pass from that SVG/spec.
+4. Save the raster under `<wiki-out>/assets/images/`.
+5. Keep or link the deterministic SVG adjacent to the raster, and add
+   `data-source-diagram="../assets/diagrams/<name>.svg"` to the raster image.
+
+Never let a generated bitmap replace the deterministic diagram for exact
+topology, labels, or relationship evidence. If exact labels matter in the
+polished visual, overlay them with deterministic SVG/HTML or keep the exact SVG
+directly below the raster.
+
 Keep page and asset links local so the wiki opens from `index.html` without a
 server. For evidence references, prefer online commit-pinned source links when
 the analyzed repo has a supported hosted remote.
@@ -196,19 +232,29 @@ For GitHub repos, generate source links with:
 scripts/code-wiki evidence-link --repo <repo-path> --evidence <path:start-end> --html
 ```
 
-Use the emitted evidence chip in wiki evidence blocks.
+Use the emitted evidence chip in wiki evidence blocks. For multiple refs, use:
+
+```bash
+scripts/code-wiki evidence-link --batch --repo <repo-path> --in <refs.txt|json|-> --html
+```
+
+Use the claim matrix as the page outline: every major section should map back to
+ready claims, and every ready claim should be rendered as repo-specific prose,
+tables, diagrams, or change guidance in its target page.
 
 ### 5. Use Images Selectively
 
 Open `references/image-guidance.md` before generating images.
 
-Use `$imagegen` only for conceptual overview visuals or illustrative flow art
-that benefits from a raster image. Do not use generated images as the only
-source for exact architecture, class names, API paths, dependency names, or
+Use `$imagegen` for conceptual overview visuals, illustrative flow art, or the
+hybrid diagram polish pass described above. Do not use generated images as the
+only source for exact architecture, class names, API paths, dependency names, or
 other factual claims.
 
 Any project-referenced image must be copied into `<wiki-out>/assets/images/`.
 Never leave a referenced image only under `$CODEX_HOME/generated_images/`.
+For factual polished diagram images, verify the HTML includes
+`data-source-diagram` pointing to the deterministic SVG/spec.
 
 ### 6. Validate
 
@@ -218,18 +264,30 @@ Before finishing, run:
 scripts/code-wiki validate --wiki <wiki-out>
 ```
 
-Fix broken local links, missing pages, missing required assets, invalid
-`data/inventory.json`, scaffold placeholders, thin or non-comprehensive page
-content, missing clickable evidence links, and invalid evidence paths. Warnings
-about empty diagrams are acceptable only if the user explicitly asked for a
-minimal wiki; otherwise add deterministic diagram assets. Do not add filler
-raster images only to satisfy validation.
+For multi-repo runs, strict runs, or repositories with `data/inventory.json`
+`counts.files >= 500`, run:
 
-When the user explicitly asks for subagent-based validation, use reader
-subagents after generation. They should read only the generated HTML/SVG wiki
-and report whether it is enough for expert developer onboarding. Treat a reader
-FAIL as a real failure and iterate on the wiki or skill instructions before
-claiming success.
+```bash
+scripts/code-wiki validate --wiki <wiki-out> --strict
+```
+
+Fix broken local links, missing pages, missing required assets, invalid
+`data/inventory.json`, missing or incomplete `data/claim-matrix.json` in strict
+runs, scaffold placeholders, thin or non-comprehensive page content, missing
+clickable evidence links, invalid evidence paths, broad-only claim evidence,
+reused broad evidence, duplicated claim text, and repeated boilerplate prose.
+Warnings about empty diagrams are acceptable only if the user explicitly asked
+for a minimal wiki; otherwise add deterministic diagram assets. Do not add
+filler raster images only to satisfy validation.
+If strict validation reports a polished diagram image without a deterministic
+source diagram, add or link the SVG/spec instead of treating the raster as
+authoritative.
+If validation reports UI-pattern warnings, adjust the HTML structure rather
+than hiding evidence or removing diagrams.
+
+Validation prints `PASS` only for clean runs, `PASS_WITH_WARNINGS` when warnings
+remain, and `FAIL` when errors remain. Report the exact status instead of
+describing a warning-only run as a clean pass.
 
 ## Output
 

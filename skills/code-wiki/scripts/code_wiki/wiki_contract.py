@@ -227,10 +227,9 @@ GENERIC_DIAGRAM_EDGE_SETS = (
 
 EVIDENCE_REF_RE = re.compile(r"^(?P<path>.+?):(?P<start>\d+)(?:-(?P<end>\d+))?$")
 EVIDENCE_BLOCK_RE = re.compile(
-    r"""<aside\b[^>]*class=["'][^"']*\bevidence\b[^"']*["'][^>]*>(?P<body>.*?)</aside>""",
+    r"""<(?P<tag>aside|details)\b[^>]*class=["'][^"']*\bevidence\b[^"']*["'][^>]*>(?P<body>.*?)</(?P=tag)>""",
     re.IGNORECASE | re.DOTALL,
 )
 ANCHOR_RE = re.compile(r"""<a\b(?P<attrs>[^>]*)>(?P<body>.*?)</a>""", re.IGNORECASE | re.DOTALL)
 ATTR_RE = re.compile(r"""(?P<name>[\w:-]+)=["'](?P<value>[^"']+)["']""", re.IGNORECASE)
 TAG_RE = re.compile(r"<[^>]+>")
-

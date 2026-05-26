@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import shutil
 from pathlib import Path
 
@@ -87,11 +88,16 @@ def placeholder_body(title: str, description: str) -> str:
     return f"""    <header class="page-header">
       <p class="eyebrow">Evidence-backed repository guide</p>
       <h1>{html.escape(title)}</h1>
-      <p>{html.escape(description)}</p>
+      <p class="lead">{html.escape(description)}</p>
+      <div class="meta-bar">
+        <span class="meta-pill">Claim-backed sections required</span>
+        <span class="meta-pill">Deterministic diagrams first</span>
+        <span class="meta-pill">Collapsible evidence expected</span>
+      </div>
     </header>
-    <section class="panel">
+    <section class="doc-section">
       <h2>What to Fill In</h2>
-      <p>Replace this placeholder with synthesized findings from repo inventory, source inspection, and subagent research. Keep claims tied to file evidence.</p>
+      <p>Replace this placeholder with ready claims from data/claim-matrix.json, source inspection, and subagent research. Keep every claim tied to file evidence.</p>
     </section>
 """
 
@@ -119,6 +125,59 @@ def init_local_source_cache(out_dir: Path) -> None:
     (cache_dir / ".gitignore").write_text("*\n!.gitignore\n", encoding="utf-8")
 
 
+def write_claim_matrix_example(out_dir: Path) -> None:
+    example = {
+        "schema_version": 1,
+        "repo": {
+            "name": "example-repo",
+            "path": "/absolute/path/to/example-repo",
+            "web_url": "https://github.com/example/example-repo",
+            "commit": "0000000000000000000000000000000000000000",
+            "dirty": False,
+        },
+        "inventory": {
+            "path": "/absolute/path/to/wiki/data/inventory.json",
+            "schema_version": 1,
+            "counts": {"files": 0},
+        },
+        "page_targets": [
+            {
+                "page": "pages/overview.html",
+                "min_ready_claims": 2,
+                "status": "pending",
+            }
+        ],
+        "deep_dive_targets": {
+            "minimum_pages": 2,
+            "min_ready_claims_per_page": 3,
+            "status": "pending",
+            "suggested_pages": [],
+        },
+        "coverage_roots": [
+            {
+                "root": "src",
+                "kind": "source",
+                "reason": "primary source root",
+                "status": "pending",
+                "not_applicable_reason": "",
+            }
+        ],
+        "claims": [
+            {
+                "claim": "Replace with a concrete repo-specific statement.",
+                "page": "pages/overview.html",
+                "evidence": ["src/main.py:1-20"],
+                "why_it_matters": "Explain how this changes a maintainer's mental model.",
+                "status": "draft",
+            }
+        ],
+    }
+    (out_dir / "data" / "claim-matrix.example.json").write_text(
+        json.dumps(example, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def scaffold(out_arg: str, title: str, local_source_cache: bool = False) -> None:
     out_dir = Path(out_arg).expanduser().resolve()
     (out_dir / "pages").mkdir(parents=True, exist_ok=True)
@@ -127,13 +186,19 @@ def scaffold(out_arg: str, title: str, local_source_cache: bool = False) -> None
     (out_dir / "assets" / "images").mkdir(parents=True, exist_ok=True)
     (out_dir / "data").mkdir(parents=True, exist_ok=True)
     copy_template_assets(out_dir)
+    write_claim_matrix_example(out_dir)
     if local_source_cache:
         init_local_source_cache(out_dir)
 
     index_body = f"""    <header class="hero">
       <p class="eyebrow">Code Wiki</p>
       <h1>{html.escape(title)}</h1>
-      <p>A linked repository guide for project context, architecture, public surfaces, dependencies, patterns, flows, tests, and operations.</p>
+      <p class="lead">A linked repository guide for project context, architecture, public surfaces, dependencies, patterns, flows, tests, and operations.</p>
+      <div class="meta-bar">
+        <span class="meta-pill">Static HTML</span>
+        <span class="meta-pill">Source-backed</span>
+        <span class="meta-pill">Evidence-linked</span>
+      </div>
     </header>
     <section class="grid">
       <a class="card" href="pages/project-context.html"><span>01</span><strong>Project Context</strong><p>Use cases, audience, adoption constraints, governance, and upstream docs.</p></a>

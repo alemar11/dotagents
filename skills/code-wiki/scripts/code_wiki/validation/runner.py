@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from code_wiki.claim_matrix import validate_claim_matrix
+from code_wiki.validation.boilerplate import validate_duplicate_boilerplate
 from code_wiki.validation.content import (
     comprehension_rule_for_path,
     is_deep_dive_content_page,
     validate_comprehension_depth,
 )
-from code_wiki.validation.diagrams import validate_diagrams
+from code_wiki.validation.diagrams import validate_diagrams, validate_polished_diagram_images
 from code_wiki.validation.evidence import validate_evidence_block
 from code_wiki.validation.links import validate_local_references
 from code_wiki.validation.report import print_report
@@ -20,6 +22,7 @@ from code_wiki.validation.source_state import (
     validate_source_state,
 )
 from code_wiki.validation.structures import validate_required_structures
+from code_wiki.validation.ui import validate_ui_patterns
 from code_wiki.wiki_contract import (
     ANCHOR_RE,
     EVIDENCE_BLOCK_RE,
@@ -29,7 +32,7 @@ from code_wiki.wiki_contract import (
 )
 
 
-def validate(wiki_arg: str) -> int:
+def validate(wiki_arg: str, strict: bool = False) -> int:
     wiki_dir = Path(wiki_arg).expanduser().resolve()
     errors: list[str] = []
     warnings: list[str] = []
@@ -78,6 +81,11 @@ def validate(wiki_arg: str) -> int:
                 f"found {len(deep_dive_pages)}, expected at least {MIN_LARGE_REPO_DEEP_DIVES} "
                 "under pages/deep-dives/"
             )
+    if strict:
+        if inventory:
+            validate_claim_matrix(wiki_dir, inventory, deep_dive_pages, errors)
+        else:
+            errors.append("strict validation requires valid data/inventory.json before claim-matrix checks")
 
     html_files = [
         path
@@ -118,6 +126,10 @@ def validate(wiki_arg: str) -> int:
             warnings.append(f"{rel_html} has table markup without an explicit table-wrap container")
 
         validate_local_references(html_file, wiki_dir, text, errors)
+        validate_polished_diagram_images(html_file, wiki_dir, text, strict, errors, warnings)
+        validate_ui_patterns(html_file, wiki_dir, text, strict, errors, warnings)
+
+    validate_duplicate_boilerplate(html_files, wiki_dir, strict, errors, warnings)
 
     if not any((wiki_dir / "assets" / "diagrams").glob("*")):
         warnings.append("assets/diagrams is empty")
@@ -126,4 +138,3 @@ def validate(wiki_arg: str) -> int:
 
     print_report(errors, warnings)
     return 1 if errors else 0
-
