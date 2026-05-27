@@ -143,6 +143,17 @@ DB_PROJECT_ROOT="$DB_PROJECT_ROOT" DB_PROFILE=local "$POSTGRES_CLI" query run -c
   "select current_database() as db, current_user as user, inet_server_addr() as host, inet_server_port() as port;"
 ```
 
+### Remote/prod preflight (recommended)
+
+If there is any chance you are not on a local dev DB, run both (and paste the output)
+before doing anything else:
+
+```bash
+DB_PROJECT_ROOT="$DB_PROJECT_ROOT" DB_PROFILE=your_profile "$POSTGRES_CLI" --json profile resolve
+DB_PROJECT_ROOT="$DB_PROJECT_ROOT" DB_PROFILE=your_profile "$POSTGRES_CLI" query run -c \
+  "select current_database() as db, current_user as user, inet_server_addr() as host, inet_server_port() as port;"
+```
+
 ## Quick lookup query template (safe)
 
 Prefer a heredoc so the SQL is visible and auditable:

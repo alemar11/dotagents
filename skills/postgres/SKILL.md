@@ -76,6 +76,12 @@ Use `references/common-workflows.md` for copy/paste playbooks:
 
 ## Guardrails (short)
 
+- Before you run any non-trivial query, confirm the target:
+  - `DB_PROJECT_ROOT="$DB_PROJECT_ROOT" DB_PROFILE=local "$POSTGRES_CLI" --json profile resolve`
+  - then run the identity query from `references/common-workflows.md` (“Which DB am I connected to?”).
+- If the user says “production”, “prod”, “staging”, or “remote DB”:
+  - stop and ask for the exact `DB_PROFILE` / `DB_URL` they intend
+  - default to `access=read` and require an explicit confirmation before any write/DDL
 - Always ask for approval before DDL changes.
 - Keep schema changes in a pending migration file; do not edit released files.
 - Use `references/postgres_guardrails.md` as the canonical migration workflow.
