@@ -1,6 +1,6 @@
 interface:
   display_name: "GitHub Reviews"
-  short_description: "Prefer `gh` for straightforward review submission and comments, and resolve the installed `ghflow` artifact for review-thread triage and reply routing."
+  short_description: "Use when handling PR reviews, review threads, replies, or review submission; resolve `ghflow` only for thread routing."
   brand_color: "#DC2626"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"

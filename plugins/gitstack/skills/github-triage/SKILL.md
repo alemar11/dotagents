@@ -1,6 +1,6 @@
 ---
 name: github-triage
-description: Handle focused GitHub triage inside `gitstack`. Prefer plain `gh` for repository, issue, and PR work, and use shared `ghflow` helpers only for authenticated-user stars and star lists.
+description: Use when triaging repos, issues, or PRs.
 ---
 
 # GitHub Triage
@@ -10,12 +10,9 @@ description: Handle focused GitHub triage inside `gitstack`. Prefer plain `gh` f
 Use this bundled skill when the request is clearly about repo orientation,
 issues, PR metadata, authenticated-user stars, or star lists.
 
-Prefer direct `gh` commands for straightforward repo, issue, and PR work.
-Use the resolved GitStack `ghflow` artifact for the parts that are API-heavy,
-cross-session standardized, or shared with other bundled skills. Resolve it
-with `../github/references/core/ghflow-resolution.md`; do not assume bare
-`ghflow` is on `PATH`. Route mixed-domain or publish-lifecycle work back to the
-umbrella `github` skill.
+Prefer direct `gh` for straightforward repo, issue, and PR work. Use resolved
+`ghflow` only for authenticated-user stars and star lists. Route mixed-domain
+or publish-lifecycle work back to the umbrella `github` skill.
 
 ## Direct commands first
 
@@ -28,8 +25,9 @@ umbrella `github` skill.
 
 ## Use Resolved `ghflow` When
 
-- the workflow needs normalized JSON across repos or domains
 - the job is about authenticated-user stars or star lists
+
+Resolve `ghflow` with `../github/references/core/ghflow-resolution.md` before helper use.
 
 ## Fast path
 

@@ -1,6 +1,6 @@
 ---
 name: yeet
-description: Orchestrate the full publish flow from a local checkout by using `git` for branch and push work, bundled `git-commit` for commit discipline, and bundled `github` plus shared `ghflow` publish helpers only where repo-aware PR orchestration is justified.
+description: Use when publishing local work to a draft PR.
 ---
 
 # Yeet
@@ -36,8 +36,7 @@ Inside `gitstack`, this skill is intentionally composed:
 - `git-commit` owns selective staging, commit authoring, and post-commit
   verification.
 - `github` owns already-pushed-branch PR lifecycle work.
-- `ghflow` is the shared installed helper artifact for publish-context and
-  publish-open operations that multiple GitStack skills reuse.
+- resolved `ghflow` provides publish-context and publish-open helpers.
 
 Keep v1 intentionally narrow:
 

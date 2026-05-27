@@ -1,6 +1,6 @@
 ---
 name: github-ci
-description: Handle focused GitHub CI work inside `gitstack`. Use plain `gh` for routine PR checks and Actions listing, and use the resolved `ghflow` artifact's `ci inspect` helper for reusable failing-PR triage.
+description: Use when inspecting GitHub Actions.
 ---
 
 # GitHub CI
@@ -10,11 +10,9 @@ description: Handle focused GitHub CI work inside `gitstack`. Use plain `gh` for
 Use this bundled skill when the request is about failing checks, GitHub Actions
 runs, or log-oriented CI triage.
 
-Use plain `gh` commands for routine check reads and run inspection. Use
-the resolved GitStack `ghflow` artifact when the job is specifically to gather
-failing GitHub Actions evidence from a pull request. Resolve it with
-`../github/references/core/ghflow-resolution.md`; do not assume bare `ghflow`
-is on `PATH`. Keep review-thread work in `github-reviews` and publish lifecycle
+Use direct `gh` for routine check reads and run inspection. Use resolved
+`ghflow ci inspect` only when failing-PR triage needs reusable evidence
+extraction. Keep review-thread work in `github-reviews` and publish lifecycle
 work in the umbrella `github`.
 
 ## Direct commands first
@@ -36,6 +34,7 @@ work in the umbrella `github`.
 - Use for PR checks and generic Actions investigation.
 - Distinguish PR-associated failures from generic branch, SHA, workflow, or
   explicit run-id investigations.
+- Resolve `ghflow` with `../github/references/core/ghflow-resolution.md` before helper use.
 - Use `<resolved-ghflow> ci inspect` for repeated failing-PR triage that should
   fetch run metadata, fall back to job logs, and extract a concise failure
   snippet.

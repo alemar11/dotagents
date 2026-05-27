@@ -9,3 +9,10 @@ bundled `github` skill.
 - `gh release list --repo <owner/repo> --exclude-drafts --exclude-pre-releases --limit 1`
 - `gh api repos/<owner>/<repo>/releases/generate-notes -X POST -f tag_name=<tag> -f target_commitish=<branch-or-sha>`
 - `gh release create <tag> --repo <owner/repo> --target <branch-or-sha> --generate-notes`
+
+## Package availability checks
+
+- `gh run list --repo <owner/repo> --workflow Release --limit 5`
+- `python3 -m pip index versions <package> --no-cache-dir`
+- `brew info <owner>/tap/<formula>`
+- `gh run list --repo <owner>/homebrew-tap --limit 5`

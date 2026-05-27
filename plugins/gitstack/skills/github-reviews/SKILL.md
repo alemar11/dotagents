@@ -1,6 +1,6 @@
 ---
 name: github-reviews
-description: Handle focused PR review work inside `gitstack`. Prefer plain `gh` for straightforward review submission and comments, and use shared `ghflow` helpers for review-thread triage, reply routing, and higher-level comment handling.
+description: Use when handling PR review threads.
 ---
 
 # GitHub Reviews
@@ -10,12 +10,10 @@ description: Handle focused PR review work inside `gitstack`. Prefer plain `gh` 
 Use this bundled skill when the request is clearly about review comments,
 review threads, replies, or submitting a review.
 
-Prefer direct `gh` commands for simple review submission or top-level PR
-comments. Use the resolved GitStack `ghflow` artifact when the job needs thread
-selection, reply routing, or shared higher-level behavior. Resolve it with
-`../github/references/core/ghflow-resolution.md`; do not assume bare `ghflow`
-is on `PATH`. Keep reactions and mixed-domain GitHub work in the umbrella
-`github` skill.
+Prefer direct `gh` for simple review submission or top-level PR comments. Use
+resolved `ghflow` when the job needs thread selection, reply routing, or shared
+higher-level behavior. Keep reactions and mixed-domain GitHub work in the
+umbrella `github` skill.
 
 ## Direct commands first
 
@@ -30,6 +28,8 @@ is on `PATH`. Keep reactions and mixed-domain GitHub work in the umbrella
 - the task needs reply routing to selected comments or thread rows
 - the task benefits from shared fallback handling across review comment
   transports
+
+Resolve `ghflow` with `../github/references/core/ghflow-resolution.md` before helper use.
 
 ## Fast path
 

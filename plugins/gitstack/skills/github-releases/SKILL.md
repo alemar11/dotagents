@@ -1,6 +1,6 @@
 ---
 name: github-releases
-description: Handle focused GitHub release work inside `gitstack`. Use plain `git` and `gh` for release-backed tags, notes, and publication; this skill is guidance-first and does not rely on a dedicated `ghflow` release surface.
+description: Use when checking GitHub or package releases.
 ---
 
 # GitHub Releases
@@ -10,10 +10,10 @@ description: Handle focused GitHub release work inside `gitstack`. Use plain `gi
 Use this bundled skill when the request is about release-backed tags, notes
 generation, release planning, or release publication.
 
-Use plain `git` and `gh` for tag-only and release-backed flows. This skill now
-acts as routing and workflow guidance rather than a separate `ghflow` command
-surface. Keep tag-only or local publish orchestration decisions aligned with
-the umbrella `github` skill and `yeet`.
+Use plain `git` and `gh` for tag-only and GitHub Release flows. GitHub
+Releases are not the same as package-registry availability; when users ask
+whether a release exists on PyPI, npm, Homebrew, or another distributor, verify
+that registry separately.
 
 ## Direct commands first
 
@@ -32,6 +32,8 @@ the umbrella `github` skill and `yeet`.
 ## Trigger rules
 
 - Use for release planning, notes generation, and release publication.
+- Use for package-release verification when the user asks whether a release is
+  available from a package registry or Homebrew tap.
 - Resolve target refs explicitly; do not guess `main`.
 - Keep generic GitHub routing in the umbrella `github`.
 

@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub Releases"
-  short_description: "Use plain `git` and `gh` for release-backed tags, notes generation, and publication; this skill is guidance-first and does not rely on a dedicated `ghflow` release surface."
+  short_description: "Use when planning GitHub Releases or checking package-registry availability for tags, PyPI, Homebrew, npm, or similar releases."
   brand_color: "#B45309"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub Releases skill to prefer direct `git` and `gh` commands for release-backed tag planning, notes generation, and publication without guessing target refs."
+  default_prompt: "Use the bundled GitHub Releases skill to prefer direct `git` and `gh` commands for release-backed tag planning, notes generation, and publication, and separately verify package-registry availability when users ask about PyPI, Homebrew, npm, or similar distribution."

@@ -1,6 +1,6 @@
 ---
 name: github
-description: Handle repo-scoped GitHub work plus authenticated-user star and star-list workflows inside the `gitstack` plugin. Prefer plain `gh` for straightforward reads and writes, and use the shared `ghflow` helpers when workflows need extra orchestration, shared JSON contracts, API-heavy behavior, or focused failing-PR CI triage.
+description: Use when GitHub work is mixed.
 ---
 
 # GitHub
@@ -10,16 +10,9 @@ description: Handle repo-scoped GitHub work plus authenticated-user star and sta
 Use this as the umbrella GitHub skill inside the `gitstack` plugin.
 
 Use `github` as the default GitHub surface when the request is mixed,
-ambiguous, or already-pushed-branch lifecycle work.
-
-Default command preference:
-
-- plain `gh` for straightforward repo, issue, PR, and release operations
-- plain `git` for local checkout state and branch operations
-- shared `ghflow` helpers, run through the resolved installed artifact, only
-  when the job needs extra orchestration, shared JSON contracts,
-  authenticated-user star or list GraphQL behavior, or the repo-aware publish
-  helpers or focused CI inspector that multiple bundled skills reuse
+ambiguous, or already-pushed-branch lifecycle work. Prefer direct `git` and
+`gh`; use resolved `ghflow` only for shared helpers that add behavior beyond a
+short direct command sequence.
 
 `gitstack` bundles one shared helper runtime:
 
@@ -45,8 +38,8 @@ lifecycle work on already-pushed branches, or any time the user just says
 - Use `github-triage`, `github-reviews`, `github-ci`, or `github-releases`
   only when the request is clearly confined to that domain.
 - Use plain `git` and `gh` when one command or a short direct sequence expresses
-  the job clearly. Use the resolved `ghflow` artifact when the workflow needs
-  normalized JSON, cross-session reuse, review-thread routing,
+  the job clearly.
+- Use resolved `ghflow` for normalized JSON, review-thread routing,
   authenticated-user stars or star lists, focused failing-PR CI inspection, or
   current-branch publish helpers.
 
@@ -61,10 +54,7 @@ lifecycle work on already-pushed branches, or any time the user just says
   - `gh auth status`
 - If either is missing, use `references/core/installation.md`.
 - `ghflow` is an embedded plugin artifact, not a host dependency. Resolve it
-  with `references/core/ghflow-resolution.md` before use, then run the resolved
-  installed artifact path directly.
-- Treat bare `ghflow` as display shorthand only after an explicit wrapper,
-  alias, or `PATH` contract has already been verified for the current shell.
+  with `references/core/ghflow-resolution.md` before use.
 - The maintained shared implementation lives under
   `<plugin-root>/projects/ghflow/src/ghflow/`.
 - Specialist bundled skills are routing layers only; they do not own separate
@@ -85,6 +75,10 @@ Do not open every GitStack bundled skill during normal GitHub work. Pick the
 smallest owning surface from this table, then use the resolved `ghflow`
 artifact only when the helper adds behavior that plain `git` or `gh` would
 otherwise need repeated shell glue to reproduce.
+
+## Measurement
+
+For plugin improvement and audit work, use `../../references/measurement.md`.
 
 ## Trigger rules
 

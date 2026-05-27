@@ -1,6 +1,6 @@
 interface:
   display_name: "Yeet"
-  short_description: "Orchestrate full publish from a local checkout by using `git`, `git-commit`, and the resolved `ghflow` artifact only where repo-aware PR orchestration is justified."
+  short_description: "Use when local work should become a pushed branch and draft PR through `git`, bundled `git-commit`, and resolved `ghflow` publish helpers."
   brand_color: "#F97316"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"

@@ -1,6 +1,6 @@
 interface:
   display_name: "GitHub CI"
-  short_description: "Use plain `gh` for routine checks, and use the resolved `ghflow` artifact for reusable failing-PR triage."
+  short_description: "Use when investigating GitHub Actions runs, PR checks, or CI logs; use resolved `ghflow` only for failing-PR triage."
   brand_color: "#4338CA"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
