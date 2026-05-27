@@ -1,81 +1,121 @@
-# Skills
+# dotagents
 
-This directory contains reusable skills, repo-local plugins, project maintainer skills, and Codex MCP install helpers.
+Reusable Codex skills, repo-local plugins, project maintainer skills, and MCP install helpers.
 
-## MCPs
-- `mcps/` — Install global Codex MCP server entries that are not bundled with Codex itself, such as XcodeBuildMCP, Discourse, and optional local-tool integrations.
+This repository is organized around two installable surfaces:
 
-## Plugins
-- `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, git/gh-first GitHub workflows, release/package verification, and Yeet, with shared `ghflow` helpers reserved for review-thread routing, authenticated-user stars and star lists, and current-branch publish flows.
-  Bundled skills: `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
-- `plugins/tanstack/` — Bundled TanStack React + CLI install surface organized around macro-area umbrellas for Query, Router, Start, CLI workflows, and cross-stack integration guidance; start from the umbrella skills and open focused sub-skills only for narrow concerns.
-  Bundled skill families: umbrellas `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-cli`, `tanstack-integration`; Router family `tanstack-router-core`, `tanstack-router-search-params`, `tanstack-router-path-params`, `tanstack-router-navigation`, `tanstack-router-data-loading`, `tanstack-router-auth-and-guards`, `tanstack-router-code-splitting`, `tanstack-router-not-found-and-errors`, `tanstack-router-type-safety`, `tanstack-router-ssr`, `tanstack-router-plugin`; Start family `tanstack-react-start`, `tanstack-react-start-server-components`, `tanstack-start-migrate-from-nextjs`, `tanstack-start-core`, `tanstack-start-execution-model`, `tanstack-start-middlewares`, `tanstack-start-server-functions`, `tanstack-start-server-routes`, `tanstack-start-deployments`, `tanstack-start-server-core`; CLI family `tanstack-cli-create-app-scaffold`, `tanstack-cli-add-addons-existing-app`, `tanstack-cli-choose-ecosystem-integrations`, `tanstack-cli-maintain-custom-addons-dev-watch`, `tanstack-cli-query-docs-library-metadata`.
+- **Reusable skills** under `skills/`, which can be linked locally or installed into Codex.
+- **Repo-local plugins** under `plugins/`, which bundle related skills and shared runtime artifacts.
 
-## Skills
-- `skills/code-wiki/` — Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki from that analysis.
-- `skills/skill-cli-creator/` — Build host-aware embedded CLIs that live inside a skill or plugin, run from an owner-root-relative shipped artifact under `scripts/`, and can grow into a maintenance-only project at `projects/<tool>/`.
-- `skills/codex-changelog/` — Check the installed Codex CLI and Codex App versions, then print CLI notes from `openai/codex/releases` and app notes from the OpenAI Codex changelog page.
-- `skills/xcode-changelog/` — Resolve active Xcode notes, include latest notes when behind, look up a requested version, or list Apple Xcode release notes.
-- `skills/plan-harder/` — Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a saved `plans/<topic>-plan.md` output.
-- `skills/grill-me/` — Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action.
-- `skills/learn/` — Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md` when the user sets lasting guidance.
-- `skills/postgres/` — Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns.
-- `skills/skill-audit/` — Audit installed Codex skills, plugin packages, and bundled plugin skills using repo evidence, memory, sessions, the `scripts/session-evidence` helper, and current context to plan updates, additions, merges, or disables.
-- `skills/swift-api-design/` — Design or review Swift APIs using curated local summaries and a bundled upstream copy of the official Swift API Design Guidelines.
-- `skills/swift-docc/` — Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
+Project-only maintainer workflows live under `.agents/skills/`, and global MCP setup helpers live under `mcps/`.
+
+## Repository Layout
+
+| Path | Purpose |
+| --- | --- |
+| `skills/` | Reusable skills, each with a `SKILL.md` entrypoint and `agents/openai.yaml` metadata. |
+| `plugins/` | Repo-local Codex plugins, each with `.codex-plugin/plugin.json` and optional bundled skills. |
+| `.agents/skills/` | Project-local maintainer skills for working on this repository. |
+| `.agents/plugins/marketplace.json` | Local plugin discovery surface for this checkout. |
+| `mcps/` | Helpers for installing global Codex MCP server entries not bundled with Codex itself. |
+| `skills-link.sh` | Local development helper that links reusable skills into `~/.agents/skills`. |
+
+## Repo-Local Plugins
+
+Install repo-local plugins from this checkout through `.agents/plugins/marketplace.json`.
+
+| Plugin | Path | Purpose |
+| --- | --- | --- |
+| GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, focused CI/review helpers, release checks, and publish orchestration. |
+| TanStack | `plugins/tanstack/` | Bundles TanStack Query, Router, Start, CLI, and cross-stack integration guidance through umbrella skills and focused sub-skills. |
+
+### GitStack Skills
+
+`git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
+
+`plugins/gitstack/` expects both `git` and GitHub CLI `gh` on `PATH` before GitHub-backed commands run:
+
+```sh
+command -v git && git --version
+command -v gh && gh --version
+```
+
+Use `plugins/gitstack/skills/github/references/core/installation.md` for cross-platform install guidance.
+
+### TanStack Skill Families
+
+- Umbrellas: `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-cli`, `tanstack-integration`.
+- Router: `tanstack-router-core`, `tanstack-router-search-params`, `tanstack-router-path-params`, `tanstack-router-navigation`, `tanstack-router-data-loading`, `tanstack-router-auth-and-guards`, `tanstack-router-code-splitting`, `tanstack-router-not-found-and-errors`, `tanstack-router-type-safety`, `tanstack-router-ssr`, `tanstack-router-plugin`.
+- Start: `tanstack-react-start`, `tanstack-react-start-server-components`, `tanstack-start-migrate-from-nextjs`, `tanstack-start-core`, `tanstack-start-execution-model`, `tanstack-start-middlewares`, `tanstack-start-server-functions`, `tanstack-start-server-routes`, `tanstack-start-deployments`, `tanstack-start-server-core`.
+- CLI: `tanstack-cli-create-app-scaffold`, `tanstack-cli-add-addons-existing-app`, `tanstack-cli-choose-ecosystem-integrations`, `tanstack-cli-maintain-custom-addons-dev-watch`, `tanstack-cli-query-docs-library-metadata`.
+
+For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills. For TanStack React application work, install the TanStack plugin instead of copying advice from mixed community sources.
+
+## Reusable Skills
+
+| Skill | Purpose |
+| --- | --- |
+| `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
+| `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
+| `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
+| `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
+| `plan-harder` | Create a higher-rigor implementation plan with focused clarification, a gotcha pass, and a saved `plans/<topic>-plan.md`. |
+| `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
+| `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
+| `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
+| `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
+| `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
+| `swift-docc` | Write, structure, review, and publish Swift-DocC documentation using curated summaries and a bundled upstream DocC source tree. |
 
 ## Skill Dependencies
+
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 
-## Project Skills
-- `.agents/skills/Maintainer/` — Maintain and improve one or more skills or plugins in this repository with shared upgrade workflows and skill-specific refresh tasks.
-Project skills are repository-local and are not included in the reusable install examples below.
+## Project-Local Skills
 
-## Codex
+| Skill | Path | Purpose |
+| --- | --- | --- |
+| Maintainer | `.agents/skills/Maintainer/` | Maintain and improve one or more skills or plugins in this repository with shared upgrade workflows and skill-specific refresh tasks. |
 
-### Preferred Plugin Install
-The preferred full-stack surface for linked git + GitHub workflows is the
-repo-local `plugins/gitstack/` plugin, registered through
-`.agents/plugins/marketplace.json`.
+Project-local skills are repository-specific and are not included in reusable install commands.
 
-`plugins/gitstack/` expects both `git` and GitHub CLI `gh` to be installed on
-the host before GitHub-backed commands run. Use
-`plugins/gitstack/skills/github/references/core/installation.md` for the
-cross-platform install paths and:
+## Installation
 
-- `command -v git && git --version`
-- `command -v gh && gh --version`
+### Use Repo-Local Plugins
 
-to confirm both binaries are on `PATH`.
+Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
-For TanStack React application and TanStack CLI work, install the repo-local
-`plugins/tanstack/` plugin to get bundled Query, Router, Start, CLI, and
-integration skills from one surface instead of copying advice piecemeal from
-mixed community sources.
+- Use GitStack for linked git + GitHub workflows.
+- Use TanStack for TanStack Query, Router, Start, CLI, and integration work.
 
-Run `./skills-link.sh` only to link the reusable skills from this repo into
-`~/.agents/skills`. Repo-local plugins are exposed from this checkout through
-`.agents/plugins/marketplace.json`; `skills-link.sh` does not install or mirror
-plugin entries into your personal plugin marketplace.
+### Link Reusable Skills For Local Development
 
-### Install Reusable Skills With skill-installer (Codex-only)
-These prompts are for use inside Codex only.
-Copy/paste one of these prompts:
+Run this from the repository root to link `skills/` into `~/.agents/skills`:
 
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/skill-cli-creator`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-changelog`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/xcode-changelog`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/plan-harder`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/grill-me`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/learn`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/postgres`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/skill-audit`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/swift-api-design`
-- `Use $skill-installer to install skills from alemar11/dotagents --path skills/swift-docc`
+```sh
+./skills-link.sh
+```
 
-### Install With `npx skills` (Vercel Skills CLI)
+This helper only links reusable skills. It does not install, mirror, or rewrite plugin marketplace entries.
+
+### Install Reusable Skills With `skill-installer` (Codex-only)
+
+Inside Codex, install all reusable skills with:
+
+```text
+Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+```
+
+Install one reusable skill by passing only its path:
+
+```text
+Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki
+```
+
+Replace `skills/code-wiki` with any path listed in the reusable skills table.
+
+### Install Reusable Skills With `npx skills`
+
 These commands use the [`vercel-labs/skills`](https://github.com/vercel-labs/skills) CLI and target Codex directly.
 
 List the skills available in this repository:
@@ -101,40 +141,12 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill swift-docc
 ```
 
-Install an individual skill globally for Codex:
+Install one reusable skill globally for Codex:
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y --skill code-wiki
 ```
 
-```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill skill-cli-creator
-```
+Replace `code-wiki` with any skill name from the reusable skills table. Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
 
-```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill xcode-changelog
-```
-
-```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill swift-api-design
-```
-
-```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill swift-docc
-```
-
-```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill plan-harder
-```
-
-```sh
-npx skills add alemar11/dotagents -a codex -g -y --skill grill-me
-```
-
-Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
-For linked git + GitHub workflows, install the bundled `plugins/gitstack/`
-surface instead of looking for separate standalone `git-commit`, `github`, or
-`yeet` skills in this repo.
-The repository-local `Maintainer` skill is intentionally excluded from these commands.
-
-Restart Codex to pick up new skills.
+Restart Codex after installing or updating skills.
