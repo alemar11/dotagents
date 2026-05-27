@@ -5,6 +5,17 @@ description: Create a well-formed git commit from current changes using session 
 
 # Git Commit
 
+## TL;DR
+
+- If the user mentions PRs (“open PR”, “draft PR”, “publish branch”), use `yeet`.
+- If the user says “commit” (or “commit and push”), stay in `git-commit` and just do:
+  - `git status`
+  - `git diff` (and/or `git diff --staged`)
+  - `git add -- <paths...>` (explicit pathspec)
+  - `git commit`
+  - optional push-only: `git push -u origin HEAD`
+- If “commit and push” is ambiguous, ask: “PR or push-only?” Default to **push-only** unless PR intent is explicit.
+
 ## When to use this
 
 Use `git-commit` when the work is commit-centric:
