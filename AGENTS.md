@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Overview
-This repository hosts reusable Codex skills, repo-local plugins, and project maintainer skills. Reusable skills live under `skills/`, repo-local plugins live under `plugins/`, and project maintainer skills live under `.agents/skills/`. Every reusable or bundled skill is documented by a `SKILL.md` entrypoint, and every plugin must ship `.codex-plugin/plugin.json`. Keep guidance lightweight and focused on building and evolving skills and plugins.
+This repository hosts reusable Codex skills, repo-local plugins, project maintainer skills, and MCP install helpers. Reusable skills live under `skills/`, repo-local plugins live under `plugins/`, project maintainer skills live under `.agents/skills/`, and global MCP install helpers live under `mcps/`. Every reusable or bundled skill is documented by a `SKILL.md` entrypoint, and every plugin must ship `.codex-plugin/plugin.json`. Keep guidance lightweight and focused on building and evolving skills and plugins.
 Agent skills follow the specification at `https://agentskills.io/specification`.
 Codex skills reference: `https://developers.openai.com/codex/skills/`.
 

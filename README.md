@@ -1,6 +1,9 @@
 # Skills
 
-This directory contains reusable skills, repo-local plugins, and project maintainer skills—task-specific packages of instructions, resources, and optional scripts that help agents follow workflows reliably.
+This directory contains reusable skills, repo-local plugins, project maintainer skills, and Codex MCP install helpers.
+
+## MCPs
+- `mcps/` — Install global Codex MCP server entries that are not bundled with Codex itself, such as XcodeBuildMCP, Discourse, and optional local-tool integrations.
 
 ## Plugins
 - `plugins/gitstack/` — Preferred bundled install surface for linked git authoring, git/gh-first GitHub workflows, and Yeet, with shared `ghflow` helpers reserved for review-thread routing, authenticated-user stars and star lists, and current-branch publish flows.
