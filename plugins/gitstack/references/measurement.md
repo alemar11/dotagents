@@ -15,8 +15,12 @@ report with session evidence from representative workflows.
 ## Evidence Commands
 
 ```bash
-node /Users/alessandro/.codex/plugins/cache/openai-curated/plugin-eval/603a6e80/scripts/plugin-eval.js analyze /Users/alessandro/Developer/dotagents/plugins/gitstack --format markdown
-/Users/alessandro/Developer/dotagents/skills/skill-audit/scripts/session-evidence --target gitstack --target github-ci --target github-releases --target yeet --root /Users/alessandro/.codex/sessions --since 2026-05-27 --include-zero
+DOTAGENTS_ROOT=/path/to/dotagents
+CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+PLUGIN_EVAL=/path/to/plugin-eval/scripts/plugin-eval.js
+
+node "$PLUGIN_EVAL" analyze "$DOTAGENTS_ROOT/plugins/gitstack" --format markdown
+"$DOTAGENTS_ROOT/skills/skill-audit/scripts/session-evidence" --target gitstack --target github-ci --target github-releases --target yeet --root "$CODEX_HOME/sessions" --since 2026-05-27 --include-zero
 ```
 
 ## Success Signals
