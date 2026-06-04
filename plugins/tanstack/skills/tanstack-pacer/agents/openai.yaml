@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Pacer"
+  short_description: "Review TanStack Pacer debouncing, throttling, rate limiting, queuing, batching, and async control."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#EA580C"
+  default_prompt: "Use the bundled TanStack Pacer skill to review or implement debouncing, throttling, rate limiting, queuing, batching, async control, and lifecycle-safe timing behavior."

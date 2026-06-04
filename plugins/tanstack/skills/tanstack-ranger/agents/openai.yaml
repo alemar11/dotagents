@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Ranger"
+  short_description: "Review TanStack Ranger headless range sliders, multi-range controls, interpolation, drag behavior, and accessibility."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#65A30D"
+  default_prompt: "Use the bundled TanStack Ranger skill to review or implement headless range sliders, custom steps, interpolation, drag behavior, and accessible UI wiring."

@@ -24,6 +24,11 @@ specific concern, such as Router search params or Start server functions. Do
 not open every focused skill in a normal audit or implementation pass; use the
 umbrella reference map first, then jump to a focused skill when it can reduce
 prompt weight or sharpen exact guidance.
+For standalone product work outside Query, Router, Start, or CLI, route to the
+matching product skill such as `tanstack-form`, `tanstack-table`,
+`tanstack-virtual`, `tanstack-store`, `tanstack-db`, `tanstack-ai`,
+`tanstack-pacer`, `tanstack-devtools`, `tanstack-config`, or
+`tanstack-ranger`.
 
 ## What to Optimize For
 

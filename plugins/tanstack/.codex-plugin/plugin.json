@@ -1,7 +1,7 @@
 {
   "name": "tanstack",
-  "version": "0.3.2",
-  "description": "Bundle TanStack React Query, Router, Start, CLI, and cross-stack integration guidance in one repo-local plugin with macro-area umbrellas and focused sub-skills.",
+  "version": "0.4.0",
+  "description": "Bundle full-portfolio TanStack guidance for AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, and cross-stack integration.",
   "author": {
     "name": "alemar11",
     "email": "",
@@ -12,17 +12,27 @@
   "license": "MIT",
   "keywords": [
     "tanstack",
+    "ai",
     "cli",
+    "config",
+    "db",
+    "devtools",
+    "form",
+    "pacer",
     "query",
+    "ranger",
     "router",
     "start",
+    "store",
+    "table",
+    "virtual",
     "skills"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "TanStack",
-    "shortDescription": "Bundle TanStack Query, Router, Start, CLI, and integration guidance in one plugin.",
-    "longDescription": "TanStack bundles macro-area umbrella skills plus focused React and CLI sub-skills for Query, Router, Start, and the integration patterns that connect them, with references-based routing for broader workflow entrypoints.",
+    "shortDescription": "Bundle full-portfolio TanStack product and integration guidance in one plugin.",
+    "longDescription": "TanStack bundles product-level skills for AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, and Virtual, plus cross-stack integration guidance and focused Router, Start, and CLI sub-skills for direct triggering.",
     "developerName": "alemar11",
     "category": "Development",
     "capabilities": [
@@ -33,9 +43,9 @@
     "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
-      "Review this TanStack React Query code for cache key, invalidation, and queryOptions issues.",
-      "Help me refactor this TanStack React Router tree for typed search params, loaders, and lazy routes or route plugin wiring.",
-      "Wire TanStack React Start, Router, and Query together with server functions and SSR-safe data loading, or scaffold a TanStack app with the CLI."
+      "Review this TanStack app for the right Query, Router, Start, Form, Table, Store, DB, Virtual, or integration ownership.",
+      "Help me refactor this TanStack React Router, Query, Start, or Form code using current official TanStack docs and the bundled focused skills.",
+      "Use the full TanStack plugin portfolio to design or review AI, CLI, Config, DB, Devtools, Pacer, Ranger, Store, Table, Virtual, and cross-stack patterns."
     ],
     "brandColor": "#0F172A",
     "composerIcon": "./assets/tanstack-small.svg",

@@ -14,9 +14,12 @@ the local `plugins/tanstack/` plugin.
 
 ## Current Local Layout
 
-- Treat `plugins/tanstack/` as a macro-area plugin surface.
-- `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-cli`, and
-  `tanstack-integration` are the stable bundled entrypoints.
+- Treat `plugins/tanstack/` as one broad Codex plugin surface for the TanStack
+  portfolio.
+- Product-level bundled skills are stable direct-trigger entrypoints for AI,
+  CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store,
+  Table, and Virtual.
+- `tanstack-integration` owns cross-stack composition guidance.
 - `tanstack-router`, `tanstack-start`, and `tanstack-cli` own dense workflow
   routing through local `references/*.md` files.
 - Focused bundled skills remain valid direct-trigger surfaces; do not replace

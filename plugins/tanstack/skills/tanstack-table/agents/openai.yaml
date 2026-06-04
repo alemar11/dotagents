@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack Table"
+  short_description: "Review TanStack Table columns, row models, sorting, filtering, pagination, selection, and virtualization integration."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0D9488"
+  default_prompt: "Use the bundled TanStack Table skill to review or implement headless table columns, row models, feature state, server/client ownership, and virtualization integration."

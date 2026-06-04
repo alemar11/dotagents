@@ -27,7 +27,7 @@ Install repo-local plugins from this checkout through `.agents/plugins/marketpla
 | Plugin | Path | Purpose |
 | --- | --- | --- |
 | GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, focused CI/review helpers, release checks, and publish orchestration. |
-| TanStack | `plugins/tanstack/` | Bundles TanStack Query, Router, Start, CLI, and cross-stack integration guidance through umbrella skills and focused sub-skills. |
+| TanStack | `plugins/tanstack/` | Bundles full-portfolio TanStack product guidance plus focused Router, Start, CLI, and integration sub-skills. |
 
 ### GitStack Skills
 
@@ -44,12 +44,13 @@ Use `plugins/gitstack/skills/github/references/core/installation.md` for cross-p
 
 ### TanStack Skill Families
 
-- Umbrellas: `tanstack-query`, `tanstack-router`, `tanstack-start`, `tanstack-cli`, `tanstack-integration`.
+- Product skills: `tanstack-ai`, `tanstack-cli`, `tanstack-config`, `tanstack-db`, `tanstack-devtools`, `tanstack-form`, `tanstack-pacer`, `tanstack-query`, `tanstack-ranger`, `tanstack-router`, `tanstack-start`, `tanstack-store`, `tanstack-table`, `tanstack-virtual`.
+- Cross-stack: `tanstack-integration`.
 - Router: `tanstack-router-core`, `tanstack-router-search-params`, `tanstack-router-path-params`, `tanstack-router-navigation`, `tanstack-router-data-loading`, `tanstack-router-auth-and-guards`, `tanstack-router-code-splitting`, `tanstack-router-not-found-and-errors`, `tanstack-router-type-safety`, `tanstack-router-ssr`, `tanstack-router-plugin`.
 - Start: `tanstack-react-start`, `tanstack-react-start-server-components`, `tanstack-start-migrate-from-nextjs`, `tanstack-start-core`, `tanstack-start-execution-model`, `tanstack-start-middlewares`, `tanstack-start-server-functions`, `tanstack-start-server-routes`, `tanstack-start-deployments`, `tanstack-start-server-core`.
 - CLI: `tanstack-cli-create-app-scaffold`, `tanstack-cli-add-addons-existing-app`, `tanstack-cli-choose-ecosystem-integrations`, `tanstack-cli-maintain-custom-addons-dev-watch`, `tanstack-cli-query-docs-library-metadata`.
 
-For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills. For TanStack React application work, install the TanStack plugin instead of copying advice from mixed community sources.
+This repository ships one broad Codex `tanstack` plugin rather than separate upstream-style product plugins such as `tanstack-form` or bundle aliases such as `tanstack-all`. For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills. For TanStack application work, install the TanStack plugin instead of copying advice from mixed community sources.
 
 ## Reusable Skills
 
@@ -86,7 +87,7 @@ Project-local skills are repository-specific and are not included in reusable in
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
 - Use GitStack for linked git + GitHub workflows.
-- Use TanStack for TanStack Query, Router, Start, CLI, and integration work.
+- Use TanStack for TanStack AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, and integration work.
 
 ### Link Reusable Skills For Local Development
 

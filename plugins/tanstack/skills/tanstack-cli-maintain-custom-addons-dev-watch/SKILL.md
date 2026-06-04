@@ -17,7 +17,7 @@ Use this skill when the task is specifically about authoring or iterating custom
 
 - Installing existing add-ons: use `tanstack-cli-add-addons-existing-app`.
 - App scaffolding for end users: use `tanstack-cli-create-app-scaffold`.
-- General plugin or skill maintenance in this repo: use the repo maintainer workflow, not this runtime skill.
+- General plugin or skill packaging unrelated to TanStack CLI add-on authoring.
 
 ## Workflow
 

@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack DB"
+  short_description: "Review TanStack DB collections, live queries, sync adapters, and optimistic mutations."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#134E4A"
+  default_prompt: "Use the bundled TanStack DB skill to review or implement collections, live queries, sync-backed data loading, and optimistic mutations with current TanStack DB docs."

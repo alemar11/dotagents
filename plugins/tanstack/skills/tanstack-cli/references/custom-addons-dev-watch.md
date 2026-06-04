@@ -9,4 +9,4 @@ Owns:
 
 Escalate to:
 - `tanstack-cli-maintain-custom-addons-dev-watch` for direct leaf-skill handling
-- repo maintainer workflows only when the task is about this repository’s own plugin maintenance rather than runtime CLI usage
+- repository documentation outside this runtime guide when the task is about this repository's own plugin packaging rather than TanStack CLI usage
