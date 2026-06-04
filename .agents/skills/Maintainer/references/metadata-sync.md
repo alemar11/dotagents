@@ -15,6 +15,10 @@ When fields drift, resolve in this order:
 2. `agents/openai.yaml` should stay semantically aligned for UI text (`display_name`, `short_description`, `default_prompt`).
 3. `README.md` one-liners should mirror the same user-facing purpose as metadata.
 
+Use `references/skill_openai_metadata.md` only for the expected UI field shape
+and metadata-editing checks. Do not use it as a replacement for `$skill-creator`
+when a brand-new skill scaffold is needed.
+
 ## What to Align
 - Skill identity and purpose (`name`, `description`, display labels)
 - Trigger intent in `SKILL.md` vs UI-facing `short_description`

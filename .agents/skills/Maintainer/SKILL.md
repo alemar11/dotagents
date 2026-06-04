@@ -86,6 +86,7 @@ Use this skill when users ask to:
 - `references/run-maintenance.md`: use for proactive repo maintenance across one or more existing skills or plugins.
 - `references/skill-upgrade.md`: use for scoped improvements to one or more existing skills or plugins.
 - `references/metadata-sync.md`: use for `SKILL.md`, `agents/openai.yaml`, and repo-doc alignment.
+- `references/skill_openai_metadata.md`: field-shape reference for maintaining `agents/openai.yaml` UI metadata.
 - `references/doc-consistency.md`: use for repository-wide structure and policy checks.
 - `references/codex-dependency-audit.md`: use for Codex-dependency classification, portability-boundary checks, and Codex-tool wording audits.
 - `references/swift-docc-refresh.md`: use for maintainer-only Swift-DocC bundled-reference refresh work.

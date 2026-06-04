@@ -11,7 +11,11 @@ Build for embedded host use only. Do not use this skill for standalone global CL
 
 ## Start
 
-This skill assumes the owning skill or plugin already exists. If the host does not exist yet, scaffold it first with [$skill-creator](/Users/alessandro/.codex/skills/.system/skill-creator/SKILL.md) or [$plugin-creator](/Users/alessandro/.codex/skills/.system/plugin-creator/SKILL.md), then return here once the host boundary is real.
+This skill assumes the owning skill or plugin already exists. If the host does
+not exist yet, scaffold it first with `$skill-creator` or `$plugin-creator`
+when those Codex helpers are available. Outside Codex, create the equivalent
+host directory, `SKILL.md` or plugin manifest, and metadata by hand, then return
+here once the host boundary is real.
 
 Name the host, the CLI source material, and the first real jobs it should do:
 

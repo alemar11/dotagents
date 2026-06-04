@@ -38,6 +38,8 @@ Only create the plan. Do not implement the work.
 - Prefer `request_user_input` when available.
 - Respect the runtime limit of 1-3 questions per `request_user_input` call;
   if more clarification is needed, ask only the highest-signal next batch.
+- If `request_user_input` is unavailable, ask the same focused questions in
+  plain chat with concise numbered options and a recommended default.
 - Prefer short numbered questions over paragraphs.
 - Offer multiple-choice options when practical.
 - Suggest reasonable defaults when appropriate.
