@@ -71,7 +71,7 @@ chrome-devtools performance_analyze_insight "1" "LCPBreakdown"
 
 ## Extensions and experimental tools
 
-Extension commands require the MCP server category flag:
+Extension commands require the daemon category flag:
 
 ```sh
 chrome-devtools list_extensions
@@ -79,6 +79,6 @@ chrome-devtools install_extension "/path/to/unpacked-extension"
 chrome-devtools trigger_extension_action "extension_id"
 ```
 
-If extension tools are missing, restart the underlying MCP server with
-`--categoryExtensions=true`. Some extension workflows cannot use `--autoConnect`
-on older Chrome versions.
+If extension tools are missing, restart the CLI daemon with
+`chrome-devtools start --categoryExtensions=true`. Some extension workflows
+cannot use `--autoConnect` on older Chrome versions.

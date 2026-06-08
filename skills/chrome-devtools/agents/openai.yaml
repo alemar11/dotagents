@@ -1,5 +1,5 @@
 interface:
   display_name: "Chrome DevTools"
-  short_description: "Debug and automate Chrome with DevTools MCP."
+  short_description: "Debug and automate Chrome with DevTools CLI/MCP."
   brand_color: "#256F8C"
-  default_prompt: "Use $chrome-devtools to inspect and debug a browser page with Chrome DevTools MCP."
+  default_prompt: "Use $chrome-devtools to inspect and debug a browser page with Chrome DevTools CLI or MCP tools."

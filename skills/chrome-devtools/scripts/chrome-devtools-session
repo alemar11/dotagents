@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run Chrome DevTools MCP actions through one long-lived MCP server session.
+"""Run Chrome DevTools actions through the Homebrew chrome-devtools CLI.
 
-The script talks to the Homebrew-installed chrome-devtools-mcp server over
-newline-delimited JSON-RPC on stdio. One server process is started per run, then
-all requested actions are executed through that same MCP/browser session.
+This skill-local runner keeps a stable executable surface for JSON step files,
+interactive batches, and session cleanup. Normal browser work delegates to the
+official chrome-devtools CLI. Authenticated current-Chrome work uses the MCP
+stdio server directly so Chrome can grant access to an existing browser window.
 """
 
 from __future__ import annotations
@@ -23,22 +24,144 @@ from pathlib import Path
 from typing import Any
 
 
-RUNNER_VERSION = "1.0.0"
-DEFAULT_MCP_COMMAND = (
-    shutil.which("chrome-devtools-mcp")
-    or next(
-        (
-            path
-            for path in (
-                "/opt/homebrew/bin/chrome-devtools-mcp",
-                "/usr/local/bin/chrome-devtools-mcp",
-            )
-            if Path(path).exists()
-        ),
-        "chrome-devtools-mcp",
-    )
-)
+RUNNER_VERSION = "1.1.0"
+
+
+def existing_executable(paths: list[Path]) -> str | None:
+    for path in paths:
+        if path.exists() and os.access(path, os.X_OK):
+            return str(path)
+    return None
+
+
+def brew_prefix(formula: str | None = None) -> Path | None:
+    brew = shutil.which("brew")
+    if not brew:
+        return None
+
+    command = [brew, "--prefix"]
+    if formula:
+        command.append(formula)
+
+    try:
+        completed = subprocess.run(
+            command,
+            text=True,
+            capture_output=True,
+            timeout=3,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    if completed.returncode != 0:
+        return None
+
+    prefix = completed.stdout.strip()
+    if not prefix:
+        return None
+    return Path(prefix)
+
+
+def cli_candidates_from_prefix(prefix: Path) -> list[Path]:
+    return [
+        prefix / "bin" / "chrome-devtools",
+        prefix / "opt" / "chrome-devtools-mcp" / "bin" / "chrome-devtools",
+    ]
+
+
+def mcp_candidates_from_prefix(prefix: Path) -> list[Path]:
+    return [
+        prefix / "bin" / "chrome-devtools-mcp",
+        prefix / "opt" / "chrome-devtools-mcp" / "bin" / "chrome-devtools-mcp",
+    ]
+
+
+def resolve_cli_command() -> str:
+    found = shutil.which("chrome-devtools")
+    if found:
+        return found
+
+    candidates: list[Path] = []
+    mcp_command = shutil.which("chrome-devtools-mcp")
+    if mcp_command:
+        candidates.append(Path(mcp_command).with_name("chrome-devtools"))
+
+    for value in (os.environ.get("HOMEBREW_PREFIX"), os.environ.get("BREW_PREFIX")):
+        if value:
+            candidates.extend(cli_candidates_from_prefix(Path(value)))
+
+    for prefix in (brew_prefix("chrome-devtools-mcp"), brew_prefix()):
+        if prefix:
+            candidates.extend(cli_candidates_from_prefix(prefix))
+
+    discovered = existing_executable(candidates)
+    if discovered:
+        return discovered
+
+    return "chrome-devtools"
+
+
+def resolve_mcp_command() -> str:
+    found = shutil.which("chrome-devtools-mcp")
+    if found:
+        return found
+
+    candidates: list[Path] = []
+    cli_command = shutil.which("chrome-devtools")
+    if cli_command:
+        candidates.append(Path(cli_command).with_name("chrome-devtools-mcp"))
+
+    for value in (os.environ.get("HOMEBREW_PREFIX"), os.environ.get("BREW_PREFIX")):
+        if value:
+            candidates.extend(mcp_candidates_from_prefix(Path(value)))
+
+    for prefix in (brew_prefix("chrome-devtools-mcp"), brew_prefix()):
+        if prefix:
+            candidates.extend(mcp_candidates_from_prefix(prefix))
+
+    discovered = existing_executable(candidates)
+    if discovered:
+        return discovered
+
+    return "chrome-devtools-mcp"
+
+
+DEFAULT_CLI_COMMAND = resolve_cli_command()
+DEFAULT_MCP_COMMAND = resolve_mcp_command()
 DEFAULT_PROTOCOL_VERSION = "2025-06-18"
+OUTPUT_FORMAT_COMMANDS_WITHOUT_SUPPORT = {"start", "stop", "status"}
+POSITIONAL_ARGUMENTS: dict[str, tuple[str, ...]] = {
+    "new_page": ("url",),
+    "select_page": ("pageId",),
+    "close_page": ("pageId",),
+    "evaluate_script": ("function",),
+    "click": ("uid",),
+    "hover": ("uid",),
+    "fill": ("uid", "value"),
+    "upload_file": ("uid", "file"),
+    "press_key": ("key",),
+    "type_text": ("text",),
+    "resize_page": ("width", "height"),
+    "get_console_message": ("msgid",),
+    "performance_analyze_insight": ("traceId", "insightName"),
+    "trigger_extension_action": ("extensionId",),
+    "install_extension": ("extensionPath",),
+}
+OPTION_ALIASES = {
+    "page_id": "pageId",
+    "page": "pageId",
+    "bring_to_front": "bringToFront",
+    "file_path": "filePath",
+    "filepath": "filePath",
+    "output_format": "output-format",
+    "request_file_path": "requestFilePath",
+    "response_file_path": "responseFilePath",
+    "output_dir_path": "outputDirPath",
+}
+
+
+class CliError(RuntimeError):
+    pass
 
 
 class McpError(RuntimeError):
@@ -58,6 +181,9 @@ def is_session_command(command: str) -> bool:
     script_names = {"chrome-devtools-session", "chrome_devtools_mcp_session.py"}
 
     if command_name in {"chrome-devtools-session", "chrome-devtools-mcp"}:
+        return True
+
+    if "chrome-devtools-mcp" in command:
         return True
 
     for index, token in enumerate(tokens[1:], start=1):
@@ -108,7 +234,7 @@ def session_processes() -> list[dict[str, Any]]:
 
 def print_session_processes(processes: list[dict[str, Any]]) -> None:
     if not processes:
-        print("No running Chrome DevTools MCP runner/server sessions found.")
+        print("No skill runner or chrome-devtools-mcp processes found.")
         return
 
     print("PID     PPID    ELAPSED   STAT  COMMAND")
@@ -231,7 +357,7 @@ class McpClient:
                 "protocolVersion": self.protocol_version,
                 "capabilities": {},
                 "clientInfo": {
-                    "name": "single-session-chrome-devtools-mcp",
+                    "name": "chrome-devtools-session",
                     "version": RUNNER_VERSION,
                 },
             },
@@ -314,17 +440,19 @@ class McpClient:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run navigate/evaluate/screenshot actions through one "
-            "Homebrew chrome-devtools-mcp session."
+            "Run browser actions through the Homebrew chrome-devtools CLI while "
+            "keeping a skill-local JSON step runner."
         )
     )
-    parser.add_argument("--mcp-command", default=DEFAULT_MCP_COMMAND)
-    parser.add_argument("--mcp-arg", action="append", default=[], help="extra raw MCP server arg")
-    parser.add_argument("--protocol-version", default=DEFAULT_PROTOCOL_VERSION)
+    parser.add_argument("--cli-command", default=DEFAULT_CLI_COMMAND, help="chrome-devtools CLI path")
+    parser.add_argument("--start-arg", action="append", default=[], help="extra raw chrome-devtools start arg")
+    parser.add_argument("--mcp-command", default=DEFAULT_MCP_COMMAND, help="chrome-devtools-mcp path for --current-chrome")
+    parser.add_argument("--mcp-arg", action="append", default=[], help="extra raw MCP server arg for --current-chrome")
+    parser.add_argument("--protocol-version", default=DEFAULT_PROTOCOL_VERSION, help="MCP protocol version")
     parser.add_argument("--timeout", type=float, default=30)
     parser.add_argument("--url", help="URL to navigate to before eval/screenshot actions")
-    parser.add_argument("--new-page", action="store_true", help="open --url in a new tab when full tools are active")
-    parser.add_argument("--page-id", type=int, help="select this MCP page ID before running CLI actions")
+    parser.add_argument("--new-page", action="store_true", help="open --url in a new tab")
+    parser.add_argument("--page-id", type=int, help="select this CLI page ID before running actions")
     parser.add_argument(
         "--use-selected-page",
         action="store_true",
@@ -332,43 +460,44 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--eval", action="append", default=[], dest="evals", help="JS to evaluate")
     parser.add_argument("--eval-file", action="append", default=[], help="path to JS file to evaluate")
-    parser.add_argument("--screenshot", help="copy screenshot to this path after eval actions")
+    parser.add_argument("--screenshot", help="write screenshot to this path after eval actions")
     parser.add_argument("--steps", help="JSON file containing a steps array")
-    parser.add_argument("--list-tools", action="store_true", help="list MCP tools and exit")
+    parser.add_argument("--list-tools", action="store_true", help="list chrome-devtools CLI commands and exit")
     parser.add_argument("--version", action="store_true", help="print runner version and exit")
     parser.add_argument(
         "--interactive",
         action="store_true",
-        help="keep the MCP session alive and read JSON commands, or @step-file paths, from stdin",
+        help="keep reading CLI JSON commands, JSON step arrays, or @step-file paths from stdin",
     )
     parser.add_argument(
         "--current-chrome",
         action="store_true",
-        help="shortcut for attaching to the existing debuggable Chrome via --autoConnect",
+        help="attach to the existing Chrome window through chrome-devtools-mcp --autoConnect",
     )
-    parser.add_argument("--json", action="store_true", help="print raw JSON results")
-    parser.add_argument("--headful", action="store_true", help="show Chrome instead of headless mode")
-    parser.add_argument("--no-isolated", action="store_true", help="reuse the default MCP profile")
-    parser.add_argument("--full-tools", action="store_true", help="do not pass --slim to the MCP server")
-    parser.add_argument("--viewport", default="1280x720")
+    parser.add_argument("--json", action="store_true", help="request JSON output from CLI commands")
+    parser.add_argument("--headful", action="store_true", help="start Chrome with --headless=false")
+    parser.add_argument("--no-isolated", action="store_true", help="start without an isolated Chrome profile")
+    parser.add_argument("--full-tools", action="store_true", help="compatibility no-op; the CLI exposes its commands")
+    parser.add_argument("--viewport", help="resize the selected page, formatted as WIDTHxHEIGHT")
     parser.add_argument(
         "--list-running-sessions",
         action="store_true",
-        help="list running skill runner and chrome-devtools-mcp processes",
+        help="show chrome-devtools daemon status and matching skill runner/server processes",
     )
     parser.add_argument(
         "--close-session",
         type=int,
         metavar="PID",
-        help="close one running session by runner or MCP server PID",
+        help="close one skill runner or chrome-devtools-mcp process by PID",
     )
     parser.add_argument(
         "--close-all-sessions",
         action="store_true",
-        help="close all running skill runner and chrome-devtools-mcp processes",
+        help="stop the chrome-devtools daemon and close matching runner/server processes",
     )
 
     args = parser.parse_args()
+
     has_process_action = any([args.list_running_sessions, args.close_session, args.close_all_sessions])
     has_action = any(
         [
@@ -392,21 +521,79 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def build_mcp_args(args: argparse.Namespace) -> list[str]:
-    mcp_args = ["--no-usage-statistics", "--viewport", args.viewport]
-    if not args.headful and not args.current_chrome:
-        mcp_args.append("--headless")
-    if not args.no_isolated and not args.current_chrome:
-        mcp_args.append("--isolated")
-    if not args.full_tools and not args.current_chrome:
-        mcp_args.append("--slim")
-    if args.current_chrome and not any(
-        option.startswith(("--autoConnect", "--auto-connect", "--browserUrl", "--browser-url", "--wsEndpoint", "--ws-endpoint"))
-        for option in args.mcp_arg
-    ):
-        mcp_args.append("--autoConnect")
-    mcp_args.extend(args.mcp_arg)
-    return mcp_args
+def cli_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["CHROME_DEVTOOLS_MCP_NO_USAGE_STATISTICS"] = "1"
+    return env
+
+
+def ensure_cli_exists(command: str) -> None:
+    if Path(command).exists() or shutil.which(command):
+        return
+    raise CliError(
+        "chrome-devtools CLI not found; install with `brew install chrome-devtools-mcp` "
+        "and verify `chrome-devtools --version`"
+    )
+
+
+def run_cli(
+    args: argparse.Namespace,
+    argv: list[str],
+    *,
+    fail: bool = True,
+) -> dict[str, Any]:
+    ensure_cli_exists(args.cli_command)
+    try:
+        completed = subprocess.run(
+            [args.cli_command, *argv],
+            text=True,
+            capture_output=True,
+            timeout=args.timeout,
+            env=cli_env(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise CliError(f"timed out after {args.timeout:g}s running chrome-devtools {' '.join(argv)}") from exc
+
+    result = {
+        "argv": argv,
+        "returncode": completed.returncode,
+        "stdout": completed.stdout,
+        "stderr": completed.stderr,
+    }
+    if fail and completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
+        raise CliError(f"chrome-devtools {' '.join(argv)} failed: {message}")
+    return result
+
+
+def print_cli_result(result: dict[str, Any]) -> None:
+    if result["stdout"]:
+        print(result["stdout"], end="" if result["stdout"].endswith("\n") else "\n")
+    if result["stderr"]:
+        print(result["stderr"], end="" if result["stderr"].endswith("\n") else "\n", file=sys.stderr)
+
+
+def split_raw_args(values: list[str]) -> list[str]:
+    args: list[str] = []
+    for value in values:
+        args.extend(shlex.split(value))
+    return args
+
+
+def build_start_args(args: argparse.Namespace) -> list[str]:
+    start_args = ["start", "--usageStatistics=false"]
+    if args.current_chrome:
+        start_args.append("--autoConnect")
+    if args.headful:
+        start_args.append("--headless=false")
+    if args.no_isolated:
+        start_args.append("--isolated=false")
+    start_args.extend(split_raw_args(args.start_arg))
+    return start_args
+
+
+def should_start_daemon(args: argparse.Namespace) -> bool:
+    return bool(args.headful or args.no_isolated or args.start_arg)
 
 
 def load_steps(path: str) -> list[dict[str, Any]]:
@@ -442,10 +629,288 @@ def load_interactive_command(line: str) -> list[dict[str, Any]]:
 
 def cli_steps(args: argparse.Namespace) -> list[dict[str, Any]]:
     steps: list[dict[str, Any]] = []
-    uses_full_tools = args.full_tools or args.current_chrome
     if args.page_id is not None:
-        if not uses_full_tools:
-            raise ValueError("--page-id requires --full-tools or --current-chrome")
+        steps.append(
+            {
+                "command": ["select_page", str(args.page_id), "--bringToFront", "true"],
+                "label": f"select page {args.page_id}",
+            }
+        )
+    if args.url:
+        if args.new_page:
+            steps.append({"command": ["new_page", args.url], "label": "new page"})
+        else:
+            steps.append({"command": ["navigate_page", "--url", args.url], "label": "navigate"})
+    if args.viewport:
+        width, height = parse_viewport(args.viewport)
+        steps.append({"command": ["resize_page", str(width), str(height)], "label": f"resize {args.viewport}"})
+    for script in args.evals:
+        steps.append({"command": ["evaluate_script", js_function(script)], "label": "evaluate"})
+    for path in args.eval_file:
+        script = Path(path).read_text(encoding="utf-8")
+        steps.append({"command": ["evaluate_script", js_function(script)], "label": f"evaluate {path}"})
+    if args.screenshot:
+        steps.append({"command": ["take_screenshot", "--filePath", args.screenshot], "label": "screenshot"})
+    return steps
+
+
+def parse_viewport(viewport: str) -> tuple[int, int]:
+    parts = viewport.lower().split("x", 1)
+    if len(parts) != 2:
+        raise ValueError("--viewport must be formatted as WIDTHxHEIGHT")
+    try:
+        width = int(parts[0])
+        height = int(parts[1])
+    except ValueError as exc:
+        raise ValueError("--viewport must be formatted as WIDTHxHEIGHT") from exc
+    if width <= 0 or height <= 0:
+        raise ValueError("--viewport dimensions must be positive")
+    return width, height
+
+
+def js_function(script: str) -> str:
+    function = script.strip()
+    looks_like_function = function.startswith(("async ", "function ")) or "=>" in function[:160]
+    if looks_like_function:
+        return function
+    return f"() => eval({json.dumps(script)})"
+
+
+def normalize_step(step: dict[str, Any]) -> tuple[str, list[str]]:
+    label = str(step.get("label") or step.get("name") or step.get("tool") or step.get("command") or "step")
+
+    if "command" in step:
+        return label, normalize_command_value(step["command"], step)
+    if "cli" in step:
+        return label, normalize_command_value(step["cli"], step)
+    if "tool" in step:
+        return label, tool_step_to_cli(str(step["tool"]), dict(step.get("arguments") or {}), step)
+    if "navigate" in step:
+        return label, ["navigate_page", "--url", str(step["navigate"])]
+    if "evaluate" in step:
+        return label, ["evaluate_script", js_function(str(step["evaluate"]))]
+    if "screenshot" in step:
+        path = str(step.get("path") or step["screenshot"])
+        return label, ["take_screenshot", "--filePath", path]
+
+    raise ValueError(f"cannot determine CLI command for step: {json.dumps(step)}")
+
+
+def normalize_command_value(command: Any, step: dict[str, Any]) -> list[str]:
+    if isinstance(command, list):
+        argv = [str(item) for item in command]
+    elif isinstance(command, str):
+        if "args" in step:
+            raw_args = step["args"]
+            if not isinstance(raw_args, list):
+                raise ValueError("step args must be an array")
+            argv = [command, *[str(item) for item in raw_args]]
+        else:
+            arguments = dict(step.get("arguments") or {})
+            argv = [command, *arguments_to_argv(command, arguments)]
+    else:
+        raise ValueError("step command must be a string or array")
+
+    if argv and Path(argv[0]).name == Path(DEFAULT_CLI_COMMAND).name:
+        argv = argv[1:]
+    if not argv:
+        raise ValueError("step command cannot be empty")
+    return argv
+
+
+def tool_step_to_cli(tool: str, arguments: dict[str, Any], step: dict[str, Any]) -> list[str]:
+    if tool == "navigate":
+        url = arguments.get("url") or step.get("url")
+        if not url:
+            raise ValueError("navigate step requires arguments.url")
+        return ["navigate_page", "--url", str(url)]
+
+    if tool == "evaluate":
+        script = arguments.get("script") or arguments.get("function") or step.get("script")
+        if script is None:
+            raise ValueError("evaluate step requires arguments.script")
+        return ["evaluate_script", js_function(str(script))]
+
+    if tool == "screenshot":
+        path = step.get("path") or arguments.get("filePath") or arguments.get("path")
+        if not path:
+            raise ValueError("screenshot step requires path or arguments.filePath")
+        return ["take_screenshot", "--filePath", str(path)]
+
+    if tool == "new_page":
+        url = arguments.get("url") or step.get("url") or "about:blank"
+        remaining = {key: value for key, value in arguments.items() if key != "url"}
+        return ["new_page", str(url), *dict_to_cli_options(remaining)]
+
+    if tool == "select_page":
+        page_id = arguments.get("pageId", arguments.get("page_id", step.get("pageId")))
+        if page_id is None:
+            raise ValueError("select_page step requires arguments.pageId")
+        remaining = {
+            key: value
+            for key, value in arguments.items()
+            if key not in {"pageId", "page_id"}
+        }
+        return ["select_page", str(page_id), *dict_to_cli_options(remaining)]
+
+    if tool == "evaluate_script":
+        script = arguments.get("function") or arguments.get("script")
+        if script is None:
+            raise ValueError("evaluate_script step requires arguments.function")
+        remaining = {
+            key: value
+            for key, value in arguments.items()
+            if key not in {"function", "script"}
+        }
+        return ["evaluate_script", js_function(str(script)), *dict_to_cli_options(remaining)]
+
+    if tool == "take_screenshot":
+        return [tool, *arguments_to_argv(tool, arguments)]
+
+    return [tool, *arguments_to_argv(tool, arguments)]
+
+
+def arguments_to_argv(command: str, arguments: dict[str, Any]) -> list[str]:
+    command = Path(command).name
+    positional_keys = POSITIONAL_ARGUMENTS.get(command, ())
+    remaining = dict(arguments)
+    argv: list[str] = []
+
+    if command == "evaluate_script" and "script" in remaining and "function" not in remaining:
+        remaining["function"] = js_function(str(remaining.pop("script")))
+    elif command == "evaluate_script" and "function" in remaining:
+        remaining["function"] = js_function(str(remaining["function"]))
+
+    for key in positional_keys:
+        if key in remaining:
+            argv.append(str(remaining.pop(key)))
+        elif key == "pageId" and "page_id" in remaining:
+            argv.append(str(remaining.pop("page_id")))
+        elif key == "file" and "path" in remaining:
+            argv.append(str(remaining.pop("path")))
+
+    argv.extend(dict_to_cli_options(remaining))
+    return argv
+
+
+def dict_to_cli_options(arguments: dict[str, Any]) -> list[str]:
+    argv: list[str] = []
+    for raw_key, value in arguments.items():
+        if value is None:
+            continue
+        key = OPTION_ALIASES.get(raw_key, raw_key)
+        option = f"--{key}"
+        if isinstance(value, bool):
+            argv.extend([option, "true" if value else "false"])
+        elif isinstance(value, list):
+            for item in value:
+                argv.extend([option, str(item)])
+        elif isinstance(value, dict):
+            argv.extend([option, json.dumps(value, separators=(",", ":"))])
+        else:
+            argv.extend([option, str(value)])
+    return argv
+
+
+def add_output_format(argv: list[str], raw_json: bool) -> list[str]:
+    if not raw_json:
+        return argv
+    command = Path(argv[0]).name
+    if command in OUTPUT_FORMAT_COMMANDS_WITHOUT_SUPPORT:
+        return argv
+    if any(arg == "--output-format" or arg.startswith("--output-format=") for arg in argv):
+        return argv
+    return [*argv, "--output-format", "json"]
+
+
+def run_step(args: argparse.Namespace, step: dict[str, Any], index: int) -> dict[str, Any]:
+    label, argv = normalize_step(step)
+    argv = add_output_format(argv, args.json)
+    result = run_cli(args, argv)
+    return {
+        "index": index,
+        "label": label,
+        "command": argv,
+        "returncode": result["returncode"],
+        "stdout": result["stdout"],
+        "stderr": result["stderr"],
+    }
+
+
+def print_record(record: dict[str, Any]) -> None:
+    print(f"[{record['index']}] {record['label']} ({' '.join(record['command'])})")
+    stdout = str(record.get("stdout") or "").strip()
+    if stdout:
+        for line in stdout.splitlines():
+            print(f"  {line}")
+    stderr = str(record.get("stderr") or "").strip()
+    if stderr:
+        for line in stderr.splitlines():
+            print(f"  stderr: {line}", file=sys.stderr)
+
+
+def run_steps(args: argparse.Namespace, steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    results = []
+    for index, step in enumerate(steps, start=1):
+        record = run_step(args, step, index)
+        results.append(record)
+        if not args.json:
+            print_record(record)
+    return results
+
+
+def run_interactive(args: argparse.Namespace) -> None:
+    print(
+        "interactive chrome-devtools CLI runner ready; send one JSON step, a JSON step array, @steps.json, or exit.",
+        flush=True,
+    )
+    next_index = 1
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            if line in {"exit", "quit"}:
+                print("closing interactive chrome-devtools CLI runner", flush=True)
+                return
+            steps = load_interactive_command(line)
+            if len(steps) == 1 and (steps[0] == {"exit": True} or steps[0] == {"quit": True}):
+                print("closing interactive chrome-devtools CLI runner", flush=True)
+                return
+
+            for step in steps:
+                record = run_step(args, step, next_index)
+                next_index += 1
+                print(json.dumps([record], indent=2), flush=True)
+        except Exception as exc:
+            print(f"error: {exc}", file=sys.stderr, flush=True)
+
+
+def build_mcp_args(args: argparse.Namespace) -> list[str]:
+    mcp_args = ["--no-usage-statistics"]
+    raw_mcp_args = split_raw_args(args.mcp_arg)
+    has_browser_target = any(
+        option.startswith(
+            (
+                "--autoConnect",
+                "--auto-connect",
+                "--browserUrl",
+                "--browser-url",
+                "--wsEndpoint",
+                "--ws-endpoint",
+            )
+        )
+        for option in raw_mcp_args
+    )
+    if args.current_chrome and not has_browser_target:
+        mcp_args.append("--autoConnect")
+    mcp_args.extend(raw_mcp_args)
+    return mcp_args
+
+
+def mcp_steps(args: argparse.Namespace) -> list[dict[str, Any]]:
+    steps: list[dict[str, Any]] = []
+    if args.page_id is not None:
         steps.append(
             {
                 "tool": "select_page",
@@ -454,15 +919,9 @@ def cli_steps(args: argparse.Namespace) -> list[dict[str, Any]]:
             }
         )
     if args.url:
-        if uses_full_tools and args.new_page:
-            steps.append(
-                {
-                    "tool": "new_page",
-                    "arguments": {"url": args.url},
-                    "label": "new page",
-                }
-            )
-        elif uses_full_tools:
+        if args.new_page:
+            steps.append({"tool": "new_page", "arguments": {"url": args.url}, "label": "new page"})
+        else:
             steps.append(
                 {
                     "tool": "navigate_page",
@@ -470,54 +929,148 @@ def cli_steps(args: argparse.Namespace) -> list[dict[str, Any]]:
                     "label": "navigate",
                 }
             )
-        else:
-            steps.append({"tool": "navigate", "arguments": {"url": args.url}, "label": "navigate"})
+    if args.viewport:
+        width, height = parse_viewport(args.viewport)
+        steps.append(
+            {
+                "tool": "resize_page",
+                "arguments": {"width": width, "height": height},
+                "label": f"resize {args.viewport}",
+            }
+        )
     for script in args.evals:
-        steps.append(evaluate_step(script, uses_full_tools, "evaluate"))
+        steps.append(
+            {
+                "tool": "evaluate_script",
+                "arguments": {"function": js_function(script)},
+                "label": "evaluate",
+            }
+        )
     for path in args.eval_file:
         script = Path(path).read_text(encoding="utf-8")
-        steps.append(evaluate_step(script, uses_full_tools, f"evaluate {path}"))
+        steps.append(
+            {
+                "tool": "evaluate_script",
+                "arguments": {"function": js_function(script)},
+                "label": f"evaluate {path}",
+            }
+        )
     if args.screenshot:
-        if uses_full_tools:
-            steps.append(
-                {
-                    "tool": "take_screenshot",
-                    "arguments": {"filePath": args.screenshot},
-                    "label": "screenshot",
-                }
-            )
-        else:
-            steps.append({"tool": "screenshot", "arguments": {}, "path": args.screenshot, "label": "screenshot"})
+        steps.append(
+            {
+                "tool": "take_screenshot",
+                "arguments": {"filePath": args.screenshot},
+                "label": "screenshot",
+            }
+        )
     return steps
 
 
-def evaluate_step(script: str, uses_full_tools: bool, label: str) -> dict[str, Any]:
-    if not uses_full_tools:
-        return {"tool": "evaluate", "arguments": {"script": script}, "label": label}
-
-    function = script.strip()
-    looks_like_function = function.startswith(("async ", "function ")) or "=>" in function[:120]
-    if not looks_like_function:
-        function = f"() => eval({json.dumps(script)})"
-
-    return {"tool": "evaluate_script", "arguments": {"function": function}, "label": label}
-
-
-def normalize_step(step: dict[str, Any]) -> tuple[str, dict[str, Any], str, str | None]:
-    label = str(step.get("label") or step.get("name") or step.get("tool") or "step")
-    output_path = step.get("path")
+def normalize_mcp_step(step: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    label = str(step.get("label") or step.get("name") or step.get("tool") or step.get("command") or "step")
 
     if "tool" in step:
-        return str(step["tool"]), dict(step.get("arguments") or {}), label, output_path
+        return label, *tool_step_to_mcp(str(step["tool"]), dict(step.get("arguments") or {}), step)
+    if "command" in step:
+        argv = normalize_command_value(step["command"], step)
+        return label, *argv_to_mcp_tool(argv)
+    if "cli" in step:
+        argv = normalize_command_value(step["cli"], step)
+        return label, *argv_to_mcp_tool(argv)
     if "navigate" in step:
-        return "navigate", {"url": str(step["navigate"])}, label, output_path
+        return label, "navigate_page", {"type": "url", "url": str(step["navigate"])}
     if "evaluate" in step:
-        return "evaluate", {"script": str(step["evaluate"])}, label, output_path
+        return label, "evaluate_script", {"function": js_function(str(step["evaluate"]))}
     if "screenshot" in step:
-        path = output_path or str(step["screenshot"])
-        return "screenshot", dict(step.get("arguments") or {}), label, path
+        path = str(step.get("path") or step["screenshot"])
+        return label, "take_screenshot", {"filePath": path}
 
     raise ValueError(f"cannot determine MCP tool for step: {json.dumps(step)}")
+
+
+def tool_step_to_mcp(tool: str, arguments: dict[str, Any], step: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    if tool == "navigate":
+        url = arguments.get("url") or step.get("url")
+        if not url:
+            raise ValueError("navigate step requires arguments.url")
+        return "navigate_page", {"type": "url", "url": str(url)}
+
+    if tool == "evaluate":
+        script = arguments.get("script") or arguments.get("function") or step.get("script")
+        if script is None:
+            raise ValueError("evaluate step requires arguments.script")
+        return "evaluate_script", {"function": js_function(str(script))}
+
+    if tool == "screenshot":
+        path = step.get("path") or arguments.get("filePath") or arguments.get("path")
+        if not path:
+            raise ValueError("screenshot step requires path or arguments.filePath")
+        return "take_screenshot", {"filePath": str(path)}
+
+    if tool == "evaluate_script" and "script" in arguments and "function" not in arguments:
+        arguments["function"] = js_function(str(arguments.pop("script")))
+    elif tool == "evaluate_script" and "function" in arguments:
+        arguments["function"] = js_function(str(arguments["function"]))
+
+    return tool, arguments
+
+
+def argv_to_mcp_tool(argv: list[str]) -> tuple[str, dict[str, Any]]:
+    if not argv:
+        raise ValueError("step command cannot be empty")
+
+    tool = Path(argv[0]).name
+    positional_keys = POSITIONAL_ARGUMENTS.get(tool, ())
+    arguments: dict[str, Any] = {}
+    index = 1
+
+    for key in positional_keys:
+        if index >= len(argv) or argv[index].startswith("--"):
+            break
+        value: Any = argv[index]
+        if key in {"pageId", "width", "height", "msgid"}:
+            value = int(value)
+        if tool == "evaluate_script" and key == "function":
+            value = js_function(str(value))
+        arguments[key] = value
+        index += 1
+
+    while index < len(argv):
+        token = argv[index]
+        if not token.startswith("--"):
+            raise ValueError(f"unexpected positional argument for {tool}: {token}")
+        raw_key = token[2:]
+        if "=" in raw_key:
+            key, value = raw_key.split("=", 1)
+            index += 1
+        else:
+            key = raw_key
+            if index + 1 < len(argv) and not argv[index + 1].startswith("--"):
+                value = argv[index + 1]
+                index += 2
+            else:
+                value = True
+                index += 1
+        key = OPTION_ALIASES.get(key, key)
+        arguments[key] = coerce_cli_value(value)
+
+    if tool == "navigate_page" and "url" in arguments and "type" not in arguments:
+        arguments["type"] = "url"
+    if tool == "evaluate_script" and "script" in arguments and "function" not in arguments:
+        arguments["function"] = js_function(str(arguments.pop("script")))
+    if tool == "evaluate_script" and "function" in arguments:
+        arguments["function"] = js_function(str(arguments["function"]))
+    return tool, arguments
+
+
+def coerce_cli_value(value: Any) -> Any:
+    if value in {"true", "True"}:
+        return True
+    if value in {"false", "False"}:
+        return False
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+    return value
 
 
 def content_text(result: dict[str, Any]) -> str:
@@ -528,61 +1081,39 @@ def content_text(result: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
-def copy_screenshot_if_requested(result: dict[str, Any], output_path: str | None) -> str | None:
-    if not output_path:
-        return None
-
-    text = content_text(result).strip()
-    if not text:
-        raise McpError("screenshot result did not include a source path")
-
-    source = Path(text)
-    destination = Path(output_path)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, destination)
-    return str(destination)
-
-
-def run_step(client: McpClient, step: dict[str, Any], index: int) -> dict[str, Any]:
-    tool, arguments, label, path = normalize_step(step)
+def run_mcp_step(client: McpClient, step: dict[str, Any], index: int) -> dict[str, Any]:
+    label, tool, arguments = normalize_mcp_step(step)
     result = client.call_tool(tool, arguments)
-    copied_to = copy_screenshot_if_requested(result, path) if tool == "screenshot" else None
     return {
         "index": index,
         "label": label,
         "tool": tool,
         "arguments": arguments,
-        "copiedTo": copied_to,
         "result": result,
     }
 
 
-def print_record(record: dict[str, Any]) -> None:
+def print_mcp_record(record: dict[str, Any]) -> None:
     print(f"[{record['index']}] {record['label']} ({record['tool']})")
-    if record.get("copiedTo"):
-        print(f"  screenshot: {record['copiedTo']}")
-        return
-
     text = content_text(record["result"])
     if text:
         for line in text.splitlines():
             print(f"  {line}")
 
 
-def run_steps(client: McpClient, steps: list[dict[str, Any]], raw_json: bool) -> list[dict[str, Any]]:
+def run_mcp_steps(client: McpClient, steps: list[dict[str, Any]], raw_json: bool) -> list[dict[str, Any]]:
     results = []
     for index, step in enumerate(steps, start=1):
-        record = run_step(client, step, index)
+        record = run_mcp_step(client, step, index)
         results.append(record)
-
         if not raw_json:
-            print_record(record)
+            print_mcp_record(record)
     return results
 
 
-def run_interactive(client: McpClient) -> None:
+def run_mcp_interactive(client: McpClient) -> None:
     print(
-        "interactive MCP session ready; send one JSON step, a JSON step array, @steps.json, or {\"exit\": true}.",
+        "interactive chrome-devtools MCP session ready; send one JSON step, a JSON step array, @steps.json, or exit.",
         flush=True,
     )
     next_index = 1
@@ -592,56 +1123,30 @@ def run_interactive(client: McpClient) -> None:
             continue
         try:
             if line in {"exit", "quit"}:
-                print("closing interactive MCP session", flush=True)
+                print("closing interactive chrome-devtools MCP session", flush=True)
                 return
             steps = load_interactive_command(line)
             if len(steps) == 1 and (steps[0] == {"exit": True} or steps[0] == {"quit": True}):
-                print("closing interactive MCP session", flush=True)
+                print("closing interactive chrome-devtools MCP session", flush=True)
                 return
 
             for step in steps:
-                record = run_step(client, step, next_index)
+                record = run_mcp_step(client, step, next_index)
                 next_index += 1
                 print(json.dumps([record], indent=2), flush=True)
         except Exception as exc:
             print(f"error: {exc}", file=sys.stderr, flush=True)
 
 
-def main() -> int:
-    args = parse_args()
-
-    if args.version:
-        print(f"chrome-devtools-session {RUNNER_VERSION}")
-        return 0
-
-    if args.list_running_sessions:
-        print_session_processes(session_processes())
-        return 0
-
-    if args.close_session is not None:
-        processes = read_processes()
-        matching = [process for process in processes if is_session_command(process["command"])]
-        pids = collect_related_pids(args.close_session, matching)
-        if not pids:
-            raise McpError(f"no running Chrome DevTools MCP session found for PID {args.close_session}")
-        terminate_pids(pids)
-        return 0
-
-    if args.close_all_sessions:
-        pids = {process["pid"] for process in session_processes()}
-        terminate_pids(pids)
-        return 0
-
-    mcp_args = build_mcp_args(args)
-
+def run_current_chrome_mcp_mode(args: argparse.Namespace) -> int:
     steps = []
     if args.steps:
         steps.extend(load_steps(args.steps))
-    steps.extend(cli_steps(args))
+    steps.extend(mcp_steps(args))
 
     with McpClient(
         command=args.mcp_command,
-        args=mcp_args,
+        args=build_mcp_args(args),
         timeout=args.timeout,
         protocol_version=args.protocol_version,
     ) as client:
@@ -653,11 +1158,83 @@ def main() -> int:
                 for tool in tools.get("tools", []):
                     print(f"{tool['name']}: {tool.get('description', '')}")
 
-        results = run_steps(client, steps, args.json)
+        results = run_mcp_steps(client, steps, args.json)
         if args.json and results:
             print(json.dumps(results, indent=2))
         if args.interactive:
-            run_interactive(client)
+            run_mcp_interactive(client)
+
+    return 0
+
+
+def print_daemon_status(args: argparse.Namespace) -> None:
+    try:
+        result = run_cli(args, ["status"], fail=False)
+    except CliError as exc:
+        print(f"chrome-devtools status unavailable: {exc}", file=sys.stderr)
+        return
+
+    print("chrome-devtools daemon status:")
+    text = (result["stdout"] or result["stderr"]).strip()
+    if text:
+        for line in text.splitlines():
+            print(f"  {line}")
+    else:
+        print(f"  status exited with code {result['returncode']}")
+
+
+def main() -> int:
+    args = parse_args()
+
+    if args.version:
+        print(f"chrome-devtools-session {RUNNER_VERSION}")
+        return 0
+
+    if args.list_running_sessions:
+        print_daemon_status(args)
+        print()
+        print_session_processes(session_processes())
+        return 0
+
+    if args.close_session is not None:
+        processes = read_processes()
+        matching = [process for process in processes if is_session_command(process["command"])]
+        pids = collect_related_pids(args.close_session, matching)
+        if not pids:
+            raise CliError(f"no skill runner or chrome-devtools-mcp process found for PID {args.close_session}")
+        terminate_pids(pids)
+        return 0
+
+    if args.close_all_sessions:
+        result = run_cli(args, ["stop"], fail=False)
+        print_cli_result(result)
+        pids = {process["pid"] for process in session_processes()}
+        terminate_pids(pids)
+        return 0
+
+    if args.current_chrome:
+        return run_current_chrome_mcp_mode(args)
+
+    if args.list_tools:
+        result = run_cli(args, ["--help"], fail=False)
+        print_cli_result(result)
+        return result["returncode"]
+
+    if should_start_daemon(args):
+        result = run_cli(args, build_start_args(args))
+        if not args.json:
+            print_cli_result(result)
+
+    steps = []
+    if args.steps:
+        steps.extend(load_steps(args.steps))
+    steps.extend(cli_steps(args))
+
+    results = run_steps(args, steps)
+    if args.json and results:
+        print(json.dumps(results, indent=2))
+    if args.interactive:
+        run_interactive(args)
 
     return 0
 
@@ -665,6 +1242,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (McpError, OSError, ValueError) as exc:
+    except (CliError, McpError, OSError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         raise SystemExit(1)

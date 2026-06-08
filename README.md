@@ -56,7 +56,7 @@ This repository ships one broad Codex `tanstack` plugin rather than separate ups
 
 | Skill | Purpose |
 | --- | --- |
-| `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a bundled session runner. |
+| `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a hybrid session runner. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |

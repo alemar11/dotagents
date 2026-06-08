@@ -1,6 +1,6 @@
 ---
 name: chrome-devtools
-description: Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew `chrome-devtools` CLI, and the bundled single-session runner. Use for browser debugging, browser automation, DevTools MCP/CLI setup, page inspection, screenshots, network and console inspection, Lighthouse and performance traces, accessibility checks, LCP/Core Web Vitals work, browser memory debugging, or troubleshooting Chrome DevTools MCP startup and connection failures.
+description: Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew `chrome-devtools` CLI, and the bundled CLI session runner. Use for browser debugging, browser automation, DevTools MCP/CLI setup, page inspection, screenshots, network and console inspection, Lighthouse and performance traces, accessibility checks, LCP/Core Web Vitals work, browser memory debugging, or troubleshooting Chrome DevTools MCP startup and connection failures.
 ---
 
 # Chrome DevTools
@@ -13,8 +13,9 @@ pages. Prefer the fastest available runtime surface:
 - Direct Chrome DevTools MCP tools when they are already available in the current
   agent session.
 - Homebrew `chrome-devtools` for shell-oriented one-off commands.
-- This skill's `scripts/chrome-devtools-session` runner when a long-lived stdio MCP
-  session, explicit session cleanup, or JSON step files are useful.
+- This skill's `scripts/chrome-devtools-session` runner when JSON step files,
+  interactive batches, guarded current-Chrome attach, or explicit daemon cleanup
+  are useful.
 
 ## Runtime surfaces
 
@@ -29,10 +30,13 @@ The bundled skill runner is the stable embedded artifact:
 - From another repo: `<chrome-devtools-skill-root>/scripts/chrome-devtools-session`.
 - Version check: `<chrome-devtools-skill-root>/scripts/chrome-devtools-session --version`.
 
-The runner resolves `chrome-devtools-mcp` from `PATH` first, then common
-Homebrew fallbacks. It defaults to `--headless --isolated --slim
---no-usage-statistics`; pass `--full-tools`, `--headful`, `--no-isolated`, or
-`--mcp-arg ...` only when the task needs them.
+The runner resolves `chrome-devtools` and `chrome-devtools-mcp` from `PATH`
+first, then Homebrew discovery from the paired binary, `HOMEBREW_PREFIX`, and
+`brew --prefix`. Normal unauthenticated flows delegate browser actions to the
+Homebrew CLI. `--current-chrome` intentionally uses the MCP stdio server with
+`--autoConnect` so Chrome can request access to the already-running macOS
+browser window. Use `--start-arg ...` only for CLI daemon startup and
+`--mcp-arg ...` only for the current-Chrome MCP path.
 
 ## Installation
 
@@ -84,8 +88,10 @@ For the bundled runner:
 ```
 
 Interactive mode accepts one JSON step, a JSON step array, `@steps.json`, or
-`exit` per line. Prefer `@steps.json` for long batches so the terminal does not
-depend on a huge single input line.
+`exit` per line. In normal mode each step maps to a `chrome-devtools` CLI
+command; in `--current-chrome` mode each step maps to an MCP tool. Prefer
+`@steps.json` for long batches so the terminal does not depend on a huge single
+input line.
 
 Session cleanup:
 

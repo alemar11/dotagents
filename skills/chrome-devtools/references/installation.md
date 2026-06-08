@@ -11,7 +11,7 @@ chrome-devtools --version
 The Homebrew formula installs both:
 
 - `chrome-devtools-mcp`: MCP server for agent integrations.
-- `chrome-devtools`: shell CLI for direct browser commands.
+- `chrome-devtools`: shell CLI for direct browser commands and daemon lifecycle.
 
 If the binaries are not found after installation, verify Homebrew's bin
 directory is on `PATH`:
@@ -51,7 +51,8 @@ Chrome session:
 1. Open Chrome.
 2. Visit `chrome://inspect/#remote-debugging`.
 3. Enable remote debugging.
-4. Configure MCP with `--autoConnect` or run the skill runner with
+4. Configure MCP with `--autoConnect`, start the CLI daemon with
+   `chrome-devtools start --autoConnect`, or run the skill runner with
    `--current-chrome`.
 5. Accept Chrome's remote debugging permission prompt.
 
@@ -70,7 +71,13 @@ data directory:
   --user-data-dir=/tmp/chrome-devtools-profile
 ```
 
-Then point MCP at that browser:
+Then point the Homebrew CLI daemon at that browser:
+
+```sh
+chrome-devtools start --browserUrl=http://127.0.0.1:9222 --usageStatistics=false
+```
+
+For a direct MCP config, point the MCP server at the same browser:
 
 ```sh
 chrome-devtools-mcp --browser-url=http://127.0.0.1:9222 --no-usage-statistics

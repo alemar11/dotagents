@@ -18,9 +18,16 @@ brew install chrome-devtools-mcp
 brew info chrome-devtools-mcp
 ```
 
-## Server startup failures
+## Daemon startup failures
 
-Run the MCP server directly:
+Start the CLI daemon with logging:
+
+```sh
+DEBUG=* chrome-devtools start --logFile /tmp/chrome-devtools-mcp.log --usageStatistics=false
+```
+
+If you are debugging Codex MCP configuration rather than the CLI, run the MCP
+server directly:
 
 ```sh
 DEBUG=* chrome-devtools-mcp --logFile /tmp/chrome-devtools-mcp.log --no-usage-statistics
@@ -45,22 +52,27 @@ If only a tiny tool set is available, check these causes:
 - Category tools need explicit flags, such as `--categoryExtensions=true`,
   `--experimentalMemory=true`, or `--experimentalScreencast=true`.
 
-Use the skill runner to list what this invocation exposes:
+Use the skill runner to list the installed CLI command surface:
 
 ```sh
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --list-tools
-<chrome-devtools-skill-root>/scripts/chrome-devtools-session --full-tools --list-tools
 ```
 
 ## Auto-connect failures
 
-For `--autoConnect` or runner `--current-chrome`, verify:
+For `chrome-devtools start --autoConnect`, MCP `--autoConnect`, or runner
+`--current-chrome`, verify:
 
 1. Chrome is already running.
 2. Chrome supports the auto-connect flow.
 3. Remote debugging is enabled at `chrome://inspect/#remote-debugging`.
 4. The browser permission prompt was accepted.
 5. Another tool is not competing for the same browser/debugging connection.
+
+The runner uses the MCP stdio path for `--current-chrome` specifically so Chrome
+can surface the existing-window permission flow. If it lists only `about:blank`
+instead of the user's existing tabs, stop the session and fix the attach path
+before continuing.
 
 If this still fails, use a manual debugging port:
 
@@ -69,12 +81,14 @@ If this still fails, use a manual debugging port:
   --remote-debugging-port=9222 \
   --user-data-dir=/tmp/chrome-devtools-profile
 
+chrome-devtools start --browserUrl=http://127.0.0.1:9222 --usageStatistics=false
 chrome-devtools-mcp --browser-url=http://127.0.0.1:9222 --no-usage-statistics
 ```
 
 ## Runner session cleanup
 
-The bundled runner can find and close long-running runner/server processes:
+The bundled runner reports the CLI daemon status, calls `chrome-devtools stop`
+for `--close-all-sessions`, and can still close matching runner/server PIDs:
 
 ```sh
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --list-running-sessions
