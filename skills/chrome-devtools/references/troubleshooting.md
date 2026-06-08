@@ -74,10 +74,32 @@ can surface the existing-window permission flow. If it lists only `about:blank`
 instead of the user's existing tabs, stop the session and fix the attach path
 before continuing.
 
-If this still fails, use a manual debugging port:
+If auto-connect attaches to a blank or unexpected profile, retry with the user
+data directory for the Chrome profile that owns the requested tab before falling
+back to a manually started debugging port:
 
 ```sh
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session \
+  --current-chrome \
+  --mcp-arg "--userDataDir=<chrome-user-data-dir>" \
+  --mcp-arg "--channel=stable" \
+  --mcp-arg "--no-category-extensions" \
+  --mcp-arg "--no-performance-crux" \
+  --interactive
+```
+
+After the permission prompt is accepted, send `{"tool":"list_pages"}` to the
+interactive session. Proceed only if the output includes the requested tab's
+title or URL. If the attached profile or window is not the one the user asked
+for, stop and ask the user to expose or approve the correct Chrome profile.
+
+If this still fails, a manually started debugging port can prove the tooling
+works, but the example below uses a temporary isolated profile. Do not use it as
+a replacement for an authenticated current-tab request unless the user approves
+switching to that separate browser profile.
+
+```sh
+<chrome-executable> \
   --remote-debugging-port=9222 \
   --user-data-dir=/tmp/chrome-devtools-profile
 
@@ -97,3 +119,18 @@ for `--close-all-sessions`, and can still close matching runner/server PIDs:
 ```
 
 Prefer `--close-session <PID>` when account-bearing Chrome sessions may be open.
+
+## Runner smoke checks
+
+These checks do not require a live browser:
+
+```sh
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session --version
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session --list-tools
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session \
+  --current-chrome \
+  --url https://example.com
+```
+
+The final command should fail fast with the guard that `--current-chrome --url`
+requires `--new-page`, `--page-id`, or `--use-selected-page`.

@@ -37,11 +37,11 @@ Headless isolated mode is appropriate for most local app checks:
 codex mcp add chrome-devtools -- "$(command -v chrome-devtools-mcp)" --headless --isolated --no-usage-statistics
 ```
 
-On macOS or Linux systems where Homebrew is supported, ask the user whether they
-want to install with `brew install chrome-devtools-mcp` before suggesting any
+On systems where Homebrew is supported, ask the user whether they want to
+install with `brew install chrome-devtools-mcp` before suggesting any
 non-Homebrew path. Treat `npx chrome-devtools-mcp@latest` as a last-resort
-fallback for unsupported environments, unavailable Homebrew, or an explicit user
-request for the upstream npm install path.
+fallback for unsupported environments, unavailable Homebrew, or an explicit
+user request for the upstream npm install path.
 
 ## Existing Chrome sessions
 
@@ -66,7 +66,7 @@ running browser, start Chrome manually with a debugging port and a dedicated use
 data directory:
 
 ```sh
-/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+<chrome-executable> \
   --remote-debugging-port=9222 \
   --user-data-dir=/tmp/chrome-devtools-profile
 ```

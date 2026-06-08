@@ -34,8 +34,8 @@ The runner resolves `chrome-devtools` and `chrome-devtools-mcp` from `PATH`
 first, then Homebrew discovery from the paired binary, `HOMEBREW_PREFIX`, and
 `brew --prefix`. Normal unauthenticated flows delegate browser actions to the
 Homebrew CLI. `--current-chrome` intentionally uses the MCP stdio server with
-`--autoConnect` so Chrome can request access to the already-running macOS
-browser window. Use `--start-arg ...` only for CLI daemon startup and
+`--autoConnect` so Chrome can request access to the already-running browser
+window on the current OS. Use `--start-arg ...` only for CLI daemon startup and
 `--mcp-arg ...` only for the current-Chrome MCP path.
 
 ## Installation
@@ -63,6 +63,25 @@ already-authenticated Chrome session. In that mode, the agent can read and act
 through the user's active browser state. Do not navigate account tabs casually.
 When using the runner, `--current-chrome --url` must include one explicit target:
 `--new-page`, `--page-id`, or `--use-selected-page`.
+
+## Existing Chrome windows
+
+When the user asks for the current Chrome window already open on this OS, an
+existing authenticated tab, or says not to use an isolated browser, start with
+the existing-window path:
+
+```sh
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session --current-chrome --interactive
+```
+
+In interactive mode, send JSON steps such as `{"tool":"list_pages"}` and then
+`{"tool":"select_page","arguments":{"pageId":3,"bringToFront":true}}`, replacing
+`3` with the page ID for the requested title or URL. Match the requested title
+or URL before inspecting or interacting with it. If the session lists only
+`about:blank`, or if the target tab is missing or ambiguous, do not continue in
+the wrong browser. Ask the user to identify or expose the correct tab/profile,
+and use `references/troubleshooting.md#auto-connect-failures` to repair the
+attach path.
 
 ## Core workflow
 

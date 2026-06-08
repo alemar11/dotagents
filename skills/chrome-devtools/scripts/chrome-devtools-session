@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 
-RUNNER_VERSION = "1.1.0"
+RUNNER_VERSION = "1.1.1"
 
 
 def existing_executable(paths: list[Path]) -> str | None:
@@ -573,9 +573,13 @@ def print_cli_result(result: dict[str, Any]) -> None:
         print(result["stderr"], end="" if result["stderr"].endswith("\n") else "\n", file=sys.stderr)
 
 
-def split_raw_args(values: list[str]) -> list[str]:
+def split_raw_args(values: list[str], *, preserve_option_assignments: bool = False) -> list[str]:
     args: list[str] = []
     for value in values:
+        stripped = value.strip()
+        if preserve_option_assignments and stripped.startswith("--") and "=" in stripped:
+            args.append(stripped)
+            continue
         args.extend(shlex.split(value))
     return args
 
@@ -888,7 +892,7 @@ def run_interactive(args: argparse.Namespace) -> None:
 
 def build_mcp_args(args: argparse.Namespace) -> list[str]:
     mcp_args = ["--no-usage-statistics"]
-    raw_mcp_args = split_raw_args(args.mcp_arg)
+    raw_mcp_args = split_raw_args(args.mcp_arg, preserve_option_assignments=True)
     has_browser_target = any(
         option.startswith(
             (
