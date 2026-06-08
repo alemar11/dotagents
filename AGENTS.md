@@ -56,6 +56,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat `.agents/skills/Maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
+- Treat `chrome-devtools` as portable and runtime-dependent on Homebrew-installed Chrome DevTools for agents plus a local Chrome-capable environment: it requires `python3`, Chrome, `chrome-devtools-mcp`/`chrome-devtools` on `PATH` or in a Homebrew fallback path, and the skill-local runner lives at `skills/chrome-devtools/scripts/chrome-devtools-session`.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
 - When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
 - Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.

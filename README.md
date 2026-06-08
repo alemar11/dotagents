@@ -56,6 +56,7 @@ This repository ships one broad Codex `tanstack` plugin rather than separate ups
 
 | Skill | Purpose |
 | --- | --- |
+| `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a bundled session runner. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
@@ -104,7 +105,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -129,6 +130,7 @@ Install all reusable skills globally for Codex:
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
+  --skill chrome-devtools \
   --skill code-wiki \
   --skill skill-cli-creator \
   --skill codex-changelog \
