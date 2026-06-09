@@ -83,6 +83,12 @@ the wrong browser. Ask the user to identify or expose the correct tab/profile,
 and use `references/troubleshooting.md#auto-connect-failures` to repair the
 attach path.
 
+For long current-Chrome workflows, prefer snapshots, UID-based actions, hover,
+click, fill, and short synchronous `evaluate_script` checks. Avoid large DOM
+walks or long async evaluation scripts in the interactive session; if a browser
+call stops returning, use `references/troubleshooting.md#blocked-current-chrome-calls`
+to recover, then re-run `list_pages` and reselect the requested tab.
+
 ## Core workflow
 
 For direct MCP tools or the Homebrew CLI:
@@ -101,6 +107,7 @@ For the bundled runner:
 
 ```sh
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --list-tools
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session --current-chrome --list-tools
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --url https://example.com --eval "document.title"
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --steps steps.json
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --current-chrome --interactive
@@ -111,6 +118,11 @@ Interactive mode accepts one JSON step, a JSON step array, `@steps.json`, or
 command; in `--current-chrome` mode each step maps to an MCP tool. Prefer
 `@steps.json` for long batches so the terminal does not depend on a huge single
 input line.
+
+`--list-tools` without `--current-chrome` lists the Homebrew CLI command
+surface. `--current-chrome --list-tools` lists the MCP tools available in the
+current-Chrome path. Check the matching surface before using optional or
+experimental commands.
 
 Session cleanup:
 
@@ -126,7 +138,8 @@ Session cleanup:
   config, `--autoConnect`, and `--browser-url`.
 - `references/cli-workflows.md`: command examples for navigation, input,
   emulation, network, console, screenshots, performance, and extensions.
-- `references/troubleshooting.md`: startup failures, missing tools, slim mode,
-  sandboxing, auto-connect failures, logs, and cleanup.
+- `references/troubleshooting.md`: startup failures, missing tools, tool-surface
+  mismatches, slim mode, sandboxing, auto-connect failures, blocked current-Chrome
+  calls, logs, and cleanup.
 - `references/a11y-performance-memory.md`: accessibility, Lighthouse, LCP/Core
   Web Vitals, performance traces, and heap snapshot workflows.

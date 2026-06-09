@@ -43,7 +43,7 @@ Inspect the error text and the log file. Common causes:
 For sandboxed clients, start Chrome outside the client and connect with
 `--browser-url=http://127.0.0.1:9222`.
 
-## Missing tools
+## Tool-surface mismatches
 
 If only a tiny tool set is available, check these causes:
 
@@ -52,11 +52,26 @@ If only a tiny tool set is available, check these causes:
 - Category tools need explicit flags, such as `--categoryExtensions=true`,
   `--experimentalMemory=true`, or `--experimentalScreencast=true`.
 
-Use the skill runner to list the installed CLI command surface:
+The runner has two tool surfaces. Normal mode delegates to the Homebrew
+`chrome-devtools` CLI, while `--current-chrome` talks to the MCP server over
+stdio. A command listed in one surface is not guaranteed to exist in the other.
+
+List the installed CLI command surface:
 
 ```sh
 <chrome-devtools-skill-root>/scripts/chrome-devtools-session --list-tools
 ```
+
+List the MCP tools available to the current-Chrome path:
+
+```sh
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session --current-chrome --list-tools
+```
+
+Do not send CLI-only commands such as coordinate-click helpers to an interactive
+`--current-chrome` session unless the current-Chrome tool list includes them.
+Inside interactive mode, `list_tools` may not be a browser tool; use the startup
+flag above to inspect the available MCP tools.
 
 ## Auto-connect failures
 
@@ -107,6 +122,37 @@ chrome-devtools start --browserUrl=http://127.0.0.1:9222 --usageStatistics=false
 chrome-devtools-mcp --browser-url=http://127.0.0.1:9222 --no-usage-statistics
 ```
 
+## Blocked current-Chrome calls
+
+If an interactive `--current-chrome` command stops returning output, first
+identify whether the browser target or the runner is blocked:
+
+1. Poll the runner once with an empty input read and a short wait.
+2. If there is still no output, avoid queuing more browser actions into the same
+   interactive session.
+3. If the previous action was a long or async `evaluate_script`, assume the page
+   main thread or the MCP request may still be busy.
+4. Interrupt the runner with `Ctrl-C` only after deciding the request is blocked.
+5. Start a new `--current-chrome --interactive` runner, then run `list_pages` and
+   explicitly `select_page` for the requested title or URL before continuing.
+
+Prefer these patterns for live app exploration:
+
+- Use `take_snapshot`, `hover`, `click`, `fill`, `press_key`, and short
+  `evaluate_script` checks.
+- Keep evaluation scripts synchronous and narrowly scoped to selected elements,
+  visible controls, or one small DOM region.
+- Split DOM extraction into multiple small steps instead of one large tree walk.
+- Use `@steps.json` for batches, but keep each step independently small.
+
+Avoid these patterns in long current-Chrome sessions:
+
+- Large DOM walks over broad selectors such as all `div`, `span`, or form nodes.
+- Long async evaluation scripts that both mutate UI and wait for the result.
+- Sending additional commands while a previous `tools/call` is still pending.
+- Assuming the selected page survived a reattach. Always verify with
+  `list_pages`, then select the requested tab again.
+
 ## Runner session cleanup
 
 The bundled runner reports the CLI daemon status, calls `chrome-devtools stop`
@@ -134,3 +180,10 @@ These checks do not require a live browser:
 
 The final command should fail fast with the guard that `--current-chrome --url`
 requires `--new-page`, `--page-id`, or `--use-selected-page`.
+
+When current-Chrome attachment is intentionally in scope, this check lists the
+MCP tools for that path and may prompt or connect to the existing browser:
+
+```sh
+<chrome-devtools-skill-root>/scripts/chrome-devtools-session --current-chrome --list-tools
+```
