@@ -1,7 +1,0 @@
-interface:
-  display_name: "TanStack Devtools"
-  short_description: "Review TanStack Devtools setup for centralized panels, plugins, framework integration, and safe diagnostics."
-  icon_small: "./assets/tanstack-small.svg"
-  icon_large: "./assets/tanstack.png"
-  brand_color: "#F59E0B"
-  default_prompt: "Use the bundled TanStack Devtools skill to review or implement centralized devtools panels, library plugins, framework integration, and production-safe diagnostics."

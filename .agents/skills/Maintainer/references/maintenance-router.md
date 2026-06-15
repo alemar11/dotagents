@@ -24,7 +24,7 @@ Use this file first to route maintenance requests to the right playbook.
 5. If the user asks for repo health, policy compliance, structure checks, or pre-release validation, classify as `audit` and use `doc-consistency.md` plus `release-checklist.md`.
 6. If the user asks to refresh bundled Swift-DocC references, review the `swift-docc` manifest, or re-sync the local DocC asset tree against upstream, classify as `refresh` and use `swift-docc-refresh.md`.
 7. If the user asks to refresh bundled Swift API Design references, review the `swift-api-design` manifest, or re-sync the local guideline source against upstream, classify as `refresh` and use `swift-api-design-refresh.md`.
-8. If the user asks to review, refresh, or periodically re-check TanStack Intent coverage for `plugins/tanstack/`, classify as `refresh` and use `tanstack-intent-refresh.md`.
+8. If the user asks to review, refresh, or periodically re-check TanStack Intent coverage for `skills/tanstack/`, classify as `refresh` and use `tanstack-intent-refresh.md`.
 9. If the user asks to review, refresh, align, or periodically re-check TanStack skills coverage against `tanstack-skills/tanstack-skills`, classify as `refresh` and use `tanstack-skills-alignment.md`.
 10. If the user asks to create or bootstrap a brand-new skill, route skill creation through `$skill-creator` first. Return to this maintainer skill only for repo integration or follow-up maintenance after the scaffold exists.
 11. If a request mixes categories, run in this deterministic order:

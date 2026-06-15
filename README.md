@@ -27,7 +27,6 @@ Install repo-local plugins from this checkout through `.agents/plugins/marketpla
 | Plugin | Path | Purpose |
 | --- | --- | --- |
 | GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, maintainer triage, focused CI/review helpers, release checks, and publish orchestration. |
-| TanStack | `plugins/tanstack/` | Bundles full-portfolio TanStack product guidance plus macro Router, Start, CLI reference maps, and integration guidance. |
 
 ### GitStack Skills
 
@@ -42,15 +41,7 @@ command -v gh && gh --version
 
 Use `plugins/gitstack/skills/github/references/core/installation.md` for cross-platform install guidance.
 
-### TanStack Skill Families
-
-- Product and macro skills: `tanstack-ai`, `tanstack-cli`, `tanstack-config`, `tanstack-db`, `tanstack-devtools`, `tanstack-form`, `tanstack-pacer`, `tanstack-query`, `tanstack-ranger`, `tanstack-router`, `tanstack-start`, `tanstack-store`, `tanstack-table`, `tanstack-virtual`.
-- Cross-stack: `tanstack-integration`.
-- Router references under `plugins/tanstack/skills/tanstack-router/references/`: `routing-structure.md`, `navigation-and-search.md`, `data-loading-and-ssr.md`, `auth-and-failures.md`, `plugin-and-splitting.md`.
-- Start references under `plugins/tanstack/skills/tanstack-start/references/`: `framework-and-execution.md`, `server-functions-and-routes.md`, `middlewares-and-server-core.md`, `server-components-and-migrations.md`, `deployments.md`.
-- CLI references under `plugins/tanstack/skills/tanstack-cli/references/`: `scaffolding.md`, `addons-existing-app.md`, `ecosystem-integrations.md`, `custom-addons-dev-watch.md`, `docs-and-library-metadata.md`.
-
-This repository ships one broad Codex `tanstack` plugin rather than separate upstream-style product plugins, narrow focused skills, or bundle aliases such as `tanstack-all`. For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills. For TanStack application work, install the TanStack plugin instead of copying advice from mixed community sources.
+For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills.
 
 ## Reusable Skills
 
@@ -60,6 +51,7 @@ This repository ships one broad Codex `tanstack` plugin rather than separate ups
 | `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a hybrid session runner. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
+| `tanstack` | Review and implement TanStack product and integration patterns through one reusable skill with focused references. |
 | `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create a higher-rigor implementation plan with focused clarification, a gotcha pass, and a saved `plans/<topic>-plan.md`. |
@@ -69,6 +61,17 @@ This repository ships one broad Codex `tanstack` plugin rather than separate ups
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC documentation using curated summaries and a bundled upstream DocC source tree. |
+
+### TanStack References
+
+The reusable `tanstack` skill covers TanStack AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, and cross-stack integration from one `$tanstack` invocation surface.
+
+- Product references live under `skills/tanstack/references/`: `ai.md`, `cli.md`, `config.md`, `db.md`, `devtools.md`, `form.md`, `integration.md`, `pacer.md`, `query.md`, `ranger.md`, `router.md`, `start.md`, `store.md`, `table.md`, `virtual.md`.
+- Router references include `router-routing-structure.md`, `router-navigation-and-search.md`, `router-data-loading-and-ssr.md`, `router-auth-and-failures.md`, and `router-plugin-and-splitting.md`.
+- Start references include `start-framework-and-execution.md`, `start-server-functions-and-routes.md`, `start-middlewares-and-server-core.md`, `start-server-components-and-migrations.md`, and `start-deployments.md`.
+- CLI references include `cli-scaffolding.md`, `cli-addons-existing-app.md`, `cli-ecosystem-integrations.md`, `cli-custom-addons-dev-watch.md`, and `cli-docs-and-library-metadata.md`.
+
+This repository ships one broad reusable `tanstack` skill rather than separate upstream-style product plugins, narrow focused skills, or bundle aliases such as `tanstack-all`. For TanStack application work, install the reusable TanStack skill instead of copying advice from mixed community sources.
 
 ## Skill Dependencies
 
@@ -89,7 +92,6 @@ Project-local skills are repository-specific and are not included in reusable in
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
 - Use GitStack for linked git + GitHub workflows.
-- Use TanStack for TanStack AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, and integration work.
 
 ### Link Reusable Skills For Local Development
 
@@ -106,7 +108,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -135,6 +137,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill chrome-devtools \
   --skill code-wiki \
   --skill skill-cli-creator \
+  --skill tanstack \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill plan-harder \

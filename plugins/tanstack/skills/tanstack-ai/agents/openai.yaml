@@ -1,7 +1,0 @@
-interface:
-  display_name: "TanStack AI"
-  short_description: "Review TanStack AI usage for streaming, tools, structured output, workflows, and AG-UI integration."
-  icon_small: "./assets/tanstack-small.svg"
-  icon_large: "./assets/tanstack.png"
-  brand_color: "#1E3A8A"
-  default_prompt: "Use the bundled TanStack AI skill to review or implement provider-agnostic streaming, tool calling, structured output, workflows, and AG-UI integration with current TanStack AI docs."

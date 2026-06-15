@@ -1,50 +1,51 @@
 # TanStack Intent Coverage Refresh Playbook
 
 Use this playbook when asked to review or refresh TanStack Intent coverage for
-the local `plugins/tanstack/` plugin.
+the local `skills/tanstack/` skill.
 
 ## Routing Rule
 
 - Treat this as an explicit skill-specific refresh workflow, not as generic
   repo-wide maintenance.
 - Review current upstream TanStack Intent coverage before changing local
-  verification wording or plugin scope.
-- Keep runtime `plugins/tanstack/skills/*/SKILL.md` files free of maintainer
-  routing; any maintainer-only review procedure stays here.
+  verification wording or skill scope.
+- Keep runtime `skills/tanstack/SKILL.md` and `skills/tanstack/references/*.md`
+  files free of maintainer routing; any maintainer-only review procedure stays here.
 
 ## Current Local Layout
 
-- Treat `plugins/tanstack/` as one broad Codex plugin surface for the TanStack
+- Treat `skills/tanstack/` as one broad reusable skill surface for the TanStack
   portfolio.
-- Product-level bundled skills are stable direct-trigger entrypoints for AI,
-  CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store,
-  Table, and Virtual.
-- `tanstack-integration` owns cross-stack composition guidance.
-- `tanstack-router`, `tanstack-start`, and `tanstack-cli` own dense workflow
-  routing through local `references/*.md` files rather than separate narrow
-  skill directories.
+- Product-level references are stable routing units for AI, CLI, Config, DB,
+  Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, and
+  Virtual.
+- `references/integration.md` owns cross-stack composition guidance.
+- `references/router.md`, `references/start.md`, and `references/cli.md` own
+  dense workflow routing through local focused `references/*.md` files rather
+  than separate narrow skill directories.
 - When upstream coverage expands, prefer:
-  - refreshing umbrella `references/*.md` routing first
-  - then adding a new product or macro skill only when the workflow boundary
-    truly needs direct triggering
+  - refreshing `$tanstack` plus `references/*.md` routing first
+  - then adding a new product reference only when the workflow boundary truly
+    needs its own reference file
 
 ## Execution Flow (Mandatory Order)
 
-1. `inventory-local-surface`: inspect `plugins/tanstack/.codex-plugin/plugin.json`,
-   bundled `SKILL.md` files, umbrella `references/*.md` files, `agents/openai.yaml`,
-   and coupled repo docs such as `README.md` to capture the current local claims.
+1. `inventory-local-surface`: inspect `skills/tanstack/SKILL.md`,
+   `skills/tanstack/agents/openai.yaml`, product and focused
+   `references/*.md` files, and coupled repo docs such as `README.md` to
+   capture the current local claims.
 2. `review-upstream-coverage`: check the current TanStack Intent registry and the
    relevant official package pages on `tanstack.com` for first-party Intent
-   coverage relevant to the local plugin, especially Router, Start, CLI, and any
+   coverage relevant to the local skill, especially Router, Start, CLI, and any
    newly added Query-related surface.
 3. `compare-coverage`: identify whether new upstream first-party Intent skills
-   materially change the correct local guidance, such as plugin scope wording,
-   umbrella routing, verification fallbacks, or which TanStack packages should be
+   materially change the correct local guidance, such as skill scope wording,
+   reference routing, verification fallbacks, or which TanStack packages should be
    called out.
-4. `refresh-local-guidance-if-needed`: update local plugin metadata or docs only
+4. `refresh-local-guidance-if-needed`: update local skill metadata or docs only
    when upstream coverage changes create a real guidance delta. Keep wording
    precise and avoid speculating about unshipped Intent surfaces.
-5. `scoped-check`: run a scoped consistency pass across touched TanStack plugin
+5. `scoped-check`: run a scoped consistency pass across touched TanStack skill
    files and any directly coupled repo docs.
 6. `final-report`: use the release checklist schema and return `PASS (NOOP)` if
    no persistent updates were needed.
@@ -57,7 +58,7 @@ When the user asks only for a review:
 - Run `review-upstream-coverage`.
 - Run `compare-coverage`.
 - Do not make persistent edits unless the user explicitly asks to refresh or
-  update the local plugin guidance.
+  update the local skill guidance.
 
 ## Upstream Fetch Order
 
@@ -85,7 +86,7 @@ surfaces when they exist.
    - `https://tanstack.com/router/latest`
    - `https://tanstack.com/start/latest/docs`
    - `https://tanstack.com/cli/latest/docs`
-   - Use these to refresh umbrella guidance and `references/*.md` routing when
+   - Use these to refresh `$tanstack` guidance and `references/*.md` routing when
      the official docs reorganize task boundaries or terminology.
 5. Fallback for ambiguous package-version questions:
    - Use npm package metadata only when the TanStack registry page or product
@@ -94,29 +95,29 @@ surfaces when they exist.
 
 ## Layout Refresh Rules
 
-- Keep macro-area workflows in umbrella skills plus `references/*.md`.
+- Keep macro-area workflows in the `$tanstack` skill plus `references/*.md`.
 - Keep narrow Router, Start, and CLI tasks in focused reference files unless
-  the domain becomes broad enough to justify a macro skill.
+  the domain becomes broad enough to justify a product reference.
 - When a new official TanStack domain appears:
-  - add it to the nearest umbrella `references/README.md`
-  - decide whether it deserves a new macro skill or belongs inside an existing
+  - add it to `references/README.md`
+  - decide whether it deserves a new product reference or belongs inside an existing
     macro guide
 - When an official domain disappears or merges:
-  - update umbrella `references/*.md` first
-- Keep `README.md`, `.codex-plugin/plugin.json`, and umbrella `SKILL.md` files
-  aligned on the plugin's macro skills and focused reference maps
+  - update the matching product or focused `references/*.md` first
+- Keep `README.md`, `skills/tanstack/SKILL.md`, `agents/openai.yaml`, and
+  `references/*.md` files aligned on the skill's product and focused reference maps
 
 ## Guardrails
 
 - Use TanStack-owned public sources first for the upstream coverage check.
 - Do not assume a missing Query Intent surface is permanent; state it as the
   current observed registry state only.
-- Do not broaden `plugins/tanstack/` beyond its actual framework coverage
+- Do not broaden `skills/tanstack/` beyond its actual framework coverage
   without a real upstream and local-scope reason.
 - Keep local wording aligned with what the plugin actually bundles today, not
   with possible future TanStack Intent expansion.
 - Do not reintroduce separate narrow Router, Start, or CLI skill directories
-  unless a maintainer deliberately changes the plugin packaging model.
+  unless a maintainer deliberately changes the reusable-skill packaging model.
 
 ## Deliverable
 

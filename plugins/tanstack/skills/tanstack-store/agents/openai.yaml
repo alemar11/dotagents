@@ -1,7 +1,0 @@
-interface:
-  display_name: "TanStack Store"
-  short_description: "Review TanStack Store reactive state, immutable updates, selectors, derived state, and framework adapters."
-  icon_small: "./assets/tanstack-small.svg"
-  icon_large: "./assets/tanstack.png"
-  brand_color: "#312E81"
-  default_prompt: "Use the bundled TanStack Store skill to review or implement framework-agnostic reactive state, immutable updates, selectors, derived state, and adapter usage."

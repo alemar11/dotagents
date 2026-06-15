@@ -1,0 +1,7 @@
+interface:
+  display_name: "TanStack"
+  short_description: "Review and implement TanStack product and integration patterns."
+  icon_small: "./assets/tanstack-small.svg"
+  icon_large: "./assets/tanstack.png"
+  brand_color: "#0F172A"
+  default_prompt: "Use $tanstack to review or implement TanStack Query, Router, Start, Form, Table, CLI, and cross-stack patterns with focused references."

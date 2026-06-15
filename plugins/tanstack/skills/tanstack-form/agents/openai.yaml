@@ -1,7 +1,0 @@
-interface:
-  display_name: "TanStack Form"
-  short_description: "Review TanStack Form forms, RHF migrations, typed fields, arrays, validation, errors, reactivity, and resets."
-  icon_small: "./assets/tanstack-small.svg"
-  icon_large: "./assets/tanstack.png"
-  brand_color: "#DB2777"
-  default_prompt: "Use the bundled TanStack Form skill to review or migrate forms with typed fields, arrays, validation, custom errors, reactivity, resets, and React Hook Form behavior preservation."

@@ -1,7 +1,0 @@
-interface:
-  display_name: "TanStack Config"
-  short_description: "Review TanStack Config package build, lint, versioning, publishing, and shared configuration workflows."
-  icon_small: "./assets/tanstack-small.svg"
-  icon_large: "./assets/tanstack.png"
-  brand_color: "#16A34A"
-  default_prompt: "Use the bundled TanStack Config skill to review package build, lint, typecheck, versioning, publishing, and shared JavaScript or TypeScript configuration workflows."
