@@ -1,6 +1,6 @@
 ---
 name: maintainer-orchestrator
-description: Use when coordinating Codex worker threads across one or more repositories, portfolio triage, gates, ledgers, autoreview, GitStack workflows, or owner-ready maintainer closeout.
+description: Use when coordinating Codex worker threads across one or more repositories, portfolio triage, gates, ledgers, autoreview, standalone Git/GitHub workflows, or owner-ready maintainer closeout.
 ---
 
 # Maintainer Orchestrator
@@ -9,8 +9,8 @@ description: Use when coordinating Codex worker threads across one or more repos
 
 Use this Codex-dependent skill as the control plane for maintainer work across
 one or more repositories. It coordinates named portfolio ledgers, read-only
-GitStack portfolio triage, Codex worker threads, heartbeat monitoring, gates,
-`$autoreview`, and owner-ready status reports.
+standalone GitHub portfolio triage, Codex worker threads, heartbeat monitoring,
+gates, `$autoreview`, and owner-ready status reports.
 
 This skill is not a worker. It delegates scoped work, monitors progress, keeps
 the ledger current, and decides when a task is ready for owner review, commit,
@@ -31,8 +31,8 @@ sources, not the only planning model.
   monitoring.
 - The reusable `$autoreview` skill for closeout review after non-trivial code
   edits and after review-triggered fixes.
-- The GitStack plugin for `github-portfolio-triage`, current-repo triage, CI,
-  reviews, releases, commit, and publish workflows.
+- The relevant standalone Git/GitHub skills for `github-portfolio-triage`,
+  current-repo triage, CI, reviews, releases, commit, and publish workflows.
 - Local ledger storage at
   `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`.
 
@@ -44,10 +44,10 @@ the parts that can be done safely and report the exact missing surface.
 1. Resolve the portfolio ledger with `references/ledger.md`.
 2. Identify the repository set, current goals, suppressed items, owner
    constraints, and portfolio-specific gate overrides.
-3. If discovery is needed, run GitStack `github-portfolio-triage` for broad or
-   multi-repo queue scans. If the user provided a plan, decompose that plan into
-   workstreams before scanning for additional queue signals. Use current-repo
-   GitStack skills only when the task is focused on one repo.
+3. If discovery is needed, run standalone `github-portfolio-triage` for broad
+   or multi-repo queue scans. If the user provided a plan, decompose that plan
+   into workstreams before scanning for additional queue signals. Use focused
+   standalone Git/GitHub skills only when the task is focused on one repo.
 4. Classify work as `Active`, `Autonomous`, `Needs owner`, `Ready next`,
    `Blocked`, `Ignored`, or `Released` in the ledger.
 5. Before delegation, read `references/worker.md` and create one Codex worker
@@ -79,6 +79,6 @@ the parts that can be done safely and report the exact missing surface.
 - V1 does not include 1Password, specialized release executors, ledger-parsing
   scripts, or mandatory live GitHub write tests.
 - Portfolio triage is read-only. Follow-up mutations require explicit user
-  authorization and the matching GitStack skill.
+  authorization and the matching standalone Git/GitHub skill.
 - The orchestrator owns ledger updates. Worker threads report facts and
   recommendations; they do not edit portfolio ledgers directly.

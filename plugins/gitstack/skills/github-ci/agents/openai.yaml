@@ -1,7 +1,0 @@
-interface:
-  display_name: "GitHub CI"
-  short_description: "Use when investigating GitHub Actions runs, PR checks, or CI logs; use resolved `ghflow` only for failing-PR triage."
-  brand_color: "#4338CA"
-  icon_small: "./assets/github-small.svg"
-  icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub CI skill to keep routine status reads on direct `gh` commands, resolve the installed `ghflow` artifact before using `ci inspect` for failing pull requests that need GitHub Actions log triage, keep PR-associated status on `gh pr checks`, and use `gh run ...` for generic run investigation."

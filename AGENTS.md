@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Overview
-This repository hosts reusable Codex skills, repo-local plugins, project maintainer skills, and MCP install helpers. Reusable skills live under `skills/`, repo-local plugins live under `plugins/`, project maintainer skills live under `.agents/skills/`, and global MCP install helpers live under `mcps/`. Every reusable or bundled skill is documented by a `SKILL.md` entrypoint, and every plugin must ship `.codex-plugin/plugin.json`. Keep guidance lightweight and focused on building and evolving skills and plugins.
+This repository hosts reusable Codex skills, project maintainer skills, optional repo-local plugins, and MCP install helpers. Reusable skills live under `skills/`, optional repo-local plugins live under `plugins/`, project maintainer skills live under `.agents/skills/`, and global MCP install helpers live under `mcps/`. Every reusable or bundled skill is documented by a `SKILL.md` entrypoint, and every plugin must ship `.codex-plugin/plugin.json`. Keep guidance lightweight and focused on building and evolving skills and plugins.
 Agent skills follow the specification at `https://agentskills.io/specification`.
 Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
@@ -53,7 +53,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
-- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and GitStack workflows including read-only portfolio triage.
+- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub skills including read-only portfolio triage.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
@@ -133,39 +133,20 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit`, `github`, and focused `github-*` skills rather than owning duplicate helper code.
 - Keep stars and star-list workflows in standalone `github-stars`, not in repository triage.
 
-### GitStack plugin
-- Keep `plugins/gitstack/` available as the legacy backup plugin bundle for linked git authoring, GitHub operations, and publish orchestration.
-- Keep `plugins/gitstack/scripts/ghflow` as the shared runtime for bundled GitHub skills; do not add bundled skill-local runtime copies.
-- Keep `ghflow` intentionally narrow in implementation scope; avoid expanding it into wrappers for routine `git` or `gh` operations that do not need shared higher-level behavior. (Codex learning)
-- Treat bare `ghflow` as display shorthand only in GitStack runtime docs; executable examples must resolve and run the installed `scripts/ghflow` artifact unless a shell wrapper or `PATH` contract has already been verified. (Codex learning)
-- Bundle `git-commit`, `github`, `github-triage`, `github-portfolio-triage`, `github-reviews`, `github-ci`, `github-releases`, and `yeet` under `plugins/gitstack/skills/`.
-- Do not use the legacy plugin bundle as a runtime or maintenance dependency for standalone reusable Git and GitHub skills. (Codex learning)
-
 ### Maintainer Orchestrator skill
-- Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, not embedded in GitStack.
+- Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, using standalone Git/GitHub skills for queue and publish workflows.
 - Keep runtime orchestration, worker, gate, and ledger details in `skills/maintainer-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 
 ### GitHub skill
 - Keep the standalone reusable `github` skill under `skills/github/` as the umbrella GitHub routing surface for the standalone suite.
-- Keep the bundled `github` skill under `plugins/gitstack/skills/github/` as the umbrella GitHub skill surface inside this repo-local plugin, with full publish-from-worktree remaining owned by bundled `yeet`.
-- Keep shared install and dependency guidance for the bundled `github` skill centralized in `plugins/gitstack/skills/github/references/core/installation.md`. (Codex learning)
-- Keep the bundled `github` skill self-owned and self-sufficient; do not require the upstream GitHub plugin for runtime routing or execution.
-- Benchmark GitHub-skill parity work against the upstream `openai/plugins` GitHub bundle when useful, but keep repo-owned runtime instructions and helper flows local to this plugin.
-- Keep full publish-from-worktree guidance in `plugins/gitstack/skills/yeet/SKILL.md` and `plugins/gitstack/skills/yeet/references/*`, not in `plugins/gitstack/skills/github`. (Codex learning)
-- Organize bundled GitHub references under `plugins/gitstack/skills/github/references/` into domain slices: `core`, `triage`, `reviews`, `ci`, `releases`, and `publish`, and keep the shared runtime under `plugins/gitstack/scripts/ghflow`. (Codex learning)
-- Domain docs and helpers may depend only on the shared `plugins/gitstack/scripts/ghflow` runtime plus same-domain reference material; do not create cross-domain helper dependencies. (Codex learning)
 
 ### Git Commit skill
 - Keep the standalone reusable `git-commit` skill under `skills/git-commit/` scriptless and focused on selective staging, commit authoring, and push-only flows with direct `git`.
-- `git-commit` may be bundled inside `plugins/gitstack`, but keep it as a distinct skill-owned surface rather than folding commit authoring or staging responsibilities into `ghflow`. (Codex learning)
 
 ### Yeet skill
 - Keep the standalone reusable `yeet` skill under `skills/yeet/` scriptless unless a future repeated publish workflow proves a shipped script is necessary.
 - Keep `yeet` focused on publish orchestration from a local checkout rather than duplicating commit-authoring or generic GitHub skill ownership. (Codex learning)
-- Within `plugins/gitstack`, keep bundled `yeet` dependency-aware: require bundled `git-commit` and `github` instead of vendoring a duplicate GitHub helper layer. (Codex learning)
-- Within `plugins/gitstack`, keep `yeet` wired to bundled `git-commit` plus the shared `ghflow publish ...` runtime surface instead of legacy helper-script paths. (Codex learning)
-- Treat GitStack plugin cache artifacts as the installed runtime surface for shared CLIs such as `ghflow`; do not treat cache-path resolution rules as repo-level API behavior. (Codex learning)
 
 ### Learn skill
 - Keep `learn` as the repo-facing persistence surface for durable `AGENTS.md` updates in this repository; broader memory-system files are outside this repo's editable scope.

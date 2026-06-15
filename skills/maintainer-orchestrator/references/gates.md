@@ -39,8 +39,8 @@ decision brief with options and recommended next action.
 ### Release Gate
 
 Before release-ready status, verify version, changelog or release notes, tags,
-package artifacts, migration notes, rollback path, and CI. Use GitStack release
-guidance for GitHub-backed releases.
+package artifacts, migration notes, rollback path, and CI. Use the standalone
+GitHub Releases skill for GitHub-backed releases.
 
 ### Public Model Identifier Gate
 

@@ -1,20 +1,19 @@
 # dotagents
 
-Reusable Codex skills, repo-local plugins, project maintainer skills, and MCP install helpers.
+Reusable Codex skills, project maintainer skills, optional repo-local plugins, and MCP install helpers.
 
-This repository is organized around two installable surfaces:
+This repository is organized around reusable installable skills:
 
 - **Reusable skills** under `skills/`, which can be linked locally or installed into Codex.
-- **Repo-local plugins** under `plugins/`, which bundle related skills and shared runtime artifacts.
 
-Project-only maintainer workflows live under `.agents/skills/`, and global MCP setup helpers live under `mcps/`.
+Project-only maintainer workflows live under `.agents/skills/`, optional repo-local plugin discovery lives under `.agents/plugins/`, and global MCP setup helpers live under `mcps/`.
 
 ## Repository Layout
 
 | Path | Purpose |
 | --- | --- |
 | `skills/` | Reusable skills, each with a `SKILL.md` entrypoint and `agents/openai.yaml` metadata. |
-| `plugins/` | Repo-local Codex plugins, each with `.codex-plugin/plugin.json` and optional bundled skills. |
+| `plugins/` | Optional repo-local Codex plugins, each with `.codex-plugin/plugin.json` and optional bundled skills. |
 | `.agents/skills/` | Project-local maintainer skills for working on this repository. |
 | `.agents/plugins/marketplace.json` | Local plugin discovery surface for this checkout. |
 | `mcps/` | Helpers for installing global Codex MCP server entries not bundled with Codex itself. |
@@ -22,26 +21,7 @@ Project-only maintainer workflows live under `.agents/skills/`, and global MCP s
 
 ## Repo-Local Plugins
 
-Install repo-local plugins from this checkout through `.agents/plugins/marketplace.json`.
-
-| Plugin | Path | Purpose |
-| --- | --- | --- |
-| GitStack | `plugins/gitstack/` | Legacy backup bundle for git commit authoring, git/gh-first GitHub workflows, maintainer and portfolio triage, focused CI/review helpers, release checks, and publish orchestration. |
-
-### GitStack Skills
-
-`git-commit`, `github`, `github-triage`, `github-portfolio-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
-
-`plugins/gitstack/` expects both `git` and GitHub CLI `gh` on `PATH` before GitHub-backed commands run:
-
-```sh
-command -v git && git --version
-command -v gh && gh --version
-```
-
-Use `plugins/gitstack/skills/github/references/core/installation.md` for cross-platform install guidance.
-
-GitStack remains available as a backup plugin bundle. New reusable git and GitHub workflows are exposed as standalone skills under `skills/` and install independently from the plugin.
+There are currently no repo-local plugins registered in `.agents/plugins/marketplace.json`.
 
 ## Reusable Skills
 
@@ -65,7 +45,7 @@ GitStack remains available as a backup plugin bundle. New reusable git and GitHu
 | `plan-harder` | Create a higher-rigor implementation plan with focused clarification, a gotcha pass, and a saved `plans/<topic>-plan.md`. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
-| `maintainer-orchestrator` | Coordinate Codex worker threads, GitStack portfolio triage, gates, and portfolio ledgers for maintainer work. |
+| `maintainer-orchestrator` | Coordinate Codex worker threads, standalone GitHub triage workflows, gates, and portfolio ledgers for maintainer work. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
@@ -86,7 +66,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
-- `maintainer-orchestrator` requires `$autoreview` and the GitStack plugin.
+- `maintainer-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, CI, review, release, commit, or publish work: `$github`, `$github-triage`, `$github-portfolio-triage`, `$github-ci`, `$github-reviews`, `$github-releases`, `$git-commit`, and `$yeet`.
 - `yeet` requires `$git-commit` and `$github`; it may route to `$github-ci` or `$github-reviews` for follow-up CI or review work.
 
 ## Project-Local Skills
@@ -103,7 +83,7 @@ Project-local skills are repository-specific and are not included in reusable in
 
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
-- Use GitStack only when the legacy bundled plugin surface is explicitly desired; otherwise prefer the standalone reusable git and GitHub skills.
+No repo-local plugins are currently registered. Use the standalone reusable git and GitHub skills for git authoring, GitHub triage, CI, reviews, releases, and publishing.
 
 ### Link Reusable Skills For Local Development
 
