@@ -1,0 +1,7 @@
+interface:
+  display_name: "GitHub Portfolio Triage"
+  short_description: "Scan multi-repo GitHub queues and portfolio next actions."
+  brand_color: "#0F766E"
+  icon_small: "./assets/github-small.svg"
+  icon_large: "./assets/github.png"
+  default_prompt: "Use the bundled GitHub Portfolio Triage skill to scan explicit GitHub repositories with resolved `ghflow portfolio scan`, then produce a read-only URL-first portfolio queue, CI, release, blocker, and next-action report."

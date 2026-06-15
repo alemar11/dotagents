@@ -12,6 +12,10 @@ bundled `github` skill.
 - Issue reads and writes: `gh issue view`, `gh issue create`, `gh issue edit`
 - PR reads and metadata edits: `gh pr view`, `gh pr edit`
 
+Route broad, multi-repo, or portfolio queue scans to
+`../../../github-portfolio-triage/references/script-summary.md` instead of
+expanding this current-repo triage surface.
+
 ## Shared `ghflow` helpers kept in triage
 
 - Resolve the artifact with `../core/ghflow-resolution.md` before running

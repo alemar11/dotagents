@@ -21,6 +21,7 @@ short direct command sequence.
 It also bundles focused routing skills that all reuse that helper:
 
 - `github-triage`
+- `github-portfolio-triage`
 - `github-reviews`
 - `github-ci`
 - `github-releases`
@@ -35,9 +36,11 @@ lifecycle work on already-pushed branches, or any time the user just says
 - Use `yeet` when local work must become a pushed branch and draft PR.
 - Use `github` when the branch is already pushed, the GitHub task is mixed, or
   the user asks generically for GitHub work.
-- Use `github-triage`, `github-reviews`, `github-ci`, or `github-releases`
-  only when the request is clearly confined to that domain; route maintainer
-  issue/PR queue triage to `github-triage`.
+- Use `github-triage`, `github-portfolio-triage`, `github-reviews`,
+  `github-ci`, or `github-releases` only when the request is clearly confined
+  to that domain. Route current-repo issue/PR queue triage to
+  `github-triage`; route broad, multi-repo, or portfolio queue scans to
+  `github-portfolio-triage`.
 - Use plain `git` and `gh` when one command or a short direct sequence expresses
   the job clearly.
 - Use resolved `ghflow` for normalized JSON, review-thread routing,
@@ -66,7 +69,8 @@ lifecycle work on already-pushed branches, or any time the user just says
 | Request type | Preferred skill |
 | --- | --- |
 | Mixed GitHub work, publish lifecycle, or ambiguous routing | `github` |
-| Repo orientation, maintainer issue/PR queue triage, issues, PR metadata, authenticated-user stars or star lists, or raw cross-repo issue transfer | `github-triage` |
+| Repo orientation, current-repo maintainer issue/PR queue triage, issues, PR metadata, authenticated-user stars or star lists, or raw cross-repo issue transfer | `github-triage` |
+| Broad, multi-repo, or portfolio queue scans across explicit repositories | `github-portfolio-triage` |
 | Review follow-up, thread replies, review submission | `github-reviews` |
 | PR checks and GitHub Actions investigation | `github-ci` |
 | Release planning, notes, and publication with plain `git`/`gh` | `github-releases` |
@@ -115,6 +119,7 @@ Use the resolved `ghflow` artifact when one of these applies:
 - the workflow is reused across multiple bundled skills
 - the job needs repo-aware publish context or PR open-or-reuse behavior
 - the job needs normalized JSON output across subdomains
+- the job needs a read-only portfolio scan across explicit repositories
 - the job needs authenticated-user star or list GraphQL behavior
 - the job needs focused failing-PR CI inspection beyond a single direct `gh`
   status command
@@ -151,10 +156,13 @@ Use the resolved `ghflow` artifact when one of these applies:
   - `<resolved-ghflow> --json publish context`
   - `<resolved-ghflow> --json publish template`
   - `<resolved-ghflow> publish open --draft`
+  - `<resolved-ghflow> portfolio scan --repo owner/repo --repo owner/other`
   - `<resolved-ghflow> --json stars list`
   - `<resolved-ghflow> --json stars lists list`
 - Triage specialist:
   - `../github-triage/references/script-summary.md`
+- Portfolio triage specialist:
+  - `../github-portfolio-triage/references/script-summary.md`
 - Reviews specialist:
   - `../github-reviews/references/script-summary.md`
 - CI specialist:
@@ -169,6 +177,7 @@ Use the resolved `ghflow` artifact when one of these applies:
 - Open `references/workflows.md` when you need the full umbrella runbook.
 - For pure domain work, jump into the specialist skill references:
   - `../github-triage/references/`
+  - `../github-portfolio-triage/references/`
   - `../github-reviews/references/`
   - `../github-ci/references/`
   - `../github-releases/references/`
@@ -187,7 +196,8 @@ Use the resolved `ghflow` artifact when one of these applies:
 - Keep runtime logic in `<plugin-root>/projects/ghflow/src/ghflow/`.
 - Keep skill docs sample-first around `git` and `gh`; use the resolved
   `ghflow` artifact only for shared higher-level behavior such as failing-PR CI
-  inspection, review-thread routing, stars, lists, and publish helpers.
+  inspection, portfolio scans, review-thread routing, stars, lists, and publish
+  helpers.
 - Do not add skill-local runtime copies under bundled GitHub skills.
 - Do not add compatibility aliases or reintroduce public per-domain script
   entrypoints.
@@ -202,6 +212,7 @@ Use the resolved `ghflow` artifact when one of these applies:
 
 - "Summarize this repo and tell me what matters first."
 - "Triage this repo's open issues and PRs."
+- "Scan these repos and tell me which portfolio queue items need action."
 - "Show me the open PRs for this repo and summarize which one needs attention."
 - "Show me my starred repos."
 - "Update the PR title and body without changing review state."

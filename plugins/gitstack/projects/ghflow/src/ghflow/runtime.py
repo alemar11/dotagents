@@ -510,13 +510,14 @@ def print_json_error(command_path: tuple[str, ...], *, code: str, message: str, 
     sys.stdout.write("\n")
 
 
-def validate_repo_reference(repo: str) -> str:
+def validate_repo_reference(repo: str, *, command_path: tuple[str, ...] = ()) -> str:
     value = repo.strip()
     if not REPO_PATTERN.match(value):
         raise GhflowError(
             f"Invalid --repo value '{repo}'. Use owner/repo.",
             code="invalid_arguments",
             exit_code=64,
+            command_path=command_path,
         )
     return value
 
@@ -576,7 +577,7 @@ def normalize_remote_url(remote: str | None) -> str | None:
 
 def resolve_repo(repo_ref: str | None, allow_non_project: bool, *, command_path: tuple[str, ...]) -> str:
     if repo_ref:
-        return validate_repo_reference(repo_ref)
+        return validate_repo_reference(repo_ref, command_path=command_path)
     if not is_git_repo():
         if allow_non_project:
             raise GhflowError(
@@ -931,6 +932,329 @@ def snippet(text: str, *, limit: int = 220) -> str:
     if len(compact) > limit:
         return compact[: limit - 3] + "..."
     return compact
+
+
+ISSUE_LIST_FIELDS = "number,title,author,labels,createdAt,updatedAt,url"
+PR_LIST_FIELDS = "number,title,author,isDraft,reviewDecision,mergeStateStatus,statusCheckRollup,createdAt,updatedAt,url"
+RUN_LIST_FIELDS = "status,conclusion,workflowName,displayTitle,headBranch,url,createdAt,updatedAt"
+REPO_VIEW_FIELDS = "issues,pullRequests,latestRelease,url,isArchived,isFork,pushedAt"
+PORTFOLIO_FAILURE_CONCLUSIONS = {"failure", "cancelled", "timed_out", "action_required", "startup_failure"}
+
+
+def read_repo_file(path: str, *, command_path: tuple[str, ...]) -> list[str]:
+    try:
+        content = Path(path).read_text()
+    except OSError as exc:
+        raise GhflowError(
+            f"Could not read --repo-file '{path}': {exc}",
+            code="invalid_arguments",
+            exit_code=64,
+            command_path=command_path,
+        ) from exc
+    repos: list[str] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        repos.append(line.split()[0])
+    return repos
+
+
+def portfolio_repos(opts: dict[str, Any], *, command_path: tuple[str, ...]) -> list[str]:
+    raw_repos: list[str] = list(opts["repos"] or [])
+    if opts["repo_file"]:
+        raw_repos.extend(read_repo_file(str(opts["repo_file"]), command_path=command_path))
+    if not raw_repos:
+        raise GhflowError(
+            "Pass at least one --repo owner/repo or --repo-file path.",
+            code="invalid_arguments",
+            exit_code=64,
+            command_path=command_path,
+        )
+    repos: list[str] = []
+    seen: set[str] = set()
+    for raw_repo in raw_repos:
+        repo = validate_repo_reference(str(raw_repo), command_path=command_path)
+        if repo not in seen:
+            seen.add(repo)
+            repos.append(repo)
+    return repos
+
+
+def login_of(author: Any) -> str:
+    if isinstance(author, dict):
+        value = author.get("login")
+        return str(value) if value else ""
+    return ""
+
+
+def label_names(labels: Any) -> list[str]:
+    if not isinstance(labels, list):
+        return []
+    names: list[str] = []
+    for label in labels:
+        if isinstance(label, dict) and label.get("name"):
+            names.append(str(label["name"]))
+    return names
+
+
+def simplify_issue(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "number": item.get("number"),
+        "title": item.get("title") or "",
+        "author": login_of(item.get("author")),
+        "labels": label_names(item.get("labels")),
+        "updated_at": item.get("updatedAt") or "",
+        "url": item.get("url") or "",
+    }
+
+
+def status_rollup_summary(value: Any) -> str:
+    if not isinstance(value, list):
+        return "unknown"
+    failing = 0
+    pending = 0
+    success = 0
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        state = str(item.get("conclusion") or item.get("state") or item.get("status") or "").lower()
+        if state in PORTFOLIO_FAILURE_CONCLUSIONS | {"error"}:
+            failing += 1
+        elif state in {"pending", "queued", "in_progress", "requested", "waiting", "expected"}:
+            pending += 1
+        elif state in {"success", "completed", "neutral", "skipped"}:
+            success += 1
+    if failing:
+        return f"{failing} failing"
+    if pending:
+        return f"{pending} pending"
+    if success:
+        return f"{success} passing"
+    return "none"
+
+
+def simplify_pr(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "number": item.get("number"),
+        "title": item.get("title") or "",
+        "author": login_of(item.get("author")),
+        "is_draft": bool(item.get("isDraft")),
+        "review_decision": item.get("reviewDecision"),
+        "merge_state": item.get("mergeStateStatus"),
+        "status": status_rollup_summary(item.get("statusCheckRollup")),
+        "updated_at": item.get("updatedAt") or "",
+        "url": item.get("url") or "",
+    }
+
+
+def connection_total(value: Any, *, fallback: int = 0) -> int:
+    if isinstance(value, dict) and isinstance(value.get("totalCount"), int):
+        return int(value["totalCount"])
+    return fallback
+
+
+def summarize_ci(runs: Any) -> dict[str, Any]:
+    if not isinstance(runs, list) or not runs:
+        return {"state": "none", "text": "no recent runs", "recent": []}
+    simplified: list[dict[str, Any]] = []
+    for run_item in runs:
+        if not isinstance(run_item, dict):
+            continue
+        simplified.append(
+            {
+                "workflow": run_item.get("workflowName") or run_item.get("name") or "",
+                "title": run_item.get("displayTitle") or "",
+                "branch": run_item.get("headBranch") or "",
+                "status": run_item.get("status") or "",
+                "conclusion": run_item.get("conclusion"),
+                "updated_at": run_item.get("updatedAt") or run_item.get("createdAt") or "",
+                "url": run_item.get("url") or "",
+            }
+        )
+    failures = [item for item in simplified if str(item.get("conclusion") or "").lower() in PORTFOLIO_FAILURE_CONCLUSIONS]
+    pending = [
+        item
+        for item in simplified
+        if str(item.get("status") or "").lower() not in {"completed", ""}
+    ]
+    if failures:
+        first = failures[0]
+        text = f"{len(failures)} failing/cancelled; latest {first['workflow'] or first['title'] or 'run'}"
+        state = "failing"
+    elif pending:
+        first = pending[0]
+        text = f"{len(pending)} pending; latest {first['workflow'] or first['title'] or 'run'}"
+        state = "pending"
+    else:
+        text = f"{len(simplified)} recent successful/neutral run(s)"
+        state = "green"
+    return {"state": state, "text": text, "recent": simplified[:5]}
+
+
+def latest_release_payload(repo: str, release: Any) -> dict[str, Any]:
+    if not isinstance(release, dict) or not release:
+        return {"status": "missing", "tag": None, "name": None, "published_at": None, "url": None}
+    tag = str(release.get("tagName") or "")
+    payload = {
+        "status": "found",
+        "tag": tag or None,
+        "name": release.get("name") or None,
+        "published_at": release.get("publishedAt") or release.get("createdAt"),
+        "url": release.get("url") or (f"https://github.com/{repo}/releases/tag/{tag}" if tag else None),
+    }
+    optional_booleans = {
+        "isDraft": "is_draft",
+        "isPrerelease": "is_prerelease",
+        "isLatest": "is_latest",
+    }
+    for source_key, output_key in optional_booleans.items():
+        if source_key in release:
+            payload[output_key] = bool(release.get(source_key))
+    return payload
+
+
+def top_queue_signals(repo_payload: dict[str, Any]) -> list[str]:
+    signals: list[str] = []
+    if repo_payload.get("is_archived"):
+        signals.append("archived")
+    if repo_payload["ci"]["state"] == "failing":
+        signals.append("failing CI")
+    if repo_payload["open_prs"] > 0:
+        signals.append(f"{repo_payload['open_prs']} open PRs")
+    if repo_payload["open_issues"] > 0:
+        signals.append(f"{repo_payload['open_issues']} open issues")
+    if repo_payload["latest_release"]["status"] == "missing":
+        signals.append("no release")
+    return signals[:4]
+
+
+def next_portfolio_action(repo_payload: dict[str, Any]) -> str:
+    if repo_payload.get("is_archived"):
+        return "confirm archived repo is intentionally in scope"
+    if repo_payload["ci"]["state"] == "failing":
+        return "inspect recent CI failures"
+    if repo_payload["open_prs"] > 0:
+        return "review open PRs"
+    if repo_payload["open_issues"] > 0:
+        return "triage open issues"
+    if repo_payload["latest_release"]["status"] == "missing":
+        return "check release readiness"
+    return "queue empty; check freshness/release need"
+
+
+def scan_portfolio_repo(repo: str, *, limit: int, command_path: tuple[str, ...]) -> dict[str, Any]:
+    repo_info = gh_json(["repo", "view", repo, "--json", REPO_VIEW_FIELDS], command_path=command_path)
+    issues = gh_json(
+        ["issue", "list", "--repo", repo, "--state", "open", "--limit", str(limit), "--json", ISSUE_LIST_FIELDS],
+        command_path=command_path,
+    )
+    prs = gh_json(
+        ["pr", "list", "--repo", repo, "--state", "open", "--limit", str(limit), "--json", PR_LIST_FIELDS],
+        command_path=command_path,
+    )
+    runs = gh_json(["run", "list", "--repo", repo, "--limit", "5", "--json", RUN_LIST_FIELDS], command_path=command_path)
+    issue_items = [simplify_issue(item) for item in issues if isinstance(item, dict)] if isinstance(issues, list) else []
+    pr_items = [simplify_pr(item) for item in prs if isinstance(item, dict)] if isinstance(prs, list) else []
+    payload = {
+        "repo": repo,
+        "ok": True,
+        "repo_url": repo_info.get("url") if isinstance(repo_info, dict) else None,
+        "is_archived": bool(repo_info.get("isArchived")) if isinstance(repo_info, dict) else False,
+        "is_fork": bool(repo_info.get("isFork")) if isinstance(repo_info, dict) else False,
+        "pushed_at": repo_info.get("pushedAt") if isinstance(repo_info, dict) else None,
+        "open_issues": connection_total(repo_info.get("issues"), fallback=len(issue_items)) if isinstance(repo_info, dict) else len(issue_items),
+        "open_prs": connection_total(repo_info.get("pullRequests"), fallback=len(pr_items)) if isinstance(repo_info, dict) else len(pr_items),
+        "issues": issue_items,
+        "pull_requests": pr_items,
+        "ci": summarize_ci(runs),
+        "latest_release": latest_release_payload(repo, repo_info.get("latestRelease") if isinstance(repo_info, dict) else None),
+    }
+    payload["top_queue_signals"] = top_queue_signals(payload)
+    payload["next_action"] = next_portfolio_action(payload)
+    return payload
+
+
+def portfolio_error_payload(repo: str, exc: GhflowError) -> dict[str, Any]:
+    return {
+        "repo": repo,
+        "ok": False,
+        "error": {
+            "code": exc.code,
+            "message": exc.message,
+            "retry": exc.retry,
+        },
+    }
+
+
+def render_portfolio_scan(payload: dict[str, Any]) -> str:
+    lines = ["Portfolio scan:"]
+    successes = [repo for repo in payload["repos"] if repo.get("ok")]
+    failures = [repo for repo in payload["repos"] if not repo.get("ok")]
+    if successes:
+        lines.append(f"{'Repo':<34} {'Issues':>6} {'PRs':>5} {'CI':<22} {'Release':<16} {'Signals':<24} Next")
+        for repo in successes:
+            release = repo["latest_release"].get("tag") or repo["latest_release"].get("status") or "none"
+            signals = ", ".join(repo.get("top_queue_signals") or ["none"])
+            lines.append(
+                f"{repo['repo']:<34} {repo['open_issues']:>6} {repo['open_prs']:>5} "
+                f"{snippet(repo['ci']['text'], limit=22):<22} {snippet(str(release), limit=16):<16} "
+                f"{snippet(signals, limit=24):<24} {repo['next_action']}"
+            )
+    if failures:
+        lines.extend(["", "Errors:"])
+        for repo in failures:
+            error = repo.get("error") or {}
+            lines.append(f"- {repo['repo']}: {error.get('message') or 'scan failed'}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def portfolio_scan_handler(spec: CommandSpec, tail: list[str], json_mode: bool) -> CommandResponse:
+    opts = parse_options(
+        spec.command_path,
+        tail,
+        {
+            "--repo": value("repos", multiple=True),
+            "--repo-file": value("repo_file"),
+            "--limit": value("limit", default="20"),
+        },
+    )
+    limit = require_positive_int("limit", str(opts["limit"]), command_path=spec.command_path)
+    repos = portfolio_repos(opts, command_path=spec.command_path)
+    results: list[dict[str, Any]] = []
+    for repo in repos:
+        try:
+            results.append(scan_portfolio_repo(repo, limit=limit, command_path=spec.command_path))
+        except GhflowError as exc:
+            results.append(portfolio_error_payload(repo, exc))
+    successful = sum(1 for item in results if item.get("ok"))
+    failed = len(results) - successful
+    payload = {
+        "summary": {
+            "requested": len(repos),
+            "successful": successful,
+            "failed": failed,
+            "limit": limit,
+        },
+        "repos": results,
+    }
+    exit_code = 0 if successful else 2
+    if json_mode:
+        return CommandResponse(
+            RunResult(exit_code, json.dumps(payload, indent=2) + "\n", ""),
+            "json",
+            allow_nonzero=exit_code != 0,
+            error_code="portfolio_scan_failed" if exit_code else None,
+            error_message="No repositories scanned successfully." if exit_code else None,
+        )
+    return CommandResponse(
+        RunResult(exit_code, render_portfolio_scan(payload), ""),
+        "text",
+        allow_nonzero=exit_code != 0,
+        error_code="portfolio_scan_failed" if exit_code else None,
+        error_message="No repositories scanned successfully." if exit_code else None,
+    )
 
 
 def ci_inspect_handler(spec: CommandSpec, tail: list[str], json_mode: bool) -> CommandResponse:
@@ -1417,6 +1741,7 @@ def lists_handler(spec: CommandSpec, tail: list[str], json_mode: bool) -> Comman
 COMMAND_LIST = [
     CommandSpec(("ci", "inspect"), usage_tail="[--pr <number-or-url>] [--repo <owner/repo>] [--allow-non-project] [--max-lines <count>] [--context <count>]", handler=ci_inspect_handler),
     CommandSpec(("reviews", "address"), usage_tail="--pr <number> [--repo <owner/repo>] [--include-resolved] [--selection <rows>] [--comment-ids <ids>] [--reply-body <text>] [--dry-run] [--allow-non-project]", handler=reviews_address_handler),
+    CommandSpec(("portfolio", "scan"), usage_tail="--repo <owner/repo> [--repo <owner/repo> ...] [--repo-file <path>] [--limit <count>]", handler=portfolio_scan_handler),
     CommandSpec(("stars", "list"), handler=stars_handler),
     CommandSpec(("stars", "add"), handler=stars_handler),
     CommandSpec(("stars", "remove"), handler=stars_handler),
@@ -1435,11 +1760,12 @@ COMMAND_SPECS = {spec.command_path: spec for spec in COMMAND_LIST}
 GROUP_HELP_PREFIXES = {prefix for command_path in COMMAND_ORDER for prefix in (command_path[:size] for size in range(1, len(command_path)))}
 ROOT_NOUN_DESCRIPTIONS = {
     "ci": "failing PR check inspection for GitHub Actions",
+    "portfolio": "read-only multi-repo queue and release triage",
     "reviews": "PR review-thread work",
     "stars": "authenticated-user stars and star lists",
     "publish": "current-branch PR context, template discovery, and open-or-reuse flows",
 }
-ROOT_NOUN_ORDER = ("ci", "reviews", "stars", "publish")
+ROOT_NOUN_ORDER = ("ci", "portfolio", "reviews", "stars", "publish")
 ROOT_NOUNS = tuple(noun for noun in ROOT_NOUN_ORDER if any(command_path[0] == noun for command_path in COMMAND_ORDER))
 SORTED_COMMAND_KEYS = sorted(COMMAND_ORDER, key=len, reverse=True)
 MAX_COMMAND_DEPTH = max(len(command_path) for command_path in COMMAND_ORDER)

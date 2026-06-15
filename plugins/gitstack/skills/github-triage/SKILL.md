@@ -8,12 +8,13 @@ description: Use when triaging GitHub repos, issues, PRs, or maintainer queues.
 ## Overview
 
 Use this bundled skill when the request is clearly about repo orientation,
-maintainer triage, issues, PR metadata, authenticated-user stars, or star
-lists.
+current-repo maintainer triage, issues, PR metadata, authenticated-user stars,
+or star lists.
 
 Prefer direct `gh` for straightforward repo, issue, and PR work. Use resolved
-`ghflow` only for authenticated-user stars and star lists. Route mixed-domain
-or publish-lifecycle work back to the umbrella `github` skill.
+`ghflow` only for authenticated-user stars and star lists. Route broad,
+multi-repo, or portfolio queue scans to `github-portfolio-triage`; route
+mixed-domain or publish-lifecycle work back to the umbrella `github` skill.
 
 When the user says `triage` from a GitHub repo, produce a URL-first maintainer
 triage report for the current repo's open issues and PRs. This is report-only:
@@ -56,6 +57,8 @@ Resolve `ghflow` with `../github/references/core/ghflow-resolution.md` before he
 - Keep maintainer triage current-repo first. Support explicit `owner/repo`, but
   do not broaden to owner/org-wide queue discovery unless a future workflow
   explicitly adds that behavior.
+- Route broad, multi-repo, portfolio, or several-repository queue scans to
+  `github-portfolio-triage`.
 - Keep review follow-up in `github-reviews`.
 - Keep CI and Actions work in `github-ci`.
 - Keep release creation and planning in `github-releases`.

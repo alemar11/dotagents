@@ -52,6 +52,17 @@ class ParseRootArgsTests(unittest.TestCase):
     def test_project_package_exports_main(self) -> None:
         self.assertTrue(callable(ghflow.main))
 
+    def test_package_entrypoint_exits_with_runtime_code(self) -> None:
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(sys, "argv", ["ghflow", "doctor"]),
+            contextlib.redirect_stderr(stderr),
+            self.assertRaises(SystemExit) as ctx,
+        ):
+            ghflow.main()
+        self.assertEqual(ctx.exception.code, 64)
+        self.assertIn("Unknown command group: doctor", stderr.getvalue())
+
     def test_match_longest_nested_command(self) -> None:
         parsed = runtime.parse_root_args(["stars", "lists", "delete", "--list", "later"])
         self.assertEqual(parsed["mode"], "command")
@@ -78,9 +89,21 @@ class ParseRootArgsTests(unittest.TestCase):
         self.assertEqual(parsed["command"], ("ci", "inspect"))
         self.assertEqual(parsed["tail"], ["--pr", "123"])
 
+    def test_parse_portfolio_scan_repeated_repo_command(self) -> None:
+        parsed = runtime.parse_root_args(
+            ["portfolio", "scan", "--repo", "openai/codex", "--repo", "openai/openai"]
+        )
+        self.assertEqual(parsed["mode"], "command")
+        self.assertEqual(parsed["command"], ("portfolio", "scan"))
+        self.assertEqual(parsed["tail"], ["--repo", "openai/codex", "--repo", "openai/openai"])
+
     def test_render_ci_help_mentions_inspect(self) -> None:
         help_text = runtime.render_noun_help(("ci",))
         self.assertIn("ghflow [--json] ci inspect", help_text)
+
+    def test_render_portfolio_help_mentions_scan(self) -> None:
+        help_text = runtime.render_noun_help(("portfolio",))
+        self.assertIn("ghflow [--json] portfolio scan", help_text)
 
     def test_render_publish_help_mentions_template_and_body_file(self) -> None:
         help_text = runtime.render_noun_help(("publish",))
@@ -307,6 +330,161 @@ class CiInspectRuntimeTests(unittest.TestCase):
         self.assertEqual(body["command"], ["ci", "inspect"])
         self.assertEqual(body["error"]["code"], "failing_checks")
         self.assertEqual(body["data"]["failingCount"], 1)
+
+
+class PortfolioScanTests(unittest.TestCase):
+    def fake_gh_json(self, args, *, command_path, cwd=None, input_text=None):
+        repo = args[2] if args[:2] == ["repo", "view"] else args[args.index("--repo") + 1]
+        if repo == "bad/repo":
+            raise runtime.GhflowError(
+                "HTTP 404: Not Found",
+                code="command_failed",
+                exit_code=1,
+                command_path=command_path,
+            )
+        if args[:2] == ["repo", "view"]:
+            return {
+                "url": f"https://github.com/{repo}",
+                "isArchived": False,
+                "isFork": False,
+                "pushedAt": "2026-06-15T10:10:00Z",
+                "issues": {"totalCount": 7},
+                "pullRequests": {"totalCount": 3},
+                "latestRelease": {
+                    "tagName": "v1.2.3",
+                    "name": "v1.2.3",
+                    "url": f"https://github.com/{repo}/releases/tag/v1.2.3",
+                    "isDraft": False,
+                    "isPrerelease": False,
+                    "isLatest": True,
+                    "publishedAt": "2026-06-14T10:00:00Z",
+                },
+            }
+        if args[:2] == ["issue", "list"]:
+            return [
+                {
+                    "number": 1,
+                    "title": "Bug",
+                    "author": {"login": "alice"},
+                    "labels": [{"name": "bug"}],
+                    "updatedAt": "2026-06-15T09:00:00Z",
+                    "url": f"https://github.com/{repo}/issues/1",
+                }
+            ]
+        if args[:2] == ["pr", "list"]:
+            return [
+                {
+                    "number": 2,
+                    "title": "Fix",
+                    "author": {"login": "bob"},
+                    "isDraft": False,
+                    "reviewDecision": "REVIEW_REQUIRED",
+                    "mergeStateStatus": "CLEAN",
+                    "statusCheckRollup": [{"state": "SUCCESS"}],
+                    "updatedAt": "2026-06-15T10:00:00Z",
+                    "url": f"https://github.com/{repo}/pull/2",
+                }
+            ]
+        if args[:2] == ["run", "list"]:
+            return [
+                {
+                    "workflowName": "CI",
+                    "displayTitle": "test",
+                    "headBranch": "main",
+                    "status": "completed",
+                    "conclusion": "success",
+                    "updatedAt": "2026-06-15T10:05:00Z",
+                    "url": f"https://github.com/{repo}/actions/runs/1",
+                }
+            ]
+        raise AssertionError(f"unexpected gh_json args: {args}")
+
+    def test_portfolio_scan_json_success(self) -> None:
+        stdout = io.StringIO()
+        with (
+            contextlib.redirect_stdout(stdout),
+            mock.patch.object(runtime, "gh_json", side_effect=self.fake_gh_json),
+        ):
+            exit_code = runtime.main(["--json", "portfolio", "scan", "--repo", "openai/codex"])
+        body = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["command"], ["portfolio", "scan"])
+        self.assertEqual(body["data"]["summary"]["successful"], 1)
+        self.assertEqual(body["data"]["repos"][0]["open_issues"], 7)
+        self.assertEqual(body["data"]["repos"][0]["open_prs"], 3)
+        self.assertIn("7 open issues", body["data"]["repos"][0]["top_queue_signals"])
+        self.assertEqual(body["data"]["repos"][0]["latest_release"]["url"], "https://github.com/openai/codex/releases/tag/v1.2.3")
+
+    def test_portfolio_scan_repo_file_and_partial_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo_file = Path(temp) / "repos.txt"
+            repo_file.write_text("# comment\nopenai/codex\nbad/repo\nopenai/codex duplicate\n")
+            stdout = io.StringIO()
+            with (
+                contextlib.redirect_stdout(stdout),
+                mock.patch.object(runtime, "gh_json", side_effect=self.fake_gh_json),
+            ):
+                exit_code = runtime.main(["--json", "portfolio", "scan", "--repo-file", str(repo_file), "--limit", "5"])
+        body = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(body["ok"])
+        self.assertEqual(body["data"]["summary"]["requested"], 2)
+        self.assertEqual(body["data"]["summary"]["successful"], 1)
+        self.assertEqual(body["data"]["summary"]["failed"], 1)
+        self.assertFalse(body["data"]["repos"][1]["ok"])
+        self.assertEqual(body["data"]["repos"][1]["error"]["message"], "HTTP 404: Not Found")
+
+    def test_portfolio_scan_all_failures_return_nonzero_with_data(self) -> None:
+        stdout = io.StringIO()
+        with (
+            contextlib.redirect_stdout(stdout),
+            mock.patch.object(runtime, "gh_json", side_effect=self.fake_gh_json),
+        ):
+            exit_code = runtime.main(["--json", "portfolio", "scan", "--repo", "bad/repo"])
+        body = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 2)
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["error"]["code"], "portfolio_scan_failed")
+        self.assertEqual(body["data"]["summary"]["successful"], 0)
+
+    def test_portfolio_scan_invalid_repo_json_preserves_command_path(self) -> None:
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            exit_code = runtime.main(["--json", "portfolio", "scan", "--repo", "bad"])
+        body = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 64)
+        self.assertFalse(body["ok"])
+        self.assertEqual(body["command"], ["portfolio", "scan"])
+        self.assertEqual(body["error"]["code"], "invalid_arguments")
+
+    def test_summarize_ci_treats_startup_failure_as_failure(self) -> None:
+        payload = runtime.summarize_ci(
+            [
+                {
+                    "workflowName": "CI",
+                    "displayTitle": "build",
+                    "status": "completed",
+                    "conclusion": "startup_failure",
+                }
+            ]
+        )
+        self.assertEqual(payload["state"], "failing")
+        self.assertIn("failing", payload["text"])
+
+    def test_status_rollup_summary_reads_pending_check_run_status(self) -> None:
+        summary = runtime.status_rollup_summary(
+            [
+                {"status": "IN_PROGRESS", "conclusion": None},
+                {"state": "EXPECTED"},
+                {"state": "SUCCESS"},
+            ]
+        )
+        self.assertEqual(summary, "2 pending")
+
+    def test_status_rollup_summary_treats_startup_failure_as_failure(self) -> None:
+        summary = runtime.status_rollup_summary([{"conclusion": "STARTUP_FAILURE"}])
+        self.assertEqual(summary, "1 failing")
 
 
 class ChecksTests(unittest.TestCase):

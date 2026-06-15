@@ -10,6 +10,8 @@ shared `ghflow` helpers is actually justified.
 - Triage-owned maintainer queue reports, repository orientation,
   authenticated-user star or star-list, issue, and PR metadata flows:
   `references/triage/workflows.md`
+- Broad or multi-repo queue scans across explicit repositories:
+  `../../github-portfolio-triage/references/workflows.md`
 - Review-thread inspection, reply, and review submission:
   `references/reviews/workflows.md`
 - PR checks and generic GitHub Actions investigation:
@@ -23,8 +25,8 @@ shared `ghflow` helpers is actually justified.
 
 - Stay on direct `gh` or `git` commands by default, and switch to the resolved
   `ghflow` artifact only for focused failing-PR CI inspection,
-  review-thread routing, authenticated-user stars or star lists, and
-  current-branch publish helpers.
+  read-only portfolio scans, review-thread routing, authenticated-user stars or
+  star lists, and current-branch publish helpers.
 - Before running any shared helper command, resolve the installed artifact with
   `references/core/ghflow-resolution.md`; bare `ghflow` is not assumed to be
   on `PATH`.

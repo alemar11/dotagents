@@ -1,7 +1,7 @@
 interface:
   display_name: "GitHub"
-  short_description: "Use when GitHub work is mixed or already-pushed; route maintainer triage to `github-triage`, prefer `git`/`gh`, and resolve `ghflow` only for shared helpers."
+  short_description: "Use when GitHub work is mixed or already-pushed; route current-repo triage to `github-triage` and portfolio scans to `github-portfolio-triage`."
   brand_color: "#1F9D55"
   icon_small: "./assets/github-small.svg"
   icon_large: "./assets/github.png"
-  default_prompt: "Use the bundled GitHub skill to ensure both `git` and `gh` are installed, route focused maintainer issue/PR queue triage to `github-triage`, prefer direct `gh` commands for straightforward GitHub work, resolve the installed `ghflow` artifact before helper use, and use it only for failing-PR CI inspection, publish-context inspection, review-thread routing, authenticated-user stars or star lists, or other higher-level shared behavior."
+  default_prompt: "Use the bundled GitHub skill to ensure both `git` and `gh` are installed, route focused current-repo issue/PR queue triage to `github-triage`, route broad or multi-repo queue scans to `github-portfolio-triage`, prefer direct `gh` commands for straightforward GitHub work, resolve the installed `ghflow` artifact before helper use, and use it only for failing-PR CI inspection, portfolio scans, publish-context inspection, review-thread routing, authenticated-user stars or star lists, or other higher-level shared behavior."

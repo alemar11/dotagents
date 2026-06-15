@@ -17,6 +17,7 @@ bundled `github` skill.
 ## Shared `ghflow` helpers
 
 - Failing-PR CI inspection: `<resolved-ghflow> ci inspect`
+- Read-only portfolio scans: `<resolved-ghflow> portfolio scan`
 - Review-thread triage and reply routing: `<resolved-ghflow> reviews address`
 - Authenticated-user stars and star lists:
   `<resolved-ghflow> stars <list|add|remove>`,
@@ -32,6 +33,8 @@ bundled `github` skill.
   `references/core/installation.md`, `references/core/ghflow-resolution.md`
 - Triage helpers and maintainer queue reports:
   `references/triage/script-summary.md`
+- Portfolio triage helper:
+  `../../github-portfolio-triage/references/script-summary.md`
 - Review helpers: `references/reviews/script-summary.md`
 - CI guidance: `references/ci/script-summary.md`
 - Release guidance: `references/releases/script-summary.md`

@@ -21,6 +21,9 @@ Use this reference for triage-domain GitHub flows inside the consolidated
   `gh pr view <n> --repo <owner/repo>`
   `gh pr edit <n> --repo <owner/repo> ...`
 
+Route broad, multi-repo, or portfolio queue scans to
+`../../../github-portfolio-triage/references/workflows.md`.
+
 ## Shared helper workflows
 
 - Stars:

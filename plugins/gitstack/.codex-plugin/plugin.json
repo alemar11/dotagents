@@ -1,7 +1,7 @@
 {
   "name": "gitstack",
-  "version": "3.3.0",
-  "description": "Bundle git authoring, git/gh-first GitHub operations, maintainer triage, and publish workflows, with shared ghflow helpers for focused CI inspection, higher-level review, star-list, and publish flows.",
+  "version": "3.4.0",
+  "description": "Bundle git authoring, git/gh-first GitHub operations, maintainer and portfolio triage, and publish workflows, with shared ghflow helpers for focused CI inspection, higher-level review, star-list, portfolio-scan, and publish flows.",
   "author": {
     "name": "alemar11",
     "email": "",
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "GitStack",
-    "shortDescription": "Bundle git commit, git/gh-first GitHub workflows, maintainer triage, and narrow shared CI/review/publish helpers in one plugin.",
-    "longDescription": "GitStack keeps normal work centered on `git` and `gh`, with `git-commit`, `github`, specialist GitHub skills, and Yeet using shared `ghflow` helpers only where focused failing-PR CI inspection, review-thread routing, authenticated-user stars or star lists, or current-branch publish helpers justify extra tooling. Focused maintainer issue/PR queue triage routes to the bundled `github-triage` skill and stays report-only until the user asks for follow-up action.",
+    "shortDescription": "Bundle git commit, git/gh-first GitHub workflows, maintainer and portfolio triage, and narrow shared helpers in one plugin.",
+    "longDescription": "GitStack keeps normal work centered on `git` and `gh`, with `git-commit`, `github`, specialist GitHub skills, and Yeet using shared `ghflow` helpers only where focused failing-PR CI inspection, review-thread routing, authenticated-user stars or star lists, read-only portfolio scans, or current-branch publish helpers justify extra tooling. Focused current-repo issue/PR queue triage routes to the bundled `github-triage` skill, while broad or multi-repo queue triage routes to `github-portfolio-triage`; both stay report-only until the user asks for follow-up action.",
     "developerName": "alemar11",
     "category": "Productivity",
     "capabilities": [
@@ -31,6 +31,7 @@
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
       "Triage this repo's open issues and PRs.",
+      "Scan this portfolio's GitHub queues across multiple repositories.",
       "Turn these local changes into a draft PR.",
       "Create a clean commit and open or reuse the PR."
     ],
