@@ -50,9 +50,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Dependency Classification
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
-- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, and `skill-audit`.
+- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
+- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and GitStack workflows including read-only portfolio triage.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
@@ -127,8 +128,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `plugins/gitstack/scripts/ghflow` as the shared runtime for bundled GitHub skills; do not add bundled skill-local runtime copies.
 - Keep `ghflow` intentionally narrow in implementation scope; avoid expanding it into wrappers for routine `git` or `gh` operations that do not need shared higher-level behavior. (Codex learning)
 - Treat bare `ghflow` as display shorthand only in GitStack runtime docs; executable examples must resolve and run the installed `scripts/ghflow` artifact unless a shell wrapper or `PATH` contract has already been verified. (Codex learning)
-- Bundle `git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, and `yeet` under `plugins/gitstack/skills/`.
+- Bundle `git-commit`, `github`, `github-triage`, `github-portfolio-triage`, `github-reviews`, `github-ci`, `github-releases`, and `yeet` under `plugins/gitstack/skills/`.
 - Keep GitHub-oriented skills distributed through `plugins/gitstack/`, not duplicated as standalone reusable skills under `skills/`. (Codex learning)
+
+### Maintainer Orchestrator skill
+- Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, not embedded in GitStack.
+- Keep runtime orchestration, worker, gate, and ledger details in `skills/maintainer-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
+- Persist portfolio ledgers under `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 
 ### GitHub skill
 - Keep the bundled `github` skill under `plugins/gitstack/skills/github/` as the umbrella GitHub skill surface inside this repo-local plugin, with full publish-from-worktree remaining owned by bundled `yeet`.

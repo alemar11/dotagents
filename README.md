@@ -26,11 +26,11 @@ Install repo-local plugins from this checkout through `.agents/plugins/marketpla
 
 | Plugin | Path | Purpose |
 | --- | --- | --- |
-| GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, maintainer triage, focused CI/review helpers, release checks, and publish orchestration. |
+| GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, maintainer and portfolio triage, focused CI/review helpers, release checks, and publish orchestration. |
 
 ### GitStack Skills
 
-`git-commit`, `github`, `github-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
+`git-commit`, `github`, `github-triage`, `github-portfolio-triage`, `github-reviews`, `github-ci`, `github-releases`, `yeet`.
 
 `plugins/gitstack/` expects both `git` and GitHub CLI `gh` on `PATH` before GitHub-backed commands run:
 
@@ -57,6 +57,7 @@ For linked git + GitHub workflows, install the GitStack plugin instead of lookin
 | `plan-harder` | Create a higher-rigor implementation plan with focused clarification, a gotcha pass, and a saved `plans/<topic>-plan.md`. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
+| `maintainer-orchestrator` | Coordinate Codex worker threads, GitStack portfolio triage, gates, and portfolio ledgers for maintainer work. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
@@ -76,6 +77,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
+- `maintainer-orchestrator` requires `$autoreview` and the GitStack plugin.
 
 ## Project-Local Skills
 
@@ -108,7 +110,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -143,6 +145,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill plan-harder \
   --skill grill-me \
   --skill learn \
+  --skill maintainer-orchestrator \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \

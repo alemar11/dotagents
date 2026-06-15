@@ -1,0 +1,5 @@
+interface:
+  display_name: "Maintainer Orchestrator"
+  short_description: "Coordinate portfolio workers, gates, and ledgers."
+  brand_color: "#6A7F3F"
+  default_prompt: "Use $maintainer-orchestrator to coordinate a portfolio of repositories, triage queues, delegate safe work, monitor workers, and maintain the portfolio ledger."
