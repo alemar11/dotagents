@@ -14,9 +14,17 @@ service mutation, destructive local changes, or broad scope changes.
 
 ### Live Proof Gate
 
-For user-facing behavior, require proof from the real app, CLI, API, or
-rendered artifact when feasible. Synthetic proof is acceptable only when live
-proof is blocked and the blocker is reported.
+For user-facing behavior, require proof from the real app, CLI, API, service,
+or rendered artifact before declaring the source item complete. Synthetic proof
+is acceptable only when live proof is impossible, unsafe, or blocked by missing
+credentials, setup, hardware, paid access, external service state, or explicit
+owner deferral.
+
+When live proof is blocked, record the exact blocker, the synthetic proof that
+was collected, and the owner decision or follow-up needed. Do not land,
+release, close, or mark complete on synthetic proof alone unless the owner
+explicitly accepts that gap or the source item is moved to `Deferred` with an
+owner-visible follow-up.
 
 ### Closure Gate
 

@@ -49,10 +49,13 @@ Out of scope:
 ## Worker Policy
 
 Default authorization: inspect|implement
+Worker surface: codex-app-thread|cli-subagent|no-delegation
 Allowed worker count: <number>
 Heartbeat: disabled|every 5 minutes|custom
 No subdelegation: true
 Workers edit ledger: false
+Root owns worker lifecycle: true
+Visible worker title format: <Project>: <short current task>
 
 ## Gate Policy
 
@@ -73,9 +76,9 @@ Portfolio overrides:
 
 ### Active
 
-| ID | Repo | Worker Thread | Objective | Status | Next Check |
-| --- | --- | --- | --- | --- | --- |
-| A-001 | owner/repo | <thread id or link> | <objective> | active | <time> |
+| ID | Repo | Surface | Worker ID | Title | Objective | Status | Next Check |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A-001 | owner/repo | codex-app-thread | <thread id or link> | <Project>: <short task> | <objective> | active | <time> |
 
 ### Autonomous
 
