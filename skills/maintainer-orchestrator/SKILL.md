@@ -16,6 +16,13 @@ This skill is not a worker. It delegates scoped work, monitors progress, keeps
 the ledger current, and decides when a task is ready for owner review, commit,
 PR, release, or another explicit decision.
 
+## Workstream Sources
+
+A workstream is the orchestration unit. It may come from a user-provided plan,
+GitHub issue, PR review, CI failure, release checklist, local TODO, audit
+result, ledger item, or ad hoc owner request. GitHub issues and PRs are trigger
+sources, not the only planning model.
+
 ## Runtime Requirements
 
 - Codex thread tools for worker creation, inspection, messaging, handoff, title
@@ -37,8 +44,10 @@ the parts that can be done safely and report the exact missing surface.
 1. Resolve the portfolio ledger with `references/ledger.md`.
 2. Identify the repository set, current goals, suppressed items, owner
    constraints, and portfolio-specific gate overrides.
-3. Run GitStack `github-portfolio-triage` for broad or multi-repo queue scans.
-   Use current-repo GitStack skills only when the task is focused on one repo.
+3. If discovery is needed, run GitStack `github-portfolio-triage` for broad or
+   multi-repo queue scans. If the user provided a plan, decompose that plan into
+   workstreams before scanning for additional queue signals. Use current-repo
+   GitStack skills only when the task is focused on one repo.
 4. Classify work as `Active`, `Autonomous`, `Needs owner`, `Ready next`,
    `Blocked`, `Ignored`, or `Released` in the ledger.
 5. Before delegation, read `references/worker.md` and create one Codex worker
