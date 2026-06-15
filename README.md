@@ -27,7 +27,7 @@ Install repo-local plugins from this checkout through `.agents/plugins/marketpla
 | Plugin | Path | Purpose |
 | --- | --- | --- |
 | GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, maintainer triage, focused CI/review helpers, release checks, and publish orchestration. |
-| TanStack | `plugins/tanstack/` | Bundles full-portfolio TanStack product guidance plus focused Router, Start, CLI, and integration sub-skills. |
+| TanStack | `plugins/tanstack/` | Bundles full-portfolio TanStack product guidance plus macro Router, Start, CLI reference maps, and integration guidance. |
 
 ### GitStack Skills
 
@@ -44,18 +44,19 @@ Use `plugins/gitstack/skills/github/references/core/installation.md` for cross-p
 
 ### TanStack Skill Families
 
-- Product skills: `tanstack-ai`, `tanstack-cli`, `tanstack-config`, `tanstack-db`, `tanstack-devtools`, `tanstack-form`, `tanstack-pacer`, `tanstack-query`, `tanstack-ranger`, `tanstack-router`, `tanstack-start`, `tanstack-store`, `tanstack-table`, `tanstack-virtual`.
+- Product and macro skills: `tanstack-ai`, `tanstack-cli`, `tanstack-config`, `tanstack-db`, `tanstack-devtools`, `tanstack-form`, `tanstack-pacer`, `tanstack-query`, `tanstack-ranger`, `tanstack-router`, `tanstack-start`, `tanstack-store`, `tanstack-table`, `tanstack-virtual`.
 - Cross-stack: `tanstack-integration`.
-- Router: `tanstack-router-core`, `tanstack-router-search-params`, `tanstack-router-path-params`, `tanstack-router-navigation`, `tanstack-router-data-loading`, `tanstack-router-auth-and-guards`, `tanstack-router-code-splitting`, `tanstack-router-not-found-and-errors`, `tanstack-router-type-safety`, `tanstack-router-ssr`, `tanstack-router-plugin`.
-- Start: `tanstack-react-start`, `tanstack-react-start-server-components`, `tanstack-start-migrate-from-nextjs`, `tanstack-start-core`, `tanstack-start-execution-model`, `tanstack-start-middlewares`, `tanstack-start-server-functions`, `tanstack-start-server-routes`, `tanstack-start-deployments`, `tanstack-start-server-core`.
-- CLI: `tanstack-cli-create-app-scaffold`, `tanstack-cli-add-addons-existing-app`, `tanstack-cli-choose-ecosystem-integrations`, `tanstack-cli-maintain-custom-addons-dev-watch`, `tanstack-cli-query-docs-library-metadata`.
+- Router references under `plugins/tanstack/skills/tanstack-router/references/`: `routing-structure.md`, `navigation-and-search.md`, `data-loading-and-ssr.md`, `auth-and-failures.md`, `plugin-and-splitting.md`.
+- Start references under `plugins/tanstack/skills/tanstack-start/references/`: `framework-and-execution.md`, `server-functions-and-routes.md`, `middlewares-and-server-core.md`, `server-components-and-migrations.md`, `deployments.md`.
+- CLI references under `plugins/tanstack/skills/tanstack-cli/references/`: `scaffolding.md`, `addons-existing-app.md`, `ecosystem-integrations.md`, `custom-addons-dev-watch.md`, `docs-and-library-metadata.md`.
 
-This repository ships one broad Codex `tanstack` plugin rather than separate upstream-style product plugins such as `tanstack-form` or bundle aliases such as `tanstack-all`. For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills. For TanStack application work, install the TanStack plugin instead of copying advice from mixed community sources.
+This repository ships one broad Codex `tanstack` plugin rather than separate upstream-style product plugins, narrow focused skills, or bundle aliases such as `tanstack-all`. For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills. For TanStack application work, install the TanStack plugin instead of copying advice from mixed community sources.
 
 ## Reusable Skills
 
 | Skill | Purpose |
 | --- | --- |
+| `autoreview` | Run Codex-only structured closeout review for local changes, branch diffs, or commits. |
 | `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a hybrid session runner. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
@@ -105,7 +106,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -130,6 +131,7 @@ Install all reusable skills globally for Codex:
 
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
+  --skill autoreview \
   --skill chrome-devtools \
   --skill code-wiki \
   --skill skill-cli-creator \

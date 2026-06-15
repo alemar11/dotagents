@@ -1,0 +1,757 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import textwrap
+from pathlib import Path
+from typing import Any
+
+VERSION = "0.3.0"
+
+PRIORITIES = {"P0", "P1", "P2", "P3"}
+CATEGORIES = {"bug", "security", "regression", "test_gap", "maintainability"}
+OVERALL = {"patch is correct", "patch is incorrect"}
+
+SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "findings",
+        "overall_correctness",
+        "overall_explanation",
+        "overall_confidence",
+    ],
+    "properties": {
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "title",
+                    "body",
+                    "priority",
+                    "confidence",
+                    "category",
+                    "code_location",
+                ],
+                "properties": {
+                    "title": {"type": "string", "minLength": 1, "maxLength": 140},
+                    "body": {"type": "string", "minLength": 1, "maxLength": 2000},
+                    "priority": {"type": "string", "enum": sorted(PRIORITIES)},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "category": {"type": "string", "enum": sorted(CATEGORIES)},
+                    "code_location": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["file_path", "line"],
+                        "properties": {
+                            "file_path": {"type": "string", "minLength": 1},
+                            "line": {"type": "integer", "minimum": 1},
+                        },
+                    },
+                },
+            },
+        },
+        "overall_correctness": {"type": "string", "enum": sorted(OVERALL)},
+        "overall_explanation": {"type": "string", "minLength": 1, "maxLength": 3000},
+        "overall_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    },
+}
+
+
+class AutoreviewError(RuntimeError):
+    pass
+
+
+def run(
+    args: list[str],
+    cwd: Path,
+    *,
+    input_text: str | None = None,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        args,
+        cwd=cwd,
+        input=input_text,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if check and result.returncode != 0:
+        command = " ".join(args)
+        detail = result.stderr or result.stdout
+        raise AutoreviewError(f"command failed ({result.returncode}): {command}\n{detail}")
+    return result
+
+
+def run_with_heartbeat(
+    args: list[str],
+    cwd: Path,
+    *,
+    input_text: str,
+    label: str,
+    heartbeat_seconds: int,
+) -> subprocess.CompletedProcess[str]:
+    started = time_monotonic()
+    proc = subprocess.Popen(
+        args,
+        cwd=cwd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    first_communicate = True
+    while True:
+        try:
+            stdout, stderr = proc.communicate(
+                input=input_text if first_communicate else None,
+                timeout=heartbeat_seconds,
+            )
+            return subprocess.CompletedProcess(args, int(proc.returncode or 0), stdout, stderr)
+        except subprocess.TimeoutExpired:
+            first_communicate = False
+            elapsed = int(time_monotonic() - started)
+            print(
+                f"review still running: {label} elapsed={elapsed}s pid={proc.pid}",
+                file=sys.stderr,
+                flush=True,
+            )
+
+
+def time_monotonic() -> float:
+    import time
+
+    return time.monotonic()
+
+
+def has_directory_component(name: str) -> bool:
+    path = Path(name)
+    separators = [sep for sep in (os.sep, os.altsep) if sep]
+    return path.is_absolute() or bool(path.drive) or any(sep in name for sep in separators)
+
+
+def is_within(path: Path, root: Path) -> bool:
+    try:
+        return path.resolve() == root.resolve() or path.resolve().is_relative_to(root.resolve())
+    except OSError:
+        return False
+
+
+def first_executable(path: Path, *, reject_root: Path | None = None) -> str | None:
+    candidates = [path]
+    if os.name == "nt" and not path.suffix:
+        exts = [ext for ext in os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").split(";") if ext]
+        candidates = [path.with_suffix(ext.lower()) for ext in exts]
+        candidates.extend(path.with_suffix(ext.upper()) for ext in exts)
+        candidates.append(path)
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            if reject_root is not None and is_within(candidate, reject_root):
+                continue
+            return str(candidate)
+    return None
+
+
+def resolve_command(name: str, repo: Path | None = None) -> str:
+    if has_directory_component(name):
+        path = Path(name)
+        candidate = path if path.is_absolute() else Path.cwd() / path
+        found = first_executable(candidate)
+        if found:
+            return found
+        raise AutoreviewError(f"executable not found or not executable: {name}")
+
+    reject_root = repo.resolve() if repo else None
+    for part in os.environ.get("PATH", "").split(os.pathsep):
+        if not part or part == ".":
+            continue
+        parent = Path(part)
+        if not parent.is_absolute():
+            continue
+        if reject_root is not None and is_within(parent, reject_root):
+            continue
+        found = first_executable(parent / name, reject_root=reject_root)
+        if found:
+            return found
+    raise AutoreviewError(f"executable not found: {name}")
+
+
+def git(repo: Path, *args: str, check: bool = True) -> str:
+    return run([resolve_command("git", repo), *args], repo, check=check).stdout
+
+
+def repo_root() -> Path:
+    git_bin = resolve_command("git")
+    result = run([git_bin, "rev-parse", "--show-toplevel"], Path.cwd(), check=False)
+    if result.returncode != 0:
+        raise AutoreviewError("autoreview must run inside a git repository")
+    return Path(result.stdout.strip()).resolve()
+
+
+def repo_root_or_none() -> Path | None:
+    try:
+        return repo_root()
+    except AutoreviewError:
+        return None
+
+
+def current_branch(repo: Path) -> str:
+    return git(repo, "branch", "--show-current", check=False).strip() or "detached"
+
+
+def is_dirty(repo: Path) -> bool:
+    return bool(git(repo, "status", "--porcelain").strip())
+
+
+def default_base_ref(repo: Path) -> str:
+    origin_head = git(repo, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD", check=False).strip()
+    if origin_head:
+        return origin_head
+    for candidate in ("origin/main", "origin/master", "main", "master"):
+        if git(repo, "rev-parse", "--verify", "--quiet", candidate, check=False).strip():
+            return candidate
+    return "origin/main"
+
+
+def detect_pr_base(repo: Path) -> str | None:
+    try:
+        gh_bin = resolve_command("gh", repo)
+    except AutoreviewError:
+        return None
+    result = run(
+        [gh_bin, "pr", "view", "--json", "baseRefName", "--jq", ".baseRefName"],
+        repo,
+        check=False,
+    )
+    base = result.stdout.strip()
+    if result.returncode != 0 or not base:
+        return None
+    return f"origin/{base}"
+
+
+def choose_target(repo: Path, mode: str, base_ref: str | None) -> tuple[str, str | None]:
+    branch = current_branch(repo)
+    if mode == "local" or (mode == "auto" and is_dirty(repo)):
+        return "local", None
+    if mode == "commit":
+        return "commit", None
+    if mode == "branch":
+        return "branch", base_ref or detect_pr_base(repo) or default_base_ref(repo)
+    if branch not in {"main", "master"} and branch != "detached":
+        return "branch", base_ref or detect_pr_base(repo) or default_base_ref(repo)
+    raise AutoreviewError("no review target: clean default-branch checkout and no forced mode")
+
+
+def bounded(text: str, limit: int = 180_000) -> str:
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"\n\n[truncated at {limit} characters]\n"
+
+
+def read_text(path: Path, limit: int = 40_000) -> str:
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        return f"[unreadable: {exc}]"
+    if b"\0" in data:
+        return "[binary file omitted]"
+    return bounded(data.decode("utf-8", errors="replace"), limit)
+
+
+def local_bundle(repo: Path) -> str:
+    parts = [
+        "# Git Status",
+        git(repo, "status", "--short"),
+        "# Staged Diff",
+        git(repo, "diff", "--cached", "--stat"),
+        bounded(git(repo, "diff", "--cached", "--patch", "--find-renames")),
+        "# Unstaged Diff",
+        git(repo, "diff", "--stat"),
+        bounded(git(repo, "diff", "--patch", "--find-renames")),
+    ]
+    untracked = [
+        line
+        for line in git(repo, "ls-files", "--others", "--exclude-standard").splitlines()
+        if line.strip()
+    ]
+    if untracked:
+        parts.append("# Untracked Files")
+        for rel in untracked:
+            parts.append(f"## {rel}\n{read_text(repo / rel)}")
+    return "\n\n".join(parts)
+
+
+def branch_bundle(repo: Path, base_ref: str) -> str:
+    if base_ref.startswith("origin/"):
+        git(repo, "fetch", "origin", "--quiet", check=False)
+    return "\n\n".join(
+        [
+            "# Branch Diff",
+            f"base: {base_ref}",
+            git(repo, "diff", "--stat", f"{base_ref}...HEAD"),
+            bounded(git(repo, "diff", "--patch", "--find-renames", f"{base_ref}...HEAD")),
+        ]
+    )
+
+
+def commit_bundle(repo: Path, commit_ref: str) -> str:
+    return "\n\n".join(
+        [
+            "# Commit Diff",
+            f"commit: {commit_ref}",
+            git(repo, "show", "--stat", "--format=fuller", commit_ref),
+            bounded(git(repo, "show", "--patch", "--find-renames", "--format=fuller", commit_ref)),
+        ]
+    )
+
+
+def changed_paths(repo: Path, target: str, target_ref: str | None, commit_ref: str) -> set[str]:
+    if target == "local":
+        sources = [
+            git(repo, "diff", "--name-only", "--cached"),
+            git(repo, "diff", "--name-only"),
+            git(repo, "ls-files", "--others", "--exclude-standard"),
+        ]
+    elif target == "branch":
+        if target_ref is None:
+            raise AutoreviewError("branch target requires a base ref")
+        sources = [git(repo, "diff", "--name-only", f"{target_ref}...HEAD")]
+    else:
+        sources = [git(repo, "show", "--name-only", "--format=", commit_ref)]
+    return {line.strip() for source in sources for line in source.splitlines() if line.strip()}
+
+
+def load_extra_prompt(args: argparse.Namespace) -> str:
+    chunks: list[str] = []
+    for value in args.prompt or []:
+        chunks.append(value)
+    for path in args.prompt_file or []:
+        chunks.append(Path(path).read_text())
+    return "\n\n".join(chunks)
+
+
+def load_datasets(args: argparse.Namespace) -> str:
+    chunks: list[str] = []
+    for spec in args.dataset or []:
+        path = Path(spec)
+        if path.is_dir():
+            raise AutoreviewError(f"--dataset must be a file, got directory: {path}")
+        chunks.append(f"# Dataset: {path}\n{read_text(path)}")
+    return "\n\n".join(chunks)
+
+
+def build_prompt(
+    repo: Path,
+    target: str,
+    target_ref: str | None,
+    bundle: str,
+    extra_prompt: str,
+    datasets: str,
+) -> str:
+    target_line = f"{target} {target_ref}" if target_ref else target
+    return textwrap.dedent(
+        f"""
+        You are a senior code reviewer. Review the provided git change bundle only.
+
+        Hard rules:
+        - Return exactly one JSON object and nothing else. Do not wrap it in Markdown.
+        - The JSON object must match this schema exactly:
+        {json.dumps(SCHEMA, indent=2)}
+        - Do not modify files.
+        - Do not invoke nested reviewers or review tools.
+        - Forbidden nested review commands include: codex review, autoreview, claude review, oracle review.
+        - You may use read-only tools and web search to inspect files, dependency contracts, upstream docs, current behavior, and security implications.
+        - Shell commands, if available, must be read-only inspection commands.
+        - Do not run tests, formatters, package installs, generators, network mutation commands, git mutation commands, or commands that write files.
+        - Report only actionable defects introduced or exposed by this change.
+        - Prefer high-signal findings over style feedback.
+        - Include security findings for concrete injection, secret leak, authorization, path traversal, unsafe deserialization, shell, filesystem, privacy, or credential risks.
+        - Do not reject legitimate functionality merely because it touches shell, filesystem, network, auth, or sensitive data.
+        - For each finding, use the smallest file/line location that demonstrates the issue.
+        - If there are no actionable findings, return an empty findings array and mark the patch correct.
+
+        Review target: {target_line}
+        Repository: {repo}
+
+        {extra_prompt}
+
+        {datasets}
+
+        # Change Bundle
+        {bundle}
+        """
+    ).strip()
+
+
+def configured_codex_model() -> str | None:
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        return None
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    config_path = codex_home / "config.toml"
+    try:
+        with config_path.open("rb") as handle:
+            config = tomllib.load(handle)
+    except OSError:
+        return None
+    except tomllib.TOMLDecodeError:
+        return None
+    model = config.get("model")
+    return model if isinstance(model, str) and model.strip() else None
+
+
+def write_json_temp(data: dict[str, Any]) -> Path:
+    handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+    with handle:
+        json.dump(data, handle)
+    return Path(handle.name)
+
+
+def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
+    codex_bin = resolve_command(args.codex_bin, repo)
+    schema_path = write_json_temp(SCHEMA)
+    output_path = Path(tempfile.NamedTemporaryFile("w", suffix=".json", delete=False).name)
+    model = args.model or configured_codex_model()
+    cmd = [codex_bin, "--ask-for-approval", "never"]
+    if args.web_search:
+        cmd.append("--search")
+    if model:
+        cmd.extend(["--model", model])
+    cmd.extend(
+        [
+            "exec",
+            "--ephemeral",
+            "-s",
+            "read-only",
+            "-C",
+            str(repo),
+            "--ignore-user-config",
+            "--ignore-rules",
+            "--output-schema",
+            str(schema_path),
+            "--output-last-message",
+            str(output_path),
+            "-",
+        ]
+    )
+    result = run_with_heartbeat(
+        cmd,
+        repo,
+        input_text=prompt,
+        label="codex",
+        heartbeat_seconds=args.heartbeat_seconds,
+    )
+    try:
+        output = output_path.read_text()
+    finally:
+        schema_path.unlink(missing_ok=True)
+        output_path.unlink(missing_ok=True)
+    if result.returncode != 0:
+        raise AutoreviewError(f"codex engine failed ({result.returncode})\n{result.stderr or result.stdout}")
+    return output or result.stdout
+
+
+def parse_json_candidate(text: str) -> Any | None:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        lines = stripped.splitlines()
+        if lines and lines[0].startswith("```") and lines[-1].strip() == "```":
+            stripped = "\n".join(lines[1:-1]).strip()
+    try:
+        parsed = json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+    if isinstance(parsed, str) and parsed != text:
+        nested = parse_json_candidate(parsed)
+        return nested if nested is not None else parsed
+    return parsed
+
+
+def extract_json(text: str) -> dict[str, Any]:
+    stripped = text.strip()
+    if not stripped:
+        raise AutoreviewError("review engine returned empty output")
+    parsed = parse_json_candidate(stripped)
+    if isinstance(parsed, dict) and "findings" in parsed:
+        return parsed
+    if isinstance(parsed, dict) and isinstance(parsed.get("structured_output"), dict):
+        return parsed["structured_output"]
+    if isinstance(parsed, dict) and isinstance(parsed.get("result"), str):
+        result = parse_json_candidate(parsed["result"])
+        if isinstance(result, dict) and "findings" in result:
+            return result
+    preview = stripped[:2000]
+    raise AutoreviewError(f"review engine returned unexpected JSON shape:\n{preview}")
+
+
+def number_in_range(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and 0 <= value <= 1
+
+
+def validate_report(report: dict[str, Any], changed: set[str]) -> None:
+    allowed_top = {"findings", "overall_correctness", "overall_explanation", "overall_confidence"}
+    extra_top = set(report) - allowed_top
+    if extra_top:
+        raise AutoreviewError(f"review JSON has unexpected top-level keys: {sorted(extra_top)}")
+    for key in SCHEMA["required"]:
+        if key not in report:
+            raise AutoreviewError(f"review JSON missing required key: {key}")
+    if not isinstance(report["findings"], list):
+        raise AutoreviewError("review JSON findings must be an array")
+    if report.get("overall_correctness") not in OVERALL:
+        raise AutoreviewError(f"review JSON has invalid overall_correctness: {report.get('overall_correctness')}")
+    if not isinstance(report.get("overall_explanation"), str) or not report["overall_explanation"]:
+        raise AutoreviewError("review JSON overall_explanation must be a non-empty string")
+    if len(report["overall_explanation"]) > 3000:
+        raise AutoreviewError("review JSON overall_explanation is too long")
+    if not number_in_range(report.get("overall_confidence")):
+        raise AutoreviewError("review JSON overall_confidence must be numeric")
+
+    for index, finding in enumerate(report["findings"]):
+        validate_finding(index, finding, changed)
+
+
+def validate_finding(index: int, finding: Any, changed: set[str]) -> None:
+    if not isinstance(finding, dict):
+        raise AutoreviewError(f"finding {index} must be an object")
+    allowed = {"title", "body", "priority", "confidence", "category", "code_location"}
+    extra = set(finding) - allowed
+    if extra:
+        raise AutoreviewError(f"finding {index} has unexpected keys: {sorted(extra)}")
+    for key in allowed:
+        if key not in finding:
+            raise AutoreviewError(f"finding {index} missing required key: {key}")
+    title = finding.get("title")
+    if not isinstance(title, str) or not title or len(title) > 140:
+        raise AutoreviewError(f"finding {index} has invalid title")
+    body = finding.get("body")
+    if not isinstance(body, str) or not body or len(body) > 2000:
+        raise AutoreviewError(f"finding {index} has invalid body")
+    if finding.get("priority") not in PRIORITIES:
+        raise AutoreviewError(f"finding {index} has invalid priority: {finding.get('priority')}")
+    if finding.get("category") not in CATEGORIES:
+        raise AutoreviewError(f"finding {index} has invalid category: {finding.get('category')}")
+    if not number_in_range(finding.get("confidence")):
+        raise AutoreviewError(f"finding {index} has invalid confidence")
+    location = finding.get("code_location")
+    if not isinstance(location, dict):
+        raise AutoreviewError(f"finding {index} missing code_location")
+    rel = str(location.get("file_path", "")).strip()
+    line = location.get("line")
+    rel_path = Path(rel)
+    if not rel or not isinstance(line, int) or line < 1:
+        raise AutoreviewError(f"finding {index} has invalid location: {location}")
+    if rel_path.is_absolute() or ".." in rel_path.parts:
+        raise AutoreviewError(f"finding {index} uses invalid file path: {rel}")
+    if rel not in changed:
+        raise AutoreviewError(f"finding {index} points to a file outside the reviewed change: {rel}")
+
+
+def human_report(report: dict[str, Any]) -> str:
+    lines: list[str] = []
+    findings = report["findings"]
+    if findings:
+        lines.append(f"autoreview findings: {len(findings)}")
+    elif report["overall_correctness"] == "patch is incorrect":
+        lines.append("autoreview verdict: patch is incorrect without discrete findings")
+    else:
+        lines.append("autoreview clean: no accepted/actionable findings reported")
+    for finding in findings:
+        loc = finding["code_location"]
+        lines.append("")
+        lines.append(f"[{finding['priority']}] {finding['title']}")
+        lines.append(f"{loc['file_path']}:{loc['line']}")
+        lines.append(finding["body"])
+    lines.append("")
+    lines.append(f"overall: {report['overall_correctness']} ({report['overall_confidence']})")
+    lines.append(report["overall_explanation"])
+    return "\n".join(lines)
+
+
+def doctor(args: argparse.Namespace) -> int:
+    repo = repo_root_or_none()
+    missing: list[str] = []
+    git_info = command_info("git", repo)
+    codex_info = command_info(args.codex_bin, repo)
+    gh_info = command_info("gh", repo)
+    if not git_info["ok"]:
+        missing.append("git")
+    if not codex_info["ok"]:
+        missing.append("codex")
+
+    codex_exec = False
+    structured_flags = False
+    if codex_info["ok"]:
+        result = run([codex_info["path"], "exec", "--help"], Path.cwd(), check=False)
+        help_text = f"{result.stdout}\n{result.stderr}"
+        codex_exec = result.returncode == 0
+        structured_flags = "--output-schema" in help_text and "--output-last-message" in help_text
+        if not codex_exec:
+            missing.append("codex exec")
+        if not structured_flags:
+            missing.append("codex structured output flags")
+
+    payload = {
+        "ok": not missing,
+        "version": VERSION,
+        "repo_root": str(repo) if repo else None,
+        "git": git_info,
+        "gh": {**gh_info, "optional": True, "purpose": "PR base detection"},
+        "codex": codex_info,
+        "configured_model": configured_codex_model(),
+        "supports": {
+            "codex_exec": codex_exec,
+            "structured_output_flags": structured_flags,
+            "read_only_sandbox": True,
+        },
+        "missing": missing,
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+    else:
+        print(f"autoreview {VERSION}")
+        print(f"repo: {payload['repo_root'] or 'not inside a git repository'}")
+        print(f"git: {git_info.get('path') or 'missing'}")
+        print(f"codex: {codex_info.get('path') or 'missing'}")
+        print(f"structured output: {'yes' if structured_flags else 'no'}")
+        print(f"ok: {'yes' if payload['ok'] else 'no'}")
+        if missing:
+            print("missing: " + ", ".join(missing))
+    return 0 if payload["ok"] else 1
+
+
+def command_info(name: str, repo: Path | None) -> dict[str, Any]:
+    try:
+        path = resolve_command(name, repo)
+    except AutoreviewError as exc:
+        return {"ok": False, "path": None, "version": None, "error": str(exc)}
+    version = run([path, "--version"], Path.cwd(), check=False)
+    return {
+        "ok": version.returncode == 0,
+        "path": path,
+        "version": (version.stdout or version.stderr).strip() or None,
+        "error": None if version.returncode == 0 else (version.stderr or version.stdout).strip(),
+    }
+
+
+def build_review(args: argparse.Namespace) -> tuple[Path, str, str | None, set[str], str]:
+    repo = repo_root()
+    target, target_ref = choose_target(repo, args.mode, args.base)
+    if target == "local":
+        bundle = local_bundle(repo)
+    elif target == "branch":
+        if target_ref is None:
+            raise AutoreviewError("branch target requires a base ref")
+        bundle = branch_bundle(repo, target_ref)
+    else:
+        bundle = commit_bundle(repo, args.commit)
+    changed = changed_paths(repo, target, target_ref, args.commit)
+    if not changed:
+        raise AutoreviewError("review target has no changed files")
+    prompt = build_prompt(repo, target, target_ref, bundle, load_extra_prompt(args), load_datasets(args))
+    return repo, target, target_ref, changed, prompt
+
+
+def run_review(args: argparse.Namespace) -> int:
+    repo, target, target_ref, changed, prompt = build_review(args)
+    if args.dry_run:
+        payload = {
+            "ok": True,
+            "dry_run": True,
+            "repo_root": str(repo),
+            "target": target,
+            "base": target_ref,
+            "changed_files": sorted(changed),
+            "prompt_characters": len(prompt),
+        }
+        if args.output:
+            Path(args.output).write_text(prompt)
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print(f"autoreview dry run: {target}{f' {target_ref}' if target_ref else ''}")
+            print(f"changed files: {len(changed)}")
+            print(f"prompt characters: {len(prompt)}")
+            if args.output:
+                print(f"prompt written: {args.output}")
+        return 0
+
+    report = extract_json(run_codex(args, repo, prompt))
+    validate_report(report, changed)
+    if args.json_output:
+        Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    rendered = human_report(report)
+    if args.output:
+        Path(args.output).write_text(rendered + "\n")
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True))
+    else:
+        print(rendered)
+    has_actionable = bool(report["findings"]) or report["overall_correctness"] == "patch is incorrect"
+    return 1 if has_actionable else 0
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run a Codex-only structured closeout review.")
+    parser.add_argument("command", nargs="?", choices=["doctor"], help="Optional command. Omit to run a review.")
+    parser.add_argument("--version", action="store_true", help="Print the autoreview helper version.")
+    parser.add_argument("--json", action="store_true", help="Print machine-readable JSON when supported.")
+    parser.add_argument("--mode", choices=["auto", "local", "branch", "commit"], default="auto")
+    parser.add_argument(
+        "--base",
+        help="Base ref for branch review. If omitted, branch mode tries gh PR base detection before fallback.",
+    )
+    parser.add_argument("--commit", default="HEAD", help="Commit ref for commit review.")
+    parser.add_argument("--model", help="Codex model to pass to codex exec.")
+    parser.add_argument("--codex-bin", default=os.environ.get("CODEX_BIN", "codex"), help="Codex executable path or name.")
+    parser.add_argument("--prompt", action="append", help="Additional review instruction text.")
+    parser.add_argument("--prompt-file", action="append", help="File containing additional review instructions.")
+    parser.add_argument("--dataset", action="append", help="Evidence file to include in the review prompt.")
+    parser.add_argument("--dry-run", action="store_true", help="Build the review prompt without calling Codex.")
+    parser.add_argument("--output", help="Write human report output, or dry-run prompt, to a file.")
+    parser.add_argument("--json-output", help="Write the validated structured review JSON to a file.")
+    parser.add_argument(
+        "--heartbeat-seconds",
+        type=positive_int,
+        default=60,
+        help="Seconds between long-running Codex review heartbeat lines on stderr.",
+    )
+    parser.add_argument("--no-web-search", dest="web_search", action="store_false", default=True)
+    return parser.parse_args(argv)
+
+
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv or sys.argv[1:])
+    if args.version:
+        print(f"autoreview {VERSION}")
+        return 0
+    try:
+        if args.command == "doctor":
+            return doctor(args)
+        return run_review(args)
+    except AutoreviewError as exc:
+        if args.json:
+            print(json.dumps({"ok": False, "error": str(exc)}, indent=2, sort_keys=True), file=sys.stderr)
+        else:
+            print(f"autoreview: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
