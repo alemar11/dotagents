@@ -14,6 +14,10 @@ Keep one shared owner model:
 - optional maintenance project in `projects/<tool>/`
 - persisted working-project config under the matching owner namespace
 
+For a small script-native CLI, `scripts/<tool>` can be both the shipped
+artifact and the maintained source. Add `projects/<tool>/` only when the tool
+actually needs a multi-file or build-backed maintenance project.
+
 ## Path vocabulary
 
 - `owner root`: the directory from which canonical executable examples run
@@ -126,12 +130,17 @@ When the CLI is embedded inside a host:
 - treat `<artifact-path>` as the shipped runnable artifact or launcher for normal execution
 - use `<artifact-path> --version` as the stable version check
 - choose the CLI/tool name intentionally; do not assume it must match the host name
-- use the same CLI/tool name consistently for `<artifact-path>` and `projects/<tool>/`
+- use the same CLI/tool name consistently for `<artifact-path>` and
+  `projects/<tool>/` when a maintenance project exists
 - do not inspect `projects/<tool>/` during normal execution
-- open `projects/<tool>/` only when fixing, improving, rebuilding, or extending the implementation behind the `<artifact-path>` surface
+- open `projects/<tool>/` only when it exists and you are fixing, improving,
+  rebuilding, or extending the implementation behind the `<artifact-path>`
+  surface
 - keep the command shape stable even if the implementation language or internal layout changes
 - do not treat `target/`, `dist/`, virtualenv paths, or other build directories as supported runtime entrypoints
-- keep manifests, lockfiles, dependency installs, caches, intermediate build outputs, and project-local build/test config inside `projects/<tool>/` when a real maintenance project exists
+- keep manifests, lockfiles, dependency installs, caches, intermediate build
+  outputs, and project-local build/test config inside `projects/<tool>/` when a
+  real maintenance project exists
 
 Keep one semver source of truth. Use the runtime-native manifest version when available, otherwise keep one explicit version constant or file and have `--version` read from it.
 
