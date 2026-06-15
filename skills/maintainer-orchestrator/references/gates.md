@@ -1,8 +1,8 @@
 # Gates Reference
 
-Use gates before declaring work owner-ready, merge-ready, release-ready, or
-complete. Portfolio ledgers may add stricter gates, but they should not weaken
-these defaults without explicit owner approval.
+Use gates before declaring work owner-ready, issue-closed, merge-ready,
+release-ready, or complete. Portfolio ledgers may add stricter gates, but they
+should not weaken these defaults without explicit owner approval.
 
 ## Universal Gates
 
@@ -17,6 +17,28 @@ service mutation, destructive local changes, or broad scope changes.
 For user-facing behavior, require proof from the real app, CLI, API, or
 rendered artifact when feasible. Synthetic proof is acceptable only when live
 proof is blocked and the blocker is reported.
+
+### Closure Gate
+
+Before closing a GitHub issue, marking a PR thread resolved, or moving work to
+`Completed`, verify that the source acceptance criteria are satisfied by
+recorded proof. If live proof is feasible but blocked by credentials, setup,
+service access, or missing hardware, do not treat the source item as fully
+complete unless the owner explicitly accepts that gap.
+
+If the implementation intentionally satisfies only part of the source item,
+keep the source item open or move it to `Needs Owner` until the deferred scope
+has an owner-visible follow-up and the closeout links it.
+
+### Follow-Up Issue Gate
+
+Before closing a partially satisfied GitHub issue or PR thread, create or link
+a follow-up issue for deferred work when GitHub mutation is authorized. The
+follow-up must include the missing setup or behavior, the blocker or decision
+needed, the proof already collected, and the acceptance criteria that remain.
+
+If GitHub mutation is not authorized, do not close the source item. Record the
+proposed follow-up title/body in the ledger under `Needs Owner` or `Deferred`.
 
 ### Autoreview Gate
 
@@ -35,6 +57,21 @@ owner-ready next action.
 When progress depends on product direction, risk acceptance, credentials,
 budget, merge timing, release timing, or external coordination, produce a
 decision brief with options and recommended next action.
+
+### Risk Follow-Up Gate
+
+When a worker reports a residual risk, dependency audit warning, security
+finding, untested adapter, schema/data-loss concern, credential gap, or
+production-readiness caveat, resolve it before closure by doing one of:
+
+- fix it and rerun the relevant validation;
+- prove it is not applicable;
+- create or link a follow-up issue when mutation is authorized;
+- record a `Needs Owner`, `Blocked`, or `Deferred` ledger item with the proposed
+  follow-up when mutation is not authorized.
+
+Do not leave unresolved worker-reported risks only in chronological notes when
+declaring a workstream complete.
 
 ### Release Gate
 

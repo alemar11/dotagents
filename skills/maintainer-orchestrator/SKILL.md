@@ -66,8 +66,9 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    or `$github-reviews` only when the task is focused on one repo or PR. If the
    user provided a plan, decompose that plan into workstreams before scanning
    for additional queue signals.
-4. Classify work as `Active`, `Autonomous`, `Needs owner`, `Ready next`,
-   `Blocked`, `Ignored`, or `Released` in the ledger.
+4. Classify work with the vocabulary in `references/ledger.md`: `Active`,
+   `Autonomous`, `Needs owner`, `Ready next`, `Blocked`, `Deferred`,
+   `Completed`, `Ignored`, or `Released`.
 5. Before delegation, read `references/worker.md` and create one Codex worker
    thread per repository or tightly scoped workstream.
 6. Give each worker an explicit authorization mode, scope, gates, expected
@@ -75,13 +76,20 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    the ledger.
 7. Use heartbeat monitoring only when periodic follow-up is requested. Capture
    status, blockers, and next actions in the ledger.
-8. Before marking owner-ready, merge-ready, release-ready, or final, apply
-   `references/gates.md`.
+8. Before marking owner-ready, issue-closed, merge-ready, release-ready, or
+   final, apply `references/gates.md`. Treat blocked live proof, deferred
+   acceptance criteria, and worker-reported risks as gate inputs, not as notes
+   to bury after closure.
 9. For non-trivial code edits, require focused tests and `$autoreview`; rerun
    both after any review-triggered code change.
-10. Stop when the ledger shows no active worker requiring orchestration and all
-    surfaced work is either owner-ready, blocked with a decision brief,
-    released, or intentionally deferred.
+10. Before closing a GitHub issue or PR thread that is only partially satisfied,
+    create or link an owner-visible follow-up issue for the deferred work when
+    GitHub mutation is authorized. If mutation is not authorized, keep the item
+    owner-ready with the proposed follow-up body and do not call it complete.
+11. Stop when the ledger shows no active worker requiring orchestration and all
+    surfaced work is either completed with gates satisfied, owner-ready, blocked
+    with a decision brief, released, or intentionally deferred with a linked or
+    proposed follow-up.
 
 ## References
 

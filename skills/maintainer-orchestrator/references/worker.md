@@ -57,14 +57,16 @@ Execution:
 3. If editing, run focused validation.
 4. Run or request autoreview when required by the gate.
 5. Stop and report if blocked by access, ambiguous owner intent, unsafe state,
-   missing dependency, or a gate that cannot be satisfied.
+   missing dependency, worker-reported risk, or a gate that cannot be
+   satisfied.
 
 Final report:
 - Status: done|blocked|needs-owner|ready-for-review
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
 - Gate status: pass/fail/not-applicable with evidence
-- Risks: residual risks or test gaps
+- Risks: residual risks, dependency audit warnings, security findings,
+  untested adapters, setup gaps, or test gaps
 - Next: exact owner or orchestrator action
 ```
 

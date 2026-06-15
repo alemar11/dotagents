@@ -35,7 +35,7 @@ display name, derive a slug and record the display name in the ledger.
 
 Last updated: <YYYY-MM-DD HH:MM TZ>
 Owner: <person or team>
-Status: active|paused|blocked|released|archived
+Status: active|paused|blocked|complete|released|archived
 
 ## Scope
 
@@ -97,6 +97,16 @@ Portfolio overrides:
 
 - <item, reason, date, owner>
 
+### Deferred
+
+- <follow-up issue/ticket or proposed issue body, residual scope, blocker,
+  source item, owner/action needed>
+
+### Completed
+
+- <issue/PR/work item, commit/PR/proof, validation, whether the source issue
+  was closed>
+
 ### Released
 
 - <repo/version/tag/date/proof>
@@ -116,3 +126,16 @@ Use one ledger per portfolio. For example:
 
 Do not mix unrelated portfolios in one ledger unless the user explicitly wants a
 single combined operating view.
+
+## Vocabulary
+
+- `Ready Next`: owner-ready work that still needs an explicit next action such
+  as review, commit, push, PR, merge, close, or release.
+- `Completed`: implemented work whose required gates passed. Record commits,
+  PRs, validation, proof, and source issue closure here.
+- `Deferred`: known residual work that is intentionally not part of the current
+  closeout. Link the follow-up issue/ticket when one exists, or record the
+  proposed follow-up when mutation is not authorized.
+- `Released`: use only for actual product/package/version releases, deploys, or
+  tags. Do not put ordinary issue-closing commits here unless a release really
+  happened.

@@ -45,7 +45,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `plan-harder` | Create a higher-rigor implementation plan with focused clarification, a gotcha pass, and a saved `plans/<topic>-plan.md`. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
-| `maintainer-orchestrator` | Coordinate Codex worker threads, standalone Git/GitHub companion skills, gates, and portfolio ledgers for maintainer work. |
+| `maintainer-orchestrator` | Coordinate Codex worker threads, standalone Git/GitHub companion skills, gates, portfolio ledgers, and closure follow-ups for maintainer work. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
