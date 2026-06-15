@@ -26,7 +26,7 @@ Install repo-local plugins from this checkout through `.agents/plugins/marketpla
 
 | Plugin | Path | Purpose |
 | --- | --- | --- |
-| GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, maintainer and portfolio triage, focused CI/review helpers, release checks, and publish orchestration. |
+| GitStack | `plugins/gitstack/` | Legacy backup bundle for git commit authoring, git/gh-first GitHub workflows, maintainer and portfolio triage, focused CI/review helpers, release checks, and publish orchestration. |
 
 ### GitStack Skills
 
@@ -41,7 +41,7 @@ command -v gh && gh --version
 
 Use `plugins/gitstack/skills/github/references/core/installation.md` for cross-platform install guidance.
 
-For linked git + GitHub workflows, install the GitStack plugin instead of looking for separate standalone `git-commit`, `github`, or `yeet` skills.
+GitStack remains available as a backup plugin bundle. New reusable git and GitHub workflows are exposed as standalone skills under `skills/` and install independently from the plugin.
 
 ## Reusable Skills
 
@@ -50,6 +50,14 @@ For linked git + GitHub workflows, install the GitStack plugin instead of lookin
 | `autoreview` | Run Codex-only structured closeout review for local changes, branch diffs, or commits. |
 | `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a hybrid session runner. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
+| `git-commit` | Create precise git commits from local changes with direct `git` commands. |
+| `github` | Route GitHub work, verify `git`/`gh` readiness, and use direct GitHub CLI workflows. |
+| `github-ci` | Inspect GitHub Actions checks and failing PR logs with a focused `ci-inspect` CLI. |
+| `github-portfolio-triage` | Scan multiple explicit GitHub repositories read-only for queue, CI, release, and next-action summaries. |
+| `github-releases` | Check, plan, draft, publish, and validate GitHub Releases, tags, notes, and package availability. |
+| `github-reviews` | Inspect PR review threads and route selected replies with a focused `reviews` CLI. |
+| `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
+| `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review and implement TanStack product and integration patterns through one reusable skill with focused references. |
 | `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
@@ -62,6 +70,7 @@ For linked git + GitHub workflows, install the GitStack plugin instead of lookin
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC documentation using curated summaries and a bundled upstream DocC source tree. |
+| `yeet` | Publish local work as a branch and draft PR by composing standalone git and GitHub skills. |
 
 ### TanStack References
 
@@ -78,6 +87,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer-orchestrator` requires `$autoreview` and the GitStack plugin.
+- `yeet` requires `$git-commit` and `$github`; it may route to `$github-ci` or `$github-reviews` for follow-up CI or review work.
 
 ## Project-Local Skills
 
@@ -93,7 +103,7 @@ Project-local skills are repository-specific and are not included in reusable in
 
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
-- Use GitStack for linked git + GitHub workflows.
+- Use GitStack only when the legacy bundled plugin surface is explicitly desired; otherwise prefer the standalone reusable git and GitHub skills.
 
 ### Link Reusable Skills For Local Development
 
@@ -110,7 +120,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/git-commit skills/github skills/github-ci skills/github-portfolio-triage skills/github-releases skills/github-reviews skills/github-stars skills/github-triage skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -138,6 +148,14 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill autoreview \
   --skill chrome-devtools \
   --skill code-wiki \
+  --skill git-commit \
+  --skill github \
+  --skill github-ci \
+  --skill github-portfolio-triage \
+  --skill github-releases \
+  --skill github-reviews \
+  --skill github-stars \
+  --skill github-triage \
   --skill skill-cli-creator \
   --skill tanstack \
   --skill codex-changelog \
@@ -149,7 +167,8 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \
-  --skill swift-docc
+  --skill swift-docc \
+  --skill yeet
 ```
 
 Install one reusable skill globally for Codex:

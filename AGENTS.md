@@ -57,6 +57,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
+- Treat `git-commit`, `github`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
+- Treat `github-ci`, `github-reviews`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
 - Treat `tanstack` as portable because it is guidance-only, relies on local repo/package inspection plus current TanStack-owned docs when exact APIs matter, and does not require Codex-only runtime tools.
 - Treat `.agents/skills/Maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `chrome-devtools` as portable and runtime-dependent on Homebrew-installed Chrome DevTools for agents plus a local Chrome-capable environment: it requires `python3`, Chrome, `chrome-devtools-mcp`/`chrome-devtools` on `PATH` or discoverable through Homebrew metadata, and the skill-local runner at `skills/chrome-devtools/scripts/chrome-devtools-session` delegates normal flows to the Homebrew `chrome-devtools` CLI while using MCP stdio for authenticated current-Chrome attachment.
@@ -118,18 +120,26 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Skill CLI Creator skill
 - Route embedded-CLI design and layout work through `$skill-cli-creator`; keep detailed host, execution, and migration doctrine in `skills/skill-cli-creator/SKILL.md` and its references.
 - Repo-level embedded-CLI invariants are: shipped artifacts live under `scripts/`, maintenance-only implementations live under `projects/<tool>/`, and ownership stays aligned when a CLI is skill-owned, plugin-shared, or owned by one bundled plugin skill. (Codex learning)
+- Use direct `scripts/<tool>` implementations for simple single-file CLIs; reserve `projects/<tool>/` for real multi-file, compiled, generated, dependency-managed, or build-backed CLI implementations. (Codex learning)
 - Multi-OS compiled CLIs keep the stable executable surface at `scripts/<tool>` and place platform binaries under `scripts/bin/<tool>-<os>-<arch>`; use `projects/<tool>/scripts/` for build/install helpers when needed. (Codex learning)
 - Persist embedded-CLI config in owner-aligned `config.toml` files under `<project-root>/.skills/...` or `<project-root>/.plugins/...`, and treat those directories as config-only. (Codex learning)
 - Require the shipped artifact to expose `--version` with one semver source of truth, and if `projects/<tool>/` exists require `projects/<tool>/AGENTS.md` plus a scoped `projects/<tool>/.gitignore` when generated state exists. (Codex learning)
 - Keep embedded-CLI docs artifact-first: examples must run `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed artifact path unless the host explicitly documents a wrapper, alias, or `PATH` contract for bare `<tool> ...`. (Codex learning)
 
+### Standalone Git and GitHub skills
+- Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github`, `github-triage`, `github-releases`, `github-ci`, `github-reviews`, `github-portfolio-triage`, `github-stars`, and `yeet`.
+- Keep standalone skills independent from repo-local plugin files, plugin shared scripts, and installed plugin cache copies; standalone runtime docs and code must use direct `git`, direct `gh`, or their own `scripts/<tool>` artifacts.
+- Keep `git-commit`, `github`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
+- Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit`, `github`, and focused `github-*` skills rather than owning duplicate helper code.
+- Keep stars and star-list workflows in standalone `github-stars`, not in repository triage.
+
 ### GitStack plugin
-- Keep `plugins/gitstack/` as the preferred full-stack install surface for linked git authoring, GitHub operations, and publish orchestration.
+- Keep `plugins/gitstack/` available as the legacy backup plugin bundle for linked git authoring, GitHub operations, and publish orchestration.
 - Keep `plugins/gitstack/scripts/ghflow` as the shared runtime for bundled GitHub skills; do not add bundled skill-local runtime copies.
 - Keep `ghflow` intentionally narrow in implementation scope; avoid expanding it into wrappers for routine `git` or `gh` operations that do not need shared higher-level behavior. (Codex learning)
 - Treat bare `ghflow` as display shorthand only in GitStack runtime docs; executable examples must resolve and run the installed `scripts/ghflow` artifact unless a shell wrapper or `PATH` contract has already been verified. (Codex learning)
 - Bundle `git-commit`, `github`, `github-triage`, `github-portfolio-triage`, `github-reviews`, `github-ci`, `github-releases`, and `yeet` under `plugins/gitstack/skills/`.
-- Keep GitHub-oriented skills distributed through `plugins/gitstack/`, not duplicated as standalone reusable skills under `skills/`. (Codex learning)
+- Do not use the legacy plugin bundle as a runtime or maintenance dependency for standalone reusable Git and GitHub skills. (Codex learning)
 
 ### Maintainer Orchestrator skill
 - Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, not embedded in GitStack.
@@ -137,6 +147,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 
 ### GitHub skill
+- Keep the standalone reusable `github` skill under `skills/github/` as the umbrella GitHub routing surface for the standalone suite.
 - Keep the bundled `github` skill under `plugins/gitstack/skills/github/` as the umbrella GitHub skill surface inside this repo-local plugin, with full publish-from-worktree remaining owned by bundled `yeet`.
 - Keep shared install and dependency guidance for the bundled `github` skill centralized in `plugins/gitstack/skills/github/references/core/installation.md`. (Codex learning)
 - Keep the bundled `github` skill self-owned and self-sufficient; do not require the upstream GitHub plugin for runtime routing or execution.
@@ -146,11 +157,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Domain docs and helpers may depend only on the shared `plugins/gitstack/scripts/ghflow` runtime plus same-domain reference material; do not create cross-domain helper dependencies. (Codex learning)
 
 ### Git Commit skill
+- Keep the standalone reusable `git-commit` skill under `skills/git-commit/` scriptless and focused on selective staging, commit authoring, and push-only flows with direct `git`.
 - `git-commit` may be bundled inside `plugins/gitstack`, but keep it as a distinct skill-owned surface rather than folding commit authoring or staging responsibilities into `ghflow`. (Codex learning)
 
 ### Yeet skill
+- Keep the standalone reusable `yeet` skill under `skills/yeet/` scriptless unless a future repeated publish workflow proves a shipped script is necessary.
 - Keep `yeet` focused on publish orchestration from a local checkout rather than duplicating commit-authoring or generic GitHub skill ownership. (Codex learning)
-- Keep `yeet` dependency-aware: require bundled `git-commit` and `github` instead of vendoring a duplicate GitHub helper layer. (Codex learning)
+- Within `plugins/gitstack`, keep bundled `yeet` dependency-aware: require bundled `git-commit` and `github` instead of vendoring a duplicate GitHub helper layer. (Codex learning)
 - Within `plugins/gitstack`, keep `yeet` wired to bundled `git-commit` plus the shared `ghflow publish ...` runtime surface instead of legacy helper-script paths. (Codex learning)
 - Treat GitStack plugin cache artifacts as the installed runtime surface for shared CLIs such as `ghflow`; do not treat cache-path resolution rules as repo-level API behavior. (Codex learning)
 

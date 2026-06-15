@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub"
+  short_description: "Route GitHub work and run direct gh workflows."
+  brand_color: "#24292F"
+  default_prompt: "Use $github to route GitHub work, verify git and gh readiness, prefer direct gh commands, and hand focused domains to standalone GitHub skills."

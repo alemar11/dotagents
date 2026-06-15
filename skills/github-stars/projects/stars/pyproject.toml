@@ -1,0 +1,18 @@
+[project]
+name = "github-stars-cli"
+version = "1.0.0"
+description = "Standalone authenticated GitHub stars and lists CLI"
+requires-python = ">=3.11"
+
+[project.scripts]
+stars = "github_stars_cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

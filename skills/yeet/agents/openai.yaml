@@ -1,0 +1,5 @@
+interface:
+  display_name: "Yeet"
+  short_description: "Publish local work as a branch and draft PR."
+  brand_color: "#EA580C"
+  default_prompt: "Use $yeet to publish local work by inspecting scope, composing a commit through $git-commit, pushing safely, and opening or reusing a draft PR with standalone GitHub skills."

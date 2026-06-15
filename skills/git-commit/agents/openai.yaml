@@ -1,0 +1,5 @@
+interface:
+  display_name: "Git Commit"
+  short_description: "Create precise git commits from local changes."
+  brand_color: "#64748B"
+  default_prompt: "Use $git-commit to inspect local changes, stage explicit paths, write a clear commit message, commit, and optionally push without opening a PR."

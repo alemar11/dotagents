@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Stars"
+  short_description: "Manage authenticated-user stars and lists."
+  brand_color: "#CA8A04"
+  default_prompt: "Use $github-stars to list, star, unstar, and manage authenticated-user GitHub star lists through scripts/stars."
