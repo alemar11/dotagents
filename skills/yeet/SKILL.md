@@ -14,6 +14,11 @@ composes standalone skills conceptually:
 - Use `github` for GitHub readiness and PR lifecycle commands.
 - Use `github-ci` or `github-reviews` only for follow-up CI or review work.
 
+If there is no local work to publish, or the request is only GitHub issue
+hygiene such as creating, commenting on, labeling, or closing issues, do not run
+the full publish flow. Route that work to `github` or `github-triage`, perform
+the authorized GitHub mutation, and state that full `yeet` was not applicable.
+
 ## Workflow
 
 1. Inspect branch and worktree state.

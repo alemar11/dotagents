@@ -22,6 +22,9 @@ repositories. Use `github-stars` for star and list operations.
    or follow-up owner.
 5. Do not edit labels, milestones, assignees, titles, or comments unless the
    user asked for that specific change.
+6. Before closing issues or resolving partial work, read
+   `references/issue-workflows.md` and require a linked or proposed follow-up
+   for any deferred acceptance criteria.
 
 ## References
 

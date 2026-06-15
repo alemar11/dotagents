@@ -1,5 +1,5 @@
 interface:
   display_name: "Yeet"
-  short_description: "Publish local work as a branch and draft PR."
+  short_description: "Publish local work as a branch and draft PR, or hand off issue-only hygiene."
   brand_color: "#EA580C"
-  default_prompt: "Use $yeet to publish local work by inspecting scope, composing a commit through $git-commit, pushing safely, and opening or reusing a draft PR with standalone GitHub skills."
+  default_prompt: "Use $yeet to publish local work by inspecting scope, composing a commit through $git-commit, pushing safely, and opening or reusing a draft PR with standalone GitHub skills. If there is no publishable local work or the request is issue-only hygiene, route to $github or $github-triage and say full yeet was not applicable."
