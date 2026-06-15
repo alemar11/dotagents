@@ -1,7 +1,7 @@
 {
   "name": "gitstack",
-  "version": "3.2.3",
-  "description": "Bundle git authoring, git/gh-first GitHub operations, and publish workflows, with shared ghflow helpers for focused CI inspection, higher-level review, star-list, and publish flows.",
+  "version": "3.3.0",
+  "description": "Bundle git authoring, git/gh-first GitHub operations, maintainer triage, and publish workflows, with shared ghflow helpers for focused CI inspection, higher-level review, star-list, and publish flows.",
   "author": {
     "name": "alemar11",
     "email": "",
@@ -18,8 +18,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "GitStack",
-    "shortDescription": "Bundle git commit, git/gh-first GitHub workflows, and narrow shared CI/review/publish helpers in one plugin.",
-    "longDescription": "GitStack keeps normal work centered on `git` and `gh`, with `git-commit`, `github`, specialist GitHub skills, and Yeet using shared `ghflow` helpers only where focused failing-PR CI inspection, review-thread routing, authenticated-user stars or star lists, or current-branch publish helpers justify extra tooling.",
+    "shortDescription": "Bundle git commit, git/gh-first GitHub workflows, maintainer triage, and narrow shared CI/review/publish helpers in one plugin.",
+    "longDescription": "GitStack keeps normal work centered on `git` and `gh`, with `git-commit`, `github`, specialist GitHub skills, and Yeet using shared `ghflow` helpers only where focused failing-PR CI inspection, review-thread routing, authenticated-user stars or star lists, or current-branch publish helpers justify extra tooling. Focused maintainer issue/PR queue triage routes to the bundled `github-triage` skill and stays report-only until the user asks for follow-up action.",
     "developerName": "alemar11",
     "category": "Productivity",
     "capabilities": [
@@ -30,7 +30,7 @@
     "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
-      "Review this repo and summarize the open PRs.",
+      "Triage this repo's open issues and PRs.",
       "Turn these local changes into a draft PR.",
       "Create a clean commit and open or reuse the PR."
     ],

@@ -7,8 +7,8 @@ shared `ghflow` helpers is actually justified.
 
 ## Domain runbooks
 
-- Triage-owned repository, authenticated-user star or star-list, issue, and PR
-  metadata flows:
+- Triage-owned maintainer queue reports, repository orientation,
+  authenticated-user star or star-list, issue, and PR metadata flows:
   `references/triage/workflows.md`
 - Review-thread inspection, reply, and review submission:
   `references/reviews/workflows.md`

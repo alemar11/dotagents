@@ -26,7 +26,7 @@ Install repo-local plugins from this checkout through `.agents/plugins/marketpla
 
 | Plugin | Path | Purpose |
 | --- | --- | --- |
-| GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, focused CI/review helpers, release checks, and publish orchestration. |
+| GitStack | `plugins/gitstack/` | Bundles git commit authoring, git/gh-first GitHub workflows, maintainer triage, focused CI/review helpers, release checks, and publish orchestration. |
 | TanStack | `plugins/tanstack/` | Bundles full-portfolio TanStack product guidance plus focused Router, Start, CLI, and integration sub-skills. |
 
 ### GitStack Skills

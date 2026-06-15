@@ -36,7 +36,8 @@ lifecycle work on already-pushed branches, or any time the user just says
 - Use `github` when the branch is already pushed, the GitHub task is mixed, or
   the user asks generically for GitHub work.
 - Use `github-triage`, `github-reviews`, `github-ci`, or `github-releases`
-  only when the request is clearly confined to that domain.
+  only when the request is clearly confined to that domain; route maintainer
+  issue/PR queue triage to `github-triage`.
 - Use plain `git` and `gh` when one command or a short direct sequence expresses
   the job clearly.
 - Use resolved `ghflow` for normalized JSON, review-thread routing,
@@ -65,7 +66,7 @@ lifecycle work on already-pushed branches, or any time the user just says
 | Request type | Preferred skill |
 | --- | --- |
 | Mixed GitHub work, publish lifecycle, or ambiguous routing | `github` |
-| Repo orientation, issues, PR metadata, authenticated-user stars or star lists, or raw cross-repo issue transfer | `github-triage` |
+| Repo orientation, maintainer issue/PR queue triage, issues, PR metadata, authenticated-user stars or star lists, or raw cross-repo issue transfer | `github-triage` |
 | Review follow-up, thread replies, review submission | `github-reviews` |
 | PR checks and GitHub Actions investigation | `github-ci` |
 | Release planning, notes, and publication with plain `git`/`gh` | `github-releases` |
@@ -98,6 +99,8 @@ Use direct commands first when they already express the job clearly:
 
 - Repo or PR orientation:
   - `gh repo view --json nameWithOwner,description,defaultBranchRef,url`
+  - `gh issue list --repo <owner/repo> --state open --limit 50 --json number,title,author,labels,createdAt,updatedAt,url`
+  - `gh pr list --repo <owner/repo> --state open --limit 50 --json number,title,author,isDraft,reviewDecision,mergeStateStatus,createdAt,updatedAt,url`
   - `gh pr view <n> --repo <owner/repo> --json number,title,state,url`
 - Issues:
   - `gh issue view <n> --repo <owner/repo>`
@@ -137,6 +140,8 @@ Use the resolved `ghflow` artifact when one of these applies:
 
 - Direct orientation:
   - `gh repo view --json nameWithOwner,description,defaultBranchRef,url`
+  - `gh issue list --repo <owner/repo> --state open --limit 50 --json number,title,author,labels,createdAt,updatedAt,url`
+  - `gh pr list --repo <owner/repo> --state open --limit 50 --json number,title,author,isDraft,reviewDecision,mergeStateStatus,createdAt,updatedAt,url`
   - `gh pr view <n> --repo <owner/repo> --json number,title,state,url`
 - Direct mutation:
   - `gh issue create --repo <owner/repo> ...`
@@ -196,6 +201,7 @@ Use the resolved `ghflow` artifact when one of these applies:
 ## Examples
 
 - "Summarize this repo and tell me what matters first."
+- "Triage this repo's open issues and PRs."
 - "Show me the open PRs for this repo and summarize which one needs attention."
 - "Show me my starred repos."
 - "Update the PR title and body without changing review state."

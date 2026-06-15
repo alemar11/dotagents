@@ -30,7 +30,8 @@ bundled `github` skill.
 
 - Core setup, auth, artifact resolution, and retry helpers:
   `references/core/installation.md`, `references/core/ghflow-resolution.md`
-- Triage helpers: `references/triage/script-summary.md`
+- Triage helpers and maintainer queue reports:
+  `references/triage/script-summary.md`
 - Review helpers: `references/reviews/script-summary.md`
 - CI guidance: `references/ci/script-summary.md`
 - Release guidance: `references/releases/script-summary.md`

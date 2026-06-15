@@ -7,6 +7,12 @@ Use this reference for triage-domain GitHub flows inside the consolidated
 
 - Repo orientation:
   `gh repo view --json nameWithOwner,description,defaultBranchRef,url`
+- Maintainer triage report:
+  `project-triage.md`
+- Issue queue scan:
+  `gh issue list --repo <owner/repo> --state open --limit 50 --json number,title,author,labels,createdAt,updatedAt,url`
+- PR queue scan:
+  `gh pr list --repo <owner/repo> --state open --limit 50 --json number,title,author,isDraft,reviewDecision,mergeStateStatus,createdAt,updatedAt,url`
 - Issue reads and writes:
   `gh issue view <n> --repo <owner/repo>`
   `gh issue create --repo <owner/repo> ...`

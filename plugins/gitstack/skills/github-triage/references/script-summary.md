@@ -6,6 +6,9 @@ bundled `github-triage` skill.
 ## Direct `gh` first
 
 - Repository orientation: `gh repo view`
+- Maintainer triage report: `references/project-triage.md`
+- Issue queue scan: `gh issue list`
+- PR queue scan: `gh pr list`
 - Issue reads and writes: `gh issue view`, `gh issue create`, `gh issue edit`
 - PR reads and metadata edits: `gh pr view`, `gh pr edit`
 
