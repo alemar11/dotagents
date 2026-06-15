@@ -53,7 +53,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
-- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub skills including read-only portfolio triage.
+- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github`, `$github-portfolio-triage`, `$github-triage`, `$github-ci`, `$github-reviews`, `$github-releases`, `$git-commit`, and `$yeet`.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
@@ -134,7 +134,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep stars and star-list workflows in standalone `github-stars`, not in repository triage.
 
 ### Maintainer Orchestrator skill
-- Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, using standalone Git/GitHub skills for queue and publish workflows.
+- Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, using standalone Git/GitHub companion skills for queue, CI, review, release, commit, and publish workflows.
 - Keep runtime orchestration, worker, gate, and ledger details in `skills/maintainer-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 
