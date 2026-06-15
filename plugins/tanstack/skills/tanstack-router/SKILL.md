@@ -7,10 +7,10 @@ description: Review, design, and refactor TanStack Router usage with emphasis on
 
 Use this skill when a task involves `@tanstack/react-router`, route trees, `createFileRoute`, `createRouter`, `beforeLoad`, `loader`, `loaderDeps`, `validateSearch`, `Link`, `useNavigate`, or lazy route files.
 
-Use this umbrella skill when the Router scope is broad, mixed, or still unclear. When the task collapses to one Router concern, route to the matching focused bundled skill instead of keeping the whole problem here.
+Use this umbrella skill when the Router scope is broad, mixed, or still unclear.
 Recent session evidence shows this umbrella is the common useful entrypoint;
-open focused Router skills only when the request is already specific enough to
-benefit from a narrower contract.
+open focused Router references only when the request is already specific enough
+to benefit from a narrower contract.
 
 ## What to Optimize For
 
@@ -40,17 +40,19 @@ benefit from a narrower contract.
 - `references/data-loading-and-ssr.md`: loaders, `loaderDeps`, preload behavior, cache boundaries, and Router-layer SSR.
 - `references/auth-and-failures.md`: `beforeLoad`, redirects, not-found paths, and route error ownership.
 - `references/plugin-and-splitting.md`: router plugin wiring, generated routes, and lazy-route code splitting.
-- `references/README.md`: quick map from Router problem shape to the right macro guide or focused skill.
+- `references/README.md`: quick map from Router problem shape to the right
+  macro guide or focused reference.
 
-## Focused-Skill Routing
+## Focused Reference Routing
 
 - Stay here for mixed route-tree work, route migrations, breadcrumb/design
   questions, or implementation reviews that touch several Router features.
-- Route to exactly one focused Router skill when the request is plainly about
+- Read exactly one focused Router reference when the request is plainly about
   search params, path params, navigation, loaders, auth guards, code splitting,
   not-found/error handling, type registration, SSR, or plugin wiring.
 - Do not fan out across the entire Router family for ordinary app work; use the
-  macro guides first and open focused skills only for the narrow issue at hand.
+  macro guides first and open focused references only for the narrow issue at
+  hand.
 
 ## Default Rules
 
@@ -61,19 +63,19 @@ benefit from a narrower contract.
 - Prefer route loaders for route-owned fetching, especially when paired with TanStack Query preloading.
 - Use `from` on hooks and links when narrowing improves precision and TypeScript performance.
 
-## Focused Skills
+## Focused References
 
-- `tanstack-router-core`: overall Router mental model and route tree shape.
-- `tanstack-router-search-params`: validated search params and typed updates.
-- `tanstack-router-path-params`: route params, path structure, and file-route alignment.
-- `tanstack-router-navigation`: `Link`, `navigate`, and route-aware hook narrowing.
-- `tanstack-router-data-loading`: loaders, `loaderDeps`, preload behavior, and cache boundaries.
-- `tanstack-router-auth-and-guards`: `beforeLoad`, redirects, and auth preconditions.
-- `tanstack-router-code-splitting`: lazy route files and route-owned code splitting.
-- `tanstack-router-not-found-and-errors`: not-found routing and route error handling.
-- `tanstack-router-type-safety`: registration, inference, and unnecessary annotations.
-- `tanstack-router-ssr`: Router SSR patterns and Start handoff boundaries.
-- `tanstack-router-plugin`: Vite or bundler plugin setup for generated routes and build wiring.
+- `references/routing-structure.md`: Router core model, route tree shape, path
+  params, file-route alignment, type registration, and inference.
+- `references/navigation-and-search.md`: validated search params, typed updates,
+  `Link`, `navigate`, and route-aware hook narrowing.
+- `references/data-loading-and-ssr.md`: loaders, `loaderDeps`, preload behavior,
+  cache boundaries, Router SSR, and Start handoff decisions.
+- `references/auth-and-failures.md`: `beforeLoad`, redirects, auth
+  preconditions, not-found routes, route error boundaries, and failure
+  ownership.
+- `references/plugin-and-splitting.md`: generated routes, build wiring, lazy
+  route files, and route-level code splitting.
 
 ## Review Checklist
 

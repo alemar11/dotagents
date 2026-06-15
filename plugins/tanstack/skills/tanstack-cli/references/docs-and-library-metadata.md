@@ -7,6 +7,15 @@ Owns:
 - machine-readable preflight checks
 - establishing current CLI-backed facts before framework-specific reasoning
 
-Escalate to:
-- `tanstack-cli-query-docs-library-metadata` for direct leaf-skill handling
-- the relevant framework skill after the needed facts are resolved
+Workflow:
+1. Use CLI metadata or docs queries to establish current facts.
+2. Prefer machine-readable discovery before making tool-sensitive claims.
+3. Hand off to a framework or integration skill once the needed context is
+   resolved.
+
+Do not use this guide for framework implementation once the needed docs are
+known, ecosystem add-on choice comparison, or general web research outside
+CLI-backed discovery.
+
+Verification: verify against current `@tanstack/cli` docs and metadata commands
+when exact command names or JSON shapes matter.

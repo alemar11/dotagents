@@ -23,8 +23,8 @@ plugin against the upstream `tanstack-skills/tanstack-skills` plugin tree.
   `tanstack-devtools`, `tanstack-form`, `tanstack-pacer`, `tanstack-query`,
   `tanstack-ranger`, `tanstack-router`, `tanstack-start`, `tanstack-store`,
   `tanstack-table`, and `tanstack-virtual`.
-- Focused Router, Start, and CLI skills remain available for direct triggering
-  when their narrower concern is already known.
+- Focused Router, Start, and CLI concerns live under the matching macro skill's
+  `references/*.md` files when their narrower concern is already known.
 - `tanstack-integration` owns cross-stack Query, Router, Start, and broader
   product-composition decisions.
 
@@ -81,8 +81,8 @@ plugin against the upstream `tanstack-skills/tanstack-skills` plugin tree.
   guidance and verify product details against TanStack-owned docs.
 - Do not add upstream bundle aliases as local skills unless this repo
   intentionally changes its plugin packaging model.
-- Keep focused sub-skills only where they reduce prompt weight for a recurring
-  narrow workflow.
+- Keep narrow Router, Start, and CLI guidance in focused references under the
+  macro skill unless a new direct-trigger skill is deliberately justified.
 - Keep plugin manifest keywords, `README.md`, and `agents/openai.yaml` aligned
   whenever product coverage changes.
 

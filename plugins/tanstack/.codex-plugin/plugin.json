@@ -1,6 +1,6 @@
 {
   "name": "tanstack",
-  "version": "0.4.0",
+  "version": "1.0.0",
   "description": "Bundle full-portfolio TanStack guidance for AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, Virtual, and cross-stack integration.",
   "author": {
     "name": "alemar11",
@@ -32,7 +32,7 @@
   "interface": {
     "displayName": "TanStack",
     "shortDescription": "Bundle full-portfolio TanStack product and integration guidance in one plugin.",
-    "longDescription": "TanStack bundles product-level skills for AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, and Virtual, plus cross-stack integration guidance and focused Router, Start, and CLI sub-skills for direct triggering.",
+    "longDescription": "TanStack bundles product-level skills for AI, CLI, Config, DB, Devtools, Form, Pacer, Query, Ranger, Router, Start, Store, Table, and Virtual, plus cross-stack integration guidance and focused Router, Start, and CLI reference maps.",
     "developerName": "alemar11",
     "category": "Development",
     "capabilities": [
@@ -44,7 +44,7 @@
     "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
     "defaultPrompt": [
       "Review this TanStack app for the right Query, Router, Start, Form, Table, Store, DB, Virtual, or integration ownership.",
-      "Help me refactor this TanStack React Router, Query, Start, or Form code using current official TanStack docs and the bundled focused skills.",
+      "Help me refactor this TanStack React Router, Query, Start, or Form code using current official TanStack docs and the bundled focused references.",
       "Use the full TanStack plugin portfolio to design or review AI, CLI, Config, DB, Devtools, Pacer, Ranger, Store, Table, Virtual, and cross-stack patterns."
     ],
     "brandColor": "#0F172A",

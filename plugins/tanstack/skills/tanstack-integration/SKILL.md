@@ -7,7 +7,7 @@ description: Review and design how TanStack Query, Router, and Start work togeth
 
 Use this skill when a task spans more than one TanStack layer, especially Query + Router, or Query + Router + Start together.
 
-Use this skill for cross-stack composition, not as a substitute for a focused Router or Start skill when the task is confined to one domain.
+Use this skill for cross-stack composition, not as a substitute for the focused Router or Start references when the task is confined to one domain.
 
 ## Skill Selection
 
@@ -19,10 +19,10 @@ Start with the macro-area umbrellas unless the user names a narrower concern:
 - `tanstack-cli` for scaffolding, add-ons, library metadata, and custom add-on workflows.
 - `tanstack-integration` for Query + Router + Start ownership, loader prefetch, and hydration boundaries.
 
-Use the focused bundled skills only after the task has collapsed to one
-specific concern, such as Router search params or Start server functions. Do
-not open every focused skill in a normal audit or implementation pass; use the
-umbrella reference map first, then jump to a focused skill when it can reduce
+Use focused references only after the task has collapsed to one specific
+concern, such as Router search params or Start server functions. Do not open
+every focused reference in a normal audit or implementation pass; use the
+umbrella reference map first, then jump to the focused reference that can reduce
 prompt weight or sharpen exact guidance.
 For standalone product work outside Query, Router, Start, or CLI, route to the
 matching product skill such as `tanstack-form`, `tanstack-table`,
@@ -70,10 +70,12 @@ matching product skill such as `tanstack-form`, `tanstack-table`,
 ## Routing
 
 - If the issue is only Query, route to `tanstack-query`.
-- If the issue is only Router, route to `tanstack-router` or one of its focused sub-skills.
-- If the issue is only Start, route to `tanstack-start` or one of its focused sub-skills.
+- If the issue is only Router, route to `tanstack-router` and its focused
+  references.
+- If the issue is only Start, route to `tanstack-start` and its focused
+  references.
 - If the issue is only CLI scaffolding, add-ons, or package metadata discovery,
-  route to `tanstack-cli` or one of its focused CLI skills.
+  route to `tanstack-cli` and its focused references.
 - Keep this skill for Query + Router + Start ownership, loader-prefetch alignment, and hydration-boundary decisions.
 
 ## Avoid

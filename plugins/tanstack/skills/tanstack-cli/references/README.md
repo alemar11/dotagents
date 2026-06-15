@@ -7,3 +7,7 @@ Use these files when `tanstack-cli` is the right macro-area but the exact CLI wo
 - `ecosystem-integrations.md`: compare installable ecosystem options.
 - `custom-addons-dev-watch.md`: build and iterate custom add-ons or templates.
 - `docs-and-library-metadata.md`: query machine-readable docs and library metadata.
+
+These files replace the former focused CLI entrypoints. Use them from the
+`tanstack-cli` umbrella instead of expecting separate `tanstack-cli-*` skills to
+be installed.

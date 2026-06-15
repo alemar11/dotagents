@@ -21,13 +21,12 @@ the local `plugins/tanstack/` plugin.
   Table, and Virtual.
 - `tanstack-integration` owns cross-stack composition guidance.
 - `tanstack-router`, `tanstack-start`, and `tanstack-cli` own dense workflow
-  routing through local `references/*.md` files.
-- Focused bundled skills remain valid direct-trigger surfaces; do not replace
-  them with reference files only.
+  routing through local `references/*.md` files rather than separate narrow
+  skill directories.
 - When upstream coverage expands, prefer:
   - refreshing umbrella `references/*.md` routing first
-  - then adding, removing, or renaming focused bundled skills only when the
-    workflow boundary truly changed
+  - then adding a new product or macro skill only when the workflow boundary
+    truly needs direct triggering
 
 ## Execution Flow (Mandatory Order)
 
@@ -96,18 +95,16 @@ surfaces when they exist.
 ## Layout Refresh Rules
 
 - Keep macro-area workflows in umbrella skills plus `references/*.md`.
-- Use focused bundled skills for direct-triggerable narrow tasks only.
+- Keep narrow Router, Start, and CLI tasks in focused reference files unless
+  the domain becomes broad enough to justify a macro skill.
 - When a new official TanStack domain appears:
   - add it to the nearest umbrella `references/README.md`
-  - decide whether it deserves a new focused bundled skill or belongs inside an
-    existing macro guide
+  - decide whether it deserves a new macro skill or belongs inside an existing
+    macro guide
 - When an official domain disappears or merges:
   - update umbrella `references/*.md` first
-  - remove or merge focused bundled skills only if the old trigger boundary is
-    now actively misleading
 - Keep `README.md`, `.codex-plugin/plugin.json`, and umbrella `SKILL.md` files
-  aligned on whether the plugin is describing macro areas, focused sub-skills,
-  or both
+  aligned on the plugin's macro skills and focused reference maps
 
 ## Guardrails
 
@@ -118,9 +115,8 @@ surfaces when they exist.
   without a real upstream and local-scope reason.
 - Keep local wording aligned with what the plugin actually bundles today, not
   with possible future TanStack Intent expansion.
-- Do not collapse focused bundled skills into reference files only; keep
-  discoverable bundled entrypoints where the plugin already owns a direct
-  trigger surface.
+- Do not reintroduce separate narrow Router, Start, or CLI skill directories
+  unless a maintainer deliberately changes the plugin packaging model.
 
 ## Deliverable
 

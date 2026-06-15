@@ -50,7 +50,7 @@ When the user asks what this skill can do, offer this task list:
 6) `refresh tanstack intent coverage`
    - Review the current TanStack Intent registry and relevant TanStack package skill pages for `plugins/tanstack/`.
    - Update local plugin metadata, umbrella `SKILL.md` routing, `references/*.md` fast paths, and related docs only when newly shipped first-party Intent coverage materially changes the right guidance.
-   - Use the current TanStack umbrella layout: macro-area bundled skills stay as the primary entrypoints, with dense domain slices living under each umbrella's `references/` folder and focused bundled skills remaining available for direct triggering.
+   - Use the current TanStack umbrella layout: macro-area bundled skills stay as the primary entrypoints, with dense domain slices living under each umbrella's `references/` folder instead of separate narrow skill directories.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 7) `refresh tanstack skills coverage`
    - Compare local `plugins/tanstack/` product-level bundled skills against the upstream `tanstack-skills/tanstack-skills` plugin tree.

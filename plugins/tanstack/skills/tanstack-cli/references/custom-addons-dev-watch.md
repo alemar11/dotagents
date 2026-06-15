@@ -7,6 +7,14 @@ Owns:
 - local iteration mechanics for custom CLI surfaces
 - separating authoring workflows from ordinary app-consumer commands
 
-Escalate to:
-- `tanstack-cli-maintain-custom-addons-dev-watch` for direct leaf-skill handling
-- repository documentation outside this runtime guide when the task is about this repository's own plugin packaging rather than TanStack CLI usage
+Workflow:
+1. Confirm the task is about custom add-on or template development.
+2. Set up the correct init, compile, and watch loop.
+3. Keep guidance scoped to CLI authoring mechanics, not framework design.
+
+Do not use this guide for installing existing add-ons, app scaffolding for end
+users, or general plugin/skill packaging unrelated to TanStack CLI add-on
+authoring.
+
+Verification: verify against current `@tanstack/cli` add-on authoring guidance
+when exact commands or watch-mode constraints matter.

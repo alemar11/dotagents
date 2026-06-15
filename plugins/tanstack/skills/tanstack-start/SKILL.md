@@ -7,10 +7,13 @@ description: Review, design, and refactor TanStack Start apps with emphasis on t
 
 Use this skill when a task involves `@tanstack/react-start`, `createServerFn`, middleware, server routes, SSR, hydration, environment variables, cookies, or auth flows in a TanStack Start app.
 
-Use this umbrella skill when the Start scope spans multiple framework concerns or when the exact subdomain is still unclear. For targeted work, route to the matching focused bundled skill instead of solving every Start concern from one broad prompt.
+Use this umbrella skill when the Start scope spans multiple framework concerns
+or when the exact subdomain is still unclear. For targeted work, read the
+matching focused reference instead of solving every Start concern from one broad
+prompt.
 Recent session evidence favors this umbrella for real Start app work; use the
-focused Start skills only when the request has already narrowed to one Start
-subdomain.
+focused Start references only when the request has already narrowed to one
+Start subdomain.
 
 ## What to Optimize For
 
@@ -40,17 +43,18 @@ subdomain.
 - `references/middlewares-and-server-core.md`: middleware ownership, shared request concerns, and server-runtime boundaries.
 - `references/server-components-and-migrations.md`: experimental server components and Next.js App Router migrations.
 - `references/deployments.md`: deployment targets, packaging assumptions, and runtime-sensitive tradeoffs.
-- `references/README.md`: quick map from Start problem shape to the right macro guide or focused skill.
+- `references/README.md`: quick map from Start problem shape to the right macro
+  guide or focused reference.
 
-## Focused-Skill Routing
+## Focused Reference Routing
 
 - Stay here for mixed Start app reviews, server/client boundary audits, or
   framework-level implementation changes that touch several concerns.
-- Route to exactly one focused Start skill for isolated server-function,
+- Read exactly one focused Start reference for isolated server-function,
   middleware, execution-model, server-route, deployment, migration, or
   experimental server-component work.
-- Do not open every Start focused skill during normal implementation; open the
-  umbrella reference map first, then use a focused skill only when it will
+- Do not open every Start focused reference during normal implementation; open the
+  umbrella reference map first, then use focused guidance only when it will
   reduce ambiguity.
 
 ## Default Rules
@@ -62,18 +66,21 @@ subdomain.
 - Keep server-only files and shared files clearly separated.
 - Use middleware for reusable request concerns rather than repeating auth and header logic.
 
-## Focused Skills
+## Focused References
 
-- `tanstack-react-start`: broad React Start app setup and framework-level guidance.
-- `tanstack-react-start-server-components`: experimental server component setup and caveats.
-- `tanstack-start-migrate-from-nextjs`: Next.js App Router migration work.
-- `tanstack-start-core`: Start core runtime patterns when React-specific wrapping is not the main issue.
-- `tanstack-start-execution-model`: isomorphic boundaries and runtime placement.
-- `tanstack-start-middlewares`: request shaping, auth, cookies, and cross-cutting middleware.
-- `tanstack-start-server-functions`: `createServerFn`, validation, and server-only helpers.
-- `tanstack-start-server-routes`: server endpoints defined alongside route files.
-- `tanstack-start-deployments`: deployment targets and deployment-sensitive constraints.
-- `tanstack-start-server-core`: server runtime behavior and server-only boundaries.
+- `references/framework-and-execution.md`: React Start app setup, Start core
+  runtime patterns, isomorphic boundaries, shared-module safety, and runtime
+  placement.
+- `references/server-functions-and-routes.md`: `createServerFn`, validation,
+  server-only helpers, raw HTTP handling, and API-style server routes.
+- `references/middlewares-and-server-core.md`: middleware ordering, auth,
+  cookies, headers, reusable request concerns, server runtime behavior, and
+  server-only module boundaries.
+- `references/server-components-and-migrations.md`: experimental server
+  components, composition caveats, caching caveats, and Next.js App Router
+  migration work.
+- `references/deployments.md`: deployment targets, runtime packaging,
+  environment-sensitive behavior, and target-specific constraints.
 
 ## Review Checklist
 

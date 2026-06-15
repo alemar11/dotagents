@@ -7,3 +7,7 @@ Use these files when `tanstack-start` is the right macro-area but the exact Star
 - `middlewares-and-server-core.md`: middleware ownership and server-runtime concerns.
 - `server-components-and-migrations.md`: server components and Next.js App Router migration work.
 - `deployments.md`: deployment targets and runtime packaging tradeoffs.
+
+These files replace the former focused Start entrypoints. Use them from the
+`tanstack-start` umbrella instead of expecting separate Start-focused skills to
+be installed.

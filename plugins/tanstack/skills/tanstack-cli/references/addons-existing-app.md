@@ -7,6 +7,13 @@ Owns:
 - preconditions and project metadata checks
 - dependency chains introduced by chosen add-ons
 
-Escalate to:
-- `tanstack-cli-add-addons-existing-app` for direct leaf-skill handling
-- `tanstack-cli-choose-ecosystem-integrations` if add-on selection itself is still open
+Workflow:
+1. Confirm the project already exists and is a valid CLI target.
+2. Resolve the desired add-on ids and dependency implications.
+3. Keep the guidance scoped to add-on application, not framework redesign.
+
+Do not use this guide for new app scaffolding, ecosystem option discovery before
+a choice is made, or app architecture after install.
+
+Verification: verify against current `@tanstack/cli` add-on guidance when exact
+commands or metadata constraints matter.
