@@ -27,6 +27,8 @@ display name, derive a slug and record the display name in the ledger.
 - Workers report status, proof, blockers, and next actions to the orchestrator.
 - Preserve historical notes that explain owner decisions, suppressions, and
   release state.
+- The orchestrator records worker lifecycle decisions: integrated,
+  retained-for-inspection, abandoned, or handoff-pending.
 
 ## Template
 
@@ -109,6 +111,8 @@ Portfolio overrides:
 
 - <issue/PR/work item, commit/PR/proof, validation, whether the source issue
   was closed>
+- <worker id/title, integration method, worker lifecycle decision, generated
+  ignored artifacts removed/retained/left in disposable worktree>
 
 ### Released
 
@@ -132,13 +136,37 @@ single combined operating view.
 
 ## Vocabulary
 
+- `Active`: work that currently needs orchestration, worker monitoring,
+  integration, owner input, or a scheduled next check. Remove a worker row from
+  `Active` once its output is integrated, abandoned, retained only for
+  inspection, or handed off with the remaining action recorded elsewhere. A
+  completed row may remain in `Active` only while a root-owned closeout action
+  is still pending, and the `Next Check` must name that action.
 - `Ready Next`: owner-ready work that still needs an explicit next action such
   as review, commit, push, PR, merge, close, or release.
 - `Completed`: implemented work whose required gates passed. Record commits,
-  PRs, validation, proof, and source issue closure here.
+  PRs, validation, proof, source issue closure, integration method, worker
+  lifecycle decision, and any generated ignored artifacts that were removed or
+  intentionally retained.
 - `Deferred`: known residual work that is intentionally not part of the current
   closeout. Link the follow-up issue/ticket when one exists, or record the
-  proposed follow-up when mutation is not authorized.
+  proposed follow-up when mutation is not authorized. Do not mirror completed
+  source items here; use `Deferred` only for real residual scope, blocked live
+  proof, or owner-visible follow-up work.
 - `Released`: use only for actual product/package/version releases, deploys, or
   tags. Do not put ordinary issue-closing commits here unless a release really
   happened.
+
+## Closeout Hygiene
+
+Before marking a ledger `complete`, verify:
+
+- `Active` contains no worker that is merely done; every active row needs a real
+  next check or root-owned closeout action.
+- `Deferred` contains only residual work with a linked or proposed
+  owner-visible follow-up.
+- `Completed` records the final proof, issue/PR closure state, integration
+  method, and worker lifecycle decision for each completed worker-backed item.
+- Generated ignored artifacts and helper worktrees are either removed, retained
+  for inspection with a reason, left only inside disposable worker state, or
+  explicitly handed off.

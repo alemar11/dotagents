@@ -69,6 +69,84 @@ Do not send broad new scope into a worker without recording why the existing
 scope changed. If the latest state is unavailable, stop and report the missing
 inspection surface instead of guessing.
 
+## Multi-Wave Resync
+
+Before reusing a worker for a second or later wave, or before changing a worker
+to overlapping scope, reconcile the worker with root-integrated state:
+
+- read the worker's latest state and identify its current branch, checkout,
+  worktree, dirty files, generated ignored artifacts, validation, and remaining
+  risks;
+- identify root-integrated changes accepted since the worker's assignment,
+  especially changes from other workers that touch the same files, contracts,
+  fixtures, or docs;
+- either hand the worker to a current checkout, send a precise resync brief
+  with the accepted root changes, create a fresh worker from the current root,
+  or keep the overlapping integration in the root thread;
+- do not ask a stale worker to keep editing overlapping files until the resync
+  path is explicit in the ledger.
+
+If a worker still has unintegrated output from a previous assignment, integrate
+or intentionally abandon that output before adding unrelated new scope. When
+preserving previous worker changes is required, state that requirement in the
+new prompt and ask the worker to report any overlap or conflict.
+
+## Worker Output Integration
+
+The root orchestrator owns integration. Choose and record one integration path
+per worker output:
+
+- `handoff`: use `codex_app.handoff_thread` or the equivalent inspected worker
+  surface when the worker's checkout should become the integration checkout.
+- `worker-commit`: accept a worker-prepared commit or branch only when the
+  authorization mode permits commit or publication and the root has reviewed
+  the diff.
+- `patch-apply`: apply a worker diff or patch in the root checkout, then inspect
+  conflicts and rerun root gates.
+- `manual-root`: reimplement or copy the relevant change in the root checkout
+  when the worker output is partial, stale, conflicting, or easier to reproduce
+  safely than to apply directly.
+
+For every path, inspect the tracked diff, preserve unrelated local changes,
+exclude generated ignored artifacts, rerun the required root gates, and record
+the integration method and proof in the ledger. Do not commit, push, merge,
+close, release, or mutate external services unless the current authorization
+mode and gate state permit it.
+
+## Generated Artifacts
+
+Workers may create local ignored artifacts while validating work, such as
+dependency directories, build outputs, caches, virtual environments, screenshots,
+or coverage files. The worker final report must list those artifacts separately
+from tracked source changes.
+
+Generated ignored artifacts are not automatically a failure, but they are part
+of closeout. The root orchestrator decides whether they are removed, retained
+for inspection, or left inside a disposable worker worktree. Never treat ignored
+artifacts as proof that tracked changes are clean; inspect tracked status and
+diffs explicitly.
+
+## Worker Closeout
+
+After a worker reports `done`, `ready-for-review`, `blocked`, or `needs-owner`,
+the root orchestrator decides the worker lifecycle state before final owner
+status:
+
+- `integrated`: output was accepted into the root checkout, root gates passed,
+  and the worker can be archived or its helper worktree removed.
+- `retained-for-inspection`: output or artifacts are intentionally kept for
+  owner/root review; record what remains and why.
+- `abandoned`: output was not used; record the reason and confirm there is no
+  required follow-up hidden only in the worker thread.
+- `handoff-pending`: the worker's checkout or thread is the intended next
+  integration surface; record the pending action and owner decision needed.
+
+Do not remove or archive a worker before reading its latest state. Do not remove
+a helper worktree that contains unreviewed tracked work, unreported artifacts,
+or the only copy of evidence needed for a gate. Once all useful output is
+integrated or intentionally abandoned, remove or archive helper surfaces when
+that cleanup is safe and available, or record why they remain.
+
 ## Authorization Modes
 
 - `inspect`: read-only investigation, triage, diagnosis, or plan.
@@ -104,6 +182,7 @@ Context:
 - Known blockers or assumptions: <bullets>
 - Required gates: <gate names from references/gates.md>
 - Required proof: <tests, live proof, CI, autoreview, docs, screenshots>
+- Known root-integrated changes since assignment: <bullets or none>
 
 Execution:
 1. Inspect the current state before editing.
@@ -119,6 +198,7 @@ Final report:
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
 - Gate status: pass/fail/not-applicable with evidence
+- Generated artifacts: ignored local files or directories created, or none
 - Risks: residual risks, dependency audit warnings, security findings,
   untested adapters, setup gaps, or test gaps
 - Next: exact owner or orchestrator action

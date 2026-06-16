@@ -131,20 +131,26 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    steering, renaming, archiving, interrupting, replacing, or closing a worker,
    read the worker's latest state. Capture status, blockers, validation, risks,
    and next actions in the ledger.
-10. Before marking owner-ready, issue-closed, merge-ready, release-ready, or
-   final, apply `references/gates.md`. Treat blocked live proof, deferred
-   acceptance criteria, and worker-reported risks as gate inputs, not as notes
-   to bury after closure.
-11. For non-trivial code edits, require focused tests and `$autoreview`; rerun
+10. Before reusing a worker for a new wave, changing overlapping scope, or
+    integrating worker output, apply the lifecycle guidance in
+    `references/worker.md`: resync against root-integrated work, choose a
+    root-owned integration method, record generated ignored artifacts, and make
+    an explicit worker closeout decision.
+11. Before marking owner-ready, issue-closed, merge-ready, release-ready, or
+    final, apply `references/gates.md`. Treat blocked live proof, deferred
+    acceptance criteria, and worker-reported risks as gate inputs, not as notes
+    to bury after closure.
+12. For non-trivial code edits, require focused tests and `$autoreview`; rerun
    both after any review-triggered code change.
-12. Before closing a GitHub issue or PR thread that is only partially satisfied,
+13. Before closing a GitHub issue or PR thread that is only partially satisfied,
     create or link an owner-visible follow-up issue for the deferred work when
     GitHub mutation is authorized. If mutation is not authorized, keep the item
     owner-ready with the proposed follow-up body and do not call it complete.
-13. Stop when the ledger shows no active worker requiring orchestration and all
+14. Stop when the ledger shows no active worker requiring orchestration and all
     surfaced work is either completed with gates satisfied, owner-ready, blocked
     with a decision brief, released, or intentionally deferred with a linked or
-    proposed follow-up.
+    proposed follow-up. Completed workers should be moved out of active tracking
+    or explicitly marked as awaiting a root-owned closeout action.
 
 ## References
 
