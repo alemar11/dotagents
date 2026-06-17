@@ -28,7 +28,6 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | Skill | Purpose |
 | --- | --- |
 | `autoreview` | Run Codex-only structured closeout review for local changes, branch diffs, or commits. |
-| `chrome-devtools` | Debug and automate live Chrome pages with Chrome DevTools MCP, the Homebrew CLI, and a hybrid session runner. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
 | `git-commit` | Create precise git commits from local changes with direct `git` commands. |
 | `github` | Route GitHub work, verify `git`/`gh` readiness, and use direct GitHub CLI workflows. |
@@ -100,7 +99,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/chrome-devtools skills/code-wiki skills/git-commit skills/github skills/github-ci skills/github-portfolio-triage skills/github-releases skills/github-reviews skills/github-stars skills/github-triage skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/git-commit skills/github skills/github-ci skills/github-portfolio-triage skills/github-releases skills/github-reviews skills/github-stars skills/github-triage skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -126,7 +125,6 @@ Install all reusable skills globally for Codex:
 ```sh
 npx skills add alemar11/dotagents -a codex -g -y \
   --skill autoreview \
-  --skill chrome-devtools \
   --skill code-wiki \
   --skill git-commit \
   --skill github \
