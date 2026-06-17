@@ -1,6 +1,6 @@
 ---
 name: plan-harder
-description: Create a higher-rigor implementation plan when the user explicitly asks for deeper planning, a harder plan, or a stress-tested plan before coding. Use to research the codebase, ask focused clarifying questions, write a phased plan under `./plans/`, and review it for gaps before implementation starts.
+description: Create a higher-rigor implementation plan when the user explicitly asks for deeper planning, a harder plan, or a stress-tested plan before coding. Use to research the codebase, ask focused clarifying questions, produce a planning-only phased plan, save it under `./plans/` by default, and review it for gaps before implementation starts.
 ---
 
 # Plan Harder
@@ -13,6 +13,17 @@ is ready for careful execution.
 
 Only create the plan. Do not implement the work.
 
+## Planning-Only Contract
+
+- Do not implement the work.
+- Do not open PRs, mutate GitHub state, publish artifacts, or silently continue
+  into coding after the plan.
+- Repo writes are limited to the saved plan file under `plans/` unless the user
+  explicitly asks for chat-only output.
+- If the broader request includes later implementation, issue creation, or
+  orchestration, finish the plan first and make the handoff explicit instead of
+  blending phases together.
+
 ## Trigger Rules
 
 - Use when the user explicitly invokes `plan-harder` or asks for a harder,
@@ -21,6 +32,15 @@ Only create the plan. Do not implement the work.
   ordering problems or missing validation steps.
 - Do not use for straightforward planning work that does not need an extra
   review pass.
+
+## Output Mode
+
+- Default: save the plan to `plans/<topic>-plan.md`.
+- If the user explicitly says not to write a file, not to write Markdown, or
+  to keep the plan in chat, return the plan in chat only and say that no file
+  was saved.
+- When the plan is meant to feed later implementation or GitHub issue creation,
+  end with issue-sized work slices and a clear handoff note.
 
 ## Workflow
 
@@ -98,6 +118,8 @@ Each task should be:
 - If it does not exist, create it before saving the plan.
 - Save the generated plan to `plans/<topic>-plan.md`.
 - Derive `<topic>` from the request using kebab-case.
+- If the user explicitly asked for chat-only or no-file output, skip the write
+  and keep the same structure in the returned plan.
 
 Examples:
 
@@ -180,11 +202,14 @@ Examples:
 
 ## Output Expectations
 
-- Return the final saved plan path.
+- Return the final saved plan path, or explicitly say that the plan stayed in
+  chat-only mode with no file written.
 - Summarize the main phases, the riskiest assumptions, and any open questions
   that remain.
 - If clarification was needed, restate the resolved interpretation before
   summarizing the plan.
+- Include the explicit handoff boundary for any later implementation,
+  orchestration, or GitHub follow-up.
 - Do not implement the plan.
 
 ## Example Requests

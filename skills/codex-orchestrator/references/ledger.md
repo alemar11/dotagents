@@ -7,14 +7,14 @@ orchestration state between Codex sessions.
 
 1. An explicit user-provided ledger path wins.
 2. A named portfolio uses:
-   `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/<portfolio>.md`
+   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/<portfolio>.md`
 3. If no portfolio is named, use:
-   `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/default.md`
+   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/default.md`
 
 Create the parent directory if needed:
 
 ```bash
-mkdir -p ~/.cache/dotagents/skills/maintainer-orchestrator/ledgers
+mkdir -p ~/.cache/dotagents/skills/codex-orchestrator/ledgers
 ```
 
 Portfolio names should be lowercase, filesystem-safe slugs. If the user gives a
@@ -127,9 +127,9 @@ Portfolio overrides:
 
 Use one ledger per portfolio. For example:
 
-- `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/default.md`
-- `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/mobile-stack.md`
-- `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/app-backend.md`
+- `~/.cache/dotagents/skills/codex-orchestrator/ledgers/default.md`
+- `~/.cache/dotagents/skills/codex-orchestrator/ledgers/mobile-stack.md`
+- `~/.cache/dotagents/skills/codex-orchestrator/ledgers/app-backend.md`
 
 Do not mix unrelated portfolios in one ledger unless the user explicitly wants a
 single combined operating view.

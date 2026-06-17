@@ -1,5 +1,5 @@
 interface:
   display_name: "Auto Review"
-  short_description: "Run Codex-only structured review before commit, PR, or ship."
+  short_description: "Run structured closeout review before final, commit, PR, or ship."
   brand_color: "#2B6F6C"
-  default_prompt: "Use $autoreview to run a Codex-only structured review on my current branch before I ship it."
+  default_prompt: "Use $autoreview as the closeout review step before final, commit, PR, or ship. Pick the right local, branch, or commit mode, verify findings in real code, and rerun tests plus autoreview after any accepted fix."

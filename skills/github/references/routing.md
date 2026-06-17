@@ -1,5 +1,16 @@
 # GitHub Routing
 
+## Preferred Entry Signals
+
+Start here when the user asks for GitHub help but the domain is still broad or
+mixed:
+
+- `check GitHub`
+- `look at this issue or PR`
+- `is GitHub CLI set up?`
+- `handle the GitHub follow-up`
+- `inspect the repo on GitHub`
+
 ## Skill Map
 
 - Current repo issues or PR queue: `github-triage`.
@@ -20,3 +31,7 @@ gh issue view <n> --repo <owner/repo>
 gh pr view <n> --repo <owner/repo>
 gh pr edit <n> --repo <owner/repo> --title "<title>"
 ```
+
+For ambiguous GitHub work, prefer starting with `gh auth status` plus one of
+`gh repo view`, `gh issue view`, or `gh pr view` before widening into a
+specialized flow.

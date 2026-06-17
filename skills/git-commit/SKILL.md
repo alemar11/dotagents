@@ -16,6 +16,40 @@ explicitly authorizes direct-to-main issue closure, use issue-closing commit
 trailers such as `Closes #123` only after staging the intended paths and
 verifying the diff.
 
+## Trigger Cues
+
+Use this skill for short or implicit commit-authoring asks such as:
+
+- `commit`
+- `commit this`
+- `create a commit`
+- `commit and push`
+- `push-only`
+- `stage only <paths> and commit`
+
+If the request expands into branch publication or PR creation, route to `yeet`
+instead of stretching this skill.
+
+## Observable Command Baseline
+
+Prefer the same command spine for most runs so commit work stays easy to audit
+from session traces:
+
+```bash
+git status --short --branch
+git diff -- <path>
+git diff --staged
+git add -- <explicit-paths>
+git commit -F <message-file>
+git log -1 --pretty=fuller
+```
+
+For push-only follow-through, append:
+
+```bash
+git push
+```
+
 ## Workflow
 
 1. Inspect the worktree with `git status --short --branch`.

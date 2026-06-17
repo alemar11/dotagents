@@ -1,12 +1,35 @@
 ---
 name: autoreview
-description: Run a Codex-only structured closeout review for local git changes, branch diffs, or commits before final, commit, PR, or ship. Use when the user asks for autoreview, Codex review, second-model review, or after non-trivial code edits before handing work back.
+description: Run a Codex-only structured closeout review for local git changes, branch diffs, or commits before final, commit, PR, or ship. Use when the user asks for autoreview, Codex review, second-model review, a final check, or after non-trivial code edits before handing work back.
 ---
 
 # Auto Review
 
 Run the shipped Codex-only review helper as a closeout check. This is code
 review, not GitHub PR review submission or approval routing.
+
+## Trigger Cues
+
+Use this skill when the user asks for or clearly implies:
+
+- `autoreview`
+- `review this before final`
+- `review before commit`
+- `review before PR`
+- `review before ship`
+- `review again after fixes`
+- a final closeout check after non-trivial code edits
+
+## Canonical Closeout Sequence
+
+1. Run the focused local tests or proof first.
+2. Run `scripts/autoreview` on the correct target mode.
+3. Verify each finding in the real code before accepting it.
+4. Fix only the accepted findings.
+5. Rerun focused tests or proof if code changed.
+6. Rerun the same `scripts/autoreview` mode.
+7. Stop once the helper is clean or the remaining findings were consciously
+   rejected with a reason.
 
 ## Runtime Surface
 
@@ -17,6 +40,12 @@ review, not GitHub PR review submission or approval routing.
   `<autoreview-skill-root>/scripts/autoreview ...`.
 - This skill is Codex-dependent. The helper requires local `git`, the Codex CLI
   `exec` command, structured output flags, and read-only review execution.
+
+## Closeout Entry Modes
+
+- Before final or before commit on a dirty worktree: `scripts/autoreview --mode local`
+- Before PR, merge, or branch handoff: `scripts/autoreview --mode branch --base origin/main`
+- After a commit exists or when reviewing one exact commit: `scripts/autoreview --mode commit --commit HEAD`
 
 ## Workflow
 

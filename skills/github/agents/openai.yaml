@@ -1,5 +1,5 @@
 interface:
   display_name: "GitHub"
-  short_description: "Route GitHub work and run direct gh workflows."
+  short_description: "Route ambiguous GitHub work and direct gh workflows."
   brand_color: "#24292F"
-  default_prompt: "Use $github to route GitHub work, verify git and gh readiness, prefer direct gh commands, and hand focused domains to standalone GitHub skills."
+  default_prompt: "Use $github for mixed or ambiguous GitHub requests such as repo inspection, issue or PR lookup, auth/setup checks, and post-push GitHub follow-up. Verify git and gh readiness, prefer direct gh commands, and hand focused domains to standalone GitHub skills."

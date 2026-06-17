@@ -1,5 +1,5 @@
 interface:
   display_name: "Plan Harder"
-  short_description: "Create a higher-rigor implementation plan with minimal high-signal clarification, a gotcha pass, and a reviewed `plans/<topic>-plan.md` output."
+  short_description: "Create a planning-only higher-rigor plan with explicit handoff boundaries."
   brand_color: "#4F46E5"
-  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then save a deeper phased implementation plan to `plans/<topic>-plan.md` in the current working directory after a gotcha pass and review."
+  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then produce a deeper phased implementation plan without coding. Save it to `plans/<topic>-plan.md` by default unless the user explicitly asked for chat-only output, and finish with a clear handoff boundary for later implementation or orchestration."

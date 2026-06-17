@@ -1,5 +1,15 @@
 # Git Commit Workflows
 
+## Preferred Entry Signals
+
+Treat these user phrasings as direct entry points into this workflow:
+
+- `commit`
+- `commit this`
+- `commit and push`
+- `push-only`
+- `stage only these files and commit`
+
 ## Fast Path
 
 Use when changes are tiny, cohesive, and low risk:
@@ -14,6 +24,9 @@ git commit -F "$message_file"
 git status --short --branch
 git log -1 --pretty=fuller
 ```
+
+Keep this command order when practical so session evidence stays easy to
+recognize during audits.
 
 ## Safe Path
 
@@ -30,6 +43,9 @@ git diff --staged
 ```
 
 Do not commit if staged files and the commit message describe different work.
+
+If the user said only `commit`, stop after commit verification unless they also
+asked to push.
 
 ## Split Commits
 

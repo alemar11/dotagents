@@ -23,6 +23,18 @@ Do not present hidden subagents as visible App threads. If the chosen surface
 will not be visible in the Codex App sidebar, say that in the ledger and final
 report.
 
+## When Not To Delegate
+
+Stay in the root orchestrator thread when:
+
+- the task is small enough that orchestration overhead would dominate;
+- the work overlaps heavily with root-owned integration or another worker's
+  active files;
+- no inspectable worker surface is available;
+- the owner did not authorize delegation for the requested scope; or
+- the remaining work is mostly gate evaluation, ledger updates, closeout, or
+  publication decisions.
+
 ## Worker Rules
 
 - Create one worker per repository or tightly scoped workstream.
@@ -38,6 +50,18 @@ report.
   paths.
 - Only the root orchestrator creates, reuses, forks, assigns, renames,
   messages, archives, closes, interrupts, or replaces worker threads.
+
+## Worker Status Vs Root Lifecycle
+
+Workers report execution status. The root orchestrator decides lifecycle:
+
+- Worker status: `done`, `blocked`, `needs-owner`, `ready-for-review`
+- Root lifecycle: `integrated`, `retained-for-inspection`, `abandoned`,
+  `handoff-pending`
+
+Do not equate a worker saying `done` with the workstream being complete. The
+root still needs to inspect the latest state, choose an integration path, rerun
+root-owned gates, and record the lifecycle decision in the ledger.
 
 ## Visible Thread Naming
 
@@ -90,6 +114,10 @@ If a worker still has unintegrated output from a previous assignment, integrate
 or intentionally abandon that output before adding unrelated new scope. When
 preserving previous worker changes is required, state that requirement in the
 new prompt and ask the worker to report any overlap or conflict.
+
+Prefer creating a fresh worker when the old one is stale, its checkout drift is
+unclear, or the new scope overlaps accepted root changes enough that resync
+would be harder to reason about than replacement.
 
 ## Worker Output Integration
 

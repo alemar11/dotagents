@@ -1,9 +1,9 @@
 ---
-name: maintainer-orchestrator
-description: Use when coordinating visible Codex App worker threads, CLI/subagent worker threads, portfolio triage, gates, ledgers, autoreview, standalone Git/GitHub companion skills, or owner-ready maintainer closeout.
+name: codex-orchestrator
+description: Use when coordinating visible Codex App worker threads, CLI/subagent worker threads, portfolio triage, gates, ledgers, root-owned worker lifecycle, autoreview, standalone Git/GitHub companion skills, or owner-ready Codex closeout.
 ---
 
-# Maintainer Orchestrator
+# Codex Orchestrator
 
 ## Overview
 
@@ -19,6 +19,19 @@ PR, release, or another explicit decision. Keep the root orchestrator thread
 lightweight: it owns routing, lifecycle, integration, gates, ledger updates,
 and final publication, while delegated workers own substantial repository
 inspection or implementation whenever delegation is authorized and useful.
+
+## Root Ownership Contract
+
+- The root orchestrator owns routing, ledger updates, worker lifecycle,
+  integration choice, gate evaluation, and final closeout decisions.
+- Workers own one scoped repository or workstream plus focused validation and a
+  clear final report.
+- Worker-reported statuses such as `done`, `blocked`, `needs-owner`, or
+  `ready-for-review` are inputs to the root thread, not final lifecycle
+  decisions.
+- If no inspectable worker surface is available, delegation is not explicitly
+  authorized, or the work is too small or overlapping, keep the work in the
+  root thread.
 
 ## Workstream Sources
 
@@ -47,7 +60,7 @@ sources, not the only planning model.
   `$github-portfolio-triage`, `$github-triage`, `$github-ci`,
   `$github-reviews`, `$github-releases`, `$git-commit`, and `$yeet`.
 - Local ledger storage at
-  `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`.
+  `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
 
 If a required Codex tool or companion skill is unavailable, continue only with
 the parts that can be done safely and report the exact missing surface.
@@ -79,6 +92,17 @@ Choose the worker surface deliberately:
 Record the chosen surface, worker id, title or nickname, repository, scope, and
 authorization mode in the ledger. Do not call a hidden subagent a visible
 thread.
+
+## Delegation Fast Rules
+
+- Use visible Codex App threads only when the owner explicitly asked for
+  visible, new, separate, or background workers.
+- Use CLI/subagent workers for inspectable bounded parallel work when visible
+  App threads were not requested.
+- Keep small single-thread tasks, overlapping file work, and last-mile
+  integration in the root thread unless there is a strong reason to delegate.
+- Before sending overlapping new scope into an existing worker, resync or
+  replace that worker instead of assuming its checkout is still current.
 
 ## Companion Skill Routing
 
