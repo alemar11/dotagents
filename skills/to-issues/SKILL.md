@@ -117,6 +117,9 @@ issue list:
 - `delivery-mode`: inherited from the PRD and copied in each issue.
 - ordered issue map with `<NN>` and short intent.
 - dependency graph plus `blocks` / `depends on` intent.
+- dependency edge validity check: every `depends on` / `blocks` reference must
+  resolve to a generated issue ID in this feature set (`01`, `02`, ...), and the
+  graph must be acyclic.
 - wave gates and unblock conditions.
 - repo-level boundaries and integration proof requirements (for orchestrator work).
 
@@ -139,6 +142,8 @@ Every issue should:
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
+- keep dependency references in issue `Parallelization` lines as issue IDs (`01`,
+  `02`, ...) rather than prose titles,
 - avoid circular dependencies that can lock the queue.
 
 ### 3. Harden every issue with `$plan-harder`
@@ -252,8 +257,8 @@ metadata without duplicating the full PRD branch and PR details:
   feature, not only this generated issue. For an exception, record the
   issue-level override and authorization reason, such as `One PR Per Issue
   (issue-level override, authorized by <owner/date>)`.
-- `Parallelization`: required. Use `independent`, `depends on <issue>`,
-  `blocks <issue>`, or `root-integrated`.
+- `Parallelization`: required. Use `independent`, `depends on <issue-id>[,
+  <issue-id>]`, `blocks <issue-id>[, <issue-id>]`, or `root-integrated`.
 - `Closeout`: required. State the concrete completion path, such as `feature PR
   closes issue`, `repo PR closes issue`, `issue PR closes issue`, `direct commit
   closes issue`, or `local done move after proof`.
@@ -370,8 +375,8 @@ single-repo issues, `current repository`; for orchestrator issues, use
 - Delivery mode: [One Feature Branch | One PR Per Repo | One PR Per Issue |
   Direct Commit] ([feature-level, inherited from Source PRD] or [issue-level
   override with authorization reason])
-- Parallelization: [independent | depends on <issue> | blocks <issue> |
-  root-integrated]
+- Parallelization: [independent | depends on <issue-id>[, <issue-id>] | blocks
+  <issue-id>[, <issue-id>] | root-integrated]
 - Closeout: [feature PR closes issue | repo PR closes issue | issue PR closes
   issue | direct commit closes issue | local done move after proof]
 - Integration mode: [omit when obvious from Source PRD; otherwise shared

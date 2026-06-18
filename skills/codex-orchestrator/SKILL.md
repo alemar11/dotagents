@@ -201,6 +201,10 @@ Apply issue-level scheduling constraints before choosing a wave or worker:
   use workers only for read-only inspection or clearly isolated supporting
   proof when that does not change the integration ownership.
 
+If dependency references are malformed, missing, or cyclical, classify the
+workstream as `Needs Owner`/`Blocked` and do not dispatch until the graph is
+corrected.
+
 If a dependency, `Source PRD`, closeout path, or parallelization value is
 missing, ambiguous, or contradictory, classify the workstream as `Needs Owner`
 or `Blocked` instead of inventing scheduling semantics.

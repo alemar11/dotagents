@@ -165,10 +165,12 @@ types and triage labels, attach GitHub implementation issues to the PRD issue
 when GitHub or GitHub coordination mode is configured, use the configured title
 formats, apply the `<project-slug>` GitHub label to GitHub coordination issues,
 and confirm that `$to-issues` produced a feature `execution-plan.md` (or
-returned an equivalent inline plan when local write is disallowed) and ran
-`$plan-harder` once per generated issue. If external tracker mutation is
-disallowed, require `$to-issues` to return draft publish commands or write to the
-effective local target instead of mutating GitHub.
+returned an equivalent inline plan when local write is disallowed), ran
+`$plan-harder` once per generated issue, and validated that every `Parallelization`
+dependency in that run resolves to a known issue ID and the dependency graph is
+acyclic. If external tracker mutation is disallowed, require `$to-issues` to
+return draft publish commands or write to the effective local target instead of
+mutating GitHub.
 
 In orchestrator workspace mode, require generated issues to include affected
 repos, cross-repo contracts, integration gates, repo PR links or placeholders,
