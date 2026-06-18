@@ -32,6 +32,7 @@ first.
 Inspect the current project context before drafting:
 
 - `project-memory/agents/issue-tracker.md`
+- `project-memory/agents/triage-labels.md`
 - `project-memory/agents/domain.md`
 - `CONTEXT.md` or `CONTEXT-MAP.md`
 - `project-memory/adr/`
@@ -72,8 +73,8 @@ Keep the PRD implementation-facing:
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 
-- GitHub: publish only after confirmation, using `gh` and the title format
-  `PRD: <Feature Name>`.
+- GitHub: publish only after confirmation, using `gh`, the title format
+  `PRD: <Feature Name>`, and the mapped `feature` issue type when available.
 - Local markdown: write to `.scratch/<feature-slug>/PRD.md` only after
   confirmation.
 - Other tracker: follow the repo-specific instructions in
@@ -82,6 +83,11 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 For GitHub PRDs, derive `<Feature Name>` from the accepted product name or
 short feature phrase in title case. Do not include issue numbers, status labels,
 or implementation slice names in the PRD title.
+
+Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
+When GitHub issue types are available, create or update the PRD issue with that
+mapped type, usually `Feature`. If issue types are disabled or unsupported,
+publish the PRD without a type and keep the PRD title/body convention intact.
 
 If a composing skill such as `$plan-feature` passes explicit write
 authorization, use the configured target without re-asking unless this skill
@@ -96,6 +102,7 @@ Return:
 
 - PRD title,
 - target location or "chat only",
+- issue type applied, when the tracker supports it,
 - any open questions,
 - whether it is ready for `$to-issues`.
 

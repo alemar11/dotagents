@@ -82,11 +82,13 @@ After `$plan-harder` returns:
 
 Do not batch multiple issues into one `$plan-harder` call.
 
-### 4. Apply triage state
+### 4. Apply issue type and triage state
 
-Read `project-memory/agents/triage-labels.md` and map canonical roles to the
-repo's labels or status values.
+Read `project-memory/agents/triage-labels.md` and map canonical issue types
+and triage states to the repo's tracker values.
 
+- Use the canonical `task` type for generated implementation issues unless the
+  repo's mapping says otherwise.
 - Use `ready-for-agent` only when the issue contains a hardened implementation
   brief, acceptance criteria, validation, and no unresolved blocker.
 - Use `needs-info` when an issue has unresolved product or technical questions.
@@ -98,9 +100,11 @@ repo's labels or status values.
 Use `project-memory/agents/issue-tracker.md` for the target:
 
 - GitHub: create issues with `gh issue create --parent <prd-number>` when the
-  PRD source is a GitHub issue, then apply mapped labels.
+  PRD source is a GitHub issue, set the mapped `task` issue type when
+  available, then apply mapped labels.
 - Local markdown: write
-  `.scratch/<feature-slug>/issues/<NN>-<slug>.md`.
+  `.scratch/<feature-slug>/issues/<NN>-<slug>.md` with `Type:` and `Status:`
+  lines near the top.
 - Other tracker: follow the repo-specific instructions.
 
 For GitHub PRDs, every implementation issue must be attached to the PRD issue
@@ -108,6 +112,10 @@ as a sub-issue. If an implementation issue is created before the parent
 relationship is set, attach it afterward with
 `gh issue edit <prd-number> --add-sub-issue <issue-number>`. Keep
 `Source PRD: #<prd-number>` in the issue body as well.
+
+When GitHub issue types are available, create or update each implementation
+issue with the mapped `task` type, usually `Task`. If issue types are disabled
+or unsupported, publish without a type and keep the mapped state labels.
 
 Use this GitHub implementation issue title format:
 
@@ -137,7 +145,7 @@ Summarize:
 - number of issues produced,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
-- labels/statuses assigned,
+- issue types and labels/statuses assigned,
 - any blocked issues and why,
 - confirmation that `$plan-harder` was run once per issue.
 
@@ -148,6 +156,7 @@ Use this shape unless the tracker has a stronger local template:
 ```markdown
 # [Issue Title]
 
+Type: [mapped issue type, usually task]
 Status: [mapped triage state]
 Source PRD: [path, issue number, or title]
 

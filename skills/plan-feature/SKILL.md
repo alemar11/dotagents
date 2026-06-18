@@ -80,10 +80,10 @@ Write authorization: granted by $plan-feature because the PRD is written and no
 issue-splitting gates remain.
 ```
 
-Require `$to-issues` to use the configured issue target, apply triage labels,
-attach GitHub implementation issues to the PRD issue when GitHub is configured,
-use the configured GitHub title formats, and confirm that `$plan-harder` ran
-once per generated issue.
+Require `$to-issues` to use the configured issue target, apply configured issue
+types and triage labels, attach GitHub implementation issues to the PRD issue
+when GitHub is configured, use the configured GitHub title formats, and confirm
+that `$plan-harder` ran once per generated issue.
 
 ### 5. Report completion
 
@@ -93,7 +93,7 @@ Summarize:
 - PRD location,
 - number of issues written or published,
 - GitHub PRD parent/sub-issue relationship, when applicable,
-- labels/statuses applied,
+- issue types and labels/statuses applied,
 - gates resolved or deferred,
 - any issue still blocked and why.
 

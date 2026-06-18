@@ -1,6 +1,6 @@
 ---
 name: setup-project-memory
-description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent Codex session history, or updating AGENTS.md pointers, issue-tracker instructions, triage label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-with-docs, or architecture-improvement skills.
+description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent Codex session history, or updating AGENTS.md pointers, issue-tracker instructions, triage type and label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-with-docs, or architecture-improvement skills.
 ---
 
 # Setup Project Memory
@@ -11,7 +11,8 @@ Configure the repo-level project memory that other skills can rely on:
 
 - `AGENTS.md` as the only agent-instruction file this skill writes.
 - `project-memory/agents/issue-tracker.md` for where PRDs and issues live.
-- `project-memory/agents/triage-labels.md` for canonical role to label mapping.
+- `project-memory/agents/triage-labels.md` for canonical issue-type and
+  triage-state mappings.
 - `project-memory/agents/domain.md` for where `CONTEXT.md`, `CONTEXT-MAP.md`,
   and ADRs live.
 - `CONTEXT.md` and `project-memory/adr/` as optional seeded domain memory when
@@ -19,7 +20,8 @@ Configure the repo-level project memory that other skills can rely on:
 
 This is a setup skill. Run it once per repo before using workflows that publish
 PRDs, split issues, triage incoming work, or update repo-backed domain memory.
-Re-run it when the issue tracker, triage vocabulary, or domain-memory layout
+Re-run it when the issue tracker, issue-type vocabulary, triage vocabulary, or
+domain-memory layout
 changes, or when an already-used project needs its existing knowledge migrated
 into the project-memory structure.
 
@@ -97,7 +99,26 @@ Choose where PRDs and implementation issues live:
 Default to GitHub when the remote is GitHub, and local markdown when no clear
 GitHub issue tracker exists.
 
-**Triage labels**
+**Triage types and labels**
+
+Use these canonical issue types:
+
+- `bug`: something is broken or regressed.
+- `feature`: a new capability or product enhancement.
+- `task`: maintenance, docs, refactor, follow-up, cleanup, or implementation
+  work item.
+
+In GitHub mode, default these to native GitHub Issue Types:
+
+- `bug` -> `Bug`
+- `feature` -> `Feature`
+- `task` -> `Task`
+
+In local markdown mode, default these to `Type:` values using the canonical
+lowercase strings.
+
+Ask whether the repo uses different issue types, disabled GitHub issue types,
+or type-like labels instead.
 
 Use these canonical state roles:
 
@@ -107,7 +128,8 @@ Use these canonical state roles:
 - `ready-for-human`: requires human implementation or judgment.
 - `wontfix`: will not be actioned.
 
-Ask whether the actual tracker labels differ. If not, use identity mapping.
+Ask whether the actual tracker labels or status values differ. If not, use
+identity mapping.
 
 **Domain memory layout**
 
@@ -179,9 +201,9 @@ Use this `AGENTS.md` block shape:
 
 [one-line summary of where PRDs and issues live]. See `project-memory/agents/issue-tracker.md`.
 
-### Triage labels
+### Triage types and labels
 
-[one-line summary of the label vocabulary]. See `project-memory/agents/triage-labels.md`.
+[one-line summary of the issue type and state vocabulary]. See `project-memory/agents/triage-labels.md`.
 
 ### Domain memory
 
@@ -195,7 +217,7 @@ Summarize:
 - setup mode,
 - files written,
 - selected issue tracker,
-- triage label mapping,
+- issue-type and triage-state mapping,
 - domain-memory layout,
 - session-history window and whether it was used,
 - `CONTEXT.md` terms/rules/open questions seeded, if any,

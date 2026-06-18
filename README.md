@@ -39,6 +39,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `github-review-threads` | Inspect PR review threads and route selected replies with a focused `reviews` CLI. |
 | `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
 | `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
+| `triage` | Triage existing GitHub or local markdown issues into typed, agent-ready states. |
 | `grill-with-docs` | Stress-test repo-backed plans while updating context docs and ADRs. |
 | `improve-codebase-architecture` | Find architecture candidates, then pressure-test the selected refactor. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
@@ -79,6 +80,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `plan-feature` requires `$setup-project-memory`, `$grill-with-docs`, `$to-prd`, and `$to-issues` so it can run the feature-planning wrapper flow from setup through PRD and agent-ready issues.
 - `setup-project-memory` requires `$domain-modeling` when bootstrapping an existing project into `CONTEXT.md` or ADRs from repo or session evidence.
 - `to-issues` requires `$plan-harder` and must run it once for every generated issue before returning or publishing that issue.
+- `triage` requires `$setup-project-memory` for tracker setup when project memory is missing, uses `$grill-with-docs` when issue intent needs repo-backed clarification, and requires `$plan-harder` before marking an issue `ready-for-agent`.
 - `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
 
 ## Project-Local Skills
@@ -112,7 +114,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/grill-with-docs skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/setup-project-memory skills/to-prd skills/to-issues skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/triage skills/grill-with-docs skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/setup-project-memory skills/to-prd skills/to-issues skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -149,6 +151,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill github-review-threads \
   --skill github-stars \
   --skill github-triage \
+  --skill triage \
   --skill grill-with-docs \
   --skill improve-codebase-architecture \
   --skill skill-cli-creator \

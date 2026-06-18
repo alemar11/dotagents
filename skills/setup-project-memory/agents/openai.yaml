@@ -2,4 +2,4 @@ interface:
   display_name: "Setup Project Memory"
   short_description: "Configure or bootstrap repo project memory for agent workflows."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $setup-project-memory to inspect this repo, confirm issue tracker, triage labels, and domain-memory layout, then write AGENTS.md plus project-memory/agents files and seed CONTEXT.md or ADRs when existing repo/session evidence is strong."
+  default_prompt: "Use $setup-project-memory to inspect this repo, confirm issue tracker, triage types and labels, and domain-memory layout, then write AGENTS.md plus project-memory/agents files and seed CONTEXT.md or ADRs when existing repo/session evidence is strong."

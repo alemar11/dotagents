@@ -6,12 +6,16 @@ PRDs and implementation issues for this repo live as GitHub issues. Use the
 ## Conventions
 
 - Create an issue: `gh issue create --title "..." --body "..."`
+- Create an issue with a GitHub Issue Type:
+  `gh issue create --type "<type>" --title "..." --body "..."`
 - Create an implementation issue under a PRD issue:
   `gh issue create --parent <prd-number> --title "..." --body-file <file>`
 - Attach existing implementation issues to a PRD issue:
   `gh issue edit <prd-number> --add-sub-issue <issue-number>[,<issue-number>]`
 - Read an issue: `gh issue view <number> --comments`
-- List issues: `gh issue list --state open --json number,title,body,labels,comments`
+- List issues:
+  `gh issue list --state open --json number,title,body,labels,type,comments`
+- Set or change issue type: `gh issue edit <number> --type "<type>"`
 - Comment on an issue: `gh issue comment <number> --body "..."`
 - Apply or remove labels: `gh issue edit <number> --add-label "..."` or
   `gh issue edit <number> --remove-label "..."`
@@ -19,6 +23,17 @@ PRDs and implementation issues for this repo live as GitHub issues. Use the
 
 Infer the repo from `git remote -v`; `gh` usually does this automatically when
 run inside a clone.
+
+Use `project-memory/agents/triage-labels.md` for type and label mappings. The
+default GitHub issue types are:
+
+- `Bug` for `bug`
+- `Feature` for `feature`
+- `Task` for `task`
+
+If GitHub issue types are disabled or customized for the organization, record
+the actual available values or fallback label convention in
+`project-memory/agents/triage-labels.md`.
 
 ## Title Format
 
@@ -35,12 +50,24 @@ Create a GitHub issue.
 
 For feature planning:
 
-- The PRD is a GitHub issue titled `PRD: <Feature Name>`.
-- Implementation issues are GitHub sub-issues of the PRD issue.
+- The PRD is a GitHub issue titled `PRD: <Feature Name>` with type `Feature`
+  unless the repo maps `feature` to a different value.
+- Implementation issues are GitHub sub-issues of the PRD issue with type
+  `Task` unless the repo maps `task` to a different value.
 - Implementation issue titles use
   `<feature-slug>: <NN> <vertical outcome>`.
 - Each implementation issue body must also include `Source PRD: #<number>` for
   searchability and backlinks.
+
+For triage:
+
+- Existing bug reports should use the mapped `bug` type.
+- Existing feature or enhancement requests should use the mapped `feature`
+  type.
+- Existing maintenance, docs, cleanup, follow-up, or implementation work items
+  should use the mapped `task` type.
+- Workflow state belongs in the mapped triage labels, not in the GitHub issue
+  type.
 
 ## When a skill says "fetch the relevant issue"
 

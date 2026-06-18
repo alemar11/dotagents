@@ -64,6 +64,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `to-prd` as portable because it uses local repo evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
 - Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue and otherwise relies on local project memory plus configured issue-tracker instructions.
 - Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-with-docs`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
+- Treat `triage` as portable and skill-composed because it relies on project-memory issue-tracker mappings, can load `$setup-project-memory` when setup is missing, uses `$grill-with-docs` for underspecified repo-backed issue intent, and requires `$plan-harder` before marking an issue `ready-for-agent`.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
 - Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
@@ -118,6 +119,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `setup-project-memory` as the reusable setup surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, and `project-memory/agents/domain.md`.
 - `setup-project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
 - Keep `setup-project-memory` issue-tracker setup GitHub/local/custom only; do not add additional hosted-tracker-specific templates to the project-memory flow.
+- Keep `project-memory/agents/triage-labels.md` responsible for both issue type/category mapping (`bug`, `feature`, `task`) and workflow state mapping (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).
 - For already-used projects, `setup-project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo Codex session history, using `$domain-modeling` for the context and ADR shape.
 - Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
 
@@ -128,8 +130,15 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `to-issues` focused on splitting PRDs into vertical implementation issues; it must run `$plan-harder` once per issue and embed the returned brief before returning or publishing that issue.
 - In GitHub issue-tracker mode, keep the PRD issue as the parent issue and attach generated implementation issues as sub-issues while preserving `Source PRD: #<number>` in each child issue body.
 - In GitHub issue-tracker mode, title PRD issues as `PRD: <Feature Name>` and implementation issues as `<feature-slug>: <NN> <vertical outcome>`.
+- In GitHub issue-tracker mode, PRD issues use the mapped `feature` issue type and generated implementation sub-issues use the mapped `task` issue type when GitHub issue types are available.
 - `to-issues` owns any issue tracker or local markdown writes it performs; `$plan-harder` remains chat-output-only and must not write plan files or issue files.
 - Both skills should read `project-memory/agents/issue-tracker.md` and related project memory before deciding where PRDs or issues belong.
+
+### Triage skill
+- Keep `triage` focused on existing incoming GitHub or local markdown issues; new feature planning should still go through `plan-feature`.
+- In GitHub mode, use GitHub Issue Type for work kind (`Bug`, `Feature`, `Task` by default) and labels for workflow state.
+- In local markdown mode, use `Type:` for work kind and `Status:` for workflow state.
+- Before marking an existing issue `ready-for-agent`, `triage` must harden that single issue through `$plan-harder` and preserve the resulting agent brief in the tracker.
 
 ### Maintainer skill
 - The `.agents/skills/Maintainer` skill is the default maintainer for improving existing skills and plugins in this repository through shared upgrade tasks and skill-specific refresh workflows.
