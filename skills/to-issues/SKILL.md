@@ -40,7 +40,9 @@ returned or published.
   issue-level exception.
 - Build and persist a feature-level `execution-plan.md` for execution sequencing.
   It should own issue-level ordering, dependency waves, and unlock conditions so
-  issues can stay implementation-focused.
+  issues can stay implementation-focused. Keep this file at feature scope (e.g.
+  `.scratch/<feature-slug>/` or `projects/<project>/features/<feature>/`), not
+  under `issues/`.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
 
