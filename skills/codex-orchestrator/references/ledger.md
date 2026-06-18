@@ -62,17 +62,23 @@ Out of scope:
 ## Worker Policy
 
 Default authorization: inspect|implement
-Default worker surface: codex-app-thread|cli-subagent|no-delegation
-Allowed worker count: <number>
+Delegated worker surface: auto|codex-app-thread|cli-subagent|none
+Max active delegated workers: <number>
 Heartbeat: disabled|every 5 minutes|custom
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true
 Visible worker title format: <Project>: <short current task>
 
-Each workstream records the actual surface used. For root-owned work, record
-`Surface=no-delegation`, `Worker ID=root`, and the reason delegation was
-skipped.
+`Delegated worker surface` is the owner-authorized delegation policy. `auto`
+means choose per workstream from available and owner-authorized delegated
+surfaces: in Codex CLI this resolves to `cli-subagent`, while in Codex App it
+may choose `codex-app-thread` or `cli-subagent`. `none` disables delegation.
+`Max active delegated workers` is a cap, not a quota.
+
+Each workstream records the actual surface used: `codex-app-thread`,
+`cli-subagent`, or `no-delegation`. For root-owned work, record
+`Surface=no-delegation`, `Worker ID=root`, and the reason delegation was skipped.
 
 ## Gate Policy
 

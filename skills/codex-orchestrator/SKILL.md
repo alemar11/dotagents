@@ -116,6 +116,15 @@ Visible Codex App thread creation requires explicit owner intent for visible,
 new, separate, or background threads. Do not create user-owned App threads
 merely because a subtask exists.
 
+Before assigning workstreams, record the owner-authorized worker policy in the
+ledger with `Delegated worker surface` set to
+`auto|codex-app-thread|cli-subagent|none`, plus `Max active delegated workers`.
+`auto` means choose per workstream from available and owner-authorized delegated
+surfaces: in Codex CLI this resolves to `cli-subagent`, while in Codex App it
+may choose `codex-app-thread` or `cli-subagent`. `none` disables delegation.
+Record `no-delegation` only as the actual per-workstream `Surface` for
+root-owned work.
+
 Choose the worker surface deliberately:
 
 - In Codex App, prefer visible Codex App worker threads for substantial
@@ -134,10 +143,13 @@ thread.
 
 ## Delegation Fast Rules
 
+- Treat `Delegated worker surface: auto` as permission to choose among
+  available owner-authorized delegated surfaces, not as a quota to fill.
 - Use visible Codex App threads only when the owner explicitly asked for
   visible, new, separate, or background workers.
 - Use CLI/subagent workers for inspectable bounded parallel work when visible
-  App threads were not requested.
+  App threads were not requested, or when `Delegated worker surface: auto`
+  permits subagents and they are the better fit for the workstream.
 - Split workers by independent ownership boundary: repository, package,
   service, path set, or tightly scoped workstream. In multi-repo projects this
   is usually one active worker per affected repo per wave; in a single repo or

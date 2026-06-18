@@ -5,7 +5,16 @@ Codex worker threads or subagents.
 
 ## Worker Surfaces
 
-Choose and record the worker surface before delegation:
+Resolve the ledger worker policy before delegation:
+
+- `auto`: choose per workstream from available and owner-authorized delegated
+  surfaces. In Codex CLI this resolves to `cli-subagent`; in Codex App it may
+  choose `codex-app-thread` or `cli-subagent`.
+- `codex-app-thread`: use visible Codex App worker threads only.
+- `cli-subagent`: use CLI/subagent workers only.
+- `none`: do not delegate; keep work in the root thread.
+
+Choose and record the actual workstream surface before delegation:
 
 - `codex-app-thread`: a visible Codex App thread created with
   `codex_app.create_thread`. Use this in Codex App only when the owner
@@ -18,6 +27,10 @@ Choose and record the worker surface before delegation:
 - `no-delegation`: use the root thread only when delegation is not authorized,
   no inspectable worker surface is available, or the task is too small or
   tightly coupled for a worker.
+
+`Max active delegated workers` is a cap, not a quota. Create fewer workers when
+the ownership boundaries, file overlap, or gate requirements make delegation
+unhelpful.
 
 Do not present hidden subagents as visible App threads. If the chosen surface
 will not be visible in the Codex App sidebar, say that in the ledger and final
