@@ -3,11 +3,11 @@
 ## Commands
 
 ```bash
-skills/github-reviews/scripts/reviews --help
-skills/github-reviews/scripts/reviews --version
-skills/github-reviews/scripts/reviews doctor
-skills/github-reviews/scripts/reviews --json doctor
-skills/github-reviews/scripts/reviews address --repo <owner/repo> --pr <number>
+skills/github-review-threads/scripts/reviews --help
+skills/github-review-threads/scripts/reviews --version
+skills/github-review-threads/scripts/reviews doctor
+skills/github-review-threads/scripts/reviews --json doctor
+skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <number>
 ```
 
 ## JSON Mode

@@ -73,7 +73,7 @@ Default to different names when the runtime command is narrower than the host. O
 Good divergent examples:
 
 - `postgres` skill -> `scripts/pgops` with `projects/pgops/`
-- `github` skill -> `scripts/ghtriage` with `projects/ghtriage/` when the embedded CLI focuses on repo triage, reviews, and CI
+- `github-ci` skill -> `scripts/ci-inspect` with `projects/ci-inspect/` when the embedded CLI focuses on PR checks and failing Action logs
 - `ops-toolkit` plugin -> `scripts/logs` with `projects/logs/` when multiple bundled skills share the same log-reading surface
 
 Allowed matching-name exception:

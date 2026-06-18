@@ -28,8 +28,8 @@ gh issue list --state open --limit 50 --json number,title,state,url
 
 If there are no relevant local changes to stage, do not create an empty commit,
 branch, push, or PR. Route issue creation, comments, labels, or closure to
-`github` or `github-triage`, then verify the result with `gh issue view` or
-`gh issue list`.
+`github-triage` or the focused GitHub companion that owns the request, then
+verify the result with `gh issue view` or `gh issue list`.
 
 Close out by saying explicitly:
 
@@ -57,4 +57,4 @@ Return:
 - validation performed before publishing
 
 If CI fails or review comments need follow-up, route to `github-ci` or
-`github-reviews` after the publish step.
+`github-review-threads` after the publish step.

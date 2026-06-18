@@ -1,6 +1,6 @@
 ---
 name: github-triage
-description: Use when triaging issues, pull requests, labels, milestones, or queue health in the current GitHub repository. Prefer direct gh commands and stay read-only unless the user explicitly asks for a mutation.
+description: Use for current-repository GitHub issue, pull request, label, milestone, or queue-health triage. Prefer direct gh commands and stay read-only unless the user explicitly asks for a mutation.
 ---
 
 # GitHub Triage

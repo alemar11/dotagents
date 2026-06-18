@@ -56,9 +56,10 @@ sources, not the only planning model.
   monitoring.
 - The reusable `$autoreview` skill for closeout review after non-trivial code
   edits and after review-triggered fixes.
-- Standalone Git/GitHub companion skills as needed: `$github`,
+- Standalone Git/GitHub companion skills as needed:
   `$github-portfolio-triage`, `$github-triage`, `$github-ci`,
-  `$github-reviews`, `$github-releases`, `$git-commit`, and `$yeet`.
+  `$github-deep-review`, `$github-review-threads`, `$github-releases`,
+  `$git-commit`, and `$yeet`.
 - Local ledger storage at
   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
 
@@ -110,11 +111,11 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 
 | Workstream | Companion skill |
 | --- | --- |
-| GitHub setup, authentication, ambiguous GitHub work, or PR lifecycle after a branch is pushed | `$github` |
 | Read-only scans across multiple explicit repositories | `$github-portfolio-triage` |
 | Current-repository issue, PR, label, milestone, or queue triage | `$github-triage` |
+| Evidence-first issue, PR, bug, root-cause, or fix-quality review | `$github-deep-review` |
 | GitHub Actions runs, pending checks, or failing PR logs | `$github-ci` |
-| PR review threads, comment context, or selected replies | `$github-reviews` |
+| PR review threads, comment context, or selected replies | `$github-review-threads` |
 | Release readiness, tags, GitHub Releases, notes, assets, or package availability | `$github-releases` |
 | Local staging, commit authoring, and push-only flows | `$git-commit` |
 | Full local checkout publish flow to branch plus draft PR | `$yeet` |
@@ -126,8 +127,9 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    constraints, and portfolio-specific gate overrides.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
-   use focused current-repo companions such as `$github-triage`, `$github-ci`,
-   or `$github-reviews` only when the task is focused on one repo or PR. If the
+   use focused current-repo companions such as `$github-triage`,
+   `$github-deep-review`, `$github-ci`, or `$github-review-threads` only when
+   the task is focused on one repo or PR. If the
    user provided a plan, decompose that plan into workstreams before scanning
    for additional queue signals. For broad maintainer discovery, include open
    issues, open PRs, failing or pending CI, latest release or package state when

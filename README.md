@@ -31,11 +31,11 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
 | `crusty` | Direct-only skeptical architecture and implementation challenge from an evidence-first senior engineer. |
 | `git-commit` | Create precise git commits from local changes with direct `git` commands. |
-| `github` | Route GitHub work, verify `git`/`gh` readiness, and use direct GitHub CLI workflows. |
 | `github-ci` | Inspect GitHub Actions checks and failing PR logs with a focused `ci-inspect` CLI. |
+| `github-deep-review` | Review GitHub issues, PRs, and fixes by tracing root cause, provenance, proof, and fix quality. |
 | `github-portfolio-triage` | Scan multiple explicit GitHub repositories read-only for queue, CI, release, and next-action summaries. |
 | `github-releases` | Check, plan, draft, publish, and validate GitHub Releases, tags, notes, and package availability. |
-| `github-reviews` | Inspect PR review threads and route selected replies with a focused `reviews` CLI. |
+| `github-review-threads` | Inspect PR review threads and route selected replies with a focused `reviews` CLI. |
 | `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
 | `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
@@ -66,8 +66,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
-- `maintainer-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, CI, review, release, commit, or publish work: `$github`, `$github-triage`, `$github-portfolio-triage`, `$github-ci`, `$github-reviews`, `$github-releases`, `$git-commit`, and `$yeet`.
-- `yeet` requires `$git-commit` and `$github`; it may route to `$github-ci` or `$github-reviews` for follow-up CI or review work.
+- `maintainer-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, CI, review, release, commit, or publish work: `$github-triage`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
+- `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
 
 ## Project-Local Skills
 
@@ -100,7 +100,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/git-commit skills/github skills/github-ci skills/github-portfolio-triage skills/github-releases skills/github-reviews skills/github-stars skills/github-triage skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/git-commit skills/github-ci skills/github-deep-review skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/maintainer-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -128,11 +128,11 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill autoreview \
   --skill code-wiki \
   --skill git-commit \
-  --skill github \
   --skill github-ci \
+  --skill github-deep-review \
   --skill github-portfolio-triage \
   --skill github-releases \
-  --skill github-reviews \
+  --skill github-review-threads \
   --skill github-stars \
   --skill github-triage \
   --skill skill-cli-creator \

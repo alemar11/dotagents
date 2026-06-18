@@ -1,9 +1,9 @@
 ---
-name: github-reviews
+name: github-review-threads
 description: Use when listing, understanding, drafting, or posting replies to GitHub pull request review threads and conversation comments.
 ---
 
-# GitHub Reviews
+# GitHub Review Threads
 
 ## Role
 
@@ -14,9 +14,9 @@ reply routing is needed.
 ## Public Script
 
 ```bash
-skills/github-reviews/scripts/reviews --help
-skills/github-reviews/scripts/reviews --version
-skills/github-reviews/scripts/reviews --json doctor
+skills/github-review-threads/scripts/reviews --help
+skills/github-review-threads/scripts/reviews --version
+skills/github-review-threads/scripts/reviews --json doctor
 ```
 
 The script emits stable JSON success/error envelopes for JSON mode and writes

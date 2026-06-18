@@ -53,13 +53,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
-- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github`, `$github-portfolio-triage`, `$github-triage`, `$github-ci`, `$github-reviews`, `$github-releases`, `$git-commit`, and `$yeet`.
+- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github-portfolio-triage`, `$github-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its core challenge workflow can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
-- Treat `git-commit`, `github`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
-- Treat `github-ci`, `github-reviews`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
+- Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
+- Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
 - Treat `tanstack` as portable because it is guidance-only, relies on local repo/package inspection plus current TanStack-owned docs when exact APIs matter, and does not require Codex-only runtime tools.
 - Treat `.agents/skills/Maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
@@ -127,10 +127,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep embedded-CLI docs artifact-first: examples must run `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed artifact path unless the host explicitly documents a wrapper, alias, or `PATH` contract for bare `<tool> ...`. (Codex learning)
 
 ### Standalone Git and GitHub skills
-- Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github`, `github-triage`, `github-releases`, `github-ci`, `github-reviews`, `github-portfolio-triage`, `github-stars`, and `yeet`.
+- Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, `github-ci`, `github-review-threads`, `github-portfolio-triage`, `github-stars`, and `yeet`.
 - Keep standalone skills independent from repo-local plugin files, plugin shared scripts, and installed plugin cache copies; standalone runtime docs and code must use direct `git`, direct `gh`, or their own `scripts/<tool>` artifacts.
-- Keep `git-commit`, `github`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
-- Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit`, `github`, and focused `github-*` skills rather than owning duplicate helper code.
+- Keep `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
+- Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit` and focused `github-*` skills rather than owning duplicate helper code.
 - Keep stars and star-list workflows in standalone `github-stars`, not in repository triage.
 
 ### Maintainer Orchestrator skill
@@ -138,8 +138,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep runtime orchestration, worker, gate, and ledger details in `skills/maintainer-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 
-### GitHub skill
-- Keep the standalone reusable `github` skill under `skills/github/` as the umbrella GitHub routing surface for the standalone suite.
+### GitHub Deep Review skill
+- Keep `github-deep-review` focused on evidence-first GitHub issue, PR, root-cause, provenance, and fix-quality review; keep PR review-thread reply routing in `github-review-threads`.
+- Do not reintroduce a broad umbrella `github` skill unless repeated runtime evidence shows ambiguous GitHub work needs a dedicated model-visible router again.
 
 ### Git Commit skill
 - Keep the standalone reusable `git-commit` skill under `skills/git-commit/` scriptless and focused on selective staging, commit authoring, and push-only flows with direct `git`.

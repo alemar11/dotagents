@@ -3,8 +3,8 @@
 ## List Review Context
 
 ```bash
-skills/github-reviews/scripts/reviews address --repo <owner/repo> --pr <number>
-skills/github-reviews/scripts/reviews --json address --repo <owner/repo> --pr <number>
+skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <number>
+skills/github-review-threads/scripts/reviews --json address --repo <owner/repo> --pr <number>
 ```
 
 By default, resolved or outdated review threads are omitted. Add
@@ -15,8 +15,8 @@ By default, resolved or outdated review threads are omitted. Add
 First list comments, then reply by displayed selection or comment id:
 
 ```bash
-skills/github-reviews/scripts/reviews address --repo <owner/repo> --pr <number> --selection "1 3" --reply-body "<body>" --dry-run
-skills/github-reviews/scripts/reviews address --repo <owner/repo> --pr <number> --comment-ids "123456" --reply-body "<body>"
+skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <number> --selection "1 3" --reply-body "<body>" --dry-run
+skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <number> --comment-ids "123456" --reply-body "<body>"
 ```
 
 Use `--dry-run` for batch replies unless the user already approved posting.
