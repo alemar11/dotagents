@@ -68,7 +68,7 @@ Orchestrator workspace:
                 ├── integration-gates.md
                 └── issues/
                     ├── 01-accept-invitation.md
-                    └── done/
+                    └── done/       # created on demand after first completion
 ```
 
 In orchestrator workspace mode, root `CONTEXT.md` should define coordination

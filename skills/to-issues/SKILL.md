@@ -15,11 +15,14 @@ returned or published.
 
 - Load and follow `$plan-harder` for every issue.
 - Pass exactly one issue at a time to `$plan-harder` in issue-hardening mode.
-- Embed the returned `$plan-harder` brief into agent-ready issue bodies. If
-  `$plan-harder` identifies an unresolved blocker, preserve that blocker in
-  the withheld result or explicitly authorized partial issue instead.
+- Use the returned `$plan-harder` brief to enrich agent-ready issue bodies:
+  synthesize implementation guidance under `## Implementation Plan` and merge
+  acceptance, validation, dependency, and blocker details into the matching
+  top-level sections. If `$plan-harder` identifies an unresolved blocker,
+  preserve that blocker in the withheld result or explicitly authorized
+  partial issue instead.
 - Do not publish or return an issue as ready for execution until it includes
-  the hardened implementation brief.
+  the hardened implementation guidance and provenance line.
 - Include a `## Completion` section in every generated implementation issue.
 - Do not use `needs-info` as a normal output state for generated
   implementation issues. Treat unresolved product, domain, dependency, or
@@ -78,7 +81,8 @@ Each issue should:
 - include enough context to be implemented without rereading the whole PRD,
 - have clear non-goals,
 - include acceptance criteria and validation,
-- list dependencies on earlier issues only when truly needed.
+- list dependencies on earlier issues only when truly needed,
+- avoid circular dependencies that can lock the queue.
 
 ### 3. Harden every issue with `$plan-harder`
 
@@ -87,12 +91,19 @@ issue's draft body and the minimum relevant PRD context.
 
 After `$plan-harder` returns:
 
-- insert its brief under `## Implementation Plan` only when the issue is ready
-  for execution,
+- add concise implementation guidance under `## Implementation Plan` only when
+  the issue is ready for the queue,
+- add the first line under that heading as:
+  `Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.`,
+- merge non-duplicative details from the hardening brief into the issue's
+  top-level acceptance criteria, validation, dependencies, context, and
+  blocker sections as appropriate,
 - resolve any blocker it identifies before marking the issue agent-ready,
 - keep the issue scoped to the original vertical slice,
 - repeat for the next issue.
 
+Do not paste the `$plan-harder` output wholesale when it would create nested or
+duplicated sections such as a second acceptance-criteria list.
 Do not batch multiple issues into one `$plan-harder` call.
 If a blocker cannot be resolved from the PRD, repo evidence, or project memory,
 stop and return the blocker instead of publishing an agent-ready issue.
@@ -104,8 +115,12 @@ and triage states to the repo's tracker values.
 
 - Use the canonical `task` type for generated implementation issues unless the
   repo's mapping says otherwise.
-- Use `ready-for-agent` only when the issue contains a hardened implementation
-  brief, acceptance criteria, validation, and no unresolved blocker.
+- Use `ready-for-agent` only when the issue contains hardened implementation
+  guidance, acceptance criteria, validation, and no unresolved blocker.
+  Dependencies may still be listed; in that case, the issue is queue-ready but
+  must not be started until its dependencies are complete.
+- Do not create dependency cycles. Every dependency graph must be acyclic so a
+  set of ready issues cannot retain-cycle itself into a locked queue.
 - Use `needs-info` only for explicitly requested partial backlog output where
   the next action is a concrete question for a human/reporter. Do not count
   `needs-info` issues as agent-ready, and do not publish them from a composing
@@ -132,11 +147,17 @@ Use `project-memory/agents/issue-tracker.md` for the target:
   v1.
 - `Tracker mode: local-markdown`: write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
-  and `Status:` lines near the top.
+  and `Status:` lines near the top and a heading that follows the local issue
+  title convention `<feature-slug>: <NN> <vertical outcome>`.
 - `Tracker mode: orchestrator-local`: write to
   `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
-  with `Type:` and `Status:` lines near the top. Create the project/feature
-  directories only when writing the actual feature artifacts, not during setup.
+  with `Type:` and `Status:` lines near the top and a heading that follows the
+  local issue title convention `<feature-slug>: <NN> <vertical outcome>`.
+  Create the project/feature directories only when writing the actual feature
+  artifacts, not during setup.
+  `$to-issues` owns the issue files and reads `PROJECT.md`, `repos/*.md`, and
+  `integration-gates.md`; it does not create or refresh those supporting files
+  unless the user explicitly asks for that broader orchestrator artifact update.
 - Other tracker: follow the repo-specific instructions.
 
 For GitHub PRDs and GitHub coordination PRDs, every generated implementation or
@@ -167,11 +188,13 @@ complete:
   close the parent PRD issue from an implementation issue unless the maintainer
   explicitly says the whole PRD is complete.
 - Local markdown: when all acceptance criteria pass and validation is complete,
-  move the issue file to the configured `issues/done/<NN>-<slug>.md` path. For
-  orchestrator workspace issues, do this only after cross-repo integration
-  proof is recorded. Do not delete the file and do not add a `done` status.
+  create `issues/done/` on demand if needed, then move the issue file to the
+  configured `issues/done/<NN>-<slug>.md` path. For orchestrator workspace
+  issues, do this only after cross-repo integration proof is recorded. Do not
+  delete the file and do not add a `done` status.
 
-Use this GitHub implementation issue title format:
+Use this implementation issue title format for both GitHub issue titles and
+local markdown issue headings:
 
 ```text
 <feature-slug>: <NN> <vertical outcome>
@@ -190,6 +213,11 @@ authorization, return the hardened issue bodies in chat.
 If a composing skill such as `$plan-feature` passes explicit write
 authorization, use the configured target without re-asking unless this skill
 finds a new blocker or unresolved question.
+If the configured target is GitHub or GitHub coordination but external mutation
+is not authorized for the current run, do not call `gh` mutation commands.
+Return the hardened issue bodies and exact publish commands in chat, or use the
+configured local dry-run target if `project-memory/agents/issue-tracker.md`
+records one.
 When a blocker or unresolved question appears under `$plan-feature`, return it
 as an issue-splitting gate instead of publishing a `needs-info` issue by
 default.
@@ -207,14 +235,16 @@ Summarize:
 - any blocked issues and why,
 - whether any non-agent-ready partial issues were withheld or explicitly
   published as `needs-info` / `ready-for-human`,
-- confirmation that `$plan-harder` was run once per issue.
+- confirmation that `$plan-harder` was run once per issue, that each issue
+  includes the standard plan-hardening provenance line, and that the hardening
+  output was merged into the issue without duplicated sections.
 
 ## Issue Body Shape
 
 Use this shape unless the tracker has a stronger local template:
 
 ```markdown
-# [Issue Title]
+# <feature-slug>: <NN> <vertical outcome>
 
 Type: [mapped issue type, usually task]
 Status: [mapped triage state]
@@ -246,12 +276,12 @@ single-repo issues.]
 
 ## Implementation Plan
 
-[Paste the $plan-harder issue-hardening brief here.]
+Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.
 
-## Questions
-
-[Only include for explicitly authorized `needs-info` partial output. Ask the
-concrete human/reporter question that blocks agent-ready implementation.]
+[Concise implementation approach synthesized from the $plan-harder hardening
+brief. Do not duplicate acceptance criteria, validation, dependencies,
+questions, or completion rules here; merge those details into their top-level
+sections.]
 
 ## Acceptance Criteria
 
@@ -271,14 +301,20 @@ When implementation and validation are complete:
   complete. The closing keyword takes effect when the PR or commit reaches the
   default branch.
 - Local markdown: move this file to
-  the configured `issues/done/<NN>-<slug>.md` path. For orchestrator workspace
-  issues, move it only after cross-repo integration proof is recorded. Do not
-  delete the file and do not add a `done` status.
+  the configured `issues/done/<NN>-<slug>.md` path, creating `issues/done/` on
+  demand if needed. For orchestrator workspace issues, move it only after
+  cross-repo integration proof is recorded. Do not delete the file and do not
+  add a `done` status.
 
 ## Dependencies
 
 - [Issue dependency or `None`.]
 ```
+
+Include a `## Questions` section only for explicitly authorized partial
+`needs-info` output, and put the concrete human/reporter question there. Omit
+the section entirely for `ready-for-agent` issues; never write `N/A` as a
+placeholder question.
 
 ## References
 

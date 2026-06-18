@@ -39,8 +39,10 @@ into the project-memory structure.
   doctrine, or weak inferences from session text.
 - Do not create empty `project-memory/adr/` directories just to show intent.
   Create only files with useful content.
-- In orchestrator workspace mode, keep setup config-only: do not create
-  `projects/<project>/`, feature PRDs, or issue files during setup.
+- In orchestrator workspace mode, keep setup config-only: configure root setup
+  files only. Root `AGENTS.md`, `project-memory/agents/*`, `CONTEXT.md`, and
+  ADR layout are allowed when useful, but do not create `projects/<project>/`,
+  feature PRDs, or issue files during setup.
 - Do not treat an orchestrator workspace as a monorepo. It coordinates
   external repos; those repos keep their own project memory, validation,
   branches, commits, and PRs.
@@ -53,7 +55,8 @@ into the project-memory structure.
 Use one of three modes:
 
 - **Fresh setup**: the repo has little or no prior project-memory structure and
-  the goal is to configure `AGENTS.md` plus `project-memory/agents/*`.
+  the goal is to configure `AGENTS.md` plus `project-memory/agents/*`, even if
+  the repo already has starter code, README files, tests, or package manifests.
 - **Existing-project bootstrap**: the repo already has code, docs, issues,
   prior agent sessions, or partial project-memory files, and the goal is to
   infer the setup plus seed `CONTEXT.md` and ADRs from strong evidence.
@@ -62,9 +65,11 @@ Use one of three modes:
   owns cross-repo PRDs, vertical feature issues, repo pointer sheets, and
   integration gates, but not product code.
 
-Default to existing-project bootstrap when the repo has meaningful existing
-code/docs or prior project-memory files. Default to fresh setup for empty or
-new repos. Recommend orchestrator workspace when the folder has no clear
+Default to fresh setup when the user only needs tracker, triage, and domain
+memory routing, even in a non-empty repo. Use existing-project bootstrap only
+when the user wants accepted repo knowledge migrated or seeded into
+`CONTEXT.md` or ADRs, or when partial project-memory/domain files already need
+reconciliation. Recommend orchestrator workspace when the folder has no clear
 single codebase but contains or is intended to contain `projects/`, repo
 pointer docs, symlinks/worktrees to external repos, or cross-repo planning
 artifacts.
@@ -119,7 +124,10 @@ Choose where PRDs and implementation issues live:
 - **Other**: ask for one paragraph describing the tracker workflow.
 
 Default to GitHub for code repos when the remote is GitHub, and local markdown
-when no clear GitHub issue tracker exists. For orchestrator workspaces, ask
+when no clear GitHub issue tracker exists. If the user is running a temp
+exercise, validation pass, rehearsal, dry run, or otherwise says not to mutate
+external systems, recommend local markdown for that run and record the reason
+in `project-memory/agents/issue-tracker.md`. For orchestrator workspaces, ask
 whether the default should be local orchestrator files or a GitHub coordination
 repo; record the chosen backend in `project-memory/agents/issue-tracker.md`.
 
@@ -148,7 +156,8 @@ Use these canonical state roles:
 
 - `needs-triage`: maintainer needs to evaluate.
 - `needs-info`: waiting on reporter or requester.
-- `ready-for-agent`: fully specified and agent-ready.
+- `ready-for-agent`: fully specified and agent-queue-ready; listed
+  dependencies still gate when work can start.
 - `ready-for-human`: requires human implementation or judgment.
 - `wontfix`: will not be actioned.
 
@@ -207,8 +216,11 @@ For orchestrator workspace mode:
   vertical issues, repo pointer sheets, and integration gates live.
 - For GitHub coordination mode, state that each PRD parent issue and vertical
   feature issue gets a project label named exactly `<project-slug>`.
-- State that setup does not create project or feature folders. `$plan-feature`,
-  `$to-prd`, and `$to-issues` create them only when writing an actual feature.
+- State that setup does not create project or feature folders. In this context,
+  config-only means no project or feature artifacts during setup; root setup
+  files such as `AGENTS.md`, `project-memory/agents/*`, and accepted root
+  context remain allowed. `$plan-feature`, `$to-prd`, and `$to-issues` create
+  project or feature folders only when writing an actual feature.
 - State that child repos retain their own `AGENTS.md`, `CONTEXT.md`,
   `project-memory`, validation commands, branches, commits, and PRs.
 - State that `codex-orchestrator` owns runtime worker state and ledgers; the

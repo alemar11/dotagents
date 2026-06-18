@@ -26,11 +26,30 @@ Done issue path pattern:
   `projects/<project-slug>/features/<feature-slug>/integration-gates.md`
 - Vertical feature issues:
   `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
+- Vertical feature issue headings use:
+  `<feature-slug>: <NN> <vertical outcome>`
 - Completed vertical issues move to:
   `projects/<project-slug>/features/<feature-slug>/issues/done/<NN>-<slug>.md`
+- Create `issues/done/` only when moving the first completed issue into it.
 
-Setup is config-only. Do not create project or feature folders during setup.
-Create them only when a feature is actually planned or written.
+Setup is config-only: it may create root setup files such as `AGENTS.md`,
+`project-memory/agents/*`, and accepted root coordination context, but it must
+not create project or feature folders. Create those only when a feature is
+actually planned or written.
+
+## Artifact Ownership
+
+- `$to-prd` owns the feature PRD and, when writing an orchestrator-local PRD,
+  may create or update `projects/<project-slug>/PROJECT.md`,
+  `projects/<project-slug>/repos/<repo-slug>.md`, and
+  `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
+  from accepted project, repo, or PRD source material.
+- `$to-issues` owns files under
+  `projects/<project-slug>/features/<feature-slug>/issues/` and records
+  issue-specific integration proof requirements inside those issue files.
+- `$to-issues` reads `PROJECT.md`, `repos/*.md`, and `integration-gates.md`,
+  but does not create or refresh those supporting files unless the user
+  explicitly asks for that broader orchestrator artifact update.
 
 ## Orchestrator Issue Content
 
@@ -54,7 +73,8 @@ implemented and validated across the required repos. Move the issue to
 `issues/done/` only after cross-repo integration proof is recorded.
 
 Do not delete completed issue files. Do not add a `done` status; the
-`issues/done/` folder is the completion signal.
+`issues/done/` folder is the completion signal. If `issues/done/` does not
+exist yet, create it when completing the first issue.
 
 ## When a skill says "publish to the issue tracker"
 

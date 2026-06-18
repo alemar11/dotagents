@@ -5,10 +5,6 @@ Use this shape unless the project already has a stronger local PRD format.
 ```markdown
 # PRD: [Feature Name]
 
-## Status
-
-Draft
-
 ## Source
 
 - Conversation, issue, doc, or repo evidence used to create this PRD.

@@ -68,11 +68,15 @@ Dependencies must be explicit, minimal, and implementable:
 - Reference issue titles or numbers when a prior issue must land first.
 - Explain what dependency is needed, such as "uses the draft creation endpoint
   from Issue 01."
-- Do not create circular dependencies.
+- Do not create circular dependencies or retain cycles that can lock the
+  issue queue.
 - Do not depend on a broad phase such as "backend complete" or "frontend
   complete."
 - If the issue depends on an unresolved decision, mark it `needs-info` instead
   of `ready-for-agent`.
+  If it depends only on another generated implementation issue being completed,
+  it may still be `ready-for-agent`; queue consumers must wait for the listed
+  dependency to finish before starting it.
 
 ## Avoid Horizontal Tickets
 
@@ -112,8 +116,12 @@ Mark an issue `ready-for-agent` only when it has:
   workspace issue,
 - acceptance criteria,
 - validation steps,
-- an embedded `$plan-harder` implementation brief,
+- implementation guidance enriched by `$plan-harder`,
 - no unresolved product, technical, access, API, data, or validation blocker.
+
+A `ready-for-agent` issue may list dependencies on other ready issues. That
+means it is specified enough for an agent queue, not that it is immediately
+startable before those dependencies are complete.
 
 Mark an issue `needs-info` when any of these remain unclear:
 
@@ -139,10 +147,17 @@ For each issue:
 - pass only that draft issue body plus the minimum relevant PRD context to
   `$plan-harder`,
 - request issue-hardening mode,
-- embed the returned brief under `## Implementation Plan`,
+- start `## Implementation Plan` with the standard provenance line
+  `Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.`,
+- synthesize the implementation-relevant guidance under `## Implementation Plan`,
+- merge acceptance criteria, validation, dependency, and blocker details into
+  the matching top-level issue sections,
 - keep any `$plan-harder` blocker visible,
 - do not mark the issue `ready-for-agent` until blockers are resolved,
 - do not batch multiple issues into one `$plan-harder` call.
+
+Do not paste the `$plan-harder` output wholesale if doing so duplicates
+sections already present in the issue body.
 
 Because `$plan-harder` is chat-output-only, `$to-issues` owns any later issue
 tracker or local markdown writes.

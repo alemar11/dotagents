@@ -72,6 +72,10 @@ Keep the PRD implementation-facing:
 - risks and open questions,
 - notes for later issue splitting.
 
+Do not include workflow status fields such as `Status: Draft` in the PRD body.
+PRD readiness and lifecycle state belong in the issue tracker, mapped labels,
+or the generated implementation issues, not in the PRD content itself.
+
 ### 4. Choose publication target
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
@@ -84,7 +88,12 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 - `Tracker mode: orchestrator-local`: write to the configured orchestrator
   feature PRD path,
   `projects/<project-slug>/features/<feature-slug>/PRD.md`, only after
-  confirmation. Derive or ask for `<project-slug>` before writing.
+  confirmation. Derive or ask for `<project-slug>` before writing. `$to-prd`
+  owns the PRD and may create or update
+  `projects/<project-slug>/PROJECT.md`,
+  `projects/<project-slug>/repos/<repo-slug>.md`, and
+  `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
+  from accepted project, repo, or PRD source material needed for planning.
 - `Tracker mode: orchestrator-github`: publish the PRD parent issue in the
   configured coordination repo using `gh --repo <owner>/<repo>`. Derive or ask
   for `<project-slug>`, ensure the GitHub label named exactly
@@ -112,6 +121,11 @@ publish the PRD without a type and keep the PRD title/body convention intact.
 If a composing skill such as `$plan-feature` passes explicit write
 authorization, use the configured target without re-asking unless this skill
 finds a new blocker or unresolved question.
+
+If the configured target is GitHub or GitHub coordination but external mutation
+is not authorized for the current run, do not call `gh` mutation commands.
+Return the PRD body and exact publish command in chat, or use the configured
+local dry-run target if `project-memory/agents/issue-tracker.md` records one.
 
 If no issue-tracker setup exists, return the PRD in chat and recommend running
 `$setup-project-memory` before publishing.

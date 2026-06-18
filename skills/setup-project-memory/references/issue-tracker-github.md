@@ -7,6 +7,15 @@ Tracker mode: `github`
 GitHub repo: infer from `git remote -v` unless this file records a specific
 `<owner>/<repo>`.
 
+## Non-Mutating Runs
+
+If this setup is being used for a temp exercise, validation pass, rehearsal,
+dry run, or any workflow where external GitHub mutation is not authorized, do
+not run `gh issue create`, `gh issue edit`, `gh issue comment`, or label
+mutation commands. Use local markdown for that run, or return draft issue
+bodies and exact `gh` commands without executing them. Record the non-mutating
+choice in `project-memory/agents/issue-tracker.md`.
+
 ## Conventions
 
 - Create an issue: `gh issue create --title "..." --body "..."`

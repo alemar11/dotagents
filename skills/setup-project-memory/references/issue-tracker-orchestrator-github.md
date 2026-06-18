@@ -19,6 +19,16 @@ Project label format: <project-slug>
 Run `gh` commands with `--repo <owner>/<repo>` unless the current checkout is
 the coordination repository.
 
+## Non-Mutating Runs
+
+If this setup is being used for a temp exercise, validation pass, rehearsal,
+dry run, or any workflow where external GitHub mutation is not authorized, do
+not run `gh issue create`, `gh issue edit`, `gh issue comment`,
+`gh label create`, or other GitHub mutation commands. Use local orchestrator
+markdown for that run, or return draft issue bodies and exact `gh` commands
+without executing them. Record the non-mutating choice in
+`project-memory/agents/issue-tracker.md`.
+
 ## Conventions
 
 - PRD issue title: `PRD: <Feature Name>`
