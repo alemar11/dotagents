@@ -28,8 +28,9 @@ should improve future agent context, not just the current conversation.
 
 ### 1. Ground in the project
 
-- Inspect the relevant repo files, existing docs, `CONTEXT.md`, and `docs/adr/`
-  before asking questions.
+- Inspect the relevant repo files, existing docs, `CONTEXT.md`,
+  `CONTEXT-MAP.md`, `project-memory/agents/domain.md`, and
+  `project-memory/adr/` before asking questions.
 - Load and follow `$grill-me` for the one-question-at-a-time interrogation
   loop.
 - Load and follow `$domain-modeling` for inline documentation updates.
@@ -55,8 +56,8 @@ After an answer resolves a durable point, use `$domain-modeling` inline:
 - add or revise glossary terms in `CONTEXT.md`,
 - record business rules, lifecycle states, actors, permissions, or invariants,
 - update relevant project docs with accepted workflow semantics,
-- offer an ADR only when a decision is load-bearing enough that future work
-  would otherwise reopen it.
+- offer an ADR under `project-memory/adr/` only when a decision is load-bearing
+  enough that future work would otherwise reopen it.
 
 Keep documentation updates small and evidence-backed. Prefer enriching the
 closest existing doc over creating new files.

@@ -57,9 +57,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its core challenge workflow can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
-- Treat `domain-modeling` as portable because it uses local repo evidence and project docs such as `CONTEXT.md` and `docs/adr/`, with no Codex-only runtime tools required.
+- Treat `domain-modeling` as portable because it uses local repo evidence and project memory such as `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`, with no Codex-only runtime tools required.
 - Treat `grill-with-docs` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-with-docs` is the fallback path.
+- Treat `setup-project-memory` as Codex-aware but portable because it can optionally read local Codex session history under `~/.codex/sessions` for existing-project bootstrap, while its core setup flow falls back to repo-only evidence plus `$domain-modeling`.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
 - Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
@@ -104,9 +105,16 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Grill and Domain Modeling skills
 - Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-with-docs`.
-- Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs; do not use it for repo-maintenance metadata sync.
+- Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs under `project-memory/adr/`; do not use it for repo-maintenance metadata sync.
 - Keep `grill-with-docs` as the thin composition layer over `grill-me` and `domain-modeling`, not a duplicate questioning loop.
 - Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-with-docs` before implementation rather than duplicating the documentation loop.
+- Use `project-memory/` as the visible root for durable project memory owned by these runtime skills: `project-memory/agents/` for repo-specific agent operating config and `project-memory/adr/` for durable decision records. Keep `CONTEXT.md` and optional `CONTEXT-MAP.md` at the project root for fast discovery.
+
+### Setup Project Memory skill
+- Keep `setup-project-memory` as the reusable setup surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, and `project-memory/agents/domain.md`.
+- `setup-project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
+- For already-used projects, `setup-project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo Codex session history, using `$domain-modeling` for the context and ADR shape.
+- Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
 
 ### Maintainer skill
 - The `.agents/skills/Maintainer` skill is the default maintainer for improving existing skills and plugins in this repository through shared upgrade tasks and skill-specific refresh workflows.

@@ -31,9 +31,12 @@ durable.
 
 ### 1. Inspect existing context
 
-- Look for `CONTEXT.md`, `README.md`, `docs/`, `docs/adr/`, `.github/`,
-  product specs, issue templates, and nearby code or tests that define the
-  vocabulary already in use.
+- Look for `CONTEXT.md`, `CONTEXT-MAP.md`,
+  `project-memory/agents/domain.md`, `project-memory/adr/`, `README.md`,
+  project docs, product specs, issue templates, and nearby code or tests that
+  define the vocabulary already in use.
+- If `CONTEXT-MAP.md` exists, use it to choose the relevant context-specific
+  `CONTEXT.md` before editing domain language.
 - Prefer updating an existing relevant file over creating a new one.
 - If no domain context file exists and a durable term or rule needs a home,
   create `CONTEXT.md` at the project root.
@@ -60,8 +63,8 @@ Write the smallest durable update that preserves the resolved meaning:
 
 - Add or revise glossary entries in `CONTEXT.md`.
 - Add short workflow or rule notes to the most relevant project doc.
-- Add an ADR under `docs/adr/` only for load-bearing decisions that future
-  agents or maintainers would otherwise reopen.
+- Add an ADR under `project-memory/adr/` only for load-bearing decisions that
+  future agents or maintainers would otherwise reopen.
 - Leave open questions clearly marked instead of smoothing over uncertainty.
 
 Keep docs practical:
@@ -109,7 +112,7 @@ Short project-specific definition.
 - Question that remains unresolved.
 ```
 
-For ADRs:
+For ADRs under `project-memory/adr/`:
 
 ```markdown
 # ADR-0001: Decision title

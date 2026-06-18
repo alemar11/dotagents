@@ -31,8 +31,9 @@ This is a discovery and decision-shaping skill, not an automatic refactor.
 
 ### 1. Ground in repo evidence
 
-- Inspect project docs, `CONTEXT.md`, ADRs, package boundaries, public APIs,
-  tests, and the files near the requested area.
+- Inspect project docs, `CONTEXT.md`, `CONTEXT-MAP.md`,
+  `project-memory/agents/domain.md`, `project-memory/adr/`, package
+  boundaries, public APIs, tests, and the files near the requested area.
 - If subagents are available and the repo is large, use bounded read-only
   exploration slices; otherwise inspect sequentially.
 - Prefer source-backed call paths and concrete file references over broad

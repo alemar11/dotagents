@@ -48,6 +48,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
+| `setup-project-memory` | Configure project memory and bootstrap context from existing repo or session evidence. |
 | `codex-orchestrator` | Coordinate workers with root-owned lifecycle, standalone Git/GitHub companion skills, gates, ledgers, and closure follow-ups. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
@@ -72,6 +73,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, CI, review, release, commit, or publish work: `$github-triage`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
 - `grill-with-docs` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop and update project context docs or ADRs inline.
 - `improve-codebase-architecture` requires `$grill-with-docs` to pressure-test the selected architecture candidate before implementation.
+- `setup-project-memory` requires `$domain-modeling` when bootstrapping an existing project into `CONTEXT.md` or ADRs from repo or session evidence.
 - `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
 
 ## Project-Local Skills
@@ -105,7 +107,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/grill-with-docs skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/grill-with-docs skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/grill-me skills/learn skills/setup-project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -151,6 +153,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill plan-harder \
   --skill grill-me \
   --skill learn \
+  --skill setup-project-memory \
   --skill codex-orchestrator \
   --skill postgres \
   --skill skill-audit \

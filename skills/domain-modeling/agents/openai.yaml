@@ -2,4 +2,4 @@ interface:
   display_name: "Domain Modeling"
   short_description: "Build and maintain project domain language and durable decisions."
   brand_color: "#0E7490"
-  default_prompt: "Use $domain-modeling to inspect existing project docs, sharpen terms and boundaries against repo evidence, then update CONTEXT.md, relevant docs, or ADRs only for durable accepted terminology, rules, and decisions."
+  default_prompt: "Use $domain-modeling to inspect existing project docs, sharpen terms and boundaries against repo evidence, then update CONTEXT.md, relevant docs, or ADRs under project-memory/adr/ only for durable accepted terminology, rules, and decisions."
