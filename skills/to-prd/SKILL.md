@@ -71,8 +71,8 @@ Keep the PRD implementation-facing:
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 
-- GitHub or GitLab: publish only after confirmation, using the configured
-  tracker commands and a title like `PRD: <feature>`.
+- GitHub: publish only after confirmation, using `gh` and a title like
+  `PRD: <feature>`.
 - Local markdown: write to `.scratch/<feature-slug>/PRD.md` only after
   confirmation.
 - Other tracker: follow the repo-specific instructions in

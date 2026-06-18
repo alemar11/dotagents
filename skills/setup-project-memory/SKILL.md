@@ -58,7 +58,7 @@ new repos.
 
 Read the current state without assuming a layout:
 
-- `git remote -v` and `.git/config` to infer GitHub, GitLab, or no remote.
+- `git remote -v` and `.git/config` to infer GitHub or no GitHub remote.
 - `AGENTS.md` to see whether an `## Agent skills` block already exists.
 - `project-memory/agents/` to see whether prior setup exists.
 - `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`.
@@ -90,13 +90,12 @@ accept a short answer such as `default`.
 Choose where PRDs and implementation issues live:
 
 - **GitHub**: use GitHub Issues through `gh`.
-- **GitLab**: use GitLab Issues through `glab`.
 - **Local markdown**: use `.scratch/<feature-slug>/PRD.md` and
   `.scratch/<feature-slug>/issues/*.md`.
 - **Other**: ask for one paragraph describing the tracker workflow.
 
-Default to GitHub when the remote is GitHub, GitLab when the remote is GitLab,
-and local markdown when no clear hosted issue tracker exists.
+Default to GitHub when the remote is GitHub, and local markdown when no clear
+GitHub issue tracker exists.
 
 **Triage labels**
 
@@ -139,7 +138,6 @@ Before writing, show:
 Use these reference templates as starting points:
 
 - `references/issue-tracker-github.md`
-- `references/issue-tracker-gitlab.md`
 - `references/issue-tracker-local.md`
 - `references/triage-labels.md`
 - `references/domain.md`

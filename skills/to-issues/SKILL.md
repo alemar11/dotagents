@@ -37,7 +37,7 @@ returned or published.
 Find or ask for the PRD source:
 
 - `.scratch/<feature-slug>/PRD.md`,
-- a GitHub or GitLab PRD issue,
+- a GitHub PRD issue,
 - pasted PRD text,
 - another project document that clearly acts as the PRD.
 
@@ -97,7 +97,6 @@ repo's labels or status values.
 Use `project-memory/agents/issue-tracker.md` for the target:
 
 - GitHub: create issues with `gh issue create`, then apply mapped labels.
-- GitLab: create issues with `glab issue create`, then apply mapped labels.
 - Local markdown: write
   `.scratch/<feature-slug>/issues/<NN>-<slug>.md`.
 - Other tracker: follow the repo-specific instructions.

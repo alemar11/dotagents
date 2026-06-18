@@ -116,6 +116,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Setup Project Memory skill
 - Keep `setup-project-memory` as the reusable setup surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, and `project-memory/agents/domain.md`.
 - `setup-project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
+- Keep `setup-project-memory` issue-tracker setup GitHub/local/custom only; do not add additional hosted-tracker-specific templates to the project-memory flow.
 - For already-used projects, `setup-project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo Codex session history, using `$domain-modeling` for the context and ADR shape.
 - Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
 
