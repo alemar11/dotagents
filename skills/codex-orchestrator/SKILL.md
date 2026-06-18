@@ -40,6 +40,15 @@ GitHub issue, PR review, CI failure, release checklist, local TODO, audit
 result, ledger item, or ad hoc owner request. GitHub issues and PRs are trigger
 sources, not the only planning model.
 
+New feature planning is not a shortcut through orchestration decomposition. If
+the source is rough feature or product intent without a durable PRD and
+generated implementation issues, route it through `$plan-feature` before
+scheduling implementation. If the source is an existing PRD without generated
+implementation issues, route it through `$to-issues` before implementation
+scheduling unless the owner only asked for inspect-only review. Generated
+issues, PRs, CI failures, bugs, local checklists, and explicit implementation
+requests can become orchestrator source items directly.
+
 Treat every task source as a source item before it becomes a workstream. A
 source item needs a stable source id, source reference, acceptance criteria,
 current source status, closeout target, and mutation authority. Examples:
@@ -93,6 +102,9 @@ loop silently on the same worker status or source snapshot.
   `$github-portfolio-triage`, `$github-triage`, `$github-issues`,
   `$github-ci`, `$github-deep-review`, `$github-review-threads`,
   `$github-releases`, `$git-commit`, and `$yeet`.
+- Planning companion skills as needed before implementation scheduling:
+  `$plan-feature` for rough new feature intent, and `$to-issues` for existing
+  PRDs that do not yet have generated implementation issues.
 - Local ledger storage at
   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
 
@@ -170,6 +182,23 @@ first read the issue body and any linked `Source PRD`; the PRD is the canonical
 source for full topology, while the issue body supplies issue-level
 parallelization, dependencies, closeout, and overrides.
 
+Apply issue-level scheduling constraints before choosing a wave or worker:
+
+- `Parallelization: independent`: eligible for delegation when authorization,
+  ownership boundaries, and gates allow it.
+- `Parallelization: depends on <issue>`: queue-ready is not start-ready. Do not
+  start or delegate it until the named dependency is completed with
+  root-verifiable proof, or until the owner explicitly changes the dependency.
+- `Parallelization: blocks <issue>`: the issue may start when otherwise
+  eligible, but dependent workstreams stay unassigned until this one completes.
+- `Parallelization: root-integrated`: keep implementation in the root thread;
+  use workers only for read-only inspection or clearly isolated supporting
+  proof when that does not change the integration ownership.
+
+If a dependency, `Source PRD`, closeout path, or parallelization value is
+missing, ambiguous, or contradictory, classify the workstream as `Needs Owner`
+or `Blocked` instead of inventing scheduling semantics.
+
 - **One Feature Branch**: use for one git repo, including monorepos. The root
   orchestrator owns the shared feature branch and usually one draft PR for the
   whole feature. Parallel workers may use isolated helper worktrees, patches,
@@ -226,15 +255,20 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    use focused current-repo companions such as `$github-triage`,
    `$github-issues`, `$github-deep-review`, `$github-ci`, or
    `$github-review-threads` only when the task is focused on one repo or PR. If the
-   user provided a plan, decompose that plan into workstreams before scanning
-   for additional queue signals. For broad maintainer discovery, include open
-   issues, open PRs, failing or pending CI, latest release or package state when
-   relevant, unreleased changelog/TODO signals, and owner-suppressed items.
+   user provided a rough new feature idea, route it through `$plan-feature`
+   before implementation scheduling; if the user provided an existing PRD
+   without generated implementation issues, route it through `$to-issues` unless
+   the request is inspect-only; if the user provided generated issues, a
+   checklist, or an implementation plan, decompose that durable source into
+   workstreams before scanning for additional queue signals. For broad
+   maintainer discovery, include open issues, open PRs, failing or pending CI,
+   latest release or package state when relevant, unreleased changelog/TODO
+   signals, and owner-suppressed items.
 4. Classify work with the canonical vocabulary in `references/ledger.md`:
    `Active`, `Autonomous`, `Needs Owner`, `Ready Next`, `Blocked`, `Deferred`,
    `Completed`, `Ignored Or Suppressed`, or `Released`. Each workstream must
-   carry its source id, acceptance criteria, selected gates, proof target, and
-   closeout target.
+   carry its source id, acceptance criteria, scheduling constraints,
+   dependencies, selected gates, proof target, and closeout target.
 5. Before delegation, read `references/worker.md` and create one Codex worker
    per independent ownership boundary, such as repository, package, service,
    path set, or tightly scoped workstream, using the selected worker surface

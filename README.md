@@ -75,7 +75,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
-- `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work: `$github-triage`, `$github-issues`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
+- `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work: `$github-triage`, `$github-issues`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`. It routes rough new feature intent through `$plan-feature`, and existing PRDs without generated implementation issues through `$to-issues`, before scheduling implementation work.
 - `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop and update project context docs or ADRs inline.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `plan-feature` requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` so it can run the feature-planning wrapper flow from setup through PRD and configured agent-ready issues.

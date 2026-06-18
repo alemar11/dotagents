@@ -99,6 +99,17 @@ integration mode only when it is not obvious from the inherited topology or when
 the issue declares an override. Workers may not choose a different branch or PR
 strategy without a root-owned ledger update and authorization check.
 
+Issue-level parallelization controls startability:
+
+- `independent`: may enter an active wave when authorization, ownership
+  boundaries, and gates allow it.
+- `depends on <issue>`: do not assign until the named dependency has
+  root-verifiable completion proof.
+- `blocks <issue>`: may start when otherwise eligible; keep dependent items
+  unassigned until this one completes.
+- `root-integrated`: keep implementation in the root thread and record
+  `Surface=no-delegation` unless the worker is read-only or proof-only.
+
 ## Gate Policy
 
 Available gates:
@@ -129,7 +140,7 @@ Gate matrix:
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD or topology; parallelization; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD or topology; parallelization; dependencies; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 

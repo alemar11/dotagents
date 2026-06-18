@@ -67,6 +67,11 @@ Stay in the root orchestrator thread when:
   integration in the root thread.
 - Give each worker a single clear objective, repository path or URL, branch
   expectations, and exit condition.
+- Do not assign implementation work for `Parallelization: depends on <issue>`
+  until the root orchestrator has verified the named dependency is complete.
+- Keep `Parallelization: root-integrated` implementation in the root thread.
+  Workers may provide read-only inspection or isolated proof only when the root
+  keeps integration ownership.
 - Workers may inspect, implement, test, and report only within their authorized
   mode.
 - Workers must not spawn sub-workers, create new Codex threads, manage other
@@ -278,6 +283,8 @@ Scope:
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Delivery topology: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
 - Delivery topology source: <Source PRD path/issue, explicit owner request, or issue override>
+- Parallelization: <independent|depends on source/workstream|blocks source/workstream|root-integrated>
+- Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>
 - Integration mode: <patch to root|handoff|worker commit|repo PR|issue PR|direct commit|inspect only>
 - Report channel: this worker thread only

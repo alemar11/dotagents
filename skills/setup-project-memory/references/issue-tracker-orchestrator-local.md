@@ -81,8 +81,10 @@ Generated feature issues should include:
 - `Type:` and `Status:` lines from `project-memory/agents/triage-labels.md`
 - `Source PRD:` pointing to the feature PRD
 - affected repo list
-- delivery topology, branch or PR expectations, parallelization status,
-  integration mode, and closeout path
+- issue-level `Parallelization`, `Closeout`, and only explicit
+  `Topology override` or `Integration mode` lines when the issue intentionally
+  differs from the PRD. Full branch and PR strategy is inherited from
+  `Source PRD`.
 - cross-repo contract or interface notes
 - integration gates by name or link and validation proof needed before
   completion

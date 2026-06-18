@@ -30,8 +30,12 @@ preference change unless the user explicitly says to make it persistent.
 - Triage state is recorded as a `Status:` line near the top of each issue file,
   using the state strings from `project-memory/agents/triage-labels.md`
 - Comments and conversation history append under a `## Comments` heading
-- Each implementation issue body includes `## Delivery` with the inherited
-  topology, parallelization status, integration mode, and closeout path.
+- Each implementation issue body includes `Source PRD:` pointing to
+  `.scratch/<feature-slug>/PRD.md`.
+- Each implementation issue body includes `## Delivery` with issue-level
+  `Parallelization`, `Closeout`, and only explicit `Topology override` or
+  `Integration mode` lines when the issue intentionally differs from the PRD.
+  Full topology is inherited from `Source PRD`.
 - In multi-context repos or monorepos, feature slugs must include the accepted
   product or workspace slug when needed to avoid collisions, for example
   `customer-portal-weekly-digest` instead of `weekly-digest`.

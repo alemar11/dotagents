@@ -69,8 +69,10 @@ For feature planning:
   `<feature-slug>: <NN> <vertical outcome>`.
 - Each implementation issue body must also include `Source PRD: #<number>` for
   searchability and backlinks.
-- Each implementation issue body must include `## Delivery` with the inherited
-  topology, parallelization status, integration mode, and closeout path.
+- Each implementation issue body must include `## Delivery` with issue-level
+  `Parallelization`, `Closeout`, and only explicit `Topology override` or
+  `Integration mode` lines when the issue intentionally differs from the PRD.
+  Full topology is inherited from `Source PRD`.
 
 For triage:
 
