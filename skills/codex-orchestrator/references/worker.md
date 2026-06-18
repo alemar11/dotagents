@@ -80,7 +80,10 @@ Stay in the root orchestrator thread when:
 
 ## Delivery Topology Rules
 
-Record one of these human-readable labels for every implementation workstream:
+Record one of these human-readable labels for every implementation workstream.
+When the assignment comes from a generated issue with a `Source PRD`, the root
+orchestrator may pass the inherited PRD topology instead of requiring the issue
+to restate the full branch and PR strategy:
 
 - **One Feature Branch**: the root owns one shared feature branch and usually
   one draft PR for the feature. Workers operate in isolated helper worktrees or
@@ -274,6 +277,7 @@ Scope:
 - Authorization mode: <inspect|implement|push-pr|ci-rerun-fix|merge-close|release>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Delivery topology: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
+- Delivery topology source: <Source PRD path/issue, explicit owner request, or issue override>
 - Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>
 - Integration mode: <patch to root|handoff|worker commit|repo PR|issue PR|direct commit|inspect only>
 - Report channel: this worker thread only

@@ -163,8 +163,12 @@ thread.
 
 ## Delivery Topology Execution
 
-When a PRD, generated issue, source item, or owner request names a delivery
-topology, record it in the ledger and execute against that topology:
+For implementation or publication workstreams, resolve delivery topology from
+the source item, a linked `Source PRD`, or the owner request. Record it in the
+ledger and execute against that topology. For generated implementation issues,
+first read the issue body and any linked `Source PRD`; the PRD is the canonical
+source for full topology, while the issue body supplies issue-level
+parallelization, dependencies, closeout, and overrides.
 
 - **One Feature Branch**: use for one git repo, including monorepos. The root
   orchestrator owns the shared feature branch and usually one draft PR for the
@@ -183,9 +187,14 @@ topology, record it in the ledger and execute against that topology:
   item. Record the authorization, validation, and issue-closing target before
   committing.
 
-Do not let workers invent a different branch or PR strategy. If the topology is
-missing or contradicted by repo reality, stop and classify the workstream as
-`Needs Owner` until the topology is corrected or explicitly overridden.
+Do not let workers invent a different branch or PR strategy. For implementation
+or publication workstreams that need branch or PR strategy, if a source item
+lacks both an explicit topology and a durable `Source PRD` pointer, or if issue
+metadata contradicts the PRD or repo reality, stop and classify the workstream
+as `Needs Owner` until the topology is corrected or explicitly overridden.
+Inspect-only workstreams, such as PR review or CI diagnosis, do not need a
+delivery topology unless the review result is being turned into implementation
+or publication work.
 
 ## Companion Skill Routing
 
@@ -206,11 +215,12 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 ## Workflow
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
-2. Identify the repository set, task sources, current goals, delivery topology,
-   suppressed items, owner constraints, and portfolio-specific gate overrides.
-   Register task sources in the ledger with source ids, source refs,
-   last-checked state, dedupe rules, mutation authority, branch or PR
-   expectations, and integration proof target.
+2. Identify the repository set, task sources, current goals, delivery topology
+   or `Source PRD` inheritance, issue-level scheduling constraints, suppressed
+   items, owner constraints, and portfolio-specific gate overrides. Register
+   task sources in the ledger with source ids, source refs, last-checked state,
+   dedupe rules, mutation authority, branch or PR expectations, closeout target,
+   and integration proof target.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
    use focused current-repo companions such as `$github-triage`,
@@ -228,8 +238,8 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 5. Before delegation, read `references/worker.md` and create one Codex worker
    per independent ownership boundary, such as repository, package, service,
    path set, or tightly scoped workstream, using the selected worker surface
-   and the recorded delivery topology. Use visible Codex App threads in
-   App-oriented workflows only when explicit owner intent for
+   and the recorded or inherited delivery topology. Use visible Codex App
+   threads in App-oriented workflows only when explicit owner intent for
    visible/new/separate/background workers is present; otherwise use
    CLI/subagent workers when authorized and inspectable, or stay in the root
    thread.

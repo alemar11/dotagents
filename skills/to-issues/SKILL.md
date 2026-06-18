@@ -33,9 +33,10 @@ returned or published.
 - Use the authoritative feature slug in this order: explicit slug from a
   composing skill, PRD file path directory, configured tracker path, then PRD
   title-derived slug as a fallback only.
-- Inherit delivery topology from the PRD. Use human-readable labels:
-  `One Feature Branch`, `One PR Per Repo`, `One PR Per Issue`, or
-  `Direct Commit`.
+- Inherit delivery topology from the PRD. The PRD is the canonical place for
+  full branch and PR strategy; generated issues should link it with
+  `Source PRD` and record only issue-level scheduling constraints, closeout,
+  and explicit topology overrides.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
 
@@ -110,8 +111,8 @@ Each issue should:
 - include enough context to be implemented without rereading the whole PRD,
 - include product/workspace/context scope for monorepo work, or affected repos
   and integration gates for orchestrator work,
-- include the inherited delivery topology, parallelization status, integration
-  mode, and expected closeout path,
+- include a durable `Source PRD` pointer plus issue-level parallelization,
+  dependencies, closeout, and any topology or integration override,
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
@@ -214,16 +215,31 @@ Repo PR links may be placeholders before implementation when the issue is
 otherwise agent-ready, but completion must require replacing them with real PR
 links or recording equivalent integration proof.
 
-Every published or returned issue must include a `## Delivery` section:
+Every published or returned issue must preserve cross-session scheduling
+metadata without duplicating the full PRD delivery topology:
 
-- `Topology`: copy the PRD topology exactly.
-- `Parallelization`: `independent`, `depends on <issue>`, `blocks <issue>`, or
-  `root-integrated`.
-- `Integration mode`: `shared feature branch`, `repo PR`, `issue PR`, or
-  `direct commit` with the explicit authorization reason.
-- `Closeout path`: `feature PR closes issue`, `repo PR closes issue`,
-  `issue PR closes issue`, `direct commit closes issue`, or
-  `local done move after proof`.
+- `Source PRD`: required. Prefer a stable GitHub issue number or local PRD path.
+- `Parallelization`: required. Use `independent`, `depends on <issue>`,
+  `blocks <issue>`, or `root-integrated`.
+- `Closeout`: required. State the concrete completion path, such as `feature PR
+  closes issue`, `repo PR closes issue`, `issue PR closes issue`, `direct commit
+  closes issue`, or `local done move after proof`.
+- `Topology override`: optional. Include only when this issue intentionally
+  differs from the PRD topology, such as `One PR Per Issue` or `Direct Commit`
+  with an authorization reason.
+- `Integration mode`: optional for ordinary issues that inherit from the PRD.
+  Include it when the issue is cross-repo, exceptional, or otherwise not obvious
+  from the PRD topology.
+
+For ordinary single-repo or monorepo `One Feature Branch` issues, the
+`## Delivery` section can be as small as:
+
+```markdown
+## Delivery
+
+- Parallelization: independent
+- Closeout: feature PR closes issue
+```
 
 Every published or returned issue must also say what happens when the work is
 complete:
@@ -235,10 +251,10 @@ complete:
   closes the repo-local issue, while coordination issues close only after repo
   PR links or equivalent integration proof are recorded; for `One PR Per
   Issue`, the issue PR closes the issue. Use final-commit closure only when the
-  issue's `## Delivery` section records `Direct Commit` or another explicit
-  maintainer authorization for final-commit closeout. Do not close the parent
-  PRD issue from an implementation issue unless the maintainer explicitly says
-  the whole PRD is complete.
+  Source PRD or this issue's `## Delivery` section records `Direct Commit` or
+  another explicit maintainer authorization for final-commit closeout. Do not
+  close the parent PRD issue from an implementation issue unless the maintainer
+  explicitly says the whole PRD is complete.
 - Local markdown: when all acceptance criteria pass and validation is complete,
   create `issues/done/` on demand if needed, then move the issue file to the
   configured `issues/done/<NN>-<slug>.md` path. For orchestrator workspace
@@ -300,7 +316,8 @@ Summarize:
 
 ## Issue Body Shape
 
-Use this shape unless the tracker has a stronger local template:
+Use this shape unless the tracker has a stronger local template. Delete optional
+delivery lines when they do not apply.
 
 ```markdown
 # <feature-slug>: <NN> <vertical outcome>
@@ -317,10 +334,14 @@ single-repo issues, `current repository`; for orchestrator issues, use
 
 ## Delivery
 
-- Topology: [One Feature Branch | One PR Per Repo | One PR Per Issue | Direct Commit]
-- Parallelization: [independent | depends on <issue> | blocks <issue> | root-integrated]
-- Integration mode: [shared feature branch | repo PR | issue PR | direct commit with authorization reason]
-- Closeout path: [feature PR closes issue | repo PR closes issue | issue PR closes issue | direct commit closes issue | local done move after proof]
+- Parallelization: [independent | depends on <issue> | blocks <issue> |
+  root-integrated]
+- Closeout: [feature PR closes issue | repo PR closes issue | issue PR closes
+  issue | direct commit closes issue | local done move after proof]
+- Topology override: [omit when inherited from Source PRD; otherwise One PR
+  Per Issue | Direct Commit with authorization reason]
+- Integration mode: [omit when obvious from Source PRD; otherwise shared
+  feature branch | repo PR | issue PR | direct commit with authorization reason]
 
 ## Goal
 
@@ -373,11 +394,11 @@ When all acceptance criteria pass and validation is complete:
 
 - GitHub: close this implementation issue from the relevant PR body with
   `Closes #<this-issue-number>`, following the closeout path in `## Delivery`.
-  Final-commit closure is allowed only when `## Delivery` records `Direct
-  Commit` or another explicit maintainer authorization. Do not close the parent
-  PRD issue unless the maintainer explicitly says the whole PRD is complete.
-  The closing keyword takes effect when the PR or authorized commit reaches the
-  default branch.
+  Final-commit closure is allowed only when the Source PRD or `## Delivery`
+  records `Direct Commit` or another explicit maintainer authorization. Do not
+  close the parent PRD issue unless the maintainer explicitly says the whole PRD
+  is complete. The closing keyword takes effect when the PR or authorized commit
+  reaches the default branch.
 - Local markdown: move this file to
   the configured `issues/done/<NN>-<slug>.md` path, creating `issues/done/` on
   demand if needed. For orchestrator workspace issues, move it only after

@@ -92,10 +92,12 @@ Exceptions:
   issue work.
 - **Direct Commit** only with explicit owner authorization.
 
-Each implementation workstream records the topology, branch expectation,
-integration mode, expected PR shape, and integration proof target. Workers may
-not choose a different branch or PR strategy without a root-owned ledger update
-and authorization check.
+Each implementation workstream records either the explicit topology or the
+`Source PRD` it inherits from, plus issue-level parallelization, dependencies,
+closeout target, branch or PR expectation, and integration proof target. Record
+integration mode only when it is not obvious from the inherited topology or when
+the issue declares an override. Workers may not choose a different branch or PR
+strategy without a root-owned ledger update and authorization check.
 
 ## Gate Policy
 
@@ -127,7 +129,7 @@ Gate matrix:
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <topology; branch; integration mode; PR shape> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD or topology; parallelization; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 

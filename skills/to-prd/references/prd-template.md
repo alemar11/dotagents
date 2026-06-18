@@ -58,6 +58,8 @@ What user or system problem this solves.
   PR per issue by exception, or no PR only for an authorized direct commit.
 - Integration proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
+- Issue inheritance: generated issues may link this PRD with `Source PRD` and
+  carry only issue-level parallelization, closeout, dependencies, and overrides.
 
 ## Cross-Repo Contracts
 

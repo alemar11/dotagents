@@ -169,8 +169,11 @@ commands or write to the effective local target instead of mutating GitHub.
 
 In orchestrator workspace mode, require generated issues to include affected
 repos, cross-repo contracts, integration gates, repo PR links or placeholders,
-and completion instructions that require cross-repo integration proof before
-closing or moving to `issues/done/`.
+issue-level scheduling and closeout metadata, and completion instructions that
+require cross-repo integration proof before closing or moving to `issues/done/`.
+Do not require every issue to restate the full PRD delivery topology when a
+durable `Source PRD` pointer is present; use explicit issue-level topology
+overrides only for exceptions.
 
 If `$to-issues` discovers a product, domain, dependency, or acceptance-criteria
 blocker, pause issue writing and route the blocker back through

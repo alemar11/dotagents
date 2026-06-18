@@ -168,6 +168,11 @@ cross-repo proof needed before coordination issues close. Use `One PR Per
 Issue` or `Direct Commit` only when explicitly authorized and record the
 authorization reason.
 
+Treat the PRD as the canonical source for full delivery topology. Generated
+issues may inherit this section through their `Source PRD` pointer and should
+only restate topology details when an individual issue needs an explicit
+override or cross-repo closeout rule.
+
 For GitHub coordination PRDs, treat the project label as required issue
 metadata. It is separate from the mapped issue type and workflow-state labels.
 
