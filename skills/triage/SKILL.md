@@ -100,8 +100,8 @@ For GitHub, use `gh issue list` and `gh issue view`. Request JSON fields when
 useful, but if the installed `gh` version rejects the `type` field, rerun
 without it and use the configured fallback from `triage-labels.md`.
 
-For local markdown, use the configured `.scratch/` layout and
-`references/local-markdown.md`.
+For local markdown, use the configured local issue layout from
+`project-memory/agents/issue-tracker.md` and `references/local-markdown.md`.
 
 ### 3. Gather evidence
 
@@ -182,6 +182,9 @@ For local markdown:
 - Insert or update the `Status:` line.
 - Append triage notes, questions, decisions, or the agent brief under the
   headings in `references/local-markdown.md`.
+- Preserve orchestrator workspace fields such as affected repos, integration
+  gates, and repo PR links when the issue lives under
+  `projects/<project>/features/<feature>/issues/`.
 
 ### 7. Report result
 

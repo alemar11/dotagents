@@ -13,7 +13,8 @@ Run the full feature-planning pipeline from one invocation:
 `$to-issues`.
 
 Use this skill to turn a rough feature idea into a written PRD and
-agent-ready vertical issues. Do not implement the feature.
+agent-ready vertical issues. In orchestrator workspaces, those issues may be
+cross-repo vertical outcomes. Do not implement the feature.
 
 ## Hard Requirements
 
@@ -37,7 +38,8 @@ Inspect the repo for:
 
 If any of these files are missing, load and run `$setup-project-memory` first.
 Use the user's current feature-planning goal as context, but keep setup focused
-on repo-level routing and memory.
+on routing and memory. In orchestrator workspace mode, setup is config-only and
+must not create project or feature folders.
 
 ### 2. Grill the feature with context
 
@@ -66,10 +68,13 @@ feature-planning gates remain.
 ```
 
 Ask `$to-prd` to use the configured target from
-`project-memory/agents/issue-tracker.md`. If `$to-prd` discovers a new blocker,
-route the blocker back through `$grill-me-with-context` using the same one-question
-loop, then continue only after the blocker is resolved or explicitly deferred
-as non-blocking.
+`project-memory/agents/issue-tracker.md`. If the configured target is a local
+orchestrator workspace, pass the accepted `<project-slug>` and
+`<feature-slug>` and allow `$to-prd` to create the feature directory only when
+writing the PRD. If `$to-prd` discovers a new blocker, route the blocker back
+through `$grill-me-with-context` using the same one-question loop, then
+continue only after the blocker is resolved or explicitly deferred as
+non-blocking.
 
 ### 4. Split and write issues
 
@@ -84,8 +89,13 @@ issue-splitting gates remain.
 
 Require `$to-issues` to use the configured issue target, apply configured issue
 types and triage labels, attach GitHub implementation issues to the PRD issue
-when GitHub is configured, use the configured GitHub title formats, and confirm
-that `$plan-harder` ran once per generated issue.
+when GitHub or GitHub coordination mode is configured, use the configured title
+formats, and confirm that `$plan-harder` ran once per generated issue.
+
+In orchestrator workspace mode, require generated issues to include affected
+repos, cross-repo contracts, integration gates, repo PR links or placeholders,
+and completion instructions that require cross-repo integration proof before
+closing or moving to `issues/done/`.
 
 If `$to-issues` discovers a product, domain, dependency, or acceptance-criteria
 blocker, pause issue writing and route the blocker back through
@@ -102,6 +112,7 @@ Summarize:
 - PRD location,
 - number of issues written or published,
 - GitHub PRD parent/sub-issue relationship, when applicable,
+- orchestrator project/feature path and affected repos, when applicable,
 - issue types and labels/statuses applied,
 - completion instructions included,
 - gates resolved or deferred,

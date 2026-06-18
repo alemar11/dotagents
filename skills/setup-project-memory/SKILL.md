@@ -1,13 +1,13 @@
 ---
 name: setup-project-memory
-description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent local session history, or updating AGENTS.md pointers, issue-tracker instructions, triage type and label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-me-with-context, or architecture-improvement skills.
+description: Configure or refresh project-memory for code repos, monorepos, and orchestrator workspaces. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent local session history, or configuring AGENTS.md pointers, issue-tracker instructions, triage mappings, CONTEXT.md, and ADR layout before planning, PRD, issue-splitting, triage, grill-me-with-context, or architecture-improvement skills.
 ---
 
 # Setup Project Memory
 
 ## Goal
 
-Configure the repo-level project memory that other skills can rely on:
+Configure the project memory that other skills can rely on:
 
 - `AGENTS.md` as the only agent-instruction file this skill writes.
 - `project-memory/agents/issue-tracker.md` for where PRDs and issues live.
@@ -18,8 +18,9 @@ Configure the repo-level project memory that other skills can rely on:
 - `CONTEXT.md` and `project-memory/adr/` as optional seeded domain memory when
   an existing project has strong repo or session evidence.
 
-This is a setup skill. Run it once per repo before using workflows that publish
-PRDs, split issues, triage incoming work, or update repo-backed domain memory.
+This is a setup skill. Run it once per code repo, monorepo, or orchestrator
+workspace before using workflows that publish PRDs, split issues, triage
+incoming work, or update project-backed domain memory.
 Re-run it when the issue tracker, issue-type vocabulary, triage vocabulary, or
 domain-memory layout
 changes, or when an already-used project needs its existing knowledge migrated
@@ -38,23 +39,35 @@ into the project-memory structure.
   doctrine, or weak inferences from session text.
 - Do not create empty `project-memory/adr/` directories just to show intent.
   Create only files with useful content.
+- In orchestrator workspace mode, keep setup config-only: do not create
+  `projects/<project>/`, feature PRDs, or issue files during setup.
+- Do not treat an orchestrator workspace as a monorepo. It coordinates
+  external repos; those repos keep their own project memory, validation,
+  branches, commits, and PRs.
 - Ask for confirmation before writing files.
 
 ## Workflow
 
 ### 1. Choose setup mode
 
-Use one of two modes:
+Use one of three modes:
 
 - **Fresh setup**: the repo has little or no prior project-memory structure and
   the goal is to configure `AGENTS.md` plus `project-memory/agents/*`.
 - **Existing-project bootstrap**: the repo already has code, docs, issues,
   prior agent sessions, or partial project-memory files, and the goal is to
   infer the setup plus seed `CONTEXT.md` and ADRs from strong evidence.
+- **Orchestrator workspace**: the current folder is a parent coordination
+  workspace used to plan and run Codex across multiple independent repos. It
+  owns cross-repo PRDs, vertical feature issues, repo pointer sheets, and
+  integration gates, but not product code.
 
 Default to existing-project bootstrap when the repo has meaningful existing
 code/docs or prior project-memory files. Default to fresh setup for empty or
-new repos.
+new repos. Recommend orchestrator workspace when the folder has no clear
+single codebase but contains or is intended to contain `projects/`, repo
+pointer docs, symlinks/worktrees to external repos, or cross-repo planning
+artifacts.
 
 ### 2. Inspect the repo
 
@@ -66,6 +79,8 @@ Read the current state without assuming a layout:
 - `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`.
 - `.scratch/` as a signal that local markdown issue tracking may already be in
   use.
+- `projects/` as a signal that orchestrator workspace planning may already be
+  in use.
 - Existing issue templates or tracker docs when present.
 - README, project docs, package manifests, source directories, tests, and
   local architecture notes that define repo vocabulary or accepted behavior.
@@ -90,13 +105,21 @@ accept a short answer such as `default`.
 
 Choose where PRDs and implementation issues live:
 
-- **GitHub**: use GitHub Issues through `gh`.
-- **Local markdown**: use `.scratch/<feature-slug>/PRD.md` and
+- **GitHub**: for code repos, use GitHub Issues through `gh`.
+- **Local markdown**: for code repos, use `.scratch/<feature-slug>/PRD.md` and
   `.scratch/<feature-slug>/issues/*.md`.
+- **Local orchestrator**: for orchestrator workspaces, use
+  `projects/<project-slug>/features/<feature-slug>/PRD.md` and
+  `projects/<project-slug>/features/<feature-slug>/issues/*.md`.
+- **GitHub coordination repo**: for orchestrator workspaces, publish PRD
+  parent issues and vertical feature issues in a configured coordination repo.
+  Repo-local implementation PRs are linked from those issues.
 - **Other**: ask for one paragraph describing the tracker workflow.
 
-Default to GitHub when the remote is GitHub, and local markdown when no clear
-GitHub issue tracker exists.
+Default to GitHub for code repos when the remote is GitHub, and local markdown
+when no clear GitHub issue tracker exists. For orchestrator workspaces, ask
+whether the default should be local orchestrator files or a GitHub coordination
+repo; record the chosen backend in `project-memory/agents/issue-tracker.md`.
 
 **Triage types and labels**
 
@@ -137,9 +160,14 @@ Choose:
 - **Single-context**: one root `CONTEXT.md` and root `project-memory/adr/`.
 - **Multi-context**: root `CONTEXT-MAP.md` points to context-specific
   `CONTEXT.md` files, with optional context-specific `project-memory/adr/`.
+- **Orchestrator context**: root `CONTEXT.md` defines coordination vocabulary
+  such as project, feature, repo pointer, vertical issue, integration gate, and
+  done. Feature-specific context lives in `projects/<project>/PROJECT.md` and
+  `projects/<project>/features/<feature>/PRD.md`, not in child repos.
 
 Default to single-context unless `CONTEXT-MAP.md` already exists or the repo is
-clearly a multi-domain monorepo.
+clearly a multi-domain monorepo. Use orchestrator context only for
+orchestrator workspace mode.
 
 For existing-project bootstrap, also confirm whether to seed domain memory from
 the evidence found. Recommend seeding only high-confidence items and presenting
@@ -160,12 +188,27 @@ Use these reference templates as starting points:
 
 - `references/issue-tracker-github.md`
 - `references/issue-tracker-local.md`
+- `references/issue-tracker-orchestrator-github.md`
+- `references/issue-tracker-orchestrator-local.md`
 - `references/triage-labels.md`
 - `references/domain.md`
 - `references/session-history.md`
 
 For an "other" issue tracker, write `issue-tracker.md` from the user's
 description instead of forcing a hosted-tracker template.
+
+For orchestrator workspace mode:
+
+- Record whether the workspace uses local orchestrator files or a GitHub
+  coordination repo.
+- Draft tracker instructions that say where project folders, feature PRDs,
+  vertical issues, repo pointer sheets, and integration gates live.
+- State that setup does not create project or feature folders. `$plan-feature`,
+  `$to-prd`, and `$to-issues` create them only when writing an actual feature.
+- State that child repos retain their own `AGENTS.md`, `CONTEXT.md`,
+  `project-memory`, validation commands, branches, commits, and PRs.
+- State that `codex-orchestrator` owns runtime worker state and ledgers; the
+  orchestrator workspace owns durable planning artifacts.
 
 For existing-project bootstrap:
 
@@ -188,6 +231,9 @@ After confirmation:
   `## Agent skills` block in place.
 - In existing-project bootstrap mode, create or update root `CONTEXT.md` and
   useful ADR files under `project-memory/adr/` using `$domain-modeling`.
+- In orchestrator workspace mode, create or update root `CONTEXT.md` only when
+  useful coordination vocabulary is accepted or strongly evidenced. Do not
+  create `projects/<project>/` or feature folders during setup.
 - Preserve unrelated `AGENTS.md` content.
 - Preserve unrelated `CONTEXT.md`, ADR, and project doc content.
 
@@ -209,6 +255,10 @@ Use this `AGENTS.md` block shape:
 [one-line summary of single-context or multi-context layout]. See `project-memory/agents/domain.md`.
 ```
 
+For orchestrator workspace mode, the `AGENTS.md` block should explicitly say
+that the workspace coordinates external repos and that each child repo keeps
+its own project memory and code ownership.
+
 ### 6. Report completion
 
 Summarize:
@@ -218,6 +268,8 @@ Summarize:
 - selected issue tracker,
 - issue-type and triage-state mapping,
 - domain-memory layout,
+- workspace mode and, for orchestrator workspaces, selected coordination
+  backend,
 - session-history window and whether it was used,
 - `CONTEXT.md` terms/rules/open questions seeded, if any,
 - ADRs created or updated, if any,

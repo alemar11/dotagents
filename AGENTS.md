@@ -60,8 +60,8 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `domain-modeling` as portable because it uses local repo evidence and project memory such as `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`, with no Codex-only runtime tools required.
 - Treat `grill-me-with-context` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-me-with-context` is the fallback path.
-- Treat `setup-project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/setup-project-memory/references/session-history.md`, while its core setup flow falls back to repo-only evidence plus `$domain-modeling`.
-- Treat `to-prd` as portable because it uses local repo evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
+- Treat `setup-project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/setup-project-memory/references/session-history.md`, while its core setup flow falls back to repo/workspace evidence plus `$domain-modeling`.
+- Treat `to-prd` as portable because it uses local repo or workspace evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
 - Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue and otherwise relies on local project memory plus configured issue-tracker instructions.
 - Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
 - Treat `triage` as portable and skill-composed because it relies on project-memory issue-tracker mappings, can load `$setup-project-memory` when setup is missing, uses `$grill-me-with-context` for underspecified repo-backed issue intent, and requires `$plan-harder` before marking an issue `ready-for-agent`.
@@ -116,12 +116,14 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Use `project-memory/` as the visible root for durable project memory owned by these runtime skills: `project-memory/agents/` for repo-specific agent operating config and `project-memory/adr/` for durable decision records. Keep `CONTEXT.md` and optional `CONTEXT-MAP.md` at the project root for fast discovery.
 
 ### Setup Project Memory skill
-- Keep `setup-project-memory` as the reusable setup surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, and `project-memory/agents/domain.md`.
+- Keep `setup-project-memory` as the reusable setup surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, and `project-memory/agents/domain.md` in code repos, monorepos, and orchestrator workspaces.
 - `setup-project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
-- Keep `setup-project-memory` issue-tracker setup GitHub/local/custom only; do not add additional hosted-tracker-specific templates to the project-memory flow.
+- Keep `setup-project-memory` issue-tracker setup limited to GitHub, local markdown, orchestrator-local, GitHub-coordination, or custom only; do not add additional hosted-tracker-specific templates to the project-memory flow.
 - Keep `project-memory/agents/triage-labels.md` responsible for both issue type/category mapping (`bug`, `feature`, `task`) and workflow state mapping (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).
 - For already-used projects, `setup-project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo session history, using `$domain-modeling` for the context and ADR shape.
 - Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
+- In orchestrator workspace mode, keep setup config-only: configure `AGENTS.md`, `project-memory/agents/*`, root `CONTEXT.md`, and ADR layout, but do not create `projects/<project>/` or `features/<feature>/` folders until `$plan-feature`, `$to-prd`, or `$to-issues` writes a real feature.
+- Orchestrator workspace memory coordinates cross-repo planning only; child repos keep their own `AGENTS.md`, `CONTEXT.md`, `project-memory`, validation, branches, commits, and PRs.
 
 ### PRD and issue-splitting skills
 - Keep `plan-feature` as the thin wrapper over `setup-project-memory`, `grill-me-with-context`, `to-prd`, and `to-issues`; do not let it duplicate grilling, PRD drafting, vertical slicing, or issue-hardening logic.
@@ -131,7 +133,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - In GitHub issue-tracker mode, keep the PRD issue as the parent issue and attach generated implementation issues as sub-issues while preserving `Source PRD: #<number>` in each child issue body.
 - In GitHub issue-tracker mode, title PRD issues as `PRD: <Feature Name>` and implementation issues as `<feature-slug>: <NN> <vertical outcome>`.
 - In GitHub issue-tracker mode, PRD issues use the mapped `feature` issue type and generated implementation sub-issues use the mapped `task` issue type when GitHub issue types are available.
-- Generated implementation issues must include a `## Completion` section: GitHub issues close through a closing keyword on the implementation PR or final commit, while local markdown issues are moved into `.scratch/<feature-slug>/issues/done/` after validation rather than being deleted or marked with a `done` status.
+- Generated implementation issues must include a `## Completion` section: GitHub issues close through a closing keyword on the implementation PR or final commit, while local markdown issues are moved into the configured `issues/done/` folder after validation rather than being deleted or marked with a `done` status. In orchestrator workspace mode, moving to `done` requires cross-repo integration proof.
 - `to-issues` owns any issue tracker or local markdown writes it performs; `$plan-harder` remains chat-output-only and must not write plan files or issue files.
 - Both skills should read `project-memory/agents/issue-tracker.md` and related project memory before deciding where PRDs or issues belong.
 

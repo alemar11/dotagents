@@ -49,6 +49,33 @@ Multi-context repo:
             └── adr/          # mobile-specific decisions
 ```
 
+Orchestrator workspace:
+
+```text
+/
+├── CONTEXT.md                 # coordination vocabulary
+├── project-memory/
+│   └── adr/                   # durable coordination decisions
+└── projects/
+    └── customer-growth/
+        ├── PROJECT.md         # initiative-level overview and constraints
+        ├── repos/
+        │   ├── backend.md     # pointer sheet, not repo memory
+        │   └── mobile.md
+        └── features/
+            └── team-invitations/
+                ├── PRD.md
+                ├── integration-gates.md
+                └── issues/
+                    ├── 01-accept-invitation.md
+                    └── done/
+```
+
+In orchestrator workspace mode, root `CONTEXT.md` should define coordination
+terms such as project, feature, vertical issue, repo pointer, integration gate,
+and done. Child repos keep their own `AGENTS.md`, `CONTEXT.md`,
+`project-memory/`, validation, branches, commits, and PRs.
+
 ## Use the glossary vocabulary
 
 When output names a domain concept in a PRD, issue title, refactor proposal,
@@ -62,6 +89,12 @@ or note it as a candidate for the domain-modeling workflow.
 
 If output contradicts an existing ADR, surface the conflict explicitly rather
 than silently overriding it.
+
+## Orchestrator boundaries
+
+Orchestrator workspace memory coordinates work across repos. It should not copy
+or replace child repo memory. Use `projects/<project>/repos/*.md` as pointer
+sheets for repo path, role, tracker, validation, and linked work only.
 
 ## Existing-project bootstrap
 

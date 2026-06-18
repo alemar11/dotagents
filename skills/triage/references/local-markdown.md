@@ -1,7 +1,9 @@
 # Local Markdown Issues
 
 Use this format when `project-memory/agents/issue-tracker.md` says issues live
-under `.scratch/`.
+as local markdown. Local issue roots may be repo-local `.scratch/<feature>/`
+folders or orchestrator workspace
+`projects/<project>/features/<feature>/` folders.
 
 ## Header Fields
 
@@ -22,6 +24,10 @@ arrives, re-triage the issue before marking it `ready-for-agent`.
 Completion is represented by moving the file into `issues/done/`, not by
 adding a `done` status.
 
+For orchestrator workspace issues, preserve additional fields such as
+`Affected Repos:` and sections such as `## Cross-Repo Notes` or
+`## Integration Gates`.
+
 ## Update Rules
 
 - Preserve existing body content unless the user asks for a rewrite.
@@ -33,7 +39,9 @@ adding a `done` status.
 - If a heading does not exist, append it at the end of the file.
 - Keep comments and triage notes summarized; do not paste raw session logs.
 - Do not delete completed local issue files. Move them to the configured
-  `issues/done/` folder after implementation and validation are complete.
+  `issues/done/` folder after implementation and validation are complete. For
+  orchestrator workspace issues, move only after cross-repo integration proof
+  is recorded.
 
 ## Standard Sections
 

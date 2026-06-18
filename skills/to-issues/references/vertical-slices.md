@@ -9,6 +9,8 @@ not practical and the exception rules below are satisfied.
 A vertical issue delivers one independently verifiable product or system
 outcome. It may touch UI, API, storage, tests, docs, jobs, migrations, and
 configuration in one issue when those changes belong to the same outcome.
+In an orchestrator workspace, one vertical issue may span multiple independent
+repos when the outcome is cross-repo by nature.
 
 A good vertical issue:
 
@@ -28,6 +30,8 @@ types:
 - one state transition becomes possible,
 - one permission or policy rule is enforced,
 - one integration path works end to end,
+- one cross-repo contract is introduced and consumed by at least one affected
+  repo,
 - one validation or failure mode is handled,
 - one migration or compatibility step becomes verifiable,
 - one observable system behavior changes.
@@ -104,6 +108,8 @@ Mark an issue `ready-for-agent` only when it has:
 - a clear vertical outcome,
 - non-goals,
 - direct dependencies,
+- affected repos and integration gates when the issue is an orchestrator
+  workspace issue,
 - acceptance criteria,
 - validation steps,
 - an embedded `$plan-harder` implementation brief,

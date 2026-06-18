@@ -1,5 +1,5 @@
 interface:
   display_name: "To PRD"
-  short_description: "Turn clarified feature intent into a repo-backed PRD."
+  short_description: "Turn clarified feature intent into a project-backed PRD."
   brand_color: "#B45309"
-  default_prompt: "Use $to-prd to inspect project memory and repo evidence, turn the clarified feature or product intent into a PRD, and publish it only after confirmation using the configured issue tracker or local .scratch/ PRD path."
+  default_prompt: "Use $to-prd to inspect project memory and repo evidence, turn the clarified feature or product intent into a PRD, and publish it only after confirmation using the configured issue tracker, including repo-local or orchestrator workspace paths."

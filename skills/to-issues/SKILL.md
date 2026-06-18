@@ -46,6 +46,8 @@ Find or ask for the PRD source:
 
 - `.scratch/<feature-slug>/PRD.md`,
 - a GitHub PRD issue,
+- `projects/<project-slug>/features/<feature-slug>/PRD.md`,
+- a GitHub coordination-repo PRD issue,
 - pasted PRD text,
 - another project document that clearly acts as the PRD.
 
@@ -55,6 +57,9 @@ Also inspect:
 - `project-memory/agents/triage-labels.md`,
 - `CONTEXT.md` or `CONTEXT-MAP.md`,
 - `project-memory/adr/`,
+- orchestrator workspace docs such as `projects/<project>/PROJECT.md`,
+  `projects/<project>/repos/*.md`, and feature `integration-gates.md` when
+  the tracker config uses orchestrator mode,
 - nearby source files, tests, and docs relevant to the PRD.
 
 If there is no PRD-quality source, stop and ask the user to provide one or run
@@ -113,23 +118,37 @@ and triage states to the repo's tracker values.
 
 Use `project-memory/agents/issue-tracker.md` for the target:
 
-- GitHub: create issues with `gh issue create --parent <prd-number>` when the
-  PRD source is a GitHub issue, set the mapped `task` issue type when
-  available, then apply mapped labels.
-- Local markdown: write
-  `.scratch/<feature-slug>/issues/<NN>-<slug>.md` with `Type:` and `Status:`
-  lines near the top.
+- `Tracker mode: github`: create issues with
+  `gh issue create --parent <prd-number>` when the PRD source is a GitHub
+  issue, set the mapped `task` issue type when available, then apply mapped
+  labels.
+- `Tracker mode: orchestrator-github`: create vertical feature issues in the
+  configured coordination repo with
+  `gh issue create --repo <owner>/<repo> --parent <prd-number>`. Repo-local
+  implementation PRs or child issues are linked from the coordination issue;
+  repo-local child issues are optional in v1.
+- `Tracker mode: local-markdown`: write to the configured repo-local issue
+  path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
+  and `Status:` lines near the top.
+- `Tracker mode: orchestrator-local`: write to
+  `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
+  with `Type:` and `Status:` lines near the top. Create the project/feature
+  directories only when writing the actual feature artifacts, not during setup.
 - Other tracker: follow the repo-specific instructions.
 
-For GitHub PRDs, every implementation issue must be attached to the PRD issue
-as a sub-issue. If an implementation issue is created before the parent
-relationship is set, attach it afterward with
-`gh issue edit <prd-number> --add-sub-issue <issue-number>`. Keep
+For GitHub PRDs and GitHub coordination PRDs, every generated implementation or
+vertical feature issue must be attached to the PRD issue as a sub-issue. If an
+issue is created before the parent relationship is set, attach it afterward
+with `gh issue edit <prd-number> --add-sub-issue <issue-number-or-url>`. Keep
 `Source PRD: #<prd-number>` in the issue body as well.
 
 When GitHub issue types are available, create or update each implementation
 issue with the mapped `task` type, usually `Task`. If issue types are disabled
 or unsupported, publish without a type and keep the mapped state labels.
+
+For orchestrator workspace issues, include affected repos, cross-repo contract
+notes, integration gates, repo-local PR or implementation issue links, and the
+proof required before the issue can move to `done` or close.
 
 Every published or returned issue must also say what happens when the work is
 complete:
@@ -141,9 +160,9 @@ complete:
   close the parent PRD issue from an implementation issue unless the maintainer
   explicitly says the whole PRD is complete.
 - Local markdown: when all acceptance criteria pass and validation is complete,
-  move the issue file from `.scratch/<feature-slug>/issues/<NN>-<slug>.md` to
-  `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`. Do not delete the file
-  and do not add a `done` status.
+  move the issue file to the configured `issues/done/<NN>-<slug>.md` path. For
+  orchestrator workspace issues, do this only after cross-repo integration
+  proof is recorded. Do not delete the file and do not add a `done` status.
 
 Use this GitHub implementation issue title format:
 
@@ -194,6 +213,8 @@ Type: [mapped issue type, usually task]
 Status: [mapped triage state]
 Source PRD: [path, issue number, or title]
 
+Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
+
 ## Goal
 
 [One vertical outcome.]
@@ -205,6 +226,12 @@ Source PRD: [path, issue number, or title]
 ## Context
 
 [Relevant PRD and repo context.]
+
+## Cross-Repo Notes
+
+[For orchestrator issues only: affected repos, interface contracts,
+integration gates, repo PR links, and validation order. Use `N/A` for ordinary
+single-repo issues.]
 
 ## Requirements
 
@@ -237,8 +264,9 @@ When implementation and validation are complete:
   complete. The closing keyword takes effect when the PR or commit reaches the
   default branch.
 - Local markdown: move this file to
-  `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`. Do not delete the file
-  and do not add a `done` status.
+  the configured `issues/done/<NN>-<slug>.md` path. For orchestrator workspace
+  issues, move it only after cross-repo integration proof is recorded. Do not
+  delete the file and do not add a `done` status.
 
 ## Dependencies
 

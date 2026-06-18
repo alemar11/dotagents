@@ -3,6 +3,11 @@
 PRDs and implementation issues for this repo live as markdown files under
 `.scratch/`.
 
+Tracker mode: `local-markdown`
+Local PRD path pattern: `.scratch/<feature-slug>/PRD.md`
+Local issue path pattern: `.scratch/<feature-slug>/issues/<NN>-<slug>.md`
+Done issue path pattern: `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
+
 ## Conventions
 
 - One feature per directory: `.scratch/<feature-slug>/`

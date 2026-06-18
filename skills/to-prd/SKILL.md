@@ -1,14 +1,14 @@
 ---
 name: to-prd
-description: Convert clarified product or feature intent into a repo-backed PRD. Use when the user asks for a PRD, wants to turn a grilled conversation into a product requirements document, or needs a PRD artifact before splitting work into implementation issues.
+description: Convert clarified product or feature intent into a project-backed PRD. Use when the user asks for a PRD, wants to turn a grilled conversation into a product requirements document, or needs a PRD artifact before splitting work into implementation issues.
 ---
 
 # To PRD
 
 ## Goal
 
-Turn clarified feature, product, migration, or workflow intent into a practical
-PRD that can feed `$to-issues`.
+Turn clarified feature, product, migration, cross-repo project, or workflow
+intent into a practical PRD that can feed `$to-issues`.
 
 Use this after requirements have been sharpened by conversation or
 `$grill-me-with-context`. If the request is still too vague to produce a useful PRD,
@@ -36,6 +36,9 @@ Inspect the current project context before drafting:
 - `project-memory/agents/domain.md`
 - `CONTEXT.md` or `CONTEXT-MAP.md`
 - `project-memory/adr/`
+- orchestrator workspace docs such as `projects/<project>/PROJECT.md` and
+  `projects/<project>/repos/*.md`, when the tracker config uses orchestrator
+  mode
 - README, product docs, issue templates, and relevant source/tests
 
 If setup files are missing, continue with repo evidence and say which project
@@ -73,16 +76,28 @@ Keep the PRD implementation-facing:
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 
-- GitHub: publish only after confirmation, using `gh`, the title format
-  `PRD: <Feature Name>`, and the mapped `feature` issue type when available.
-- Local markdown: write to `.scratch/<feature-slug>/PRD.md` only after
-  confirmation.
+- `Tracker mode: github`: publish only after confirmation, using `gh`, the
+  title format `PRD: <Feature Name>`, and the mapped `feature` issue type when
+  available.
+- `Tracker mode: local-markdown`: write to the configured repo-local PRD path,
+  normally `.scratch/<feature-slug>/PRD.md`, only after confirmation.
+- `Tracker mode: orchestrator-local`: write to the configured orchestrator
+  feature PRD path,
+  `projects/<project-slug>/features/<feature-slug>/PRD.md`, only after
+  confirmation. Derive or ask for `<project-slug>` before writing.
+- `Tracker mode: orchestrator-github`: publish the PRD parent issue in the
+  configured coordination repo using `gh --repo <owner>/<repo>`. The PRD issue
+  is the parent for vertical feature issues.
 - Other tracker: follow the repo-specific instructions in
   `project-memory/agents/issue-tracker.md`.
 
-For GitHub PRDs, derive `<Feature Name>` from the accepted product name or
-short feature phrase in title case. Do not include issue numbers, status labels,
-or implementation slice names in the PRD title.
+For GitHub and GitHub coordination PRDs, derive `<Feature Name>` from the
+accepted product name or short feature phrase in title case. Do not include
+issue numbers, status labels, or implementation slice names in the PRD title.
+
+For orchestrator workspace PRDs, include repository scope, cross-repo
+contracts, integration gates, and release or validation order when those affect
+issue splitting.
 
 Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
 When GitHub issue types are available, create or update the PRD issue with that

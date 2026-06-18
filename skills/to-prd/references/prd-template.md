@@ -35,6 +35,17 @@ What user or system problem this solves.
 - Functional requirement.
 - Behavior, data, permission, API, or integration requirement when relevant.
 
+## Repository Scope
+
+- For orchestrator workspace PRDs only: affected repos, each repo's role, and
+  any repo-local implementation notes. Use `N/A` for ordinary single-repo PRDs.
+
+## Cross-Repo Contracts
+
+- For orchestrator workspace PRDs only: API shape, schema, version, migration,
+  fixture, deploy, or compatibility contracts that issue splitting must
+  preserve. Use `N/A` for ordinary single-repo PRDs.
+
 ## Acceptance Criteria
 
 - [ ] Specific, testable product or system outcome.
@@ -51,4 +62,9 @@ What user or system problem this solves.
 
 - Suggested vertical slices, sequencing constraints, or dependencies for
   `$to-issues`.
+
+## Integration Gates
+
+- For orchestrator workspace PRDs only: proof required before a vertical issue
+  can move to `issues/done/` or close in the coordination tracker.
 ```

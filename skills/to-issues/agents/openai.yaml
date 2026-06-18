@@ -2,4 +2,4 @@ interface:
   display_name: "To Issues"
   short_description: "Split PRDs into vertical issues hardened by Plan Harder."
   brand_color: "#2DD4BF"
-  default_prompt: "Use $to-issues to read the PRD and project-memory issue tracker rules, split the PRD into vertical implementation issues, run $plan-harder once for every issue, embed each hardened brief, and publish only after confirmation."
+  default_prompt: "Use $to-issues to read the PRD and project-memory issue tracker rules, split the PRD into vertical implementation issues or orchestrator feature issues, run $plan-harder once for every issue, embed each hardened brief, and publish only after confirmation."

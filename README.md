@@ -47,11 +47,11 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `plan-feature` | Plan a feature from grilling to PRD to agent-ready issues. |
+| `plan-feature` | Plan a feature from grilling to PRD to configured agent-ready issues. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
-| `setup-project-memory` | Configure project memory and bootstrap context from existing repo or session evidence. |
-| `to-prd` | Turn clarified feature intent into a repo-backed PRD. |
+| `setup-project-memory` | Configure project memory for repos, monorepos, and orchestrator workspaces. |
+| `to-prd` | Turn clarified feature intent into a project-backed PRD. |
 | `to-issues` | Split PRDs into vertical issues hardened by `plan-harder`. |
 | `codex-orchestrator` | Coordinate workers with root-owned lifecycle, standalone Git/GitHub companion skills, gates, ledgers, and closure follow-ups. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
@@ -77,8 +77,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, CI, review, release, commit, or publish work: `$github-triage`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
 - `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop and update project context docs or ADRs inline.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `plan-feature` requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` so it can run the feature-planning wrapper flow from setup through PRD and agent-ready issues.
-- `setup-project-memory` requires `$domain-modeling` when bootstrapping an existing project into `CONTEXT.md` or ADRs from repo or session evidence.
+- `plan-feature` requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` so it can run the feature-planning wrapper flow from setup through PRD and configured agent-ready issues.
+- `setup-project-memory` requires `$domain-modeling` when bootstrapping an existing project or orchestrator workspace into `CONTEXT.md` or ADRs from repo, workspace, or session evidence.
 - `to-issues` requires `$plan-harder` and must run it once for every generated issue before returning or publishing that issue.
 - `triage` requires `$setup-project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, and requires `$plan-harder` before marking an issue `ready-for-agent`.
 - `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.

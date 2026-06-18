@@ -3,6 +3,10 @@
 PRDs and implementation issues for this repo live as GitHub issues. Use the
 `gh` CLI for all operations.
 
+Tracker mode: `github`
+GitHub repo: infer from `git remote -v` unless this file records a specific
+`<owner>/<repo>`.
+
 ## Conventions
 
 - Create an issue: `gh issue create --title "..." --body "..."`
