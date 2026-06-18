@@ -2,4 +2,4 @@ interface:
   display_name: "Plan Harder"
   short_description: "Create higher-rigor plans or harden single issues before coding."
   brand_color: "#4F46E5"
-  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then produce either a saved full implementation plan or a compact issue-hardening brief without coding. Save full plans to `plans/<topic>-plan.md` by default, but do not create `plans/` for issue-hardening mode unless explicitly requested."
+  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then produce a full implementation plan or compact issue-hardening brief in chat without coding. Do not create `plans/`, save Markdown files, or edit repo files."

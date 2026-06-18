@@ -102,6 +102,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Plan Harder skill
 - Keep `plan-harder` as the single reusable home for higher-rigor planning support in this repo; do not reintroduce a separate lightweight clarification skill unless that package boundary is intentionally restored. (Codex learning)
 - Keep `plan-harder` runtime workflow, clarification behavior, and output details in `skills/plan-harder/SKILL.md` and its references, not in this `AGENTS.md`.
+- Keep `plan-harder` chat-output-only: it must not create `plans/`, write Markdown plan files, or edit repo files as part of its own runtime workflow.
 
 ### Grill and Domain Modeling skills
 - Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-with-docs`.

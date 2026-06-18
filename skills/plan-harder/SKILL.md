@@ -25,12 +25,10 @@ Plan Harder has two modes:
 - Do not implement the work.
 - Do not open PRs, mutate GitHub state, publish artifacts, or silently continue
   into coding after the plan.
-- In full-plan mode, repo writes are limited to the saved plan file under
-  `plans/` unless the user explicitly asks for chat-only output.
-- In issue-hardening mode, do not create a `plans/` file by default. Return a
-  compact issue-ready brief for the caller to embed in the issue, PRD, or local
-  tracker artifact. Only edit a local issue file when the user or calling skill
-  explicitly provides that file as the target.
+- Do not write Markdown files under `plans/`.
+- Do not create or update repo files as part of this skill. Return the plan or
+  hardened issue brief in chat so the user or calling workflow can decide where
+  to persist it.
 - If the broader request includes later implementation, issue creation, or
   orchestration, finish the plan first and make the handoff explicit instead of
   blending phases together.
@@ -50,12 +48,10 @@ Plan Harder has two modes:
 
 ## Output Mode
 
-- Direct full-plan default: save the plan to `plans/<topic>-plan.md`.
-- Issue-hardening default: return a compact issue-ready brief in chat for the
-  caller to embed; do not save under `plans/`.
-- If the user explicitly says not to write a file, not to write Markdown, or
-  to keep the plan in chat, return the plan in chat only and say that no file
-  was saved.
+- Always return the plan or issue-hardening brief in chat.
+- Never save to `plans/`, create `plans/`, or write a Markdown plan file.
+- If the user asks to save the plan, explain that this skill only plans harder
+  and returns the result; a separate workflow can persist it afterward.
 - When the plan is meant to feed later implementation or GitHub issue creation,
   end with issue-sized work slices and a clear handoff note.
 - When hardening an existing issue, end with a clear implementation handoff for
@@ -70,7 +66,7 @@ Plan Harder has two modes:
 - Use issue-hardening mode for one existing issue, one vertical slice, or one
   work item produced by a PRD or issue-splitting skill.
 - If another skill calls Plan Harder with an issue body, treat that as
-  issue-hardening mode unless it explicitly asks for a saved full plan.
+  issue-hardening mode unless it explicitly asks for a full multi-step plan.
 
 ### 2. Research First
 
@@ -156,28 +152,9 @@ In issue-hardening mode, create a compact issue brief with:
 
 Keep the brief small enough to paste into an issue body or issue comment.
 
-### 6. Save Only When the Mode Calls For It
+### 6. Run a Gotcha Pass
 
-- In full-plan mode, ensure a `plans/` directory exists in the current working
-  directory before saving.
-- If `plans/` does not exist, create it before saving the plan.
-- Save the generated full plan to `plans/<topic>-plan.md`.
-- Derive `<topic>` from the request using kebab-case.
-- If the user explicitly asked for chat-only or no-file output, skip the write
-  and keep the same structure in the returned plan.
-- In issue-hardening mode, skip the `plans/` write unless the user explicitly
-  asks for a saved plan. If a local issue file path is explicitly provided as
-  the target, update that issue file instead of creating a separate plan file.
-
-Examples:
-
-- `fix auth timeout bug` -> `plans/auth-timeout-bug-plan.md`
-- `design a safer webhook retry flow` ->
-  `plans/safer-webhook-retry-flow-plan.md`
-
-### 7. Run a Gotcha Pass
-
-- Re-read the saved plan, issue brief, or edited issue file and look for:
+- Re-read the plan or issue brief and look for:
   - missing steps
   - missing dependencies
   - vague acceptance criteria
@@ -185,11 +162,11 @@ Examples:
   - rollout or rollback gaps
   - missing validation
 - If real gaps remain, ask the minimum follow-up questions needed and update
-  the saved plan or issue brief.
+  the plan or issue brief before returning it.
 
-### 8. Review Before Returning
+### 7. Review Before Returning
 
-- Review the saved plan or issue brief for:
+- Review the plan or issue brief for:
   - missing dependencies
   - ordering failures
   - unhandled edge cases
@@ -290,11 +267,9 @@ Use this for issue-hardening mode.
 
 ## Output Expectations
 
-- In full-plan mode, return the final saved plan path, or explicitly say that
-  the plan stayed in chat-only mode with no file written.
-- In issue-hardening mode, return the hardened issue brief or the local issue
-  file path that was updated, and explicitly say that no `plans/` file was
-  created unless one was requested.
+- Return the final plan or hardened issue brief directly in chat.
+- Explicitly say that no repo files were written and no `plans/` Markdown file
+  was created.
 - Summarize the main phases, the riskiest assumptions, and any open questions
   that remain.
 - If clarification was needed, restate the resolved interpretation before
@@ -307,6 +282,5 @@ Use this for issue-hardening mode.
 
 - "Plan harder for this auth migration before we touch any code."
 - "Give me a deeper, stress-tested implementation plan for this feature."
-- "Make a harder plan for this refactor and save it under `plans/`."
 - "Harden this issue before I give it to an agent."
 - "Make this vertical slice agent-ready without creating a separate plan file."
