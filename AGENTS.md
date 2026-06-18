@@ -60,7 +60,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `domain-modeling` as portable because it uses local repo evidence and project memory such as `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`, with no Codex-only runtime tools required.
 - Treat `grill-with-docs` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-with-docs` is the fallback path.
-- Treat `setup-project-memory` as Codex-aware but portable because it can optionally read local Codex session history under `~/.codex/sessions` for existing-project bootstrap, while its core setup flow falls back to repo-only evidence plus `$domain-modeling`.
+- Treat `setup-project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/setup-project-memory/references/session-history.md`, while its core setup flow falls back to repo-only evidence plus `$domain-modeling`.
 - Treat `to-prd` as portable because it uses local repo evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
 - Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue and otherwise relies on local project memory plus configured issue-tracker instructions.
 - Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-with-docs`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
@@ -120,7 +120,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - `setup-project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
 - Keep `setup-project-memory` issue-tracker setup GitHub/local/custom only; do not add additional hosted-tracker-specific templates to the project-memory flow.
 - Keep `project-memory/agents/triage-labels.md` responsible for both issue type/category mapping (`bug`, `feature`, `task`) and workflow state mapping (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).
-- For already-used projects, `setup-project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo Codex session history, using `$domain-modeling` for the context and ADR shape.
+- For already-used projects, `setup-project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo session history, using `$domain-modeling` for the context and ADR shape.
 - Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
 
 ### PRD and issue-splitting skills

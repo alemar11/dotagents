@@ -1,11 +1,12 @@
 # Session History
 
-Use this reference only during existing-project bootstrap, when recent Codex
-history can help seed project memory for an already-used repository.
+Use this reference only during existing-project bootstrap, when recent local
+agent session history can help seed project memory for an already-used
+repository.
 
 ## Default window
 
-- Read local Codex sessions under `~/.codex/sessions`.
+- When reading Codex history, use local sessions under `~/.codex/sessions`.
 - Search the last 14 days from the current date.
 - Include archived session history only when it is discoverable in that same
   date window.

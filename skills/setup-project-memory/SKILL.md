@@ -1,6 +1,6 @@
 ---
 name: setup-project-memory
-description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent Codex session history, or updating AGENTS.md pointers, issue-tracker instructions, triage type and label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-with-docs, or architecture-improvement skills.
+description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent local session history, or updating AGENTS.md pointers, issue-tracker instructions, triage type and label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-with-docs, or architecture-improvement skills.
 ---
 
 # Setup Project Memory
@@ -73,8 +73,7 @@ Read the current state without assuming a layout:
 For existing-project bootstrap, also read recent session history with
 `references/session-history.md`:
 
-- Search local Codex sessions under `~/.codex/sessions` for the same git root
-  over the last 14 days.
+- Search local session history for the same git root over the last 14 days.
 - Include archived history only when discoverable in the same date window.
 - Keep at most the 10 most recent matching sessions.
 - Match sessions by `session_meta.cwd`, `turn_context.cwd`, tool-call
