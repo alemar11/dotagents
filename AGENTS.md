@@ -133,6 +133,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - In GitHub issue-tracker mode, keep the PRD issue as the parent issue and attach generated implementation issues as sub-issues while preserving `Source PRD: #<number>` in each child issue body.
 - In GitHub issue-tracker mode, title PRD issues as `PRD: <Feature Name>` and implementation issues as `<feature-slug>: <NN> <vertical outcome>`.
 - In GitHub issue-tracker mode, PRD issues use the mapped `feature` issue type and generated implementation sub-issues use the mapped `task` issue type when GitHub issue types are available.
+- In orchestrator GitHub coordination mode, apply a GitHub label named exactly `<project-slug>` to the PRD parent issue and every generated vertical feature issue in the coordination repo.
 - Generated implementation issues must include a `## Completion` section: GitHub issues close through a closing keyword on the implementation PR or final commit, while local markdown issues are moved into the configured `issues/done/` folder after validation rather than being deleted or marked with a `done` status. In orchestrator workspace mode, moving to `done` requires cross-repo integration proof.
 - `to-issues` owns any issue tracker or local markdown writes it performs; `$plan-harder` remains chat-output-only and must not write plan files or issue files.
 - Both skills should read `project-memory/agents/issue-tracker.md` and related project memory before deciding where PRDs or issues belong.

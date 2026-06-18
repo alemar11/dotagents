@@ -13,6 +13,7 @@ Record the coordination repository in `project-memory/agents/issue-tracker.md`:
 
 ```text
 Coordination repo: <owner>/<repo>
+Project label format: <project-slug>
 ```
 
 Run `gh` commands with `--repo <owner>/<repo>` unless the current checkout is
@@ -28,11 +29,29 @@ the coordination repository.
 - Vertical feature issues use the mapped `task` issue type when available.
 - Vertical feature issues are GitHub sub-issues of the PRD parent issue.
 - Each vertical feature issue body includes `Source PRD: #<prd-number>`.
+- Each PRD parent issue and vertical feature issue gets a GitHub label named
+  exactly `<project-slug>`. This is a project grouping/search label, not a
+  workflow state label.
+
+Before creating the first issue for a project, ensure the project label exists:
+
+```bash
+gh label list --repo <owner>/<repo> --search "<project-slug>"
+gh label create "<project-slug>" --repo <owner>/<repo> --description "Project: <project-slug>"
+```
+
+If the label already exists, keep using it.
+
+Create the PRD parent issue with:
+
+```bash
+gh issue create --repo <owner>/<repo> --label "<project-slug>" --title "PRD: <Feature Name>" --body-file <file>
+```
 
 Create a vertical issue under a PRD with:
 
 ```bash
-gh issue create --repo <owner>/<repo> --parent <prd-number> --title "..." --body-file <file>
+gh issue create --repo <owner>/<repo> --parent <prd-number> --label "<project-slug>" --title "..." --body-file <file>
 ```
 
 Attach an existing issue to a PRD with:
@@ -50,6 +69,7 @@ Generated vertical feature issues should include:
 - integration gates and validation proof needed before closure
 - repo-local PR links or implementation child issue links when they exist
 - completion rule for the coordination issue
+- project label applied: `<project-slug>`
 
 Repo-local child issues are optional in v1. Create them only when a repo needs
 its own implementation queue item for ownership, review, or CI. When child

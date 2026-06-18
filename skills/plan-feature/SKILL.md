@@ -71,9 +71,11 @@ Ask `$to-prd` to use the configured target from
 `project-memory/agents/issue-tracker.md`. If the configured target is a local
 orchestrator workspace, pass the accepted `<project-slug>` and
 `<feature-slug>` and allow `$to-prd` to create the feature directory only when
-writing the PRD. If `$to-prd` discovers a new blocker, route the blocker back
-through `$grill-me-with-context` using the same one-question loop, then
-continue only after the blocker is resolved or explicitly deferred as
+writing the PRD. If the configured target is a GitHub coordination repo, pass
+the accepted `<project-slug>` so `$to-prd` can apply the matching project label
+to the PRD parent issue. If `$to-prd` discovers a new blocker, route the
+blocker back through `$grill-me-with-context` using the same one-question loop,
+then continue only after the blocker is resolved or explicitly deferred as
 non-blocking.
 
 ### 4. Split and write issues
@@ -90,7 +92,8 @@ issue-splitting gates remain.
 Require `$to-issues` to use the configured issue target, apply configured issue
 types and triage labels, attach GitHub implementation issues to the PRD issue
 when GitHub or GitHub coordination mode is configured, use the configured title
-formats, and confirm that `$plan-harder` ran once per generated issue.
+formats, apply the `<project-slug>` GitHub label to GitHub coordination issues,
+and confirm that `$plan-harder` ran once per generated issue.
 
 In orchestrator workspace mode, require generated issues to include affected
 repos, cross-repo contracts, integration gates, repo PR links or placeholders,

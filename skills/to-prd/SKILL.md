@@ -86,8 +86,10 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
   `projects/<project-slug>/features/<feature-slug>/PRD.md`, only after
   confirmation. Derive or ask for `<project-slug>` before writing.
 - `Tracker mode: orchestrator-github`: publish the PRD parent issue in the
-  configured coordination repo using `gh --repo <owner>/<repo>`. The PRD issue
-  is the parent for vertical feature issues.
+  configured coordination repo using `gh --repo <owner>/<repo>`. Derive or ask
+  for `<project-slug>`, ensure the GitHub label named exactly
+  `<project-slug>` exists in the coordination repo, and apply it to the PRD
+  parent issue. The PRD issue is the parent for vertical feature issues.
 - Other tracker: follow the repo-specific instructions in
   `project-memory/agents/issue-tracker.md`.
 
@@ -98,6 +100,9 @@ issue numbers, status labels, or implementation slice names in the PRD title.
 For orchestrator workspace PRDs, include repository scope, cross-repo
 contracts, integration gates, and release or validation order when those affect
 issue splitting.
+
+For GitHub coordination PRDs, treat the project label as required issue
+metadata. It is separate from the mapped issue type and workflow-state labels.
 
 Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
 When GitHub issue types are available, create or update the PRD issue with that

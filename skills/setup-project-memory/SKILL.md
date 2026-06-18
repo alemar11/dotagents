@@ -113,7 +113,9 @@ Choose where PRDs and implementation issues live:
   `projects/<project-slug>/features/<feature-slug>/issues/*.md`.
 - **GitHub coordination repo**: for orchestrator workspaces, publish PRD
   parent issues and vertical feature issues in a configured coordination repo.
-  Repo-local implementation PRs are linked from those issues.
+  Repo-local implementation PRs are linked from those issues. Apply a GitHub
+  label named exactly `<project-slug>` to each PRD parent issue and vertical
+  feature issue for that orchestrator project.
 - **Other**: ask for one paragraph describing the tracker workflow.
 
 Default to GitHub for code repos when the remote is GitHub, and local markdown
@@ -203,6 +205,8 @@ For orchestrator workspace mode:
   coordination repo.
 - Draft tracker instructions that say where project folders, feature PRDs,
   vertical issues, repo pointer sheets, and integration gates live.
+- For GitHub coordination mode, state that each PRD parent issue and vertical
+  feature issue gets a project label named exactly `<project-slug>`.
 - State that setup does not create project or feature folders. `$plan-feature`,
   `$to-prd`, and `$to-issues` create them only when writing an actual feature.
 - State that child repos retain their own `AGENTS.md`, `CONTEXT.md`,

@@ -124,9 +124,12 @@ Use `project-memory/agents/issue-tracker.md` for the target:
   labels.
 - `Tracker mode: orchestrator-github`: create vertical feature issues in the
   configured coordination repo with
-  `gh issue create --repo <owner>/<repo> --parent <prd-number>`. Repo-local
-  implementation PRs or child issues are linked from the coordination issue;
-  repo-local child issues are optional in v1.
+  `gh issue create --repo <owner>/<repo> --parent <prd-number> --label "<project-slug>"`.
+  Derive `<project-slug>` from the PRD/project context or ask for it, ensure
+  the label exists in the coordination repo, and apply it to every generated
+  vertical feature issue. Repo-local implementation PRs or child issues are
+  linked from the coordination issue; repo-local child issues are optional in
+  v1.
 - `Tracker mode: local-markdown`: write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
   and `Status:` lines near the top.
@@ -141,6 +144,10 @@ vertical feature issue must be attached to the PRD issue as a sub-issue. If an
 issue is created before the parent relationship is set, attach it afterward
 with `gh issue edit <prd-number> --add-sub-issue <issue-number-or-url>`. Keep
 `Source PRD: #<prd-number>` in the issue body as well.
+
+For GitHub coordination PRDs, every generated vertical feature issue must share
+the same project label as the PRD parent issue, named exactly `<project-slug>`.
+This label is separate from issue type and workflow-state labels.
 
 When GitHub issue types are available, create or update each implementation
 issue with the mapped `task` type, usually `Task`. If issue types are disabled
