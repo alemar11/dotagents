@@ -43,7 +43,7 @@ coordination backend change unless the user explicitly says so.
 - Vertical feature issues use the mapped `task` issue type when available.
 - Vertical feature issues are GitHub sub-issues of the PRD parent issue.
 - Each vertical feature issue body includes `Source PRD: #<prd-number>`.
-- Each vertical feature issue body should include a `Execution plan` pointer to
+- Each vertical feature issue body should include an `Execution plan` pointer to
   `execution-plan.md` when local artifact targets are available.
 - Each PRD parent issue and vertical feature issue gets a GitHub label named
   exactly `<project-slug>`. This is a project grouping/search label, not a
@@ -77,7 +77,7 @@ Generated vertical feature issues should include:
 - `Delivery mode` copied from the PRD and labeled as feature-level metadata
   inherited from `Source PRD`, for example `Delivery mode: One PR Per Repo
   (feature-level, inherited from Source PRD)`. Feature-level means the mode
-  applies to the whole Source PRD feature, not only this generated issue.
+  applies to the whole Source PRD feature.
 - issue-level `Parallelization` and `Closeout`
 - explicit `Delivery mode` or `Integration mode` exception lines only when the
   issue intentionally differs from the PRD, with the authorization or reason

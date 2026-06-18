@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Triage existing GitHub or local markdown issues into typed, stateful, agent-ready work. Use when the user asks to inspect incoming issues, classify bugs/features/tasks, request missing info, mark work ready for an agent or human, or close/wontfix issues.
+description: Triage existing GitHub or local markdown issues into typed workflow states, including needs-info, ready-for-agent, ready-for-human, and wontfix.
 ---
 
 # Triage

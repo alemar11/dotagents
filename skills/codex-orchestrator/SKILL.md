@@ -1,6 +1,6 @@
 ---
 name: codex-orchestrator
-description: Use when coordinating visible Codex App worker threads, CLI/subagent worker threads, portfolio triage, gates, ledgers, root-owned worker lifecycle, autoreview, standalone Git/GitHub companion skills, or owner-ready Codex closeout.
+description: Coordinate Codex workers, portfolio ledgers, gates, autoreview, Git/GitHub companion skills, and owner-ready closeout.
 ---
 
 # Codex Orchestrator
@@ -182,7 +182,7 @@ first read the issue body and any linked `Source PRD`; the PRD is the canonical
 source for full delivery mode details, while the issue body supplies the copied
 feature-level `Delivery mode` label plus issue-level parallelization,
 dependencies, closeout, and overrides. If the issue references a `execution-plan.md`
-or the source includes a `Execution plan` pointer, load it and use its wave and
+or the source includes an `Execution plan` pointer, load it and use its wave and
 unlock rules for scheduling. Treat an issue line such as
 `Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)`
 as a feature-level landing strategy, not as a claim that only this one issue

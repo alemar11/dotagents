@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Find architecture improvement candidates in a codebase, present evidence-backed options, then use grill-me-with-context to sharpen the selected refactor. Use when the user asks to improve architecture, find module-boundary problems, deepen shallow modules, reduce coupling, or make a codebase easier for agents and humans to change.
+description: Find evidence-backed architecture improvement candidates, then use grill-me-with-context to sharpen the selected refactor before implementation.
 ---
 
 # Improve Codebase Architecture

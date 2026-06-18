@@ -32,7 +32,7 @@ preference change unless the user explicitly says to make it persistent.
 - Comments and conversation history append under a `## Comments` heading
 - Each implementation issue body includes `Source PRD:` pointing to
   `.scratch/<feature-slug>/PRD.md`.
-- Each implementation issue body should include a `Execution plan` pointer to
+- Each implementation issue body should include an `Execution plan` pointer to
   `.scratch/<feature-slug>/execution-plan.md` when local artifact runs are in
   scope.
 - Each implementation issue body includes `## Delivery` with issue-level
@@ -40,8 +40,7 @@ preference change unless the user explicitly says to make it persistent.
 - Each implementation issue body copies the effective PRD `Delivery mode` and
   labels it as feature-level metadata inherited from `Source PRD`, for example
   `Delivery mode: One Feature Branch (feature-level, inherited from Source
-  PRD)`. Feature-level means the mode applies to the whole Source PRD feature,
-  not only this generated issue.
+  PRD)`. Feature-level means the mode applies to the whole Source PRD feature.
 - Add issue-level `Delivery mode` or `Integration mode` exception lines only
   when the issue intentionally differs from the PRD, and include the
   authorization or reason.

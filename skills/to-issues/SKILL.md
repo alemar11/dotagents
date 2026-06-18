@@ -1,6 +1,6 @@
 ---
 name: to-issues
-description: Split a PRD into vertical, agent-ready implementation issues. Use when the user asks to turn a PRD into issues, create vertical slices, or prepare issue-tracker work from a PRD; this skill must use $plan-harder for every issue before returning or publishing it.
+description: Split a PRD into vertical, agent-ready implementation issues hardened by $plan-harder.
 ---
 
 # To Issues
@@ -15,12 +15,10 @@ returned or published.
 
 - Load and follow `$plan-harder` for every issue.
 - Pass exactly one issue at a time to `$plan-harder` in issue-hardening mode.
-- Use the returned `$plan-harder` brief to enrich agent-ready issue bodies:
-  synthesize implementation guidance under `## Implementation Plan` and merge
-  acceptance, validation, dependency, and blocker details into the matching
-  top-level sections. If `$plan-harder` identifies an unresolved blocker,
-  preserve that blocker in the withheld result or explicitly authorized
-  partial issue instead.
+- Use the returned `$plan-harder` brief to enrich `## Implementation Plan` and
+  merge acceptance, validation, dependency, and blocker details into the
+  matching top-level sections. If `$plan-harder` finds an unresolved blocker,
+  preserve it in the withheld result or explicitly authorized partial issue.
 - Do not publish or return an issue as ready for execution until it includes
   the hardened implementation guidance and provenance line.
 - Include a `## Completion` section in every generated implementation issue.
@@ -186,7 +184,7 @@ and triage states to the repo's tracker values.
   Dependencies may still be listed; in that case, the issue is queue-ready but
   must not be started until its dependencies are complete.
 - Do not create dependency cycles. Every dependency graph must be acyclic so a
-  set of ready issues cannot retain-cycle itself into a locked queue.
+  set of ready issues cannot lock the queue.
 - Use `needs-info` only for explicitly requested partial backlog output where
   the next action is a concrete question for a human/reporter. Do not count
   `needs-info` issues as agent-ready, and do not publish them from a composing
@@ -281,25 +279,16 @@ For ordinary single-repo or monorepo `One Feature Branch` issues, the
 - Closeout: feature PR closes issue
 ```
 
-Every published or returned issue must also say what happens when the work is
-complete:
+Every published or returned issue must state its completion path:
 
-- GitHub: when all acceptance criteria pass and validation is complete, close
-  the implementation issue from the relevant PR body with a GitHub closing
-  keyword such as `Closes #<this-issue-number>`. For `One Feature Branch`, the
-  feature PR closes the issue; for `One PR Per Repo`, the relevant repo PR
-  closes the repo-local issue, while coordination issues close only after repo
-  PR links or equivalent integration proof are recorded; for `One PR Per
-  Issue`, the issue PR closes the issue. Use final-commit closure only when the
-  Source PRD or this issue's `## Delivery` section records `Direct Commit` or
-  another explicit maintainer authorization for final-commit closeout. Do not
-  close the parent PRD issue from an implementation issue unless the maintainer
-  explicitly says the whole PRD is complete.
-- Local markdown: when all acceptance criteria pass and validation is complete,
-  create `issues/done/` on demand if needed, then move the issue file to the
-  configured `issues/done/<NN>-<slug>.md` path. For orchestrator workspace
-  issues, do this only after cross-repo integration proof is recorded. Do not
-  delete the file and do not add a `done` status.
+- GitHub: close the implementation issue from the relevant PR body with a
+  closing keyword, following `Closeout`. Final-commit closure requires
+  `Direct Commit` or another explicit authorization. Do not close the PRD
+  parent unless the maintainer says the whole PRD is complete.
+- Local markdown: move the issue to `issues/done/<NN>-<slug>.md` after
+  validation, creating `issues/done/` on demand. Orchestrator workspace issues
+  also require recorded cross-repo integration proof. Do not delete the file or
+  add a `done` status.
 
 Use this implementation issue title format for both GitHub issue titles and
 local markdown issue headings:
@@ -325,10 +314,8 @@ unless this skill finds a new blocker or unresolved question. Do not treat
 "local file writes allowed" as permission to mutate GitHub or another hosted
 tracker.
 If the configured target is GitHub or GitHub coordination but external mutation
-is not authorized for the current run, do not mutate GitHub. Ask
-`$github-issues` for exact draft publish commands and return them with the
-hardened issue bodies, or use the configured local dry-run target if
-`project-memory/agents/issue-tracker.md` records one.
+is not authorized, do not mutate GitHub. Ask `$github-issues` for exact draft
+commands, or use the configured local dry-run target when one is recorded.
 When a blocker or unresolved question appears under `$plan-feature`, return it
 as an issue-splitting gate instead of publishing a `needs-info` issue by
 default.
@@ -444,17 +431,13 @@ sections.]
 When all acceptance criteria pass and validation is complete:
 
 - GitHub: close this implementation issue from the relevant PR body with
-  `Closes #<this-issue-number>`, following the closeout path in `## Delivery`.
-  Final-commit closure is allowed only when the Source PRD or `## Delivery`
-  records `Direct Commit` or another explicit maintainer authorization. Do not
-  close the parent PRD issue unless the maintainer explicitly says the whole PRD
-  is complete. The closing keyword takes effect when the PR or authorized commit
-  reaches the default branch.
-- Local markdown: move this file to
-  the configured `issues/done/<NN>-<slug>.md` path, creating `issues/done/` on
-  demand if needed. For orchestrator workspace issues, move it only after
-  cross-repo integration proof is recorded. Do not delete the file and do not
-  add a `done` status.
+  `Closes #<this-issue-number>`, following `## Delivery`. Final-commit closure
+  requires `Direct Commit` or another explicit authorization. Do not close the
+  parent PRD unless the maintainer says the whole PRD is complete.
+- Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
+  `issues/done/` on demand. For orchestrator workspace issues, move it only
+  after cross-repo integration proof is recorded. Do not delete the file or add
+  a `done` status.
 
 ## Dependencies
 

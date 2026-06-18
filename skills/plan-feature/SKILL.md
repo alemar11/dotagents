@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: Plan a new feature from initial intent to agent-ready implementation issues. Use when the user wants one wrapper workflow for feature planning, repo-backed grilling, PRD creation, and vertical issue splitting before implementation.
+description: Plan a new feature from rough intent through repo-backed grilling, PRD creation, and agent-ready vertical issues before implementation.
 ---
 
 # Plan Feature
@@ -58,11 +58,10 @@ Before continuing, resolve the effective target for the current run:
   this run,
 - any local dry-run target or current-run override.
 
-If the user asked for a rehearsal, temp run, dry run, validation pass, or
-otherwise disallowed external mutation, treat external tracker mutation as
-disallowed even when persisted setup points at GitHub. Use the configured local
-dry-run target when one exists; otherwise stop and ask for a local target or
-return draft publish commands instead of mutating the external tracker.
+If the user asked for a rehearsal, temp run, dry run, validation pass, or other
+non-mutating run, treat external mutation as disallowed even when persisted
+setup points at GitHub. Use the configured local dry-run target when one exists;
+otherwise ask for a local target or return draft publish commands.
 
 Resolve the planning identity before writing:
 
@@ -160,17 +159,13 @@ Planning identity:
   Also include the expected `execution-plan.md` location for local artifact runs.
 ```
 
-Require `$to-issues` to use the configured issue target, apply configured issue
-types and triage labels, attach GitHub implementation issues to the PRD issue
-when GitHub or GitHub coordination mode is configured, use the configured title
-formats, apply the `<project-slug>` GitHub label to GitHub coordination issues,
-and confirm that `$to-issues` produced a feature `execution-plan.md` (or
-returned an equivalent inline plan when local write is disallowed), ran
-`$plan-harder` once per generated issue, and validated that every `Parallelization`
-dependency in that run resolves to a known issue ID and the dependency graph is
-acyclic. If external tracker mutation is disallowed, require `$to-issues` to
-return draft publish commands or write to the effective local target instead of
-mutating GitHub.
+Require `$to-issues` to use the configured issue target, issue types, labels,
+title formats, PRD parent/sub-issue relationships, and GitHub coordination
+project label when those modes apply. It must also produce `execution-plan.md`
+or an inline equivalent, run `$plan-harder` once per generated issue, and verify
+that every `Parallelization` dependency resolves to a known issue ID in an
+acyclic graph. If external mutation is disallowed, it must write to the
+effective local target or return draft publish commands instead.
 
 In orchestrator workspace mode, require generated issues to include affected
 repos, cross-repo contracts, integration gates, repo PR links or placeholders,

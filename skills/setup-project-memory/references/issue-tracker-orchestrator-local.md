@@ -80,14 +80,14 @@ Generated feature issues should include:
 
 - `Type:` and `Status:` lines from `project-memory/agents/triage-labels.md`
 - `Source PRD:` pointing to the feature PRD
-- Each implementation issue body should include a `Execution plan` pointer to
+- Each implementation issue body should include an `Execution plan` pointer to
   `projects/<project-slug>/features/<feature-slug>/execution-plan.md` when local
   files are in scope.
 - affected repo list
 - `Delivery mode` copied from the PRD and labeled as feature-level metadata
   inherited from `Source PRD`, for example `Delivery mode: One PR Per Repo
   (feature-level, inherited from Source PRD)`. Feature-level means the mode
-  applies to the whole Source PRD feature, not only this generated issue.
+  applies to the whole Source PRD feature.
 - issue-level `Parallelization` and `Closeout`
 - explicit `Delivery mode` or `Integration mode` exception lines only when the
   issue intentionally differs from the PRD, with the authorization or reason

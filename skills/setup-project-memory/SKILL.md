@@ -1,6 +1,6 @@
 ---
 name: setup-project-memory
-description: Configure or refresh project-memory for code repos, monorepos, and orchestrator workspaces. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent local session history, or configuring AGENTS.md pointers, issue-tracker instructions, triage mappings, CONTEXT.md, and ADR layout before planning, PRD, issue-splitting, triage, grill-me-with-context, or architecture-improvement skills.
+description: Configure project-memory before planning, PRD, issue-splitting, triage, or domain-memory workflows.
 ---
 
 # Setup Project Memory
@@ -19,12 +19,10 @@ Configure the project memory that other skills can rely on:
   an existing project has strong repo or session evidence.
 
 This is a setup skill. Run it once per code repo, monorepo, or orchestrator
-workspace before using workflows that publish PRDs, split issues, triage
-incoming work, or update project-backed domain memory.
-Re-run it when the issue tracker, issue-type vocabulary, triage vocabulary, or
-domain-memory layout
-changes, or when an already-used project needs its existing knowledge migrated
-into the project-memory structure.
+workspace before workflows publish PRDs, split issues, triage incoming work, or
+update project-backed domain memory. Re-run it when tracker routing, issue
+types, triage states, or domain-memory layout changes, or when an existing
+project needs accepted knowledge migrated into project memory.
 
 ## Hard Boundaries
 

@@ -1,6 +1,6 @@
 ---
 name: domain-modeling
-description: Build and maintain project domain language while decisions are being made. Use when terminology, concept boundaries, business rules, ADRs, or project context docs need to be clarified or updated, or when another skill needs durable domain notes.
+description: Build and maintain project domain language, context docs, and ADRs from repo evidence and accepted decisions.
 ---
 
 # Domain Modeling

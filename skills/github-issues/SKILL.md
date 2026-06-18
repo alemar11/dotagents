@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: "Use for GitHub issue lifecycle operations with direct gh commands: create, list, view, edit, comment, close, set issue types, manage labels, attach parent/sub-issues, work against coordination repos with --repo, or return dry-run issue commands when mutation is not authorized. Use github-triage for queue summaries and PR triage instead."
+description: Use direct gh commands for GitHub issue lifecycle, labels, types, parent/sub-issues, coordination repos, and dry-run commands.
 ---
 
 # GitHub Issues

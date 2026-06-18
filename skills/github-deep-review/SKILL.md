@@ -1,6 +1,6 @@
 ---
 name: github-deep-review
-description: Review GitHub issues, pull requests, or proposed fixes by tracing root cause, provenance, proof, and fix quality; use github-review-threads for review-thread replies.
+description: Review GitHub issues, pull requests, or fixes by tracing root cause, provenance, proof, and fix quality.
 ---
 
 # GitHub Deep Review
