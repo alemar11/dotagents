@@ -94,6 +94,7 @@ Summarize:
 - number of issues written or published,
 - GitHub PRD parent/sub-issue relationship, when applicable,
 - issue types and labels/statuses applied,
+- completion instructions included,
 - gates resolved or deferred,
 - any issue still blocked and why.
 

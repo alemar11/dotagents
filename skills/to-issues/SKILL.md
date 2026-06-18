@@ -18,6 +18,7 @@ returned or published.
 - Embed the returned `$plan-harder` brief into that issue body.
 - Do not publish or return an issue as ready for execution until it includes
   the hardened implementation brief.
+- Include a `## Completion` section in every generated implementation issue.
 - Remember that `$plan-harder` is chat-output-only. It must not write files;
   this skill owns any issue tracker or local markdown writes.
 
@@ -117,6 +118,20 @@ When GitHub issue types are available, create or update each implementation
 issue with the mapped `task` type, usually `Task`. If issue types are disabled
 or unsupported, publish without a type and keep the mapped state labels.
 
+Every published or returned issue must also say what happens when the work is
+complete:
+
+- GitHub: when all acceptance criteria pass and validation is complete, close
+  the implementation issue from the implementation PR body or final commit
+  message with a GitHub closing keyword such as `Closes #<this-issue-number>`.
+  The issue closes when that PR or commit reaches the default branch. Do not
+  close the parent PRD issue from an implementation issue unless the maintainer
+  explicitly says the whole PRD is complete.
+- Local markdown: when all acceptance criteria pass and validation is complete,
+  move the issue file from `.scratch/<feature-slug>/issues/<NN>-<slug>.md` to
+  `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`. Do not delete the file
+  and do not add a `done` status.
+
 Use this GitHub implementation issue title format:
 
 ```text
@@ -146,6 +161,7 @@ Summarize:
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
 - issue types and labels/statuses assigned,
+- completion instruction included,
 - any blocked issues and why,
 - confirmation that `$plan-harder` was run once per issue.
 
@@ -187,6 +203,19 @@ Source PRD: [path, issue number, or title]
 ## Validation
 
 - [Command, test, or manual check.]
+
+## Completion
+
+When implementation and validation are complete:
+
+- GitHub: close this implementation issue from the implementation PR body or
+  final commit message with `Closes #<this-issue-number>`. Do not close the
+  parent PRD issue unless the maintainer explicitly says the whole PRD is
+  complete. The closing keyword takes effect when the PR or commit reaches the
+  default branch.
+- Local markdown: move this file to
+  `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`. Do not delete the file
+  and do not add a `done` status.
 
 ## Dependencies
 

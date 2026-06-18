@@ -69,6 +69,17 @@ For triage:
 - Workflow state belongs in the mapped triage labels, not in the GitHub issue
   type.
 
+## Completion
+
+When an implementation issue is fully implemented and validated, close that
+implementation issue from the implementation PR body or final commit message
+with a GitHub closing keyword such as `Closes #<issue-number>`. The issue
+closes when that PR or commit reaches the default branch.
+
+Use closing keywords only for issues actually satisfied by the change. Do not
+close the parent PRD issue from a child implementation issue unless the
+maintainer explicitly says the whole PRD is complete.
+
 ## When a skill says "fetch the relevant issue"
 
 Run `gh issue view <number> --comments`.

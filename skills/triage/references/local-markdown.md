@@ -17,6 +17,8 @@ Source PRD: [path, issue number, title, or `None`]
 
 Use mapped values from `project-memory/agents/triage-labels.md` if the repo has
 custom strings. Keep `Type:` for work kind and `Status:` for workflow state.
+Completion is represented by moving the file into `issues/done/`, not by
+adding a `done` status.
 
 ## Update Rules
 
@@ -28,6 +30,8 @@ custom strings. Keep `Type:` for work kind and `Status:` for workflow state.
 - Append new information under the most specific existing heading.
 - If a heading does not exist, append it at the end of the file.
 - Keep comments and triage notes summarized; do not paste raw session logs.
+- Do not delete completed local issue files. Move them to the configured
+  `issues/done/` folder after implementation and validation are complete.
 
 ## Standard Sections
 

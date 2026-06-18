@@ -131,6 +131,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - In GitHub issue-tracker mode, keep the PRD issue as the parent issue and attach generated implementation issues as sub-issues while preserving `Source PRD: #<number>` in each child issue body.
 - In GitHub issue-tracker mode, title PRD issues as `PRD: <Feature Name>` and implementation issues as `<feature-slug>: <NN> <vertical outcome>`.
 - In GitHub issue-tracker mode, PRD issues use the mapped `feature` issue type and generated implementation sub-issues use the mapped `task` issue type when GitHub issue types are available.
+- Generated implementation issues must include a `## Completion` section: GitHub issues close through a closing keyword on the implementation PR or final commit, while local markdown issues are moved into `.scratch/<feature-slug>/issues/done/` after validation rather than being deleted or marked with a `done` status.
 - `to-issues` owns any issue tracker or local markdown writes it performs; `$plan-harder` remains chat-output-only and must not write plan files or issue files.
 - Both skills should read `project-memory/agents/issue-tracker.md` and related project memory before deciding where PRDs or issues belong.
 
@@ -138,6 +139,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `triage` focused on existing incoming GitHub or local markdown issues; new feature planning should still go through `plan-feature`.
 - In GitHub mode, use GitHub Issue Type for work kind (`Bug`, `Feature`, `Task` by default) and labels for workflow state.
 - In local markdown mode, use `Type:` for work kind and `Status:` for workflow state.
+- In local markdown mode, completed issues move to the configured `issues/done/` path instead of adding a new completed status.
 - Before marking an existing issue `ready-for-agent`, `triage` must harden that single issue through `$plan-harder` and preserve the resulting agent brief in the tracker.
 
 ### Maintainer skill
