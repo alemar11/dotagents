@@ -122,6 +122,10 @@ issue list:
   graph must be acyclic.
 - wave gates and unblock conditions.
 - repo-level boundaries and integration proof requirements (for orchestrator work).
+- Treat `execution-plan.md` as the durable ordering contract for scheduling and
+  worker-routing. Issues should carry only issue-level scheduling fields
+  (`Parallelization`, `Closeout`, dependencies), not full sequence and release
+  logic.
 
 Write this plan as a local artifact when local file writes are permitted:
 
