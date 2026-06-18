@@ -22,7 +22,8 @@ first.
 - Do not invent requirements, users, constraints, or acceptance criteria that
   are not supported by user input, repo evidence, or project memory.
 - Ask for confirmation before writing a PRD file or publishing to an issue
-  tracker.
+  tracker unless the user explicitly asked to write/publish or a composing
+  skill passes explicit write authorization after resolving gates.
 
 ## Workflow
 
@@ -71,12 +72,20 @@ Keep the PRD implementation-facing:
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 
-- GitHub: publish only after confirmation, using `gh` and a title like
-  `PRD: <feature>`.
+- GitHub: publish only after confirmation, using `gh` and the title format
+  `PRD: <Feature Name>`.
 - Local markdown: write to `.scratch/<feature-slug>/PRD.md` only after
   confirmation.
 - Other tracker: follow the repo-specific instructions in
   `project-memory/agents/issue-tracker.md`.
+
+For GitHub PRDs, derive `<Feature Name>` from the accepted product name or
+short feature phrase in title case. Do not include issue numbers, status labels,
+or implementation slice names in the PRD title.
+
+If a composing skill such as `$plan-feature` passes explicit write
+authorization, use the configured target without re-asking unless this skill
+finds a new blocker or unresolved question.
 
 If no issue-tracker setup exists, return the PRD in chat and recommend running
 `$setup-project-memory` before publishing.

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Plan Feature"
+  short_description: "Plan a feature from grilling to PRD to agent-ready issues."
+  brand_color: "#10B981"
+  default_prompt: "Use $plan-feature to inspect project memory, run setup if needed, grill the feature with docs, produce the PRD, split it into vertical issues, and write artifacts when no gates remain."

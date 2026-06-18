@@ -63,6 +63,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `setup-project-memory` as Codex-aware but portable because it can optionally read local Codex session history under `~/.codex/sessions` for existing-project bootstrap, while its core setup flow falls back to repo-only evidence plus `$domain-modeling`.
 - Treat `to-prd` as portable because it uses local repo evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
 - Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue and otherwise relies on local project memory plus configured issue-tracker instructions.
+- Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-with-docs`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
 - Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
@@ -121,8 +122,12 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
 
 ### PRD and issue-splitting skills
+- Keep `plan-feature` as the thin wrapper over `setup-project-memory`, `grill-with-docs`, `to-prd`, and `to-issues`; do not let it duplicate grilling, PRD drafting, vertical slicing, or issue-hardening logic.
+- `plan-feature` may pass explicit write authorization to `to-prd` and `to-issues` only after setup exists and no gates remain.
 - Keep `to-prd` focused on producing or publishing PRD artifacts from clarified requirements; do not let it split implementation issues.
 - Keep `to-issues` focused on splitting PRDs into vertical implementation issues; it must run `$plan-harder` once per issue and embed the returned brief before returning or publishing that issue.
+- In GitHub issue-tracker mode, keep the PRD issue as the parent issue and attach generated implementation issues as sub-issues while preserving `Source PRD: #<number>` in each child issue body.
+- In GitHub issue-tracker mode, title PRD issues as `PRD: <Feature Name>` and implementation issues as `<feature-slug>: <NN> <vertical outcome>`.
 - `to-issues` owns any issue tracker or local markdown writes it performs; `$plan-harder` remains chat-output-only and must not write plan files or issue files.
 - Both skills should read `project-memory/agents/issue-tracker.md` and related project memory before deciding where PRDs or issues belong.
 

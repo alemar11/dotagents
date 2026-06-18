@@ -28,7 +28,8 @@ returned or published.
 - Do not create horizontal layer tickets such as "backend only", "frontend
   only", or "tests only" when a vertical slice is practical.
 - Ask for confirmation before writing local issue files or publishing to a
-  hosted issue tracker.
+  hosted issue tracker unless the user explicitly asked to write/publish or a
+  composing skill passes explicit write authorization after resolving gates.
 
 ## Workflow
 
@@ -96,12 +97,37 @@ repo's labels or status values.
 
 Use `project-memory/agents/issue-tracker.md` for the target:
 
-- GitHub: create issues with `gh issue create`, then apply mapped labels.
+- GitHub: create issues with `gh issue create --parent <prd-number>` when the
+  PRD source is a GitHub issue, then apply mapped labels.
 - Local markdown: write
   `.scratch/<feature-slug>/issues/<NN>-<slug>.md`.
 - Other tracker: follow the repo-specific instructions.
 
-If the user did not ask to publish, return the hardened issue bodies in chat.
+For GitHub PRDs, every implementation issue must be attached to the PRD issue
+as a sub-issue. If an implementation issue is created before the parent
+relationship is set, attach it afterward with
+`gh issue edit <prd-number> --add-sub-issue <issue-number>`. Keep
+`Source PRD: #<prd-number>` in the issue body as well.
+
+Use this GitHub implementation issue title format:
+
+```text
+<feature-slug>: <NN> <vertical outcome>
+```
+
+- `<feature-slug>` is lowercase kebab-case derived from the PRD title without
+  the `PRD:` prefix.
+- `<NN>` is the two-digit sequence from the vertical issue ordering.
+- `<vertical outcome>` is a short imperative or outcome phrase, without a
+  trailing period.
+
+Example: `team-invitations: 02 Accept invitation into team`.
+
+If the user did not ask to publish and no composing skill passed explicit write
+authorization, return the hardened issue bodies in chat.
+If a composing skill such as `$plan-feature` passes explicit write
+authorization, use the configured target without re-asking unless this skill
+finds a new blocker or unresolved question.
 
 ### 6. Report completion
 
@@ -109,6 +135,7 @@ Summarize:
 
 - source PRD,
 - number of issues produced,
+- GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
 - labels/statuses assigned,
 - any blocked issues and why,
