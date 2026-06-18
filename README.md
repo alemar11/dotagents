@@ -29,7 +29,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | --- | --- |
 | `autoreview` | Run Codex-only structured closeout review before final, commit, PR, or ship. |
 | `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
-| `crusty` | Direct-only skeptical architecture and implementation challenge from an evidence-first senior engineer. |
+| `crusty` | Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs. |
 | `domain-modeling` | Build and maintain project domain language and durable decisions while work is being clarified. |
 | `git-commit` | Handle commit and push-only requests with direct `git` commands and explicit staging. |
 | `github-ci` | Inspect GitHub Actions checks and failing PR logs with a focused `ci-inspect` CLI. |
