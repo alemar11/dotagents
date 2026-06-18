@@ -1,5 +1,5 @@
 interface:
   display_name: "Plan Harder"
-  short_description: "Create a planning-only higher-rigor plan with explicit handoff boundaries."
+  short_description: "Create higher-rigor plans or harden single issues before coding."
   brand_color: "#4F46E5"
-  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then produce a deeper phased implementation plan without coding. Save it to `plans/<topic>-plan.md` by default unless the user explicitly asked for chat-only output, and finish with a clear handoff boundary for later implementation or orchestration."
+  default_prompt: "Use $plan-harder to research the codebase, ask only the minimum highest-signal clarifying questions with defaults when helpful, then produce either a saved full implementation plan or a compact issue-hardening brief without coding. Save full plans to `plans/<topic>-plan.md` by default, but do not create `plans/` for issue-hardening mode unless explicitly requested."

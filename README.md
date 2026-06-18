@@ -45,7 +45,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `tanstack` | Review and implement TanStack product and integration patterns through one reusable skill with focused references. |
 | `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
-| `plan-harder` | Create a planning-only higher-rigor implementation plan with focused clarification and explicit handoff boundaries. |
+| `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
 | `codex-orchestrator` | Coordinate workers with root-owned lifecycle, standalone Git/GitHub companion skills, gates, ledgers, and closure follow-ups. |
