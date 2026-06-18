@@ -40,6 +40,39 @@ GitHub issue, PR review, CI failure, release checklist, local TODO, audit
 result, ledger item, or ad hoc owner request. GitHub issues and PRs are trigger
 sources, not the only planning model.
 
+Treat every task source as a source item before it becomes a workstream. A
+source item needs a stable source id, source reference, acceptance criteria,
+current source status, closeout target, and mutation authority. Examples:
+`github-issue:owner/repo#123`, `github-pr-thread:owner/repo#45:<thread-id>`,
+`markdown:/path/plan.md#heading`, `markdown-check:/path/plan.md:42`,
+`todo:/path/file.ext:88`, `ci:owner/repo/actions/runs/<id>`, or
+`ledger:<portfolio>:<item-id>`. The ledger is the orchestration projection; the
+source item remains the acceptance and closure source unless the owner
+explicitly migrates it.
+
+For Markdown plans or checklists, enumerate unchecked items with their nearest
+heading context and a stable path plus line or anchor. Preserve parent context,
+map each actionable item to a ledger workstream, and close it by applying or
+proposing a file update, moving residual scope to `Deferred`, or recording the
+owner decision that leaves it open.
+
+## Loop Semantics
+
+Run orchestration as bounded waves, not as a one-pass checklist:
+
+1. Resolve or initialize the ledger.
+2. Snapshot authorized task sources and reconcile them with existing ledger
+   workstreams by stable source id.
+3. Select the next root-owned and delegated wave.
+4. Execute, monitor, integrate, and gate the wave.
+5. Update the ledger and any authorized source closeout targets.
+6. Rescan due sources, then repeat only while there are `Active` items, due next
+   checks, authorized `Ready Next` actions, or newly surfaced source items.
+
+Each wave must produce at least one ledger state transition, new proof, source
+update, owner decision brief, or explicit no-progress/blocker record. Do not
+loop silently on the same worker status or source snapshot.
+
 ## Runtime Requirements
 
 - Codex App thread tools when visible App workers are requested and available:
@@ -63,8 +96,13 @@ sources, not the only planning model.
 - Local ledger storage at
   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
 
-If a required Codex tool or companion skill is unavailable, continue only with
-the parts that can be done safely and report the exact missing surface.
+If a required Codex tool is not already visible, search the available tool
+registry for the operation name, such as `create_thread`, `read_thread`,
+`spawn_agent`, or `wait_agent`, before treating the surface as unavailable.
+Record the actual callable tool name when it differs from the logical names
+above. If a required Codex tool or companion skill remains unavailable, continue
+only with the parts that can be done safely and report the exact missing
+surface.
 
 ## Worker Surface Selection
 
@@ -100,8 +138,14 @@ thread.
   visible, new, separate, or background workers.
 - Use CLI/subagent workers for inspectable bounded parallel work when visible
   App threads were not requested.
-- Keep small single-thread tasks, overlapping file work, and last-mile
-  integration in the root thread unless there is a strong reason to delegate.
+- Split workers by independent ownership boundary: repository, package,
+  service, path set, or tightly scoped workstream. In multi-repo projects this
+  is usually one active worker per affected repo per wave; in a single repo or
+  monorepo, use multiple workers only when files, contracts, tests, and
+  validation paths are cleanly separated.
+- Keep small single-thread tasks, overlapping file work, shared contracts,
+  dependency or root config changes, migrations, generated snapshots, broad
+  tests, conflict resolution, and last-mile integration in the root thread.
 - Before sending overlapping new scope into an existing worker, resync or
   replace that worker instead of assuming its checkout is still current.
 
@@ -123,24 +167,29 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 ## Workflow
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
-2. Identify the repository set, current goals, suppressed items, owner
-   constraints, and portfolio-specific gate overrides.
+2. Identify the repository set, task sources, current goals, suppressed items,
+   owner constraints, and portfolio-specific gate overrides. Register task
+   sources in the ledger with source ids, source refs, last-checked state,
+   dedupe rules, and mutation authority.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
    use focused current-repo companions such as `$github-triage`,
-   `$github-deep-review`, `$github-ci`, or `$github-review-threads` only when
-   the task is focused on one repo or PR. If the
+   `$github-deep-review`, `$github-ci`, or `$github-review-threads` only when the task
+   is focused on one repo or PR. If the
    user provided a plan, decompose that plan into workstreams before scanning
    for additional queue signals. For broad maintainer discovery, include open
    issues, open PRs, failing or pending CI, latest release or package state when
    relevant, unreleased changelog/TODO signals, and owner-suppressed items.
-4. Classify work with the vocabulary in `references/ledger.md`: `Active`,
-   `Autonomous`, `Needs owner`, `Ready next`, `Blocked`, `Deferred`,
-   `Completed`, `Ignored`, or `Released`.
+4. Classify work with the canonical vocabulary in `references/ledger.md`:
+   `Active`, `Autonomous`, `Needs Owner`, `Ready Next`, `Blocked`, `Deferred`,
+   `Completed`, `Ignored Or Suppressed`, or `Released`. Each workstream must
+   carry its source id, acceptance criteria, selected gates, proof target, and
+   closeout target.
 5. Before delegation, read `references/worker.md` and create one Codex worker
-   per repository or tightly scoped workstream using the selected worker
-   surface. Use visible Codex App threads in App-oriented workflows only when
-   explicit owner intent for visible/new/separate/background workers is present;
+   per independent ownership boundary, such as repository, package, service,
+   path set, or tightly scoped workstream, using the selected worker surface.
+   Use visible Codex App threads in App-oriented workflows only when explicit
+   owner intent for visible/new/separate/background workers is present;
    otherwise use CLI/subagent workers when authorized and inspectable, or stay
    in the root thread.
 6. Give each worker an explicit authorization mode, scope, gates, expected
@@ -168,15 +217,25 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
     to bury after closure.
 12. For non-trivial code edits, require focused tests and `$autoreview`; rerun
    both after any review-triggered code change.
-13. Before closing a GitHub issue or PR thread that is only partially satisfied,
-    create or link an owner-visible follow-up issue for the deferred work when
-    GitHub mutation is authorized. If mutation is not authorized, keep the item
-    owner-ready with the proposed follow-up body and do not call it complete.
-14. Stop when the ledger shows no active worker requiring orchestration and all
-    surfaced work is either completed with gates satisfied, owner-ready, blocked
-    with a decision brief, released, or intentionally deferred with a linked or
-    proposed follow-up. Completed workers should be moved out of active tracking
-    or explicitly marked as awaiting a root-owned closeout action.
+13. Before closing a source item that is only partially satisfied, create or
+    link an owner-visible follow-up when mutation is authorized. For GitHub this
+    may be an issue, PR reply, label, or thread resolution; for Markdown or local
+    plans this may be a checkbox update, follow-up bullet, or proposed patch. If
+    mutation is not authorized, keep the item owner-ready with the proposed
+    update body and do not call it complete.
+14. Before stopping, execute every `Ready Next` action that is within current
+    authorization. Reclassify any remaining `Ready Next` item as `Needs Owner`,
+    `Blocked`, or `Deferred` with the missing decision, access, or follow-up.
+15. Stop only after reconciling the original task sources against the ledger.
+    The ledger must show no `Active` worker requiring orchestration, no
+    `Autonomous` item that can still be delegated, no authorized `Ready Next`
+    action, and no newly surfaced source item. Remaining work must be
+    `Completed` with gates satisfied, `Needs Owner` with a decision brief,
+    `Blocked` with minimum missing access/action, `Released`, `Deferred` with a
+    linked or proposed follow-up, or `Ignored Or Suppressed` with source key,
+    reason, owner, date, and unchanged source fingerprint. Completed workers
+    should be moved out of active tracking or explicitly marked as awaiting a
+    root-owned closeout action.
 
 ## References
 

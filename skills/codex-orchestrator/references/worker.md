@@ -30,6 +30,9 @@ Stay in the root orchestrator thread when:
 - the task is small enough that orchestration overhead would dominate;
 - the work overlaps heavily with root-owned integration or another worker's
   active files;
+- the work touches shared contracts, dependency or package manifests, root
+  config, migrations, generated snapshots, broad test orchestration, conflict
+  resolution, or other cross-cutting integration;
 - no inspectable worker surface is available;
 - the owner did not authorize delegation for the requested scope; or
 - the remaining work is mostly gate evaluation, ledger updates, closeout, or
@@ -37,7 +40,18 @@ Stay in the root orchestrator thread when:
 
 ## Worker Rules
 
-- Create one worker per repository or tightly scoped workstream.
+- Create one worker per independent ownership boundary: repository, package,
+  service, path set, or tightly scoped workstream.
+- Treat repository boundaries as the default isolation heuristic, not a quota
+  and not a strict cap. In multi-repo projects, use one active worker per
+  affected repo per wave by default; add more only when a repo itself contains
+  independent workstreams with clean file, contract, test, and validation
+  boundaries.
+- In a single repo or monorepo, multiple workers are allowed only when their
+  files, contracts, tests, validation paths, and expected outputs are cleanly
+  separated. Keep shared contracts, dependency changes, root config, migrations,
+  generated snapshots, broad test runs, conflict resolution, and final
+  integration in the root thread.
 - Give each worker a single clear objective, repository path or URL, branch
   expectations, and exit condition.
 - Workers may inspect, implement, test, and report only within their authorized
@@ -150,9 +164,23 @@ from tracked source changes.
 
 Generated ignored artifacts are not automatically a failure, but they are part
 of closeout. The root orchestrator decides whether they are removed, retained
-for inspection, or left inside a disposable worker worktree. Never treat ignored
-artifacts as proof that tracked changes are clean; inspect tracked status and
-diffs explicitly.
+for inspection, or left inside a worker-owned helper worktree. Never treat
+ignored artifacts as proof that tracked changes are clean; inspect tracked
+status and diffs explicitly.
+
+## Helper Worktrees
+
+Treat Codex App worker worktrees and other worker checkouts as temporary helper
+surfaces by default, but not as disposable until closeout. A helper worktree may
+contain tracked changes, generated artifacts, logs, screenshots, test evidence,
+branches, patches, or context that the root needs before final status.
+
+Before archiving, removing, abandoning, or handing off a helper worktree, read
+the latest worker state, inspect tracked changes and ignored artifacts, and
+record whether useful output was integrated, retained for inspection,
+intentionally abandoned, or left handoff-pending. The root orchestrator decides
+whether the helper surface is archived, removed, retained, abandoned, or handed
+off; workers only report facts and recommendations.
 
 ## Worker Closeout
 
@@ -178,8 +206,10 @@ that cleanup is safe and available, or record why they remain.
 ## Authorization Modes
 
 - `inspect`: read-only investigation, triage, diagnosis, or plan.
-- `implement`: local code/docs changes plus focused validation, but no push,
-  PR, merge, release, or external mutation.
+- `implement`: local code/docs changes plus focused validation, but no staging,
+  commit, push, PR, merge, release, or external mutation unless explicitly
+  listed in allowed surfaces. `push-pr` is the first mode that permits commits
+  or publication.
 - `push-pr`: commit, push, or draft PR creation when the user explicitly
   authorized publication.
 - `ci-rerun-fix`: rerun checks or push targeted fixes for a known PR or branch
@@ -197,9 +227,19 @@ You are a Codex worker for the <portfolio> portfolio.
 Scope:
 - Repository: <repo path or owner/repo>
 - Workstream: <short name>
+- Worker surface: <codex-app-thread|cli-subagent>
+- Worker ID/title: <id/title or pending>
+- Wave: <number>
 - Objective: <one concrete outcome>
+- Source ID: <stable source id>
+- Source ref: <URL, path:line, heading, run id, or ledger item>
+- Acceptance criteria: <source-owned completion criteria>
+- Closeout target: <issue close, PR reply, file checkbox/patch, CI rerun, ledger status>
 - Authorization mode: <inspect|implement|push-pr|ci-rerun-fix|merge-close|release>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
+- Report channel: this worker thread only
+- Helper checkout/worktree: <path or unknown>
+- Heartbeat/next checkpoint: <interval/time or none>
 - Forbidden actions: no subdelegation, no ledger edits, no unrelated cleanup,
   no worker/thread/chat management, no publish/merge/release unless this mode
   explicitly permits it.
@@ -208,7 +248,7 @@ Context:
 - Owner request: <summary>
 - Current ledger status: <summary>
 - Known blockers or assumptions: <bullets>
-- Required gates: <gate names from references/gates.md>
+- Selected gates: <gate names from references/gates.md>
 - Required proof: <tests, live proof, CI, autoreview, docs, screenshots>
 - Known root-integrated changes since assignment: <bullets or none>
 
@@ -223,9 +263,10 @@ Execution:
 
 Final report:
 - Status: done|blocked|needs-owner|ready-for-review
+- Source disposition: completed|partial|blocked|needs-owner|deferred|unchanged
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
-- Gate status: pass/fail/not-applicable with evidence
+- Gate status: pass/fail/not-applicable with root-verifiable evidence
 - Generated artifacts: ignored local files or directories created, or none
 - Risks: residual risks, dependency audit warnings, security findings,
   untested adapters, setup gaps, or test gaps
@@ -240,3 +281,11 @@ when the worker surface supports it, then ask for status, blocker, validation,
 risks, and expected next checkpoint only if the latest state is stale or
 insufficient. Do not interrupt a worker with new scope unless the user changed
 priority, a contract mismatch was discovered, or a gate failed.
+
+For each heartbeat wave, update the ledger with last-read time, worker status,
+validation or proof delta, blocker, risk delta, and next check. If a worker
+misses its next checkpoint or produces the same status for two consecutive
+heartbeats without new proof, send one focused unblock request. After the next
+no-progress check, choose a root-owned action: continue with a reason, steer,
+replace, abandon, retain for inspection, classify as `Blocked` or `Needs
+Owner`, or ask the owner.

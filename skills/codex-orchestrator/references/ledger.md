@@ -20,6 +20,11 @@ mkdir -p ~/.cache/dotagents/skills/codex-orchestrator/ledgers
 Portfolio names should be lowercase, filesystem-safe slugs. If the user gives a
 display name, derive a slug and record the display name in the ledger.
 
+If the resolved ledger file does not exist, create it from the template before
+discovery. Fill known fields, use `TBD` for unknown owner or repository
+metadata, set `Status: active`, and add a dated note summarizing the owner
+request and initial task sources.
+
 ## Ownership
 
 - The orchestrator reads and writes the ledger.
@@ -48,10 +53,16 @@ Repositories:
 Out of scope:
 - <repos, branches, issues, or workflows intentionally ignored>
 
+## Discovery Sources
+
+| Source ID | Kind | Path/Query/URL | Last Checked | Cursor/Fingerprint | Item Key Rule | Mutation Authority | Suppression Rule |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| DS-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | none, propose, or write | <owner/date/reason/source fingerprint> |
+
 ## Worker Policy
 
 Default authorization: inspect|implement
-Worker surface: codex-app-thread|cli-subagent|no-delegation
+Default worker surface: codex-app-thread|cli-subagent|no-delegation
 Allowed worker count: <number>
 Heartbeat: disabled|every 5 minutes|custom
 No subdelegation: true
@@ -59,28 +70,41 @@ Workers edit ledger: false
 Root owns worker lifecycle: true
 Visible worker title format: <Project>: <short current task>
 
+Each workstream records the actual surface used. For root-owned work, record
+`Surface=no-delegation`, `Worker ID=root`, and the reason delegation was
+skipped.
+
 ## Gate Policy
 
-Required gates:
+Available gates:
 - authorization
+- closure
+- follow-up
 - live-proof
 - autoreview
 - ci
 - owner-decision
+- risk-follow-up
 - release
 - public-model-identifier
 - cross-repo-integration
+- credential-and-access
 
 Portfolio overrides:
 - <gate>: <stricter requirement or owner-approved exception>
+
+Gate matrix:
+| Source ID | Workstream ID | Gate | Required When | Status | Evidence | Waiver/Owner | Next Action |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <source id> | <workstream id> | <gate> | <condition> | pass, fail, blocked, or not-applicable | <root-verifiable proof> | <owner/date or none> | <next action> |
 
 ## Workstreams
 
 ### Active
 
-| ID | Repo | Surface | Worker ID | Title | Objective | Status | Next Check |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | owner/repo | codex-app-thread | <thread id or link> | <Project>: <short task> | <objective> | active | <time> |
+| ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 
@@ -109,14 +133,20 @@ Portfolio overrides:
 
 ### Completed
 
-- <issue/PR/work item, commit/PR/proof, validation, whether the source issue
-  was closed>
+- <source id/ref, commit/PR/proof, validation, source closeout target and
+  whether it was updated/closed>
 - <worker id/title, integration method, worker lifecycle decision, generated
-  ignored artifacts removed/retained/left in disposable worktree>
+  ignored artifacts removed/retained/left in helper worktree>
 
 ### Released
 
 - <repo/version/tag/date/proof>
+
+## Wave Checkpoints
+
+| Wave | Started | Finished | Sources Scanned | Items Processed | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | <time> | <time> | <source ids> | <count> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
 ## Notes
 
@@ -142,12 +172,27 @@ single combined operating view.
   inspection, or handed off with the remaining action recorded elsewhere. A
   completed row may remain in `Active` only while a root-owned closeout action
   is still pending, and the `Next Check` must name that action.
+- `Autonomous`: candidate work safe to delegate under the current worker policy.
+  Move it to `Active` when assigned, or reclassify it when delegation is no
+  longer useful or authorized. A ledger cannot be `complete` while actionable
+  `Autonomous` work remains.
+- `Needs Owner`: progress waits on owner decision, credentials, scope approval,
+  risk acceptance, mutation authorization, or another non-Codex decision. Record
+  the decision brief, options, recommendation, and minimum owner action.
 - `Ready Next`: owner-ready work that still needs an explicit next action such
-  as review, commit, push, PR, merge, close, or release.
+  as review, commit, push, PR, merge, close, or release. Execute it before
+  stopping when current authorization permits; otherwise reclassify it as
+  `Needs Owner`, `Blocked`, or `Deferred` with the missing decision or access.
+- `Blocked`: work cannot progress with current access, state, dependency, or
+  proof. Record blocker, evidence, minimum next action, and whether the blocker
+  is owner-actionable or external.
+- `Ignored Or Suppressed`: known item intentionally excluded from this loop.
+  Record source id, source fingerprint, owner, date, and reason. Do not
+  rediscover it unless owner direction changes or the source fingerprint changes.
 - `Completed`: implemented work whose required gates passed. Record commits,
-  PRs, validation, proof, source issue closure, integration method, worker
-  lifecycle decision, and any generated ignored artifacts that were removed or
-  intentionally retained.
+  PRs, validation, root-verifiable proof, source closeout state, integration
+  method, worker lifecycle decision, and any generated ignored artifacts that
+  were removed or intentionally retained.
 - `Deferred`: known residual work that is intentionally not part of the current
   closeout. Link the follow-up issue/ticket when one exists, or record the
   proposed follow-up when mutation is not authorized. Do not mirror completed
@@ -161,12 +206,42 @@ single combined operating view.
 
 Before marking a ledger `complete`, verify:
 
+- All discovery sources were rescanned or intentionally skipped with a recorded
+  reason, cursor, and fingerprint.
 - `Active` contains no worker that is merely done; every active row needs a real
   next check or root-owned closeout action.
+- `Autonomous` is empty, or every item was reclassified as non-actionable under
+  the current authorization.
+- `Ready Next` is empty, or every remaining action was reclassified as `Needs
+  Owner`, `Blocked`, or `Deferred` with the missing authorization, decision, or
+  follow-up.
+- `Needs Owner` and `Blocked` entries are explicitly non-Codex-actionable and
+  include decision briefs, blockers, evidence, and minimum next actions.
 - `Deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
-- `Completed` records the final proof, issue/PR closure state, integration
+- `Completed` records the final proof, source closeout state, integration
   method, and worker lifecycle decision for each completed worker-backed item.
 - Generated ignored artifacts and helper worktrees are either removed, retained
-  for inspection with a reason, left only inside disposable worker state, or
-  explicitly handed off.
+  for inspection with a reason, left only inside a helper worktree with an
+  explicit lifecycle decision, or explicitly handed off.
+- `Ignored Or Suppressed` items have source id, source fingerprint, reason,
+  owner, and date, and they are not rediscovered unless that fingerprint or
+  owner direction changes.
+
+## Source Reconciliation
+
+At the end of each wave and before final closeout, compare the current source
+snapshot against the ledger:
+
+- every open GitHub issue, PR thread, CI failure, Markdown checkbox, local TODO,
+  release checklist item, and ledger-only item in scope has a stable source id;
+- every source id is mapped to exactly one current ledger status or an explicit
+  suppression entry;
+- completed source items have root-verifiable proof and a source closeout
+  update, such as issue closure, PR reply, resolved thread, green CI URL,
+  Markdown checkbox diff, TODO removal/update, commit SHA, release URL,
+  screenshot, API response, or timestamped command output;
+- partial completions have a linked/proposed follow-up or remain open under
+  `Needs Owner`, `Blocked`, or `Deferred`;
+- newly surfaced source items are added to `Autonomous`, `Active`, `Needs
+  Owner`, `Blocked`, `Deferred`, or `Ignored Or Suppressed` before stopping.

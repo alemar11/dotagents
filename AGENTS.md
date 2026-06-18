@@ -50,13 +50,16 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Dependency Classification
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
-- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer-orchestrator`, and `skill-audit`.
+- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `codex-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
-- Treat `maintainer-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github-portfolio-triage`, `$github-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
+- Treat `codex-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github-portfolio-triage`, `$github-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its core challenge workflow can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
+- Treat `domain-modeling` as portable because it uses local repo evidence and project docs such as `CONTEXT.md` and `docs/adr/`, with no Codex-only runtime tools required.
+- Treat `grill-with-docs` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
+- Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-with-docs` is the fallback path.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
 - Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
@@ -99,6 +102,12 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `plan-harder` as the single reusable home for higher-rigor planning support in this repo; do not reintroduce a separate lightweight clarification skill unless that package boundary is intentionally restored. (Codex learning)
 - Keep `plan-harder` runtime workflow, clarification behavior, and output details in `skills/plan-harder/SKILL.md` and its references, not in this `AGENTS.md`.
 
+### Grill and Domain Modeling skills
+- Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-with-docs`.
+- Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs; do not use it for repo-maintenance metadata sync.
+- Keep `grill-with-docs` as the thin composition layer over `grill-me` and `domain-modeling`, not a duplicate questioning loop.
+- Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-with-docs` before implementation rather than duplicating the documentation loop.
+
 ### Maintainer skill
 - The `.agents/skills/Maintainer` skill is the default maintainer for improving existing skills and plugins in this repository through shared upgrade tasks and skill-specific refresh workflows.
 - `Maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills and plugins in this repository.
@@ -133,10 +142,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit` and focused `github-*` skills rather than owning duplicate helper code.
 - Keep stars and star-list workflows in standalone `github-stars`, not in repository triage.
 
-### Maintainer Orchestrator skill
-- Keep `maintainer-orchestrator` as a standalone reusable skill under `skills/maintainer-orchestrator/`, using standalone Git/GitHub companion skills for queue, CI, review, release, commit, and publish workflows.
-- Keep runtime orchestration, worker, gate, and ledger details in `skills/maintainer-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
-- Persist portfolio ledgers under `~/.cache/dotagents/skills/maintainer-orchestrator/ledgers/`, with one ledger per named portfolio by default.
+### Codex Orchestrator skill
+- Keep `codex-orchestrator` as a standalone reusable skill under `skills/codex-orchestrator/`, using standalone Git/GitHub companion skills for queue, CI, review, release, commit, and publish workflows.
+- Keep runtime orchestration, worker, gate, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
+- Persist portfolio ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 
 ### GitHub Deep Review skill
 - Keep `github-deep-review` focused on evidence-first GitHub issue, PR, root-cause, provenance, and fix-quality review; keep PR review-thread reply routing in `github-review-threads`.

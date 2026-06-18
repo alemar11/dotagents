@@ -6,6 +6,21 @@ should not weaken these defaults without explicit owner approval.
 
 ## Universal Gates
 
+Gate selection is per workstream. Always evaluate `authorization` and
+`closure`. Add `live-proof` for user-facing behavior, `autoreview` for
+non-trivial code edits, `ci` for merge or release readiness, `owner-decision`
+when progress depends on approval or risk acceptance, `release` only for tag,
+package, deploy, or promotion work, `public-model-identifier` only when public
+names or API fields are changed or exposed, and `cross-repo-integration` only
+when multiple repositories or packages must remain compatible. Record
+`not-applicable` only with a short reason in the ledger gate matrix.
+
+Proof means root-verifiable evidence, not only a worker assertion. Acceptable
+proof includes command output, test names and outcomes, CI URLs, commit SHAs,
+PR or issue links, resolved review-thread links, Markdown checkbox diffs,
+TODO-removal diffs, screenshots, rendered artifacts, API responses, release
+URLs, timestamps, and owner decisions.
+
 ### Authorization Gate
 
 Confirm the worker's requested action is covered by the current authorization
@@ -28,25 +43,42 @@ owner-visible follow-up.
 
 ### Closure Gate
 
-Before closing a GitHub issue, marking a PR thread resolved, or moving work to
-`Completed`, verify that the source acceptance criteria are satisfied by
-recorded proof. If live proof is feasible but blocked by credentials, setup,
-service access, or missing hardware, do not treat the source item as fully
-complete unless the owner explicitly accepts that gap.
+Before closing any source item or moving work to `Completed`, verify that the
+source acceptance criteria are satisfied by root-verifiable proof. If live proof
+is feasible but blocked by credentials, setup, service access, or missing
+hardware, do not treat the source item as fully complete unless the owner
+explicitly accepts that gap.
 
 If the implementation intentionally satisfies only part of the source item,
 keep the source item open or move it to `Needs Owner` until the deferred scope
 has an owner-visible follow-up and the closeout links it.
 
-### Follow-Up Issue Gate
+### Follow-Up Gate
 
-Before closing a partially satisfied GitHub issue or PR thread, create or link
-a follow-up issue for deferred work when GitHub mutation is authorized. The
-follow-up must include the missing setup or behavior, the blocker or decision
-needed, the proof already collected, and the acceptance criteria that remain.
+Before closing a partially satisfied source item, create or link a follow-up for
+deferred work when mutation is authorized. The follow-up must include the
+missing setup or behavior, the blocker or decision needed, the proof already
+collected, and the acceptance criteria that remain.
 
-If GitHub mutation is not authorized, do not close the source item. Record the
-proposed follow-up title/body in the ledger under `Needs Owner` or `Deferred`.
+If mutation is not authorized, do not close the source item. Record the proposed
+follow-up title/body, file patch, reply, or owner-visible update in the ledger
+under `Needs Owner` or `Deferred`.
+
+### Source-Type Exit Criteria
+
+- GitHub issue: acceptance criteria satisfied, proof recorded, and issue closed
+  only when mutation is authorized; otherwise record the proposed closeout body.
+- GitHub PR review thread: thread resolved or reply drafted with proof and
+  owner-visible next action.
+- CI failure: latest relevant run is green, or the failure is summarized with a
+  blocker, owner action, and link.
+- Markdown checklist or plan item: checkbox or text updated, or a proposed patch
+  is recorded when file mutation is not authorized.
+- Local TODO: TODO removed, updated, or linked to a follow-up with proof.
+- Ledger-only item: moved to `Completed`, `Deferred`, `Blocked`, `Needs Owner`,
+  or `Ignored Or Suppressed` with proof and reason.
+- Release checklist: release gate satisfied, or residual release scope moved to
+  `Deferred`, `Blocked`, or `Needs Owner`.
 
 ### Autoreview Gate
 
