@@ -80,6 +80,23 @@ Each workstream records the actual surface used: `codex-app-thread`,
 `cli-subagent`, or `no-delegation`. For root-owned work, record
 `Surface=no-delegation`, `Worker ID=root`, and the reason delegation was skipped.
 
+## Delivery Topology Policy
+
+Default topology:
+- **One Feature Branch** for a single git repo, including monorepos.
+- **One PR Per Repo** for true multi-repo features.
+
+Exceptions:
+- **One PR Per Issue** only when the issue is isolated from shared contracts,
+  migrations, lockfiles, generated files, broad validation, and other active
+  issue work.
+- **Direct Commit** only with explicit owner authorization.
+
+Each implementation workstream records the topology, branch expectation,
+integration mode, expected PR shape, and integration proof target. Workers may
+not choose a different branch or PR strategy without a root-owned ledger update
+and authorization check.
+
 ## Gate Policy
 
 Available gates:
@@ -108,9 +125,9 @@ Gate matrix:
 
 ### Active
 
-| ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <topology; branch; integration mode; PR shape> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 
@@ -139,7 +156,7 @@ Gate matrix:
 
 ### Completed
 
-- <source id/ref, commit/PR/proof, validation, source closeout target and
+- <source id/ref, delivery topology, branch/PR/proof, validation, source closeout target and
   whether it was updated/closed>
 - <worker id/title, integration method, worker lifecycle decision, generated
   ignored artifacts removed/retained/left in helper worktree>

@@ -23,7 +23,10 @@ first.
   are not supported by user input, repo evidence, or project memory.
 - Ask for confirmation before writing a PRD file or publishing to an issue
   tracker unless the user explicitly asked to write/publish or a composing
-  skill passes explicit write authorization after resolving gates.
+  skill passes explicit run authorization after resolving gates.
+- Treat local file write authorization and external issue-tracker mutation
+  authorization as separate permissions. A composing skill may allow local
+  writes while still forbidding GitHub or another hosted tracker mutation.
 
 ## Workflow
 
@@ -43,6 +46,36 @@ Inspect the current project context before drafting:
 
 If setup files are missing, continue with repo evidence and say which project
 memory files were unavailable.
+
+If `CONTEXT-MAP.md` or `project-memory/agents/domain.md` indicates a
+multi-context repo or monorepo, resolve the selected product/workspace context
+before writing:
+
+- `product_slug`
+- `workspace_path`
+- `context_file`
+- `feature_slug`
+- `delivery_topology`
+
+Use values passed by a composing skill such as `$plan-feature` when present.
+Otherwise derive them from project memory and repo evidence, asking only when
+multiple contexts could plausibly own the feature.
+
+Resolve the PRD delivery topology before drafting:
+
+- `One Feature Branch`: default for a single project in one git repo and for a
+  monorepo where multiple products or packages share one git repo. Record one
+  shared feature branch and usually one draft PR for the whole feature.
+- `One PR Per Repo`: default for orchestrator workspaces and true cross-repo
+  features that span multiple independent git repositories. Record one feature
+  branch and draft PR per affected repo.
+- `One PR Per Issue`: exception only for isolated work with no shared
+  contracts, migrations, lockfiles, generated files, or overlapping validation.
+- `Direct Commit`: exception only when the maintainer explicitly authorizes a
+  direct commit path for this feature.
+
+If the repo shape makes `One Feature Branch` versus `One PR Per Repo`
+ambiguous, ask before writing the PRD.
 
 ### 2. Confirm the PRD source
 
@@ -67,6 +100,10 @@ Keep the PRD implementation-facing:
 - goals and non-goals,
 - functional requirements,
 - user workflow or system behavior,
+- selected planning identity: feature slug, product or project slug, workspace
+  path, and context file when applicable,
+- delivery topology: branch naming guidance, expected PR shape, and integration
+  proof expectations,
 - data, permissions, API, or integration constraints when relevant,
 - acceptance criteria,
 - risks and open questions,
@@ -84,21 +121,27 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
   `$github-issues`, using the title format `PRD: <Feature Name>` and the
   mapped `feature` issue type when available.
 - `Tracker mode: local-markdown`: write to the configured repo-local PRD path,
-  normally `.scratch/<feature-slug>/PRD.md`, only after confirmation.
+  normally `.scratch/<feature-slug>/PRD.md`, only after confirmation. Derive
+  or ask for `<feature-slug>` before writing. In multi-context repos, require
+  the accepted product/workspace context and use the tracker's product-scoped
+  slug convention when one is recorded.
 - `Tracker mode: orchestrator-local`: write to the configured orchestrator
   feature PRD path,
   `projects/<project-slug>/features/<feature-slug>/PRD.md`, only after
-  confirmation. Derive or ask for `<project-slug>` before writing. `$to-prd`
-  owns the PRD and may create or update
+  confirmation. Derive or ask for both `<project-slug>` and `<feature-slug>`
+  before writing. `$to-prd` owns the PRD and may create or update
   `projects/<project-slug>/PROJECT.md`,
   `projects/<project-slug>/repos/<repo-slug>.md`, and
   `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
   from accepted project, repo, or PRD source material needed for planning.
+  Record the accepted source in each support doc or in the completion report so
+  the source boundary is auditable.
 - `Tracker mode: orchestrator-github`: publish the PRD parent issue in the
   configured coordination repo through `$github-issues`. Derive or ask for
-  `<project-slug>`, ensure the GitHub label named exactly `<project-slug>`
-  exists in the coordination repo, and apply it to the PRD parent issue. The
-  PRD issue is the parent for vertical feature issues.
+  `<project-slug>` and `<feature-slug>`, ensure the GitHub label named exactly
+  `<project-slug>` exists in the coordination repo, and apply it to the PRD
+  parent issue when external mutation is authorized. The PRD issue is the
+  parent for vertical feature issues.
 - Other tracker: follow the repo-specific instructions in
   `project-memory/agents/issue-tracker.md`.
 
@@ -110,6 +153,21 @@ For orchestrator workspace PRDs, include repository scope, cross-repo
 contracts, integration gates, and release or validation order when those affect
 issue splitting.
 
+For single-repo and monorepo PRDs, include concrete product or workspace scope
+instead of using `N/A` when scope helps later issue splitting. For a simple
+single repo, say "current repository." For a monorepo, include the selected
+workspace path, context file, and explicitly out-of-scope sibling workspaces
+when relevant.
+
+Include a `## Delivery Topology` section in every PRD. For `One Feature
+Branch`, record branch naming such as `feature/<feature-slug>`, one draft PR
+for the feature, and the validation required before implementation issues
+close. For `One PR Per Repo`, record the branch name to use in each affected
+repo, the expected draft PR per repo, repo PR links or placeholders, and the
+cross-repo proof needed before coordination issues close. Use `One PR Per
+Issue` or `Direct Commit` only when explicitly authorized and record the
+authorization reason.
+
 For GitHub coordination PRDs, treat the project label as required issue
 metadata. It is separate from the mapped issue type and workflow-state labels.
 
@@ -120,9 +178,11 @@ publish the PRD without a type and keep the PRD title/body convention intact.
 Use `$github-issues` for the GitHub create, type, label, and dry-run command
 mechanics.
 
-If a composing skill such as `$plan-feature` passes explicit write
-authorization, use the configured target without re-asking unless this skill
-finds a new blocker or unresolved question.
+If a composing skill such as `$plan-feature` passes explicit run
+authorization, use the effective target from that handoff without re-asking
+unless this skill finds a new blocker or unresolved question. Do not treat
+"local file writes allowed" as permission to mutate GitHub or another hosted
+tracker.
 
 If the configured target is GitHub or GitHub coordination but external mutation
 is not authorized for the current run, do not mutate GitHub. Ask
@@ -138,8 +198,14 @@ If no issue-tracker setup exists, return the PRD in chat and recommend running
 Return:
 
 - PRD title,
+- authoritative `feature_slug`,
+- product/workspace/context or orchestrator project identity used, when
+  applicable,
+- delivery topology used,
 - target location or "chat only",
 - issue type applied, when the tracker supports it,
+- support docs created or updated and the accepted source used for each, when
+  applicable,
 - any open questions,
 - whether it is ready for `$to-issues`.
 

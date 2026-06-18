@@ -17,6 +17,10 @@ A good vertical issue:
 - changes one user-visible or system-verifiable behavior,
 - can be validated on its own,
 - includes the minimum layers needed to make that behavior real,
+- names the product/workspace context in monorepos or the affected repos and
+  integration gates in orchestrator workspaces,
+- inherits the PRD delivery topology and states how the issue can run in
+  parallel,
 - has explicit dependencies and no hidden ordering assumptions,
 - gives the implementation agent enough local context to start,
 - has acceptance criteria written as outcomes, not internal chores.
@@ -112,8 +116,13 @@ Mark an issue `ready-for-agent` only when it has:
 - a clear vertical outcome,
 - non-goals,
 - direct dependencies,
+- product/workspace/context scope when the PRD comes from a multi-context repo
+  or monorepo,
 - affected repos and integration gates when the issue is an orchestrator
   workspace issue,
+- inherited delivery topology using `One Feature Branch`, `One PR Per Repo`,
+  `One PR Per Issue`, or `Direct Commit`,
+- parallelization status, integration mode, and expected closeout path,
 - acceptance criteria,
 - validation steps,
 - implementation guidance enriched by `$plan-harder`,
@@ -126,12 +135,26 @@ startable before those dependencies are complete.
 Mark an issue `needs-info` when any of these remain unclear:
 
 - product behavior or user outcome,
+- selected product/workspace/context in a multi-context repo or monorepo,
 - required source of truth,
 - API contract or schema,
 - permissions or roles,
 - migration or compatibility policy,
 - access to credentials, services, fixtures, or test data,
-- validation command or acceptance signal.
+- validation command or acceptance signal,
+- delivery topology or whether the issue is safe to implement in parallel.
+
+If the source PRD has open questions that affect scope, acceptance criteria,
+dependency ordering, validation, permissions, publication target, data
+contracts, or cross-repo contracts, stop and resolve them before returning or
+publishing `ready-for-agent` issues. A deferred question is safe only when it
+is explicitly classified as non-blocking for the generated issue set.
+
+For orchestrator issues, repo PR links may be placeholders before
+implementation starts when all other implementation details are agent-ready.
+Completion must still require replacing those placeholders with real PR links
+or recording equivalent integration proof before the issue moves to `done` or
+closes.
 
 Mark an issue `ready-for-human` when the next step requires human judgment,
 business approval, design approval, or manual operational access before an

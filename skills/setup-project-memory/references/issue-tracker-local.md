@@ -7,6 +7,12 @@ Tracker mode: `local-markdown`
 Local PRD path pattern: `.scratch/<feature-slug>/PRD.md`
 Local issue path pattern: `.scratch/<feature-slug>/issues/<NN>-<slug>.md`
 Done issue path pattern: `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
+External mutation policy: local files only unless the user explicitly
+authorizes a hosted tracker in the current run.
+
+Current-run override: record any temp, dry-run, rehearsal, or no-external
+constraint here. Do not treat a current-run override as a durable tracker
+preference change unless the user explicitly says to make it persistent.
 
 ## Conventions
 
@@ -24,6 +30,24 @@ Done issue path pattern: `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
 - Triage state is recorded as a `Status:` line near the top of each issue file,
   using the state strings from `project-memory/agents/triage-labels.md`
 - Comments and conversation history append under a `## Comments` heading
+- Each implementation issue body includes `## Delivery` with the inherited
+  topology, parallelization status, integration mode, and closeout path.
+- In multi-context repos or monorepos, feature slugs must include the accepted
+  product or workspace slug when needed to avoid collisions, for example
+  `customer-portal-weekly-digest` instead of `weekly-digest`.
+- When a PRD has an accepted `Planning Identity`, use that `feature_slug`
+  rather than deriving a new slug from the PRD title.
+
+## Delivery Topology Defaults
+
+- Default topology: **One Feature Branch** for a single project or monorepo in
+  this git repo.
+- Branch naming: default to `feature/<feature-slug>`.
+- PR shape: one draft PR for the feature when the work is later published.
+  Local issue files are scheduling units and move to `issues/done/` only after
+  validation and the configured proof are complete.
+- Exceptions: **One PR Per Issue** only for isolated work; **Direct Commit**
+  only with explicit maintainer authorization.
 
 Implementation issues created from a PRD usually use `Type: task`. PRD files
 do not need `Type:` or `Status:` lines unless the repo chooses to treat PRDs as
@@ -32,8 +56,8 @@ workflow status belongs on implementation issues or in the tracker convention.
 
 ## Completion
 
-When a local markdown implementation issue is fully implemented and validated,
-move the issue file from `.scratch/<feature-slug>/issues/<NN>-<slug>.md` to
+When all acceptance criteria pass and validation is complete, move the issue
+file from `.scratch/<feature-slug>/issues/<NN>-<slug>.md` to
 `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`.
 
 Do not delete completed issue files. Do not add a `done` status; the
@@ -44,7 +68,8 @@ exist yet, create it when completing the first issue.
 ## When a skill says "publish to the issue tracker"
 
 Create a new file under `.scratch/<feature-slug>/`, creating the directory if
-needed.
+needed. If a current-run override disallows external mutation, this local write
+target is the effective target only when local file writes are authorized.
 
 ## When a skill says "fetch the relevant issue"
 

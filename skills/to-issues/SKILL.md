@@ -30,6 +30,14 @@ returned or published.
   unless the user explicitly asks for partial non-agent-ready backlog output.
 - Remember that `$plan-harder` is chat-output-only. It must not write files;
   this skill owns any issue tracker or local markdown writes.
+- Use the authoritative feature slug in this order: explicit slug from a
+  composing skill, PRD file path directory, configured tracker path, then PRD
+  title-derived slug as a fallback only.
+- Inherit delivery topology from the PRD. Use human-readable labels:
+  `One Feature Branch`, `One PR Per Repo`, `One PR Per Issue`, or
+  `Direct Commit`.
+- Treat local file write authorization and external issue-tracker mutation
+  authorization as separate permissions.
 
 ## Boundaries
 
@@ -39,7 +47,7 @@ returned or published.
   only", or "tests only" when a vertical slice is practical.
 - Ask for confirmation before writing local issue files or publishing to a
   hosted issue tracker unless the user explicitly asked to write/publish or a
-  composing skill passes explicit write authorization after resolving gates.
+  composing skill passes explicit run authorization after resolving gates.
 
 ## Workflow
 
@@ -68,6 +76,27 @@ Also inspect:
 If there is no PRD-quality source, stop and ask the user to provide one or run
 `$to-prd` first.
 
+Resolve and carry the planning identity before splitting:
+
+- `feature_slug`: explicit handoff value first, then the PRD directory slug,
+  then title-derived fallback only when no accepted path exists.
+- For multi-context repos or monorepos: `product_slug`, `workspace_path`, and
+  `context_file`.
+- For orchestrator workspaces: `project_slug` and affected repos.
+- `delivery_topology`: inherit from the PRD `## Delivery Topology` section. If
+  the PRD lacks it, infer `One Feature Branch` only for unambiguous single-repo
+  or monorepo work and `One PR Per Repo` only for unambiguous orchestrator or
+  cross-repo work; otherwise stop and require the PRD topology to be resolved.
+
+If a multi-context local-markdown repo lacks an accepted product/context or the
+feature slug can collide with another product according to tracker
+conventions, stop and resolve that identity before writing issues.
+
+Review PRD open questions before splitting. If any open question affects
+scope, acceptance criteria, dependencies, validation, publication target,
+permissions, data contracts, or cross-repo contracts, treat it as a blocker
+instead of creating `ready-for-agent` issues.
+
 ### 2. Split into vertical issues
 
 Use `references/vertical-slices.md` to create a proposed issue list.
@@ -79,6 +108,10 @@ Each issue should:
 
 - deliver a user-visible or system-verifiable increment,
 - include enough context to be implemented without rereading the whole PRD,
+- include product/workspace/context scope for monorepo work, or affected repos
+  and integration gates for orchestrator work,
+- include the inherited delivery topology, parallelization status, integration
+  mode, and expected closeout path,
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
@@ -146,7 +179,9 @@ Use `project-memory/agents/issue-tracker.md` for the target:
 - `Tracker mode: local-markdown`: write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
   and `Status:` lines near the top and a heading that follows the local issue
-  title convention `<feature-slug>: <NN> <vertical outcome>`.
+  title convention `<feature-slug>: <NN> <vertical outcome>`. Use the
+  authoritative feature slug from the handoff or PRD path; derive it from the
+  PRD title only when no accepted slug/path exists.
 - `Tracker mode: orchestrator-local`: write to
   `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
   with `Type:` and `Status:` lines near the top and a heading that follows the
@@ -173,18 +208,37 @@ issue with the mapped `task` type, usually `Task`. If issue types are disabled
 or unsupported, publish without a type and keep the mapped state labels.
 
 For orchestrator workspace issues, include affected repos, cross-repo contract
-notes, integration gates, repo-local PR or implementation issue links, and the
-proof required before the issue can move to `done` or close.
+notes, integration gates by name or link, repo-local PR or implementation issue
+links, and the proof required before the issue can move to `done` or close.
+Repo PR links may be placeholders before implementation when the issue is
+otherwise agent-ready, but completion must require replacing them with real PR
+links or recording equivalent integration proof.
+
+Every published or returned issue must include a `## Delivery` section:
+
+- `Topology`: copy the PRD topology exactly.
+- `Parallelization`: `independent`, `depends on <issue>`, `blocks <issue>`, or
+  `root-integrated`.
+- `Integration mode`: `shared feature branch`, `repo PR`, `issue PR`, or
+  `direct commit` with the explicit authorization reason.
+- `Closeout path`: `feature PR closes issue`, `repo PR closes issue`,
+  `issue PR closes issue`, `direct commit closes issue`, or
+  `local done move after proof`.
 
 Every published or returned issue must also say what happens when the work is
 complete:
 
 - GitHub: when all acceptance criteria pass and validation is complete, close
-  the implementation issue from the implementation PR body or final commit
-  message with a GitHub closing keyword such as `Closes #<this-issue-number>`.
-  The issue closes when that PR or commit reaches the default branch. Do not
-  close the parent PRD issue from an implementation issue unless the maintainer
-  explicitly says the whole PRD is complete.
+  the implementation issue from the relevant PR body with a GitHub closing
+  keyword such as `Closes #<this-issue-number>`. For `One Feature Branch`, the
+  feature PR closes the issue; for `One PR Per Repo`, the relevant repo PR
+  closes the repo-local issue, while coordination issues close only after repo
+  PR links or equivalent integration proof are recorded; for `One PR Per
+  Issue`, the issue PR closes the issue. Use final-commit closure only when the
+  issue's `## Delivery` section records `Direct Commit` or another explicit
+  maintainer authorization for final-commit closeout. Do not close the parent
+  PRD issue from an implementation issue unless the maintainer explicitly says
+  the whole PRD is complete.
 - Local markdown: when all acceptance criteria pass and validation is complete,
   create `issues/done/` on demand if needed, then move the issue file to the
   configured `issues/done/<NN>-<slug>.md` path. For orchestrator workspace
@@ -198,19 +252,22 @@ local markdown issue headings:
 <feature-slug>: <NN> <vertical outcome>
 ```
 
-- `<feature-slug>` is lowercase kebab-case derived from the PRD title without
-  the `PRD:` prefix.
+- `<feature-slug>` is the authoritative lowercase kebab-case slug from the
+  composing skill, PRD path, or configured tracker target. Derive it from the
+  PRD title without the `PRD:` prefix only as a fallback.
 - `<NN>` is the two-digit sequence from the vertical issue ordering.
 - `<vertical outcome>` is a short imperative or outcome phrase, without a
   trailing period.
 
 Example: `team-invitations: 02 Accept invitation into team`.
 
-If the user did not ask to publish and no composing skill passed explicit write
+If the user did not ask to publish and no composing skill passed explicit run
 authorization, return the hardened issue bodies in chat.
-If a composing skill such as `$plan-feature` passes explicit write
-authorization, use the configured target without re-asking unless this skill
-finds a new blocker or unresolved question.
+If a composing skill such as `$plan-feature` passes explicit run
+authorization, use the effective target from that handoff without re-asking
+unless this skill finds a new blocker or unresolved question. Do not treat
+"local file writes allowed" as permission to mutate GitHub or another hosted
+tracker.
 If the configured target is GitHub or GitHub coordination but external mutation
 is not authorized for the current run, do not mutate GitHub. Ask
 `$github-issues` for exact draft publish commands and return them with the
@@ -225,6 +282,10 @@ default.
 Summarize:
 
 - source PRD,
+- authoritative `feature_slug`,
+- product/workspace/context or orchestrator project identity used, when
+  applicable,
+- delivery topology inherited,
 - number of issues produced,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
@@ -250,6 +311,17 @@ Source PRD: [path, issue number, or title]
 
 Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
 
+Product Scope: [for monorepos, workspace path and selected context file; for
+single-repo issues, `current repository`; for orchestrator issues, use
+`Affected Repos`]
+
+## Delivery
+
+- Topology: [One Feature Branch | One PR Per Repo | One PR Per Issue | Direct Commit]
+- Parallelization: [independent | depends on <issue> | blocks <issue> | root-integrated]
+- Integration mode: [shared feature branch | repo PR | issue PR | direct commit with authorization reason]
+- Closeout path: [feature PR closes issue | repo PR closes issue | issue PR closes issue | direct commit closes issue | local done move after proof]
+
 ## Goal
 
 [One vertical outcome.]
@@ -265,8 +337,14 @@ Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
 ## Cross-Repo Notes
 
 [For orchestrator issues only: affected repos, interface contracts,
-integration gates, repo PR links, and validation order. Use `N/A` for ordinary
+repo PR links or placeholders, and validation order. Use `N/A` for ordinary
 single-repo issues.]
+
+## Integration Gates
+
+[For orchestrator issues only: named gates or a link to
+`integration-gates.md`, plus proof required before completion. Use `N/A` for
+ordinary single-repo issues.]
 
 ## Requirements
 
@@ -291,12 +369,14 @@ sections.]
 
 ## Completion
 
-When implementation and validation are complete:
+When all acceptance criteria pass and validation is complete:
 
-- GitHub: close this implementation issue from the implementation PR body or
-  final commit message with `Closes #<this-issue-number>`. Do not close the
-  parent PRD issue unless the maintainer explicitly says the whole PRD is
-  complete. The closing keyword takes effect when the PR or commit reaches the
+- GitHub: close this implementation issue from the relevant PR body with
+  `Closes #<this-issue-number>`, following the closeout path in `## Delivery`.
+  Final-commit closure is allowed only when `## Delivery` records `Direct
+  Commit` or another explicit maintainer authorization. Do not close the parent
+  PRD issue unless the maintainer explicitly says the whole PRD is complete.
+  The closing keyword takes effect when the PR or authorized commit reaches the
   default branch.
 - Local markdown: move this file to
   the configured `issues/done/<NN>-<slug>.md` path, creating `issues/done/` on

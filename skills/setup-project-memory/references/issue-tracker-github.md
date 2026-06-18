@@ -13,7 +13,9 @@ If this setup is being used for a temp exercise, validation pass, rehearsal,
 dry run, or any workflow where external GitHub mutation is not authorized, do
 not mutate GitHub. Use local markdown for that run, or ask `$github-issues` to
 return draft issue bodies and exact `gh` commands without executing them.
-Record the non-mutating choice in `project-memory/agents/issue-tracker.md`.
+Record the non-mutating choice as a current-run override in
+`project-memory/agents/issue-tracker.md`; do not treat it as a durable tracker
+preference change unless the user explicitly says so.
 
 ## Conventions
 
@@ -32,14 +34,26 @@ If GitHub issue types are disabled or customized for the organization, record
 the actual available values or fallback label convention in
 `project-memory/agents/triage-labels.md`.
 
+## Delivery Topology Defaults
+
+- Default topology: **One Feature Branch** for a single project or monorepo in
+  this git repo.
+- Branch naming: default to `feature/<feature-slug>`.
+- PR shape: one draft PR for the feature. Generated implementation issues are
+  scheduling units and normally close from that feature PR body.
+- Exceptions: **One PR Per Issue** only for isolated work; **Direct Commit**
+  only with explicit maintainer authorization.
+
 ## Title Format
 
 - PRD issue: `PRD: <Feature Name>`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
 
-Use a lowercase kebab-case `<feature-slug>` derived from the PRD title. Use
-two-digit ordering (`01`, `02`, `03`) for implementation issues so the global
-issue list remains scannable even outside the PRD sub-issue view.
+Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
+the PRD planning identity, or the PRD source path. Derive it from the PRD title
+only when no accepted slug exists. Use two-digit ordering (`01`, `02`, `03`)
+for implementation issues so the global issue list remains scannable even
+outside the PRD sub-issue view.
 
 ## When a skill says "publish to the issue tracker"
 
@@ -55,6 +69,8 @@ For feature planning:
   `<feature-slug>: <NN> <vertical outcome>`.
 - Each implementation issue body must also include `Source PRD: #<number>` for
   searchability and backlinks.
+- Each implementation issue body must include `## Delivery` with the inherited
+  topology, parallelization status, integration mode, and closeout path.
 
 For triage:
 
@@ -68,10 +84,13 @@ For triage:
 
 ## Completion
 
-When an implementation issue is fully implemented and validated, close that
-implementation issue from the implementation PR body or final commit message
-with a GitHub closing keyword such as `Closes #<issue-number>`. The issue
-closes when that PR or commit reaches the default branch.
+When all acceptance criteria pass and validation is complete, close that
+implementation issue from the relevant PR body with a GitHub closing keyword
+such as `Closes #<issue-number>`. For the default **One Feature Branch**
+topology, the feature PR closes generated implementation issues. Final-commit
+closure is allowed only when the issue records **Direct Commit** or another
+explicit maintainer authorization. The issue closes when that PR or authorized
+commit reaches the default branch.
 
 Use closing keywords only for issues actually satisfied by the change. Do not
 close the parent PRD issue from a child implementation issue unless the

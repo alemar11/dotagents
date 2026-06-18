@@ -2,4 +2,4 @@ interface:
   display_name: "To Issues"
   short_description: "Split PRDs into vertical issues hardened by Plan Harder."
   brand_color: "#2DD4BF"
-  default_prompt: "Use $to-issues to read the PRD and project-memory issue tracker rules, split the PRD into vertical implementation issues or orchestrator feature issues, run $plan-harder once for every issue, merge the hardened guidance into each issue body without duplicate sections, and publish only after confirmation. Use $github-issues for GitHub issue creation, issue type, labels, parent/sub-issue relationships, and dry-run commands."
+  default_prompt: "Use $to-issues to read the PRD and project-memory issue tracker rules, preserve the authoritative feature slug, product/project scope, and delivery topology, split the PRD into vertical implementation issues or orchestrator feature issues with delivery and closeout details, run $plan-harder once for every issue, merge the hardened guidance without duplicate sections, and publish only after confirmation or explicit run authorization. Use $github-issues for GitHub issue creation, issue type, labels, parent/sub-issue relationships, and dry-run commands."

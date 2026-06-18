@@ -11,6 +11,12 @@ Local issue path pattern:
 `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
 Done issue path pattern:
 `projects/<project-slug>/features/<feature-slug>/issues/done/<NN>-<slug>.md`
+External mutation policy: local files only unless the user explicitly
+authorizes a hosted tracker in the current run.
+
+Current-run override: record any temp, dry-run, rehearsal, or no-external
+constraint here. Do not treat a current-run override as a durable coordination
+backend change unless the user explicitly says to make it persistent.
 
 ## Conventions
 
@@ -43,13 +49,30 @@ actually planned or written.
   may create or update `projects/<project-slug>/PROJECT.md`,
   `projects/<project-slug>/repos/<repo-slug>.md`, and
   `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
-  from accepted project, repo, or PRD source material.
+  from accepted project, repo, or PRD source material. It must record the
+  accepted source in each support doc or in its completion report so the source
+  boundary is auditable.
 - `$to-issues` owns files under
   `projects/<project-slug>/features/<feature-slug>/issues/` and records
   issue-specific integration proof requirements inside those issue files.
 - `$to-issues` reads `PROJECT.md`, `repos/*.md`, and `integration-gates.md`,
   but does not create or refresh those supporting files unless the user
   explicitly asks for that broader orchestrator artifact update.
+
+## Delivery Topology Defaults
+
+- Default topology: **One PR Per Repo** for true multi-repo orchestrator work.
+- Branch naming: default to `feature/<feature-slug>` in each affected repo
+  unless that repo has a stricter branch policy.
+- PR shape: one draft PR per affected repo, linked from the local PRD or
+  vertical feature issue.
+- Integration proof: cross-repo validation is required before local
+  orchestrator issues move to `issues/done/`. Repo PR links may be placeholders
+  before implementation, but completion requires real PR links or equivalent
+  proof.
+- Exceptions: **One Feature Branch** only when all affected work is actually in
+  one git repo; **One PR Per Issue** only for isolated work; **Direct Commit**
+  only with explicit maintainer authorization.
 
 ## Orchestrator Issue Content
 
@@ -58,9 +81,14 @@ Generated feature issues should include:
 - `Type:` and `Status:` lines from `project-memory/agents/triage-labels.md`
 - `Source PRD:` pointing to the feature PRD
 - affected repo list
+- delivery topology, branch or PR expectations, parallelization status,
+  integration mode, and closeout path
 - cross-repo contract or interface notes
-- integration gates and validation proof needed before completion
-- repo-local PR links or implementation child issue links when they exist
+- integration gates by name or link and validation proof needed before
+  completion
+- repo-local PR links or implementation child issue links when they exist;
+  placeholders are allowed before implementation when the issue is otherwise
+  ready, but real PR links or equivalent proof are required before completion
 
 Vertical issues are cross-repo outcomes by default. Repo-specific chores should
 stay inside the vertical issue unless a separate repo-local issue is needed for
@@ -68,9 +96,10 @@ ownership, review, or CI.
 
 ## Completion
 
-A local orchestrator issue is complete only after the feature slice is
-implemented and validated across the required repos. Move the issue to
-`issues/done/` only after cross-repo integration proof is recorded.
+A local orchestrator issue is complete only after all acceptance criteria pass,
+validation is complete across the required repos, and cross-repo integration
+proof is recorded. Move the issue to `issues/done/` only after that proof is
+recorded.
 
 Do not delete completed issue files. Do not add a `done` status; the
 `issues/done/` folder is the completion signal. If `issues/done/` does not

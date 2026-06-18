@@ -127,9 +127,30 @@ Default to GitHub for code repos when the remote is GitHub, and local markdown
 when no clear GitHub issue tracker exists. If the user is running a temp
 exercise, validation pass, rehearsal, dry run, or otherwise says not to mutate
 external systems, recommend local markdown for that run and record the reason
-in `project-memory/agents/issue-tracker.md`. For orchestrator workspaces, ask
-whether the default should be local orchestrator files or a GitHub coordination
-repo; record the chosen backend in `project-memory/agents/issue-tracker.md`.
+in `project-memory/agents/issue-tracker.md` as a current-run or dry-run
+override, not as proof that the durable tracker preference changed. When a
+durable tracker preference is known, record both the durable default and the
+current-run effective target. For orchestrator workspaces, ask whether the
+default should be local orchestrator files or a GitHub coordination repo;
+record the chosen backend in `project-memory/agents/issue-tracker.md`.
+
+For local markdown in a multi-context repo or monorepo, confirm whether feature
+slugs must include a product or workspace prefix, such as
+`customer-portal-weekly-digest`. Record that convention so `$plan-feature`,
+`$to-prd`, and `$to-issues` can reject ambiguous feature paths before writing.
+
+Confirm delivery topology defaults:
+
+- **One Feature Branch** for a single project or monorepo in one git repo: one
+  shared feature branch and usually one draft PR for the feature.
+- **One PR Per Repo** for orchestrator or true multi-repo work: one feature
+  branch and draft PR per affected repo.
+- **One PR Per Issue** only for isolated exceptions with no shared contracts,
+  migrations, lockfiles, generated files, or overlapping validation.
+- **Direct Commit** only with explicit maintainer authorization.
+
+Record these defaults in `project-memory/agents/issue-tracker.md` so PRDs can
+select a topology before `$to-issues` generates implementation issues.
 
 **Triage types and labels**
 
@@ -178,7 +199,9 @@ Choose:
 
 Default to single-context unless `CONTEXT-MAP.md` already exists or the repo is
 clearly a multi-domain monorepo. Use orchestrator context only for
-orchestrator workspace mode.
+orchestrator workspace mode. For multi-context repos, record how a planning
+workflow selects and carries `product_slug`, `workspace_path`, and
+`context_file` into PRDs and generated issues.
 
 For existing-project bootstrap, also confirm whether to seed domain memory from
 the evidence found. Recommend seeding only high-confidence items and presenting
@@ -225,6 +248,10 @@ For orchestrator workspace mode:
   `project-memory`, validation commands, branches, commits, and PRs.
 - State that `codex-orchestrator` owns runtime worker state and ledgers; the
   orchestrator workspace owns durable planning artifacts.
+- Start from the matching orchestrator tracker template and preserve its
+  config-only setup, artifact ownership, child-repo ownership, issue content,
+  and completion sections. Do not collapse orchestrator tracker setup to path
+  patterns alone.
 
 For existing-project bootstrap:
 

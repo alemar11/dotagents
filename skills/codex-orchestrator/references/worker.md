@@ -78,6 +78,29 @@ Stay in the root orchestrator thread when:
 - Only the root orchestrator creates, reuses, forks, assigns, renames,
   messages, archives, closes, interrupts, or replaces worker threads.
 
+## Delivery Topology Rules
+
+Record one of these human-readable labels for every implementation workstream:
+
+- **One Feature Branch**: the root owns one shared feature branch and usually
+  one draft PR for the feature. Workers operate in isolated helper worktrees or
+  produce patches, handoff-ready diffs, or reviewed commits for root
+  integration. Workers must not publish independent branches or PRs unless the
+  root explicitly changes their authorization mode and branch expectation.
+- **One PR Per Repo**: each affected repo has its own feature branch and draft
+  PR. A worker assigned to one repo may prepare that repo branch or PR only
+  when authorization mode permits publication. The root records all repo PR
+  links and verifies cross-repo integration before closeout.
+- **One PR Per Issue**: use only when the issue is explicitly isolated from
+  shared contracts, migrations, lockfiles, generated files, broad validation,
+  and other active issue work.
+- **Direct Commit**: use only with explicit owner authorization recorded in the
+  prompt and ledger.
+
+If the worker sees a mismatch between the assigned topology and repo reality,
+such as multi-repo work labeled **One Feature Branch**, it must stop and report
+`needs-owner` instead of choosing a new branch or PR strategy.
+
 ## Worker Status Vs Root Lifecycle
 
 Workers report execution status. The root orchestrator decides lifecycle:
@@ -250,6 +273,9 @@ Scope:
 - Closeout target: <issue close, PR reply, file checkbox/patch, CI rerun, ledger status>
 - Authorization mode: <inspect|implement|push-pr|ci-rerun-fix|merge-close|release>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
+- Delivery topology: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
+- Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>
+- Integration mode: <patch to root|handoff|worker commit|repo PR|issue PR|direct commit|inspect only>
 - Report channel: this worker thread only
 - Helper checkout/worktree: <path or unknown>
 - Heartbeat/next checkpoint: <interval/time or none>
@@ -279,6 +305,8 @@ Final report:
 - Source disposition: completed|partial|blocked|needs-owner|deferred|unchanged
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
+- Delivery: topology, branch or PR used, closeout path, and PR links or
+  `none`
 - Gate status: pass/fail/not-applicable with root-verifiable evidence
 - Generated artifacts: ignored local files or directories created, or none
 - Risks: residual risks, dependency audit warnings, security findings,

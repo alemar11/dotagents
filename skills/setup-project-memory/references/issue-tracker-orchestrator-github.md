@@ -26,14 +26,18 @@ If this setup is being used for a temp exercise, validation pass, rehearsal,
 dry run, or any workflow where external GitHub mutation is not authorized, do
 not mutate GitHub. Use local orchestrator markdown for that run, or ask
 `$github-issues` to return draft issue bodies and exact `gh` commands without
-executing them. Record the non-mutating choice in
-`project-memory/agents/issue-tracker.md`.
+executing them. Record this as a current-run override in
+`project-memory/agents/issue-tracker.md`; do not treat it as a durable
+coordination backend change unless the user explicitly says so.
 
 ## Conventions
 
 - PRD issue title: `PRD: <Feature Name>`
 - Vertical feature issue title:
   `<feature-slug>: <NN> <vertical outcome>`
+- Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
+  the PRD planning identity, or the PRD source path. Derive it from the PRD
+  title only when no accepted slug exists.
 - PRD issues use the mapped `feature` issue type when GitHub issue types are
   available.
 - Vertical feature issues use the mapped `task` issue type when available.
@@ -48,14 +52,32 @@ the project label exists. Use `$github-issues` to create the PRD parent issue,
 create vertical issues under the PRD, and attach existing issues to the PRD
 when needed.
 
+## Delivery Topology Defaults
+
+- Default topology: **One PR Per Repo** for true multi-repo orchestrator work.
+- Branch naming: default to `feature/<feature-slug>` in each affected repo
+  unless that repo has a stricter branch policy.
+- PR shape: one draft PR per affected repo, all linked from the coordination
+  PRD or vertical feature issue.
+- Integration proof: cross-repo validation is required before coordination
+  issues close. Repo PR links may be placeholders before implementation, but
+  completion requires real PR links or equivalent proof.
+- Exceptions: **One Feature Branch** only when all affected work is actually in
+  one git repo; **One PR Per Issue** only for isolated work; **Direct Commit**
+  only with explicit maintainer authorization.
+
 ## Orchestrator Issue Content
 
 Generated vertical feature issues should include:
 
 - affected repo list
+- delivery topology, branch or PR expectations, parallelization status,
+  integration mode, and closeout path
 - cross-repo contract or interface notes
-- integration gates and validation proof needed before closure
-- repo-local PR links or implementation child issue links when they exist
+- integration gates by name or link and validation proof needed before closure
+- repo-local PR links or implementation child issue links when they exist;
+  placeholders are allowed before implementation when the issue is otherwise
+  ready, but real PR links or equivalent proof are required before completion
 - completion rule for the coordination issue
 - project label applied: `<project-slug>`
 
@@ -66,9 +88,10 @@ URLs.
 
 ## Completion
 
-Close a vertical feature issue only after implementation and validation across
-the affected repos is complete. Repo-local implementation PRs should link back
-to the coordination issue, but do not close the PRD parent issue from a single
-repo PR unless the maintainer explicitly says the whole PRD is complete.
+Close a vertical feature issue only after all acceptance criteria pass,
+validation is complete across the affected repos, and cross-repo integration
+proof is recorded. Repo-local implementation PRs should link back to the
+coordination issue, but do not close the PRD parent issue from a single repo PR
+unless the maintainer explicitly says the whole PRD is complete.
 
 Use closing keywords only for issues actually satisfied by the change.

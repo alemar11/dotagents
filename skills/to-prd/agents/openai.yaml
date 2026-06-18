@@ -2,4 +2,4 @@ interface:
   display_name: "To PRD"
   short_description: "Turn clarified feature intent into a project-backed PRD."
   brand_color: "#B45309"
-  default_prompt: "Use $to-prd to inspect project memory and repo evidence, turn the clarified feature or product intent into a PRD, and publish it only after confirmation using the configured issue tracker, including repo-local or orchestrator workspace paths. Use $github-issues for GitHub PRD issue creation, issue type, labels, and dry-run command mechanics."
+  default_prompt: "Use $to-prd to inspect project memory and repo evidence, resolve feature slug, product/project scope, and delivery topology, turn the clarified feature or product intent into a PRD with branch, PR, and integration-proof expectations, and publish it only after confirmation or explicit run authorization using the effective target. Use $github-issues for GitHub PRD issue creation, issue type, labels, and dry-run command mechanics."

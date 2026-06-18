@@ -161,6 +161,32 @@ thread.
 - Before sending overlapping new scope into an existing worker, resync or
   replace that worker instead of assuming its checkout is still current.
 
+## Delivery Topology Execution
+
+When a PRD, generated issue, source item, or owner request names a delivery
+topology, record it in the ledger and execute against that topology:
+
+- **One Feature Branch**: use for one git repo, including monorepos. The root
+  orchestrator owns the shared feature branch and usually one draft PR for the
+  whole feature. Parallel workers may use isolated helper worktrees, patches,
+  handoff, or reviewed worker commits, but the root integrates their output
+  into the shared branch and owns the final PR.
+- **One PR Per Repo**: use for true multi-repo work. Create or use one feature
+  branch per affected repo, usually the same `feature/<feature-slug>` branch
+  name, and publish one draft PR per repo when publication is authorized. Link
+  every repo PR from the coordination PRD or issue and require cross-repo
+  integration proof before closeout.
+- **One PR Per Issue**: use only when the issue is isolated enough that its
+  branch and PR cannot conflict with shared contracts, migrations, lockfiles,
+  generated files, broad validation, or other active issue work.
+- **Direct Commit**: use only when explicitly authorized by the owner or source
+  item. Record the authorization, validation, and issue-closing target before
+  committing.
+
+Do not let workers invent a different branch or PR strategy. If the topology is
+missing or contradicted by repo reality, stop and classify the workstream as
+`Needs Owner` until the topology is corrected or explicitly overridden.
+
 ## Companion Skill Routing
 
 Use the smallest standalone companion skill for each Git or GitHub workstream:
@@ -180,10 +206,11 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 ## Workflow
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
-2. Identify the repository set, task sources, current goals, suppressed items,
-   owner constraints, and portfolio-specific gate overrides. Register task
-   sources in the ledger with source ids, source refs, last-checked state,
-   dedupe rules, and mutation authority.
+2. Identify the repository set, task sources, current goals, delivery topology,
+   suppressed items, owner constraints, and portfolio-specific gate overrides.
+   Register task sources in the ledger with source ids, source refs,
+   last-checked state, dedupe rules, mutation authority, branch or PR
+   expectations, and integration proof target.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
    use focused current-repo companions such as `$github-triage`,
@@ -200,14 +227,16 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    closeout target.
 5. Before delegation, read `references/worker.md` and create one Codex worker
    per independent ownership boundary, such as repository, package, service,
-   path set, or tightly scoped workstream, using the selected worker surface.
-   Use visible Codex App threads in App-oriented workflows only when explicit
-   owner intent for visible/new/separate/background workers is present;
-   otherwise use CLI/subagent workers when authorized and inspectable, or stay
-   in the root thread.
+   path set, or tightly scoped workstream, using the selected worker surface
+   and the recorded delivery topology. Use visible Codex App threads in
+   App-oriented workflows only when explicit owner intent for
+   visible/new/separate/background workers is present; otherwise use
+   CLI/subagent workers when authorized and inspectable, or stay in the root
+   thread.
 6. Give each worker an explicit authorization mode, scope, gates, expected
-   proof, and final report shape. Workers must not spawn sub-workers, create
-   threads, manage other chats, or edit the ledger.
+   proof, delivery topology, branch expectation, integration mode, and final
+   report shape. Workers must not spawn sub-workers, create threads, manage
+   other chats, or edit the ledger.
 7. For visible Codex App workers, immediately rename each worker thread to
    `<Project>: <short current task>` and update the title when the material
    assignment changes. Keep titles short enough to scan in the sidebar.

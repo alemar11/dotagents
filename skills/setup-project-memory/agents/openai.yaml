@@ -2,4 +2,4 @@ interface:
   display_name: "Setup Project Memory"
   short_description: "Configure project memory for repos, monorepos, or orchestrator workspaces."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $setup-project-memory to inspect this workspace, choose repo, monorepo, or orchestrator setup mode, confirm issue tracker, triage types and labels, and domain-memory layout, then write AGENTS.md plus project-memory/agents files and seed CONTEXT.md or ADRs when existing evidence is strong. Route GitHub issue lifecycle mechanics to $github-issues."
+  default_prompt: "Use $setup-project-memory to inspect this workspace, choose repo, monorepo, or orchestrator setup mode, confirm issue tracker, delivery topology defaults, current-run mutation overrides, triage types and labels, domain-memory layout, and monorepo slug conventions, then write AGENTS.md plus project-memory/agents files and seed CONTEXT.md or ADRs when evidence is strong. Route GitHub issue lifecycle mechanics to $github-issues."

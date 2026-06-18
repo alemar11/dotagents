@@ -49,6 +49,11 @@ is feasible but blocked by credentials, setup, service access, or missing
 hardware, do not treat the source item as fully complete unless the owner
 explicitly accepts that gap.
 
+For implementation issues that include `## Delivery`, verify that closeout
+matches the recorded topology and closeout path. Close through the relevant PR
+body by default. Use final-commit closure only when the issue records
+**Direct Commit** or another explicit maintainer authorization.
+
 If the implementation intentionally satisfies only part of the source item,
 keep the source item open or move it to `Needs Owner` until the deferred scope
 has an owner-visible follow-up and the closeout links it.
@@ -131,6 +136,10 @@ For portfolios involving multiple repositories, require compatibility evidence
 across repo boundaries before owner-ready status: shared API shape, version
 pinning, migration order, deploy order, fixtures, or an explicit integration
 test.
+
+For **One PR Per Repo**, also require the real repo PR links or equivalent
+integration proof promised by the coordination PRD or issue before declaring
+the coordination issue closed, merge-ready, or complete.
 
 ### Credential And Access Gate
 
