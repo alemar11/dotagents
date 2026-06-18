@@ -38,7 +38,7 @@ returned or published.
   feature-level `Delivery mode` label for cross-session scheduling. Mark it as
   inherited from `Source PRD` unless the issue has an explicit owner-authorized
   issue-level exception.
-- Build and persist a feature-level `delivery-plan.md` for execution sequencing.
+- Build and persist a feature-level `execution-plan.md` for execution sequencing.
   It should own issue-level ordering, dependency waves, and unlock conditions so
   issues can stay implementation-focused.
 - Treat local file write authorization and external issue-tracker mutation
@@ -109,7 +109,7 @@ Apply vertical slicing whenever practical. Order issues for sequential agentic
 implementation, and make dependencies explicit rather than relying on issue
 numbering.
 
-Before hardening, build one `delivery-plan.md` for the feature from the proposed
+Before hardening, build one `execution-plan.md` for the feature from the proposed
 issue list:
 
 - `delivery-mode`: inherited from the PRD and copied in each issue.
@@ -120,8 +120,8 @@ issue list:
 
 Write this plan as a local artifact when local file writes are permitted:
 
-- local-markdown: `.scratch/<feature-slug>/delivery-plan.md`
-- orchestrator-local: `projects/<project-slug>/features/<feature-slug>/delivery-plan.md`
+- local-markdown: `.scratch/<feature-slug>/execution-plan.md`
+- orchestrator-local: `projects/<project-slug>/features/<feature-slug>/execution-plan.md`
 - if local writes are disallowed, return the equivalent execution plan in-chat and
   include the intended path for the next run.
 
@@ -239,8 +239,8 @@ links or recording equivalent integration proof.
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
 
-- `Delivery plan`: required when local artifacts are written; path to
-  `delivery-plan.md` in the feature artifact folder.
+- `Execution plan`: required when local artifacts are written; path to
+  `execution-plan.md` in the feature artifact folder.
   If local writes are disallowed, include the inline execution plan in the
   completion summary and a target plan path for the next run.
 - `Source PRD`: required. Prefer a stable GitHub issue number or local PRD path.
@@ -331,7 +331,7 @@ Summarize:
 - product/workspace/context or orchestrator project identity used, when
   applicable,
 - delivery mode inherited,
-- delivery-plan file path when written, or inline plan summary when not persisted,
+- execution-plan file path when written, or inline plan summary when not persisted,
 - number of issues produced,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
@@ -355,7 +355,7 @@ delivery lines when they do not apply.
 Type: [mapped issue type, usually task]
 Status: [mapped triage state]
 Source PRD: [path, issue number, or title]
-Delivery plan: [path to delivery-plan.md or inline plan reference]
+Execution plan: [path to execution-plan.md or inline plan reference]
 
 Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
 
@@ -375,9 +375,9 @@ single-repo issues, `current repository`; for orchestrator issues, use
 - Integration mode: [omit when obvious from Source PRD; otherwise shared
   feature branch | repo PR | issue PR | direct commit with authorization reason]
 
-## Delivery Plan
+## Execution Plan
 
-- Reference: `delivery-plan.md`
+- Reference: `execution-plan.md`
 - If local files are written, keep full sequencing and unlock conditions there; the
   issue needs only dependency and parallelization fields.
 - If files are not written in this run, include the same plan in the final report and

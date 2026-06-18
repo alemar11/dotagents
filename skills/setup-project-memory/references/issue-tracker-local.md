@@ -32,8 +32,8 @@ preference change unless the user explicitly says to make it persistent.
 - Comments and conversation history append under a `## Comments` heading
 - Each implementation issue body includes `Source PRD:` pointing to
   `.scratch/<feature-slug>/PRD.md`.
-- Each implementation issue body should include a `Delivery plan` pointer to
-  `.scratch/<feature-slug>/delivery-plan.md` when local artifact runs are in
+- Each implementation issue body should include a `Execution plan` pointer to
+  `.scratch/<feature-slug>/execution-plan.md` when local artifact runs are in
   scope.
 - Each implementation issue body includes `## Delivery` with issue-level
   `Parallelization` and `Closeout`.

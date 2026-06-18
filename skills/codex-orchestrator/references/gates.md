@@ -50,7 +50,7 @@ hardware, do not treat the source item as fully complete unless the owner
 explicitly accepts that gap.
 
 For implementation issues that include `## Delivery`, verify that closeout
-matches the recorded delivery mode and closeout path. If a `delivery-plan.md` is
+matches the recorded delivery mode and closeout path. If a `execution-plan.md` is
 present, also verify that required wave/unlock conditions from that plan are
 completed before declaring closure. Close through the relevant PR body by default.
 Use final-commit closure only when the issue records

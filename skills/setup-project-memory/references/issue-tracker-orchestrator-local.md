@@ -80,8 +80,8 @@ Generated feature issues should include:
 
 - `Type:` and `Status:` lines from `project-memory/agents/triage-labels.md`
 - `Source PRD:` pointing to the feature PRD
-- Each implementation issue body should include a `Delivery plan` pointer to
-  `projects/<project-slug>/features/<feature-slug>/delivery-plan.md` when local
+- Each implementation issue body should include a `Execution plan` pointer to
+  `projects/<project-slug>/features/<feature-slug>/execution-plan.md` when local
   files are in scope.
 - affected repo list
 - `Delivery mode` copied from the PRD and labeled as feature-level metadata

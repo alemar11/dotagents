@@ -43,8 +43,8 @@ coordination backend change unless the user explicitly says so.
 - Vertical feature issues use the mapped `task` issue type when available.
 - Vertical feature issues are GitHub sub-issues of the PRD parent issue.
 - Each vertical feature issue body includes `Source PRD: #<prd-number>`.
-- Each vertical feature issue body should include a `Delivery plan` pointer to
-  `delivery-plan.md` when local artifact targets are available.
+- Each vertical feature issue body should include a `Execution plan` pointer to
+  `execution-plan.md` when local artifact targets are available.
 - Each PRD parent issue and vertical feature issue gets a GitHub label named
   exactly `<project-slug>`. This is a project grouping/search label, not a
   workflow state label.

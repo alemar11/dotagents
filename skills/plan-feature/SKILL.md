@@ -157,14 +157,14 @@ Planning identity:
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
 - delivery_mode: <mode recorded in the PRD Delivery Mode section>
-  Also include the expected `delivery-plan.md` location for local artifact runs.
+  Also include the expected `execution-plan.md` location for local artifact runs.
 ```
 
 Require `$to-issues` to use the configured issue target, apply configured issue
 types and triage labels, attach GitHub implementation issues to the PRD issue
 when GitHub or GitHub coordination mode is configured, use the configured title
 formats, apply the `<project-slug>` GitHub label to GitHub coordination issues,
-and confirm that `$to-issues` produced a feature `delivery-plan.md` (or
+and confirm that `$to-issues` produced a feature `execution-plan.md` (or
 returned an equivalent inline plan when local write is disallowed) and ran
 `$plan-harder` once per generated issue. If external tracker mutation is
 disallowed, require `$to-issues` to return draft publish commands or write to the
@@ -204,7 +204,7 @@ Summarize:
 - planning identity used, including feature slug and product/context/project
   scope when applicable,
 - delivery mode used,
-- delivery-plan path or inline execution plan returned,
+- execution-plan path or inline execution plan returned,
 - gates resolved or deferred,
 - any issue still blocked and why.
 

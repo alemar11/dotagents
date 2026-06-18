@@ -181,8 +181,8 @@ ledger and execute against that delivery mode. For generated implementation issu
 first read the issue body and any linked `Source PRD`; the PRD is the canonical
 source for full delivery mode details, while the issue body supplies the copied
 feature-level `Delivery mode` label plus issue-level parallelization,
-dependencies, closeout, and overrides. If the issue references a `delivery-plan.md`
-or the source includes a `Delivery plan` pointer, load it and use its wave and
+dependencies, closeout, and overrides. If the issue references a `execution-plan.md`
+or the source includes a `Execution plan` pointer, load it and use its wave and
 unlock rules for scheduling. Treat an issue line such as
 `Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)`
 as a feature-level landing strategy, not as a claim that only this one issue
@@ -254,7 +254,7 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
 2. Identify the repository set, task sources, current goals, delivery mode
-   or `Source PRD` inheritance, delivery-plan source, issue-level scheduling
+   or `Source PRD` inheritance, execution-plan source, issue-level scheduling
    constraints, suppressed items, owner constraints, and portfolio-specific gate
    overrides. Register task sources in the ledger with source ids, source refs,
    dedupe rules, mutation authority, branch or PR expectations, closeout target,
@@ -281,14 +281,14 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 5. Before delegation, read `references/worker.md` and create one Codex worker
    per independent ownership boundary, such as repository, package, service,
    path set, or tightly scoped workstream, using the selected worker surface,
-   recorded or inherited delivery mode, and the current delivery-plan wave.
+   recorded or inherited delivery mode, and the current execution-plan wave.
    Use visible Codex App
    threads in App-oriented workflows only when explicit owner intent for
    visible/new/separate/background workers is present; otherwise use
    CLI/subagent workers when authorized and inspectable, or stay in the root
    thread.
 6. Give each worker an explicit authorization mode, scope, gates, expected
-   proof, delivery mode, delivery-plan reference, branch expectation, integration
+   proof, delivery mode, execution-plan reference, branch expectation, integration
    mode, and final report shape. Workers must not spawn sub-workers, create
    threads, manage other chats, or edit the ledger.
 7. For visible Codex App workers, immediately rename each worker thread to

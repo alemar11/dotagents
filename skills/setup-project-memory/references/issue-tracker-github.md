@@ -71,8 +71,8 @@ For feature planning:
   searchability and backlinks.
 - Each implementation issue body must include `## Delivery` with issue-level
   `Parallelization` and `Closeout`.
-- Each implementation issue body should include a `Delivery plan` pointer to
-  `delivery-plan.md` when local artifact targets are available.
+- Each implementation issue body should include a `Execution plan` pointer to
+  `execution-plan.md` when local artifact targets are available.
 - Each implementation issue body must copy the effective PRD `Delivery mode`
   and label it as feature-level metadata inherited from `Source PRD`, for
   example `Delivery mode: One Feature Branch (feature-level, inherited from
