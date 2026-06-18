@@ -47,7 +47,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
 | `maintainer-orchestrator` | Coordinate visible Codex App threads or CLI/subagent workers, standalone Git/GitHub companion skills, gates, portfolio ledgers, and closure follow-ups for maintainer work. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
-| `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using evidence from repos, memory, sessions, and current context. |
+| `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC documentation using curated summaries and a bundled upstream DocC source tree. |
 | `yeet` | Publish local work as a branch and draft PR by composing standalone git and GitHub skills. |

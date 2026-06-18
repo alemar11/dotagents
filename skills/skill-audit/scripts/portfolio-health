@@ -1,0 +1,537 @@
+#!/usr/bin/env python3
+"""Report skill inventory, prompt-budget, duplicate, and usage signals."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+from collections import Counter, defaultdict
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
+
+
+VERSION = "0.1.0"
+LIVE_LINE_RE = re.compile(r"^\s*-\s+([^:]+(?::[^:]+)?):\s*(.*?)\s+\(file:\s*(.*?)\)\s*$")
+FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
+SKILL_ROOT_RE = re.compile(r"^\s*-\s+`([^`]+)`\s*=\s*`([^`]+)`")
+
+
+@dataclass(frozen=True)
+class SkillRecord:
+    name: str
+    description: str
+    path: str
+    realpath: str
+    source: str
+    body_hash: str
+    body_bytes: int
+    description_bytes: int
+
+
+def default_roots() -> list[Path]:
+    cwd = Path.cwd()
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser()
+    roots = [
+        cwd / "skills",
+        cwd / ".agents" / "skills",
+        codex_home / "skills",
+        Path.home() / ".codex" / "skills",
+        Path.home() / ".agents" / "skills",
+        codex_home / "plugins" / "cache",
+    ]
+    return dedupe_paths(roots)
+
+
+def default_log_roots(deep: bool) -> list[Path]:
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex")).expanduser()
+    roots = [codex_home / "history.jsonl", codex_home / "sessions"]
+    if deep:
+        roots.append(codex_home / "archived_sessions")
+    return roots
+
+
+def dedupe_paths(paths: list[Path]) -> list[Path]:
+    seen: set[str] = set()
+    result: list[Path] = []
+    for path in paths:
+        expanded = path.expanduser()
+        try:
+            key = str(expanded.resolve())
+        except OSError:
+            key = str(expanded)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(expanded)
+    return result
+
+
+def parse_frontmatter(text: str, fallback_name: str) -> tuple[str, str]:
+    match = FRONTMATTER_RE.match(text)
+    if not match:
+        return fallback_name, ""
+    fields: dict[str, str] = {}
+    for line in match.group(1).splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        value = value.strip().strip('"').strip("'")
+        fields[key.strip()] = value
+    return fields.get("name") or fallback_name, fields.get("description") or ""
+
+
+def read_skill(path: Path, source: str, *, name: str | None = None, description: str | None = None) -> SkillRecord | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        realpath = str(path.resolve())
+    except OSError:
+        return None
+    parsed_name, parsed_description = parse_frontmatter(text, path.parent.name)
+    skill_name = name or parsed_name
+    skill_description = description if description is not None else parsed_description
+    return SkillRecord(
+        name=skill_name,
+        description=" ".join(skill_description.split()),
+        path=str(path),
+        realpath=realpath,
+        source=source,
+        body_hash=hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest(),
+        body_bytes=len(text.encode("utf-8", errors="replace")),
+        description_bytes=len(skill_description.encode("utf-8", errors="replace")),
+    )
+
+
+def live_inventory() -> tuple[list[SkillRecord], str | None]:
+    codex = shutil.which("codex")
+    if not codex:
+        return [], "codex not found"
+    try:
+        result = subprocess.run(
+            [codex, "debug", "prompt-input"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        return [], str(error)
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        return [], detail[:500] or f"codex exited {result.returncode}"
+    lines = prompt_input_lines(result.stdout)
+    roots = skill_root_aliases(lines)
+    records: list[SkillRecord] = []
+    for line in lines:
+        match = LIVE_LINE_RE.match(line)
+        if not match:
+            continue
+        name, description, raw_path = match.groups()
+        path = expand_skill_path(raw_path, roots)
+        record = read_skill(path, "codex-debug-prompt-input", name=name, description=description)
+        if record:
+            records.append(record)
+    if not records:
+        return [], "codex debug prompt-input succeeded but no skill inventory lines were parsed"
+    return dedupe_records(records), None
+
+
+def prompt_input_lines(stdout: str) -> list[str]:
+    values = [stdout]
+    try:
+        parsed = json.loads(stdout)
+    except json.JSONDecodeError:
+        parsed = None
+    if parsed is not None:
+        values.extend(collect_strings(parsed))
+    lines: list[str] = []
+    for value in values:
+        lines.extend(str(value).splitlines())
+    return lines
+
+
+def collect_strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        result: list[str] = []
+        for item in value:
+            result.extend(collect_strings(item))
+        return result
+    if isinstance(value, dict):
+        result = []
+        for item in value.values():
+            result.extend(collect_strings(item))
+        return result
+    return []
+
+
+def skill_root_aliases(lines: list[str]) -> dict[str, Path]:
+    roots: dict[str, Path] = {}
+    for line in lines:
+        match = SKILL_ROOT_RE.match(line)
+        if match:
+            roots[match.group(1)] = Path(match.group(2)).expanduser()
+    return roots
+
+
+def expand_skill_path(raw_path: str, roots: dict[str, Path]) -> Path:
+    if raw_path.startswith("/"):
+        return Path(raw_path)
+    first, _, rest = raw_path.partition("/")
+    if first in roots and rest:
+        return roots[first] / rest
+    return Path(raw_path).expanduser()
+
+
+def scan_inventory(roots: list[Path]) -> list[SkillRecord]:
+    records: list[SkillRecord] = []
+    for root in roots:
+        if root.is_file() and root.name == "SKILL.md":
+            record = read_skill(root, str(root.parent))
+            if record:
+                records.append(record)
+            continue
+        if not root.exists():
+            continue
+        for path in root.rglob("SKILL.md"):
+            parts = set(path.parts)
+            if ".git" in parts or ".cache" in parts or "__pycache__" in parts:
+                continue
+            record = read_skill(path, str(root))
+            if record:
+                records.append(record)
+    return dedupe_records(records)
+
+
+def dedupe_records(records: list[SkillRecord]) -> list[SkillRecord]:
+    seen: set[str] = set()
+    result: list[SkillRecord] = []
+    for record in records:
+        key = record.realpath
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(record)
+    return sorted(result, key=lambda item: (item.name.lower(), item.path))
+
+
+def iter_log_files(roots: list[Path], since: datetime) -> list[Path]:
+    files: list[Path] = []
+    for root in roots:
+        root = root.expanduser()
+        if root.is_file() and root.suffix == ".jsonl":
+            try:
+                if datetime.fromtimestamp(root.stat().st_mtime, timezone.utc) >= since:
+                    files.append(root)
+            except OSError:
+                pass
+            continue
+        if not root.exists():
+            continue
+        for path in root.rglob("*.jsonl"):
+            try:
+                if datetime.fromtimestamp(path.stat().st_mtime, timezone.utc) >= since:
+                    files.append(path)
+            except OSError:
+                continue
+    return sorted(files)
+
+
+def evidence_needles(record: SkillRecord) -> tuple[str, ...]:
+    lower_name = record.name.lower()
+    parent = Path(record.path).parent.name.lower()
+    return (
+        f"${lower_name}",
+        f"<name>{lower_name}</name>",
+        f"/{parent}/skill.md",
+        f"{parent}/skill.md",
+    )
+
+
+def usage_counts(records: list[SkillRecord], roots: list[Path], months: int, max_log_mb: int) -> dict[str, dict[str, Any]]:
+    since = datetime.now(timezone.utc) - timedelta(days=months * 31)
+    files = iter_log_files(roots, since)
+    max_bytes = max_log_mb * 1024 * 1024
+    scanned_bytes = 0
+    counters: dict[str, Counter[str]] = {record.name: Counter() for record in records}
+    sessions: dict[str, set[str]] = {record.name: set() for record in records}
+    needles = {record.name: evidence_needles(record) for record in records}
+
+    for path in files:
+        try:
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if scanned_bytes + len(data) > max_bytes:
+            break
+        scanned_bytes += len(data)
+        text = data.decode("utf-8", errors="replace").lower()
+        session_id = path.stem
+        for name, checks in needles.items():
+            matches = sum(text.count(check) for check in checks)
+            if matches:
+                counters[name]["mentions"] += matches
+                sessions[name].add(session_id)
+
+    return {
+        name: {
+            "mentions": counter["mentions"],
+            "sessions": len(sessions[name]),
+        }
+        for name, counter in counters.items()
+    } | {
+        "_scan": {
+            "files": len(files),
+            "bytes": scanned_bytes,
+            "since": since.date().isoformat(),
+            "max_log_mb": max_log_mb,
+        }
+    }
+
+
+def duplicate_groups(records: list[SkillRecord]) -> dict[str, list[dict[str, Any]]]:
+    by_name: dict[str, list[SkillRecord]] = defaultdict(list)
+    by_body: dict[str, list[SkillRecord]] = defaultdict(list)
+    by_description: dict[str, list[SkillRecord]] = defaultdict(list)
+    for record in records:
+        by_name[record.name.lower()].append(record)
+        by_body[record.body_hash].append(record)
+        if record.description:
+            by_description[record.description.lower()].append(record)
+
+    def group(items: dict[str, list[SkillRecord]]) -> list[dict[str, Any]]:
+        result = []
+        for key, values in sorted(items.items()):
+            if len(values) < 2:
+                continue
+            result.append(
+                {
+                    "key": key,
+                    "count": len(values),
+                    "items": [
+                        {"name": value.name, "path": value.path, "source": value.source}
+                        for value in values
+                    ],
+                }
+            )
+        return result
+
+    return {
+        "same_name": group(by_name),
+        "same_body": group(by_body),
+        "same_description": group(by_description),
+    }
+
+
+def build_report(args: argparse.Namespace) -> dict[str, Any]:
+    roots = dedupe_paths(args.root or default_roots())
+    records: list[SkillRecord]
+    live_error = None
+    inventory_source = "filesystem"
+    if args.no_live:
+        records = scan_inventory(roots)
+    else:
+        records, live_error = live_inventory()
+        if records:
+            inventory_source = "codex-debug-prompt-input"
+        else:
+            records = scan_inventory(roots)
+
+    usage: dict[str, Any] = {"_scan": {"skipped": True}}
+    if not args.no_logs:
+        usage = usage_counts(records, args.log_root or default_log_roots(args.deep_logs), args.months, args.max_log_mb)
+
+    budget_tokens = math.floor(args.context_tokens * (args.budget_percent / 100))
+    inventory_tokens = sum(math.ceil(len(f"- {r.name}: {r.description} (file: {r.path})".encode("utf-8")) / 4) for r in records)
+    descriptions = sorted(
+        [
+            {
+                "name": record.name,
+                "description_bytes": record.description_bytes,
+                "path": record.path,
+                "description": record.description,
+            }
+            for record in records
+            if record.description_bytes >= args.long_description_bytes
+        ],
+        key=lambda item: item["description_bytes"],
+        reverse=True,
+    )
+    unused = sorted(
+        [
+            {
+                "name": record.name,
+                "path": record.path,
+                "source": record.source,
+                "mentions": usage.get(record.name, {}).get("mentions", 0),
+                "sessions": usage.get(record.name, {}).get("sessions", 0),
+            }
+            for record in records
+            if usage.get(record.name, {}).get("mentions", 0) == 0
+        ],
+        key=lambda item: item["name"].lower(),
+    )
+    roots_summary = Counter(record.source for record in records)
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "version": VERSION,
+        "inventory_source": inventory_source,
+        "live_error": live_error,
+        "skill_count": len(records),
+        "budget": {
+            "context_tokens": args.context_tokens,
+            "budget_percent": args.budget_percent,
+            "budget_tokens": budget_tokens,
+            "inventory_tokens_estimate": inventory_tokens,
+            "budget_used_percent": round((inventory_tokens / budget_tokens) * 100, 2) if budget_tokens else None,
+        },
+        "description_candidates": descriptions[: args.limit],
+        "duplicates": duplicate_groups(records),
+        "unused_candidates": unused[: args.limit],
+        "root_summary": dict(roots_summary.most_common()),
+        "usage_scan": usage.get("_scan", {}),
+        "skills": [
+            {
+                "name": record.name,
+                "description": record.description,
+                "path": record.path,
+                "source": record.source,
+                "body_bytes": record.body_bytes,
+                "description_bytes": record.description_bytes,
+                "usage": usage.get(record.name, {}),
+            }
+            for record in records
+        ],
+    }
+
+
+def doctor() -> dict[str, Any]:
+    roots = default_roots()
+    log_roots = default_log_roots(False)
+    return {
+        "python": shutil.which("python3") or "python3",
+        "codex": shutil.which("codex"),
+        "default_roots": [{"path": str(root), "exists": root.exists()} for root in roots],
+        "default_log_roots": [{"path": str(root), "exists": root.exists()} for root in log_roots],
+        "network_required": False,
+    }
+
+
+def print_text(report: dict[str, Any]) -> None:
+    print(f"portfolio-health {report['version']}")
+    print(f"inventory: {report['skill_count']} skills from {report['inventory_source']}")
+    if report.get("live_error"):
+        print(f"live inventory fallback: {report['live_error']}")
+    budget = report["budget"]
+    print(
+        "budget: estimate={inventory_tokens_estimate} tokens, limit={budget_tokens} tokens ({budget_used_percent}% used)".format(
+            **budget
+        )
+    )
+    print("\n## Description candidates")
+    for item in report["description_candidates"]:
+        print(f"- {item['name']} ({item['description_bytes']} bytes): {item['path']}")
+    if not report["description_candidates"]:
+        print("- none")
+
+    print("\n## Duplicates")
+    any_duplicate = False
+    for kind, groups in report["duplicates"].items():
+        if not groups:
+            continue
+        any_duplicate = True
+        print(f"{kind}:")
+        for group in groups:
+            names = ", ".join(item["path"] for item in group["items"])
+            print(f"- {group['key']} ({group['count']}): {names}")
+    if not any_duplicate:
+        print("- none")
+
+    print("\n## Unused candidates")
+    if report["usage_scan"].get("skipped"):
+        print("- skipped (--no-logs)")
+    elif report["unused_candidates"]:
+        for item in report["unused_candidates"]:
+            print(f"- {item['name']}: {item['path']}")
+    else:
+        print("- none")
+
+    print("\n## Root summary")
+    for root, count in report["root_summary"].items():
+        print(f"- {root}: {count}")
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Audit skill portfolio health signals: inventory budget, duplicate skills, descriptions, and recent usage evidence."
+    )
+    parser.add_argument("command", nargs="?", choices=["scan", "doctor"], default="scan")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
+    parser.add_argument("--json", action="store_true", help="Emit a stable JSON envelope.")
+    parser.add_argument("--root", action="append", type=Path, default=[], help="Skill root, SKILL.md file, or plugin cache root to scan.")
+    parser.add_argument("--log-root", action="append", type=Path, default=[], help="Session/history JSONL root to scan for usage evidence.")
+    parser.add_argument("--months", type=int, default=3, help="Recent log window for usage evidence.")
+    parser.add_argument("--max-log-mb", type=int, default=500, help="Maximum JSONL bytes to scan.")
+    parser.add_argument("--deep-logs", action="store_true", help="Include archived Codex sessions.")
+    parser.add_argument("--no-live", action="store_true", help="Skip codex debug prompt-input and use filesystem roots only.")
+    parser.add_argument("--no-logs", action="store_true", help="Skip session/history usage evidence.")
+    parser.add_argument("--context-tokens", type=int, default=272000, help="Context window used for budget estimates.")
+    parser.add_argument("--budget-percent", type=float, default=2.0, help="Prompt budget percentage reserved for skill inventory.")
+    parser.add_argument("--long-description-bytes", type=int, default=220, help="Threshold for long description candidates.")
+    parser.add_argument("--limit", type=int, default=25, help="Maximum candidates shown per section.")
+    return parser
+
+
+def emit_json(command: str, data: dict[str, Any]) -> None:
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "version": VERSION,
+                "command": [command],
+                "data": data,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    if args.months < 1:
+        parser.error("--months must be positive")
+    if args.max_log_mb < 1:
+        parser.error("--max-log-mb must be positive")
+
+    if args.command == "doctor":
+        data = doctor()
+        if args.json:
+            emit_json("doctor", data)
+        else:
+            print(f"portfolio-health {VERSION}")
+            print(f"python: {data['python']}")
+            print(f"codex: {data['codex'] or 'not found'}")
+            print("network: not required")
+        return 0
+
+    report = build_report(args)
+    if args.json:
+        emit_json("scan", report)
+    else:
+        print_text(report)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

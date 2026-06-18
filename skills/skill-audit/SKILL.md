@@ -31,6 +31,10 @@ When raw session behavior matters, the skill-owned helper
 `scripts/session-evidence` can extract target-specific invocation evidence
 from Codex session JSONL files. It is a shipped runtime helper for audit work;
 do not edit or route fixes to session archives themselves.
+When portfolio-level hygiene matters, the skill-owned helper
+`scripts/portfolio-health` can report live inventory pressure, duplicate
+skills, long descriptions, root summaries, and heuristic recent-usage signals.
+Treat its output as audit evidence, not an automatic cleanup instruction.
 
 If the user explicitly names one or more targets, such as `audit skill
 $my-skill`, `audit plugin $my-plugin`, or `audit [$my-plugin:publish](...)`,
@@ -111,6 +115,10 @@ After detecting the target kind, open the matching workflow reference:
 - `references/cache-resolution.md`
   - Use whenever a target path lives under `~/.codex/plugins/cache/...` or when
     a bundled target's editable owner is unclear.
+- `references/portfolio-hygiene.md`
+  - Use when deciding whether skills should be merged, disabled, trimmed,
+    deduplicated, or kept because of inventory, prompt-budget, root, or usage
+    evidence.
 
 Open only the references needed for the current target and questions. Do not
 bulk-load all reference files by default.
@@ -135,11 +143,31 @@ The helper reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
 `runtime-command` buckets. Treat its output as evidence to interpret, not as a
 replacement for reading a representative trace when a claim is high-risk.
 
+## Portfolio Health Helper
+
+Use `scripts/portfolio-health` when an audit needs inventory-level evidence
+before recommending merges, disables, description trims, or cleanup:
+
+```bash
+scripts/portfolio-health --help
+scripts/portfolio-health --version
+scripts/portfolio-health --json doctor
+scripts/portfolio-health scan --months 3
+```
+
+The helper reports prompt-budget estimates, long description candidates,
+duplicate names/bodies/descriptions, root summaries, and heuristic recent
+usage evidence. Use `references/portfolio-hygiene.md` to interpret the output.
+Do not delete, disable, or rewrite a skill solely because the helper reports no
+recent usage.
+
 ## Shared Evidence Rules
 
 - Start from relevant local surfaces first, then widen only when needed.
 - Search the memory index first, then open only the 1-3 most relevant rollout
   summaries.
+- For portfolio-level merge, disable, duplicate, or prompt-budget claims, run
+  `scripts/portfolio-health` unless the scope is too small for it to add value.
 - Check cheap maintenance signals such as `git log` and adjacent docs before
   deep session scans.
 - If the audit is making a behavior, correctness, false-positive,
@@ -158,6 +186,16 @@ replacement for reading a representative trace when a claim is high-risk.
 
 Return a compact audit using the format in
 `references/output-format.md`.
+
+## CLI Maintenance
+
+- Keep normal runtime execution on `scripts/session-evidence` and
+  `scripts/portfolio-health`.
+- Both helpers are Python standard-library scripts shipped directly under
+  `scripts/`.
+- Keep each helper's `--version` output as its semver source of truth.
+- Re-verify touched helpers with `--help`, `--version`, and `--json doctor`
+  before relying on them in an audit.
 
 ## Decision Rules
 
