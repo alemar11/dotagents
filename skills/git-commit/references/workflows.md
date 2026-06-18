@@ -91,4 +91,4 @@ Closes #11
 
 Do not add `Closes #N` for deferred or partially satisfied work. If the owner
 asked to close a partial issue, route issue follow-up handling to
-`github-triage` before committing or closing.
+`$github-issues` before committing or closing.

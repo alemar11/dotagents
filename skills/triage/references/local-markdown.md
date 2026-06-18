@@ -21,6 +21,8 @@ Use mapped values from `project-memory/agents/triage-labels.md` if the repo has
 custom strings. Keep `Type:` for work kind and `Status:` for workflow state.
 `needs-info` means waiting for reporter/requester input; when that input
 arrives, re-triage the issue before marking it `ready-for-agent`.
+`ready-for-agent` means queue-ready; listed dependencies still gate when work
+can start.
 Completion is represented by moving the file into `issues/done/`, not by
 adding a `done` status.
 
@@ -41,7 +43,7 @@ For orchestrator workspace issues, preserve additional fields such as
 - Do not delete completed local issue files. Move them to the configured
   `issues/done/` folder after implementation and validation are complete. For
   orchestrator workspace issues, move only after cross-repo integration proof
-  is recorded.
+  is recorded. Create `issues/done/` on demand when completing the first issue.
 
 ## Standard Sections
 

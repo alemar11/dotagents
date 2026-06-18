@@ -14,7 +14,8 @@ If the user asks for a PR, draft PR, branch publication, or "publish", use
 "PR or push-only?" and default to push-only when unclear. When the user
 explicitly authorizes direct-to-main issue closure, use issue-closing commit
 trailers such as `Closes #123` only after staging the intended paths and
-verifying the diff.
+verifying the diff. Route GitHub issue comments, labels, type changes, follow-up
+issue creation, or manual closure to `$github-issues`.
 
 ## Trigger Cues
 

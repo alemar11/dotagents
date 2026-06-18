@@ -32,7 +32,8 @@ Canonical triage states:
 
 - `needs-triage`: maintainer needs to evaluate.
 - `needs-info`: waiting on reporter or requester.
-- `ready-for-agent`: fully specified and agent-ready.
+- `ready-for-agent`: fully specified and agent-queue-ready; listed
+  dependencies still gate when work can start.
 - `ready-for-human`: requires human implementation or judgment.
 - `wontfix`: will not be actioned.
 
@@ -96,9 +97,9 @@ queue:
   note, so they can be re-evaluated as `needs-triage`,
 - issues that look ready but lack an agent brief.
 
-For GitHub, use `gh issue list` and `gh issue view`. Request JSON fields when
-useful, but if the installed `gh` version rejects the `type` field, rerun
-without it and use the configured fallback from `triage-labels.md`.
+For GitHub, use `$github-issues` to list or view issues and recent comments.
+Request type and relationship fields when useful, but if the installed `gh`
+version rejects them, use the configured fallback from `triage-labels.md`.
 
 For local markdown, use the configured local issue layout from
 `project-memory/agents/issue-tracker.md` and `references/local-markdown.md`.
@@ -134,6 +135,10 @@ Use `ready-for-agent` only when the issue has:
 - no unresolved product or technical blocker,
 - an embedded or posted `$plan-harder` agent brief.
 
+Dependencies may still be listed. In that case, the issue is queue-ready but
+must not be started until its dependencies are complete, and the dependency
+graph must stay acyclic.
+
 Use `needs-info` when the next action is a concrete question for the reporter
 or requester. Its next transition is back through `needs-triage` after new
 activity, not directly to agent execution. Use `ready-for-human` when the work
@@ -155,8 +160,8 @@ If blocker resolution still depends on the reporter or requester, stop at
 `needs-info`. Do not harden the issue with `$plan-harder`, do not post an agent
 brief, and do not call it ready for implementation.
 
-If the issue is ready for agent execution, use `$plan-harder` once on that
-single issue and embed the result using `references/agent-brief.md`.
+If the issue is queue-ready for agent execution, use `$plan-harder` once on
+that single issue and embed the result using `references/agent-brief.md`.
 
 ### 6. Write changes
 
@@ -165,9 +170,9 @@ asked to apply, write, publish, or update triage.
 
 For GitHub:
 
-- Set the issue type with `gh issue edit <number> --type "<mapped type>"`
-  when GitHub issue types are configured and available.
-- Apply the mapped state label with `gh issue edit <number> --add-label`.
+- Use `$github-issues` to set the issue type when GitHub issue types are
+  configured and available.
+- Use `$github-issues` to apply the mapped state label.
 - Remove conflicting old state labels when the mapping file identifies them.
 - Add a concise comment for `needs-info`, `ready-for-human`, `wontfix`, or
   `ready-for-agent` handoff notes.

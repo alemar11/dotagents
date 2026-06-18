@@ -27,9 +27,9 @@ gh issue list --state open --limit 50 --json number,title,state,url
 ```
 
 If there are no relevant local changes to stage, do not create an empty commit,
-branch, push, or PR. Route issue creation, comments, labels, or closure to
-`github-triage` or the focused GitHub companion that owns the request, then
-verify the result with `gh issue view` or `gh issue list`.
+branch, push, or PR. Route issue creation, comments, labels, type changes,
+relationships, or closure to `$github-issues`, then verify the result with
+`$github-issues` or direct read-only `gh issue view` / `gh issue list`.
 
 Close out by saying explicitly:
 

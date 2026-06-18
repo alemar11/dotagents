@@ -2,4 +2,4 @@ interface:
   display_name: "Triage"
   short_description: "Triage GitHub or local issues into ready states."
   brand_color: "#F97316"
-  default_prompt: "Use $triage to inspect project-memory tracker rules, read incoming GitHub or local markdown issues including orchestrator workspace issues, classify type and state, grill or harden when needed, and write triage notes or agent-ready briefs."
+  default_prompt: "Use $triage to inspect project-memory tracker rules, read incoming GitHub or local markdown issues including orchestrator workspace issues, classify type and state, grill or harden when needed, and write triage notes or agent-ready briefs. Use $github-issues for GitHub issue fetch, edit, comment, close, type, and label mechanics."

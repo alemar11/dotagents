@@ -21,14 +21,9 @@ gh pr view <number> --json number,title,body,author,isDraft,reviewDecision,merge
 Inspect only enough detail to make the triage recommendation. Avoid broad
 historical reads unless the user asks for a deep queue audit.
 
-## Mutations
+## Follow-Up Mutations
 
-Before edits, state the intended mutation and target item. Use direct commands:
-
-```bash
-gh issue edit <number> --add-label "<label>"
-gh issue comment <number> --body-file <file>
-gh pr edit <number> --add-assignee <login>
-```
-
-Never mutate as a side effect of a read-only triage request.
+Never mutate as a side effect of a read-only triage request. Route GitHub issue
+creation, type changes, comments, labels, parent/sub-issue relationships, and
+closure to `$github-issues`. Route PR review-thread replies to
+`$github-review-threads`.

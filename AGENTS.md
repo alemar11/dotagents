@@ -53,7 +53,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `codex-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
-- Treat `codex-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github-portfolio-triage`, `$github-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
+- Treat `codex-orchestrator` as Codex-dependent because its runtime contract requires Codex thread tools, heartbeat automation, `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, `$autoreview`, and standalone Git/GitHub companion skills including `$github-portfolio-triage`, `$github-triage`, `$github-issues`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its core challenge workflow can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
@@ -61,12 +61,12 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `grill-me-with-context` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-me-with-context` is the fallback path.
 - Treat `setup-project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/setup-project-memory/references/session-history.md`, while its core setup flow falls back to repo/workspace evidence plus `$domain-modeling`.
-- Treat `to-prd` as portable because it uses local repo or workspace evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
-- Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue and otherwise relies on local project memory plus configured issue-tracker instructions.
+- Treat `to-prd` as portable and skill-composed because it uses local repo or workspace evidence, project memory, and configured issue-tracker instructions to produce PRDs, and uses `$github-issues` for GitHub PRD publishing without Codex-only runtime tools.
+- Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue, uses `$github-issues` for GitHub tracker publishing, and otherwise relies on local project memory plus configured issue-tracker instructions.
 - Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
-- Treat `triage` as portable and skill-composed because it relies on project-memory issue-tracker mappings, can load `$setup-project-memory` when setup is missing, uses `$grill-me-with-context` for underspecified repo-backed issue intent, and requires `$plan-harder` before marking an issue `ready-for-agent`.
+- Treat `triage` as portable and skill-composed because it relies on project-memory issue-tracker mappings, can load `$setup-project-memory` when setup is missing, uses `$grill-me-with-context` for underspecified repo-backed issue intent, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$github-issues` for GitHub issue mutations.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
-- Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
+- Treat `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
 - Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
 - Treat `tanstack` as portable because it is guidance-only, relies on local repo/package inspection plus current TanStack-owned docs when exact APIs matter, and does not require Codex-only runtime tools.
 - Treat `.agents/skills/Maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
@@ -181,14 +181,15 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep embedded-CLI docs artifact-first: examples must run `<artifact-path> ...`, `<resolved-tool> ...`, or an absolute installed artifact path unless the host explicitly documents a wrapper, alias, or `PATH` contract for bare `<tool> ...`. (Codex learning)
 
 ### Standalone Git and GitHub skills
-- Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, `github-ci`, `github-review-threads`, `github-portfolio-triage`, `github-stars`, and `yeet`.
+- Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, `github-ci`, `github-review-threads`, `github-portfolio-triage`, `github-stars`, and `yeet`.
 - Keep standalone skills independent from repo-local plugin files, plugin shared scripts, and installed plugin cache copies; standalone runtime docs and code must use direct `git`, direct `gh`, or their own `scripts/<tool>` artifacts.
-- Keep `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
+- Keep `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
+- Keep GitHub issue lifecycle mechanics in standalone `github-issues`, not in queue triage, PR review-thread, publish, commit, or project-memory skills.
 - Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit` and focused `github-*` skills rather than owning duplicate helper code.
 - Keep stars and star-list workflows in standalone `github-stars`, not in repository triage.
 
 ### Codex Orchestrator skill
-- Keep `codex-orchestrator` as a standalone reusable skill under `skills/codex-orchestrator/`, using standalone Git/GitHub companion skills for queue, CI, review, release, commit, and publish workflows.
+- Keep `codex-orchestrator` as a standalone reusable skill under `skills/codex-orchestrator/`, using standalone Git/GitHub companion skills for queue, issue lifecycle, CI, review, release, commit, and publish workflows.
 - Keep runtime orchestration, worker, gate, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 

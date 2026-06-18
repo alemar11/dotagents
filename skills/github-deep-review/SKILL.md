@@ -20,9 +20,10 @@ Use this skill for questions like:
 - `did main already fix this?`
 - `should we close this issue?`
 
-Use `github-triage` for current-repo queue summaries, `github-ci` for Actions
-failures, and `github-review-threads` for listing, drafting, or posting replies
-to PR review threads.
+Use `$github-triage` for current-repo queue summaries, `$github-issues` for
+authorized issue lifecycle changes, `$github-ci` for Actions failures, and
+`$github-review-threads` for listing, drafting, or posting replies to PR review
+threads.
 
 ## Start
 
@@ -59,7 +60,8 @@ Always answer these points when they apply:
 - Risk: what remains unverified or brittle.
 
 Do not approve, comment, close, merge, push, or land unless the user explicitly
-asks for that action.
+asks for that action. Route authorized GitHub issue comments, labels, type
+changes, or closure through `$github-issues`.
 
 ## Code Reading Depth
 

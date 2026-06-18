@@ -16,17 +16,17 @@ Coordination repo: <owner>/<repo>
 Project label format: <project-slug>
 ```
 
-Run `gh` commands with `--repo <owner>/<repo>` unless the current checkout is
+Use `$github-issues` with the configured coordination repository. GitHub issue
+commands must target `--repo <owner>/<repo>` unless the current checkout is
 the coordination repository.
 
 ## Non-Mutating Runs
 
 If this setup is being used for a temp exercise, validation pass, rehearsal,
 dry run, or any workflow where external GitHub mutation is not authorized, do
-not run `gh issue create`, `gh issue edit`, `gh issue comment`,
-`gh label create`, or other GitHub mutation commands. Use local orchestrator
-markdown for that run, or return draft issue bodies and exact `gh` commands
-without executing them. Record the non-mutating choice in
+not mutate GitHub. Use local orchestrator markdown for that run, or ask
+`$github-issues` to return draft issue bodies and exact `gh` commands without
+executing them. Record the non-mutating choice in
 `project-memory/agents/issue-tracker.md`.
 
 ## Conventions
@@ -43,32 +43,10 @@ without executing them. Record the non-mutating choice in
   exactly `<project-slug>`. This is a project grouping/search label, not a
   workflow state label.
 
-Before creating the first issue for a project, ensure the project label exists:
-
-```bash
-gh label list --repo <owner>/<repo> --search "<project-slug>"
-gh label create "<project-slug>" --repo <owner>/<repo> --description "Project: <project-slug>"
-```
-
-If the label already exists, keep using it.
-
-Create the PRD parent issue with:
-
-```bash
-gh issue create --repo <owner>/<repo> --label "<project-slug>" --title "PRD: <Feature Name>" --body-file <file>
-```
-
-Create a vertical issue under a PRD with:
-
-```bash
-gh issue create --repo <owner>/<repo> --parent <prd-number> --label "<project-slug>" --title "..." --body-file <file>
-```
-
-Attach an existing issue to a PRD with:
-
-```bash
-gh issue edit <prd-number> --repo <owner>/<repo> --add-sub-issue <issue-number-or-url>
-```
+Before creating the first issue for a project, use `$github-issues` to ensure
+the project label exists. Use `$github-issues` to create the PRD parent issue,
+create vertical issues under the PRD, and attach existing issues to the PRD
+when needed.
 
 ## Orchestrator Issue Content
 

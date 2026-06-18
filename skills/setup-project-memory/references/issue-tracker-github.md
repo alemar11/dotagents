@@ -1,7 +1,7 @@
 # Issue Tracker: GitHub
 
-PRDs and implementation issues for this repo live as GitHub issues. Use the
-`gh` CLI for all operations.
+PRDs and implementation issues for this repo live as GitHub issues. Use
+`$github-issues` for GitHub issue lifecycle operations.
 
 Tracker mode: `github`
 GitHub repo: infer from `git remote -v` unless this file records a specific
@@ -11,31 +11,15 @@ GitHub repo: infer from `git remote -v` unless this file records a specific
 
 If this setup is being used for a temp exercise, validation pass, rehearsal,
 dry run, or any workflow where external GitHub mutation is not authorized, do
-not run `gh issue create`, `gh issue edit`, `gh issue comment`, or label
-mutation commands. Use local markdown for that run, or return draft issue
-bodies and exact `gh` commands without executing them. Record the non-mutating
-choice in `project-memory/agents/issue-tracker.md`.
+not mutate GitHub. Use local markdown for that run, or ask `$github-issues` to
+return draft issue bodies and exact `gh` commands without executing them.
+Record the non-mutating choice in `project-memory/agents/issue-tracker.md`.
 
 ## Conventions
 
-- Create an issue: `gh issue create --title "..." --body "..."`
-- Create an issue with a GitHub Issue Type:
-  `gh issue create --type "<type>" --title "..." --body "..."`
-- Create an implementation issue under a PRD issue:
-  `gh issue create --parent <prd-number> --title "..." --body-file <file>`
-- Attach existing implementation issues to a PRD issue:
-  `gh issue edit <prd-number> --add-sub-issue <issue-number>[,<issue-number>]`
-- Read an issue: `gh issue view <number> --comments`
-- List issues:
-  `gh issue list --state open --json number,title,body,labels,type,comments`
-- Set or change issue type: `gh issue edit <number> --type "<type>"`
-- Comment on an issue: `gh issue comment <number> --body "..."`
-- Apply or remove labels: `gh issue edit <number> --add-label "..."` or
-  `gh issue edit <number> --remove-label "..."`
-- Close an issue: `gh issue close <number> --comment "..."`
-
-Infer the repo from `git remote -v`; `gh` usually does this automatically when
-run inside a clone.
+Infer the repo from `git remote -v` unless this file records a specific target.
+Use `$github-issues` to create, read, edit, comment on, label, type, attach, or
+close GitHub issues.
 
 Use `project-memory/agents/triage-labels.md` for type and label mappings. The
 default GitHub issue types are:
@@ -59,7 +43,7 @@ issue list remains scannable even outside the PRD sub-issue view.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue.
+Use `$github-issues` to create a GitHub issue.
 
 For feature planning:
 
@@ -95,4 +79,4 @@ maintainer explicitly says the whole PRD is complete.
 
 ## When a skill says "fetch the relevant issue"
 
-Run `gh issue view <number> --comments`.
+Use `$github-issues` to view the issue and recent comments.

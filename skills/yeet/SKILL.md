@@ -10,15 +10,15 @@ description: Use when publishing local work from a checkout to GitHub by confirm
 Publish local work from a checkout. This skill is scriptless by design and
 composes standalone skills conceptually:
 
-- Use `git-commit` for staging and commit authoring.
+- Use `$git-commit` for staging and commit authoring.
 - Use direct `gh` for GitHub readiness and PR lifecycle commands.
-- Use `github-triage`, `github-deep-review`, `github-ci`, or
-  `github-review-threads` only for focused follow-up GitHub work.
+- Use `$github-issues`, `$github-triage`, `$github-deep-review`, `$github-ci`,
+  or `$github-review-threads` only for focused follow-up GitHub work.
 
 If there is no local work to publish, or the request is only GitHub issue
 hygiene such as creating, commenting on, labeling, or closing issues, do not run
-the full publish flow. Route that work to `github-triage` or the focused
-GitHub companion that owns the request, perform the authorized GitHub mutation,
+the full publish flow. Route that work to `$github-issues`, perform the
+authorized GitHub issue mutation or dry-run draft command,
 and state that full `yeet` was not applicable.
 
 ## Workflow

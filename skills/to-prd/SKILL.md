@@ -80,9 +80,9 @@ or the generated implementation issues, not in the PRD content itself.
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 
-- `Tracker mode: github`: publish only after confirmation, using `gh`, the
-  title format `PRD: <Feature Name>`, and the mapped `feature` issue type when
-  available.
+- `Tracker mode: github`: publish only after confirmation through
+  `$github-issues`, using the title format `PRD: <Feature Name>` and the
+  mapped `feature` issue type when available.
 - `Tracker mode: local-markdown`: write to the configured repo-local PRD path,
   normally `.scratch/<feature-slug>/PRD.md`, only after confirmation.
 - `Tracker mode: orchestrator-local`: write to the configured orchestrator
@@ -95,10 +95,10 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
   `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
   from accepted project, repo, or PRD source material needed for planning.
 - `Tracker mode: orchestrator-github`: publish the PRD parent issue in the
-  configured coordination repo using `gh --repo <owner>/<repo>`. Derive or ask
-  for `<project-slug>`, ensure the GitHub label named exactly
-  `<project-slug>` exists in the coordination repo, and apply it to the PRD
-  parent issue. The PRD issue is the parent for vertical feature issues.
+  configured coordination repo through `$github-issues`. Derive or ask for
+  `<project-slug>`, ensure the GitHub label named exactly `<project-slug>`
+  exists in the coordination repo, and apply it to the PRD parent issue. The
+  PRD issue is the parent for vertical feature issues.
 - Other tracker: follow the repo-specific instructions in
   `project-memory/agents/issue-tracker.md`.
 
@@ -117,15 +117,18 @@ Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
 When GitHub issue types are available, create or update the PRD issue with that
 mapped type, usually `Feature`. If issue types are disabled or unsupported,
 publish the PRD without a type and keep the PRD title/body convention intact.
+Use `$github-issues` for the GitHub create, type, label, and dry-run command
+mechanics.
 
 If a composing skill such as `$plan-feature` passes explicit write
 authorization, use the configured target without re-asking unless this skill
 finds a new blocker or unresolved question.
 
 If the configured target is GitHub or GitHub coordination but external mutation
-is not authorized for the current run, do not call `gh` mutation commands.
-Return the PRD body and exact publish command in chat, or use the configured
-local dry-run target if `project-memory/agents/issue-tracker.md` records one.
+is not authorized for the current run, do not mutate GitHub. Ask
+`$github-issues` for the exact draft publish command and return it with the PRD
+body, or use the configured local dry-run target if
+`project-memory/agents/issue-tracker.md` records one.
 
 If no issue-tracker setup exists, return the PRD in chat and recommend running
 `$setup-project-memory` before publishing.

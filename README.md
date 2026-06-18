@@ -34,6 +34,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `git-commit` | Handle commit and push-only requests with direct `git` commands and explicit staging. |
 | `github-ci` | Inspect GitHub Actions checks and failing PR logs with a focused `ci-inspect` CLI. |
 | `github-deep-review` | Review GitHub issues, PRs, and fixes by tracing root cause, provenance, proof, and fix quality. |
+| `github-issues` | Create, update, label, type, comment, close, and relate GitHub issues with direct `gh` commands. |
 | `github-portfolio-triage` | Scan multiple explicit GitHub repositories read-only for queue, CI, release, and next-action summaries. |
 | `github-releases` | Check, plan, draft, publish, and validate GitHub Releases, tags, notes, and package availability. |
 | `github-review-threads` | Inspect PR review threads and route selected replies with a focused `reviews` CLI. |
@@ -74,14 +75,15 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
-- `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, CI, review, release, commit, or publish work: `$github-triage`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
+- `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work: `$github-triage`, `$github-issues`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`.
 - `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop and update project context docs or ADRs inline.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `plan-feature` requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` so it can run the feature-planning wrapper flow from setup through PRD and configured agent-ready issues.
 - `setup-project-memory` requires `$domain-modeling` when bootstrapping an existing project or orchestrator workspace into `CONTEXT.md` or ADRs from repo, workspace, or session evidence.
-- `to-issues` requires `$plan-harder` and must run it once for every generated issue before returning or publishing that issue.
-- `triage` requires `$setup-project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, and requires `$plan-harder` before marking an issue `ready-for-agent`.
-- `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
+- `to-prd` uses `$github-issues` for GitHub PRD issue publishing, issue type, label, and dry-run command mechanics.
+- `to-issues` requires `$plan-harder` and must run it once for every generated issue before returning or publishing that issue; it uses `$github-issues` for GitHub tracker publishing and parent/sub-issue mechanics.
+- `triage` requires `$setup-project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$github-issues` for GitHub issue mutations.
+- `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-issues`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
 
 ## Project-Local Skills
 
@@ -114,7 +116,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/setup-project-memory skills/to-prd skills/to-issues skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-issues skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/setup-project-memory skills/to-prd skills/to-issues skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -146,6 +148,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill git-commit \
   --skill github-ci \
   --skill github-deep-review \
+  --skill github-issues \
   --skill github-portfolio-triage \
   --skill github-releases \
   --skill github-review-threads \

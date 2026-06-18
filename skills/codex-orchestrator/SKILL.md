@@ -90,9 +90,9 @@ loop silently on the same worker status or source snapshot.
 - The reusable `$autoreview` skill for closeout review after non-trivial code
   edits and after review-triggered fixes.
 - Standalone Git/GitHub companion skills as needed:
-  `$github-portfolio-triage`, `$github-triage`, `$github-ci`,
-  `$github-deep-review`, `$github-review-threads`, `$github-releases`,
-  `$git-commit`, and `$yeet`.
+  `$github-portfolio-triage`, `$github-triage`, `$github-issues`,
+  `$github-ci`, `$github-deep-review`, `$github-review-threads`,
+  `$github-releases`, `$git-commit`, and `$yeet`.
 - Local ledger storage at
   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
 
@@ -157,6 +157,7 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 | --- | --- |
 | Read-only scans across multiple explicit repositories | `$github-portfolio-triage` |
 | Current-repository issue, PR, label, milestone, or queue triage | `$github-triage` |
+| GitHub issue creation, comments, labels, issue types, closure, or parent/sub-issue relationships | `$github-issues` |
 | Evidence-first issue, PR, bug, root-cause, or fix-quality review | `$github-deep-review` |
 | GitHub Actions runs, pending checks, or failing PR logs | `$github-ci` |
 | PR review threads, comment context, or selected replies | `$github-review-threads` |
@@ -174,8 +175,8 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
    use focused current-repo companions such as `$github-triage`,
-   `$github-deep-review`, `$github-ci`, or `$github-review-threads` only when the task
-   is focused on one repo or PR. If the
+   `$github-issues`, `$github-deep-review`, `$github-ci`, or
+   `$github-review-threads` only when the task is focused on one repo or PR. If the
    user provided a plan, decompose that plan into workstreams before scanning
    for additional queue signals. For broad maintainer discovery, include open
    issues, open PRs, failing or pending CI, latest release or package state when
@@ -218,11 +219,12 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 12. For non-trivial code edits, require focused tests and `$autoreview`; rerun
    both after any review-triggered code change.
 13. Before closing a source item that is only partially satisfied, create or
-    link an owner-visible follow-up when mutation is authorized. For GitHub this
-    may be an issue, PR reply, label, or thread resolution; for Markdown or local
-    plans this may be a checkbox update, follow-up bullet, or proposed patch. If
-    mutation is not authorized, keep the item owner-ready with the proposed
-    update body and do not call it complete.
+    link an owner-visible follow-up when mutation is authorized. For GitHub
+    issue lifecycle work, use `$github-issues`; for PR replies, use
+    `$github-review-threads`. For Markdown or local plans this may be a checkbox
+    update, follow-up bullet, or proposed patch. If mutation is not authorized,
+    keep the item owner-ready with the proposed update body and do not call it
+    complete.
 14. Before stopping, execute every `Ready Next` action that is within current
     authorization. Reclassify any remaining `Ready Next` item as `Needs Owner`,
     `Blocked`, or `Deferred` with the missing decision, access, or follow-up.

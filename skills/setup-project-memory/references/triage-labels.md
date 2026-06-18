@@ -27,8 +27,8 @@ The table above uses the default GitHub type names. Rewrite the right-hand
 `Tracker value` cells to lowercase before writing this file for local markdown
 or local orchestrator tracking.
 
-In GitHub issue-tracker mode, use native GitHub Issue Type when available:
-`gh issue edit <number> --type "<Tracker value>"`.
+In GitHub issue-tracker mode, use `$github-issues` to apply native GitHub
+Issue Type values when available.
 
 In local markdown mode, record the mapped value as a `Type:` line near the top
 of the issue file.

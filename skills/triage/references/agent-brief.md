@@ -16,6 +16,8 @@ or rejected options unless the rejection prevents repeat mistakes.
 - Acceptance criteria that can be checked.
 - Validation commands or manual checks when known.
 - Open questions must be empty before the issue is `ready-for-agent`.
+- Dependencies may be present; `ready-for-agent` means queue-ready, not
+  start-now when listed dependencies are incomplete.
 
 ## Template
 
