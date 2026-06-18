@@ -33,10 +33,14 @@ returned or published.
 - Use the authoritative feature slug in this order: explicit slug from a
   composing skill, PRD file path directory, configured tracker path, then PRD
   title-derived slug as a fallback only.
-- Inherit delivery topology from the PRD. The PRD is the canonical place for
-  full branch and PR strategy; generated issues should link it with
-  `Source PRD` and record only issue-level scheduling constraints, closeout,
-  and explicit topology overrides.
+- Inherit delivery mode from the PRD. The PRD is the canonical place for the
+  full branch and PR strategy, but every generated issue must copy the effective
+  feature-level `Delivery mode` label for cross-session scheduling. Mark it as
+  inherited from `Source PRD` unless the issue has an explicit owner-authorized
+  issue-level exception.
+- Build and persist a feature-level `delivery-plan.md` for execution sequencing.
+  It should own issue-level ordering, dependency waves, and unlock conditions so
+  issues can stay implementation-focused.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
 
@@ -84,10 +88,10 @@ Resolve and carry the planning identity before splitting:
 - For multi-context repos or monorepos: `product_slug`, `workspace_path`, and
   `context_file`.
 - For orchestrator workspaces: `project_slug` and affected repos.
-- `delivery_topology`: inherit from the PRD `## Delivery Topology` section. If
+- `delivery_mode`: inherit from the PRD `## Delivery Mode` section. If
   the PRD lacks it, infer `One Feature Branch` only for unambiguous single-repo
   or monorepo work and `One PR Per Repo` only for unambiguous orchestrator or
-  cross-repo work; otherwise stop and require the PRD topology to be resolved.
+  cross-repo work; otherwise stop and require the PRD delivery mode to be resolved.
 
 If a multi-context local-markdown repo lacks an accepted product/context or the
 feature slug can collide with another product according to tracker
@@ -105,14 +109,31 @@ Apply vertical slicing whenever practical. Order issues for sequential agentic
 implementation, and make dependencies explicit rather than relying on issue
 numbering.
 
-Each issue should:
+Before hardening, build one `delivery-plan.md` for the feature from the proposed
+issue list:
+
+- `delivery-mode`: inherited from the PRD and copied in each issue.
+- ordered issue map with `<NN>` and short intent.
+- dependency graph plus `blocks` / `depends on` intent.
+- wave gates and unblock conditions.
+- repo-level boundaries and integration proof requirements (for orchestrator work).
+
+Write this plan as a local artifact when local file writes are permitted:
+
+- local-markdown: `.scratch/<feature-slug>/delivery-plan.md`
+- orchestrator-local: `projects/<project-slug>/features/<feature-slug>/delivery-plan.md`
+- if local writes are disallowed, return the equivalent execution plan in-chat and
+  include the intended path for the next run.
+
+Every issue should:
 
 - deliver a user-visible or system-verifiable increment,
 - include enough context to be implemented without rereading the whole PRD,
 - include product/workspace/context scope for monorepo work, or affected repos
   and integration gates for orchestrator work,
-- include a durable `Source PRD` pointer plus issue-level parallelization,
-  dependencies, closeout, and any topology or integration override,
+- include a durable `Source PRD` pointer, copied feature-level delivery mode,
+  issue-level parallelization, dependencies, closeout, and any delivery or
+  integration exception,
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
@@ -216,20 +237,27 @@ otherwise agent-ready, but completion must require replacing them with real PR
 links or recording equivalent integration proof.
 
 Every published or returned issue must preserve cross-session scheduling
-metadata without duplicating the full PRD delivery topology:
+metadata without duplicating the full PRD branch and PR details:
 
+- `Delivery plan`: required when local artifacts are written; path to
+  `delivery-plan.md` in the feature artifact folder.
+  If local writes are disallowed, include the inline execution plan in the
+  completion summary and a target plan path for the next run.
 - `Source PRD`: required. Prefer a stable GitHub issue number or local PRD path.
+- `Delivery mode`: required. Copy the effective value from the PRD and mark it
+  as feature-level, such as `One Feature Branch (feature-level, inherited from
+  Source PRD)`. Feature-level means the mode applies to the whole Source PRD
+  feature, not only this generated issue. For an exception, record the
+  issue-level override and authorization reason, such as `One PR Per Issue
+  (issue-level override, authorized by <owner/date>)`.
 - `Parallelization`: required. Use `independent`, `depends on <issue>`,
   `blocks <issue>`, or `root-integrated`.
 - `Closeout`: required. State the concrete completion path, such as `feature PR
   closes issue`, `repo PR closes issue`, `issue PR closes issue`, `direct commit
   closes issue`, or `local done move after proof`.
-- `Topology override`: optional. Include only when this issue intentionally
-  differs from the PRD topology, such as `One PR Per Issue` or `Direct Commit`
-  with an authorization reason.
 - `Integration mode`: optional for ordinary issues that inherit from the PRD.
   Include it when the issue is cross-repo, exceptional, or otherwise not obvious
-  from the PRD topology.
+  from the PRD delivery mode.
 
 For ordinary single-repo or monorepo `One Feature Branch` issues, the
 `## Delivery` section can be as small as:
@@ -237,6 +265,7 @@ For ordinary single-repo or monorepo `One Feature Branch` issues, the
 ```markdown
 ## Delivery
 
+- Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)
 - Parallelization: independent
 - Closeout: feature PR closes issue
 ```
@@ -301,7 +330,8 @@ Summarize:
 - authoritative `feature_slug`,
 - product/workspace/context or orchestrator project identity used, when
   applicable,
-- delivery topology inherited,
+- delivery mode inherited,
+- delivery-plan file path when written, or inline plan summary when not persisted,
 - number of issues produced,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
@@ -325,6 +355,7 @@ delivery lines when they do not apply.
 Type: [mapped issue type, usually task]
 Status: [mapped triage state]
 Source PRD: [path, issue number, or title]
+Delivery plan: [path to delivery-plan.md or inline plan reference]
 
 Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
 
@@ -334,14 +365,23 @@ single-repo issues, `current repository`; for orchestrator issues, use
 
 ## Delivery
 
+- Delivery mode: [One Feature Branch | One PR Per Repo | One PR Per Issue |
+  Direct Commit] ([feature-level, inherited from Source PRD] or [issue-level
+  override with authorization reason])
 - Parallelization: [independent | depends on <issue> | blocks <issue> |
   root-integrated]
 - Closeout: [feature PR closes issue | repo PR closes issue | issue PR closes
   issue | direct commit closes issue | local done move after proof]
-- Topology override: [omit when inherited from Source PRD; otherwise One PR
-  Per Issue | Direct Commit with authorization reason]
 - Integration mode: [omit when obvious from Source PRD; otherwise shared
   feature branch | repo PR | issue PR | direct commit with authorization reason]
+
+## Delivery Plan
+
+- Reference: `delivery-plan.md`
+- If local files are written, keep full sequencing and unlock conditions there; the
+  issue needs only dependency and parallelization fields.
+- If files are not written in this run, include the same plan in the final report and
+  keep this section as the pointer to that inline execution plan.
 
 ## Goal
 

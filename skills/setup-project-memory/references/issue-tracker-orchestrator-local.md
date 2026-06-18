@@ -59,9 +59,9 @@ actually planned or written.
   but does not create or refresh those supporting files unless the user
   explicitly asks for that broader orchestrator artifact update.
 
-## Delivery Topology Defaults
+## Delivery Mode Defaults
 
-- Default topology: **One PR Per Repo** for true multi-repo orchestrator work.
+- Default delivery mode: **One PR Per Repo** for true multi-repo orchestrator work.
 - Branch naming: default to `feature/<feature-slug>` in each affected repo
   unless that repo has a stricter branch policy.
 - PR shape: one draft PR per affected repo, linked from the local PRD or
@@ -80,11 +80,18 @@ Generated feature issues should include:
 
 - `Type:` and `Status:` lines from `project-memory/agents/triage-labels.md`
 - `Source PRD:` pointing to the feature PRD
+- Each implementation issue body should include a `Delivery plan` pointer to
+  `projects/<project-slug>/features/<feature-slug>/delivery-plan.md` when local
+  files are in scope.
 - affected repo list
-- issue-level `Parallelization`, `Closeout`, and only explicit
-  `Topology override` or `Integration mode` lines when the issue intentionally
-  differs from the PRD. Full branch and PR strategy is inherited from
-  `Source PRD`.
+- `Delivery mode` copied from the PRD and labeled as feature-level metadata
+  inherited from `Source PRD`, for example `Delivery mode: One PR Per Repo
+  (feature-level, inherited from Source PRD)`. Feature-level means the mode
+  applies to the whole Source PRD feature, not only this generated issue.
+- issue-level `Parallelization` and `Closeout`
+- explicit `Delivery mode` or `Integration mode` exception lines only when the
+  issue intentionally differs from the PRD, with the authorization or reason
+  recorded
 - cross-repo contract or interface notes
 - integration gates by name or link and validation proof needed before
   completion

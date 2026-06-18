@@ -2,4 +2,4 @@ interface:
   display_name: "Plan Feature"
   short_description: "Plan a feature from grilling to PRD to agent-ready issues."
   brand_color: "#10B981"
-  default_prompt: "Use $plan-feature to inspect project memory, run setup if needed, resolve run authorization, planning identity, and delivery topology, grill the feature with context, produce the PRD, split it into vertical issues, and write configured repo-local, GitHub, or orchestrator workspace artifacts only when no blocking gates remain and external mutation is authorized."
+  default_prompt: "Use $plan-feature to inspect project memory, run setup if needed, resolve run authorization, planning identity, and delivery mode, grill the feature with context, produce the PRD, split it into vertical issues, and write configured repo-local, GitHub, or orchestrator workspace artifacts only when no blocking gates remain and external mutation is authorized."

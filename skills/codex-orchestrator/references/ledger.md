@@ -80,9 +80,9 @@ Each workstream records the actual surface used: `codex-app-thread`,
 `cli-subagent`, or `no-delegation`. For root-owned work, record
 `Surface=no-delegation`, `Worker ID=root`, and the reason delegation was skipped.
 
-## Delivery Topology Policy
+## Delivery Mode Policy
 
-Default topology:
+Default delivery mode:
 - **One Feature Branch** for a single git repo, including monorepos.
 - **One PR Per Repo** for true multi-repo features.
 
@@ -92,12 +92,15 @@ Exceptions:
   issue work.
 - **Direct Commit** only with explicit owner authorization.
 
-Each implementation workstream records either the explicit topology or the
-`Source PRD` it inherits from, plus issue-level parallelization, dependencies,
-closeout target, branch or PR expectation, and integration proof target. Record
-integration mode only when it is not obvious from the inherited topology or when
-the issue declares an override. Workers may not choose a different branch or PR
-strategy without a root-owned ledger update and authorization check.
+Each implementation workstream records the effective `Delivery mode` label and
+whether it is feature-level inherited metadata from `Source PRD` or an
+issue-level override. If a workstream includes a delivery-plan reference, record
+that reference and the current wave so scheduling stays synchronized. It also
+records issue-level parallelization, dependencies, closeout target, branch or PR
+expectation, and integration proof target. Record integration mode only when it is
+not obvious from the inherited delivery mode or when the issue declares an
+override. Workers may not choose a different branch or PR strategy without a
+root-owned ledger update and authorization check.
 
 Issue-level parallelization controls startability:
 
@@ -140,7 +143,7 @@ Gate matrix:
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD or topology; parallelization; dependencies; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD or delivery-plan; delivery mode; source; parallelization; dependencies; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 
@@ -169,7 +172,7 @@ Gate matrix:
 
 ### Completed
 
-- <source id/ref, delivery topology, branch/PR/proof, validation, source closeout target and
+- <source id/ref, delivery mode, branch/PR/proof, validation, source closeout target and
   whether it was updated/closed>
 - <worker id/title, integration method, worker lifecycle decision, generated
   ignored artifacts removed/retained/left in helper worktree>

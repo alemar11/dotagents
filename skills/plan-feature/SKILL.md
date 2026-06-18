@@ -31,7 +31,7 @@ cross-repo vertical outcomes. Do not implement the feature.
 - Carry accepted planning identity through every handoff: selected context,
   product or project slug, workspace path when applicable, and authoritative
   feature slug.
-- Carry accepted delivery topology through every handoff. Use human-readable
+- Carry accepted delivery mode through every handoff. Use human-readable
   labels: `One Feature Branch`, `One PR Per Repo`, `One PR Per Issue`, or
   `Direct Commit`.
 
@@ -71,15 +71,15 @@ Resolve the planning identity before writing:
   `workspace_path`, and `context_file` selected from `CONTEXT-MAP.md` or
   project memory.
 - For orchestrator workspaces: accepted `project_slug` and `feature_slug`.
-- `delivery_topology`: `One Feature Branch` for a single git repo, including
+- `delivery_mode`: `One Feature Branch` for a single git repo, including
   monorepos; `One PR Per Repo` for orchestrator or true cross-repo features;
   `One PR Per Issue` or `Direct Commit` only when explicitly authorized.
 
 If a multi-context local-markdown repo has no accepted product/context or the
 feature slug is not product/workspace namespaced according to tracker
 conventions, stop before PRD writing and resolve that identity first.
-If the delivery topology is ambiguous because the feature might cross multiple
-git repositories, stop before PRD writing and resolve that topology first.
+If the delivery mode is ambiguous because the feature might cross multiple
+git repositories, stop before PRD writing and resolve that delivery mode first.
 
 ### 2. Grill the feature with context
 
@@ -120,7 +120,7 @@ Planning identity:
 - workspace_path: <accepted workspace path, for monorepos/multi-context repos>
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
-- delivery_topology: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
+- delivery_mode: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
 ```
 
 Ask `$to-prd` to use the configured target from
@@ -156,24 +156,28 @@ Planning identity:
 - workspace_path: <accepted workspace path, for monorepos/multi-context repos>
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
-- delivery_topology: <topology recorded in the PRD Delivery Topology section>
+- delivery_mode: <mode recorded in the PRD Delivery Mode section>
+  Also include the expected `delivery-plan.md` location for local artifact runs.
 ```
 
 Require `$to-issues` to use the configured issue target, apply configured issue
 types and triage labels, attach GitHub implementation issues to the PRD issue
 when GitHub or GitHub coordination mode is configured, use the configured title
 formats, apply the `<project-slug>` GitHub label to GitHub coordination issues,
-and confirm that `$plan-harder` ran once per generated issue. If external
-tracker mutation is disallowed, require `$to-issues` to return draft publish
-commands or write to the effective local target instead of mutating GitHub.
+and confirm that `$to-issues` produced a feature `delivery-plan.md` (or
+returned an equivalent inline plan when local write is disallowed) and ran
+`$plan-harder` once per generated issue. If external tracker mutation is
+disallowed, require `$to-issues` to return draft publish commands or write to the
+effective local target instead of mutating GitHub.
 
 In orchestrator workspace mode, require generated issues to include affected
 repos, cross-repo contracts, integration gates, repo PR links or placeholders,
 issue-level scheduling and closeout metadata, and completion instructions that
 require cross-repo integration proof before closing or moving to `issues/done/`.
-Do not require every issue to restate the full PRD delivery topology when a
-durable `Source PRD` pointer is present; use explicit issue-level topology
-overrides only for exceptions.
+Require every issue to copy the effective `Delivery mode` label from the PRD and
+mark it as feature-level inherited metadata. Do not duplicate the full PRD
+branch/PR details in each issue; use explicit issue-level delivery exceptions
+only when an issue intentionally differs from the feature-level mode.
 
 If `$to-issues` discovers a product, domain, dependency, or acceptance-criteria
 blocker, pause issue writing and route the blocker back through
@@ -199,7 +203,8 @@ Summarize:
 - run authorization applied, including whether external mutation occurred,
 - planning identity used, including feature slug and product/context/project
   scope when applicable,
-- delivery topology used,
+- delivery mode used,
+- delivery-plan path or inline execution plan returned,
 - gates resolved or deferred,
 - any issue still blocked and why.
 

@@ -43,6 +43,8 @@ coordination backend change unless the user explicitly says so.
 - Vertical feature issues use the mapped `task` issue type when available.
 - Vertical feature issues are GitHub sub-issues of the PRD parent issue.
 - Each vertical feature issue body includes `Source PRD: #<prd-number>`.
+- Each vertical feature issue body should include a `Delivery plan` pointer to
+  `delivery-plan.md` when local artifact targets are available.
 - Each PRD parent issue and vertical feature issue gets a GitHub label named
   exactly `<project-slug>`. This is a project grouping/search label, not a
   workflow state label.
@@ -52,9 +54,9 @@ the project label exists. Use `$github-issues` to create the PRD parent issue,
 create vertical issues under the PRD, and attach existing issues to the PRD
 when needed.
 
-## Delivery Topology Defaults
+## Delivery Mode Defaults
 
-- Default topology: **One PR Per Repo** for true multi-repo orchestrator work.
+- Default delivery mode: **One PR Per Repo** for true multi-repo orchestrator work.
 - Branch naming: default to `feature/<feature-slug>` in each affected repo
   unless that repo has a stricter branch policy.
 - PR shape: one draft PR per affected repo, all linked from the coordination
@@ -72,10 +74,14 @@ Generated vertical feature issues should include:
 
 - `Source PRD: #<prd-number>` for searchability and backlinks
 - affected repo list
-- issue-level `Parallelization`, `Closeout`, and only explicit
-  `Topology override` or `Integration mode` lines when the issue intentionally
-  differs from the PRD. Full branch and PR strategy is inherited from
-  `Source PRD`.
+- `Delivery mode` copied from the PRD and labeled as feature-level metadata
+  inherited from `Source PRD`, for example `Delivery mode: One PR Per Repo
+  (feature-level, inherited from Source PRD)`. Feature-level means the mode
+  applies to the whole Source PRD feature, not only this generated issue.
+- issue-level `Parallelization` and `Closeout`
+- explicit `Delivery mode` or `Integration mode` exception lines only when the
+  issue intentionally differs from the PRD, with the authorization or reason
+  recorded
 - cross-repo contract or interface notes
 - integration gates by name or link and validation proof needed before closure
 - repo-local PR links or implementation child issue links when they exist;

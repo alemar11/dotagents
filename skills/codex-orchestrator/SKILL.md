@@ -173,14 +173,20 @@ thread.
 - Before sending overlapping new scope into an existing worker, resync or
   replace that worker instead of assuming its checkout is still current.
 
-## Delivery Topology Execution
+## Delivery Mode Execution
 
-For implementation or publication workstreams, resolve delivery topology from
+For implementation or publication workstreams, resolve delivery mode from
 the source item, a linked `Source PRD`, or the owner request. Record it in the
-ledger and execute against that topology. For generated implementation issues,
+ledger and execute against that delivery mode. For generated implementation issues,
 first read the issue body and any linked `Source PRD`; the PRD is the canonical
-source for full topology, while the issue body supplies issue-level
-parallelization, dependencies, closeout, and overrides.
+source for full delivery mode details, while the issue body supplies the copied
+feature-level `Delivery mode` label plus issue-level parallelization,
+dependencies, closeout, and overrides. If the issue references a `delivery-plan.md`
+or the source includes a `Delivery plan` pointer, load it and use its wave and
+unlock rules for scheduling. Treat an issue line such as
+`Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)`
+as a feature-level landing strategy, not as a claim that only this one issue
+uses that branch/PR shape.
 
 Apply issue-level scheduling constraints before choosing a wave or worker:
 
@@ -217,12 +223,15 @@ or `Blocked` instead of inventing scheduling semantics.
   committing.
 
 Do not let workers invent a different branch or PR strategy. For implementation
-or publication workstreams that need branch or PR strategy, if a source item
-lacks both an explicit topology and a durable `Source PRD` pointer, or if issue
-metadata contradicts the PRD or repo reality, stop and classify the workstream
-as `Needs Owner` until the topology is corrected or explicitly overridden.
+or publication workstreams that need branch or PR strategy, generated issues
+should include both a copied feature-level `Delivery mode` label and a durable
+`Source PRD` pointer. If generated issue metadata omits the copied label,
+contradicts the PRD, or contradicts repo reality, stop and classify the
+workstream as `Needs Owner` until the delivery mode is corrected or explicitly
+overridden. For ad hoc or legacy source items, fall back to a durable
+`Source PRD` pointer only when the source was not produced by `$to-issues`.
 Inspect-only workstreams, such as PR review or CI diagnosis, do not need a
-delivery topology unless the review result is being turned into implementation
+delivery mode unless the review result is being turned into implementation
 or publication work.
 
 ## Companion Skill Routing
@@ -244,10 +253,10 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 ## Workflow
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
-2. Identify the repository set, task sources, current goals, delivery topology
-   or `Source PRD` inheritance, issue-level scheduling constraints, suppressed
-   items, owner constraints, and portfolio-specific gate overrides. Register
-   task sources in the ledger with source ids, source refs, last-checked state,
+2. Identify the repository set, task sources, current goals, delivery mode
+   or `Source PRD` inheritance, delivery-plan source, issue-level scheduling
+   constraints, suppressed items, owner constraints, and portfolio-specific gate
+   overrides. Register task sources in the ledger with source ids, source refs,
    dedupe rules, mutation authority, branch or PR expectations, closeout target,
    and integration proof target.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
@@ -271,16 +280,17 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    dependencies, selected gates, proof target, and closeout target.
 5. Before delegation, read `references/worker.md` and create one Codex worker
    per independent ownership boundary, such as repository, package, service,
-   path set, or tightly scoped workstream, using the selected worker surface
-   and the recorded or inherited delivery topology. Use visible Codex App
+   path set, or tightly scoped workstream, using the selected worker surface,
+   recorded or inherited delivery mode, and the current delivery-plan wave.
+   Use visible Codex App
    threads in App-oriented workflows only when explicit owner intent for
    visible/new/separate/background workers is present; otherwise use
    CLI/subagent workers when authorized and inspectable, or stay in the root
    thread.
 6. Give each worker an explicit authorization mode, scope, gates, expected
-   proof, delivery topology, branch expectation, integration mode, and final
-   report shape. Workers must not spawn sub-workers, create threads, manage
-   other chats, or edit the ledger.
+   proof, delivery mode, delivery-plan reference, branch expectation, integration
+   mode, and final report shape. Workers must not spawn sub-workers, create
+   threads, manage other chats, or edit the ledger.
 7. For visible Codex App workers, immediately rename each worker thread to
    `<Project>: <short current task>` and update the title when the material
    assignment changes. Keep titles short enough to scan in the sidebar.

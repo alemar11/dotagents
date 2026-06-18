@@ -139,7 +139,7 @@ slugs must include a product or workspace prefix, such as
 `customer-portal-weekly-digest`. Record that convention so `$plan-feature`,
 `$to-prd`, and `$to-issues` can reject ambiguous feature paths before writing.
 
-Confirm delivery topology defaults:
+Confirm delivery mode defaults:
 
 - **One Feature Branch** for a single project or monorepo in one git repo: one
   shared feature branch and usually one draft PR for the feature.
@@ -150,7 +150,7 @@ Confirm delivery topology defaults:
 - **Direct Commit** only with explicit maintainer authorization.
 
 Record these defaults in `project-memory/agents/issue-tracker.md` so PRDs can
-select a topology before `$to-issues` generates implementation issues.
+select a delivery mode before `$to-issues` generates implementation issues.
 
 **Triage types and labels**
 

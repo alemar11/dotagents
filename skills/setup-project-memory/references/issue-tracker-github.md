@@ -34,9 +34,9 @@ If GitHub issue types are disabled or customized for the organization, record
 the actual available values or fallback label convention in
 `project-memory/agents/triage-labels.md`.
 
-## Delivery Topology Defaults
+## Delivery Mode Defaults
 
-- Default topology: **One Feature Branch** for a single project or monorepo in
+- Default delivery mode: **One Feature Branch** for a single project or monorepo in
   this git repo.
 - Branch naming: default to `feature/<feature-slug>`.
 - PR shape: one draft PR for the feature. Generated implementation issues are
@@ -70,9 +70,17 @@ For feature planning:
 - Each implementation issue body must also include `Source PRD: #<number>` for
   searchability and backlinks.
 - Each implementation issue body must include `## Delivery` with issue-level
-  `Parallelization`, `Closeout`, and only explicit `Topology override` or
-  `Integration mode` lines when the issue intentionally differs from the PRD.
-  Full topology is inherited from `Source PRD`.
+  `Parallelization` and `Closeout`.
+- Each implementation issue body should include a `Delivery plan` pointer to
+  `delivery-plan.md` when local artifact targets are available.
+- Each implementation issue body must copy the effective PRD `Delivery mode`
+  and label it as feature-level metadata inherited from `Source PRD`, for
+  example `Delivery mode: One Feature Branch (feature-level, inherited from
+  Source PRD)`. Feature-level means the mode applies to the whole Source PRD
+  feature, not only this generated issue.
+- Add issue-level `Delivery mode` or `Integration mode` exception lines only
+  when the issue intentionally differs from the PRD, and include the
+  authorization or reason.
 
 For triage:
 
@@ -89,7 +97,7 @@ For triage:
 When all acceptance criteria pass and validation is complete, close that
 implementation issue from the relevant PR body with a GitHub closing keyword
 such as `Closes #<issue-number>`. For the default **One Feature Branch**
-topology, the feature PR closes generated implementation issues. Final-commit
+delivery mode, the feature PR closes generated implementation issues. Final-commit
 closure is allowed only when the issue records **Direct Commit** or another
 explicit maintainer authorization. The issue closes when that PR or authorized
 commit reaches the default branch.

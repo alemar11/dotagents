@@ -19,7 +19,7 @@ A good vertical issue:
 - includes the minimum layers needed to make that behavior real,
 - names the product/workspace context in monorepos or the affected repos and
   integration gates in orchestrator workspaces,
-- links back to the Source PRD for delivery topology and states how the issue
+- links back to the Source PRD for delivery mode and states how the issue
   can run in parallel,
 - has explicit dependencies and no hidden ordering assumptions,
 - gives the implementation agent enough local context to start,
@@ -120,9 +120,10 @@ Mark an issue `ready-for-agent` only when it has:
   or monorepo,
 - affected repos and integration gates when the issue is an orchestrator
   workspace issue,
-- a durable `Source PRD` pointer for inherited delivery topology,
-- parallelization status, expected closeout path, and any topology or
-  integration override,
+- a durable `Source PRD` pointer and copied feature-level `Delivery mode`
+  metadata,
+- parallelization status, expected closeout path, and any delivery or
+  integration exception,
 - acceptance criteria,
 - validation steps,
 - implementation guidance enriched by `$plan-harder`,
@@ -142,8 +143,8 @@ Mark an issue `needs-info` when any of these remain unclear:
 - migration or compatibility policy,
 - access to credentials, services, fixtures, or test data,
 - validation command or acceptance signal,
-- Source PRD, delivery topology override, or whether the issue is safe to
-  implement in parallel.
+- Source PRD, delivery mode inheritance or exception, or whether the issue is
+  safe to implement in parallel.
 
 If the source PRD has open questions that affect scope, acceptance criteria,
 dependency ordering, validation, permissions, publication target, data

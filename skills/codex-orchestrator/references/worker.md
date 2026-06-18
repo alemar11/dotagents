@@ -83,12 +83,15 @@ Stay in the root orchestrator thread when:
 - Only the root orchestrator creates, reuses, forks, assigns, renames,
   messages, archives, closes, interrupts, or replaces worker threads.
 
-## Delivery Topology Rules
+## Delivery Mode Rules
 
 Record one of these human-readable labels for every implementation workstream.
 When the assignment comes from a generated issue with a `Source PRD`, the root
-orchestrator may pass the inherited PRD topology instead of requiring the issue
-to restate the full branch and PR strategy:
+orchestrator should pass the generated issue's copied feature-level `Delivery
+mode` label and any `Delivery plan` pointer. The issue does not need to restate
+the full branch and PR strategy, but the prompt and ledger must preserve whether
+the label is feature-level metadata inherited from `Source PRD` or an issue-level
+override:
 
 - **One Feature Branch**: the root owns one shared feature branch and usually
   one draft PR for the feature. Workers operate in isolated helper worktrees or
@@ -105,9 +108,15 @@ to restate the full branch and PR strategy:
 - **Direct Commit**: use only with explicit owner authorization recorded in the
   prompt and ledger.
 
-If the worker sees a mismatch between the assigned topology and repo reality,
+If the worker sees a mismatch between the assigned delivery mode and repo reality,
 such as multi-repo work labeled **One Feature Branch**, it must stop and report
 `needs-owner` instead of choosing a new branch or PR strategy.
+
+Treat `Delivery mode: One Feature Branch (feature-level, inherited from Source
+PRD)` as the feature's overall landing strategy. It does not mean this
+individual issue alone owns the branch or PR shape. Treat
+`Delivery mode: One PR Per Issue (issue-level override, authorized by
+<owner/date>)` as a scoped exception for that issue only.
 
 ## Worker Status Vs Root Lifecycle
 
@@ -281,8 +290,9 @@ Scope:
 - Closeout target: <issue close, PR reply, file checkbox/patch, CI rerun, ledger status>
 - Authorization mode: <inspect|implement|push-pr|ci-rerun-fix|merge-close|release>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
-- Delivery topology: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
-- Delivery topology source: <Source PRD path/issue, explicit owner request, or issue override>
+- Delivery mode: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
+- Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
+- Delivery plan: <delivery-plan.md path, inline plan summary pointer, or none>
 - Parallelization: <independent|depends on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>
@@ -316,8 +326,9 @@ Final report:
 - Source disposition: completed|partial|blocked|needs-owner|deferred|unchanged
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
-- Delivery: topology, branch or PR used, closeout path, and PR links or
+- Delivery: delivery mode, branch or PR used, closeout path, and PR links or
   `none`
+- Delivery plan: current wave assignment, unlock state, and plan source
 - Gate status: pass/fail/not-applicable with root-verifiable evidence
 - Generated artifacts: ignored local files or directories created, or none
 - Risks: residual risks, dependency audit warnings, security findings,
