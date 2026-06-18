@@ -36,6 +36,10 @@ Canonical triage states:
 - `ready-for-human`: requires human implementation or judgment.
 - `wontfix`: will not be actioned.
 
+`needs-info` is not an implementation queue state. When the reporter or
+requester answers, move or treat the issue as `needs-triage` again and
+re-evaluate it before it can become `ready-for-agent`.
+
 Use `project-memory/agents/triage-labels.md` to map these canonical names to
 the actual tracker issue types, labels, or markdown status values.
 
@@ -54,8 +58,10 @@ the actual tracker issue types, labels, or markdown status values.
   the top of the issue file.
 - Before marking an issue `ready-for-agent`, load and run `$plan-harder` in
   issue-hardening mode and embed or post the resulting agent brief.
-- If the issue is underspecified, load and run `$grill-with-docs` to resolve
+- If the issue is underspecified, load and run `$grill-me-with-context` to resolve
   the smallest blocking question set before writing an agent-ready brief.
+- Do not run `$plan-harder` or post an agent brief for `needs-info`; preserve
+  established facts and ask concrete questions instead.
 - Do not implement the issue.
 - Do not close an issue or mark it `wontfix` without explicit user or
   maintainer confirmation.
@@ -86,7 +92,8 @@ queue:
 - issues missing a type/category,
 - issues with no recognized workflow state,
 - `needs-triage` issues,
-- `needs-info` issues with new activity,
+- `needs-info` issues with reporter/requester activity since the last triage
+  note, so they can be re-evaluated as `needs-triage`,
 - issues that look ready but lack an agent brief.
 
 For GitHub, use `gh issue list` and `gh issue view`. Request JSON fields when
@@ -128,9 +135,11 @@ Use `ready-for-agent` only when the issue has:
 - an embedded or posted `$plan-harder` agent brief.
 
 Use `needs-info` when the next action is a concrete question for the reporter
-or requester. Use `ready-for-human` when the work is real but needs human
-authority, judgment, access, design, legal, security, or code-owner input
-before an agent can execute. Use `wontfix` only after explicit confirmation.
+or requester. Its next transition is back through `needs-triage` after new
+activity, not directly to agent execution. Use `ready-for-human` when the work
+is real but needs human authority, judgment, access, design, legal, security,
+or code-owner input before an agent can execute. Use `wontfix` only after
+explicit confirmation.
 
 ### 5. Resolve blockers before writing ready states
 
@@ -138,9 +147,13 @@ If the issue cannot be classified confidently, ask one blocking question or
 leave a `needs-info` note with the smallest useful question set.
 
 If the issue is almost agent-ready but still under-specified, use
-`$grill-with-docs` to clarify the missing product/domain decisions. Let
-`$grill-with-docs` and `$domain-modeling` own any durable updates to
+`$grill-me-with-context` to clarify the missing product/domain decisions. Let
+`$grill-me-with-context` and `$domain-modeling` own any durable updates to
 `CONTEXT.md` or ADRs.
+
+If blocker resolution still depends on the reporter or requester, stop at
+`needs-info`. Do not harden the issue with `$plan-harder`, do not post an agent
+brief, and do not call it ready for implementation.
 
 If the issue is ready for agent execution, use `$plan-harder` once on that
 single issue and embed the result using `references/agent-brief.md`.
@@ -158,6 +171,8 @@ For GitHub:
 - Remove conflicting old state labels when the mapping file identifies them.
 - Add a concise comment for `needs-info`, `ready-for-human`, `wontfix`, or
   `ready-for-agent` handoff notes.
+- For `needs-info`, ask specific actionable questions and summarize what is
+  already established. Do not close the issue merely because it needs info.
 - Close only when the chosen state is `wontfix` and the user confirmed it.
 
 For local markdown:
@@ -176,7 +191,7 @@ Return:
 - selected type/category,
 - selected state,
 - labels/statuses or GitHub issue type applied,
-- whether `$grill-with-docs` or `$plan-harder` was used,
+- whether `$grill-me-with-context` or `$plan-harder` was used,
 - next action owner,
 - any write that was skipped because confirmation was not granted.
 

@@ -60,5 +60,7 @@ State: ready-for-agent
 ```
 
 If `$plan-harder` identifies a blocker, do not publish this brief as
-`ready-for-agent`. Move the issue to `needs-info` or `ready-for-human` and
-summarize the blocker instead.
+`ready-for-agent`. Move the issue to `needs-info` only when the next action is
+a concrete question for the reporter/requester; otherwise move it to
+`ready-for-human` when human judgment, authority, or access is required.
+Summarize the blocker instead of publishing an agent brief.

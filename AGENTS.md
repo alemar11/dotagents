@@ -58,13 +58,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
 - Treat `domain-modeling` as portable because it uses local repo evidence and project memory such as `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`, with no Codex-only runtime tools required.
-- Treat `grill-with-docs` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
-- Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-with-docs` is the fallback path.
+- Treat `grill-me-with-context` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
+- Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-me-with-context` is the fallback path.
 - Treat `setup-project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/setup-project-memory/references/session-history.md`, while its core setup flow falls back to repo-only evidence plus `$domain-modeling`.
 - Treat `to-prd` as portable because it uses local repo evidence, project memory, and configured issue-tracker instructions to produce or publish PRDs without Codex-only runtime tools.
 - Treat `to-issues` as portable and skill-composed because it requires `$plan-harder` for each generated issue and otherwise relies on local project memory plus configured issue-tracker instructions.
-- Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-with-docs`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
-- Treat `triage` as portable and skill-composed because it relies on project-memory issue-tracker mappings, can load `$setup-project-memory` when setup is missing, uses `$grill-with-docs` for underspecified repo-backed issue intent, and requires `$plan-harder` before marking an issue `ready-for-agent`.
+- Treat `plan-feature` as portable and skill-composed because it requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` while relying on project-memory routing rather than Codex-only runtime tools.
+- Treat `triage` as portable and skill-composed because it relies on project-memory issue-tracker mappings, can load `$setup-project-memory` when setup is missing, uses `$grill-me-with-context` for underspecified repo-backed issue intent, and requires `$plan-harder` before marking an issue `ready-for-agent`.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat `git-commit`, `github-deep-review`, `github-triage`, `github-releases`, and `yeet` as portable scriptless skills because they rely on direct local `git` and GitHub CLI `gh` workflows rather than Codex-only runtime features.
 - Treat `github-ci`, `github-review-threads`, `github-portfolio-triage`, and `github-stars` as portable runtime-dependent skills because they require `python3`, local `git` or `gh` as documented by each skill, and their own shipped `scripts/<tool>` artifacts under the owning standalone skill.
@@ -109,10 +109,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `plan-harder` chat-output-only: it must not create `plans/`, write Markdown plan files, or edit repo files as part of its own runtime workflow.
 
 ### Grill and Domain Modeling skills
-- Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-with-docs`.
+- Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-me-with-context`.
 - Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs under `project-memory/adr/`; do not use it for repo-maintenance metadata sync.
-- Keep `grill-with-docs` as the thin composition layer over `grill-me` and `domain-modeling`, not a duplicate questioning loop.
-- Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-with-docs` before implementation rather than duplicating the documentation loop.
+- Keep `grill-me-with-context` as the thin composition layer over `grill-me` and `domain-modeling`, not a duplicate questioning loop.
+- Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-me-with-context` before implementation rather than duplicating the documentation loop.
 - Use `project-memory/` as the visible root for durable project memory owned by these runtime skills: `project-memory/agents/` for repo-specific agent operating config and `project-memory/adr/` for durable decision records. Keep `CONTEXT.md` and optional `CONTEXT-MAP.md` at the project root for fast discovery.
 
 ### Setup Project Memory skill
@@ -124,7 +124,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep setup conservative: it configures locations and mappings for fresh projects, and only bootstraps domain memory for existing projects when the evidence is accepted, load-bearing, and not merely tentative session discussion.
 
 ### PRD and issue-splitting skills
-- Keep `plan-feature` as the thin wrapper over `setup-project-memory`, `grill-with-docs`, `to-prd`, and `to-issues`; do not let it duplicate grilling, PRD drafting, vertical slicing, or issue-hardening logic.
+- Keep `plan-feature` as the thin wrapper over `setup-project-memory`, `grill-me-with-context`, `to-prd`, and `to-issues`; do not let it duplicate grilling, PRD drafting, vertical slicing, or issue-hardening logic.
 - `plan-feature` may pass explicit write authorization to `to-prd` and `to-issues` only after setup exists and no gates remain.
 - Keep `to-prd` focused on producing or publishing PRD artifacts from clarified requirements; do not let it split implementation issues.
 - Keep `to-issues` focused on splitting PRDs into vertical implementation issues; it must run `$plan-harder` once per issue and embed the returned brief before returning or publishing that issue.
@@ -139,6 +139,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `triage` focused on existing incoming GitHub or local markdown issues; new feature planning should still go through `plan-feature`.
 - In GitHub mode, use GitHub Issue Type for work kind (`Bug`, `Feature`, `Task` by default) and labels for workflow state.
 - In local markdown mode, use `Type:` for work kind and `Status:` for workflow state.
+- Treat `needs-info` as a human/reporter waiting state, not an implementation queue state: reporter activity returns the issue to `needs-triage` for re-evaluation before it can become `ready-for-agent`.
 - In local markdown mode, completed issues move to the configured `issues/done/` path instead of adding a new completed status.
 - Before marking an existing issue `ready-for-agent`, `triage` must harden that single issue through `$plan-harder` and preserve the resulting agent brief in the tracker.
 

@@ -17,6 +17,8 @@ Source PRD: [path, issue number, title, or `None`]
 
 Use mapped values from `project-memory/agents/triage-labels.md` if the repo has
 custom strings. Keep `Type:` for work kind and `Status:` for workflow state.
+`needs-info` means waiting for reporter/requester input; when that input
+arrives, re-triage the issue before marking it `ready-for-agent`.
 Completion is represented by moving the file into `issues/done/`, not by
 adding a `done` status.
 
@@ -42,7 +44,8 @@ adding a `done` status.
 
 ## Questions
 
-- [Concrete question for requester or reporter.]
+- [Concrete question for requester or reporter. Required when `Status:
+  needs-info`.]
 
 ## Agent Brief
 

@@ -15,10 +15,16 @@ returned or published.
 
 - Load and follow `$plan-harder` for every issue.
 - Pass exactly one issue at a time to `$plan-harder` in issue-hardening mode.
-- Embed the returned `$plan-harder` brief into that issue body.
+- Embed the returned `$plan-harder` brief into agent-ready issue bodies. If
+  `$plan-harder` identifies an unresolved blocker, preserve that blocker in
+  the withheld result or explicitly authorized partial issue instead.
 - Do not publish or return an issue as ready for execution until it includes
   the hardened implementation brief.
 - Include a `## Completion` section in every generated implementation issue.
+- Do not use `needs-info` as a normal output state for generated
+  implementation issues. Treat unresolved product, domain, dependency, or
+  acceptance-criteria questions as blockers to resolve before publishing,
+  unless the user explicitly asks for partial non-agent-ready backlog output.
 - Remember that `$plan-harder` is chat-output-only. It must not write files;
   this skill owns any issue tracker or local markdown writes.
 
@@ -76,12 +82,15 @@ issue's draft body and the minimum relevant PRD context.
 
 After `$plan-harder` returns:
 
-- insert its brief under `## Implementation Plan`,
+- insert its brief under `## Implementation Plan` only when the issue is ready
+  for execution,
 - resolve any blocker it identifies before marking the issue agent-ready,
 - keep the issue scoped to the original vertical slice,
 - repeat for the next issue.
 
 Do not batch multiple issues into one `$plan-harder` call.
+If a blocker cannot be resolved from the PRD, repo evidence, or project memory,
+stop and return the blocker instead of publishing an agent-ready issue.
 
 ### 4. Apply issue type and triage state
 
@@ -92,7 +101,11 @@ and triage states to the repo's tracker values.
   repo's mapping says otherwise.
 - Use `ready-for-agent` only when the issue contains a hardened implementation
   brief, acceptance criteria, validation, and no unresolved blocker.
-- Use `needs-info` when an issue has unresolved product or technical questions.
+- Use `needs-info` only for explicitly requested partial backlog output where
+  the next action is a concrete question for a human/reporter. Do not count
+  `needs-info` issues as agent-ready, and do not publish them from a composing
+  skill such as `$plan-feature` unless that composing skill explicitly permits
+  partial output.
 - Use `ready-for-human` when the PRD requires human judgment before an agent can
   proceed.
 
@@ -151,6 +164,9 @@ authorization, return the hardened issue bodies in chat.
 If a composing skill such as `$plan-feature` passes explicit write
 authorization, use the configured target without re-asking unless this skill
 finds a new blocker or unresolved question.
+When a blocker or unresolved question appears under `$plan-feature`, return it
+as an issue-splitting gate instead of publishing a `needs-info` issue by
+default.
 
 ### 6. Report completion
 
@@ -163,6 +179,8 @@ Summarize:
 - issue types and labels/statuses assigned,
 - completion instruction included,
 - any blocked issues and why,
+- whether any non-agent-ready partial issues were withheld or explicitly
+  published as `needs-info` / `ready-for-human`,
 - confirmation that `$plan-harder` was run once per issue.
 
 ## Issue Body Shape
@@ -195,6 +213,11 @@ Source PRD: [path, issue number, or title]
 ## Implementation Plan
 
 [Paste the $plan-harder issue-hardening brief here.]
+
+## Questions
+
+[Only include for explicitly authorized `needs-info` partial output. Ask the
+concrete human/reporter question that blocks agent-ready implementation.]
 
 ## Acceptance Criteria
 

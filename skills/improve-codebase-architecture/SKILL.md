@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Find architecture improvement candidates in a codebase, present evidence-backed options, then use grill-with-docs to sharpen the selected refactor. Use when the user asks to improve architecture, find module-boundary problems, deepen shallow modules, reduce coupling, or make a codebase easier for agents and humans to change.
+description: Find architecture improvement candidates in a codebase, present evidence-backed options, then use grill-me-with-context to sharpen the selected refactor. Use when the user asks to improve architecture, find module-boundary problems, deepen shallow modules, reduce coupling, or make a codebase easier for agents and humans to change.
 ---
 
 # Improve Codebase Architecture
@@ -9,7 +9,7 @@ description: Find architecture improvement candidates in a codebase, present evi
 
 Surface architecture improvements that would make a codebase easier to
 understand, test, and change. Present concrete candidates first. Only after the
-user chooses a candidate, use `$grill-with-docs` to pressure-test the selected
+user chooses a candidate, use `$grill-me-with-context` to pressure-test the selected
 direction and capture durable domain or architecture decisions.
 
 This is a discovery and decision-shaping skill, not an automatic refactor.
@@ -76,7 +76,7 @@ to explore.
 
 ### 4. Grill the selected candidate
 
-After the user chooses a candidate, load and follow `$grill-with-docs`.
+After the user chooses a candidate, load and follow `$grill-me-with-context`.
 
 Use it to resolve:
 
@@ -94,7 +94,7 @@ Summarize:
 
 - selected candidate,
 - resolved architecture decisions,
-- docs updated by `$grill-with-docs`,
+- docs updated by `$grill-me-with-context`,
 - implementation path,
 - tests to add or preserve,
 - remaining risks and deferred questions.

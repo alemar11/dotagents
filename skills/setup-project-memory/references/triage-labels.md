@@ -43,6 +43,10 @@ status from this table. In GitHub mode, these are usually labels. In local
 markdown mode, record the mapped value as a `Status:` line near the top of the
 issue file.
 
+`needs-info` is a waiting state, not an agent queue state. When the reporter or
+requester answers, the issue should be re-evaluated as `needs-triage` before it
+can move to `ready-for-agent`.
+
 Edit the right-hand columns to match the vocabulary actually used in this
 repo's tracker. If GitHub issue types are disabled for the organization, record
 the fallback labels or body-field convention here.

@@ -1,5 +1,0 @@
-interface:
-  display_name: "Grill With Docs"
-  short_description: "Stress-test repo-backed plans while updating context docs and ADRs."
-  brand_color: "#BE185D"
-  default_prompt: "Use $grill-with-docs to challenge this repo-backed plan through $grill-me, inspect existing code and docs first, and use $domain-modeling to update CONTEXT.md, relevant docs, or ADRs under project-memory/adr/ as durable terms and decisions land."

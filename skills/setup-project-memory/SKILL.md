@@ -1,6 +1,6 @@
 ---
 name: setup-project-memory
-description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent local session history, or updating AGENTS.md pointers, issue-tracker instructions, triage type and label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-with-docs, or architecture-improvement skills.
+description: Configure or refresh a repository's project-memory structure for agent workflows. Use when setting up a fresh repo, bootstrapping an already-used repo from repo evidence and recent local session history, or updating AGENTS.md pointers, issue-tracker instructions, triage type and label mappings, CONTEXT.md, and ADR layout before repo-backed planning, PRD, issue-splitting, triage, grill-me-with-context, or architecture-improvement skills.
 ---
 
 # Setup Project Memory
@@ -224,5 +224,5 @@ Summarize:
 - what workflows can now consume this setup.
 
 If session history could not be read or produced no strong evidence, say so
-plainly and note that future `$domain-modeling`, `$grill-with-docs`, and
+plainly and note that future `$domain-modeling`, `$grill-me-with-context`, and
 planning workflows can keep filling project memory incrementally.

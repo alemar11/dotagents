@@ -11,8 +11,8 @@ Turn clarified feature, product, migration, or workflow intent into a practical
 PRD that can feed `$to-issues`.
 
 Use this after requirements have been sharpened by conversation or
-`$grill-with-docs`. If the request is still too vague to produce a useful PRD,
-ask the smallest blocking question set or recommend running `$grill-with-docs`
+`$grill-me-with-context`. If the request is still too vague to produce a useful PRD,
+ask the smallest blocking question set or recommend running `$grill-me-with-context`
 first.
 
 ## Boundaries
@@ -46,7 +46,7 @@ memory files were unavailable.
 Identify the source material:
 
 - user conversation or pasted notes,
-- output from `$grill-with-docs`,
+- output from `$grill-me-with-context`,
 - an existing issue, doc, or planning note,
 - repo behavior that needs to become a defined product surface.
 

@@ -9,7 +9,7 @@ description: Plan a new feature from initial intent to agent-ready implementatio
 
 Run the full feature-planning pipeline from one invocation:
 
-`$setup-project-memory` if needed -> `$grill-with-docs` -> `$to-prd` ->
+`$setup-project-memory` if needed -> `$grill-me-with-context` -> `$to-prd` ->
 `$to-issues`.
 
 Use this skill to turn a rough feature idea into a written PRD and
@@ -39,9 +39,9 @@ If any of these files are missing, load and run `$setup-project-memory` first.
 Use the user's current feature-planning goal as context, but keep setup focused
 on repo-level routing and memory.
 
-### 2. Grill the feature with docs
+### 2. Grill the feature with context
 
-Load and run `$grill-with-docs` on the feature intent.
+Load and run `$grill-me-with-context` on the feature intent.
 
 Use it to resolve:
 
@@ -67,7 +67,9 @@ feature-planning gates remain.
 
 Ask `$to-prd` to use the configured target from
 `project-memory/agents/issue-tracker.md`. If `$to-prd` discovers a new blocker,
-resolve it before continuing.
+route the blocker back through `$grill-me-with-context` using the same one-question
+loop, then continue only after the blocker is resolved or explicitly deferred
+as non-blocking.
 
 ### 4. Split and write issues
 
@@ -85,6 +87,13 @@ types and triage labels, attach GitHub implementation issues to the PRD issue
 when GitHub is configured, use the configured GitHub title formats, and confirm
 that `$plan-harder` ran once per generated issue.
 
+If `$to-issues` discovers a product, domain, dependency, or acceptance-criteria
+blocker, pause issue writing and route the blocker back through
+`$grill-me-with-context`. Do not publish `needs-info` implementation issues from the
+normal `$plan-feature` flow. Publish partial `needs-info` or `ready-for-human`
+issues only when the user explicitly asks for partial output instead of a fully
+agent-ready issue set.
+
 ### 5. Report completion
 
 Summarize:
@@ -101,9 +110,11 @@ Summarize:
 ## Guardrails
 
 - Do not implement the feature.
-- Do not write broad docs directly from this skill; `$grill-with-docs` and
+- Do not write broad docs directly from this skill; `$grill-me-with-context` and
   `$domain-modeling` own durable context and ADR updates.
 - Do not create PRDs or issues in locations not configured by
   `project-memory/agents/issue-tracker.md`.
+- Do not treat `needs-info` issues as agent-ready output; they are waiting for
+  human/reporter input and must be re-triaged before implementation.
 - If setup cannot be completed or a gate remains unresolved, stop with the
   current state and next question instead of writing partial artifacts.

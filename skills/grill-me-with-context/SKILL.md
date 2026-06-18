@@ -1,9 +1,9 @@
 ---
-name: grill-with-docs
-description: Stress-test a codebase-backed plan while updating project domain docs. Use when the user asks to be grilled with docs, sharpen a feature or architecture plan in a repo, build shared language during planning, or preserve decisions in CONTEXT.md or ADRs as the grilling session progresses.
+name: grill-me-with-context
+description: Stress-test a codebase-backed plan with project context while updating durable docs. Use when the user asks to be grilled with context, sharpen a feature or architecture plan in a repo, build shared language during planning, or preserve decisions in CONTEXT.md or ADRs as the grilling session progresses.
 ---
 
-# Grill With Docs
+# Grill Me With Context
 
 ## Goal
 
