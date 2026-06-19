@@ -96,10 +96,12 @@ Each implementation workstream records the effective `Delivery mode` label and
 whether it is feature-level inherited metadata from `Source PRD` or an
 issue-level override. It also records issue-level parallelization,
 dependencies, blocks, closeout target, branch or PR expectation, current wave,
-and integration proof target. Record integration mode only when it is not
-obvious from the inherited delivery mode or when the issue declares an override.
-Workers may not choose a different branch or PR strategy without a root-owned
-ledger update and authorization check.
+and integration proof target. For PRD-backed workflows, also record delivery
+authority, publication authority, and issue mutation authority separately, as
+defined in `prd-backed-delivery.md`. Record integration mode only when it is
+not obvious from the inherited delivery mode or when the issue declares an
+override. Workers may not choose a different branch or PR strategy without a
+root-owned ledger update and authorization check.
 
 Issue-level parallelization controls startability:
 
@@ -142,7 +144,7 @@ Gate matrix:
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; source; parallelization; dependencies; blocks; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 
@@ -221,16 +223,20 @@ single combined operating view.
   as review, commit, push, PR, merge, close, or release. Execute it before
   stopping when current authorization permits; otherwise reclassify it as
   `Needs Owner`, `Blocked`, or `Deferred` with the missing decision or access.
+  For PRD-backed workflows with branch plus draft PR delivery authority,
+  commit, push, and draft PR creation are current-authorized actions after
+  gates pass unless the owner restricted publication.
 - `Blocked`: work cannot progress with current access, state, dependency, or
   proof. Record blocker, evidence, minimum next action, and whether the blocker
   is owner-actionable or external.
 - `Ignored Or Suppressed`: known item intentionally excluded from this loop.
   Record source id, source fingerprint, owner, date, and reason. Do not
   rediscover it unless owner direction changes or the source fingerprint changes.
-- `Completed`: implemented work whose required gates passed. Record commits,
-  PRs, validation, root-verifiable proof, source closeout state, integration
-  method, worker lifecycle decision, and any generated ignored artifacts that
-  were removed or intentionally retained.
+- `Completed`: implemented work whose required gates passed and whose delivery
+  contract is satisfied or explicitly blocked outside current authorization.
+  Record commits, PRs, validation, root-verifiable proof, source closeout
+  state, integration method, worker lifecycle decision, and any generated
+  ignored artifacts that were removed or intentionally retained.
 - `Deferred`: known residual work that is intentionally not part of the current
   closeout. Link the follow-up issue/ticket when one exists, or record the
   proposed follow-up when mutation is not authorized. Do not mirror completed
@@ -253,12 +259,17 @@ Before marking a ledger `complete`, verify:
 - `Ready Next` is empty, or every remaining action was reclassified as `Needs
   Owner`, `Blocked`, or `Deferred` with the missing authorization, decision, or
   follow-up.
+- PRD-backed work with authorized branch plus draft PR delivery either records
+  the published draft PR URL or records the exact blocker that prevents
+  publication; do not mark it complete while authorized commit, push, or draft
+  PR creation remains in `Ready Next`.
 - `Needs Owner` and `Blocked` entries are explicitly non-Codex-actionable and
   include decision briefs, blockers, evidence, and minimum next actions.
 - `Deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
 - `Completed` records the final proof, source closeout state, integration
-  method, and worker lifecycle decision for each completed worker-backed item.
+  method, publication state, and worker lifecycle decision for each completed
+  worker-backed item.
 - Generated ignored artifacts and helper worktrees are either removed, retained
   for inspection with a reason, left only inside a helper worktree with an
   explicit lifecycle decision, or explicitly handed off.

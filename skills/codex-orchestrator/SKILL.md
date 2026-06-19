@@ -187,6 +187,17 @@ the scheduling graph for waves and worker routing. Treat an issue line such as
 as a feature-level landing strategy, not as a claim that only this one issue
 uses that branch/PR shape.
 
+For PRD-backed issue workflows, read
+`references/prd-backed-delivery.md` before scheduling or publishing. Keep
+delivery authority, publication authority, and issue mutation authority
+separate. When the owner asks to implement a PRD or generated issue, and the
+PRD or generated issue explicitly defines branch plus draft PR delivery,
+commit, push, and draft PR creation are part of the PRD delivery contract after
+gates pass unless the owner restricted the request to local-only, inspect-only,
+no-push, or no-PR work. For ad hoc or legacy sources without a linked PRD
+delivery contract, `implement` remains local-only and publication requires
+explicit owner authorization.
+
 Apply issue-level scheduling constraints before choosing a wave or worker:
 
 - `Parallelization: independent`: eligible for delegation when authorization,
@@ -257,10 +268,11 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
 2. Identify the repository set, task sources, current goals, delivery mode
-   or `Source PRD` inheritance, issue-level scheduling constraints, suppressed
+   or `Source PRD` inheritance, issue-level scheduling constraints, delivery
+   authority, publication authority, issue mutation authority, suppressed
    items, owner constraints, and portfolio-specific gate overrides. Register
    task sources in the ledger with source ids, source refs, dedupe rules,
-   mutation authority, branch or PR expectations, closeout target, and
+   branch or PR expectations, closeout target, mutation authority, and
    integration proof target.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
@@ -290,9 +302,9 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    CLI/subagent workers when authorized and inspectable, or stay in the root
    thread.
 6. Give each worker an explicit authorization mode, scope, gates, expected
-   proof, delivery mode, dependency state, branch expectation, integration mode,
-   and final report shape. Workers must not spawn sub-workers, create threads,
-   manage other chats, or edit the ledger.
+   proof, delivery mode, publication authority, dependency state, branch
+   expectation, integration mode, and final report shape. Workers must not
+   spawn sub-workers, create threads, manage other chats, or edit the ledger.
 7. For visible Codex App workers, immediately rename each worker thread to
    `<Project>: <short current task>` and update the title when the material
    assignment changes. Keep titles short enough to scan in the sidebar.
@@ -323,8 +335,11 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
     keep the item owner-ready with the proposed update body and do not call it
     complete.
 14. Before stopping, execute every `Ready Next` action that is within current
-    authorization. Reclassify any remaining `Ready Next` item as `Needs Owner`,
-    `Blocked`, or `Deferred` with the missing decision, access, or follow-up.
+    authorization. In PRD-backed workflows where branch plus draft PR delivery
+    is authorized by the source contract, commit, push, and draft PR creation
+    are authorized `Ready Next` actions after gates pass. Reclassify any
+    remaining `Ready Next` item as `Needs Owner`, `Blocked`, or `Deferred` with
+    the missing decision, access, or follow-up.
 15. Stop only after reconciling the original task sources against the ledger.
     The ledger must show no `Active` worker requiring orchestration, no
     `Autonomous` item that can still be delegated, no authorized `Ready Next`
@@ -342,6 +357,8 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
   overrides, and write ownership.
 - `references/worker.md`: worker prompt template, authorization modes, no
   subdelegation rule, and final report format.
+- `references/prd-backed-delivery.md`: PRD/generated-issue delivery contracts,
+  publication authority, and closeout rules.
 - `references/gates.md`: universal gate catalog for owner-ready, merge, release,
   CI, autoreview, and cross-repo integration decisions.
 
