@@ -9,6 +9,19 @@ description: Use when committing local changes, preparing commit messages, stagi
 
 Use direct `git` commands. This skill is scriptless by design.
 
+For the common case of a small cohesive change and a user ask like `commit`,
+`commit this`, or `commit and push`, stay on the shortest safe path:
+
+1. `git status --short --branch`
+2. `git diff -- <path>` for the intended files
+3. `git add -- <explicit-paths>`
+4. `git diff --staged`
+5. `git commit -F <message-file>`
+6. `git push` only if the user asked to push
+
+Escalate to broader diff review or split commits only when the worktree is
+mixed, generated files are involved, or the staged scope is still unclear.
+
 If the user asks for a PR, draft PR, branch publication, or "publish", use
 `yeet` instead. If the user says "commit and push" without PR language, ask
 "PR or push-only?" and default to push-only when unclear. When the user
@@ -54,7 +67,8 @@ git push
 ## Workflow
 
 1. Inspect the worktree with `git status --short --branch`.
-2. Inspect relevant diffs with `git diff` and `git diff --staged`.
+2. For small cohesive work, inspect only the intended files first. Expand to
+   `git diff --stat` or broader review only when the scope is mixed or unclear.
 3. Stage only intended paths with explicit pathspecs such as
    `git add -- <path>`.
 4. Re-check `git diff --staged` before committing.

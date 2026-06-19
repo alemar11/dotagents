@@ -21,13 +21,24 @@ the full publish flow. Route that work to `$github-issues`, perform the
 authorized GitHub issue mutation or dry-run draft command,
 and state that full `yeet` was not applicable.
 
+Prefer the shortest publish path that matches the state in front of you:
+
+- If a good local commit already exists, reuse it instead of reopening commit
+  authoring.
+- If the branch already has a PR, update that PR instead of treating the run as
+  a fresh publish.
+- If there is no publishable local change, stop early and route issue-only
+  follow-up to `$github-issues`.
+
 ## Workflow
 
 1. Inspect branch and worktree state.
 2. Confirm the intended scope when the worktree is mixed.
-3. Create or reuse a commit through the `git-commit` workflow.
+3. Reuse the current commit when it already represents the intended scope.
+   Otherwise create one through the `git-commit` workflow.
 4. Push the branch with direct `git push`.
-5. Open or update a draft PR with direct `gh pr create` or `gh pr edit`.
+5. Open a draft PR with `gh pr create`, or update the existing PR with
+   `gh pr edit` when one is already attached to the branch.
 6. Return branch, PR URL, commit hash, and verification performed.
 
 ## References

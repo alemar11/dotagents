@@ -13,8 +13,6 @@ SKILLS_DEST_DIR="$HOME/.agents/skills"
 
 mkdir -p "$SKILLS_DEST_DIR"
 
-DEPRECATED_BUNDLED_SKILLS="git-commit github github-ci github-releases github-reviews github-triage yeet"
-
 link_path() {
   source_path="$1"
   target_path="$2"
@@ -31,19 +29,20 @@ link_path() {
   echo "LINK $label -> $target_path"
 }
 
-prune_deprecated_skill_link() {
-  skill_name="$1"
-  target_path="$SKILLS_DEST_DIR/$skill_name"
+prune_stale_repo_skill_links() {
+  for target_path in "$SKILLS_DEST_DIR"/*; do
+    [ -L "$target_path" ] || continue
 
-  [ -L "$target_path" ] || return 0
-
-  resolved_path="$(readlink "$target_path" || true)"
-  case "$resolved_path" in
-    "$ROOT_DIR"/*)
-      rm -f "$target_path"
-      echo "REMOVE deprecated bundled skill link -> $target_path"
-      ;;
-  esac
+    resolved_path="$(readlink "$target_path" || true)"
+    case "$resolved_path" in
+      "$SKILLS_SOURCE_DIR"/*)
+        if [ ! -d "$resolved_path" ] || [ ! -f "$resolved_path/SKILL.md" ]; then
+          rm -f "$target_path"
+          echo "REMOVE stale repo skill link -> $target_path"
+        fi
+        ;;
+    esac
+  done
 }
 
 echo "Linking local skills from: $ROOT_DIR"
@@ -51,9 +50,7 @@ echo "Skills source directory: $SKILLS_SOURCE_DIR"
 echo "Skills target directory: $SKILLS_DEST_DIR"
 echo
 
-for skill_name in $DEPRECATED_BUNDLED_SKILLS; do
-  prune_deprecated_skill_link "$skill_name"
-done
+prune_stale_repo_skill_links
 
 skill_count=0
 skill_linked_count=0

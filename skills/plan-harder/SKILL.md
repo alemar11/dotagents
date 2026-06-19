@@ -20,6 +20,15 @@ Plan Harder has two modes:
 - **Issue-hardening mode**: make one vertical slice or issue agent-ready by
   adding the missing execution detail an implementation agent needs.
 
+Default to the smallest valid route:
+
+- If the input is one issue, one slice, or one task from another planning
+  skill, use issue-hardening mode.
+- If the user can reasonably accept recommended assumptions, offer a compact
+  defaults-based clarification path instead of a long question loop.
+- Escalate to full-plan mode only when the work genuinely needs phases or
+  cross-cutting sequencing.
+
 ## Planning-Only Contract
 
 - Do not implement the work.
@@ -57,6 +66,9 @@ Plan Harder has two modes:
 - When hardening an existing issue, end with a clear implementation handoff for
   exactly that issue and name any remaining blocker that prevents assignment.
 
+For routine issue-hardening runs, prefer a compact brief that reaches
+`## Implementation Plan` quickly instead of repeating generic planning doctrine.
+
 ## Workflow
 
 ### 1. Choose the Mode
@@ -90,7 +102,8 @@ Plan Harder has two modes:
 - Offer multiple-choice options when practical.
 - Suggest reasonable defaults when appropriate.
 - Include a fast-path reply such as `defaults` when the recommended choices are
-  acceptable.
+  acceptable, and proceed on those defaults when the broader request already
+  implies them clearly enough.
 - Include a low-friction "not sure - use default" option when that meaningfully
   reduces back-and-forth.
 - Do not ask questions that a quick, low-risk discovery read can answer from
