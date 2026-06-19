@@ -181,12 +181,8 @@ ledger and execute against that delivery mode. For generated implementation issu
 first read the issue body and any linked `Source PRD`; the PRD is the canonical
 source for full delivery mode details, while the issue body supplies the copied
 feature-level `Delivery mode` label plus issue-level parallelization,
-dependencies, closeout, and overrides. If the issue references
-`Execution plan: #<number>`, a local `execution-plan.md`, or another execution
-plan pointer, load it and use its wave and unlock rules for scheduling. Treat a
-hosted issue titled `Execution plan: <feature-slug>` as a planning/control
-artifact, not an implementation workstream; do not dispatch it to a worker
-unless the owner explicitly asks to edit the plan itself. Treat an issue line such as
+dependencies, blocks, closeout, and overrides. Use those issue-local fields as
+the scheduling graph for waves and worker routing. Treat an issue line such as
 `Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)`
 as a feature-level landing strategy, not as a claim that only this one issue
 uses that branch/PR shape.
@@ -261,11 +257,11 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 
 1. Resolve the portfolio ledger with `references/ledger.md`.
 2. Identify the repository set, task sources, current goals, delivery mode
-   or `Source PRD` inheritance, execution-plan source, issue-level scheduling
-   constraints, suppressed items, owner constraints, and portfolio-specific gate
-   overrides. Register task sources in the ledger with source ids, source refs,
-   dedupe rules, mutation authority, branch or PR expectations, closeout target,
-   and integration proof target.
+   or `Source PRD` inheritance, issue-level scheduling constraints, suppressed
+   items, owner constraints, and portfolio-specific gate overrides. Register
+   task sources in the ledger with source ids, source refs, dedupe rules,
+   mutation authority, branch or PR expectations, closeout target, and
+   integration proof target.
 3. Select Git/GitHub companion skills from the routing table. If discovery is
    needed, use `$github-portfolio-triage` for broad or multi-repo queue scans;
    use focused current-repo companions such as `$github-triage`,
@@ -288,16 +284,15 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 5. Before delegation, read `references/worker.md` and create one Codex worker
    per independent ownership boundary, such as repository, package, service,
    path set, or tightly scoped workstream, using the selected worker surface,
-   recorded or inherited delivery mode, and the current execution-plan wave.
-   Use visible Codex App
-   threads in App-oriented workflows only when explicit owner intent for
-   visible/new/separate/background workers is present; otherwise use
+   recorded or inherited delivery mode, and the current dependency wave. Use
+   visible Codex App threads in App-oriented workflows only when explicit owner
+   intent for visible/new/separate/background workers is present; otherwise use
    CLI/subagent workers when authorized and inspectable, or stay in the root
    thread.
 6. Give each worker an explicit authorization mode, scope, gates, expected
-   proof, delivery mode, execution-plan reference, branch expectation, integration
-   mode, and final report shape. Workers must not spawn sub-workers, create
-   threads, manage other chats, or edit the ledger.
+   proof, delivery mode, dependency state, branch expectation, integration mode,
+   and final report shape. Workers must not spawn sub-workers, create threads,
+   manage other chats, or edit the ledger.
 7. For visible Codex App workers, immediately rename each worker thread to
    `<Project>: <short current task>` and update the title when the material
    assignment changes. Keep titles short enough to scan in the sidebar.

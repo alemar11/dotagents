@@ -50,11 +50,11 @@ hardware, do not treat the source item as fully complete unless the owner
 explicitly accepts that gap.
 
 For implementation issues that include `## Delivery`, verify that closeout
-matches the recorded delivery mode and closeout path. If a `execution-plan.md` is
-present, also verify that required wave/unlock conditions from that plan are
-completed before declaring closure. Close through the relevant PR body by default.
-Use final-commit closure only when the issue records
-**Direct Commit** or another explicit maintainer authorization.
+matches the recorded delivery mode and closeout path, and verify that direct
+dependencies or blocking relationships recorded in the issue are satisfied
+before declaring closure. Close through the relevant PR body by default. Use
+final-commit closure only when the issue records **Direct Commit** or another
+explicit maintainer authorization.
 
 If the implementation intentionally satisfies only part of the source item,
 keep the source item open or move it to `Needs Owner` until the deferred scope

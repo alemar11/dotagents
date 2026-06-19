@@ -36,14 +36,12 @@ returned or published.
   feature-level `Delivery mode` label for cross-session scheduling. Mark it as
   inherited from `Source PRD` unless the issue has an explicit owner-authorized
   issue-level exception.
-- Build a feature-level execution plan for execution sequencing. It should own
-  issue-level ordering, dependency waves, and unlock conditions so issues can
-  stay implementation-focused. Persist it as `execution-plan.md` only for local
-  artifact targets such as `.scratch/<feature-slug>/` or
-  `projects/<project>/features/<feature>/`. In GitHub or GitHub coordination
-  modes, create or update a dedicated hosted issue titled
-  `Execution plan: <feature-slug>` by default; use a PRD comment/body section
-  only as a fallback when that issue cannot be created or updated.
+- Treat the generated issue set as the execution graph. Before returning or
+  publishing issues, validate issue order, dependency references, acyclicity,
+  startability waves, and cross-repo gates from the issue bodies themselves. Do
+  not create a separate planning issue, local plan file, PRD plan section, or
+  inline scheduling artifact. If the user asks for a summary, label it as a
+  non-authoritative view derived from the generated issues.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
 
@@ -112,7 +110,7 @@ Apply vertical slicing whenever practical. Order issues for sequential agentic
 implementation, and make dependencies explicit rather than relying on issue
 numbering.
 
-Before hardening, build one feature-level execution plan from the proposed issue
+Before hardening, validate the generated issue graph from the proposed issue
 list:
 
 - `delivery-mode`: inherited from the PRD and copied in each issue.
@@ -121,29 +119,10 @@ list:
 - dependency edge validity check: every `depends on` / `blocks` reference must
   resolve to a generated issue ID in this feature set (`01`, `02`, ...), and the
   graph must be acyclic.
-- wave gates and unblock conditions.
+- startability waves and unblock conditions.
 - repo-level boundaries and integration proof requirements (for orchestrator work).
-- Treat the execution plan as the durable ordering contract for scheduling and
-  worker-routing. Issues should carry only issue-level scheduling fields
-  (`Parallelization`, `Closeout`, dependencies), not full sequence and release
-  logic.
-
-Publish or persist this plan according to the effective target:
-
-- github/orchestrator-github: create or update a dedicated hosted issue titled
-  `Execution plan: <feature-slug>` through `$github-issues`, attach it to the
-  PRD parent when the tracker supports sub-issues, and use transient body files
-  outside the repo when needed. The execution-plan issue is a planning/control
-  artifact, not an implementation queue item; do not apply `ready-for-agent`.
-  It must include `Source PRD: #<prd-number>` and an ordered map of every
-  generated implementation or vertical feature issue. If final GitHub issue
-  numbers are not known when the plan issue is created, update the plan issue
-  after creating the implementation issues so it references all of them.
-- local-markdown: `.scratch/<feature-slug>/execution-plan.md`
-- orchestrator-local: `projects/<project-slug>/features/<feature-slug>/execution-plan.md`
-- if neither hosted mutation nor local writes are authorized, return the
-  equivalent execution plan in-chat and include the intended hosted issue title
-  or local path for the next run.
+- Treat the issue bodies as the durable ordering contract for scheduling and
+  worker-routing. Do not persist a separate scheduling artifact.
 
 Every issue should:
 
@@ -212,23 +191,17 @@ Use `project-memory/agents/issue-tracker.md` for the target:
 
 - `Tracker mode: github`: create issues through `$github-issues`, attach them
   to the PRD parent when the PRD source is a GitHub issue, set the mapped
-  `task` issue type when available, then apply mapped labels. Create or update
-  the dedicated execution-plan issue before returning completion; generated
-  implementation issues must include `Execution plan: #<plan-number>` when the
-  plan issue exists. Do not create a repo-local `.scratch/` mirror unless the
-  user explicitly requested one.
+  `task` issue type when available, then apply mapped labels. Do not create a
+  repo-local `.scratch/` mirror unless the user explicitly requested one.
 - `Tracker mode: orchestrator-github`: create vertical feature issues in the
   configured coordination repo through `$github-issues`, using the PRD parent
   relationship and the required `<project-slug>` label. Derive
   `<project-slug>` from the PRD/project context or ask for it, ensure the label
   exists in the coordination repo, and apply it to every generated vertical
-  feature issue and the execution-plan issue. Create or update the dedicated
-  execution-plan issue before returning completion; generated vertical feature
-  issues must include `Execution plan: #<plan-number>` when the plan issue
-  exists. Repo-local implementation PRs or child issues are linked from the
-  coordination issue; repo-local child issues are optional in v1. Do not create
-  local orchestrator feature artifacts or `.scratch/` mirrors unless the user
-  explicitly requested one.
+  feature issue. Repo-local implementation PRs or child issues are linked from
+  the coordination issue; repo-local child issues are optional in v1. Do not
+  create local orchestrator feature artifacts or `.scratch/` mirrors unless the
+  user explicitly requested one.
 - `Tracker mode: local-markdown`: write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
   and `Status:` lines near the top and a heading that follows the local issue
@@ -252,17 +225,6 @@ issue is created before the parent relationship is set, use `$github-issues` to
 attach it afterward. Keep `Source PRD: #<prd-number>` in the issue body as
 well.
 
-For GitHub PRDs and GitHub coordination PRDs, create or update one
-execution-plan issue titled `Execution plan: <feature-slug>` and attach it to
-the PRD issue when parent/sub-issues are supported. This issue must include
-`Source PRD: #<prd-number>`, the feature-level delivery mode, dependency graph,
-wave gates, unlock conditions, and links or references to every generated
-implementation or vertical feature issue. It may use the mapped `task` type, but
-it must not receive `ready-for-agent` or otherwise be presented as agent-ready
-implementation work. If GitHub mutation is authorized but the plan issue cannot
-be created or edited, fall back to a PRD comment/body section and report that
-fallback explicitly.
-
 For GitHub coordination PRDs, every generated vertical feature issue must share
 the same project label as the PRD parent issue, named exactly `<project-slug>`.
 This label is separate from issue type and workflow-state labels.
@@ -281,13 +243,6 @@ links or recording equivalent integration proof.
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
 
-- `Execution plan`: required. For hosted tracker runs, point to the dedicated
-  execution-plan issue number or URL, usually `#<plan-number>`. Use a PRD
-  comment/body section only as a stated fallback when the plan issue cannot be
-  created or edited. For local artifact runs, point to `execution-plan.md` in
-  the feature artifact folder. If neither hosted mutation nor local writes are
-  authorized, include the inline execution plan in the completion summary and a
-  target for the next run.
 - `Source PRD`: required. Prefer a stable GitHub issue number or local PRD path.
 - `Delivery mode`: required. Copy the effective value from the PRD and mark it
   as feature-level, such as `One Feature Branch (feature-level, inherited from
@@ -297,6 +252,8 @@ metadata without duplicating the full PRD branch and PR details:
   (issue-level override, authorized by <owner/date>)`.
 - `Parallelization`: required. Use `independent`, `depends on <issue-id>[,
   <issue-id>]`, `blocks <issue-id>[, <issue-id>]`, or `root-integrated`.
+- `Dependencies`: required. Use `None` or direct generated issue IDs with the
+  dependency reason.
 - `Closeout`: required. State the concrete completion path, such as `feature PR
   closes issue`, `repo PR closes issue`, `issue PR closes issue`, `direct commit
   closes issue`, or `local done move after proof`.
@@ -367,8 +324,8 @@ Summarize:
 - product/workspace/context or orchestrator project identity used, when
   applicable,
 - delivery mode inherited,
-- execution-plan issue, local file path, or inline plan summary,
 - number of issues produced,
+- issue graph validation summary, including dependency and acyclicity checks,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
 - issue types and labels/statuses assigned,
@@ -379,55 +336,6 @@ Summarize:
 - confirmation that `$plan-harder` was run once per issue, that each issue
   includes the standard plan-hardening provenance line, and that the hardening
   output was merged into the issue without duplicated sections.
-
-## Hosted Execution Plan Issue Shape
-
-For GitHub and GitHub coordination targets, create or update one hosted
-execution-plan issue using this shape unless the tracker has a stronger local
-template:
-
-```markdown
-# Execution plan: <feature-slug>
-
-Type: [mapped issue type, usually task]
-Source PRD: #<prd-number>
-Execution artifact: planning/control issue; not agent-ready implementation work
-
-## Delivery
-
-- Delivery mode: [One Feature Branch | One PR Per Repo | One PR Per Issue |
-  Direct Commit] (feature-level, inherited from Source PRD)
-- Closeout: closes only when the PRD parent is complete or the maintainer
-  explicitly retires/replaces this plan
-
-## Issue Map
-
-- 01: #<issue-number> <vertical outcome> - [independent|depends on 01|blocks 02]
-- 02: #<issue-number> <vertical outcome> - [dependency summary]
-
-## Dependency Graph
-
-[Acyclic dependency graph using issue IDs and GitHub issue numbers when known.]
-
-## Waves And Unlock Conditions
-
-- Wave 1: [issues and proof required to unlock later work]
-- Wave 2: [issues and unlock condition]
-
-## Integration And Proof
-
-[Repo boundaries, integration gates, and proof required before closing feature
-issues or the PRD.]
-
-## Notes
-
-- This issue is not an implementation queue item.
-- Generated feature issues must link back with `Execution plan: #<this-issue>`.
-```
-
-If the plan issue is created before generated issue numbers are known, update
-the `## Issue Map` after issue creation. Do not leave the hosted plan with only
-temporary local issue IDs when GitHub issue numbers exist.
 
 ## Issue Body Shape
 
@@ -440,7 +348,6 @@ delivery lines when they do not apply.
 Type: [mapped issue type, usually task]
 Status: [mapped triage state]
 Source PRD: [path, issue number, or title]
-Execution plan: [hosted issue number/URL, path to execution-plan.md, or inline plan reference]
 
 Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
 
@@ -459,15 +366,6 @@ single-repo issues, `current repository`; for orchestrator issues, use
   issue | direct commit closes issue | local done move after proof]
 - Integration mode: [omit when obvious from Source PRD; otherwise shared
   feature branch | repo PR | issue PR | direct commit with authorization reason]
-
-## Execution Plan
-
-- Reference: [hosted execution-plan issue, `execution-plan.md`, or inline final report]
-- Keep full sequencing and unlock conditions in the feature-level execution
-  plan; the issue needs only dependency and parallelization fields.
-- If no hosted issue or local file is written in this run, include the same
-  plan in the final report and keep this section as the pointer to that inline
-  execution plan.
 
 ## Goal
 
@@ -529,7 +427,8 @@ When all acceptance criteria pass and validation is complete:
 
 ## Dependencies
 
-- [Issue dependency or `None`.]
+- Depends on: [generated issue IDs and reason, or `None`.]
+- Blocks: [generated issue IDs and reason, or `None`.]
 ```
 
 Include a `## Questions` section only for explicitly authorized partial

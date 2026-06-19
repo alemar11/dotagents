@@ -94,13 +94,12 @@ Exceptions:
 
 Each implementation workstream records the effective `Delivery mode` label and
 whether it is feature-level inherited metadata from `Source PRD` or an
-issue-level override. If a workstream includes an execution-plan reference, record
-that reference and the current wave so scheduling stays synchronized. It also
-records issue-level parallelization, dependencies, closeout target, branch or PR
-expectation, and integration proof target. Record integration mode only when it is
-not obvious from the inherited delivery mode or when the issue declares an
-override. Workers may not choose a different branch or PR strategy without a
-root-owned ledger update and authorization check.
+issue-level override. It also records issue-level parallelization,
+dependencies, blocks, closeout target, branch or PR expectation, current wave,
+and integration proof target. Record integration mode only when it is not
+obvious from the inherited delivery mode or when the issue declares an override.
+Workers may not choose a different branch or PR strategy without a root-owned
+ledger update and authorization check.
 
 Issue-level parallelization controls startability:
 
@@ -143,7 +142,7 @@ Gate matrix:
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD or execution-plan issue/path; delivery mode; source; parallelization; dependencies; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; source; parallelization; dependencies; blocks; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### Autonomous
 

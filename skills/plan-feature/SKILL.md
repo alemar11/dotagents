@@ -30,9 +30,9 @@ cross-repo vertical outcomes. Do not implement the feature.
   authorizing GitHub or another hosted tracker mutation.
 - Treat persistent local planning artifacts separately from temporary hosted
   issue body files. In GitHub or GitHub-coordination modes, do not keep
-  repo-local PRD, issue, execution-plan, `.scratch/`, or
-  `project-memory/features/` mirrors unless the configured target or current
-  run explicitly asks for a local artifact target.
+  repo-local PRD, issue, `.scratch/`, or `project-memory/features/` mirrors
+  unless the configured target or current run explicitly asks for a local
+  artifact target.
 - Carry accepted planning identity through every handoff: selected context,
   product or project slug, workspace path when applicable, and authoritative
   feature slug.
@@ -173,21 +173,12 @@ Planning identity:
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
 - delivery_mode: <mode recorded in the PRD Delivery Mode section>
-  Also include the expected execution-plan location: `Execution plan:
-  <feature-slug>` GitHub issue for hosted tracker runs by default,
-  `execution-plan.md` only for local artifact runs, or inline/draft output when
-  hosted mutation and local writes are both disallowed.
 ```
 
 Require `$to-issues` to use the configured issue target, issue types, labels,
 title formats, PRD parent/sub-issue relationships, and GitHub coordination
-project label when those modes apply. It must also produce `execution-plan.md`
-for local artifact targets, create or update a dedicated hosted
-`Execution plan: <feature-slug>` issue for GitHub targets by default, or return
-an inline/draft equivalent when mutation is disallowed. Hosted execution-plan
-issues are planning/control artifacts, not implementation queue items, and must
-not receive `ready-for-agent`. `$to-issues` must run `$plan-harder` once per
-generated implementation issue and verify that every `Parallelization`
+project label when those modes apply. `$to-issues` must run `$plan-harder`
+once per generated implementation issue and verify that every `Parallelization`
 dependency resolves to a known issue ID in an acyclic graph. If external
 mutation is disallowed, it must write to the effective local target or return
 draft publish commands instead.
@@ -226,7 +217,7 @@ Summarize:
 - planning identity used, including feature slug and product/context/project
   scope when applicable,
 - delivery mode used,
-- execution-plan issue, local path, or inline execution plan returned,
+- issue graph validation summary, including dependency and acyclicity checks,
 - gates resolved or deferred,
 - any issue still blocked and why.
 

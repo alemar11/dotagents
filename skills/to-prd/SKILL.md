@@ -108,9 +108,8 @@ Keep the PRD implementation-facing:
   path, and context file when applicable,
 - delivery mode: branch naming guidance, expected PR shape, and integration
   proof expectations,
-- execution-plan delegation note: sequencing and wave order belong to
-  `$to-issues`, which publishes a hosted execution-plan issue in GitHub modes
-  and uses `execution-plan.md` only for local artifact modes,
+- issue-splitting note: sequencing, dependencies, and startability are derived
+  from generated implementation issues and validated by `$to-issues`,
 - data, permissions, API, or integration constraints when relevant,
 - acceptance criteria,
 - risks and open questions,
@@ -180,12 +179,11 @@ Issue` or `Direct Commit` only when explicitly authorized and record the
 authorization reason.
 
 Treat the PRD as the canonical source for delivery mode and branch/PR details.
-`to-issues` owns schedule ordering and wave unlock conditions in the feature
-execution plan: a dedicated hosted `Execution plan: <feature-slug>` issue in
-GitHub/GitHub coordination modes by default, or `execution-plan.md` only for
-local artifact targets. Generated issues copy only the effective
-`Delivery mode` label as feature-level metadata inherited from `Source PRD`,
-plus any explicit issue-level exception or cross-repo closeout rule.
+`to-issues` owns issue splitting and validates the generated issue graph before
+publication. Generated issues copy only the effective `Delivery mode` label as
+feature-level metadata inherited from `Source PRD`, plus issue-level
+dependencies, parallelization, closeout, and any explicit issue-level exception
+or cross-repo closeout rule.
 
 For GitHub coordination PRDs, treat the project label as required issue
 metadata. It is separate from the mapped issue type and workflow-state labels.
@@ -222,16 +220,15 @@ Return:
 - product/workspace/context or orchestrator project identity used, when
   applicable,
 - delivery mode used,
-- that scheduling and wave control is delegated to `$to-issues` through a
-  hosted execution-plan issue in GitHub modes or `execution-plan.md` in local
-  artifact modes,
+- that issue ordering and dependency graph validation are delegated to
+  `$to-issues`,
 - target location or "chat only",
 - issue type applied, when the tracker supports it,
 - support docs created or updated and the accepted source used for each, when
   applicable,
 - any open questions,
-- whether it is ready for `$to-issues` to create the execution-plan artifact
-  and generated implementation issues.
+- whether it is ready for `$to-issues` to create generated implementation
+  issues.
 
 ## Guardrails
 
