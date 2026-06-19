@@ -27,6 +27,13 @@ Confirm the worker's requested action is covered by the current authorization
 mode. Stop for owner approval before push, PR, merge, close, release, external
 service mutation, destructive local changes, or broad scope changes.
 
+For PRD-backed workflows, branch plus draft PR delivery in the PRD or generated
+issue can satisfy authorization for commit, push, and draft PR creation after
+tests, integration checks, and `$autoreview` pass, unless the owner restricted
+the request to local-only, inspect-only, no-push, or no-PR work. Record that as
+publication authority in the ledger. This does not authorize merge, release,
+direct issue mutation, production deploy, or unrelated GitHub cleanup.
+
 ### Live Proof Gate
 
 For user-facing behavior, require proof from the real app, CLI, API, service,
@@ -55,6 +62,14 @@ dependencies or blocking relationships recorded in the issue are satisfied
 before declaring closure. Close through the relevant PR body by default. Use
 final-commit closure only when the issue records **Direct Commit** or another
 explicit maintainer authorization.
+
+For PRD-backed workflows with authorized branch plus draft PR delivery, do not
+declare the workstream `Completed` while the expected draft PR remains
+uncreated. Either record the draft PR URL and PR-body closeout path, or record
+the blocker and move the publication action to `Needs Owner`, `Blocked`, or
+`Deferred`. Treat direct issue comments, labels, manual issue closure, parent
+PRD closure, merge, and release as separate mutations that require explicit
+authority.
 
 If the implementation intentionally satisfies only part of the source item,
 keep the source item open or move it to `Needs Owner` until the deferred scope

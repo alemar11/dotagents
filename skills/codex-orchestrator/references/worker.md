@@ -118,6 +118,13 @@ individual issue alone owns the branch or PR shape. Treat
 `Delivery mode: One PR Per Issue (issue-level override, authorized by
 <owner/date>)` as a scoped exception for that issue only.
 
+For PRD-backed workflows, the root resolves delivery authority, publication
+authority, and issue mutation authority with `prd-backed-delivery.md` before
+delegation. Workers do not infer publication rights from `Source PRD` text on
+their own. They may commit, push, or open a draft PR only when the assignment
+sets authorization mode to `push-pr` and names the exact repository, branch, PR
+shape, and closeout target.
+
 ## Worker Status Vs Root Lifecycle
 
 Workers report execution status. The root orchestrator decides lifecycle:
@@ -264,7 +271,9 @@ that cleanup is safe and available, or record why they remain.
   listed in allowed surfaces. `push-pr` is the first mode that permits commits
   or publication.
 - `push-pr`: commit, push, or draft PR creation when the user explicitly
-  authorized publication.
+  authorized publication, or when the root records PRD-backed publication
+  authority from `prd-backed-delivery.md`. Workers may use this mode only for
+  the named branch, PR shape, and closeout target.
 - `ci-rerun-fix`: rerun checks or push targeted fixes for a known PR or branch
   when the user authorized CI follow-up.
 - `merge-close`: merge, close, label, comment, or otherwise mutate GitHub state
@@ -292,6 +301,8 @@ Scope:
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Delivery mode: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
 - Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
+- Publication authority: <none|explicit owner authorization|PRD-backed branch plus draft PR|blocked, with reason>
+- Issue mutation authority: <none|PR body closeout only|explicit direct mutation authority>
 - Parallelization: <independent|depends on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>
