@@ -44,7 +44,8 @@ tests, integration checks, and `$autoreview` pass, unless the owner said
 `local-only`, `inspect-only`, `no push`, `no PR`, or equivalent.
 
 This PRD-backed publication authority is sufficient for the root orchestrator
-to use `$git-commit` or `$yeet` for the named branch and draft PR. It is not
+to use `$git-commit` for commit/push-only delivery, or `$yeet` when the resolved
+delivery path requires draft PR creation or updating an existing PR. It is not
 sufficient for merge, release, production deploy, final issue closure by direct
 mutation, or broad GitHub cleanup.
 
