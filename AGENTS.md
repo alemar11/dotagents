@@ -189,6 +189,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Standalone Git and GitHub skills
 - Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, `github-ci`, `github-review-threads`, `github-portfolio-triage`, `github-stars`, and `yeet`.
 - Keep standalone skills independent from repo-local plugin files, plugin shared scripts, and installed plugin cache copies; standalone runtime docs and code must use direct `git`, direct `gh`, or their own `scripts/<tool>` artifacts.
+- Keep standalone `github-*` skills provider-primitive and workflow-agnostic: they may expose GitHub mechanics and route to sibling GitHub skills, but caller-specific policy such as planning, orchestration, project-memory, queue state, issue body schema, or label taxonomy belongs in the composing skill that invokes them.
 - Keep `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
 - Keep GitHub issue lifecycle mechanics in standalone `github-issues`, not in queue triage, PR review-thread, publish, commit, or project-memory skills.
 - Keep `yeet` as a convenience orchestration skill that composes standalone `git-commit` and focused `github-*` skills rather than owning duplicate helper code.

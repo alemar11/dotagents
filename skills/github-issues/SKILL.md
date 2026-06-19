@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Use direct gh commands for GitHub issue lifecycle, labels, types, parent/sub-issues, coordination repos, and dry-run commands.
+description: Use direct gh commands for GitHub issue lifecycle, labels, types, parent/sub-issues, explicit repo targeting, and dry-run commands.
 ---
 
 # GitHub Issues
@@ -20,11 +20,10 @@ This skill only handles GitHub Issues.
 - Use direct `gh` commands. This skill is scriptless by design.
 - Confirm repository context before mutation, using the current checkout or an
   explicit `--repo <owner>/<repo>`.
-- Prefer `--body-file` for non-trivial generated issue bodies or comments.
-- Create `--body-file` inputs in a temporary directory outside the repo and
-  remove them after mutation unless a calling workflow explicitly asked to keep
-  a local mirror. Never use `.scratch/` or `project-memory/features/` as
-  implicit staging for hosted-tracker mutations.
+- Prefer `--body-file` for non-trivial issue bodies or comments.
+- Create temporary `--body-file` inputs outside checkout-owned artifact paths
+  and remove them after mutation unless the user or calling workflow explicitly
+  provides a persistent body-file or local mirror path.
 - Inspect current labels, issue type, state, and relationships before changing
   them.
 - Do not create labels, close issues, or mutate issue relationships unless the
@@ -39,10 +38,10 @@ This skill only handles GitHub Issues.
 1. Resolve the target repository and authorization:
    - current checkout repo,
    - explicit `--repo <owner>/<repo>`,
-   - or coordination repo from `project-memory/agents/issue-tracker.md`.
+   - or a target repository supplied by the user or calling workflow.
 2. Read the relevant issue or label state before mutation.
 3. Apply the smallest GitHub issue operation needed:
-   - create PRD parent, execution-plan, or implementation issues,
+   - create issues with the requested title, body, type, labels, or parent,
    - set issue type,
    - add or remove labels,
    - add comments,
