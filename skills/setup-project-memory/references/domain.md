@@ -12,10 +12,12 @@ codebase, planning work, or preparing implementation issues.
 - In multi-context repos, also check context-specific `project-memory/adr/`
   directories near the relevant `CONTEXT.md`
 
-If these files do not exist, proceed silently for fresh setup. During
-existing-project bootstrap, setup may seed root `CONTEXT.md` and useful ADRs
-when repo evidence or recent session history strongly supports the terms,
-rules, open questions, or accepted decisions being recorded.
+If these files do not exist, setup should still run an initial context-seed
+check for non-empty repos. During fresh setup, create root `CONTEXT.md` when
+durable repo evidence supports useful first vocabulary, rules, boundaries, or
+open questions. During existing-project bootstrap, setup may also create useful
+ADRs when repo evidence or recent session history strongly supports accepted
+load-bearing decisions being recorded.
 
 ## File structure
 
@@ -110,3 +112,11 @@ Use repo vocabulary first:
 
 Do not record tentative proposals, rejected ideas, secrets, raw session logs, or
 generic architecture advice as project memory.
+
+## Initial context seed
+
+For a non-empty repo without `CONTEXT.md`, fresh setup should recommend an
+initial seed when README files, product docs, source/tests, or package metadata
+can support a concise first glossary and boundary/rule list. Use
+`references/context-seed.md` for the seed shape and keep ADR creation out of
+fresh setup unless explicitly requested.

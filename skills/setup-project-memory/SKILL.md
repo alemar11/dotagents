@@ -1,6 +1,6 @@
 ---
 name: setup-project-memory
-description: Configure project-memory before planning, PRD, issue-splitting, triage, or domain-memory workflows.
+description: Configure project-memory before planning, PRD, issue-splitting, triage, or domain-memory workflows, including an initial CONTEXT.md seed when repo evidence is strong.
 ---
 
 # Setup Project Memory
@@ -15,8 +15,9 @@ Configure the project memory that other skills can rely on:
   triage-state mappings.
 - `project-memory/agents/domain.md` for where `CONTEXT.md`, `CONTEXT-MAP.md`,
   and ADRs live.
-- `CONTEXT.md` and `project-memory/adr/` as optional seeded domain memory when
-  an existing project has strong repo or session evidence.
+- `CONTEXT.md` as the initial domain memory seed when repo evidence is strong,
+  and `project-memory/adr/` as optional decision memory when accepted
+  load-bearing decisions exist.
 
 This is a setup skill. Run it once per code repo, monorepo, or orchestrator
 workspace before workflows publish PRDs, split issues, triage incoming work, or
@@ -53,21 +54,28 @@ project needs accepted knowledge migrated into project memory.
 Use one of three modes:
 
 - **Fresh setup**: the repo has little or no prior project-memory structure and
-  the goal is to configure `AGENTS.md` plus `project-memory/agents/*`, even if
-  the repo already has starter code, README files, tests, or package manifests.
+  the goal is to configure `AGENTS.md` plus `project-memory/agents/*`. In
+  non-empty repos, also perform an initial context-seed check and recommend
+  creating `CONTEXT.md` when README/docs/source evidence supports useful
+  project vocabulary or rules.
 - **Existing-project bootstrap**: the repo already has code, docs, issues,
-  prior agent sessions, or partial project-memory files, and the goal is to
-  infer the setup plus seed `CONTEXT.md` and ADRs from strong evidence.
+  prior agent sessions, or partial project-memory/domain files, and the goal
+  is to reconcile the setup, seed or enrich `CONTEXT.md`, and create ADRs from
+  strong evidence when accepted load-bearing decisions exist.
 - **Orchestrator workspace**: the current folder is a parent coordination
   workspace used to plan and run Codex across multiple independent repos. It
   owns cross-repo PRDs, vertical feature issues, repo pointer sheets, and
   integration gates, but not product code.
 
-Default to fresh setup when the user only needs tracker, triage, and domain
-memory routing, even in a non-empty repo. Use existing-project bootstrap only
-when the user wants accepted repo knowledge migrated or seeded into
-`CONTEXT.md` or ADRs, or when partial project-memory/domain files already need
-reconciliation. Recommend orchestrator workspace when the folder has no clear
+Default to fresh setup when the repo has no prior project-memory files. If the
+repo is non-empty and has durable docs, source, tests, schemas, or package
+manifests, recommend fresh setup plus an initial `CONTEXT.md` seed. Use
+routing-only fresh setup only when the repo is empty, the evidence is too thin,
+the user asks for routing only, or the current run is a dry run that should not
+write domain memory. Use existing-project bootstrap when the user wants recent
+session history considered, accepted repo knowledge migrated into an existing
+domain-memory surface, ADRs created, or partial project-memory/domain files
+reconciled. Recommend orchestrator workspace when the folder has no clear
 single codebase but contains or is intended to contain `projects/`, repo
 pointer docs, symlinks/worktrees to external repos, or cross-repo planning
 artifacts.
@@ -87,6 +95,15 @@ Read the current state without assuming a layout:
 - Existing issue templates or tracker docs when present.
 - README, project docs, package manifests, source directories, tests, and
   local architecture notes that define repo vocabulary or accepted behavior.
+
+For any non-empty repo, identify initial `CONTEXT.md` seed candidates from
+strong evidence:
+
+- project purpose and non-goals,
+- product areas, subprojects, or ownership boundaries,
+- stable domain vocabulary and canonical names,
+- durable rules, workflows, and cross-project constraints,
+- open questions only when the evidence clearly shows uncertainty or conflict.
 
 For existing-project bootstrap, also read recent session history with
 `references/session-history.md`:
@@ -205,6 +222,16 @@ For existing-project bootstrap, also confirm whether to seed domain memory from
 the evidence found. Recommend seeding only high-confidence items and presenting
 uncertain items as open questions.
 
+Confirm the initial context seed decision for every non-empty repo:
+
+- **Seed CONTEXT.md**: recommended when README/docs/source/tests provide enough
+  evidence for a useful first glossary, boundary list, or rule set.
+- **Routing only**: recommended when the repo is empty, temporary, a dry run,
+  or evidence is too thin to write durable domain memory.
+
+When recommending a seed, explain the evidence sources and say that
+`$domain-modeling` owns the final shape before writing.
+
 ### 4. Draft project memory
 
 Before writing, show:
@@ -213,8 +240,9 @@ Before writing, show:
 - the intended `project-memory/agents/issue-tracker.md`,
 - the intended `project-memory/agents/triage-labels.md`,
 - the intended `project-memory/agents/domain.md`.
-- for existing-project bootstrap, the intended `CONTEXT.md` additions and any
-  ADR drafts under `project-memory/adr/`.
+- the intended initial `CONTEXT.md` seed, or the reason no seed should be
+  written.
+- for existing-project bootstrap, any ADR drafts under `project-memory/adr/`.
 
 Use these reference templates as starting points:
 
@@ -224,6 +252,7 @@ Use these reference templates as starting points:
 - `references/issue-tracker-orchestrator-local.md`
 - `references/triage-labels.md`
 - `references/domain.md`
+- `references/context-seed.md`
 - `references/session-history.md`
 
 For an "other" issue tracker, write `issue-tracker.md` from the user's
@@ -262,6 +291,15 @@ For existing-project bootstrap:
 - Link to source files, docs, issues, commits, or session summaries when useful
   and available.
 
+For fresh setup with an initial context seed:
+
+- Load `$domain-modeling` before drafting or writing `CONTEXT.md`.
+- Use `references/context-seed.md` for the seed shape.
+- Keep the seed minimal and evidence-backed. Prefer a useful first glossary and
+  boundary/rule list over exhaustive architecture documentation.
+- Do not create ADRs during fresh setup unless the user explicitly asks for
+  accepted decisions to be recorded and the decision evidence is strong.
+
 ### 5. Write the setup
 
 After confirmation:
@@ -270,6 +308,8 @@ After confirmation:
 - Write or update the three files under `project-memory/agents/`.
 - Create `AGENTS.md` if it does not exist; otherwise update the existing
   `## Agent skills` block in place.
+- In fresh setup with an accepted initial context seed, create or update root
+  `CONTEXT.md` using `$domain-modeling`.
 - In existing-project bootstrap mode, create or update root `CONTEXT.md` and
   useful ADR files under `project-memory/adr/` using `$domain-modeling`.
 - In orchestrator workspace mode, create or update root `CONTEXT.md` only when
@@ -312,6 +352,7 @@ Summarize:
 - workspace mode and, for orchestrator workspaces, selected coordination
   backend,
 - session-history window and whether it was used,
+- context-seed decision and evidence sources,
 - `CONTEXT.md` terms/rules/open questions seeded, if any,
 - ADRs created or updated, if any,
 - what workflows can now consume this setup.
