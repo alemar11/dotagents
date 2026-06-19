@@ -88,10 +88,13 @@ Stay in the root orchestrator thread when:
 Record one of these human-readable labels for every implementation workstream.
 When the assignment comes from a generated issue with a `Source PRD`, the root
 orchestrator should pass the generated issue's copied feature-level `Delivery
-mode` label and any `Execution plan` pointer. The issue does not need to restate
-the full branch and PR strategy, but the prompt and ledger must preserve whether
-the label is feature-level metadata inherited from `Source PRD` or an issue-level
-override:
+mode` label and any `Execution plan` pointer, including hosted plan issues such
+as `Execution plan: #<number>`. The issue does not need to restate the full
+branch and PR strategy, but the prompt and ledger must preserve whether the
+label is feature-level metadata inherited from `Source PRD` or an issue-level
+override. Do not assign a hosted `Execution plan: <feature-slug>` issue as
+implementation work; it is a planning/control artifact unless the root
+explicitly asks a worker to edit the plan:
 
 - **One Feature Branch**: the root owns one shared feature branch and usually
   one draft PR for the feature. Workers operate in isolated helper worktrees or
@@ -292,7 +295,7 @@ Scope:
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Delivery mode: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
 - Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
-- Execution plan: <execution-plan.md path, inline plan summary pointer, or none>
+- Execution plan: <hosted execution-plan issue, execution-plan.md path, inline plan summary pointer, or none>
 - Parallelization: <independent|depends on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>

@@ -21,6 +21,10 @@ This skill only handles GitHub Issues.
 - Confirm repository context before mutation, using the current checkout or an
   explicit `--repo <owner>/<repo>`.
 - Prefer `--body-file` for non-trivial generated issue bodies or comments.
+- Create `--body-file` inputs in a temporary directory outside the repo and
+  remove them after mutation unless a calling workflow explicitly asked to keep
+  a local mirror. Never use `.scratch/` or `project-memory/features/` as
+  implicit staging for hosted-tracker mutations.
 - Inspect current labels, issue type, state, and relationships before changing
   them.
 - Do not create labels, close issues, or mutate issue relationships unless the
@@ -38,7 +42,7 @@ This skill only handles GitHub Issues.
    - or coordination repo from `project-memory/agents/issue-tracker.md`.
 2. Read the relevant issue or label state before mutation.
 3. Apply the smallest GitHub issue operation needed:
-   - create PRD parent or implementation issues,
+   - create PRD parent, execution-plan, or implementation issues,
    - set issue type,
    - add or remove labels,
    - add comments,

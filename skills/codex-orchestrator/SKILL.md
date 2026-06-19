@@ -181,9 +181,12 @@ ledger and execute against that delivery mode. For generated implementation issu
 first read the issue body and any linked `Source PRD`; the PRD is the canonical
 source for full delivery mode details, while the issue body supplies the copied
 feature-level `Delivery mode` label plus issue-level parallelization,
-dependencies, closeout, and overrides. If the issue references a `execution-plan.md`
-or the source includes an `Execution plan` pointer, load it and use its wave and
-unlock rules for scheduling. Treat an issue line such as
+dependencies, closeout, and overrides. If the issue references
+`Execution plan: #<number>`, a local `execution-plan.md`, or another execution
+plan pointer, load it and use its wave and unlock rules for scheduling. Treat a
+hosted issue titled `Execution plan: <feature-slug>` as a planning/control
+artifact, not an implementation workstream; do not dispatch it to a worker
+unless the owner explicitly asks to edit the plan itself. Treat an issue line such as
 `Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)`
 as a feature-level landing strategy, not as a claim that only this one issue
 uses that branch/PR shape.

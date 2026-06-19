@@ -30,23 +30,56 @@ If the installed `gh` version rejects a JSON field such as `issueType`,
 ## Create Issues
 
 Use `--body-file` for generated PRDs, implementation issues, or comments.
+Create body files in a temporary directory outside the repo and remove the temp
+directory after the command succeeds or fails. Do not leave generated
+PRD/issue/comment bodies under `.scratch/`, `project-memory/`, or other repo
+paths unless the user explicitly requested a local mirror or local dry-run
+target.
 
 ```bash
-gh issue create --title "<title>" --body-file <file>
-gh issue create --title "<title>" --body-file <file> --type "<type>"
-gh issue create --title "<title>" --body-file <file> --label "<label>"
-gh issue create --title "<title>" --body-file <file> --parent <parent-number-or-url>
+tmpdir="$(mktemp -d)"
+body_file="$tmpdir/issue.md"
+# Write the generated body to "$body_file", then run one of:
+gh issue create --title "<title>" --body-file "$body_file"
+gh issue create --title "<title>" --body-file "$body_file" --type "<type>"
+gh issue create --title "<title>" --body-file "$body_file" --label "<label>"
+gh issue create --title "<title>" --body-file "$body_file" --parent <parent-number-or-url>
+rm -rf "$tmpdir"
 ```
 
 For a coordination repo:
 
 ```bash
-gh issue create --repo <owner>/<repo> --title "<title>" --body-file <file> --label "<project-slug>"
-gh issue create --repo <owner>/<repo> --title "<title>" --body-file <file> --parent <parent-number-or-url> --label "<project-slug>"
+tmpdir="$(mktemp -d)"
+body_file="$tmpdir/issue.md"
+# Write the generated body to "$body_file", then run one of:
+gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --label "<project-slug>"
+gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --parent <parent-number-or-url> --label "<project-slug>"
+rm -rf "$tmpdir"
 ```
 
 When creating issues from a PRD, preserve `Source PRD: #<number>` in generated
 child issue bodies even when the GitHub parent/sub-issue relationship is set.
+For feature-planning flows, create a dedicated execution-plan issue titled
+`Execution plan: <feature-slug>` unless the caller explicitly requests a PRD
+comment/body fallback. Its body must reference `Source PRD: #<number>` and, once
+known, all generated feature issue numbers. Do not apply `ready-for-agent` to
+the execution-plan issue.
+
+## Edit Issue Bodies
+
+Use `--body-file` when updating generated PRDs or execution-plan issues.
+
+```bash
+tmpdir="$(mktemp -d)"
+body_file="$tmpdir/issue.md"
+# Write the replacement body to "$body_file", then run:
+gh issue edit <number-or-url> --body-file "$body_file"
+rm -rf "$tmpdir"
+```
+
+Use this after implementation issue creation to update
+`Execution plan: <feature-slug>` with final issue numbers and links.
 
 ## Issue Types
 
@@ -86,10 +119,11 @@ asks for new taxonomy.
 
 ## Parent And Sub-Issues
 
-Prefer creating child issues with the parent relationship already set:
+Prefer creating child issues with the parent relationship already set, using
+the same temporary body-file pattern as issue creation:
 
 ```bash
-gh issue create --title "<title>" --body-file <file> --parent <parent-number-or-url>
+gh issue create --title "<title>" --body-file "$body_file" --parent <parent-number-or-url>
 ```
 
 Attach or remove existing relationships only when explicitly requested:
@@ -106,7 +140,11 @@ gh issue edit <issue-number-or-url> --remove-parent
 Use `--body-file` for non-trivial comments.
 
 ```bash
-gh issue comment <number-or-url> --body-file <message-file>
+tmpdir="$(mktemp -d)"
+message_file="$tmpdir/comment.md"
+# Write the generated comment to "$message_file", then run:
+gh issue comment <number-or-url> --body-file "$message_file"
+rm -rf "$tmpdir"
 ```
 
 Comments should state observed state, requested action, next owner, and any

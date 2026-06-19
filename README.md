@@ -81,7 +81,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `plan-feature` requires `$setup-project-memory`, `$grill-me-with-context`, `$to-prd`, and `$to-issues` so it can run the feature-planning wrapper flow from setup through PRD and configured agent-ready issues.
 - `setup-project-memory` requires `$domain-modeling` when seeding or enriching `CONTEXT.md` or ADRs from repo, workspace, or session evidence, including initial context seeds for non-empty repos.
 - `to-prd` uses `$github-issues` for GitHub PRD issue publishing, issue type, label, and dry-run command mechanics.
-- `to-issues` requires `$plan-harder` and must run it once for every generated issue before returning or publishing that issue; it uses `$github-issues` for GitHub tracker publishing and parent/sub-issue mechanics.
+- `to-issues` requires `$plan-harder` and must run it once for every generated issue before returning or publishing that issue; it uses `$github-issues` for GitHub tracker publishing, hosted execution-plan issues, and parent/sub-issue mechanics.
 - `triage` requires `$setup-project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$github-issues` for GitHub issue mutations.
 - `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-issues`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
 

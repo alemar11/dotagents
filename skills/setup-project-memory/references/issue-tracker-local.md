@@ -10,6 +10,11 @@ Done issue path pattern: `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
 External mutation policy: local files only unless the user explicitly
 authorizes a hosted tracker in the current run.
 
+This root `.scratch/` tree is the authoritative local-markdown tracker path. Do
+not relocate these feature artifacts under `project-memory/features/` unless the
+repo records a custom tracker mode; `project-memory/` remains routing, domain,
+and ADR memory.
+
 Current-run override: record any temp, dry-run, rehearsal, or no-external
 constraint here. Do not treat a current-run override as a durable tracker
 preference change unless the user explicitly says to make it persistent.

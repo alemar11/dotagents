@@ -7,12 +7,19 @@ Tracker mode: `github`
 GitHub repo: infer from `git remote -v` unless this file records a specific
 `<owner>/<repo>`.
 
+GitHub is the authoritative artifact store in this mode. Do not create or keep
+repo-local `.scratch/` PRD/issue mirrors, `project-memory/features/` mirrors, or
+other local planning copies merely to feed `gh --body-file`. Temporary body
+files must live outside the repo and be removed after mutation unless the user
+explicitly asks to keep a local mirror.
+
 ## Non-Mutating Runs
 
 If this setup is being used for a temp exercise, validation pass, rehearsal,
 dry run, or any workflow where external GitHub mutation is not authorized, do
-not mutate GitHub. Use local markdown for that run, or ask `$github-issues` to
-return draft issue bodies and exact `gh` commands without executing them.
+not mutate GitHub. Use local markdown only when a local dry-run target is
+configured or explicitly chosen for that run, or ask `$github-issues` to return
+draft issue bodies and exact `gh` commands without executing them.
 Record the non-mutating choice as a current-run override in
 `project-memory/agents/issue-tracker.md`; do not treat it as a durable tracker
 preference change unless the user explicitly says so.
@@ -47,6 +54,7 @@ the actual available values or fallback label convention in
 ## Title Format
 
 - PRD issue: `PRD: <Feature Name>`
+- Execution plan issue: `Execution plan: <feature-slug>`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
 
 Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
@@ -63,6 +71,14 @@ For feature planning:
 
 - The PRD is a GitHub issue titled `PRD: <Feature Name>` with type `Feature`
   unless the repo maps `feature` to a different value.
+- The execution plan is a GitHub issue titled
+  `Execution plan: <feature-slug>` by default. It is a planning/control issue,
+  not implementation work: do not label it `ready-for-agent`. Attach it to the
+  PRD parent when parent/sub-issues are supported. It must include `Source PRD:
+  #<number>`, the delivery mode, dependency graph, waves/unlock conditions, and
+  links to every generated implementation issue after those issues exist. Use a
+  PRD comment/body section only as a fallback when the execution-plan issue
+  cannot be created or edited.
 - Implementation issues are GitHub sub-issues of the PRD issue with type
   `Task` unless the repo maps `task` to a different value.
 - Implementation issue titles use
@@ -72,7 +88,10 @@ For feature planning:
 - Each implementation issue body must include `## Delivery` with issue-level
   `Parallelization` and `Closeout`.
 - Each implementation issue body should include an `Execution plan` pointer to
-  `execution-plan.md` when local artifact targets are available.
+  the dedicated execution-plan issue, usually `Execution plan: #<number>`. Use
+  `execution-plan.md` only when the effective target is a local artifact target
+  or an explicitly requested local mirror. Use a PRD comment/body section only
+  as a fallback when the execution-plan issue cannot be created or edited.
 - Each implementation issue body must copy the effective PRD `Delivery mode`
   and label it as feature-level metadata inherited from `Source PRD`, for
   example `Delivery mode: One Feature Branch (feature-level, inherited from

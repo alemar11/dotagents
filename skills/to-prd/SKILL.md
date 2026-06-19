@@ -27,6 +27,10 @@ first.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions. A composing skill may allow local
   writes while still forbidding GitHub or another hosted tracker mutation.
+- In GitHub or GitHub coordination modes, do not persist repo-local PRD mirrors
+  or `.scratch/` staging copies unless the tracker config/current-run override
+  is local or the user explicitly asks for a local mirror. `$github-issues` may
+  use temporary `--body-file` inputs outside the repo and clean them up.
 
 ## Workflow
 
@@ -104,8 +108,9 @@ Keep the PRD implementation-facing:
   path, and context file when applicable,
 - delivery mode: branch naming guidance, expected PR shape, and integration
   proof expectations,
-- execution-plan delegation note: sequencing and wave order for `to-issues`
-  belong in `execution-plan.md`,
+- execution-plan delegation note: sequencing and wave order belong to
+  `$to-issues`, which publishes a hosted execution-plan issue in GitHub modes
+  and uses `execution-plan.md` only for local artifact modes,
 - data, permissions, API, or integration constraints when relevant,
 - acceptance criteria,
 - risks and open questions,
@@ -121,7 +126,9 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
 
 - `Tracker mode: github`: publish only after confirmation through
   `$github-issues`, using the title format `PRD: <Feature Name>` and the
-  mapped `feature` issue type when available.
+  mapped `feature` issue type when available. Do not write
+  `.scratch/<feature-slug>/PRD.md` or `project-memory/features/...` as part of
+  GitHub publishing unless explicitly asked for a local mirror.
 - `Tracker mode: local-markdown`: write to the configured repo-local PRD path,
   normally `.scratch/<feature-slug>/PRD.md`, only after confirmation. Derive
   or ask for `<feature-slug>` before writing. In multi-context repos, require
@@ -143,7 +150,9 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
   `<project-slug>` and `<feature-slug>`, ensure the GitHub label named exactly
   `<project-slug>` exists in the coordination repo, and apply it to the PRD
   parent issue when external mutation is authorized. The PRD issue is the
-  parent for vertical feature issues.
+  parent for vertical feature issues. Do not create local `projects/...`
+  feature artifacts or `.scratch/` mirrors unless the effective target is local
+  or the user explicitly asked for a local mirror.
 - Other tracker: follow the repo-specific instructions in
   `project-memory/agents/issue-tracker.md`.
 
@@ -171,10 +180,12 @@ Issue` or `Direct Commit` only when explicitly authorized and record the
 authorization reason.
 
 Treat the PRD as the canonical source for delivery mode and branch/PR details.
-`to-issues` owns schedule ordering and wave unlock conditions in
-`execution-plan.md`. Generated issues copy only the effective `Delivery mode`
-label as feature-level metadata inherited from `Source PRD`, plus any explicit
-issue-level exception or cross-repo closeout rule.
+`to-issues` owns schedule ordering and wave unlock conditions in the feature
+execution plan: a dedicated hosted `Execution plan: <feature-slug>` issue in
+GitHub/GitHub coordination modes by default, or `execution-plan.md` only for
+local artifact targets. Generated issues copy only the effective
+`Delivery mode` label as feature-level metadata inherited from `Source PRD`,
+plus any explicit issue-level exception or cross-repo closeout rule.
 
 For GitHub coordination PRDs, treat the project label as required issue
 metadata. It is separate from the mapped issue type and workflow-state labels.
@@ -190,7 +201,9 @@ If a composing skill such as `$plan-feature` passes explicit run
 authorization, use the effective target from that handoff without re-asking
 unless this skill finds a new blocker or unresolved question. Do not treat
 "local file writes allowed" as permission to mutate GitHub or another hosted
-tracker.
+tracker. In hosted tracker modes, local file write authorization applies only
+to explicit local mirrors or dry-run targets; hosted body-file inputs are
+transient files outside the repo.
 
 If the configured target is GitHub or GitHub coordination but external mutation
 is not authorized, do not mutate GitHub. Ask `$github-issues` for the exact
@@ -209,14 +222,16 @@ Return:
 - product/workspace/context or orchestrator project identity used, when
   applicable,
 - delivery mode used,
-- that scheduling and wave control is delegated to `to-issues` via
-  `execution-plan.md`,
+- that scheduling and wave control is delegated to `$to-issues` through a
+  hosted execution-plan issue in GitHub modes or `execution-plan.md` in local
+  artifact modes,
 - target location or "chat only",
 - issue type applied, when the tracker supports it,
 - support docs created or updated and the accepted source used for each, when
   applicable,
 - any open questions,
-- whether it is ready for `$to-issues`.
+- whether it is ready for `$to-issues` to create the execution-plan artifact
+  and generated implementation issues.
 
 ## Guardrails
 
