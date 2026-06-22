@@ -98,6 +98,28 @@ the PRD. Prefer defaults when the repo or project memory already implies them.
 Use `references/prd-template.md` unless the repo has a stronger local PRD
 format.
 
+Before returning, writing, or publishing the PRD, sanitize every source and
+evidence reference that came from local filesystem inspection. Published PRDs
+must not include developer-machine absolute paths such as `/Users/<name>/...`,
+`/home/<name>/...`, drive-root paths, temp directories, or cache paths.
+Use portable references instead:
+
+- current repository evidence: repo-relative paths such as
+  `agents/src/session_data.py` or `agents/src/session_data.py:42`;
+- sibling repository evidence: `<repo-name>/<repo-relative-path>` or
+  `<repo-name>/<repo-relative-path>:<line>`, using the sibling repo directory
+  name or configured repo slug;
+- hosted source evidence: the URL, issue, PR, or `owner/repo:path` reference;
+- local-only exploratory evidence that cannot be safely identified: a short
+  descriptive label such as `<local-reference>: runtime session collector`,
+  not the raw absolute path.
+
+If the same file is useful both locally and in the PRD, keep the raw absolute
+path only in private working context and put only the sanitized reference in
+the PRD body or GitHub issue body. If sanitization would make the evidence
+ambiguous, add the repo name or source label rather than restoring an absolute
+path.
+
 Keep the PRD implementation-facing:
 
 - clear problem and target user,
@@ -203,6 +225,11 @@ tracker. In hosted tracker modes, local file write authorization applies only
 to explicit local mirrors or dry-run targets; hosted body-file inputs are
 transient files outside the repo.
 
+Immediately before handing content to `$github-issues`, re-scan the final PRD
+body for machine-local absolute paths and replace them with sanitized evidence
+references. Treat any remaining unsanitized developer path as a blocker for
+hosted publication.
+
 If the configured target is GitHub or GitHub coordination but external mutation
 is not authorized, do not mutate GitHub. Ask `$github-issues` for the exact
 draft publish command and return it with the PRD body, or use the configured
@@ -238,6 +265,9 @@ Return:
 - Do not create issues from the PRD in this skill.
 - Preserve existing PRD content when updating a local PRD file; revise only the
   sections needed for the current source material.
+- Do not leak developer-machine paths in PRD evidence, source, or publication
+  output. Use repo-relative, sibling-repo-relative, hosted, or descriptive
+  sanitized references.
 
 ## References
 

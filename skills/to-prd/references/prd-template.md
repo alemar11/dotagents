@@ -8,6 +8,10 @@ Use this shape unless the project already has a stronger local PRD format.
 ## Source
 
 - Conversation, issue, doc, or repo evidence used to create this PRD.
+- Use portable evidence references only: repo-relative paths for current-repo
+  files, `<repo-name>/<repo-relative-path>` for sibling repos, hosted URLs, or
+  descriptive labels for local-only references. Do not include
+  developer-machine absolute paths.
 
 ## Planning Identity
 
