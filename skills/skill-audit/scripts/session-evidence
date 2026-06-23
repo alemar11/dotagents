@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -390,10 +391,20 @@ def print_text(summary: dict[str, Any]) -> None:
                 print(f"  prompt: {example['prompt']}")
 
 
+def doctor() -> dict[str, Any]:
+    roots = default_roots()
+    return {
+        "python": shutil.which("python3") or "python3",
+        "default_roots": [{"path": str(root), "exists": root.exists()} for root in roots],
+        "network_required": False,
+    }
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Extract focused skill/plugin invocation evidence from Codex session JSONL files."
     )
+    parser.add_argument("command", nargs="?", choices=["scan", "doctor"], default="scan")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")
     parser.add_argument(
         "--target",
@@ -437,9 +448,34 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def emit_json(command: str, data: dict[str, Any]) -> None:
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "version": VERSION,
+                "command": [command],
+                "data": data,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.command == "doctor":
+        data = doctor()
+        if args.json:
+            emit_json("doctor", data)
+        else:
+            print(f"session-evidence {VERSION}")
+            print(f"python: {data['python']}")
+            print("network: not required")
+        return 0
 
     if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
         parser.error("--since must be formatted as YYYY-MM-DD")
