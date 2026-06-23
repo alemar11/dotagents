@@ -8,7 +8,7 @@ requires-python = ">=3.11"
 stars = "github_stars_cli:main"
 
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=82.0.1"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
