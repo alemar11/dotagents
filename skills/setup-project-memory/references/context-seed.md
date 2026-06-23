@@ -16,6 +16,11 @@ content:
 Do not seed from guesses, tentative plans, rejected options, secrets, raw logs,
 or generic architecture advice.
 
+When `AGENTS.md` is a source, capture only durable project context or accepted
+repo behavior. Leave agent operating rules in `AGENTS.md`, and move tracker or
+triage details to `project-memory/agents/*` instead of copying them into
+`CONTEXT.md`.
+
 ## Seed shape
 
 Load and follow `$domain-modeling` before writing. Keep the initial seed short
@@ -52,6 +57,7 @@ verify the statement, for example `README.md`, `VISION.md`, `docs/...`,
 
 - Full architecture inventories or file trees.
 - Repeating command lists already owned by AGENTS.md or README files.
+- Copying agent operating instructions that should remain in `AGENTS.md`.
 - Long research notes that belong in project docs.
 - ADR-level decisions unless the user explicitly asks to record accepted
   decisions and the evidence is load-bearing.

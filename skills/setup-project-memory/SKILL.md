@@ -1,6 +1,6 @@
 ---
 name: setup-project-memory
-description: Configure project-memory before planning, PRD, issue-splitting, triage, or domain-memory workflows, including an initial CONTEXT.md seed when repo evidence is strong.
+description: Configure lean project-memory before planning, PRD, issue-splitting, triage, or domain-memory workflows, including an initial CONTEXT.md seed when repo evidence is strong.
 ---
 
 # Setup Project Memory
@@ -9,7 +9,8 @@ description: Configure project-memory before planning, PRD, issue-splitting, tri
 
 Configure the project memory that other skills can rely on:
 
-- `AGENTS.md` as the only agent-instruction file this skill writes.
+- `AGENTS.md` as the only agent-instruction file this skill writes, kept
+  pointer-first and focused on operating rules rather than project context.
 - `project-memory/agents/issue-tracker.md` for where PRDs and issues live.
 - `project-memory/agents/triage-labels.md` for canonical issue-type and
   triage-state mappings.
@@ -29,6 +30,16 @@ project needs accepted knowledge migrated into project memory.
 
 - Always use `AGENTS.md` for setup pointers and project-memory routing when an
   agent-instruction file is needed.
+- Keep `AGENTS.md` lean. It may contain repo-specific agent rules, ownership
+  boundaries, validation constraints, and short pointers to project memory, but
+  not copied domain context, broad architecture inventories, planning history,
+  glossary material, or tracker workflow detail that belongs in `CONTEXT.md`,
+  `project-memory/agents/*`, or ADRs.
+- When `AGENTS.md` already contains project context, classify it before writing:
+  keep true agent operating rules in `AGENTS.md`, move or summarize domain
+  vocabulary and project context into `CONTEXT.md`, move tracker and workflow
+  routing into `project-memory/agents/*`, move accepted load-bearing decisions
+  into ADRs, and preserve uncertain content until the user confirms a target.
 - Load and follow `$domain-modeling` before creating or updating `CONTEXT.md`
   or ADRs.
 - Seed `CONTEXT.md` or ADRs only from strong evidence: repo docs, code,
@@ -85,7 +96,9 @@ artifacts.
 Read the current state without assuming a layout:
 
 - `git remote -v` and `.git/config` to infer GitHub or no GitHub remote.
-- `AGENTS.md` to see whether an `## Agent skills` block already exists.
+- `AGENTS.md` to see whether an `## Agent skills` block already exists and
+  whether existing content should stay as agent rules or move into project
+  memory.
 - `project-memory/agents/` to see whether prior setup exists.
 - `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`.
 - `.scratch/` as a signal that local markdown issue tracking may already be in
@@ -95,6 +108,21 @@ Read the current state without assuming a layout:
 - Existing issue templates or tracker docs when present.
 - README, project docs, package manifests, source directories, tests, and
   local architecture notes that define repo vocabulary or accepted behavior.
+
+When `AGENTS.md` already exists, classify existing content into these buckets:
+
+- **Keep in AGENTS.md**: repo-specific instructions agents must obey while
+  operating in the checkout, including ownership boundaries, safety rules,
+  validation commands, maintenance routing, and short project-memory pointers.
+- **Move to CONTEXT.md**: project purpose, product areas, glossary terms,
+  canonical names, domain boundaries, and open questions.
+- **Move to project-memory/agents/**: issue tracker routing, triage mappings,
+  delivery-mode defaults, domain-memory layout, and orchestrator coordination
+  backend details.
+- **Move to ADRs**: accepted load-bearing decisions future work would otherwise
+  reopen.
+- **Preserve or ask**: content whose ownership is unclear, stale, conflicting,
+  or not backed by strong evidence.
 
 For any non-empty repo, identify initial `CONTEXT.md` seed candidates from
 strong evidence:
@@ -232,11 +260,25 @@ Confirm the initial context seed decision for every non-empty repo:
 When recommending a seed, explain the evidence sources and say that
 `$domain-modeling` owns the final shape before writing.
 
+**AGENTS.md minimization**
+
+For fresh setup, recommend creating only the `## Agent skills` pointer block
+plus any repo-specific operating rules the evidence clearly requires.
+
+For existing-project bootstrap or reruns, recommend reducing `AGENTS.md` when
+it duplicates material now owned by `CONTEXT.md`, `project-memory/agents/*`, or
+ADRs. Show what will stay, what will be moved or summarized, and what will be
+preserved because ownership is uncertain. Do not remove content just because it
+is long; remove or move only content with a clear better home and user
+confirmation.
+
 ### 4. Draft project memory
 
 Before writing, show:
 
 - the `AGENTS.md` `## Agent skills` block,
+- the `AGENTS.md` minimization plan, including any existing content to keep,
+  move, summarize, or preserve,
 - the intended `project-memory/agents/issue-tracker.md`,
 - the intended `project-memory/agents/triage-labels.md`,
 - the intended `project-memory/agents/domain.md`.
@@ -307,7 +349,7 @@ After confirmation:
 - Create `project-memory/agents/` if needed.
 - Write or update the three files under `project-memory/agents/`.
 - Create `AGENTS.md` if it does not exist; otherwise update the existing
-  `## Agent skills` block in place.
+  `## Agent skills` block in place and apply the confirmed minimization plan.
 - In fresh setup with an accepted initial context seed, create or update root
   `CONTEXT.md` using `$domain-modeling`.
 - In existing-project bootstrap mode, create or update root `CONTEXT.md` and
@@ -315,7 +357,10 @@ After confirmation:
 - In orchestrator workspace mode, create or update root `CONTEXT.md` only when
   useful coordination vocabulary is accepted or strongly evidenced. Do not
   create `projects/<project>/` or feature folders during setup.
-- Preserve unrelated `AGENTS.md` content.
+- Preserve unrelated or uncertain `AGENTS.md` content unless the user confirmed
+  a specific move, summary, or deletion.
+- Do not duplicate moved project context in both `AGENTS.md` and `CONTEXT.md`
+  or `project-memory/agents/*`. Leave a short pointer in `AGENTS.md` instead.
 - Preserve unrelated `CONTEXT.md`, ADR, and project doc content.
 
 Use this `AGENTS.md` block shape:
@@ -336,6 +381,10 @@ Use this `AGENTS.md` block shape:
 [one-line summary of single-context or multi-context layout]. See `project-memory/agents/domain.md`.
 ```
 
+Keep this block concise. Do not paste domain vocabulary, tracker procedure,
+delivery details, or context seed material into `AGENTS.md`; place those in the
+referenced project-memory files.
+
 For orchestrator workspace mode, the `AGENTS.md` block should explicitly say
 that the workspace coordinates external repos and that each child repo keeps
 its own project memory and code ownership.
@@ -349,6 +398,8 @@ Summarize:
 - selected issue tracker,
 - issue-type and triage-state mapping,
 - domain-memory layout,
+- `AGENTS.md` minimization outcome, including content moved or intentionally
+  preserved,
 - workspace mode and, for orchestrator workspaces, selected coordination
   backend,
 - session-history window and whether it was used,

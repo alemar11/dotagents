@@ -1,5 +1,5 @@
 interface:
   display_name: "Setup Project Memory"
-  short_description: "Configure project memory and context seeds for repos, monorepos, or orchestrator workspaces."
+  short_description: "Configure lean project-memory and context seeds for repos, monorepos, or orchestrator workspaces."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $setup-project-memory to inspect this workspace, choose repo, monorepo, or orchestrator setup mode, confirm issue tracker, delivery mode defaults, current-run mutation overrides, triage types and labels, domain-memory layout, monorepo slug conventions, and whether a non-empty repo should receive an initial CONTEXT.md seed, then write AGENTS.md plus project-memory/agents files and seed CONTEXT.md or ADRs when evidence is strong. Route GitHub issue lifecycle mechanics to $github-issues."
+  default_prompt: "Use $setup-project-memory to inspect this workspace, choose repo, monorepo, or orchestrator setup mode, confirm issue tracker, delivery mode defaults, current-run mutation overrides, triage types and labels, domain-memory layout, monorepo slug conventions, whether AGENTS.md should be minimized into pointer-first rules, and whether a non-empty repo should receive an initial CONTEXT.md seed, then write lean AGENTS.md pointers plus project-memory/agents files and seed CONTEXT.md or ADRs when evidence is strong. Route GitHub issue lifecycle mechanics to $github-issues."

@@ -19,6 +19,10 @@ open questions. During existing-project bootstrap, setup may also create useful
 ADRs when repo evidence or recent session history strongly supports accepted
 load-bearing decisions being recorded.
 
+`AGENTS.md` should point to these files and carry agent operating rules. It
+should not duplicate domain vocabulary, tracker procedures, planning history,
+or context seed material after those items have a project-memory home.
+
 ## File structure
 
 Single-context repo:
