@@ -118,11 +118,40 @@ surface.
 
 ## Worker Surface Selection
 
-Ask for or infer owner authorization before delegation. If the owner requests
-workers, parallelism, background work, heartbeat monitoring, or broad
-orchestration, delegation is authorized for the scoped workstreams. If the
-request is a small single-thread task or worker visibility is ambiguous, keep
+Resolve owner authorization before delegation. If the owner already specified
+worker surface and quota, record that policy and proceed within it. If the
+owner requests workers, parallelism, background work, heartbeat monitoring, or
+broad orchestration, delegation is authorized only to the extent the requested
+surface and quota are clear. If the request is a small single-thread task, keep
 the work in the root thread unless parallel work materially improves progress.
+
+If the owner request is broad, worker-oriented, or materially parallelizable
+but does not clearly specify worker surface and limits, ask for a worker policy
+before creating any delegated worker:
+
+- In Codex App, ask whether to use CLI/subagents, visible Codex App threads,
+  both/auto, or no delegation.
+- Outside Codex App, ask whether to use CLI/subagents or no delegation.
+- Ask for the maximum active CLI/subagents and, when Codex App threads are
+  allowed, the maximum active Codex App threads. If both surfaces are allowed,
+  also ask whether there is an overall concurrent delegated-worker cap for the
+  session.
+- Always ask whether progress should be monitored manually in the root thread
+  or with a heartbeat. When asking about heartbeat monitoring, propose a
+  5-minute interval by default and state that the owner can change it. If a
+  heartbeat is requested, also ask for the scope, stop condition, and whether
+  it may steer workers or only report status.
+- While waiting for the answer, do only root-owned discovery or planning that
+  does not create workers, create visible App threads, mutate source state, or
+  assume a delegation quota or heartbeat policy.
+
+Use this concise clarification shape when the owner omitted delegation or
+monitoring details:
+
+> How should I run orchestration for this session: CLI/subagents, visible Codex
+> App threads, both/auto, or no delegation? What max active count should I use
+> for each allowed worker surface? Should I monitor progress manually, or create
+> a heartbeat? Default heartbeat is every 5 minutes, and you can change it.
 
 Visible Codex App thread creation requires explicit owner intent for visible,
 new, separate, or background threads. Do not create user-owned App threads
@@ -135,7 +164,9 @@ ledger with `Delegated worker surface` set to
 surfaces: in Codex CLI this resolves to `cli-subagent`, while in Codex App it
 may choose `codex-app-thread` or `cli-subagent`. `none` disables delegation.
 Record `no-delegation` only as the actual per-workstream `Surface` for
-root-owned work.
+root-owned work. When separate caps are supplied, also record
+`Max active CLI/subagents`, `Max active Codex App threads`, and any
+owner-specified session-wide delegated-worker cap.
 
 Choose the worker surface deliberately:
 
@@ -312,10 +343,17 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    implementation to workers when delegation is authorized; perform root-side
    integration only when it is cross-cutting, blocked on worker outputs, or
    necessary to satisfy final gates.
-9. Use heartbeat monitoring only when periodic follow-up is requested. Before
-   steering, renaming, archiving, interrupting, replacing, or closing a worker,
-   read the worker's latest state. Capture status, blockers, validation, risks,
-   and next actions in the ledger.
+9. Always ask the owner whether progress should be monitored manually or with a
+   recurring heartbeat. When proposing heartbeat monitoring, default to
+   5-minute checks and make clear that the owner can choose a different
+   interval. Create a recurring heartbeat only when the owner selects it.
+   Record the interval, monitored workers or workstreams, reporting
+   destination, stop condition, and whether the heartbeat may steer workers or
+   only report status. If no heartbeat is requested, monitor progress manually
+   from the root thread at natural wave boundaries. Before steering, renaming,
+   archiving, interrupting, replacing, or closing a worker, read the worker's
+   latest state. Capture status, blockers, validation, risks, and next actions
+   in the ledger.
 10. Before reusing a worker for a new wave, changing overlapping scope, or
     integrating worker output, apply the lifecycle guidance in
     `references/worker.md`: resync against root-integrated work, choose a
