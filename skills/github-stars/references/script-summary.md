@@ -26,7 +26,8 @@ Errors include `ok`, `version`, `command`, and `error`.
 
 The script does not write configuration files.
 
-## Maintenance Source
+## CLI Maintenance
 
-The source and tests live under `projects/stars/`. The shipped runtime artifact
-is `scripts/stars`.
+`scripts/stars` is the direct executable Python source and shipped runtime
+artifact. Tests live under `tests/`. Preserve the `VERSION` constant,
+executable mode, and the public command/JSON contract when editing the script.
