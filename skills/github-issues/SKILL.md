@@ -26,6 +26,8 @@ This skill only handles GitHub Issues.
   provides a persistent body-file or local mirror path.
 - Inspect current labels, issue type, state, and relationships before changing
   them.
+- When verifying native GitHub Issue Types with `gh issue view --json`, request
+  `issueType`; do not request `type`, which is not a valid issue JSON field.
 - Do not create labels, close issues, or mutate issue relationships unless the
   user or calling workflow has explicit mutation authority.
 - If external mutation is not authorized, return exact draft commands and issue

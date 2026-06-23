@@ -52,9 +52,18 @@ tmpdir="$(mktemp -d)"
 body_file="$tmpdir/issue.md"
 # Write the generated body to "$body_file", then run one of:
 gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file"
+gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --type "<type>"
 gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --label "<label>"
 gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --parent <parent-number-or-url>
 rm -rf "$tmpdir"
+```
+
+After creating or editing an issue type, verify with `issueType`; `type` is not
+a valid JSON field for `gh issue view`:
+
+```bash
+gh issue view <number-or-url> --json number,title,state,url,labels,issueType
+gh issue view <number-or-url> --repo <owner>/<repo> --json number,title,state,url,labels,issueType
 ```
 
 ## Edit Issue Bodies
