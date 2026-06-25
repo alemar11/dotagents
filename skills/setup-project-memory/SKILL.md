@@ -327,8 +327,8 @@ record the chosen backend in `project-memory/agents/issue-tracker.md`.
 
 For local markdown in a multi-context repo or monorepo, confirm whether feature
 slugs must include a product or workspace prefix, such as
-`customer-portal-weekly-digest`. Record that convention so `$plan-feature`,
-`$to-prd`, and `$to-issues` can reject ambiguous feature paths before writing.
+`customer-portal-weekly-digest`. Record that convention so `$plan-feature` can
+reject ambiguous feature paths before writing.
 
 Confirm delivery mode defaults:
 
@@ -341,7 +341,7 @@ Confirm delivery mode defaults:
 - `direct-commit` only with explicit maintainer authorization.
 
 Record these defaults in `project-memory/agents/issue-tracker.md` so PRDs can
-select a delivery mode before `$to-issues` generates implementation issues.
+select a delivery mode before `$plan-feature` generates implementation issues.
 
 Confirm the default worker authorization:
 
@@ -481,8 +481,8 @@ For orchestrator workspace mode:
 - State that setup does not create project or feature folders. In this context,
   config-only means no project or feature artifacts during setup; root setup
   files such as `AGENTS.md`, `project-memory/agents/*`, and accepted root
-  context remain allowed. `$plan-feature`, `$to-prd`, and `$to-issues` create
-  project or feature folders only when writing an actual feature.
+  context remain allowed. `$plan-feature` creates project or feature folders
+  only when writing an actual feature.
 - State that child repos retain their own `AGENTS.md`, `CONTEXT.md`,
   `project-memory`, validation commands, branches, commits, and PRs.
 - State that `codex-orchestrator` owns runtime worker state and ledgers; the

@@ -1,56 +1,89 @@
 ---
 name: plan-feature
-description: Plan a new feature from rough intent through repo-backed grilling, PRD creation, and agent-ready vertical issues before implementation.
+description: Plan a feature through full-flow, prd-only, or issues-from-existing-prd modes before implementation.
 ---
 
 # Plan Feature
 
 ## Goal
 
-Run the full feature-planning pipeline from one invocation:
+Run feature planning from one public invocation. This skill owns the planning
+pipeline and its internal PRD and issue phases:
 
-`$setup-project-memory` if needed -> `$grill-me-with-context` -> `$to-prd` ->
-`$to-issues`.
+`$setup-project-memory` if needed -> `$grill-me-with-context` when scope needs
+clarification -> PRD phase -> issue phase with `$plan-harder` per generated
+issue.
 
-Use this skill to turn a rough feature idea into a written PRD and
-agent-ready vertical issues. In orchestrator workspaces, those issues may be
-cross-repo vertical outcomes. Do not implement the feature.
+Use this skill to turn rough feature intent into a written PRD and agent-ready
+vertical issues. In orchestrator workspaces, those issues may be cross-repo
+vertical outcomes. Do not implement the feature.
+
+## Modes
+
+Choose the smallest mode that satisfies the request:
+
+- `full-flow`: default for rough new feature intent. Resolve setup, grill with
+  context, produce or publish the PRD, then split it into hardened issues.
+- `prd-only`: for clarified intent that should become a PRD but should not be
+  split into issues yet.
+- `issues-from-existing-prd`: for an existing durable PRD that needs generated
+  implementation issues. Do not rewrite the PRD unless the user explicitly asks.
+
+For `prd-only` mode, stop after the PRD phase report. For
+`issues-from-existing-prd` mode, skip feature grilling unless the PRD has
+unresolved blockers that affect scope, acceptance criteria, dependencies,
+validation, publication target, permissions, or cross-repo contracts.
 
 ## Hard Requirements
 
-- Keep this skill as a thin orchestrator over the component skills.
-- Load and follow each component skill before handing work to it.
-- Do not duplicate grilling, domain-modeling, PRD drafting, vertical slicing,
-  or issue-hardening instructions.
-- Do not skip `$to-issues` hardening; `$to-issues` must still run
-  `$plan-harder` once for every generated issue.
+- Keep PRD writing and issue splitting as internal phases, not separate public
+  skill invocations.
+- Load `references/prd-phase.md` before drafting, writing, or publishing a PRD.
+- Load `references/issue-phase.md` before splitting a PRD into issues.
+- Load `references/prd-template.md`, `references/issue-body-template.md`, and
+  `references/vertical-slices.md` when the relevant phase requires them.
+- Load and follow `$plan-harder` once for every generated implementation issue.
 - Write or publish artifacts only after setup is available and no gates remain.
 - Separate local file write authorization from external issue-tracker mutation
-  authorization. A composing-skill handoff may authorize local writes without
-  authorizing GitHub or another hosted tracker mutation.
+  authorization. Local writes never imply GitHub or other hosted mutation.
 - Treat persistent local planning artifacts separately from temporary hosted
   issue body files. In GitHub or GitHub-coordination modes, do not keep
   repo-local PRD, issue, `.scratch/`, or `project-memory/features/` mirrors
   unless the configured target or current run explicitly asks for a local
   artifact target.
-- Carry accepted planning identity through every handoff: selected context,
+- Carry accepted planning identity through every phase: selected context,
   product or project slug, workspace path when applicable, and authoritative
   feature slug.
-- Carry accepted delivery mode through every handoff using structured values:
+- Carry accepted delivery mode through every phase using structured values:
   `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, or
   `direct-commit`.
-- Carry `source_prd_ref` from `$to-prd` into `$to-issues`. In
-  `draft-publish-commands` runs, use the stable draft ref from
-  `$setup-project-memory` `references/tracker-publishing.md` until a hosted
-  PRD issue number or local PRD path exists.
-- Use the structured values documented by the component skills this workflow
-  invokes: setup values from `$setup-project-memory`, PRD delivery values from
-  `$to-prd`, and generated issue values from `$to-issues`. Keep prose values
-  only for explanations, reasons, and free-form notes.
+- Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
+  the issue phase. In `draft-publish-commands` runs, use the stable draft ref
+  from `$setup-project-memory` `references/tracker-publishing.md` until a
+  hosted PRD issue number or local PRD path exists, and carry the PRD title,
+  feature slug, project slug when applicable, and PRD body fingerprint with the
+  draft handoff.
+- Use structured values from setup, the PRD phase, and the issue phase. Keep
+  prose values only for explanations, reasons, and free-form notes.
+
+## External Skill Calls
+
+This skill may call:
+
+- `$setup-project-memory` when project memory or tracker setup is missing or
+  needs review.
+- `$grill-me-with-context` when feature scope, terms, decisions, or gates need
+  repo-backed clarification.
+- `$plan-harder` once per generated implementation issue.
+- `$github-issues` only for GitHub issue publishing, issue type/label handling,
+  parent/sub-issue relationships, and dry-run command mechanics.
 
 ## Workflow
 
-### 1. Check project memory
+### 1. Resolve Mode And Setup
+
+Inspect the user request and source material to choose `full-flow`, `prd-only`,
+or `issues-from-existing-prd`.
 
 Inspect the repo for:
 
@@ -58,12 +91,13 @@ Inspect the repo for:
 - `project-memory/agents/triage-labels.md`,
 - `project-memory/agents/domain.md`.
 
-If any of these files are missing, load and run `$setup-project-memory` first.
-Use the user's current feature-planning goal as context, but keep setup focused
-on routing and memory. In orchestrator workspace mode, setup is config-only and
-must not create project or feature folders.
+If any of these files are missing, incomplete, stale, or inconsistent with the
+current planning target, load and run `$setup-project-memory` first. Use the
+user's planning goal as context, but keep setup focused on routing and memory.
+In orchestrator workspace mode, setup is config-only and must not create project
+or feature folders.
 
-Before continuing, resolve the effective target for the current run:
+Before writing or publishing, resolve the effective target for the current run:
 
 - configured tracker mode from `project-memory/agents/issue-tracker.md`,
 - whether local file writes are allowed,
@@ -99,13 +133,17 @@ Resolve the planning identity before writing:
 
 If a multi-context local-markdown repo has no accepted product/context or the
 feature slug is not product/workspace namespaced according to tracker
-conventions, stop before PRD writing and resolve that identity first.
-If the delivery mode is ambiguous because the feature might cross multiple
-git repositories, stop before PRD writing and resolve that delivery mode first.
+conventions, stop before PRD writing or issue writing and resolve that identity
+first. If the delivery mode is ambiguous because the feature might cross
+multiple git repositories, stop before writing and resolve that delivery mode
+first.
 
-### 2. Grill the feature with context
+### 2. Clarify Scope When Needed
 
-Load and run `$grill-me-with-context` on the feature intent.
+For `full-flow`, load and run `$grill-me-with-context` on the feature intent
+unless the supplied source is already clear enough to produce a PRD and issues.
+For `prd-only`, use the same clarification path when the intent is not already
+clear enough to produce a PRD, then stop after the PRD phase.
 
 Use it to resolve:
 
@@ -120,13 +158,20 @@ publish the PRD or issues while a gate remains unresolved or deferred in a way
 that can affect scope, acceptance criteria, dependencies, validation,
 publication target, permissions, or cross-repo contracts.
 
-### 3. Produce and write the PRD
+For `issues-from-existing-prd`, inspect the PRD's open questions first. Use
+`$grill-me-with-context` only if the PRD has blockers that materially affect
+issue splitting.
 
-When no gates remain, load and run `$to-prd`.
+### 3. Run The PRD Phase
 
-Pass the resolved grilling output as the PRD source and explicitly state:
+Skip this step only in `issues-from-existing-prd` mode when the PRD is already
+durable and the user did not request a PRD update.
+
+Load `references/prd-phase.md` and pass:
 
 ```text
+Plan-feature mode: <full-flow|prd-only|issues-from-existing-prd>
+
 Run authorization:
 - Persistent local artifact writes: <allowed|disallowed>, allowed only when the
   `tracker_mode` is `local-markdown` or `orchestrator-local`, the
@@ -140,7 +185,7 @@ Run authorization:
 - Effective target for this run:
   <configured-tracker|local-dry-run|draft-publish-commands>.
 - Source PRD ref:
-  <pending until $to-prd returns #<number>, local path, or draft-prd:<slug>>.
+  <pending until PRD phase returns #<number>, local path, or draft-prd:<slug>>.
 
 Planning identity:
 - feature_slug: <accepted feature slug>
@@ -151,30 +196,28 @@ Planning identity:
 - delivery_mode: <one-feature-branch|one-pr-per-repo|one-pr-per-issue|direct-commit>
 ```
 
-Ask `$to-prd` to use the configured target from
-`project-memory/agents/issue-tracker.md`. If the configured target is a local
-orchestrator workspace, pass the accepted `<project-slug>` and
-`<feature-slug>` and allow `$to-prd` to create the feature directory only when
-writing the PRD. If the configured target is a GitHub coordination repo, pass
-the accepted `<project-slug>` so `$to-prd` can apply the matching project label
-to the PRD parent issue when external mutation is authorized. If `$to-prd`
-discovers a new blocker, route the blocker back through
+Require the PRD phase to return `source_prd_ref`. In `draft-publish-commands`
+mode, this is a deterministic `draft-prd:<feature-slug>` or
+`draft-prd:<project-slug>/<feature-slug>` value plus a publish-order note that
+the PRD must be created first and issue bodies must replace the draft ref with
+the hosted PRD number before mutation.
+
+If the PRD phase discovers a new blocker, route the blocker back through
 `$grill-me-with-context` using the same one-question loop, then continue only
 after the blocker is resolved or explicitly deferred as non-blocking.
 
-Require `$to-prd` to return `source_prd_ref`. In
-`draft-publish-commands` mode, this is a deterministic
-`draft-prd:<feature-slug>` or `draft-prd:<project-slug>/<feature-slug>` value
-plus a publish-order note that the PRD must be created first and issue bodies
-must replace the draft ref with the hosted PRD number before mutation.
+Stop here in `prd-only` mode and return the PRD phase report.
 
-### 4. Split and write issues
+### 4. Run The Issue Phase
 
-After the PRD is written or published, load and run `$to-issues` on that PRD.
+After the PRD is written, published, or supplied as an existing durable PRD,
+load `references/issue-phase.md`.
 
 Pass explicit run authorization:
 
 ```text
+Plan-feature mode: <full-flow|issues-from-existing-prd>
+
 Run authorization:
 - Persistent local artifact writes: <allowed|disallowed>, allowed only when the
   `tracker_mode` is `local-markdown` or `orchestrator-local`, the
@@ -191,7 +234,7 @@ Run authorization:
   <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
 
 Planning identity:
-- feature_slug: <authoritative slug from $plan-feature/$to-prd or PRD path>
+- feature_slug: <authoritative slug from plan-feature, PRD phase, or PRD path>
 - product_slug: <accepted product slug, for monorepos/multi-context repos>
 - workspace_path: <accepted workspace path, for monorepos/multi-context repos>
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
@@ -199,13 +242,14 @@ Planning identity:
 - delivery_mode: <mode recorded in the PRD Delivery Mode section>
 ```
 
-Require `$to-issues` to use the configured issue target, issue types, labels,
-title formats, PRD parent/sub-issue relationships, and GitHub coordination
-project label when those modes apply. `$to-issues` must run `$plan-harder`
-once per generated implementation issue and verify that every `Parallelization`
-dependency resolves to a known issue ID in an acyclic graph. If external
-mutation is disallowed, it must write to the effective local target or return
-draft publish commands instead.
+Require the issue phase to use the configured issue target, issue types,
+labels, title formats, PRD parent/sub-issue relationships, and GitHub
+coordination project label when those modes apply. The issue phase must run
+`$plan-harder` once per generated implementation issue and verify that every
+`Parallelization` dependency resolves to a known issue ID in an acyclic graph
+after the final hardened issue bodies are assembled. If external mutation is
+disallowed, it must write to the effective local target or return draft publish
+commands instead.
 
 In orchestrator workspace mode, require generated issues to include affected
 repos, cross-repo contracts, integration gates, repo PR links or placeholders,
@@ -216,23 +260,24 @@ mark it as feature-level inherited metadata. Do not duplicate the full PRD
 branch/PR details in each issue; use explicit issue-level delivery exceptions
 only when an issue intentionally differs from the feature-level mode.
 
-If `$to-issues` discovers a product, domain, dependency, or acceptance-criteria
-blocker, pause issue writing and route the blocker back through
-`$grill-me-with-context`. Do not publish `needs-info` implementation issues from the
-normal `$plan-feature` flow. Publish partial `needs-info` or `ready-for-human`
-issues only when the user explicitly asks for partial output instead of a fully
-agent-ready issue set. If the PRD still has open questions that affect scope,
-acceptance criteria, dependencies, validation, publication target, permissions,
-or cross-repo contracts, treat them as issue-splitting gates and do not produce
-`ready-for-agent` issues.
+If the issue phase discovers a product, domain, dependency, or
+acceptance-criteria blocker, pause issue writing and route the blocker back
+through `$grill-me-with-context`. Do not publish `needs-info` implementation
+issues from the normal `plan-feature` flow. Publish partial `needs-info` or
+`ready-for-human` issues only when the user explicitly asks for partial output
+instead of a fully agent-ready issue set. If the PRD still has open questions
+that affect scope, acceptance criteria, dependencies, validation, publication
+target, permissions, or cross-repo contracts, treat them as issue-splitting
+gates and do not produce `ready-for-agent` issues.
 
-### 5. Report completion
+### 5. Report Completion
 
 Summarize:
 
+- selected mode,
 - setup status,
-- PRD location,
-- number of issues written or published,
+- PRD location or draft publish command status,
+- number of issues written, published, or returned,
 - GitHub PRD parent/sub-issue relationship, when applicable,
 - orchestrator project/feature path and affected repos, when applicable,
 - issue types and labels/statuses applied,
@@ -262,6 +307,14 @@ Summarize:
 
 ## References
 
+- `references/prd-phase.md`: internal PRD drafting, writing, publishing, path
+  sanitization, and `source_prd_ref` rules.
+- `references/issue-phase.md`: internal issue splitting, hardening, graph
+  validation, publishing, and completion rules.
+- `references/prd-template.md`: default PRD shape.
+- `references/issue-body-template.md`: generated implementation issue body
+  template.
+- `references/vertical-slices.md`: issue splitting rules.
 - `references/full-flow-dry-run.md`: dry-run fixture for the
-  `$plan-feature` -> `$to-prd` -> `$to-issues` -> `$codex-orchestrator`
+  `plan-feature` -> PRD phase -> issue phase -> `$codex-orchestrator`
   planning and orchestration handoff.

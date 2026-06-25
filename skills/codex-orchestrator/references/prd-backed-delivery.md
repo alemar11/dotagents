@@ -11,7 +11,7 @@ Apply this reference when any of these are true:
 - the user asks to implement a PRD issue or a set of generated implementation
   issues;
 - an issue body contains `Source PRD: #<number>` or a linked PRD path;
-- the source item was produced by `$plan-feature` or `$to-issues`;
+- the source item was produced by `$plan-feature`;
 - the source item has a `## Delivery`, `Delivery Mode`, `Completion`, or
   closeout section that defines branch, PR, or issue-closing behavior.
 

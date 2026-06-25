@@ -45,19 +45,20 @@ actually planned or written.
 
 ## Artifact Ownership
 
-- `$to-prd` owns the feature PRD and, when writing an orchestrator-local PRD,
-  may create or update `projects/<project-slug>/PROJECT.md`,
+- The `$plan-feature` PRD phase owns the feature PRD and, when writing an
+  orchestrator-local PRD, may create or update
+  `projects/<project-slug>/PROJECT.md`,
   `projects/<project-slug>/repos/<repo-slug>.md`, and
   `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
   from accepted project, repo, or PRD source material. It must record the
   accepted source in each support doc or in its completion report so the source
   boundary is auditable.
-- `$to-issues` owns files under
+- The `$plan-feature` issue phase owns files under
   `projects/<project-slug>/features/<feature-slug>/issues/` and records
   issue-specific integration proof requirements inside those issue files.
-- `$to-issues` reads `PROJECT.md`, `repos/*.md`, and `integration-gates.md`,
-  but does not create or refresh those supporting files unless the user
-  explicitly asks for that broader orchestrator artifact update.
+- The `$plan-feature` issue phase reads `PROJECT.md`, `repos/*.md`, and
+  `integration-gates.md`, but does not create or refresh those supporting files
+  unless the user explicitly asks for that broader orchestrator artifact update.
 
 ## Delivery Mode Defaults
 

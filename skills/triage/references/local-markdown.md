@@ -74,6 +74,6 @@ For orchestrator workspace issues, preserve additional fields such as
 [Optional summarized conversation history.]
 ```
 
-For generated feature work, `$to-issues` owns issue-file creation and should
+For generated feature work, `$plan-feature` owns issue-file creation and should
 still run `$plan-harder` once per issue. This skill updates or triages existing
 local markdown issues.

@@ -44,8 +44,9 @@ New feature planning is not a shortcut through orchestration decomposition. If
 the source is rough feature or product intent without a durable PRD and
 generated implementation issues, route it through `$plan-feature` before
 scheduling implementation. If the source is an existing PRD without generated
-implementation issues, route it through `$to-issues` before implementation
-scheduling unless the owner only asked for inspect-only review. Generated
+implementation issues, route it through `$plan-feature` in
+`issues-from-existing-prd` mode before implementation scheduling unless the
+owner only asked for inspect-only review. Generated
 issues, PRs, CI failures, bugs, local checklists, and explicit implementation
 requests can become orchestrator source items directly.
 
@@ -103,8 +104,8 @@ loop silently on the same worker status or source snapshot.
   `$github-ci`, `$github-deep-review`, `$github-review-threads`,
   `$github-releases`, `$git-commit`, and `$yeet`.
 - Planning companion skills as needed before implementation scheduling:
-  `$plan-feature` for rough new feature intent, and `$to-issues` for existing
-  PRDs that do not yet have generated implementation issues.
+  `$plan-feature` for rough new feature intent and existing PRDs that do not
+  yet have generated implementation issues.
 - Local ledger storage at
   `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
 
@@ -282,7 +283,7 @@ should include both a copied feature-level `Delivery mode` label and a durable
 contradicts the PRD, or contradicts repo reality, stop and classify the
 workstream as `needs-owner` until the delivery mode is corrected or explicitly
 overridden. For ad hoc or legacy source items, fall back to a durable
-`Source PRD` pointer only when the source was not produced by `$to-issues`.
+`Source PRD` pointer only when the source was not produced by `$plan-feature`.
 Inspect-only workstreams, such as PR review or CI diagnosis, do not need a
 delivery mode unless the review result is being turned into implementation
 or publication work.
@@ -319,9 +320,10 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    `$github-issues`, `$github-deep-review`, `$github-ci`, or
    `$github-review-threads` only when the task is focused on one repo or PR. If the
    user provided a rough new feature idea, route it through `$plan-feature`
-   before implementation scheduling; if the user provided an existing PRD
-   without generated implementation issues, route it through `$to-issues` unless
-   the request is inspect-only; if the user provided generated issues, a
+   full-flow mode before implementation scheduling; if the user provided an
+   existing PRD without generated implementation issues, route it through
+   `$plan-feature` issues-from-existing-prd mode unless the request is
+   inspect-only; if the user provided generated issues, a
    checklist, or an implementation plan, decompose that durable source into
    workstreams before scanning for additional queue signals. For broad
    maintainer discovery, include open issues, open PRs, failing or pending CI,

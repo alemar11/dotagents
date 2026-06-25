@@ -1,7 +1,11 @@
 # Issue Body Template
 
 Use this shape unless the tracker has a stronger local template. Delete optional
-delivery lines when they do not apply.
+delivery lines when they do not apply. Evidence references in issue bodies must
+be portable: use repo-relative paths, sibling-repo-relative paths, hosted issue
+or PR URLs, or descriptive references. Do not include developer-machine absolute
+paths in returned bodies, local issue files, hosted issue bodies, or draft
+publish commands.
 
 ```markdown
 # <feature-slug>: <NN> <vertical outcome>
@@ -39,7 +43,7 @@ single-repo issues, `current repository`; for orchestrator issues, use
 
 ## Context
 
-[Relevant PRD and repo context.]
+[Relevant PRD and repo context using portable references only.]
 
 ## Cross-Repo Notes
 

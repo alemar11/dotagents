@@ -83,7 +83,7 @@ What user or system problem this solves.
 - Issue inheritance: generated issues link this PRD with `Source PRD`, copy the
   effective `Delivery mode` label as feature-level scheduling metadata, and
   carry issue-level ordering, dependencies, parallelization, closeout, and
-  exceptions. `$to-issues` validates the generated issue graph before
+  exceptions. The issue phase validates the generated issue graph before
   publication.
 
 ## Cross-Repo Contracts
@@ -107,7 +107,7 @@ What user or system problem this solves.
 ## Issue-Splitting Notes
 
 - Suggested vertical slices, sequencing constraints, or dependencies for
-  `$to-issues`.
+  the issue phase.
 
 ## Integration Gates
 

@@ -21,6 +21,7 @@ external_tracker_mutation: disallowed
 feature_slug: account-settings-export
 delivery_mode: one-feature-branch
 source_prd_ref: draft-prd:account-settings-export
+prd_body_fingerprint: sha256:7f4a9c21d003
 default_worker_authorization: inspect, implement
 ```
 
@@ -29,9 +30,10 @@ default_worker_authorization: inspect, implement
 1. `$plan-feature` reviews project memory and resolves run authorization.
 2. `$grill-me-with-context` resolves only blockers that affect the PRD or issue
    split.
-3. `$to-prd` returns the PRD body, a draft PRD publish command, and
-   `source_prd_ref=draft-prd:account-settings-export`.
-4. `$to-issues` returns hardened issue bodies plus draft issue publish commands.
+3. The PRD phase returns the PRD body, a draft PRD publish command,
+   `source_prd_ref=draft-prd:account-settings-export`, and
+   `prd_body_fingerprint=sha256:7f4a9c21d003`.
+4. The issue phase returns hardened issue bodies plus draft issue publish commands.
    Draft issue bodies may contain `Source PRD: draft-prd:account-settings-export`
    only because no hosted PRD number exists yet.
 5. `$codex-orchestrator` may inspect the resulting issue graph in dry-run mode
@@ -41,6 +43,8 @@ default_worker_authorization: inspect, implement
 ## Expected Draft Publish Plan
 
 - Publish the PRD first and capture the created issue number as `PRD_NUMBER`.
+- Confirm the draft issue commands carry the same PRD body fingerprint as the
+  draft PRD command.
 - Replace every issue body line
   `Source PRD: draft-prd:account-settings-export` with
   `Source PRD: #$PRD_NUMBER` before creating hosted implementation issues.

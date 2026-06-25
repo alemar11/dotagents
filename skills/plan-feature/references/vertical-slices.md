@@ -190,8 +190,8 @@ For each issue:
 Do not paste the `$plan-harder` output wholesale if doing so duplicates
 sections already present in the issue body.
 
-Because `$plan-harder` is chat-output-only, `$to-issues` owns any later issue
-tracker or local markdown writes.
+Because `$plan-harder` is chat-output-only, the issue phase owns any later
+issue tracker or local markdown writes.
 
 ## Good Split Example
 
