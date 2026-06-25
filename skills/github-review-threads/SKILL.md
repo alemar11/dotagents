@@ -7,9 +7,11 @@ description: Use when listing, understanding, drafting, or posting replies to Gi
 
 ## Role
 
-Handle PR review threads and comment replies. Use direct `gh` where it is
-enough, and run `scripts/reviews` when thread-aware comment listing or selected
-reply routing is needed.
+Handle PR review threads, PR discussion comments, and comment replies. Use the
+shipped `scripts/reviews` helper first for normal PR discussion comments,
+thread-aware comment listing, and selected reply routing. Use direct `gh` only
+as a fallback when the helper is unavailable or lacks the needed GitHub
+operation, and state that fallback reason.
 
 ## Public Script
 
@@ -17,6 +19,7 @@ reply routing is needed.
 skills/github-review-threads/scripts/reviews --help
 skills/github-review-threads/scripts/reviews --version
 skills/github-review-threads/scripts/reviews --json doctor
+skills/github-review-threads/scripts/reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
 ```
 
 The script emits stable JSON success/error envelopes for JSON mode and writes
@@ -26,10 +29,12 @@ no implicit config.
 
 1. Resolve the target PR and repository.
 2. List review context before replying.
-3. Draft replies that reference the implemented change and verification.
-4. Use dry-run mode for multi-comment replies unless the user explicitly asks
+3. Draft comments or replies that reference the implemented change and
+   verification.
+4. Use `scripts/reviews comment` for top-level PR discussion comments.
+5. Use dry-run mode for multi-comment replies unless the user explicitly asks
    to post.
-5. Post only to selected comments or threads.
+6. Post only to selected comments or threads.
 
 ## References
 

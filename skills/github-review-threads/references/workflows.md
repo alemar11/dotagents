@@ -21,9 +21,22 @@ skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <n
 
 Use `--dry-run` for batch replies unless the user already approved posting.
 
-## Direct Commands
+## Post Top-Level PR Discussion Comments
 
-For simple PR comments:
+Use the helper for normal PR discussion comments, including simple review
+requests:
+
+```bash
+skills/github-review-threads/scripts/reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
+skills/github-review-threads/scripts/reviews comment --repo <owner/repo> --pr <number> --body-file <message-file>
+```
+
+Use `--dry-run` unless the user explicitly asked to post the discussion comment.
+
+## Fallback Direct Commands
+
+Use direct `gh` only when `scripts/reviews` is unavailable, broken, or lacks the
+needed operation. State the fallback reason in the response.
 
 ```bash
 gh pr comment <number> --repo <owner/repo> --body-file <message-file>

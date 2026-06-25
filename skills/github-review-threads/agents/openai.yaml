@@ -1,5 +1,5 @@
 interface:
   display_name: "GitHub Review Threads"
-  short_description: "Handle PR review threads and replies."
+  short_description: "Handle PR review threads, discussion comments, and replies."
   brand_color: "#9333EA"
-  default_prompt: "Use $github-review-threads to inspect PR review threads, draft or post replies, and use scripts/reviews for thread-aware routing when direct gh is not enough."
+  default_prompt: "Use $github-review-threads to inspect PR review threads, post PR discussion comments, and draft or post replies through scripts/reviews first; use direct gh only as a stated fallback."

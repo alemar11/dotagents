@@ -37,7 +37,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `github-issues` | Create, update, label, type, comment, close, and relate GitHub issues with direct `gh` commands. |
 | `github-portfolio-triage` | Scan multiple explicit GitHub repositories read-only for queue, CI, release, and next-action summaries. |
 | `github-releases` | Check, plan, draft, publish, and validate GitHub Releases, tags, notes, and package availability. |
-| `github-review-threads` | Inspect PR review threads and route selected replies with a focused `reviews` CLI. |
+| `github-review-threads` | Inspect PR review threads, post discussion comments, and route selected replies with a focused `reviews` CLI. |
 | `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
 | `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
 | `triage` | Triage existing GitHub or local markdown issues into typed, agent-ready states. |
