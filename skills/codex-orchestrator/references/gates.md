@@ -11,8 +11,9 @@ Gate selection is per workstream. Always evaluate `authorization` and
 non-trivial code edits, `ci` for merge or release readiness, `owner-decision`
 when progress depends on approval or risk acceptance, `release` only for tag,
 package, deploy, or promotion work, `public-model-identifier` only when public
-names or API fields are changed or exposed, and `cross-repo-integration` only
-when multiple repositories or packages must remain compatible. Record
+names or API fields are changed or exposed, `cross-repo-integration` only when
+multiple repositories or packages must remain compatible, and
+`publication-safety` before push or draft PR publication. Record
 `not-applicable` only with a short reason in the ledger gate matrix.
 
 Proof means root-verifiable evidence, not only a worker assertion. Acceptable
@@ -21,11 +22,31 @@ PR or issue links, resolved review-thread links, Markdown checkbox diffs,
 TODO-removal diffs, screenshots, rendered artifacts, API responses, release
 URLs, timestamps, and owner decisions.
 
+## Structured Gate Values
+
+Use the gate names listed in `## Universal Gates` and the sections below. Use
+these `gate_status` values in the ledger gate matrix:
+
+- `pass`: gate is satisfied with root-verifiable evidence.
+- `fail`: gate was evaluated and failed.
+- `blocked`: gate cannot be evaluated or satisfied without external action.
+- `not-applicable`: gate does not apply, with a short recorded reason.
+
+`publication-safety` owns `push_policy`, `branch_target_guard`,
+`pr_diff_status`, and `post_push_verification` values.
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. When updating an artifact
+that contains legacy aliases, rewrite touched structured values to
+lower-kebab-case.
+
 ### Authorization Gate
 
 Confirm the worker's requested action is covered by the current authorization
-mode. Stop for owner approval before push, PR, merge, close, release, external
+modes. Stop for owner approval before push, PR, merge, close, release, external
 service mutation, destructive local changes, or broad scope changes.
+For worker assignments, `commit`, `push`, and `pr` are separate capability
+flags. Do not allow PR creation to imply commit or push, and do not allow push
+to imply local commit creation.
 
 For PRD-backed workflows, branch plus draft PR delivery in the PRD or generated
 issue can satisfy authorization for commit, push, and draft PR creation after
@@ -33,6 +54,21 @@ tests, integration checks, and `$autoreview` pass, unless the owner restricted
 the request to local-only, inspect-only, no-push, or no-PR work. Record that as
 publication authority in the ledger. This does not authorize merge, release,
 direct issue mutation, production deploy, or unrelated GitHub cleanup.
+
+### Publication Safety Gate
+
+Before push or draft PR publication, evaluate `publication-safety`. Record:
+
+- `push_policy`: `no-push`, `explicit-refspec-only`, or `block-plain-push`.
+- `branch_target_guard`: `default-branch-blocked`,
+  `protected-branch-blocked`, or `verified-feature-branch`.
+- `pr_diff_status`: `non-empty`, `empty`, or `not-checked`.
+- `post_push_verification`: `verified`, `failed`, or `not-applicable`.
+
+Publication should use an explicit refspec, target the expected feature branch,
+and verify the pushed branch or draft PR state after push. If the PR diff is
+empty or the target is the default/protected branch without explicit
+authorization, stop and record `blocked`.
 
 ### Live Proof Gate
 
@@ -45,12 +81,12 @@ owner deferral.
 When live proof is blocked, record the exact blocker, the synthetic proof that
 was collected, and the owner decision or follow-up needed. Do not land,
 release, close, or mark complete on synthetic proof alone unless the owner
-explicitly accepts that gap or the source item is moved to `Deferred` with an
+explicitly accepts that gap or the source item is moved to `deferred` with an
 owner-visible follow-up.
 
 ### Closure Gate
 
-Before closing any source item or moving work to `Completed`, verify that the
+Before closing any source item or moving work to `completed`, verify that the
 source acceptance criteria are satisfied by root-verifiable proof. If live proof
 is feasible but blocked by credentials, setup, service access, or missing
 hardware, do not treat the source item as fully complete unless the owner
@@ -60,19 +96,19 @@ For implementation issues that include `## Delivery`, verify that closeout
 matches the recorded delivery mode and closeout path, and verify that direct
 dependencies or blocking relationships recorded in the issue are satisfied
 before declaring closure. Close through the relevant PR body by default. Use
-final-commit closure only when the issue records **Direct Commit** or another
+final-commit closure only when the issue records `direct-commit` or another
 explicit maintainer authorization.
 
 For PRD-backed workflows with authorized branch plus draft PR delivery, do not
-declare the workstream `Completed` while the expected draft PR remains
+declare the workstream `completed` while the expected draft PR remains
 uncreated. Either record the draft PR URL and PR-body closeout path, or record
-the blocker and move the publication action to `Needs Owner`, `Blocked`, or
-`Deferred`. Treat direct issue comments, labels, manual issue closure, parent
+the blocker and move the publication action to `needs-owner`, `blocked`, or
+`deferred`. Treat direct issue comments, labels, manual issue closure, parent
 PRD closure, merge, and release as separate mutations that require explicit
 authority.
 
 If the implementation intentionally satisfies only part of the source item,
-keep the source item open or move it to `Needs Owner` until the deferred scope
+keep the source item open or move it to `needs-owner` until the deferred scope
 has an owner-visible follow-up and the closeout links it.
 
 ### Follow-Up Gate
@@ -84,7 +120,7 @@ collected, and the acceptance criteria that remain.
 
 If mutation is not authorized, do not close the source item. Record the proposed
 follow-up title/body, file patch, reply, or owner-visible update in the ledger
-under `Needs Owner` or `Deferred`.
+under `needs-owner` or `deferred`.
 
 ### Source-Type Exit Criteria
 
@@ -97,10 +133,10 @@ under `Needs Owner` or `Deferred`.
 - Markdown checklist or plan item: checkbox or text updated, or a proposed patch
   is recorded when file mutation is not authorized.
 - Local TODO: TODO removed, updated, or linked to a follow-up with proof.
-- Ledger-only item: moved to `Completed`, `Deferred`, `Blocked`, `Needs Owner`,
-  or `Ignored Or Suppressed` with proof and reason.
+- Ledger-only item: moved to `completed`, `deferred`, `blocked`,
+  `needs-owner`, or `ignored-or-suppressed` with proof and reason.
 - Release checklist: release gate satisfied, or residual release scope moved to
-  `Deferred`, `Blocked`, or `Needs Owner`.
+  `deferred`, `blocked`, or `needs-owner`.
 
 ### Autoreview Gate
 
@@ -129,7 +165,7 @@ production-readiness caveat, resolve it before closure by doing one of:
 - fix it and rerun the relevant validation;
 - prove it is not applicable;
 - create or link a follow-up issue when mutation is authorized;
-- record a `Needs Owner`, `Blocked`, or `Deferred` ledger item with the proposed
+- record a `needs-owner`, `blocked`, or `deferred` ledger item with the proposed
   follow-up when mutation is not authorized.
 
 Do not leave unresolved worker-reported risks only in chronological notes when
@@ -154,7 +190,7 @@ across repo boundaries before owner-ready status: shared API shape, version
 pinning, migration order, deploy order, fixtures, or an explicit integration
 test.
 
-For **One PR Per Repo**, also require the real repo PR links or equivalent
+For `one-pr-per-repo`, also require the real repo PR links or equivalent
 integration proof promised by the coordination PRD or issue before declaring
 the coordination issue closed, merge-ready, or complete.
 

@@ -21,7 +21,7 @@ Portfolio names should be lowercase, filesystem-safe slugs. If the user gives a
 display name, derive a slug and record the display name in the ledger.
 
 If the resolved ledger file does not exist, create it from the template before
-discovery. Fill known fields, use `TBD` for unknown owner or repository
+discovery. Fill known fields, use `tbd` for unknown owner or repository
 metadata, set `Status: active`, and add a dated note summarizing the owner
 request and initial task sources.
 
@@ -32,8 +32,30 @@ request and initial task sources.
 - Workers report status, proof, blockers, and next actions to the orchestrator.
 - Preserve historical notes that explain owner decisions, suppressions, and
   release state.
-- The orchestrator records worker lifecycle decisions: integrated,
-  retained-for-inspection, abandoned, or handoff-pending.
+- The orchestrator records worker lifecycle decisions: `integrated`,
+  `retained-for-inspection`, `abandoned`, or `handoff-pending`.
+
+## Structured Ledger Values
+
+Use these ledger-owned values:
+
+- `ledger_status`: `active`, `paused`, `blocked`, `complete`, `released`, or
+  `archived`; this describes the portfolio ledger as a whole.
+- `source_mutation_authority`: `none` means do not mutate the source item,
+  `propose` means draft the update without applying it, and `write` means apply
+  authorized source updates.
+- `resync_state`: `synced` means worker state matches root-integrated work,
+  `needs-resync` means worker state must be reconciled, `replaced` means a new
+  worker or root flow took over, and `root-owned` means root owns integration or
+  follow-up.
+
+Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
+and gate values are owned by `worker.md`, `prd-backed-delivery.md`, and
+`gates.md`.
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. When updating an artifact
+that contains legacy aliases, rewrite touched structured values to
+lower-kebab-case.
 
 ## Template
 
@@ -57,14 +79,17 @@ Out of scope:
 
 | Source ID | Kind | Path/Query/URL | Last Checked | Cursor/Fingerprint | Item Key Rule | Mutation Authority | Suppression Rule |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| DS-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | none, propose, or write | <owner/date/reason/source fingerprint> |
+| ds-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | none, propose, or write | <owner/date/reason/source fingerprint> |
+
+`Mutation Authority` uses the `source_mutation_authority` option values.
 
 ## Worker Policy
 
-Default authorization: inspect|implement
+Default worker authorization: inspect, implement
+Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
 Delegated worker surface: auto|codex-app-thread|cli-subagent|none
 Max active delegated workers: <number>
-Heartbeat: disabled|every 5 minutes|custom
+Heartbeat: disabled|manual|every-5-minutes|custom
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true
@@ -76,6 +101,12 @@ surfaces: in Codex CLI this resolves to `cli-subagent`, while in Codex App it
 may choose `codex-app-thread` or `cli-subagent`. `none` disables delegation.
 `Max active delegated workers` is a cap, not a quota.
 
+Worker authorization modes are capability flags, not a cumulative ladder. List
+each allowed action explicitly for each workstream. A
+`default_worker_authorization` value from project memory is only a starting
+policy default; current owner/session authorization and gates may only narrow
+or explicitly extend it.
+
 Each workstream records the actual surface used: `codex-app-thread`,
 `cli-subagent`, or `no-delegation`. For root-owned work, record
 `Surface=no-delegation`, `Worker ID=root`, and the reason delegation was skipped.
@@ -83,14 +114,14 @@ Each workstream records the actual surface used: `codex-app-thread`,
 ## Delivery Mode Policy
 
 Default delivery mode:
-- **One Feature Branch** for a single git repo, including monorepos.
-- **One PR Per Repo** for true multi-repo features.
+- `one-feature-branch` for a single git repo, including monorepos.
+- `one-pr-per-repo` for true multi-repo features.
 
 Exceptions:
-- **One PR Per Issue** only when the issue is isolated from shared contracts,
+- `one-pr-per-issue` only when the issue is isolated from shared contracts,
   migrations, lockfiles, generated files, broad validation, and other active
   issue work.
-- **Direct Commit** only with explicit owner authorization.
+- `direct-commit` only with explicit owner authorization.
 
 Each implementation workstream records the effective `Delivery mode` label and
 whether it is feature-level inherited metadata from `Source PRD` or an
@@ -107,7 +138,7 @@ Issue-level parallelization controls startability:
 
 - `independent`: may enter an active wave when authorization, ownership
   boundaries, and gates allow it.
-- `depends on <issue>`: do not assign until the named dependency has
+- `depends-on <issue>`: do not assign until the named dependency has
   root-verifiable completion proof.
 - `blocks <issue>`: may start when otherwise eligible; keep dependent items
   unassigned until this one completes.
@@ -129,6 +160,7 @@ Available gates:
 - public-model-identifier
 - cross-repo-integration
 - credential-and-access
+- publication-safety
 
 Portfolio overrides:
 - <gate>: <stricter requirement or owner-approved exception>
@@ -140,45 +172,45 @@ Gate matrix:
 
 ## Workstreams
 
-### Active
+### active
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
-### Autonomous
+### autonomous
 
 - <candidate item, repo, URL, reason it is safe to delegate>
 
-### Needs Owner
+### needs-owner
 
 - <decision, URL/context, options, recommendation>
 
-### Ready Next
+### ready-next
 
 - <owner-ready task, proof, required next action>
 
-### Blocked
+### blocked
 
 - <blocker, owner/action needed, evidence>
 
-### Ignored Or Suppressed
+### ignored-or-suppressed
 
 - <item, reason, date, owner>
 
-### Deferred
+### deferred
 
 - <follow-up issue/ticket or proposed issue body, residual scope, blocker,
   source item, owner/action needed>
 
-### Completed
+### completed
 
 - <source id/ref, delivery mode, branch/PR/proof, validation, source closeout target and
   whether it was updated/closed>
 - <worker id/title, integration method, worker lifecycle decision, generated
   ignored artifacts removed/retained/left in helper worktree>
 
-### Released
+### released
 
 - <repo/version/tag/date/proof>
 
@@ -206,43 +238,44 @@ single combined operating view.
 
 ## Vocabulary
 
-- `Active`: work that currently needs orchestration, worker monitoring,
+- `active`: work that currently needs orchestration, worker monitoring,
   integration, owner input, or a scheduled next check. Remove a worker row from
-  `Active` once its output is integrated, abandoned, retained only for
+  `active` once its output is integrated, abandoned, retained only for
   inspection, or handed off with the remaining action recorded elsewhere. A
-  completed row may remain in `Active` only while a root-owned closeout action
+  completed row may remain in `active` only while a root-owned closeout action
   is still pending, and the `Next Check` must name that action.
-- `Autonomous`: candidate work safe to delegate under the current worker policy.
-  Move it to `Active` when assigned, or reclassify it when delegation is no
+- `autonomous`: candidate work safe to delegate under the current worker policy.
+  Move it to `active` when assigned, or reclassify it when delegation is no
   longer useful or authorized. A ledger cannot be `complete` while actionable
-  `Autonomous` work remains.
-- `Needs Owner`: progress waits on owner decision, credentials, scope approval,
+  `autonomous` work remains.
+- `needs-owner`: progress waits on owner decision, credentials, scope approval,
   risk acceptance, mutation authorization, or another non-Codex decision. Record
   the decision brief, options, recommendation, and minimum owner action.
-- `Ready Next`: owner-ready work that still needs an explicit next action such
+- `ready-next`: owner-ready work that still needs an explicit next action such
   as review, commit, push, PR, merge, close, or release. Execute it before
   stopping when current authorization permits; otherwise reclassify it as
-  `Needs Owner`, `Blocked`, or `Deferred` with the missing decision or access.
+  `needs-owner`, `blocked`, or `deferred` with the missing decision or access.
   For PRD-backed workflows with branch plus draft PR delivery authority,
   commit, push, and draft PR creation are current-authorized actions after
   gates pass unless the owner restricted publication.
-- `Blocked`: work cannot progress with current access, state, dependency, or
+- `blocked`: work cannot progress with current access, state, dependency, or
   proof. Record blocker, evidence, minimum next action, and whether the blocker
   is owner-actionable or external.
-- `Ignored Or Suppressed`: known item intentionally excluded from this loop.
+- `ignored-or-suppressed`: known item intentionally excluded from this loop.
   Record source id, source fingerprint, owner, date, and reason. Do not
   rediscover it unless owner direction changes or the source fingerprint changes.
-- `Completed`: implemented work whose required gates passed and whose delivery
-  contract is satisfied or explicitly blocked outside current authorization.
-  Record commits, PRs, validation, root-verifiable proof, source closeout
-  state, integration method, worker lifecycle decision, and any generated
-  ignored artifacts that were removed or intentionally retained.
-- `Deferred`: known residual work that is intentionally not part of the current
+- `completed`: implemented work whose required gates passed and whose delivery
+  contract is satisfied. Record commits, PRs, validation, root-verifiable proof,
+  source closeout state, integration method, worker lifecycle decision, and any
+  generated ignored artifacts that were removed or intentionally retained.
+  If publication, closeout, or proof is blocked outside current authorization,
+  keep the source in `needs-owner`, `blocked`, or `deferred` instead.
+- `deferred`: known residual work that is intentionally not part of the current
   closeout. Link the follow-up issue/ticket when one exists, or record the
   proposed follow-up when mutation is not authorized. Do not mirror completed
-  source items here; use `Deferred` only for real residual scope, blocked live
+  source items here; use `deferred` only for real residual scope, blocked live
   proof, or owner-visible follow-up work.
-- `Released`: use only for actual product/package/version releases, deploys, or
+- `released`: use only for actual product/package/version releases, deploys, or
   tags. Do not put ordinary issue-closing commits here unless a release really
   happened.
 
@@ -252,28 +285,28 @@ Before marking a ledger `complete`, verify:
 
 - All discovery sources were rescanned or intentionally skipped with a recorded
   reason, cursor, and fingerprint.
-- `Active` contains no worker that is merely done; every active row needs a real
+- `active` contains no worker that is merely done; every active row needs a real
   next check or root-owned closeout action.
-- `Autonomous` is empty, or every item was reclassified as non-actionable under
+- `autonomous` is empty, or every item was reclassified as non-actionable under
   the current authorization.
-- `Ready Next` is empty, or every remaining action was reclassified as `Needs
-  Owner`, `Blocked`, or `Deferred` with the missing authorization, decision, or
-  follow-up.
+- `ready-next` is empty, or every remaining action was reclassified as
+  `needs-owner`, `blocked`, or `deferred` with the missing authorization,
+  decision, or follow-up.
 - PRD-backed work with authorized branch plus draft PR delivery either records
   the published draft PR URL or records the exact blocker that prevents
   publication; do not mark it complete while authorized commit, push, or draft
-  PR creation remains in `Ready Next`.
-- `Needs Owner` and `Blocked` entries are explicitly non-Codex-actionable and
+  PR creation remains in `ready-next`.
+- `needs-owner` and `blocked` entries are explicitly non-Codex-actionable and
   include decision briefs, blockers, evidence, and minimum next actions.
-- `Deferred` contains only residual work with a linked or proposed
+- `deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
-- `Completed` records the final proof, source closeout state, integration
+- `completed` records the final proof, source closeout state, integration
   method, publication state, and worker lifecycle decision for each completed
   worker-backed item.
 - Generated ignored artifacts and helper worktrees are either removed, retained
   for inspection with a reason, left only inside a helper worktree with an
   explicit lifecycle decision, or explicitly handed off.
-- `Ignored Or Suppressed` items have source id, source fingerprint, reason,
+- `ignored-or-suppressed` items have source id, source fingerprint, reason,
   owner, and date, and they are not rediscovered unless that fingerprint or
   owner direction changes.
 
@@ -291,6 +324,7 @@ snapshot against the ledger:
   Markdown checkbox diff, TODO removal/update, commit SHA, release URL,
   screenshot, API response, or timestamped command output;
 - partial completions have a linked/proposed follow-up or remain open under
-  `Needs Owner`, `Blocked`, or `Deferred`;
-- newly surfaced source items are added to `Autonomous`, `Active`, `Needs
-  Owner`, `Blocked`, `Deferred`, or `Ignored Or Suppressed` before stopping.
+  `needs-owner`, `blocked`, or `deferred`;
+- newly surfaced source items are added to `autonomous`, `active`,
+  `needs-owner`, `blocked`, `deferred`, or `ignored-or-suppressed` before
+  stopping.

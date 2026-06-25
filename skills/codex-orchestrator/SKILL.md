@@ -62,7 +62,7 @@ explicitly migrates it.
 For Markdown plans or checklists, enumerate unchecked items with their nearest
 heading context and a stable path plus line or anchor. Preserve parent context,
 map each actionable item to a ledger workstream, and close it by applying or
-proposing a file update, moving residual scope to `Deferred`, or recording the
+proposing a file update, moving residual scope to `deferred`, or recording the
 owner decision that leaves it open.
 
 ## Loop Semantics
@@ -75,8 +75,8 @@ Run orchestration as bounded waves, not as a one-pass checklist:
 3. Select the next root-owned and delegated wave.
 4. Execute, monitor, integrate, and gate the wave.
 5. Update the ledger and any authorized source closeout targets.
-6. Rescan due sources, then repeat only while there are `Active` items, due next
-   checks, authorized `Ready Next` actions, or newly surfaced source items.
+6. Rescan due sources, then repeat only while there are `active` items, due next
+   checks, authorized `ready-next` actions, or newly surfaced source items.
 
 Each wave must produce at least one ledger state transition, new proof, source
 update, owner decision brief, or explicit no-progress/blocker record. Do not
@@ -148,10 +148,10 @@ before creating any delegated worker:
 Use this concise clarification shape when the owner omitted delegation or
 monitoring details:
 
-> How should I run orchestration for this session: CLI/subagents, visible Codex
-> App threads, both/auto, or no delegation? What max active count should I use
+> How should I run orchestration for this session: `cli-subagent`,
+> `codex-app-thread`, `auto`, or `none`? What max active count should I use
 > for each allowed worker surface? Should I monitor progress manually, or create
-> a heartbeat? Default heartbeat is every 5 minutes, and you can change it.
+> a heartbeat? Default heartbeat is `every-5-minutes`, and you can change it.
 
 Visible Codex App thread creation requires explicit owner intent for visible,
 new, separate, or background threads. Do not create user-owned App threads
@@ -181,7 +181,7 @@ Choose the worker surface deliberately:
   authorization, scope, and inspection requirements. Otherwise do not delegate.
 
 Record the chosen surface, worker id, title or nickname, repository, scope, and
-authorization mode in the ledger. Do not call a hidden subagent a visible
+authorization modes in the ledger. Do not call a hidden subagent a visible
 thread.
 
 ## Delegation Fast Rules
@@ -214,7 +214,7 @@ source for full delivery mode details, while the issue body supplies the copied
 feature-level `Delivery mode` label plus issue-level parallelization,
 dependencies, blocks, closeout, and overrides. Use those issue-local fields as
 the scheduling graph for waves and worker routing. Treat an issue line such as
-`Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)`
+`Delivery mode: one-feature-branch (feature-level, inherited from Source PRD)`
 as a feature-level landing strategy, not as a claim that only this one issue
 uses that branch/PR shape.
 
@@ -229,11 +229,19 @@ no-push, or no-PR work. For ad hoc or legacy sources without a linked PRD
 delivery contract, `implement` remains local-only and publication requires
 explicit owner authorization.
 
+When delegating these stages to a worker, list each authorized capability
+explicitly: `commit` for local commits, `push` for the exact branch/refspec, and
+`pr` for draft PR creation or update. These are not cumulative shortcuts.
+If `project-memory/agents/issue-tracker.md` records
+`default_worker_authorization`, treat it as a starting policy default only.
+Restrict it to the current owner/session authorization, publication authority,
+worker inspectability, dirty-worktree state, and gates before dispatch.
+
 Apply issue-level scheduling constraints before choosing a wave or worker:
 
 - `Parallelization: independent`: eligible for delegation when authorization,
   ownership boundaries, and gates allow it.
-- `Parallelization: depends on <issue>`: queue-ready is not start-ready. Do not
+- `Parallelization: depends-on <issue>`: queue-ready is not start-ready. Do not
   start or delegate it until the named dependency is completed with
   root-verifiable proof, or until the owner explicitly changes the dependency.
 - `Parallelization: blocks <issue>`: the issue may start when otherwise
@@ -243,27 +251,27 @@ Apply issue-level scheduling constraints before choosing a wave or worker:
   proof when that does not change the integration ownership.
 
 If dependency references are malformed, missing, or cyclical, classify the
-workstream as `Needs Owner`/`Blocked` and do not dispatch until the graph is
+workstream as `needs-owner`/`blocked` and do not dispatch until the graph is
 corrected.
 
 If a dependency, `Source PRD`, closeout path, or parallelization value is
-missing, ambiguous, or contradictory, classify the workstream as `Needs Owner`
-or `Blocked` instead of inventing scheduling semantics.
+missing, ambiguous, or contradictory, classify the workstream as `needs-owner`
+or `blocked` instead of inventing scheduling semantics.
 
-- **One Feature Branch**: use for one git repo, including monorepos. The root
+- `one-feature-branch`: use for one git repo, including monorepos. The root
   orchestrator owns the shared feature branch and usually one draft PR for the
   whole feature. Parallel workers may use isolated helper worktrees, patches,
   handoff, or reviewed worker commits, but the root integrates their output
   into the shared branch and owns the final PR.
-- **One PR Per Repo**: use for true multi-repo work. Create or use one feature
+- `one-pr-per-repo`: use for true multi-repo work. Create or use one feature
   branch per affected repo, usually the same `feature/<feature-slug>` branch
   name, and publish one draft PR per repo when publication is authorized. Link
   every repo PR from the coordination PRD or issue and require cross-repo
   integration proof before closeout.
-- **One PR Per Issue**: use only when the issue is isolated enough that its
+- `one-pr-per-issue`: use only when the issue is isolated enough that its
   branch and PR cannot conflict with shared contracts, migrations, lockfiles,
   generated files, broad validation, or other active issue work.
-- **Direct Commit**: use only when explicitly authorized by the owner or source
+- `direct-commit`: use only when explicitly authorized by the owner or source
   item. Record the authorization, validation, and issue-closing target before
   committing.
 
@@ -272,7 +280,7 @@ or publication workstreams that need branch or PR strategy, generated issues
 should include both a copied feature-level `Delivery mode` label and a durable
 `Source PRD` pointer. If generated issue metadata omits the copied label,
 contradicts the PRD, or contradicts repo reality, stop and classify the
-workstream as `Needs Owner` until the delivery mode is corrected or explicitly
+workstream as `needs-owner` until the delivery mode is corrected or explicitly
 overridden. For ad hoc or legacy source items, fall back to a durable
 `Source PRD` pointer only when the source was not produced by `$to-issues`.
 Inspect-only workstreams, such as PR review or CI diagnosis, do not need a
@@ -320,8 +328,8 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    latest release or package state when relevant, unreleased changelog/TODO
    signals, and owner-suppressed items.
 4. Classify work with the canonical vocabulary in `references/ledger.md`:
-   `Active`, `Autonomous`, `Needs Owner`, `Ready Next`, `Blocked`, `Deferred`,
-   `Completed`, `Ignored Or Suppressed`, or `Released`. Each workstream must
+   `active`, `autonomous`, `needs-owner`, `ready-next`, `blocked`, `deferred`,
+   `completed`, `ignored-or-suppressed`, or `released`. Each workstream must
    carry its source id, acceptance criteria, scheduling constraints,
    dependencies, selected gates, proof target, and closeout target.
 5. Before delegation, read `references/worker.md` and create one Codex worker
@@ -332,7 +340,7 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    intent for visible/new/separate/background workers is present; otherwise use
    CLI/subagent workers when authorized and inspectable, or stay in the root
    thread.
-6. Give each worker an explicit authorization mode, scope, gates, expected
+6. Give each worker explicit authorization modes, scope, gates, expected
    proof, delivery mode, publication authority, dependency state, branch
    expectation, integration mode, and final report shape. Workers must not
    spawn sub-workers, create threads, manage other chats, or edit the ledger.
@@ -372,22 +380,38 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
     update, follow-up bullet, or proposed patch. If mutation is not authorized,
     keep the item owner-ready with the proposed update body and do not call it
     complete.
-14. Before stopping, execute every `Ready Next` action that is within current
+14. Before stopping, execute every `ready-next` action that is within current
     authorization. In PRD-backed workflows where branch plus draft PR delivery
     is authorized by the source contract, commit, push, and draft PR creation
-    are authorized `Ready Next` actions after gates pass. Reclassify any
-    remaining `Ready Next` item as `Needs Owner`, `Blocked`, or `Deferred` with
+    are authorized `ready-next` actions after gates pass. Reclassify any
+    remaining `ready-next` item as `needs-owner`, `blocked`, or `deferred` with
     the missing decision, access, or follow-up.
 15. Stop only after reconciling the original task sources against the ledger.
-    The ledger must show no `Active` worker requiring orchestration, no
-    `Autonomous` item that can still be delegated, no authorized `Ready Next`
+    The ledger must show no `active` worker requiring orchestration, no
+    `autonomous` item that can still be delegated, no authorized `ready-next`
     action, and no newly surfaced source item. Remaining work must be
-    `Completed` with gates satisfied, `Needs Owner` with a decision brief,
-    `Blocked` with minimum missing access/action, `Released`, `Deferred` with a
-    linked or proposed follow-up, or `Ignored Or Suppressed` with source key,
+    `completed` with gates satisfied, `needs-owner` with a decision brief,
+    `blocked` with minimum missing access/action, `released`, `deferred` with a
+    linked or proposed follow-up, or `ignored-or-suppressed` with source key,
     reason, owner, date, and unchanged source fingerprint. Completed workers
     should be moved out of active tracking or explicitly marked as awaiting a
     root-owned closeout action.
+
+## Final Report
+
+Before handing control back to the owner, return a compact owner-facing report:
+
+- overall status: `completed`, `needs-owner`, `blocked`, `deferred`,
+  `released`, or mixed with the blocking reason;
+- source items reconciled, with source ids/refs and closeout state;
+- workers used, integration method per worker, and any worker output left
+  unintegrated;
+- commits, branches, PRs, issue updates, releases, or draft mutation commands
+  produced under current authorization;
+- gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
+  a proof path was unavailable;
+- remaining owner decisions, blocked access, deferred follow-ups, and the next
+  safe action.
 
 ## References
 

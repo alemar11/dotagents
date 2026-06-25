@@ -36,6 +36,36 @@ Do not present hidden subagents as visible App threads. If the chosen surface
 will not be visible in the Codex App sidebar, say that in the ledger and final
 report.
 
+## Structured Worker Values
+
+Use these worker-owned structured values in ledgers, prompts, and final
+reports:
+
+- `delegated_worker_surface`: `auto`, `codex-app-thread`, `cli-subagent`, or
+  `none`; this is the owner-authorized delegation policy.
+- `actual_workstream_surface`: `codex-app-thread`, `cli-subagent`, or
+  `no-delegation`; this records where the workstream actually runs.
+- `worker_authorization`: one or more of `inspect`, `implement`, `commit`,
+  `push`, `pr`, `ci-rerun-fix`, `merge-close`, or `release`.
+- `worker_status`: `done`, `blocked`, `needs-owner`, or `ready-for-review`;
+  this is a worker report, not a root closeout decision.
+- `worker_lifecycle`: `integrated`, `retained-for-inspection`, `abandoned`, or
+  `handoff-pending`; this is the root's decision about worker output.
+- `branch_expectation`: `shared-feature-branch`, `repo-feature-branch`,
+  `issue-branch`, `direct-commit-target`, or `none`; this names the expected
+  landing target.
+- `integration_method`: `handoff`, `worker-commit`, `patch-apply`, or
+  `manual-root`; this records how root integrated worker output.
+- `source_disposition`: `completed`, `partial`, `blocked`, `needs-owner`,
+  `deferred`, or `unchanged`; this records the source item's outcome from the
+  worker's perspective.
+
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. Treat older `push-pr`
+authorization as a legacy alias for `commit`, `push`, and `pr` when reading
+existing artifacts, then rewrite touched structured values to the exact subset
+actually authorized.
+
 ## When Not To Delegate
 
 Stay in the root orchestrator thread when:
@@ -67,7 +97,7 @@ Stay in the root orchestrator thread when:
   integration in the root thread.
 - Give each worker a single clear objective, repository path or URL, branch
   expectations, and exit condition.
-- Do not assign implementation work for `Parallelization: depends on <issue>`
+- Do not assign implementation work for `Parallelization: depends-on <issue>`
   until the root orchestrator has verified the named dependency is complete.
 - Keep `Parallelization: root-integrated` implementation in the root thread.
   Workers may provide read-only inspection or isolated proof only when the root
@@ -85,7 +115,7 @@ Stay in the root orchestrator thread when:
 
 ## Delivery Mode Rules
 
-Record one of these human-readable labels for every implementation workstream.
+Record one of these canonical values for every implementation workstream.
 When the assignment comes from a generated issue with a `Source PRD`, the root
 orchestrator should pass the generated issue's copied feature-level `Delivery
 mode` label plus issue-local dependencies, blocks, closeout, and parallelization.
@@ -93,37 +123,39 @@ The issue does not need to restate the full branch and PR strategy, but the
 prompt and ledger must preserve whether the label is feature-level metadata
 inherited from `Source PRD` or an issue-level override:
 
-- **One Feature Branch**: the root owns one shared feature branch and usually
+- `one-feature-branch`: the root owns one shared feature branch and usually
   one draft PR for the feature. Workers operate in isolated helper worktrees or
   produce patches, handoff-ready diffs, or reviewed commits for root
   integration. Workers must not publish independent branches or PRs unless the
-  root explicitly changes their authorization mode and branch expectation.
-- **One PR Per Repo**: each affected repo has its own feature branch and draft
+  root explicitly changes their authorization modes and branch expectation.
+- `one-pr-per-repo`: each affected repo has its own feature branch and draft
   PR. A worker assigned to one repo may prepare that repo branch or PR only
-  when authorization mode permits publication. The root records all repo PR
+  when authorization modes permit publication. The root records all repo PR
   links and verifies cross-repo integration before closeout.
-- **One PR Per Issue**: use only when the issue is explicitly isolated from
+- `one-pr-per-issue`: use only when the issue is explicitly isolated from
   shared contracts, migrations, lockfiles, generated files, broad validation,
   and other active issue work.
-- **Direct Commit**: use only with explicit owner authorization recorded in the
+- `direct-commit`: use only with explicit owner authorization recorded in the
   prompt and ledger.
 
 If the worker sees a mismatch between the assigned delivery mode and repo reality,
-such as multi-repo work labeled **One Feature Branch**, it must stop and report
+such as multi-repo work labeled `one-feature-branch`, it must stop and report
 `needs-owner` instead of choosing a new branch or PR strategy.
 
-Treat `Delivery mode: One Feature Branch (feature-level, inherited from Source
+Treat `Delivery mode: one-feature-branch (feature-level, inherited from Source
 PRD)` as the feature's overall landing strategy. It does not mean this
 individual issue alone owns the branch or PR shape. Treat
-`Delivery mode: One PR Per Issue (issue-level override, authorized by
+`Delivery mode: one-pr-per-issue (issue-level override, authorized by
 <owner/date>)` as a scoped exception for that issue only.
 
 For PRD-backed workflows, the root resolves delivery authority, publication
 authority, and issue mutation authority with `prd-backed-delivery.md` before
 delegation. Workers do not infer publication rights from `Source PRD` text on
 their own. They may commit, push, or open a draft PR only when the assignment
-sets authorization mode to `push-pr` and names the exact repository, branch, PR
-shape, and closeout target.
+lists the corresponding `commit`, `push`, or `pr` authorization mode and names
+the exact repository, branch, refspec, PR shape, and closeout target required by
+that mode. Do not use `pr` as a shortcut for commit or push; list every allowed
+mode explicitly.
 
 ## Worker Status Vs Root Lifecycle
 
@@ -201,8 +233,7 @@ per worker output:
 - `handoff`: use `codex_app.handoff_thread` or the equivalent inspected worker
   surface when the worker's checkout should become the integration checkout.
 - `worker-commit`: accept a worker-prepared commit or branch only when the
-  authorization mode permits commit or publication and the root has reviewed
-  the diff.
+  authorization modes include `commit` and the root has reviewed the diff.
 - `patch-apply`: apply a worker diff or patch in the root checkout, then inspect
   conflicts and rerun root gates.
 - `manual-root`: reimplement or copy the relevant change in the root checkout
@@ -213,7 +244,7 @@ For every path, inspect the tracked diff, preserve unrelated local changes,
 exclude generated ignored artifacts, rerun the required root gates, and record
 the integration method and proof in the ledger. Do not commit, push, merge,
 close, release, or mutate external services unless the current authorization
-mode and gate state permit it.
+modes and gate state permit it.
 
 ## Generated Artifacts
 
@@ -237,8 +268,8 @@ branches, patches, or context that the root needs before final status.
 
 Before archiving, removing, abandoning, or handing off a helper worktree, read
 the latest worker state, inspect tracked changes and ignored artifacts, and
-record whether useful output was integrated, retained for inspection,
-intentionally abandoned, or left handoff-pending. The root orchestrator decides
+record whether useful output was `integrated`, `retained-for-inspection`,
+`abandoned`, or left `handoff-pending`. The root orchestrator decides
 whether the helper surface is archived, removed, retained, abandoned, or handed
 off; workers only report facts and recommendations.
 
@@ -265,17 +296,38 @@ that cleanup is safe and available, or record why they remain.
 
 ## Authorization Modes
 
-- `inspect`: read-only investigation, triage, diagnosis, or plan.
+Record one or more authorization modes. Modes are capability flags, not a
+cumulative ladder. If a worker may edit, commit, push, and open a draft PR,
+record `implement, commit, push, pr`. If it may only open a PR from an
+already-pushed branch, record `pr` only.
+
+- `inspect`: read-only investigation, issue/PR/CI inspection, repo scan, or
+  design review. No file edits unless explicitly listed in allowed surfaces.
 - `implement`: local code/docs changes plus focused validation, but no staging,
   commit, push, PR, merge, release, or external mutation unless explicitly
-  listed in allowed surfaces. `push-pr` is the first mode that permits commits
-  or publication.
-- `push-pr`: commit, push, or draft PR creation when the user explicitly
-  authorized publication, or when the root records PRD-backed publication
-  authority from `prd-backed-delivery.md`. Workers may use this mode only for
-  the named branch, PR shape, and closeout target.
-- `ci-rerun-fix`: rerun checks or push targeted fixes for a known PR or branch
-  when the user authorized CI follow-up.
+  listed in allowed surfaces.
+- `commit`: may stage and create local commits for the assigned paths in the
+  exact repository and branch/worktree named by the root. It assumes edits are
+  separately allowed by `implement` or by explicit assignment text. It does not
+  permit push, PR creation/update, merge, release, or issue mutation. Commit
+  messages must not use GitHub closing keywords such as `closes`, `fixes`, or
+  `resolves` unless the source explicitly authorizes final-commit closure; use
+  non-closing references such as `Refs #123` when a reference is useful.
+- `push`: may push only the exact assigned branch or explicit refspec after the
+  required validation and publication-safety checks. It does not permit local
+  commits unless `commit` is also listed, and it does not permit PR
+  creation/update, PR-body closeout keywords, merge, release, or direct issue
+  mutation.
+- `pr`: may create or update the assigned draft PR for the exact branch and
+  closeout target after required validation and publication-safety checks. This
+  is the first mode that may place GitHub closing keywords such as `Closes #123`
+  in a PR body when the generated issue's closeout path calls for PR-body
+  closure. It does not permit local commits or push unless those modes are also
+  listed, and it does not authorize merge, release, or direct issue mutation.
+- `ci-rerun-fix`: rerun checks, inspect CI logs, and diagnose or verify a known
+  PR or branch when the root assignment names the failing checks. Any edits,
+  commits, or pushes for CI repair also require the corresponding `implement`,
+  `commit`, and `push` modes plus publication-safety gates.
 - `merge-close`: merge, close, label, comment, or otherwise mutate GitHub state
   only with explicit owner approval.
 - `release`: tag, release, publish, or package promotion only with explicit
@@ -297,22 +349,23 @@ Scope:
 - Source ref: <URL, path:line, heading, run id, or ledger item>
 - Acceptance criteria: <source-owned completion criteria>
 - Closeout target: <issue close, PR reply, file checkbox/patch, CI rerun, ledger status>
-- Authorization mode: <inspect|implement|push-pr|ci-rerun-fix|merge-close|release>
+- Authorization modes: <one or more of inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
-- Delivery mode: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
+- Delivery mode: <one-feature-branch|one-pr-per-repo|one-pr-per-issue|direct-commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
 - Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
-- Publication authority: <none|explicit owner authorization|PRD-backed branch plus draft PR|blocked, with reason>
-- Issue mutation authority: <none|PR body closeout only|explicit direct mutation authority>
-- Parallelization: <independent|depends on source/workstream|blocks source/workstream|root-integrated>
+- Publication authority: <none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|blocked, with reason>
+- Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
+- Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
-- Branch expectation: <shared feature branch|repo feature branch|issue branch|direct commit target|none>
-- Integration mode: <patch to root|handoff|worker commit|repo PR|issue PR|direct commit|inspect only>
+- Branch expectation: <shared-feature-branch|repo-feature-branch|issue-branch|direct-commit-target|none>
+- Issue integration shape: <shared-feature-branch|repo-pr|issue-pr|direct-commit|inspect-only>
+- Root integration method: <handoff|worker-commit|patch-apply|manual-root|pending>
 - Report channel: this worker thread only
 - Helper checkout/worktree: <path or unknown>
 - Heartbeat/next checkpoint: <interval/time or none>
 - Forbidden actions: no subdelegation, no ledger edits, no unrelated cleanup,
-  no worker/thread/chat management, no publish/merge/release unless this mode
-  explicitly permits it.
+  no worker/thread/chat management, no commit/push/PR/merge/release unless this
+  mode explicitly permits it.
 
 Context:
 - Owner request: <summary>
@@ -339,7 +392,7 @@ Final report:
 - Delivery: delivery mode, branch or PR used, closeout path, and PR links or
   `none`
 - Scheduling: current wave assignment, unlock state, and dependency source
-- Gate status: pass/fail/not-applicable with root-verifiable evidence
+- Gate status: pass|fail|blocked|not-applicable with root-verifiable evidence
 - Generated artifacts: ignored local files or directories created, or none
 - Risks: residual risks, dependency audit warnings, security findings,
   untested adapters, setup gaps, or test gaps
@@ -360,5 +413,5 @@ validation or proof delta, blocker, risk delta, and next check. If a worker
 misses its next checkpoint or produces the same status for two consecutive
 heartbeats without new proof, send one focused unblock request. After the next
 no-progress check, choose a root-owned action: continue with a reason, steer,
-replace, abandon, retain for inspection, classify as `Blocked` or `Needs
-Owner`, or ask the owner.
+replace, abandon, retain for inspection, classify as `blocked` or
+`needs-owner`, or ask the owner.
