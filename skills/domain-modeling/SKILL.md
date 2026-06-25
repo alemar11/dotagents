@@ -22,6 +22,9 @@ durable.
   record architectural or product decisions, or update project context docs.
 - Use when another skill is clarifying a codebase-backed plan and domain terms,
   business concepts, workflows, or durable decisions become clear.
+- Use for a periodic project context review when the caller provides recent
+  project conversations, session notes, or equivalent work history to mine for
+  durable terminology, rules, open questions, or accepted decisions.
 - Do not invent a domain model before there is evidence from the user, repo, or
   existing docs.
 - Do not update docs for transient preferences, tentative ideas, or decisions
@@ -74,7 +77,22 @@ Keep docs practical:
 - Avoid generic domain-driven-design exposition.
 - Do not rewrite broad docs just to add one clarified term.
 
-### 4. Report what changed
+### 4. Periodic context review
+
+When invoked by an automation, scheduled review, or other batch workflow:
+
+- Treat recent conversations, session logs, issue activity, and commit history
+  as candidate evidence, not as authority by themselves.
+- Re-read the current repo context files and relevant source or tracker evidence
+  before deciding that a candidate belongs in durable docs.
+- Default to a review report or proposed patch when acceptance is unclear.
+- Edit docs only when the durable term, rule, boundary, open question, or
+  accepted decision is explicit enough that an inline run of this skill would
+  have recorded it.
+- Do not create ADRs from batch review alone unless the decision is clearly
+  accepted and load-bearing.
+
+### 5. Report what changed
 
 When returning to the user or calling skill, summarize:
 
