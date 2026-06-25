@@ -29,6 +29,11 @@ as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
 `commit`, `push`, and `pr`, then rewrite touched values to the exact authorized
 subset.
 
+The canonical execution values are the worker-surface fields above. In the
+owner-facing checkpoint, `Execution mode` is only a display summary inferred
+from the selected surfaces and caps; do not treat it as a separate enum or
+source of truth.
+
 ## Delegation Rules
 
 - Create one worker per independent ownership boundary: repository, package,
@@ -55,37 +60,60 @@ subset.
 
 ## Approach Checkpoint
 
-Before dispatching any implementation wave, present an approach checkpoint and
-wait for owner approval. This is an execution brief, not a generic "can I
-start?" prompt. The root may do read-only discovery, planning, source
-registration, and wave shaping before approval, but it must not create workers,
-create visible App threads, start implementation edits, mutate source state,
-commit, push, or open PRs until the checkpoint is approved for that wave.
-Each implementation wave needs its own approved checkpoint unless the owner
-explicitly approves an autonomous multi-wave policy for the current session;
-record that policy in the ledger and keep later waves inside the approved
-surface, cap, authorization, and delivery boundaries.
+Before dispatching implementation, present an approach checkpoint and wait for
+owner approval. This is an execution brief, not a generic "can I start?"
+prompt. The root may do read-only discovery, planning, source registration, and
+wave shaping before approval, but it must not create workers, create visible
+App threads, start implementation edits, mutate source state, commit, push, or
+open PRs until the checkpoint is approved.
 
-Use this table shape:
+The checkpoint must state its approval scope. For PRD or feature
+implementation with a clear generated issue graph, prefer a bounded multi-wave
+approval scope that covers all listed source items and dependency-unlocked
+waves. Use current-wave-only approval when later workstreams are not yet
+specified enough, depend on unresolved owner decisions, or require different
+surface, cap, authorization, or delivery boundaries.
 
-| Decision | Planned value |
-| --- | --- |
-| Source items | <issue/PR/PRD/checklist refs> |
-| Workstreams starting now | <count and short names> |
-| Worker surface | <cli-subagent, codex-app-thread, none, or auto -> resolved surface> |
-| Max active workers | <cap by surface and session cap> |
-| Visible App threads | <yes/no; planned titles if yes> |
-| Root-owned work | <integration, shared files, broad tests, autoreview, publication, closeout> |
-| Authorization modes | <inspect, implement, commit, push, pr, ci-rerun-fix, merge-close, release> |
-| Delivery path | <branch, PR, closeout expectation> |
-| Gates before closeout | <tests, autoreview, CI, integration proof, owner decisions> |
-| Known blockers or risks | <none or list> |
+When a bounded multi-wave checkpoint is approved, continue from one wave to the
+next without pausing as dependencies are satisfied, as long as later waves stay
+inside the approved source items, worker surfaces, caps, authorization modes,
+delivery path, and stop conditions. Regenerate the checkpoint and wait for
+approval before doing work outside those boundaries.
+
+Start with a short `Approach Summary` paragraph in plain language. Summarize
+the approval scope, starting wave, root-owned coordination, worker usage, and
+stop conditions. Keep concrete selected values in the tables; keep raw internal
+field names out of the owner-facing checkpoint unless debugging.
+
+Then use this decision table shape:
+
+| Decision | Planned value | Meaning |
+| --- | --- | --- |
+| Source items | <issue/PR/PRD/checklist refs> | The durable work sources this approval covers. |
+| Approval scope | <current wave only OR bounded multi-wave plan through source refs> | Whether approval covers only the first wave or the whole bounded graph. |
+| Overall workstreams | <all workstreams covered by this checkpoint> | Complete work graph; each workstream is a unit of work, not necessarily a worker. |
+| Workstreams starting now | <count and short names> | The work units that can start immediately. |
+| Execution mode | <root thread only; no separate workers OR delegated workers OR mixed root + workers> | Current behavior inferred from surfaces and caps. Root-only means this thread implements and no worker is created. |
+| Worker surface | <no-delegation, cli-subagent, codex-app-thread, or auto -> resolved surface> | The concrete execution surface; `no-delegation` means this thread only. |
+| Max active workers | <cap by surface and session cap> | The maximum concurrent workers, not a target quota. |
+| CLI subagents | <yes/no; max active if yes> | Whether background CLI/subagent workers will be spawned. |
+| Visible App threads | <yes/no; planned titles if yes> | Whether new visible Codex App worker threads will appear. |
+| Root-owned work | <integration, shared files, broad tests, autoreview, publication, closeout> | Work the orchestrator root keeps instead of delegating. |
+| Authorization modes | <inspect, implement, commit, push, pr, ci-rerun-fix, merge-close, release> | The exact actions allowed by this approval. |
+| Delivery path | <branch, PR, closeout expectation> | Where implementation lands and how source items close. |
+| Gates before closeout | <tests, autoreview, CI, integration proof, owner decisions> | Required proof before the source can be marked complete. |
+| Next checkpoint or stop condition | <before next wave OR only if scope/surface/auth/delivery/gates change> | When the orchestrator must return to the owner. |
+| Known blockers or risks | <none or list> | Risks or dependency blockers known before dispatch. |
 
 Then include one row per workstream:
 
-| Workstream | Surface | Scope | Dependencies | Allowed actions | Output expected |
-| --- | --- | --- | --- | --- | --- |
-| <name/ref> | <cli-subagent, codex-app-thread, or root/no-delegation> | <repo/package/paths> | <none or refs> | <authorization modes and limits> | <patch/report/commit/PR> |
+| Wave | Workstream | Surface | Scope | Start rule | Allowed actions | Output expected |
+| --- | --- | --- | --- | --- | --- | --- |
+| <wave> | <name/ref> | <root thread (no-delegation), cli-subagent, or codex-app-thread> | <repo/package/paths> | <independent, depends-on proof, or root-integrated> | <authorization modes and limits> | <patch/report/commit/PR> |
+
+A workstream defines the implementation slice. It creates a worker only when
+its `Surface` is `cli-subagent` or `codex-app-thread`; `no-delegation` means
+the root orchestrator thread owns that slice directly.
 
 If `Worker surface` is `auto`, the checkpoint must show the resolved surface
 for the current wave. Explicit natural-language acceptance such as `approve`,
@@ -93,9 +121,14 @@ for the current wave. Explicit natural-language acceptance such as `approve`,
 changes the split, worker surface, cap, authorization, or delivery path, revise
 the checkpoint and ask again before dispatch.
 
+For root-only work, do not write `none; root-owned` in the owner-facing
+checkpoint. Write `Execution mode: root thread only; no separate workers`,
+`Worker surface: no-delegation`, `CLI subagents: no`, and
+`Visible App threads: no`.
+
 End every approach checkpoint with this exact text:
 
-> Reply approve to dispatch this wave, or send edits to the split, worker surface, cap, authorization, or delivery path. I will not start implementation workers or root-owned implementation until you approve.
+> Reply approve to dispatch the approved scope, or send edits to the split, worker surface, cap, authorization, delivery path, approval scope, or stop conditions. I will not start implementation workers or root-owned implementation until you approve.
 
 ## Delivery Mode Rules
 

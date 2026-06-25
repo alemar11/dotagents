@@ -139,18 +139,33 @@ these entrypoint rules in force:
   work in the root thread.
 - Before sending overlapping new scope to an existing worker, resync or replace
   the worker.
-- Before dispatching any implementation wave, present the `Approach Checkpoint`
-  from `references/worker.md` and wait for explicit owner approval. The root may
-  do read-only discovery, planning, source registration, and wave shaping before
+- Before dispatching implementation, present the `Approach Checkpoint` from
+  `references/worker.md` and wait for explicit owner approval. The root may do
+  read-only discovery, planning, source registration, and wave shaping before
   approval, but it must not create workers, create visible App threads, start
   implementation edits, mutate source state, commit, push, or open PRs until
-  that checkpoint is approved for the wave. Each implementation wave needs its
-  own approved checkpoint unless the owner explicitly approves an autonomous
-  multi-wave policy for the current session.
+  that checkpoint is approved. The checkpoint decision table must include a
+  short `Meaning` column that explains the current behavior inferred from each
+  planned value in owner-facing terms, and the checkpoint should start with a
+  brief `Approach Summary` paragraph before the tables.
+- For PRD or feature implementation with a clear generated issue graph, prefer
+  a bounded multi-wave approval scope that covers all listed source items and
+  dependency-unlocked waves. Use current-wave-only approval only when later
+  workstreams are not yet specified enough, depend on unresolved owner
+  decisions, or require different surface, cap, authorization, or delivery
+  boundaries.
+- After the owner approves a bounded multi-wave checkpoint, continue from one
+  wave to the next without pausing as dependencies are satisfied, as long as
+  later waves stay inside the approved source items, worker surfaces, caps,
+  authorization modes, delivery path, and stop conditions.
 - If the selected worker surface is `auto`, the checkpoint must show the
   resolved surface for the current wave. If the owner changes the split, worker
   surface, cap, authorization, or delivery path, regenerate the checkpoint and
   wait for approval before dispatch.
+- For root-only waves, use the owner-facing wording from
+  `references/worker.md`: `Execution mode: root thread only; no separate
+  workers` and `Worker surface: no-delegation`. Do not display
+  `none; root-owned` as the worker surface.
 - Treat explicit natural-language acceptance such as `approve`, `go ahead`,
   `ok proceed`, or `looks good` as approval for the displayed checkpoint.
 
@@ -212,14 +227,16 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    item needs source id, acceptance criteria, scheduling constraints,
    dependencies, selected gates, proof target, and closeout target.
 5. Resolve the worker and monitoring policy, then read `references/worker.md`
-   before delegation. Prepare the implementation wave, display the required
-   approach checkpoint, and wait for owner approval before creating workers,
-   creating visible App threads, or starting root-owned implementation. After
-   approval, create at most one worker per independent ownership boundary in the
-   current wave, name visible App threads immediately, and give each worker
-   explicit scope, per-workstream authorization modes, delivery/publication
-   authority, dependency state, gates, proof, branch/integration expectations,
-   and final report shape.
+   before delegation. Prepare the implementation plan and first wave, display
+   the required approach checkpoint with explicit approval scope, and wait for
+   owner approval before creating workers, creating visible App threads, or
+   starting root-owned implementation. After approval, create at most one worker
+   per independent ownership boundary in the current wave, name visible App
+   threads immediately, and give each worker explicit scope, per-workstream
+   authorization modes, delivery/publication authority, dependency state, gates,
+   proof, branch/integration expectations, and final report shape. If the
+   approval scope is bounded multi-wave, continue into newly unblocked waves
+   without another checkpoint while the approved boundaries still hold.
 6. Monitor using the recorded policy. Read a worker before steering, renaming,
    archiving, interrupting, replacing, closing, reusing, or integrating it.
    Record status, blockers, validation, risks, resync state, integration method,

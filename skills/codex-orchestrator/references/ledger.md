@@ -212,19 +212,19 @@ when those fields apply.
 
 ## Wave Checkpoints
 
-For each implementation wave, record the owner checkpoint approval before
-dispatch. Include the approval timestamp, approver wording, selected worker
-surface, resolved surface when `auto` is used, worker cap, and any owner edits
-to split, surface, cap, authorization, or delivery path. If an autonomous
-multi-wave policy is approved for the current session, record its boundaries
-and apply them only while later waves stay inside the approved surface, cap,
-authorization, and delivery path. If approval is pending, the wave may remain
-planned, but implementation workers and root-owned implementation must not
-start.
+Record the owner checkpoint approval before dispatch. Include the approval
+timestamp, approver wording, approval scope (`current-wave` or
+`bounded-multi-wave`), selected worker surface, resolved surface when `auto` is
+used, worker cap, stop conditions, and any owner edits to split, surface, cap,
+authorization, or delivery path. If a bounded multi-wave checkpoint is approved,
+record its boundaries and continue later waves only while they stay inside the
+approved source items, surface, cap, authorization, delivery path, and stop
+conditions. If approval is pending, planned work may remain in the ledger, but
+implementation workers and root-owned implementation must not start.
 
 | Wave | Started | Finished | Sources Scanned | Items Processed | Owner Checkpoint | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <approval time, wording, surface/cap, edits, autonomous policy, or pending> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| 1 | <time> | <time> | <source ids> | <count> | <approval time, wording, scope, surface/cap, stop conditions, edits, or pending> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
 ## Notes
 
