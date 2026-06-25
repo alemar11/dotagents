@@ -51,8 +51,8 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `plan-feature` | Plan a feature from grilling to PRD to configured agent-ready issues, with prd-only and existing PRD issue modes. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
-| `setup-project-memory` | Configure lean project memory, AGENTS pointers, and context seeds for repos, monorepos, and orchestrator workspaces. |
-| `codex-orchestrator` | Coordinate workers with root-owned lifecycle, standalone Git/GitHub companion skills, gates, ledgers, and closure follow-ups. |
+| `project-memory` | Configure lean project memory, AGENTS pointers, context seeds, and optional translation memory. |
+| `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with plan-feature gates, workers, ledgers, and closeout. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
@@ -76,9 +76,9 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work: `$github-triage`, `$github-issues`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`. It routes rough new feature intent and existing PRDs without generated implementation issues through `$plan-feature` before scheduling implementation work.
 - `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop and update project context docs or ADRs inline.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `plan-feature` requires `$setup-project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification, PRD writing, and configured agent-ready issue generation. It uses `$github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
-- `setup-project-memory` requires `$domain-modeling` when seeding or enriching `CONTEXT.md` or ADRs from repo, workspace, session evidence, or project context moved out of `AGENTS.md`.
-- `triage` requires `$setup-project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$github-issues` for GitHub issue mutations.
+- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification, PRD writing, and configured agent-ready issue generation. It uses `$github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
+- `project-memory` requires `$domain-modeling` when seeding or enriching `CONTEXT.md` or ADRs from repo, workspace, session evidence, or project context moved out of `AGENTS.md`.
+- `triage` requires `$project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$github-issues` for GitHub issue mutations.
 - `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-issues`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
 
 ## Project-Local Skills
@@ -112,7 +112,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-issues skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/setup-project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-issues skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -161,7 +161,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill plan-feature \
   --skill grill-me \
   --skill learn \
-  --skill setup-project-memory \
+  --skill project-memory \
   --skill codex-orchestrator \
   --skill postgres \
   --skill skill-audit \

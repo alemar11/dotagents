@@ -48,7 +48,7 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   below; `delivery_mode` comes from the PRD, and `issue_type` / `triage_state`
   come from project memory mappings.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
-  behavior in draft command runs, use `$setup-project-memory`
+  behavior in draft command runs, use `$project-memory`
   `references/tracker-publishing.md`.
 
 ## Boundaries
@@ -102,6 +102,7 @@ Also inspect:
 - `project-memory/agents/issue-tracker.md`,
 - `project-memory/agents/triage-labels.md`,
 - `CONTEXT.md` or `CONTEXT-MAP.md`,
+- `TRANSLATION.md`, when present for the selected context,
 - `project-memory/adr/`,
 - orchestrator workspace docs such as `projects/<project>/PROJECT.md`,
   `projects/<project>/repos/*.md`, and feature `integration-gates.md` when the
@@ -235,7 +236,7 @@ do not assume the canonical string is the label; read the mapping first.
 ### 5. Publish Or Return Issues
 
 Use `project-memory/agents/issue-tracker.md` for the target, and read
-`$setup-project-memory` `references/tracker-publishing.md` for shared
+`$project-memory` `references/tracker-publishing.md` for shared
 effective-target, temporary body-file, and `source_prd_ref` rules:
 
 - `Tracker mode: github`: create issues through `$github-issues`, attach them
@@ -413,5 +414,5 @@ include it only for explicitly authorized partial `needs-info` output.
 - `references/vertical-slices.md`: issue splitting rules.
 - `references/issue-body-template.md`: generated implementation issue body
   template.
-- `$setup-project-memory` `references/tracker-publishing.md`: shared tracker
+- `$project-memory` `references/tracker-publishing.md`: shared tracker
   publication and `source_prd_ref` contract.

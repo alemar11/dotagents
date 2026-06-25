@@ -12,7 +12,9 @@ publish commands.
 
 Type: [mapped issue type, e.g. GitHub `Task` or local `task`]
 Status: [mapped triage state, usually `ready-for-agent`]
-Source PRD: [path, issue number, or stable draft ref]
+Source PRD: [path, issue number, or stable draft ref; use `draft-prd:<...>`
+only for draft command output before hosted mutation, never for agent-ready
+implementation issues]
 
 Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
 
@@ -82,10 +84,15 @@ sections.]
 
 When all acceptance criteria pass and validation is complete:
 
-- GitHub: close this implementation issue from the relevant PR body with
-  `Closes #<this-issue-number>`, following `## Delivery`. Final-commit closure
-  requires `direct-commit` or another explicit authorization. Do not close the
-  parent PRD unless the maintainer says the whole PRD is complete.
+- GitHub: close this implementation issue from the relevant PR body, following
+  `## Delivery`. Use `Closes #<this-issue-number>` only when the PR lives in the
+  same GitHub repository as the issue. For orchestrator or cross-repo closeout
+  where the PR repository differs from the issue repository, use
+  `Closes owner/repo#<this-issue-number>` only when that cross-repo closing path
+  is intended and supported; otherwise use non-closing links and record the
+  coordination closeout action separately. Final-commit closure requires
+  `direct-commit` or another explicit authorization. Do not close the parent PRD
+  unless the maintainer says the whole PRD is complete.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
   `issues/done/` on demand. For orchestrator workspace issues, move it only
   after cross-repo integration proof is recorded. Do not delete the file or add

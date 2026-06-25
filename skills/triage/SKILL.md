@@ -49,7 +49,7 @@ the actual tracker issue types, labels, or markdown status values.
 - Load `project-memory/agents/issue-tracker.md` and
   `project-memory/agents/triage-labels.md` before mutating anything.
 - If required project-memory files are missing, load and run
-  `$setup-project-memory` before triaging unless the user explicitly asks for a
+  `$project-memory` before triaging unless the user explicitly asks for a
   one-off best-effort pass.
 - Every triaged issue must have exactly one type/category and one workflow
   state.

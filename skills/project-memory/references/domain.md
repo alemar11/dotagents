@@ -8,6 +8,8 @@ codebase, planning work, or preparing implementation issues.
 - `CONTEXT.md` at the repo root, or
 - `CONTEXT-MAP.md` at the repo root if it exists; it points at the relevant
   context-specific `CONTEXT.md` files
+- `TRANSLATION.md` beside the relevant `CONTEXT.md`, when the project supports
+  localization
 - `project-memory/adr/` for root-level durable decisions
 - In multi-context repos, also check context-specific `project-memory/adr/`
   directories near the relevant `CONTEXT.md`
@@ -21,7 +23,8 @@ load-bearing decisions being recorded.
 
 `AGENTS.md` should point to these files and carry agent operating rules. It
 should not duplicate domain vocabulary, tracker procedures, planning history,
-or context seed material after those items have a project-memory home.
+localization rules, or context seed material after those items have a
+project-memory home.
 
 ## File structure
 
@@ -30,6 +33,7 @@ Single-context repo:
 ```text
 /
 ├── CONTEXT.md
+├── TRANSLATION.md             # optional localization rules
 ├── project-memory/
 │   └── adr/
 │       ├── 0001-some-decision.md
@@ -47,10 +51,12 @@ Multi-context repo:
 └── apps/
     ├── admin/
     │   ├── CONTEXT.md
+    │   ├── TRANSLATION.md     # optional admin localization rules
     │   └── project-memory/
     │       └── adr/          # admin-specific decisions
     └── mobile/
         ├── CONTEXT.md
+        ├── TRANSLATION.md     # optional mobile localization rules
         └── project-memory/
             └── adr/          # mobile-specific decisions
 ```
@@ -80,7 +86,25 @@ Orchestrator workspace:
 In orchestrator workspace mode, root `CONTEXT.md` should define coordination
 terms such as project, feature, vertical issue, repo pointer, integration gate,
 and done. Child repos keep their own `AGENTS.md`, `CONTEXT.md`,
-`project-memory/`, validation, branches, commits, and PRs.
+optional `TRANSLATION.md`, `project-memory/`, validation, branches, commits,
+and PRs.
+
+## Translation memory
+
+Create `TRANSLATION.md` only when localization support is clear from repo
+evidence or explicit user confirmation. Place it beside the relevant
+`CONTEXT.md`: root-level for single-context repos, or context-specific in
+multi-context repos.
+
+Use `references/translation.md` for the file shape. Keep localization guidance
+there instead of copying it into `AGENTS.md` or `CONTEXT.md`. `CONTEXT.md`
+owns product vocabulary and boundaries; `TRANSLATION.md` owns how user-facing
+language is translated for supported audiences and locales.
+
+When translation rules affect domain terms, audience, product naming, or
+user-facing copy, the neighboring `CONTEXT.md` may include a one-line pointer
+to `TRANSLATION.md`. This pointer is optional; do not add it when it would be
+stale, noisy, or broken.
 
 ## Use the glossary vocabulary
 

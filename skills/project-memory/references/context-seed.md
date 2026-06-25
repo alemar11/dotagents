@@ -1,6 +1,6 @@
 # Initial CONTEXT.md Seed
 
-Use this reference when `setup-project-memory` bootstraps a non-empty repo and
+Use this reference when `project-memory` bootstraps a non-empty repo and
 repo evidence can support a useful first `CONTEXT.md`.
 
 ## Evidence threshold
@@ -40,6 +40,11 @@ and useful. Include only sections that have evidence:
 ## Open Questions
 ```
 
+When a neighboring `TRANSLATION.md` exists and localization affects domain
+terms, audience, product naming, or user-facing copy, `CONTEXT.md` may include
+a one-line pointer such as `Localization: see TRANSLATION.md`. Do not require
+this pointer and do not create broken links.
+
 Use concise bullets. Link or name source files when that helps future agents
 verify the statement, for example `README.md`, `VISION.md`, `docs/...`,
 `agents/README.md`, `be/docs/openapi.yaml`, or a specific source/test path.
@@ -58,6 +63,7 @@ verify the statement, for example `README.md`, `VISION.md`, `docs/...`,
 - Full architecture inventories or file trees.
 - Repeating command lists already owned by AGENTS.md or README files.
 - Copying agent operating instructions that should remain in `AGENTS.md`.
+- Recording translation or localization rules that belong in `TRANSLATION.md`.
 - Long research notes that belong in project docs.
 - ADR-level decisions unless the user explicitly asks to record accepted
   decisions and the evidence is load-bearing.

@@ -3,159 +3,70 @@
 Use this reference before creating, naming, messaging, steering, or closing
 Codex worker threads or subagents.
 
-## Worker Surfaces
+## Worker Policy
 
-Resolve the ledger worker policy before delegation:
+Resolve the ledger worker policy before delegation.
 
-- `auto`: choose per workstream from available and owner-authorized delegated
-  surfaces. In Codex CLI this resolves to `cli-subagent`; in Codex App it may
-  choose `codex-app-thread` or `cli-subagent`.
-- `codex-app-thread`: use visible Codex App worker threads only.
-- `cli-subagent`: use CLI/subagent workers only.
-- `none`: do not delegate; keep work in the root thread.
-
-Choose and record the actual workstream surface before delegation:
-
-- `codex-app-thread`: a visible Codex App thread created with
-  `codex_app.create_thread`. Use this in Codex App only when the owner
-  explicitly asks for visible, new, separate, or background worker threads, or
-  otherwise explicitly indicates they expect visible, inspectable,
-  handoff-ready background work.
-- `cli-subagent`: a CLI/subagent worker created with `multi_agent_v1.spawn_agent`
-  or the CLI `/agent` equivalent. Use this by default in CLI-oriented runs
-  where spawned workers are inspectable through `/agent`.
-- `no-delegation`: use the root thread only when delegation is not authorized,
-  no inspectable worker surface is available, or the task is too small or
-  tightly coupled for a worker.
-
-`Max active delegated workers` is a cap, not a quota. Create fewer workers when
-the ownership boundaries, file overlap, or gate requirements make delegation
-unhelpful.
-
-Do not present hidden subagents as visible App threads. If the chosen surface
-will not be visible in the Codex App sidebar, say that in the ledger and final
-report.
-
-## Structured Worker Values
-
-Use these worker-owned structured values in ledgers, prompts, and final
-reports:
-
-- `delegated_worker_surface`: `auto`, `codex-app-thread`, `cli-subagent`, or
-  `none`; this is the owner-authorized delegation policy.
-- `actual_workstream_surface`: `codex-app-thread`, `cli-subagent`, or
-  `no-delegation`; this records where the workstream actually runs.
-- `worker_authorization`: one or more of `inspect`, `implement`, `commit`,
-  `push`, `pr`, `ci-rerun-fix`, `merge-close`, or `release`.
-- `worker_status`: `done`, `blocked`, `needs-owner`, or `ready-for-review`;
-  this is a worker report, not a root closeout decision.
-- `worker_lifecycle`: `integrated`, `retained-for-inspection`, `abandoned`, or
-  `handoff-pending`; this is the root's decision about worker output.
-- `branch_expectation`: `shared-feature-branch`, `repo-feature-branch`,
-  `issue-branch`, `direct-commit-target`, or `none`; this names the expected
-  landing target.
-- `integration_method`: `handoff`, `worker-commit`, `patch-apply`, or
-  `manual-root`; this records how root integrated worker output.
-- `source_disposition`: `completed`, `partial`, `blocked`, `needs-owner`,
-  `deferred`, or `unchanged`; this records the source item's outcome from the
-  worker's perspective.
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `delegated_worker_surface` | `auto`, `codex-app-thread`, `cli-subagent`, `none` | Owner-authorized delegation policy. `auto` chooses among authorized surfaces; in CLI this resolves to `cli-subagent`, while in App it may use visible App threads or subagents. |
+| `actual_workstream_surface` | `codex-app-thread`, `cli-subagent`, `no-delegation` | Where the workstream actually runs. Do not present hidden subagents as visible App threads. |
+| `max_active_delegated_workers`, `max_active_cli_subagents`, `max_active_codex_app_threads`, `session_wide_delegated_worker_cap` | numbers or `none` | Caps, not quotas. Preserve separate surface caps instead of collapsing them. Title-case ledger labels are display aliases. |
+| `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. |
+| `worker_status` | `done`, `blocked`, `needs-owner`, `ready-for-review` | Worker report only, not a root closeout decision. |
+| `worker_lifecycle` | `integrated`, `retained-for-inspection`, `abandoned`, `handoff-pending` | Root decision about worker output. |
+| `branch_expectation` | `shared-feature-branch`, `repo-feature-branch`, `issue-branch`, `direct-commit-target`, `none` | Expected landing target. |
+| `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, dispatch-time `pending` | Root integration path. Replace `pending` before lifecycle closeout or record that no output was integrated. |
+| `source_disposition` | `completed`, `partial`, `blocked`, `needs-owner`, `deferred`, `unchanged` | Source outcome from the worker's perspective. |
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-as legacy aliases when reading existing artifacts. Treat older `push-pr`
-authorization as a legacy alias for `commit`, `push`, and `pr` when reading
-existing artifacts, then rewrite touched structured values to the exact subset
-actually authorized.
+as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
+`commit`, `push`, and `pr`, then rewrite touched values to the exact authorized
+subset.
 
-## When Not To Delegate
-
-Stay in the root orchestrator thread when:
-
-- the task is small enough that orchestration overhead would dominate;
-- the work overlaps heavily with root-owned integration or another worker's
-  active files;
-- the work touches shared contracts, dependency or package manifests, root
-  config, migrations, generated snapshots, broad test orchestration, conflict
-  resolution, or other cross-cutting integration;
-- no inspectable worker surface is available;
-- the owner did not authorize delegation for the requested scope; or
-- the remaining work is mostly gate evaluation, ledger updates, closeout, or
-  publication decisions.
-
-## Worker Rules
+## Delegation Rules
 
 - Create one worker per independent ownership boundary: repository, package,
-  service, path set, or tightly scoped workstream.
-- Treat repository boundaries as the default isolation heuristic, not a quota
-  and not a strict cap. In multi-repo projects, use one active worker per
-  affected repo per wave by default; add more only when a repo itself contains
-  independent workstreams with clean file, contract, test, and validation
-  boundaries.
-- In a single repo or monorepo, multiple workers are allowed only when their
-  files, contracts, tests, validation paths, and expected outputs are cleanly
-  separated. Keep shared contracts, dependency changes, root config, migrations,
-  generated snapshots, broad test runs, conflict resolution, and final
-  integration in the root thread.
-- Give each worker a single clear objective, repository path or URL, branch
-  expectations, and exit condition.
-- Do not assign implementation work for `Parallelization: depends-on <issue>`
-  until the root orchestrator has verified the named dependency is complete.
-- Keep `Parallelization: root-integrated` implementation in the root thread.
-  Workers may provide read-only inspection or isolated proof only when the root
-  keeps integration ownership.
+  service, path set, or tightly scoped workstream. Repository boundaries are the
+  default isolation heuristic, not a quota or strict cap.
+- In multi-repo projects, use one active worker per affected repo per wave by
+  default. Add more only when a repo has independent workstreams with clean
+  file, contract, test, and validation boundaries.
+- In single repos and monorepos, keep shared contracts, dependencies, root
+  config, migrations, generated snapshots, broad tests, conflict resolution,
+  and final integration in the root thread.
+- Stay in root when orchestration overhead dominates, work overlaps heavily, no
+  inspectable surface exists, delegation is unauthorized, or remaining work is
+  mostly gates, ledger updates, closeout, or publication decisions.
+- Do not assign implementation for `Parallelization: depends-on <issue>` until
+  root verifies dependency completion. Keep `root-integrated` implementation in
+  root; workers may inspect or prove only when root keeps integration ownership.
 - Workers may inspect, implement, test, and report only within their authorized
-  mode.
-- Workers must not spawn sub-workers, create new Codex threads, manage other
-  chats, or delegate their assignment.
-- Workers must not edit orchestrator ledgers. They report status back to the
-  orchestrator, which updates the ledger.
+  mode. They must not spawn sub-workers, create threads, manage chats, edit
+  ledgers, or delegate their assignment.
 - Workers must preserve unrelated local changes and stage only authorized
-  paths.
-- Only the root orchestrator creates, reuses, forks, assigns, renames,
-  messages, archives, closes, interrupts, or replaces worker threads.
+  paths. Only the root creates, reuses, forks, assigns, renames, messages,
+  archives, closes, interrupts, or replaces worker threads.
 
 ## Delivery Mode Rules
 
-Record one of these canonical values for every implementation workstream.
-When the assignment comes from a generated issue with a `Source PRD`, the root
-orchestrator should pass the generated issue's copied feature-level `Delivery
-mode` label plus issue-local dependencies, blocks, closeout, and parallelization.
-The issue does not need to restate the full branch and PR strategy, but the
-prompt and ledger must preserve whether the label is feature-level metadata
-inherited from `Source PRD` or an issue-level override:
+The root passes the effective delivery mode plus whether it is inherited from
+`Source PRD` or an issue-level override. `prd-backed-delivery.md` owns the full
+delivery/publication/issue-mutation authority model; workers only enforce the
+assignment they receive.
 
-- `one-feature-branch`: the root owns one shared feature branch and usually
-  one draft PR for the feature. Workers operate in isolated helper worktrees or
-  produce patches, handoff-ready diffs, or reviewed commits for root
-  integration. Workers must not publish independent branches or PRs unless the
-  root explicitly changes their authorization modes and branch expectation.
-- `one-pr-per-repo`: each affected repo has its own feature branch and draft
-  PR. A worker assigned to one repo may prepare that repo branch or PR only
-  when authorization modes permit publication. The root records all repo PR
-  links and verifies cross-repo integration before closeout.
-- `one-pr-per-issue`: use only when the issue is explicitly isolated from
-  shared contracts, migrations, lockfiles, generated files, broad validation,
-  and other active issue work.
-- `direct-commit`: use only with explicit owner authorization recorded in the
-  prompt and ledger.
+| Mode | Worker handling |
+| --- | --- |
+| `one-feature-branch` | Root owns the shared branch/PR. Worker provides patch, helper-worktree diff, handoff, or reviewed commit unless root explicitly grants publication modes. |
+| `one-pr-per-repo` | Repo-scoped worker may prepare that repo branch/PR only when `commit`, `push`, and/or `pr` modes are explicitly listed. |
+| `one-pr-per-issue` | Use only for explicitly isolated issue work. |
+| `direct-commit` | Use only with explicit owner authorization recorded in the prompt and ledger. |
 
-If the worker sees a mismatch between the assigned delivery mode and repo reality,
-such as multi-repo work labeled `one-feature-branch`, it must stop and report
-`needs-owner` instead of choosing a new branch or PR strategy.
-
-Treat `Delivery mode: one-feature-branch (feature-level, inherited from Source
-PRD)` as the feature's overall landing strategy. It does not mean this
-individual issue alone owns the branch or PR shape. Treat
-`Delivery mode: one-pr-per-issue (issue-level override, authorized by
-<owner/date>)` as a scoped exception for that issue only.
-
-For PRD-backed workflows, the root resolves delivery authority, publication
-authority, and issue mutation authority with `prd-backed-delivery.md` before
-delegation. Workers do not infer publication rights from `Source PRD` text on
-their own. They may commit, push, or open a draft PR only when the assignment
-lists the corresponding `commit`, `push`, or `pr` authorization mode and names
-the exact repository, branch, refspec, PR shape, and closeout target required by
-that mode. Do not use `pr` as a shortcut for commit or push; list every allowed
-mode explicitly.
+If assigned delivery mode conflicts with repo reality, stop and report
+`needs-owner`; do not choose a new branch or PR strategy. Workers may commit,
+push, or open a draft PR only when the prompt names the exact repository,
+branch/refspec, PR shape, closeout target, and corresponding authorization
+modes. `pr` is not a shortcut for commit or push.
 
 ## Worker Status Vs Root Lifecycle
 

@@ -71,7 +71,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("must not dispatch implementation workers", fixture)
 
     def test_shared_contract_documents_draft_publish_handoff(self) -> None:
-        contract = read("setup-project-memory/references/tracker-publishing.md")
+        contract = read("project-memory/references/tracker-publishing.md")
 
         self.assertIn("source_prd_ref", contract)
         self.assertIn("draft-prd:<feature-slug>", contract)
@@ -101,7 +101,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("# PRD: [Feature Name]", prd_template)
         self.assertIn("## Delivery Mode", prd_template)
         self.assertIn("# <feature-slug>: <NN> <vertical outcome>", issue_template)
-        self.assertIn("Source PRD: [path, issue number, or stable draft ref]", issue_template)
+        self.assertIn("Source PRD: [path, issue number, or stable draft ref;", issue_template)
+        self.assertIn("never for agent-ready", issue_template)
         self.assertIn("portable references", issue_template)
         self.assertIn("## Dependency Rules", vertical_slices)
         self.assertIn("circular dependencies", vertical_slices)

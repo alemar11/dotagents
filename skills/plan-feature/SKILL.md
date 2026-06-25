@@ -10,7 +10,7 @@ description: Plan a feature through full-flow, prd-only, or issues-from-existing
 Run feature planning from one public invocation. This skill owns the planning
 pipeline and its internal PRD and issue phases:
 
-`$setup-project-memory` if needed -> `$grill-me-with-context` when scope needs
+`$project-memory` if needed -> `$grill-me-with-context` when scope needs
 clarification -> PRD phase -> issue phase with `$plan-harder` per generated
 issue.
 
@@ -59,7 +59,7 @@ validation, publication target, permissions, or cross-repo contracts.
   `direct-commit`.
 - Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
   the issue phase. In `draft-publish-commands` runs, use the stable draft ref
-  from `$setup-project-memory` `references/tracker-publishing.md` until a
+  from `$project-memory` `references/tracker-publishing.md` until a
   hosted PRD issue number or local PRD path exists, and carry the PRD title,
   feature slug, project slug when applicable, and PRD body fingerprint with the
   draft handoff.
@@ -70,7 +70,7 @@ validation, publication target, permissions, or cross-repo contracts.
 
 This skill may call:
 
-- `$setup-project-memory` when project memory or tracker setup is missing or
+- `$project-memory` when project memory or tracker setup is missing or
   needs review.
 - `$grill-me-with-context` when feature scope, terms, decisions, or gates need
   repo-backed clarification.
@@ -92,7 +92,7 @@ Inspect the repo for:
 - `project-memory/agents/domain.md`.
 
 If any of these files are missing, incomplete, stale, or inconsistent with the
-current planning target, load and run `$setup-project-memory` first. Use the
+current planning target, load and run `$project-memory` first. Use the
 user's planning goal as context, but keep setup focused on routing and memory.
 In orchestrator workspace mode, setup is config-only and must not create project
 or feature folders.
@@ -105,7 +105,7 @@ Before writing or publishing, resolve the effective target for the current run:
   this run,
 - any local dry-run target or current-run override.
 
-For tracker publishing mechanics, use `$setup-project-memory`
+For tracker publishing mechanics, use `$project-memory`
 `references/tracker-publishing.md`; this includes `source_prd_ref` handling for
 `draft-publish-commands`.
 
@@ -210,8 +210,13 @@ Stop here in `prd-only` mode and return the PRD phase report.
 
 ### 4. Run The Issue Phase
 
-After the PRD is written, published, or supplied as an existing durable PRD,
-load `references/issue-phase.md`.
+After the PRD is written, published, supplied as an existing durable PRD, or
+returned as a `draft-publish-commands` dry-run with a deterministic
+`source_prd_ref`, load `references/issue-phase.md`. In
+`draft-publish-commands` mode, the issue phase may only generate draft issue
+commands or bodies for inspection. It must not mutate external trackers or mark
+the generated issues agent-ready until the draft `Source PRD` ref is replaced
+with the hosted PRD number or durable local PRD path.
 
 Pass explicit run authorization:
 

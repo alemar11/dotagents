@@ -28,7 +28,7 @@ question set or route back through `$grill-me-with-context`.
   from project memory, and use the `delivery_mode` values documented in
   `references/prd-template.md`.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
-  behavior in draft command runs, use `$setup-project-memory`
+  behavior in draft command runs, use `$project-memory`
   `references/tracker-publishing.md`.
 
 ## Workflow
@@ -41,6 +41,7 @@ Inspect the current project context before drafting:
 - `project-memory/agents/triage-labels.md`
 - `project-memory/agents/domain.md`
 - `CONTEXT.md` or `CONTEXT-MAP.md`
+- `TRANSLATION.md`, when present for the selected context
 - `project-memory/adr/`
 - orchestrator workspace docs such as `projects/<project>/PROJECT.md` and
   `projects/<project>/repos/*.md`, when the tracker config uses orchestrator
@@ -141,7 +142,7 @@ or the generated implementation issues, not in the PRD content itself.
 ### 4. Choose Publication Target
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live.
-Also read `$setup-project-memory` `references/tracker-publishing.md` for the
+Also read `$project-memory` `references/tracker-publishing.md` for the
 shared effective-target and `source_prd_ref` contract.
 
 - `Tracker mode: github`: publish only after confirmation through
@@ -240,7 +241,7 @@ must be published first so generated issues can replace the draft ref with the
 hosted PRD number before mutation.
 
 If no issue-tracker setup exists, return the PRD in chat and recommend running
-`$setup-project-memory` before publishing.
+`$project-memory` before publishing.
 
 ### 5. Report Completion
 
@@ -278,5 +279,5 @@ Return:
 ## References
 
 - `references/prd-template.md`: default PRD shape.
-- `$setup-project-memory` `references/tracker-publishing.md`: shared tracker
+- `$project-memory` `references/tracker-publishing.md`: shared tracker
   publication and `source_prd_ref` contract.

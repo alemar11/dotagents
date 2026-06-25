@@ -20,9 +20,10 @@ the conservative authorization rules in `worker.md`.
 
 If `Source PRD` is a draft ref such as `draft-prd:<...>`, treat it as a dry-run
 planning reference, not durable implementation authority. The root may inspect
-the graph, but real worker dispatch, commit, push, PR creation, or issue
-closeout requires a hosted PRD number, a local PRD path, or an explicit owner
-decision to use the full PRD body as temporary source material.
+the graph, but real worker dispatch, commit, push, PR creation, issue closeout,
+or tracker mutation requires a hosted PRD number, a local PRD path, or an
+explicit owner decision recorded with separate publication and issue-mutation
+authority.
 
 ## Authority Model
 
@@ -89,7 +90,8 @@ Before scheduling or publishing PRD-backed work:
 
 1. Read the generated issue body and the linked `Source PRD`. If the ref is
    `draft-prd:<...>`, stop before implementation scheduling unless the owner
-   explicitly authorizes temporary-source execution.
+   explicitly authorizes temporary-source execution and separately records the
+   publication and issue-mutation authority that execution may use.
 2. Resolve the effective delivery mode from the PRD first, then apply only
    issue-level overrides that are explicit and authorized.
 3. Record delivery authority, publication authority, issue mutation authority,
