@@ -20,6 +20,10 @@ dry run, or any workflow where external GitHub mutation is not authorized, do
 not mutate GitHub. Use local markdown only when a local dry-run target is
 configured or explicitly chosen for that run, or ask `$github-issues` to return
 draft issue bodies and exact `gh` commands without executing them.
+When returning draft commands before the PRD issue exists, use
+`source_prd_ref=draft-prd:<feature-slug>` and publish the PRD first; generated
+issue bodies must replace that draft ref with `Source PRD: #<prd-number>` before
+hosted mutation.
 Record the non-mutating choice as a current-run override in
 `project-memory/agents/issue-tracker.md`; do not treat it as a durable tracker
 preference change unless the user explicitly says so.
@@ -37,24 +41,41 @@ default GitHub issue types are:
 - `Feature` for `feature`
 - `Task` for `task`
 
+The default GitHub workflow-state labels are lowercase tracker values:
+
+- `needs-triage` for `needs-triage`
+- `needs-info` for `needs-info`
+- `ready-for-agent` for `ready-for-agent`
+- `ready-for-human` for `ready-for-human`
+- `wontfix` for `wontfix`
+
 If GitHub issue types are disabled or customized for the organization, record
 the actual available values or fallback label convention in
 `project-memory/agents/triage-labels.md`.
 
 ## Delivery Mode Defaults
 
-- Default delivery mode: **One Feature Branch** for a single project or monorepo in
+- Default `delivery_mode`: `one-feature-branch` for a single project or monorepo in
   this git repo.
 - Branch naming: default to `feature/<feature-slug>`.
 - PR shape: one draft PR for the feature. Generated implementation issues are
   scheduling units and normally close from that feature PR body.
-- Exceptions: **One PR Per Issue** only for isolated work; **Direct Commit**
+- Exceptions: `one-pr-per-issue` only for isolated work; `direct-commit`
   only with explicit maintainer authorization.
+
+## Worker Authorization Defaults
+
+- Default `default_worker_authorization`: `inspect, implement`.
+- This is a policy default, not final permission. `$codex-orchestrator` must
+  still apply current owner/session authorization, publication authority,
+  dirty-worktree state, inspectability, and gates before assigning worker
+  authorization modes.
+- Do not let tracker defaults grant commit, push, PR creation, merge, direct
+  issue mutation, or release authority by themselves.
 
 ## Title Format
 
 - PRD issue: `PRD: <Feature Name>`
-- Execution plan issue: `Execution plan: <feature-slug>`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
 
 Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
@@ -71,14 +92,9 @@ For feature planning:
 
 - The PRD is a GitHub issue titled `PRD: <Feature Name>` with type `Feature`
   unless the repo maps `feature` to a different value.
-- The execution plan is a GitHub issue titled
-  `Execution plan: <feature-slug>` by default. It is a planning/control issue,
-  not implementation work: do not label it `ready-for-agent`. Attach it to the
-  PRD parent when parent/sub-issues are supported. It must include `Source PRD:
-  #<number>`, the delivery mode, dependency graph, waves/unlock conditions, and
-  links to every generated implementation issue after those issues exist. Use a
-  PRD comment/body section only as a fallback when the execution-plan issue
-  cannot be created or edited.
+- Generated implementation issues are the execution graph. Do not create a
+  separate execution-plan issue unless the user explicitly requests a
+  non-authoritative summary.
 - Implementation issues are GitHub sub-issues of the PRD issue with type
   `Task` unless the repo maps `task` to a different value.
 - Implementation issue titles use
@@ -87,14 +103,9 @@ For feature planning:
   searchability and backlinks.
 - Each implementation issue body must include `## Delivery` with issue-level
   `Parallelization` and `Closeout`.
-- Each implementation issue body should include an `Execution plan` pointer to
-  the dedicated execution-plan issue, usually `Execution plan: #<number>`. Use
-  `execution-plan.md` only when the effective target is a local artifact target
-  or an explicitly requested local mirror. Use a PRD comment/body section only
-  as a fallback when the execution-plan issue cannot be created or edited.
 - Each implementation issue body must copy the effective PRD `Delivery mode`
   and label it as feature-level metadata inherited from `Source PRD`, for
-  example `Delivery mode: One Feature Branch (feature-level, inherited from
+  example `Delivery mode: one-feature-branch (feature-level, inherited from
   Source PRD)`. Feature-level means the mode applies to the whole Source PRD
   feature.
 - Add issue-level `Delivery mode` or `Integration mode` exception lines only
@@ -115,9 +126,10 @@ For triage:
 
 When all acceptance criteria pass and validation is complete, close that
 implementation issue from the relevant PR body with a GitHub closing keyword
-such as `Closes #<issue-number>`. For the default **One Feature Branch**
-delivery mode, the feature PR closes generated implementation issues. Final-commit
-closure is allowed only when the issue records **Direct Commit** or another
+such as `Closes #<issue-number>`. For the default `one-feature-branch`
+delivery mode, the feature PR closes generated
+implementation issues. Final-commit closure is allowed only when the issue
+records `direct-commit` or another
 explicit maintainer authorization. The issue closes when that PR or authorized
 commit reaches the default branch.
 

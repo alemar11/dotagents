@@ -61,7 +61,7 @@ actually planned or written.
 
 ## Delivery Mode Defaults
 
-- Default delivery mode: **One PR Per Repo** for true multi-repo orchestrator work.
+- Default `delivery_mode`: `one-pr-per-repo` for true multi-repo orchestrator work.
 - Branch naming: default to `feature/<feature-slug>` in each affected repo
   unless that repo has a stricter branch policy.
 - PR shape: one draft PR per affected repo, linked from the local PRD or
@@ -70,9 +70,19 @@ actually planned or written.
   orchestrator issues move to `issues/done/`. Repo PR links may be placeholders
   before implementation, but completion requires real PR links or equivalent
   proof.
-- Exceptions: **One Feature Branch** only when all affected work is actually in
-  one git repo; **One PR Per Issue** only for isolated work; **Direct Commit**
-  only with explicit maintainer authorization.
+- Exceptions: `one-feature-branch` only when all affected work is actually in
+  one git repo; `one-pr-per-issue` only for isolated work; `direct-commit` only
+  with explicit maintainer authorization.
+
+## Worker Authorization Defaults
+
+- Default `default_worker_authorization`: `inspect, implement`.
+- This is a policy default, not final permission. `$codex-orchestrator` must
+  still apply current owner/session authorization, publication authority,
+  dirty-worktree state, inspectability, and gates before assigning worker
+  authorization modes.
+- Do not let tracker defaults grant commit, push, PR creation, merge, direct
+  issue mutation, or release authority by themselves.
 
 ## Orchestrator Issue Content
 
@@ -80,12 +90,9 @@ Generated feature issues should include:
 
 - `Type:` and `Status:` lines from `project-memory/agents/triage-labels.md`
 - `Source PRD:` pointing to the feature PRD
-- Each implementation issue body should include an `Execution plan` pointer to
-  `projects/<project-slug>/features/<feature-slug>/execution-plan.md` when local
-  files are in scope.
 - affected repo list
 - `Delivery mode` copied from the PRD and labeled as feature-level metadata
-  inherited from `Source PRD`, for example `Delivery mode: One PR Per Repo
+  inherited from `Source PRD`, for example `Delivery mode: one-pr-per-repo
   (feature-level, inherited from Source PRD)`. Feature-level means the mode
   applies to the whole Source PRD feature.
 - issue-level `Parallelization` and `Closeout`

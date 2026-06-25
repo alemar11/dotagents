@@ -33,6 +33,10 @@ dry run, or any workflow where external GitHub mutation is not authorized, do
 not mutate GitHub. Use local orchestrator markdown only when a local dry-run
 target is configured or explicitly chosen for that run, or ask `$github-issues`
 to return draft issue bodies and exact `gh` commands without executing them.
+When returning draft commands before the PRD issue exists, use
+`source_prd_ref=draft-prd:<project-slug>/<feature-slug>` and publish the PRD
+first; generated issue bodies must replace that draft ref with
+`Source PRD: #<prd-number>` before hosted mutation.
 Record this as a current-run override in
 `project-memory/agents/issue-tracker.md`; do not treat it as a durable
 coordination backend change unless the user explicitly says so.
@@ -40,7 +44,6 @@ coordination backend change unless the user explicitly says so.
 ## Conventions
 
 - PRD issue title: `PRD: <Feature Name>`
-- Execution plan issue title: `Execution plan: <feature-slug>`
 - Vertical feature issue title:
   `<feature-slug>: <NN> <vertical outcome>`
 - Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
@@ -48,35 +51,27 @@ coordination backend change unless the user explicitly says so.
   title only when no accepted slug exists.
 - PRD issues use the mapped `feature` issue type when GitHub issue types are
   available.
-- Execution-plan issues use the mapped `task` issue type when GitHub issue
-  types are available, but they are planning/control artifacts and must not be
-  labeled `ready-for-agent`.
 - Vertical feature issues use the mapped `task` issue type when available.
+- Default workflow-state labels are lowercase tracker values:
+  `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and
+  `wontfix`.
 - Vertical feature issues are GitHub sub-issues of the PRD parent issue.
 - Each vertical feature issue body includes `Source PRD: #<prd-number>`.
-- Create or update one dedicated execution-plan issue per PRD and attach it to
-  the PRD parent when parent/sub-issues are supported. It must include
-  `Source PRD: #<prd-number>`, delivery mode, dependency graph, waves/unlock
-  conditions, integration gates, and links to every generated vertical feature
-  issue after those issues exist.
-- Each vertical feature issue body should include an `Execution plan` pointer to
-  the dedicated execution-plan issue, usually `Execution plan: #<number>`. Use
-  `execution-plan.md` only when the effective target is a local artifact target
-  or an explicitly requested local mirror. Use a PRD comment/body section only
-  as a fallback when the execution-plan issue cannot be created or edited.
+- Generated vertical feature issues are the execution graph. Do not create a
+  separate execution-plan issue unless the user explicitly requests a
+  non-authoritative summary.
 - Each PRD parent issue and vertical feature issue gets a GitHub label named
   exactly `<project-slug>`. This is a project grouping/search label, not a
   workflow state label.
-- The execution-plan issue also gets the same `<project-slug>` label.
 
 Before creating the first issue for a project, use `$github-issues` to ensure
 the project label exists. Use `$github-issues` to create the PRD parent issue,
-create or update the execution-plan issue, create vertical issues under the
-PRD, and attach existing issues to the PRD when needed.
+create vertical issues under the PRD, and attach existing issues to the PRD
+when needed.
 
 ## Delivery Mode Defaults
 
-- Default delivery mode: **One PR Per Repo** for true multi-repo orchestrator work.
+- Default `delivery_mode`: `one-pr-per-repo` for true multi-repo orchestrator work.
 - Branch naming: default to `feature/<feature-slug>` in each affected repo
   unless that repo has a stricter branch policy.
 - PR shape: one draft PR per affected repo, all linked from the coordination
@@ -84,19 +79,28 @@ PRD, and attach existing issues to the PRD when needed.
 - Integration proof: cross-repo validation is required before coordination
   issues close. Repo PR links may be placeholders before implementation, but
   completion requires real PR links or equivalent proof.
-- Exceptions: **One Feature Branch** only when all affected work is actually in
-  one git repo; **One PR Per Issue** only for isolated work; **Direct Commit**
-  only with explicit maintainer authorization.
+- Exceptions: `one-feature-branch` only when all affected work is actually in
+  one git repo; `one-pr-per-issue` only for isolated work; `direct-commit` only
+  with explicit maintainer authorization.
+
+## Worker Authorization Defaults
+
+- Default `default_worker_authorization`: `inspect, implement`.
+- This is a policy default, not final permission. `$codex-orchestrator` must
+  still apply current owner/session authorization, publication authority,
+  dirty-worktree state, inspectability, and gates before assigning worker
+  authorization modes.
+- Do not let tracker defaults grant commit, push, PR creation, merge, direct
+  issue mutation, or release authority by themselves.
 
 ## Orchestrator Issue Content
 
 Generated vertical feature issues should include:
 
 - `Source PRD: #<prd-number>` for searchability and backlinks
-- `Execution plan: #<plan-number>` pointing to the hosted execution-plan issue
 - affected repo list
 - `Delivery mode` copied from the PRD and labeled as feature-level metadata
-  inherited from `Source PRD`, for example `Delivery mode: One PR Per Repo
+  inherited from `Source PRD`, for example `Delivery mode: one-pr-per-repo
   (feature-level, inherited from Source PRD)`. Feature-level means the mode
   applies to the whole Source PRD feature.
 - issue-level `Parallelization` and `Closeout`

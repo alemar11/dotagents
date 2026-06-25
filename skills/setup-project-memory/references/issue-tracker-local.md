@@ -37,14 +37,11 @@ preference change unless the user explicitly says to make it persistent.
 - Comments and conversation history append under a `## Comments` heading
 - Each implementation issue body includes `Source PRD:` pointing to
   `.scratch/<feature-slug>/PRD.md`.
-- Each implementation issue body should include an `Execution plan` pointer to
-  `.scratch/<feature-slug>/execution-plan.md` when local artifact runs are in
-  scope.
 - Each implementation issue body includes `## Delivery` with issue-level
   `Parallelization` and `Closeout`.
 - Each implementation issue body copies the effective PRD `Delivery mode` and
   labels it as feature-level metadata inherited from `Source PRD`, for example
-  `Delivery mode: One Feature Branch (feature-level, inherited from Source
+  `Delivery mode: one-feature-branch (feature-level, inherited from Source
   PRD)`. Feature-level means the mode applies to the whole Source PRD feature.
 - Add issue-level `Delivery mode` or `Integration mode` exception lines only
   when the issue intentionally differs from the PRD, and include the
@@ -57,14 +54,24 @@ preference change unless the user explicitly says to make it persistent.
 
 ## Delivery Mode Defaults
 
-- Default delivery mode: **One Feature Branch** for a single project or monorepo in
+- Default `delivery_mode`: `one-feature-branch` for a single project or monorepo in
   this git repo.
 - Branch naming: default to `feature/<feature-slug>`.
 - PR shape: one draft PR for the feature when the work is later published.
   Local issue files are scheduling units and move to `issues/done/` only after
   validation and the configured proof are complete.
-- Exceptions: **One PR Per Issue** only for isolated work; **Direct Commit**
+- Exceptions: `one-pr-per-issue` only for isolated work; `direct-commit`
   only with explicit maintainer authorization.
+
+## Worker Authorization Defaults
+
+- Default `default_worker_authorization`: `inspect, implement`.
+- This is a policy default, not final permission. `$codex-orchestrator` must
+  still apply current owner/session authorization, publication authority,
+  dirty-worktree state, inspectability, and gates before assigning worker
+  authorization modes.
+- Do not let tracker defaults grant commit, push, PR creation, merge, direct
+  issue mutation, or release authority by themselves.
 
 Implementation issues created from a PRD usually use `Type: task`. PRD files
 do not need `Type:` or `Status:` lines unless the repo chooses to treat PRDs as

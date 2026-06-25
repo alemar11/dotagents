@@ -14,8 +14,9 @@ GitHub examples into local markdown modes.
 
 - GitHub and GitHub coordination mode: use native issue types when available,
   normally `Bug`, `Feature`, and `Task`.
-- Local markdown and local orchestrator mode: use lowercase `bug`, `feature`,
-  and `task` unless the repo already has a committed title-case convention.
+- Local markdown and local orchestrator mode: use canonical `bug`, `feature`,
+  and `task` unless the repo already has a committed tracker-specific
+  convention.
 
 | Canonical type | Tracker value | Meaning |
 | --- | --- | --- |
@@ -24,8 +25,9 @@ GitHub examples into local markdown modes.
 | `task` | `Task` | Maintenance, docs, refactor, follow-up, cleanup, or implementation work item |
 
 The table above uses the default GitHub type names. Rewrite the right-hand
-`Tracker value` cells to lowercase before writing this file for local markdown
-or local orchestrator tracking.
+`Tracker value` cells only when the actual tracker uses different values. For
+local markdown and local orchestrator tracking, prefer canonical values such as
+`bug`, `feature`, and `task`.
 
 In GitHub issue-tracker mode, use `$github-issues` to apply native GitHub
 Issue Type values when available.
@@ -49,7 +51,9 @@ information arrives or work becomes ready.
 When a skill mentions a canonical state, use the corresponding tracker label or
 status from this table. In GitHub mode, these are usually labels. In local
 markdown mode, record the mapped value as a `Status:` line near the top of the
-issue file.
+issue file. For local markdown and local orchestrator tracking, prefer
+canonical values such as `needs-triage` and `ready-for-agent` unless the repo
+already has a committed lowercase status convention.
 
 `needs-info` is a waiting state, not an agent queue state. When the reporter or
 requester answers, the issue should be re-evaluated as `needs-triage` before it
