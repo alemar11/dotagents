@@ -36,9 +36,17 @@ cross-repo vertical outcomes. Do not implement the feature.
 - Carry accepted planning identity through every handoff: selected context,
   product or project slug, workspace path when applicable, and authoritative
   feature slug.
-- Carry accepted delivery mode through every handoff. Use human-readable
-  labels: `One Feature Branch`, `One PR Per Repo`, `One PR Per Issue`, or
-  `Direct Commit`.
+- Carry accepted delivery mode through every handoff using structured values:
+  `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, or
+  `direct-commit`.
+- Carry `source_prd_ref` from `$to-prd` into `$to-issues`. In
+  `draft-publish-commands` runs, use the stable draft ref from
+  `$setup-project-memory` `references/tracker-publishing.md` until a hosted
+  PRD issue number or local PRD path exists.
+- Use the structured values documented by the component skills this workflow
+  invokes: setup values from `$setup-project-memory`, PRD delivery values from
+  `$to-prd`, and generated issue values from `$to-issues`. Keep prose values
+  only for explanations, reasons, and free-form notes.
 
 ## Workflow
 
@@ -63,15 +71,19 @@ Before continuing, resolve the effective target for the current run:
   this run,
 - any local dry-run target or current-run override.
 
+For tracker publishing mechanics, use `$setup-project-memory`
+`references/tracker-publishing.md`; this includes `source_prd_ref` handling for
+`draft-publish-commands`.
+
 If the user asked for a rehearsal, temp run, dry run, validation pass, or other
 non-mutating run, treat external mutation as disallowed even when persisted
 setup points at GitHub. Use the configured local dry-run target when one exists;
 otherwise ask for a local target or return draft publish commands.
 
-When the effective target is `github` or `orchestrator-github` and external
-mutation is authorized, the hosted tracker is authoritative. Temporary files
-needed for `$github-issues` or `gh --body-file` must be created outside the repo
-and removed after mutation. Do not use `.scratch/` as a staging area in hosted
+When `tracker_mode` is `github` or `orchestrator-github` and external mutation
+is authorized, the hosted tracker is authoritative. Temporary files needed for
+`$github-issues` or `gh --body-file` must be created outside the repo and
+removed after mutation. Do not use `.scratch/` as a staging area in hosted
 tracker mode unless the user explicitly asks to keep a local mirror.
 
 Resolve the planning identity before writing:
@@ -81,9 +93,9 @@ Resolve the planning identity before writing:
   `workspace_path`, and `context_file` selected from `CONTEXT-MAP.md` or
   project memory.
 - For orchestrator workspaces: accepted `project_slug` and `feature_slug`.
-- `delivery_mode`: `One Feature Branch` for a single git repo, including
-  monorepos; `One PR Per Repo` for orchestrator or true cross-repo features;
-  `One PR Per Issue` or `Direct Commit` only when explicitly authorized.
+- `delivery_mode`: `one-feature-branch` for a single git repo, including
+  monorepos; `one-pr-per-repo` for orchestrator or true cross-repo features;
+  `one-pr-per-issue` or `direct-commit` only when explicitly authorized.
 
 If a multi-context local-markdown repo has no accepted product/context or the
 feature slug is not product/workspace namespaced according to tracker
@@ -117,15 +129,18 @@ Pass the resolved grilling output as the PRD source and explicitly state:
 ```text
 Run authorization:
 - Persistent local artifact writes: <allowed|disallowed>, allowed only when the
-  effective target is local markdown, orchestrator-local, a configured local
-  dry-run target, or an explicitly requested local mirror.
+  `tracker_mode` is `local-markdown` or `orchestrator-local`, the
+  `effective_target` is `local-dry-run`, or the run explicitly requested a
+  local mirror.
 - External tracker mutation: <allowed|disallowed>, based on explicit
   authorization in this run.
 - Hosted tracker body-file temp files: transient outside the repo and cleaned
   up after mutation.
-- Configured tracker: <tracker mode from project-memory/agents/issue-tracker.md>.
-- Effective target for this run: <configured target|local dry-run target|draft
-  external publish commands only>.
+- Configured tracker: <tracker_mode from project-memory/agents/issue-tracker.md>.
+- Effective target for this run:
+  <configured-tracker|local-dry-run|draft-publish-commands>.
+- Source PRD ref:
+  <pending until $to-prd returns #<number>, local path, or draft-prd:<slug>>.
 
 Planning identity:
 - feature_slug: <accepted feature slug>
@@ -133,7 +148,7 @@ Planning identity:
 - workspace_path: <accepted workspace path, for monorepos/multi-context repos>
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
-- delivery_mode: <One Feature Branch|One PR Per Repo|One PR Per Issue|Direct Commit>
+- delivery_mode: <one-feature-branch|one-pr-per-repo|one-pr-per-issue|direct-commit>
 ```
 
 Ask `$to-prd` to use the configured target from
@@ -147,6 +162,12 @@ discovers a new blocker, route the blocker back through
 `$grill-me-with-context` using the same one-question loop, then continue only
 after the blocker is resolved or explicitly deferred as non-blocking.
 
+Require `$to-prd` to return `source_prd_ref`. In
+`draft-publish-commands` mode, this is a deterministic
+`draft-prd:<feature-slug>` or `draft-prd:<project-slug>/<feature-slug>` value
+plus a publish-order note that the PRD must be created first and issue bodies
+must replace the draft ref with the hosted PRD number before mutation.
+
 ### 4. Split and write issues
 
 After the PRD is written or published, load and run `$to-issues` on that PRD.
@@ -156,15 +177,18 @@ Pass explicit run authorization:
 ```text
 Run authorization:
 - Persistent local artifact writes: <allowed|disallowed>, allowed only when the
-  effective target is local markdown, orchestrator-local, a configured local
-  dry-run target, or an explicitly requested local mirror.
+  `tracker_mode` is `local-markdown` or `orchestrator-local`, the
+  `effective_target` is `local-dry-run`, or the run explicitly requested a
+  local mirror.
 - External tracker mutation: <allowed|disallowed>, based on explicit
   authorization in this run.
 - Hosted tracker body-file temp files: transient outside the repo and cleaned
   up after mutation.
-- Configured tracker: <tracker mode from project-memory/agents/issue-tracker.md>.
-- Effective target for this run: <configured target|local dry-run target|draft
-  external publish commands only>.
+- Configured tracker: <tracker_mode from project-memory/agents/issue-tracker.md>.
+- Effective target for this run:
+  <configured-tracker|local-dry-run|draft-publish-commands>.
+- Source PRD ref:
+  <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
 
 Planning identity:
 - feature_slug: <authoritative slug from $plan-feature/$to-prd or PRD path>
@@ -235,3 +259,9 @@ Summarize:
   human/reporter input and must be re-triaged before implementation.
 - If setup cannot be completed or a gate remains unresolved, stop with the
   current state and next question instead of writing partial artifacts.
+
+## References
+
+- `references/full-flow-dry-run.md`: dry-run fixture for the
+  `$plan-feature` -> `$to-prd` -> `$to-issues` -> `$codex-orchestrator`
+  planning and orchestration handoff.

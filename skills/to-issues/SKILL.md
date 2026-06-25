@@ -44,6 +44,13 @@ returned or published.
   non-authoritative view derived from the generated issues.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
+- Use structured values for multi-choice issue body fields. This skill owns the
+  `parallelization`, `closeout_mode`, and `integration_mode` values documented
+  below; `delivery_mode` comes from the PRD, and `issue_type` / `triage_state`
+  come from project memory mappings.
+- For publication mechanics, effective targets, and stable `source_prd_ref`
+  behavior in draft command runs, use `$setup-project-memory`
+  `references/tracker-publishing.md`.
 
 ## Boundaries
 
@@ -55,6 +62,28 @@ returned or published.
   hosted issue tracker unless the user explicitly asked to write/publish or a
   composing skill passes explicit run authorization after resolving gates.
 
+## Structured Issue Values
+
+Use these values in generated issue bodies:
+
+- `parallelization`: `independent` can start in any eligible wave;
+  `depends-on <issue-id>` waits for completion proof; `blocks <issue-id>`
+  unlocks later work after completion; `root-integrated` stays in the root
+  thread.
+- `closeout_mode`: `feature-pr-closes-issue`, `repo-pr-closes-issue`,
+  `issue-pr-closes-issue`, `direct-commit-closes-issue`, or
+  `local-done-move-after-proof` names the concrete completion path.
+- `integration_mode`: `shared-feature-branch`, `repo-pr`, `issue-pr`,
+  `direct-commit`, `inspect-only`, or `omitted` records how issue output lands
+  when it is not obvious from the PRD.
+
+`delivery_mode` is copied from the PRD. `issue_type` and `triage_state` are
+mapped through `project-memory/agents/triage-labels.md`.
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. When updating an artifact
+that contains legacy aliases, rewrite touched structured values to
+lower-kebab-case.
+
 ## Workflow
 
 ### 1. Load inputs
@@ -65,6 +94,7 @@ Find or ask for the PRD source:
 - a GitHub PRD issue,
 - `projects/<project-slug>/features/<feature-slug>/PRD.md`,
 - a GitHub coordination-repo PRD issue,
+- a handoff `source_prd_ref` from `$to-prd`,
 - pasted PRD text,
 - another project document that clearly acts as the PRD.
 
@@ -90,9 +120,13 @@ Resolve and carry the planning identity before splitting:
   `context_file`.
 - For orchestrator workspaces: `project_slug` and affected repos.
 - `delivery_mode`: inherit from the PRD `## Delivery Mode` section. If
-  the PRD lacks it, infer `One Feature Branch` only for unambiguous single-repo
-  or monorepo work and `One PR Per Repo` only for unambiguous orchestrator or
+  the PRD lacks it, infer `one-feature-branch` only for unambiguous single-repo
+  or monorepo work and `one-pr-per-repo` only for unambiguous orchestrator or
   cross-repo work; otherwise stop and require the PRD delivery mode to be resolved.
+- `source_prd_ref`: use the durable PRD issue number, local PRD path, or stable
+  draft ref passed by `$to-prd`. In `draft-publish-commands` mode, keep the
+  draft ref in returned bodies but include the replacement step required before
+  hosted mutation.
 
 If a multi-context local-markdown repo lacks an accepted product/context or the
 feature slug can collide with another product according to tracker
@@ -113,10 +147,10 @@ numbering.
 Before hardening, validate the generated issue graph from the proposed issue
 list:
 
-- `delivery-mode`: inherited from the PRD and copied in each issue.
+- `delivery_mode`: inherited from the PRD and copied in each issue.
 - ordered issue map with `<NN>` and short intent.
-- dependency graph plus `blocks` / `depends on` intent.
-- dependency edge validity check: every `depends on` / `blocks` reference must
+- dependency graph plus `blocks` / `depends-on` intent.
+- dependency edge validity check: every `depends-on` / `blocks` reference must
   resolve to a generated issue ID in this feature set (`01`, `02`, ...), and the
   graph must be acyclic.
 - startability waves and unblock conditions.
@@ -185,14 +219,23 @@ and triage states to the repo's tracker values.
 - Use `ready-for-human` when the PRD requires human judgment before an agent can
   proceed.
 
+Canonical values are decision inputs, not necessarily tracker values. Before
+writing an issue file or calling `$github-issues`, resolve the mapped tracker
+value from `project-memory/agents/triage-labels.md`. In default GitHub mode,
+`ready-for-agent` maps to the same lowercase label. In custom tracker setups,
+do not assume the canonical string is the label; read the mapping first.
+
 ### 5. Publish or return issues
 
-Use `project-memory/agents/issue-tracker.md` for the target:
+Use `project-memory/agents/issue-tracker.md` for the target, and read
+`$setup-project-memory` `references/tracker-publishing.md` for shared
+effective-target, temporary body-file, and `source_prd_ref` rules:
 
 - `Tracker mode: github`: create issues through `$github-issues`, attach them
   to the PRD parent when the PRD source is a GitHub issue, set the mapped
-  `task` issue type when available, then apply mapped labels. Do not create a
-  repo-local `.scratch/` mirror unless the user explicitly requested one.
+  `task` issue type when available, then apply mapped labels such as
+  `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
+  `.scratch/` mirror unless the user explicitly requested one.
 - `Tracker mode: orchestrator-github`: create vertical feature issues in the
   configured coordination repo through `$github-issues`, using the PRD parent
   relationship and the required `<project-slug>` label. Derive
@@ -243,40 +286,43 @@ links or recording equivalent integration proof.
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
 
-- `Source PRD`: required. Prefer a stable GitHub issue number or local PRD path.
+- `Source PRD`: required. Prefer a stable GitHub issue number or local PRD
+  path. Use a stable `draft-prd:<...>` ref only for draft command output before
+  hosted mutation.
 - `Delivery mode`: required. Copy the effective value from the PRD and mark it
-  as feature-level, such as `One Feature Branch (feature-level, inherited from
+  as feature-level, such as `one-feature-branch (feature-level, inherited from
   Source PRD)`. Feature-level means the mode applies to the whole Source PRD
   feature, not only this generated issue. For an exception, record the
-  issue-level override and authorization reason, such as `One PR Per Issue
+  issue-level override and authorization reason, such as `one-pr-per-issue
   (issue-level override, authorized by <owner/date>)`.
-- `Parallelization`: required. Use `independent`, `depends on <issue-id>[,
+- `Parallelization`: required. Use `independent`, `depends-on <issue-id>[,
   <issue-id>]`, `blocks <issue-id>[, <issue-id>]`, or `root-integrated`.
 - `Dependencies`: required. Use `None` or direct generated issue IDs with the
   dependency reason.
-- `Closeout`: required. State the concrete completion path, such as `feature PR
-  closes issue`, `repo PR closes issue`, `issue PR closes issue`, `direct commit
-  closes issue`, or `local done move after proof`.
+- `Closeout`: required. State the concrete completion path, such as
+  `feature-pr-closes-issue`, `repo-pr-closes-issue`,
+  `issue-pr-closes-issue`, `direct-commit-closes-issue`, or
+  `local-done-move-after-proof`.
 - `Integration mode`: optional for ordinary issues that inherit from the PRD.
   Include it when the issue is cross-repo, exceptional, or otherwise not obvious
   from the PRD delivery mode.
 
-For ordinary single-repo or monorepo `One Feature Branch` issues, the
+For ordinary single-repo or monorepo `one-feature-branch` issues, the
 `## Delivery` section can be as small as:
 
 ```markdown
 ## Delivery
 
-- Delivery mode: One Feature Branch (feature-level, inherited from Source PRD)
+- Delivery mode: one-feature-branch (feature-level, inherited from Source PRD)
 - Parallelization: independent
-- Closeout: feature PR closes issue
+- Closeout: feature-pr-closes-issue
 ```
 
 Every published or returned issue must state its completion path:
 
 - GitHub: close the implementation issue from the relevant PR body with a
   closing keyword, following `Closeout`. Final-commit closure requires
-  `Direct Commit` or another explicit authorization. Do not close the PRD
+  `direct-commit` or another explicit authorization. Do not close the PRD
   parent unless the maintainer says the whole PRD is complete.
 - Local markdown: move the issue to `issues/done/<NN>-<slug>.md` after
   validation, creating `issues/done/` on demand. Orchestrator workspace issues
@@ -310,7 +356,11 @@ to explicit local mirrors or dry-run targets; hosted body-file inputs are
 transient files outside the repo.
 If the configured target is GitHub or GitHub coordination but external mutation
 is not authorized, do not mutate GitHub. Ask `$github-issues` for exact draft
-commands, or use the configured local dry-run target when one is recorded.
+commands, or use the configured local dry-run target when one is recorded. In
+`draft-publish-commands` mode, generated issue bodies may use
+`Source PRD: draft-prd:<...>` only in returned draft output; the publish plan
+must create the PRD first, capture the hosted PRD number, replace the draft ref
+with `Source PRD: #<number>`, and then create or attach implementation issues.
 When a blocker or unresolved question appears under `$plan-feature`, return it
 as an issue-splitting gate instead of publishing a `needs-info` issue by
 default.
@@ -339,103 +389,15 @@ Summarize:
 
 ## Issue Body Shape
 
-Use this shape unless the tracker has a stronger local template. Delete optional
-delivery lines when they do not apply.
-
-```markdown
-# <feature-slug>: <NN> <vertical outcome>
-
-Type: [mapped issue type, usually task]
-Status: [mapped triage state]
-Source PRD: [path, issue number, or title]
-
-Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
-
-Product Scope: [for monorepos, workspace path and selected context file; for
-single-repo issues, `current repository`; for orchestrator issues, use
-`Affected Repos`]
-
-## Delivery
-
-- Delivery mode: [One Feature Branch | One PR Per Repo | One PR Per Issue |
-  Direct Commit] ([feature-level, inherited from Source PRD] or [issue-level
-  override with authorization reason])
-- Parallelization: [independent | depends on <issue-id>[, <issue-id>] | blocks
-  <issue-id>[, <issue-id>] | root-integrated]
-- Closeout: [feature PR closes issue | repo PR closes issue | issue PR closes
-  issue | direct commit closes issue | local done move after proof]
-- Integration mode: [omit when obvious from Source PRD; otherwise shared
-  feature branch | repo PR | issue PR | direct commit with authorization reason]
-
-## Goal
-
-[One vertical outcome.]
-
-## Non-Goals
-
-- [Excluded work.]
-
-## Context
-
-[Relevant PRD and repo context.]
-
-## Cross-Repo Notes
-
-[For orchestrator issues only: affected repos, interface contracts,
-repo PR links or placeholders, and validation order. Use `N/A` for ordinary
-single-repo issues.]
-
-## Integration Gates
-
-[For orchestrator issues only: named gates or a link to
-`integration-gates.md`, plus proof required before completion. Use `N/A` for
-ordinary single-repo issues.]
-
-## Requirements
-
-- [Requirement this issue must satisfy.]
-
-## Implementation Plan
-
-Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.
-
-[Concise implementation approach synthesized from the $plan-harder hardening
-brief. Do not duplicate acceptance criteria, validation, dependencies,
-questions, or completion rules here; merge those details into their top-level
-sections.]
-
-## Acceptance Criteria
-
-- [ ] [Specific, verifiable outcome.]
-
-## Validation
-
-- [Command, test, or manual check.]
-
-## Completion
-
-When all acceptance criteria pass and validation is complete:
-
-- GitHub: close this implementation issue from the relevant PR body with
-  `Closes #<this-issue-number>`, following `## Delivery`. Final-commit closure
-  requires `Direct Commit` or another explicit authorization. Do not close the
-  parent PRD unless the maintainer says the whole PRD is complete.
-- Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
-  `issues/done/` on demand. For orchestrator workspace issues, move it only
-  after cross-repo integration proof is recorded. Do not delete the file or add
-  a `done` status.
-
-## Dependencies
-
-- Depends on: [generated issue IDs and reason, or `None`.]
-- Blocks: [generated issue IDs and reason, or `None`.]
-```
-
-Include a `## Questions` section only for explicitly authorized partial
-`needs-info` output, and put the concrete human/reporter question there. Omit
-the section entirely for `ready-for-agent` issues; never write `N/A` as a
-placeholder question.
+Before composing or validating issue bodies, read
+`references/issue-body-template.md`. Use that template unless the tracker has a
+stronger local template. Keep `## Questions` out of `ready-for-agent` issues;
+include it only for explicitly authorized partial `needs-info` output.
 
 ## References
 
 - `references/vertical-slices.md`: issue splitting rules.
+- `references/issue-body-template.md`: generated implementation issue body
+  template.
+- `$setup-project-memory` `references/tracker-publishing.md`: shared tracker
+  publication and `source_prd_ref` contract.

@@ -31,6 +31,12 @@ first.
   or `.scratch/` staging copies unless the tracker config/current-run override
   is local or the user explicitly asks for a local mirror. `$github-issues` may
   use temporary `--body-file` inputs outside the repo and clean them up.
+- Use structured values for multi-choice fields. Read tracker and type mappings
+  from project memory, and use the `delivery_mode` values documented in
+  `references/prd-template.md`.
+- For publication mechanics, effective targets, and stable `source_prd_ref`
+  behavior in draft command runs, use `$setup-project-memory`
+  `references/tracker-publishing.md`.
 
 ## Workflow
 
@@ -65,20 +71,20 @@ Use values passed by a composing skill such as `$plan-feature` when present.
 Otherwise derive them from project memory and repo evidence, asking only when
 multiple contexts could plausibly own the feature.
 
-Resolve the PRD delivery mode before drafting:
+Resolve the PRD `delivery_mode` before drafting:
 
-- `One Feature Branch`: default for a single project in one git repo and for a
+- `one-feature-branch`: default for a single project in one git repo and for a
   monorepo where multiple products or packages share one git repo. Record one
   shared feature branch and usually one draft PR for the whole feature.
-- `One PR Per Repo`: default for orchestrator workspaces and true cross-repo
+- `one-pr-per-repo`: default for orchestrator workspaces and true cross-repo
   features that span multiple independent git repositories. Record one feature
   branch and draft PR per affected repo.
-- `One PR Per Issue`: exception only for isolated work with no shared
+- `one-pr-per-issue`: exception only for isolated work with no shared
   contracts, migrations, lockfiles, generated files, or overlapping validation.
-- `Direct Commit`: exception only when the maintainer explicitly authorizes a
+- `direct-commit`: exception only when the maintainer explicitly authorizes a
   direct commit path for this feature.
 
-If the repo shape makes `One Feature Branch` versus `One PR Per Repo`
+If the repo shape makes `one-feature-branch` versus `one-pr-per-repo`
 ambiguous, ask before writing the PRD.
 
 ### 2. Confirm the PRD source
@@ -143,7 +149,9 @@ or the generated implementation issues, not in the PRD content itself.
 
 ### 4. Choose publication target
 
-Read `project-memory/agents/issue-tracker.md` to determine where PRDs live:
+Read `project-memory/agents/issue-tracker.md` to determine where PRDs live.
+Also read `$setup-project-memory` `references/tracker-publishing.md` for the
+shared effective-target and `source_prd_ref` contract.
 
 - `Tracker mode: github`: publish only after confirmation through
   `$github-issues`, using the title format `PRD: <Feature Name>` and the
@@ -191,14 +199,14 @@ single repo, say "current repository." For a monorepo, include the selected
 workspace path, context file, and explicitly out-of-scope sibling workspaces
 when relevant.
 
-Include a `## Delivery Mode` section in every PRD. For `One Feature
-Branch`, record branch naming such as `feature/<feature-slug>`, one draft PR
-for the feature, and the validation required before implementation issues
-close. For `One PR Per Repo`, record the branch name to use in each affected
-repo, the expected draft PR per repo, repo PR links or placeholders, and the
-cross-repo proof needed before coordination issues close. Use `One PR Per
-Issue` or `Direct Commit` only when explicitly authorized and record the
-authorization reason.
+Include a `## Delivery Mode` section in every PRD. For
+`one-feature-branch`, record branch naming such as
+`feature/<feature-slug>`, one draft PR for the feature, and the validation
+required before implementation issues close. For `one-pr-per-repo`, record the
+branch name to use in each affected repo, the expected draft PR per repo, repo
+PR links or placeholders, and the cross-repo proof needed before coordination
+issues close. Use `one-pr-per-issue` or `direct-commit` only when explicitly
+authorized and record the authorization reason.
 
 Treat the PRD as the canonical source for delivery mode and branch/PR details.
 `to-issues` owns issue splitting and validates the generated issue graph before
@@ -232,8 +240,13 @@ hosted publication.
 
 If the configured target is GitHub or GitHub coordination but external mutation
 is not authorized, do not mutate GitHub. Ask `$github-issues` for the exact
-draft publish command and return it with the PRD body, or use the configured
-local dry-run target when one is recorded.
+draft publish command and return it with the PRD body and stable
+`source_prd_ref`, or use the configured local dry-run target when one is
+recorded. For `draft-publish-commands`, return
+`source_prd_ref=draft-prd:<feature-slug>` or
+`source_prd_ref=draft-prd:<project-slug>/<feature-slug>` and state that the PRD
+must be published first so generated issues can replace the draft ref with the
+hosted PRD number before mutation.
 
 If no issue-tracker setup exists, return the PRD in chat and recommend running
 `$setup-project-memory` before publishing.
@@ -250,6 +263,7 @@ Return:
 - that issue ordering and dependency graph validation are delegated to
   `$to-issues`,
 - target location or "chat only",
+- `source_prd_ref` for `$to-issues`,
 - issue type applied, when the tracker supports it,
 - support docs created or updated and the accepted source used for each, when
   applicable,
@@ -272,3 +286,5 @@ Return:
 ## References
 
 - `references/prd-template.md`: default PRD shape.
+- `$setup-project-memory` `references/tracker-publishing.md`: shared tracker
+  publication and `source_prd_ref` contract.

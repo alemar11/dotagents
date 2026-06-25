@@ -61,23 +61,26 @@ backtracking:
    only when tied to a concrete delivered behavior.
 
 Each issue must list only direct prerequisites in `## Dependencies`. If issue
-3 depends on issue 1 but not issue 2, say that directly. Do not rely on issue
-numbering alone to imply ordering.
+`03` depends on issue `01` but not issue `02`, say that directly. Do not rely
+on issue numbering alone to imply ordering.
 
 ## Dependency Rules
 
 Dependencies must be explicit, minimal, and implementable:
 
 - Use `None` when the issue can start immediately.
-- Reference issue titles or numbers when a prior issue must land first.
+- Reference generated issue IDs such as `01` or `02` when a prior generated
+  issue must land first. Include the issue title as explanatory prose when it
+  improves readability, but keep the ID as the stable dependency handle.
 - Explain what dependency is needed, such as "uses the draft creation endpoint
   from Issue 01."
 - Do not create circular dependencies or retain cycles that can lock the
   issue queue.
 - Do not depend on a broad phase such as "backend complete" or "frontend
   complete."
-- If the issue depends on an unresolved decision, mark it `needs-info` instead
-  of `ready-for-agent`.
+- If the issue depends on an unresolved decision, withhold it and return the
+  blocker by default instead of publishing a partial issue. Emit `needs-info`
+  only when the user explicitly authorizes partial non-agent-ready output.
   If it depends only on another generated implementation issue being completed,
   it may still be `ready-for-agent`; queue consumers must wait for the listed
   dependency to finish before starting it.
@@ -133,7 +136,10 @@ A `ready-for-agent` issue may list dependencies on other ready issues. That
 means it is specified enough for an agent queue, not that it is immediately
 startable before those dependencies are complete.
 
-Mark an issue `needs-info` when any of these remain unclear:
+Only publish or return a `needs-info` issue when the user explicitly authorized
+partial non-agent-ready output. Otherwise withhold the issue and report the
+blocking question. When partial output is authorized, mark the issue
+`needs-info` when any of these remain unclear:
 
 - product behavior or user outcome,
 - selected product/workspace/context in a multi-context repo or monorepo,
@@ -191,19 +197,19 @@ tracker or local markdown writes.
 
 For a PRD that adds team invitations:
 
-1. `Create pending invitation`
+1. `01 Create pending invitation`
    - Outcome: admin can invite an email and see a pending invite.
    - Dependencies: `None`.
-2. `Accept invitation into team`
+2. `02 Accept invitation into team`
    - Outcome: invited user can accept and join the team.
-   - Dependencies: `Create pending invitation`.
-3. `Handle expired or revoked invitation`
+   - Dependencies: `01 Create pending invitation`.
+3. `03 Handle expired or revoked invitation`
    - Outcome: invalid invite links fail with the correct user-facing state.
-   - Dependencies: `Create pending invitation`.
-4. `Show invitation audit trail`
+   - Dependencies: `01 Create pending invitation`.
+4. `04 Show invitation audit trail`
    - Outcome: admin can see invite lifecycle events.
-   - Dependencies: `Create pending invitation`, `Accept invitation into team`,
-     `Handle expired or revoked invitation`.
+   - Dependencies: `01 Create pending invitation`, `02 Accept invitation into
+     team`, `03 Handle expired or revoked invitation`.
 
 Bad split:
 

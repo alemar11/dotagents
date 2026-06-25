@@ -18,6 +18,12 @@ Apply this reference when any of these are true:
 If none of those are true, treat the source as ad hoc or legacy work and use
 the conservative authorization rules in `worker.md`.
 
+If `Source PRD` is a draft ref such as `draft-prd:<...>`, treat it as a dry-run
+planning reference, not durable implementation authority. The root may inspect
+the graph, but real worker dispatch, commit, push, PR creation, or issue
+closeout requires a hosted PRD number, a local PRD path, or an explicit owner
+decision to use the full PRD body as temporary source material.
+
 ## Authority Model
 
 Record these three authorities separately in the ledger:
@@ -35,6 +41,30 @@ Do not collapse these into one boolean. A PRD can authorize a draft PR delivery
 path without authorizing direct issue closure, merge, release, or unrelated
 GitHub mutations.
 
+## Structured Authority Values
+
+Use these PRD-backed authority values in the ledger and worker prompts:
+
+- `publication_authority`: `none` means no publication, `explicit-owner-authorization`
+  means the owner authorized publication in the current run,
+  `prd-backed-branch-plus-draft-pr` means the PRD delivery contract authorizes
+  commit/push/draft PR after gates, and `blocked` means publication is expected
+  but blocked by a gate, access issue, or owner restriction.
+- `publication_owner`: `root` means the root orchestrator owns the publication
+  decision. A worker may execute assigned `commit`, `push`, or `pr` steps only
+  inside an exact root-assigned scope. `none` means no publication owner exists.
+- `issue_mutation_authority`: `none` means no direct issue mutation,
+  `pr-body-closeout-only` means closure only through the relevant PR body, and
+  `explicit-direct-mutation` means direct issue comments, labels, or closure are
+  authorized.
+
+Delivery mode values are owned by the PRD and generated issue body. Worker
+authorization modes are owned by `worker.md`.
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. When updating an artifact
+that contains legacy aliases, rewrite touched structured values to
+lower-kebab-case.
+
 ## PRD-Backed Publication
 
 When the owner asks to implement a PRD or generated PRD issue, and the PRD or
@@ -49,7 +79,7 @@ delivery path requires draft PR creation or updating an existing PR. It is not
 sufficient for merge, release, production deploy, final issue closure by direct
 mutation, or broad GitHub cleanup.
 
-Direct commit remains a special case. Use **Direct Commit** only when the PRD,
+Direct commit remains a special case. Use `direct-commit` only when the PRD,
 generated issue, or owner request explicitly says direct commit is authorized
 and records the target branch plus closeout behavior.
 
@@ -57,7 +87,9 @@ and records the target branch plus closeout behavior.
 
 Before scheduling or publishing PRD-backed work:
 
-1. Read the generated issue body and the linked `Source PRD`.
+1. Read the generated issue body and the linked `Source PRD`. If the ref is
+   `draft-prd:<...>`, stop before implementation scheduling unless the owner
+   explicitly authorizes temporary-source execution.
 2. Resolve the effective delivery mode from the PRD first, then apply only
    issue-level overrides that are explicit and authorized.
 3. Record delivery authority, publication authority, issue mutation authority,
@@ -66,14 +98,14 @@ Before scheduling or publishing PRD-backed work:
 4. Build the wave graph from the generated issues' dependency and
    parallelization fields. Queue-ready does not mean start-ready when an issue
    depends on another incomplete issue.
-5. Stop as `Needs Owner` or `Blocked` if the PRD, issue body, dependency graph,
+5. Stop as `needs-owner` or `blocked` if the PRD, issue body, dependency graph,
    branch expectation, or closeout path is missing, contradictory, or unsafe.
 
 ## Closeout Rules
 
 For PRD-backed implementation, local code completion is not enough for
-`Completed` when publication authority exists. A workstream reaches
-`Completed` only after:
+`completed` when publication authority exists. A workstream reaches
+`completed` only after:
 
 - acceptance criteria are satisfied with root-verifiable proof;
 - required gates pass, including focused tests and `$autoreview` for
@@ -82,10 +114,10 @@ For PRD-backed implementation, local code completion is not enough for
 - the expected branch and draft PR exist when PRD-backed publication is
   authorized; and
 - the ledger records the PR URL or records why publication is blocked and moves
-  the remaining action to `Needs Owner`, `Blocked`, or `Deferred`.
+  the remaining action to `needs-owner`, `blocked`, or `deferred`.
 
 If PRD-backed publication is authorized and the only remaining action is
-commit, push, or draft PR creation, keep that action in `Ready Next` and
+commit, push, or draft PR creation, keep that action in `ready-next` and
 execute it before stopping. Do not mark the work complete while an authorized
 draft PR remains uncreated.
 
@@ -101,19 +133,22 @@ closeout vehicle.
 
 The root orchestrator owns branch selection, shared PR shape, source closeout,
 and final publication. Workers may inspect, implement, test, and report within
-their assigned authorization mode. They may commit, push, or open PRs only when
-the root assigns `push-pr` for a specific repo, branch, and closeout target.
+their assigned authorization modes. They may commit, push, or open PRs only when
+the root lists the corresponding `commit`, `push`, or `pr` authorization mode
+for a specific repo, branch/refspec, PR shape, and closeout target. These modes
+are capability flags, not a cumulative ladder; list every allowed action
+explicitly.
 
-For **One Feature Branch**, workers do not create independent feature PRs.
+For `one-feature-branch`, workers do not create independent feature PRs.
 They provide patches, helper worktree diffs, or reviewed commits for root
-integration into the shared branch. For **One PR Per Repo**, a repo-scoped
-worker may prepare that repo's branch or PR only if the root assigned
-repo-scoped `push-pr` authority.
+integration into the shared branch. For `one-pr-per-repo`, a repo-scoped
+worker may prepare that repo's branch or draft PR only if the root assigned
+repo-scoped `commit`, `push`, or `pr` authority matching each intended action.
 
 ## Ad Hoc And Legacy Sources
 
 For ad hoc requests, PR reviews, CI diagnosis, local TODOs, or legacy issues
 without a linked PRD delivery contract, `implement` means local code/docs
 changes plus validation only. Commit, push, draft PR, issue mutation, merge,
-and release require explicit owner authorization or a later `push-pr`,
-`merge-close`, or `release` mode.
+and release require explicit owner authorization or a later `commit`, `push`,
+`pr`, `merge-close`, or `release` mode.

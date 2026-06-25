@@ -2,6 +2,24 @@
 
 Use this shape unless the project already has a stronger local PRD format.
 
+## Structured Values
+
+Use these `delivery_mode` values in every PRD:
+
+- `one-feature-branch`: one shared feature branch and usually one draft PR for a
+  single repo or monorepo feature.
+- `one-pr-per-repo`: one feature branch and draft PR per affected repo for true
+  multi-repo work.
+- `one-pr-per-issue`: one branch and PR per generated issue, only for
+  explicitly isolated exceptions.
+- `direct-commit`: direct commit path, only with explicit maintainer
+  authorization.
+
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. When updating an artifact
+that contains legacy aliases, rewrite touched structured values to
+lower-kebab-case.
+
 ```markdown
 # PRD: [Feature Name]
 
@@ -53,10 +71,10 @@ What user or system problem this solves.
 
 ## Delivery Mode
 
-- Delivery mode: `One Feature Branch` for single-repo or monorepo work, `One PR Per
-  Repo` for true multi-repo work, `One PR Per Issue` only for isolated
-  exceptions, or `Direct Commit` only with explicit authorization.
-- Branch naming: default to `feature/<feature-slug>`; for `One PR Per Repo`,
+- Delivery mode: `one-feature-branch` for single-repo or monorepo work,
+  `one-pr-per-repo` for true multi-repo work, `one-pr-per-issue` only for
+  isolated exceptions, or `direct-commit` only with explicit authorization.
+- Branch naming: default to `feature/<feature-slug>`; for `one-pr-per-repo`,
   use that branch name in each affected repo unless repo policy differs.
 - PR shape: one draft PR for the feature, one draft PR per affected repo, one
   PR per issue by exception, or no PR only for an authorized direct commit.
