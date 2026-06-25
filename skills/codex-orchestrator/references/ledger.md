@@ -212,9 +212,19 @@ when those fields apply.
 
 ## Wave Checkpoints
 
-| Wave | Started | Finished | Sources Scanned | Items Processed | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+For each implementation wave, record the owner checkpoint approval before
+dispatch. Include the approval timestamp, approver wording, selected worker
+surface, resolved surface when `auto` is used, worker cap, and any owner edits
+to split, surface, cap, authorization, or delivery path. If an autonomous
+multi-wave policy is approved for the current session, record its boundaries
+and apply them only while later waves stay inside the approved surface, cap,
+authorization, and delivery path. If approval is pending, the wave may remain
+planned, but implementation workers and root-owned implementation must not
+start.
+
+| Wave | Started | Finished | Sources Scanned | Items Processed | Owner Checkpoint | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | <time> | <time> | <source ids> | <count> | <approval time, wording, surface/cap, edits, autonomous policy, or pending> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
 ## Notes
 

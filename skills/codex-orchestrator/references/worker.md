@@ -53,6 +53,50 @@ subset.
   paths. Only the root creates, reuses, forks, assigns, renames, messages,
   archives, closes, interrupts, or replaces worker threads.
 
+## Approach Checkpoint
+
+Before dispatching any implementation wave, present an approach checkpoint and
+wait for owner approval. This is an execution brief, not a generic "can I
+start?" prompt. The root may do read-only discovery, planning, source
+registration, and wave shaping before approval, but it must not create workers,
+create visible App threads, start implementation edits, mutate source state,
+commit, push, or open PRs until the checkpoint is approved for that wave.
+Each implementation wave needs its own approved checkpoint unless the owner
+explicitly approves an autonomous multi-wave policy for the current session;
+record that policy in the ledger and keep later waves inside the approved
+surface, cap, authorization, and delivery boundaries.
+
+Use this table shape:
+
+| Decision | Planned value |
+| --- | --- |
+| Source items | <issue/PR/PRD/checklist refs> |
+| Workstreams starting now | <count and short names> |
+| Worker surface | <cli-subagent, codex-app-thread, none, or auto -> resolved surface> |
+| Max active workers | <cap by surface and session cap> |
+| Visible App threads | <yes/no; planned titles if yes> |
+| Root-owned work | <integration, shared files, broad tests, autoreview, publication, closeout> |
+| Authorization modes | <inspect, implement, commit, push, pr, ci-rerun-fix, merge-close, release> |
+| Delivery path | <branch, PR, closeout expectation> |
+| Gates before closeout | <tests, autoreview, CI, integration proof, owner decisions> |
+| Known blockers or risks | <none or list> |
+
+Then include one row per workstream:
+
+| Workstream | Surface | Scope | Dependencies | Allowed actions | Output expected |
+| --- | --- | --- | --- | --- | --- |
+| <name/ref> | <cli-subagent, codex-app-thread, or root/no-delegation> | <repo/package/paths> | <none or refs> | <authorization modes and limits> | <patch/report/commit/PR> |
+
+If `Worker surface` is `auto`, the checkpoint must show the resolved surface
+for the current wave. Explicit natural-language acceptance such as `approve`,
+`go ahead`, `ok proceed`, or `looks good` approves the checkpoint. If the owner
+changes the split, worker surface, cap, authorization, or delivery path, revise
+the checkpoint and ask again before dispatch.
+
+End every approach checkpoint with this exact text:
+
+> Reply approve to dispatch this wave, or send edits to the split, worker surface, cap, authorization, or delivery path. I will not start implementation workers or root-owned implementation until you approve.
+
 ## Delivery Mode Rules
 
 The root passes the effective delivery mode plus whether it is inherited from
