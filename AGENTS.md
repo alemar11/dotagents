@@ -200,8 +200,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Orchestrator skill
 - Keep `codex-orchestrator` as a standalone reusable skill under `skills/codex-orchestrator/`, using standalone Git/GitHub companion skills for queue, issue lifecycle, CI, review, release, commit, and publish workflows.
-- Keep runtime orchestration, worker, gate, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
+- Treat one active `codex-orchestrator` root as the owner for a project or portfolio source graph. Parallel implementation should run as scoped workers under that root, not as multiple independent orchestrator roots in the same repo or overlapping source graph.
+- Keep runtime orchestration, worker, gate, active-root, target-repo `AGENTS.md`, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, with one ledger per named portfolio by default.
+- When an owner intentionally splits orchestration across separate roots, require explicit non-overlapping repo/source boundaries or an explicit takeover/handoff decision.
 
 ### GitHub Deep Review skill
 - Keep `github-deep-review` focused on evidence-first GitHub issue, PR, root-cause, provenance, and fix-quality review; keep PR review-thread reply routing in `github-review-threads`.

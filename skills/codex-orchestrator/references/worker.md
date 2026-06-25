@@ -53,7 +53,8 @@ source of truth.
   root; workers may inspect or prove only when root keeps integration ownership.
 - Workers may inspect, implement, test, and report only within their authorized
   mode. They must not spawn sub-workers, create threads, manage chats, edit
-  ledgers, or delegate their assignment.
+  ledgers, create active-root claims, decide takeover or handoff, choose branch
+  strategy, mutate sources, or delegate their assignment.
 - Workers must preserve unrelated local changes and stage only authorized
   paths. Only the root creates, reuses, forks, assigns, renames, messages,
   archives, closes, interrupts, or replaces worker threads.

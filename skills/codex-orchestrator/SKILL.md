@@ -24,11 +24,19 @@ inspection or implementation whenever delegation is authorized and useful.
 
 - The root orchestrator owns routing, ledger updates, worker lifecycle,
   integration choice, gate evaluation, and final closeout decisions.
+- One active root orchestrator owns a project or portfolio source graph at a
+  time. Before creating workers, starting root-owned implementation, or
+  mutating source state, verify the active-root claim in the ledger and stop
+  as `needs-owner` if another live root claims overlapping repo realpaths or
+  source ids.
 - Workers own one scoped repository or workstream plus focused validation and a
   clear final report.
 - Worker-reported statuses such as `done`, `blocked`, `needs-owner`, or
   `ready-for-review` are inputs to the root thread, not final lifecycle
   decisions.
+- A worker never becomes a second root: workers do not create active-root
+  claims, edit ledgers, create workers, or decide takeover, handoff, source
+  mutation, branch strategy, or closeout.
 - If no inspectable worker surface is available, delegation is not explicitly
   authorized, or the work is too small or overlapping, keep the work in the
   root thread.
@@ -63,11 +71,27 @@ actionable item to a ledger workstream, and close it by applying/proposing a
 file update, moving residual scope to `deferred`, or recording the owner
 decision that leaves it open.
 
+## Target Repo Instructions
+
+When orchestration setup needs durable agent instructions in a target
+repository, update `AGENTS.md` only with explicit documentation/write authority
+from the owner, source item, delivery contract, or project-memory setup.
+
+- If `AGENTS.md` exists and has a Codex orchestration section, update that
+  section minimally.
+- If `AGENTS.md` exists and lacks a Codex orchestration section, append a short
+  section covering one active root owner, parallel workers under that root, and
+  takeover or handoff expectations.
+- If `AGENTS.md` is missing, create it only when repo instruction files are
+  explicitly authorized.
+- Without write authority, include the proposed `AGENTS.md` change in the final
+  report instead of applying it.
+
 ## Loop Semantics
 
 Run orchestration as bounded waves, not as a one-pass checklist:
 
-1. Resolve or initialize the ledger.
+1. Resolve or initialize the ledger and verify the active-root claim.
 2. Snapshot authorized task sources and reconcile them with existing ledger
    workstreams by stable source id.
 3. Select the next root-owned and delegated wave.
@@ -214,7 +238,12 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 
 ## Workflow
 
-1. Resolve the portfolio ledger with `references/ledger.md`.
+1. Resolve the portfolio ledger with `references/ledger.md`, canonicalize
+   target repo realpaths when local paths are available, and verify or record
+   the active-root claim before creating workers, starting implementation, or
+   mutating source state. If another live root claims an overlapping repo or
+   source id, stop as `needs-owner` and offer resume, wait, handoff, or
+   explicit takeover.
 2. Snapshot and register task sources: repos, source ids/refs, closeout targets,
    mutation authority, owner constraints, delivery or `Source PRD` inheritance,
    scheduling constraints, gate overrides, and suppressed items.
@@ -245,7 +274,9 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    source closeout. Apply `references/gates.md` before owner-ready, issue-closed,
    merge-ready, release-ready, or final status. For non-trivial edits, require
    focused tests and `$autoreview`; rerun both after review-triggered changes.
-8. Mutate source state only when authorized. For source items published by
+8. Mutate source state and target-repo `AGENTS.md` only when authorized. For
+   target-repo instructions, apply the `Target Repo Instructions` rules above.
+   For source items published by
    `$plan-feature`, treat the published PRD and generated issues as planning
    inputs; after workstream registration, lifecycle comments, labels, direct
    closure, real PR links, and integration proof are orchestrator closeout work.
@@ -271,6 +302,8 @@ Before handing control back to the owner, return a compact owner-facing report:
   unintegrated;
 - commits, branches, PRs, issue updates, releases, or draft mutation commands
   produced under current authorization;
+- active-root claim, collision, takeover, or handoff decisions, plus any
+  target-repo `AGENTS.md` update applied or proposed;
 - gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
   a proof path was unavailable;
 - remaining owner decisions, blocked access, deferred follow-ups, and the next
@@ -278,8 +311,8 @@ Before handing control back to the owner, return a compact owner-facing report:
 
 ## References
 
-- `references/ledger.md`: named-ledger resolution, ledger template, portfolio
-  overrides, and write ownership.
+- `references/ledger.md`: named-ledger resolution, active-root claims, ledger
+  template, portfolio overrides, and write ownership.
 - `references/worker.md`: worker prompt template, authorization modes, no
   subdelegation rule, and final report format.
 - `references/prd-backed-delivery.md`: PRD/generated-issue delivery contracts,

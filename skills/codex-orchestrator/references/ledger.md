@@ -35,6 +35,32 @@ request and initial task sources.
 - The orchestrator records worker lifecycle decisions: `integrated`,
   `retained-for-inspection`, `abandoned`, or `handoff-pending`.
 
+## Active Root Claims
+
+Before creating workers, starting root-owned implementation, or mutating source
+state, the root orchestrator verifies that no live root already claims the same
+portfolio, repo realpath, or source id. The ledger is the source of truth for
+this advisory claim; do not introduce a separate filesystem lock as the
+authoritative state.
+
+Use canonical local repo realpaths when available. Portfolio names can alias the
+same checkout, so a new root should check the target ledger and any known
+ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/` for
+overlapping active-root claims before dispatch.
+
+If another non-stale active root claims overlapping repo realpaths or source
+ids, stop as `needs-owner`. Report the claiming root, overlap, last heartbeat,
+and options: resume the existing root, wait, hand off, or explicitly take over.
+If the prior root is stale, record the takeover before dispatching new workers
+or mutating sources.
+
+Staleness is recovery logic, not permission to race. Use explicit owner
+approval when heartbeat freshness is unclear, when workers may still contain
+unintegrated output, or when source mutation or publication could be duplicated.
+Default heartbeat policy is `every-5-minutes` when monitoring is active; a
+takeover should require at least two missed heartbeats plus a grace window or
+explicit owner approval.
+
 ## Structured Ledger Values
 
 Use these ledger-owned values:
@@ -48,6 +74,13 @@ Use these ledger-owned values:
   `needs-resync` means worker state must be reconciled, `replaced` means a new
   worker or root flow took over, and `root-owned` means root owns integration or
   follow-up.
+- `active_root_status`: `claimed` means this root currently owns the portfolio
+  source graph, `stale` means the claim missed the recorded heartbeat policy,
+  `released` means closeout completed, and `takeover-recorded` means a new root
+  explicitly recorded a takeover from a stale or owner-approved prior root.
+- `active_root_takeover_policy`: `owner-approval` requires an explicit owner
+  decision, while `stale-heartbeat` permits takeover only after the recorded
+  heartbeat threshold and takeover note are present.
 
 Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
 and gate values are owned by `worker.md`, `prd-backed-delivery.md`, and
@@ -82,6 +115,28 @@ Out of scope:
 | ds-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | none, propose, or write | <owner/date/reason/source fingerprint> |
 
 `Mutation Authority` uses the `source_mutation_authority` option values.
+
+## Active Root
+
+Status: claimed|stale|released|takeover-recorded
+Root ID: <thread id, session id, or root descriptor>
+Root surface: codex-app-thread|cli|unknown
+Started: <YYYY-MM-DD HH:MM TZ>
+Last heartbeat: <YYYY-MM-DD HH:MM TZ>
+Heartbeat policy: disabled|manual|every-5-minutes|custom
+Takeover policy: owner-approval|stale-heartbeat
+Claimed repo realpaths:
+- <absolute realpath or unknown>; source=<scope evidence>
+Claimed source ids:
+- <source id/ref>
+Active workers:
+- <worker id/title or none>
+Takeover history:
+- <date, previous root id, overlap, stale/owner approval evidence, worker disposition>
+
+Refresh `Last heartbeat` during each wave or heartbeat check. Release or mark
+the active-root claim `released` during final closeout when there is no active
+worker, authorized `ready-next` action, or root-owned closeout action remaining.
 
 ## Worker Policy
 
@@ -241,6 +296,11 @@ Use one ledger per portfolio. For example:
 
 Do not mix unrelated portfolios in one ledger unless the user explicitly wants a
 single combined operating view.
+
+If separate portfolios claim the same repo realpath or source id, treat that as
+an overlap unless the owner explicitly recorded non-overlapping boundaries or a
+handoff/takeover decision. Record intentional split roots in the active-root
+claim and in `## Notes`.
 
 ## Vocabulary
 
