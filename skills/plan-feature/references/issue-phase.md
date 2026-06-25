@@ -47,6 +47,10 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   `parallelization`, `closeout_mode`, and `integration_mode` values documented
   below; `delivery_mode` comes from the PRD, and `issue_type` / `triage_state`
   come from project memory mappings.
+- Do not add worker authorization defaults, worker capability modes, or worker
+  surface choices to PRDs, generated issues, issue files, hosted issue bodies,
+  or draft publish commands. `$codex-orchestrator` resolves those per
+  workstream and session.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
   behavior in draft command runs, use `$project-memory`
   `references/tracker-publishing.md`.

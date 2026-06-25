@@ -60,7 +60,9 @@ Use these PRD-backed authority values in the ledger and worker prompts:
   authorized.
 
 Delivery mode values are owned by the PRD and generated issue body. Worker
-authorization modes are owned by `worker.md`.
+authorization modes are owned by `worker.md` and resolved per workstream by the
+root orchestrator. Ignore legacy project-memory worker-authorization setup
+values; they are not delivery, publication, or issue mutation authority.
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
@@ -135,10 +137,13 @@ closeout vehicle.
 
 The root orchestrator owns branch selection, shared PR shape, source closeout,
 and final publication. Workers may inspect, implement, test, and report within
-their assigned authorization modes. They may commit, push, or open PRs only when
-the root lists the corresponding `commit`, `push`, or `pr` authorization mode
-for a specific repo, branch/refspec, PR shape, and closeout target. These modes
-are capability flags, not a cumulative ladder; list every allowed action
+their assigned authorization modes. The root derives those modes per workstream
+from the owner request, source item, linked `Source PRD`, publication authority,
+issue mutation authority, selected worker surface, dependency state,
+dirty-worktree state, and gates. Workers may commit, push, or open PRs only
+when the root lists the corresponding `commit`, `push`, or `pr` authorization
+mode for a specific repo, branch/refspec, PR shape, and closeout target. These
+modes are capability flags, not a cumulative ladder; list every allowed action
 explicitly.
 
 For `one-feature-branch`, workers do not create independent feature PRs.

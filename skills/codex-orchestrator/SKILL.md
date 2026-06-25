@@ -118,6 +118,9 @@ Use `references/worker.md` for worker surfaces, caps, authorization modes,
 prompt shape, lifecycle, resync, integration, artifacts, and closeout. Keep
 these entrypoint rules in force:
 
+- Worker authorization is resolved only by the root orchestrator per workstream
+  and session. Ignore the legacy project-memory worker-authorization setup key
+  if it appears; it is stale setup state, not authority.
 - `auto` permits choosing among owner-authorized surfaces; it is not a quota.
 - Visible Codex App threads require explicit owner intent for visible, new,
   separate, or background workers.
@@ -191,9 +194,9 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 5. Resolve the worker and monitoring policy, then read `references/worker.md`
    before delegation. Create at most one worker per independent ownership
    boundary in the current wave, name visible App threads immediately, and give
-   each worker explicit scope, authorization modes, delivery/publication
-   authority, dependency state, gates, proof, branch/integration expectations,
-   and final report shape.
+   each worker explicit scope, per-workstream authorization modes,
+   delivery/publication authority, dependency state, gates, proof,
+   branch/integration expectations, and final report shape.
 6. Monitor using the recorded policy. Read a worker before steering, renaming,
    archiving, interrupting, replacing, closing, reusing, or integrating it.
    Record status, blockers, validation, risks, resync state, integration method,

@@ -15,7 +15,6 @@ changes:
 - `run_authorization`: `local_artifact_writes` and `external_tracker_mutation`,
   including whether each value is durable or current-run only
 - `delivery_mode`
-- `default_worker_authorization`
 - `issue_type` mapping
 - `triage_state` mapping
 - `domain_memory_layout`
@@ -25,6 +24,11 @@ changes:
 
 Use `Unknown` only when a value is absent or ambiguous. If the user only asked
 to view current settings, stop after the summary.
+
+If existing setup files contain the legacy worker-authorization setup key,
+report it as stale orchestrator-owned state. Remove it from any touched
+`project-memory/agents/*` file after confirmation; do not offer it as an
+editable project-memory setting.
 
 ## Settings Editor
 
@@ -37,7 +41,6 @@ Editable sections:
 - `issue-tracker`
 - `run-authorization`
 - `delivery-mode`
-- `worker-authorization`
 - `issue-type-mapping`
 - `triage-state-mapping`
 - `domain-memory`
@@ -56,9 +59,6 @@ and the relevant alternatives:
   user explicitly asks for durable defaults.
 - `delivery-mode`: `one-feature-branch`, `one-pr-per-repo`,
   `one-pr-per-issue`, `direct-commit`.
-- `worker-authorization`: `inspect, implement`,
-  `inspect, implement, commit`, `inspect, implement, commit, push`,
-  `inspect, implement, commit, push, pr`, or a custom subset.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
   custom per canonical type.
 - `triage-state-mapping`: default GitHub lowercase labels, canonical local
@@ -81,8 +81,8 @@ confirmation before writing.
   to persist it.
 - Default delivery mode to `one-feature-branch` for one git repo and
   `one-pr-per-repo` for true multi-repo or orchestrator work.
-- Default worker authorization to `inspect, implement`. It is a policy default,
-  not final permission.
+- Do not define worker authorization in project memory. `$codex-orchestrator`
+  resolves worker capability modes per workstream and session.
 - Default domain layout to `single-context` unless `CONTEXT-MAP.md`, repo
   evidence, or orchestrator mode implies otherwise.
 - Recommend `seed-context` only when non-empty repo evidence supports useful
@@ -172,7 +172,7 @@ Summarize:
 - settings reviewed and changed;
 - selected issue tracker;
 - run authorization and whether it is durable or current-run only;
-- delivery mode and worker authorization defaults;
+- delivery mode defaults;
 - issue-type and triage-state mapping;
 - domain-memory layout;
 - localization-memory decision and evidence;

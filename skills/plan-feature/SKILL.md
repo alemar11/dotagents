@@ -65,6 +65,10 @@ validation, publication target, permissions, or cross-repo contracts.
   draft handoff.
 - Use structured values from setup, the PRD phase, and the issue phase. Keep
   prose values only for explanations, reasons, and free-form notes.
+- Do not include worker authorization defaults or worker capability modes in
+  PRDs, generated issues, local issue files, hosted issue bodies, or draft
+  publish commands. `$codex-orchestrator` resolves worker authorization per
+  workstream and session.
 
 ## External Skill Calls
 
@@ -264,6 +268,8 @@ Require every issue to copy the effective `Delivery mode` label from the PRD and
 mark it as feature-level inherited metadata. Do not duplicate the full PRD
 branch/PR details in each issue; use explicit issue-level delivery exceptions
 only when an issue intentionally differs from the feature-level mode.
+Do not add worker authorization fields to generated issues; worker capability
+decisions are an orchestration-time concern.
 
 If the issue phase discovers a product, domain, dependency, or
 acceptance-criteria blocker, pause issue writing and route the blocker back

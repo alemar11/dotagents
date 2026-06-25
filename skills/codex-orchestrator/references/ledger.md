@@ -85,7 +85,7 @@ Out of scope:
 
 ## Worker Policy
 
-Default worker authorization: inspect, implement
+Authorization resolution: per-workstream
 Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
 Delegated worker surface: auto|codex-app-thread|cli-subagent|none
 Max active delegated workers: <number>
@@ -101,6 +101,12 @@ Visible worker title format: <Project>: <short current task>
 Worker policy values follow `worker.md`. Caps are not quotas. Preserve separate
 CLI/App/session caps, list each authorization mode explicitly, and record
 `Surface=no-delegation`, `Worker ID=root`, and the reason when root owns work.
+Authorization modes are not project-memory defaults; the root resolves them for
+each workstream from owner request, source item, linked `Source PRD`,
+publication authority, issue mutation authority, selected worker surface,
+dependencies, dirty-worktree state, and gates. Ignore legacy
+project-memory worker-authorization setup values as stale, non-authoritative
+state.
 
 ## Delivery Mode Policy
 

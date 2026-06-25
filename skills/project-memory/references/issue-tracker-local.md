@@ -63,15 +63,17 @@ preference change unless the user explicitly says to make it persistent.
 - Exceptions: `one-pr-per-issue` only for isolated work; `direct-commit`
   only with explicit maintainer authorization.
 
-## Worker Authorization Defaults
+## Worker Policy Boundary
 
-- Default `default_worker_authorization`: `inspect, implement`.
-- This is a policy default, not final permission. `$codex-orchestrator` must
-  still apply current owner/session authorization, publication authority,
-  dirty-worktree state, inspectability, and gates before assigning worker
-  authorization modes.
-- Do not let tracker defaults grant commit, push, PR creation, merge, direct
-  issue mutation, or release authority by themselves.
+- Project memory does not define worker authorization defaults.
+- Tracker setup records artifact routing, delivery-mode defaults, and closeout
+  conventions only. `$codex-orchestrator` resolves worker capability modes per
+  workstream and session from the owner request, source item, linked
+  `Source PRD`, publication authority, issue mutation authority, selected worker
+  surface, dependencies, dirty-worktree state, and gates.
+- If an existing setup file contains the legacy worker-authorization setup key,
+  treat it as stale state and remove it when touching the file. Do not copy it
+  into PRDs, generated issues, draft commands, ledgers, or worker prompts.
 
 Implementation issues created from a PRD usually use `Type: task`. PRD files
 do not need `Type:` or `Status:` lines unless the repo chooses to treat PRDs as

@@ -22,7 +22,6 @@ feature_slug: account-settings-export
 delivery_mode: one-feature-branch
 source_prd_ref: draft-prd:account-settings-export
 prd_body_fingerprint: sha256:7f4a9c21d003
-default_worker_authorization: inspect, implement
 ```
 
 ## Expected Pipeline
@@ -58,6 +57,9 @@ default_worker_authorization: inspect, implement
 - A repo-local `.scratch/` PRD or issue file is created.
 - A GitHub issue is created, edited, labeled, typed, closed, or attached.
 - An implementation worker receives `commit`, `push`, or `pr` authorization
-  from tracker defaults alone.
+  from project memory, plan-feature output, tracker defaults, or the draft PRD
+  ref alone.
+- Draft PRDs, generated issues, and draft publish commands include worker
+  authorization fields or worker capability modes.
 - Generated issues use a prose `Source PRD` such as the PRD title when a stable
   draft ref is available.

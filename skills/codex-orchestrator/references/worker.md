@@ -7,6 +7,11 @@ Codex worker threads or subagents.
 
 Resolve the ledger worker policy before delegation.
 
+Worker authorization is resolved per workstream and session by the root
+orchestrator. Do not read it from project-memory defaults, tracker templates,
+generated issues, or draft publish commands. If legacy project-memory
+worker-authorization setup appears, ignore it as stale, non-authoritative state.
+
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `delegated_worker_surface` | `auto`, `codex-app-thread`, `cli-subagent`, `none` | Owner-authorized delegation policy. `auto` chooses among authorized surfaces; in CLI this resolves to `cli-subagent`, while in App it may use visible App threads or subagents. |
@@ -207,10 +212,13 @@ that cleanup is safe and available, or record why they remain.
 
 ## Authorization Modes
 
-Record one or more authorization modes. Modes are capability flags, not a
-cumulative ladder. If a worker may edit, commit, push, and open a draft PR,
-record `implement, commit, push, pr`. If it may only open a PR from an
-already-pushed branch, record `pr` only.
+Record one or more authorization modes for the specific workstream. Modes are
+capability flags, not a cumulative ladder. The root derives them from the owner
+request, source item, linked `Source PRD`, publication authority, issue mutation
+authority, selected worker surface, dependency state, dirty-worktree state, and
+gates. If a worker may edit, commit, push, and open a draft PR, record
+`implement, commit, push, pr`. If it may only open a PR from an already-pushed
+branch, record `pr` only.
 
 - `inspect`: read-only investigation, issue/PR/CI inspection, repo scan, or
   design review. No file edits unless explicitly listed in allowed surfaces.

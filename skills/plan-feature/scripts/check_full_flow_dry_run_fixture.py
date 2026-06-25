@@ -10,6 +10,9 @@ REMOVED_PRD_SKILL = "$to" + "-prd"
 REMOVED_ISSUE_SKILL = "$to" + "-issues"
 REMOVED_PRD_PATH = "skills/to" + "-prd"
 REMOVED_ISSUE_PATH = "skills/to" + "-issues"
+LEGACY_WORKER_AUTH_KEY = "default" + "_worker_authorization"
+LEGACY_WORKER_AUTH_HEADING = "Worker " + "Authorization Defaults"
+LEGACY_DEFAULT_WORKER_AUTH = "Default worker " + "authorization"
 ACTIVE_TEXT_SUFFIXES = {".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml"}
 
 
@@ -69,6 +72,9 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("prd_body_fingerprint: sha256:7f4a9c21d003", fixture)
         self.assertIn("Replace every issue body line", fixture)
         self.assertIn("must not dispatch implementation workers", fixture)
+        self.assertNotIn(LEGACY_WORKER_AUTH_KEY, fixture)
+        self.assertIn("project memory, plan-feature output, tracker defaults", fixture)
+        self.assertIn("authorization fields or worker capability modes", fixture)
 
     def test_shared_contract_documents_draft_publish_handoff(self) -> None:
         contract = read("project-memory/references/tracker-publishing.md")
@@ -89,11 +95,13 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         prd_delivery = read("codex-orchestrator/references/prd-backed-delivery.md")
 
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
+        self.assertIn("Do not include worker authorization defaults", plan_feature)
         self.assertIn("references/prd-phase.md", plan_feature)
         self.assertIn("references/issue-phase.md", plan_feature)
         self.assertIn("tracker-publishing.md", prd_phase)
         self.assertIn("PRD body fingerprint", prd_phase)
         self.assertIn("tracker-publishing.md", issue_phase)
+        self.assertIn("Do not add worker authorization defaults", issue_phase)
         self.assertIn("final hardened issue bodies", issue_phase)
         self.assertIn("machine-local absolute paths", issue_phase)
         self.assertIn("references/issue-body-template.md", issue_phase)
@@ -107,6 +115,25 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Dependency Rules", vertical_slices)
         self.assertIn("circular dependencies", vertical_slices)
         self.assertIn("draft-prd:<...>", prd_delivery)
+        self.assertIn("resolved per workstream", prd_delivery)
+
+    def test_worker_authorization_is_orchestrator_owned(self) -> None:
+        ledger = read("codex-orchestrator/references/ledger.md")
+        worker = read("codex-orchestrator/references/worker.md")
+        orchestrator = read("codex-orchestrator/SKILL.md")
+
+        self.assertIn("Authorization resolution: per-workstream", ledger)
+        self.assertIn("per workstream and session", worker)
+        self.assertIn("Ignore the legacy project-memory worker-authorization", orchestrator)
+        self.assertIn("Authorization modes:", worker)
+
+    def test_project_memory_no_longer_defines_worker_auth_defaults(self) -> None:
+        for path in iter_active_text_files():
+            contents = path.read_text(encoding="utf-8")
+            with self.subTest(file=str(path.relative_to(REPO_ROOT))):
+                self.assertNotIn(LEGACY_WORKER_AUTH_KEY, contents)
+                self.assertNotIn(LEGACY_WORKER_AUTH_HEADING, contents)
+                self.assertNotIn(LEGACY_DEFAULT_WORKER_AUTH, contents)
 
     def test_removed_public_phase_skills_are_not_referenced(self) -> None:
         for path in iter_active_text_files():

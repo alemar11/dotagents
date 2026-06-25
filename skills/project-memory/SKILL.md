@@ -54,7 +54,6 @@ when reading existing artifacts; rewrite touched values to lower-kebab-case.
 | `effective_target` | `configured-tracker`, `local-dry-run`, `draft-publish-commands` |
 | `local_artifact_writes`, `external_tracker_mutation` | `allowed`, `disallowed` |
 | `delivery_mode` | `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, `direct-commit` |
-| `default_worker_authorization` | comma-separated `$codex-orchestrator` worker capabilities, default `inspect, implement` |
 | `domain_memory_layout` | `single-context`, `multi-context`, `orchestrator-context` |
 | `context_seed_mode` | `seed-context`, `routing-only` |
 | `translation_memory` | `enabled`, `not-applicable`, `needs-confirmation` |
@@ -97,7 +96,7 @@ before writing:
 - move project purpose, vocabulary, boundaries, and open questions to
   `CONTEXT.md`;
 - move localization policy to `TRANSLATION.md`;
-- move tracker, triage, delivery, worker, and domain layout to
+- move tracker, triage, delivery, and domain layout to
   `project-memory/agents/*`;
 - move accepted load-bearing decisions to ADRs;
 - preserve or ask about stale, conflicting, or weakly evidenced content.
@@ -114,7 +113,7 @@ use `Unknown` when absent or ambiguous.
 Resolve these decisions for new setup or requested edits:
 
 - issue tracker and current-run mutation authority;
-- delivery mode and worker authorization defaults;
+- delivery mode defaults;
 - issue type and triage state mappings;
 - domain-memory layout and context seed mode;
 - localization memory state;
@@ -162,7 +161,7 @@ After confirmation:
 ### 6. Report Completion
 
 Report setup mode, files written, reviewed/changed settings, tracker target,
-authorization, delivery and worker defaults, mappings, domain layout,
+run authorization, delivery defaults, mappings, domain layout,
 localization decision, `AGENTS.md` minimization, context/translation/ADR seeds,
 session-history usage, and the workflows that can now consume this setup.
 
@@ -173,7 +172,7 @@ filling project memory incrementally.
 ## Reference Responsibilities
 
 - `issue-tracker-*.md`: tracker-specific artifact locations, publication rules,
-  delivery defaults, worker defaults, title formats, and completion.
+  delivery defaults, worker policy boundaries, title formats, and completion.
 - `tracker-publishing.md`: shared effective target, draft publish, temporary
   body-file, and `source_prd_ref` contract.
 - `triage-labels.md`: canonical issue type and workflow-state mappings.
