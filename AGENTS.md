@@ -167,6 +167,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `Maintainer` self-contained: workflow markdown guidance must live under `.agents/skills/Maintainer/references/`.
 - Keep the dependency direction one-way: runtime skills must not depend on, reference, or route users to `.agents/skills/Maintainer`; only repo-level maintainer docs may route work to `Maintainer`.
 - When updating skill or plugin metadata/docs across the repo, route through the `Maintainer` playbooks and keep README/openai metadata text aligned.
+- Keep instruction-density reviews proposal-first: identify lower-instruction equivalents, then wait for explicit approval before compaction refactors.
 - For brand-new skill creation, use `$skill-creator` first; use `Maintainer` afterward only for repo integration or follow-up maintenance. (Codex learning)
 - Keep Codex-dependency audits and TanStack Intent coverage refresh as explicit maintainer-owned maintenance tracks; do not spread those maintenance workflows into runtime skills. (Codex learning)
 - Keep TanStack skills coverage alignment against `tanstack-skills/tanstack-skills/plugins` as an explicit maintainer-owned maintenance track; map upstream product plugins into the single reusable `skills/tanstack/` skill and verify product guidance against TanStack-owned docs. (Codex learning)

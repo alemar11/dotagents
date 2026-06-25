@@ -85,7 +85,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 | Skill | Path | Purpose |
 | --- | --- | --- |
-| Maintainer | `.agents/skills/Maintainer/` | Maintain and improve one or more skills or plugins in this repository with shared upgrade workflows and skill-specific refresh tasks. |
+| Maintainer | `.agents/skills/Maintainer/` | Maintain and improve skills or plugins, including read-only instruction-density reviews before refactors. |
 
 Project-local skills are repository-specific and are not included in reusable install commands.
 
