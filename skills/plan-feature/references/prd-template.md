@@ -114,5 +114,6 @@ What user or system problem this solves.
 - For orchestrator workspace PRDs: proof required before a vertical issue can
   move to `issues/done/` or close in the coordination tracker.
 - For single-repo or monorepo PRDs: validation or release proof that affects
-  issue splitting, or `N/A` when no separate gate exists.
+  issue splitting, or `N/A` when no separate integration proof requirement
+  exists.
 ```

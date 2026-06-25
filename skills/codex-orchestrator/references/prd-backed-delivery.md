@@ -42,6 +42,13 @@ Do not collapse these into one boolean. A PRD can authorize a draft PR delivery
 path without authorizing direct issue closure, merge, release, or unrelated
 GitHub mutations.
 
+`$plan-feature` may publish the PRD and generated implementation issues before
+implementation starts. After the root registers those generated issues as
+workstreams, source lifecycle and closeout mutations are orchestrator-owned:
+issue comments, label changes, direct closure when authorized, real PR link
+recording, and integration proof all require the root's resolved issue mutation
+authority.
+
 ## Structured Authority Values
 
 Use these PRD-backed authority values in the ledger and worker prompts:
@@ -124,6 +131,11 @@ If PRD-backed publication is authorized and the only remaining action is
 commit, push, or draft PR creation, keep that action in `ready-next` and
 execute it before stopping. Do not mark the work complete while an authorized
 draft PR remains uncreated.
+
+Repo PR placeholders copied from PRDs or generated issues are not completion
+proof. The root must replace or augment them during closeout with real PR links
+or equivalent integration proof before marking a PRD-backed workstream
+`completed`.
 
 Close generated GitHub implementation issues through the relevant PR body by
 default, using the closeout wording specified by the generated issue or PRD.

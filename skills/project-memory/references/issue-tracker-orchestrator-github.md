@@ -77,8 +77,9 @@ when needed.
 - PR shape: one draft PR per affected repo, all linked from the coordination
   PRD or vertical feature issue.
 - Integration proof: cross-repo validation is required before coordination
-  issues close. Repo PR links may be placeholders before implementation, but
-  completion requires real PR links or equivalent proof.
+  issues close. Planning artifacts may contain expected repo PR slots or
+  pre-implementation placeholders, but completion requires `$codex-orchestrator`
+  to record real PR links or equivalent proof.
 - Exceptions: `one-feature-branch` only when all affected work is actually in
   one git repo; `one-pr-per-issue` only for isolated work; `direct-commit` only
   with explicit maintainer authorization.
@@ -112,8 +113,9 @@ Generated vertical feature issues should include:
 - cross-repo contract or interface notes
 - integration gates by name or link and validation proof needed before closure
 - repo-local PR links or implementation child issue links when they exist;
-  placeholders are allowed before implementation when the issue is otherwise
-  ready, but real PR links or equivalent proof are required before completion
+  expected repo PR slots or pre-implementation placeholders are allowed before
+  implementation when the issue is otherwise ready, but `$codex-orchestrator`
+  must record real PR links or equivalent proof before completion
 - completion rule for the coordination issue
 - project label applied: `<project-slug>`
 

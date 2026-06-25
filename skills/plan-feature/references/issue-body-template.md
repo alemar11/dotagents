@@ -50,12 +50,14 @@ single-repo issues, `current repository`; for orchestrator issues, use
 ## Cross-Repo Notes
 
 [For orchestrator issues only: affected repos, interface contracts,
-repo PR links or placeholders, and validation order. Use `N/A` for ordinary
-single-repo issues.]
+existing repo PR links, expected repo PR slots or pre-implementation
+placeholders, and validation order. Use `N/A` for ordinary single-repo issues.
+Placeholders are scheduling expectations, not completion proof; orchestrator
+closeout records real PR links or equivalent integration proof.]
 
 ## Integration Gates
 
-[For orchestrator issues only: named gates or a link to
+[For orchestrator issues only: named integration gates or a link to
 `integration-gates.md`, plus proof required before completion. Use `N/A` for
 ordinary single-repo issues.]
 

@@ -51,6 +51,12 @@ migrates it.
 | Generated issue with `Source PRD: draft-prd:<...>` | Register only for dry-run inspection or planning review. Do not dispatch, commit, push, open PRs, close issues, or mutate trackers until the source is a hosted PRD number, local PRD path, or explicit owner decision with separate publication and issue-mutation authority. |
 | Durable generated issue, PR, CI failure, bug, local checklist, implementation plan, or explicit implementation request | Register directly as source items and decompose into workstreams. |
 
+`$plan-feature` owns PRD and generated issue publication before implementation
+scheduling. Once a generated issue is registered as an implementation
+workstream, the root orchestrator owns lifecycle and closeout mutations for that
+source item, including issue comments, label changes, direct closure when
+authorized, real PR link recording, and integration proof.
+
 For Markdown plans or checklists, enumerate unchecked items with nearest heading
 context and a stable path plus line or anchor. Preserve parent context, map each
 actionable item to a ledger workstream, and close it by applying/proposing a
@@ -205,12 +211,15 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    source closeout. Apply `references/gates.md` before owner-ready, issue-closed,
    merge-ready, release-ready, or final status. For non-trivial edits, require
    focused tests and `$autoreview`; rerun both after review-triggered changes.
-8. Mutate source state only when authorized. Use `$github-issues` for GitHub
-   issue lifecycle work, `$github-review-threads` for PR replies,
-   `$git-commit` for commit/push-only delivery, and `$yeet` when draft PR
-   creation or update is part of the resolved path. If partial source closeout
-   cannot be applied, keep the proposed update owner-ready rather than calling
-   the source complete.
+8. Mutate source state only when authorized. For source items published by
+   `$plan-feature`, treat the published PRD and generated issues as planning
+   inputs; after workstream registration, lifecycle comments, labels, direct
+   closure, real PR links, and integration proof are orchestrator closeout work.
+   Use `$github-issues` for GitHub issue lifecycle work,
+   `$github-review-threads` for PR replies, `$git-commit` for commit/push-only
+   delivery, and `$yeet` when draft PR creation or update is part of the
+   resolved path. If partial source closeout cannot be applied, keep the
+   proposed update owner-ready rather than calling the source complete.
 9. Before stopping, execute every authorized `ready-next` action. If anything
    actionable remains, return to source reconciliation and start the next
    bounded wave. Final ledger state must have no `active` worker requiring

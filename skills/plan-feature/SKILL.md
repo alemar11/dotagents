@@ -43,7 +43,8 @@ validation, publication target, permissions, or cross-repo contracts.
 - Load `references/prd-template.md`, `references/issue-body-template.md`, and
   `references/vertical-slices.md` when the relevant phase requires them.
 - Load and follow `$plan-harder` once for every generated implementation issue.
-- Write or publish artifacts only after setup is available and no gates remain.
+- Write or publish artifacts only after setup is available and no planning
+  blockers remain.
 - Separate local file write authorization from external issue-tracker mutation
   authorization. Local writes never imply GitHub or other hosted mutation.
 - Treat persistent local planning artifacts separately from temporary hosted
@@ -76,11 +77,14 @@ This skill may call:
 
 - `$project-memory` when project memory or tracker setup is missing or
   needs review.
-- `$grill-me-with-context` when feature scope, terms, decisions, or gates need
-  repo-backed clarification.
+- `$grill-me-with-context` when feature scope, terms, decisions, or planning
+  blockers need repo-backed clarification.
 - `$plan-harder` once per generated implementation issue.
 - `$github-issues` only for GitHub issue publishing, issue type/label handling,
-  parent/sub-issue relationships, and dry-run command mechanics.
+  parent/sub-issue relationships, and dry-run command mechanics for PRDs and
+  generated implementation issues. After implementation scheduling starts,
+  issue lifecycle comments, labels, direct closure, and closeout mutation belong
+  to `$codex-orchestrator` using `$github-issues`.
 
 ## Workflow
 
@@ -154,13 +158,13 @@ Use it to resolve:
 - feature goal and non-goals,
 - users, workflows, and success criteria,
 - domain terms, rules, and accepted decisions,
-- open gates or blockers that would change the PRD or issue split.
+- open planning blockers that would change the PRD or issue split.
 
-If gates or blockers emerge, continue the grill-style one-question flow until
+If planning blockers emerge, continue the grill-style one-question flow until
 they are resolved or explicitly deferred as non-blocking. Do not write or
-publish the PRD or issues while a gate remains unresolved or deferred in a way
-that can affect scope, acceptance criteria, dependencies, validation,
-publication target, permissions, or cross-repo contracts.
+publish the PRD or issues while a planning blocker remains unresolved or
+deferred in a way that can affect scope, acceptance criteria, dependencies,
+validation, publication target, permissions, or cross-repo contracts.
 
 For `issues-from-existing-prd`, inspect the PRD's open questions first. Use
 `$grill-me-with-context` only if the PRD has blockers that materially affect
@@ -261,9 +265,12 @@ disallowed, it must write to the effective local target or return draft publish
 commands instead.
 
 In orchestrator workspace mode, require generated issues to include affected
-repos, cross-repo contracts, integration gates, repo PR links or placeholders,
-issue-level scheduling and closeout metadata, and completion instructions that
-require cross-repo integration proof before closing or moving to `issues/done/`.
+repos, cross-repo contracts, integration gates, expected repo PR slots or
+pre-implementation placeholders, issue-level scheduling and closeout metadata,
+and completion instructions that require cross-repo integration proof before
+closing or moving to `issues/done/`. Generated placeholders are delivery
+expectations, not closeout proof; `$codex-orchestrator` records real PR links or
+equivalent integration proof during source closeout.
 Require every issue to copy the effective `Delivery mode` label from the PRD and
 mark it as feature-level inherited metadata. Do not duplicate the full PRD
 branch/PR details in each issue; use explicit issue-level delivery exceptions
@@ -279,7 +286,7 @@ issues from the normal `plan-feature` flow. Publish partial `needs-info` or
 instead of a fully agent-ready issue set. If the PRD still has open questions
 that affect scope, acceptance criteria, dependencies, validation, publication
 target, permissions, or cross-repo contracts, treat them as issue-splitting
-gates and do not produce `ready-for-agent` issues.
+blockers and do not produce `ready-for-agent` issues.
 
 ### 5. Report Completion
 
@@ -298,7 +305,7 @@ Summarize:
   scope when applicable,
 - delivery mode used,
 - issue graph validation summary, including dependency and acyclicity checks,
-- gates resolved or deferred,
+- planning blockers resolved or deferred,
 - any issue still blocked and why.
 
 ## Guardrails
@@ -313,8 +320,8 @@ Summarize:
   mirror or the effective target is a local dry-run override.
 - Do not treat `needs-info` issues as agent-ready output; they are waiting for
   human/reporter input and must be re-triaged before implementation.
-- If setup cannot be completed or a gate remains unresolved, stop with the
-  current state and next question instead of writing partial artifacts.
+- If setup cannot be completed or a planning blocker remains unresolved, stop
+  with the current state and next question instead of writing partial artifacts.
 
 ## References
 

@@ -18,7 +18,8 @@ question set or route back through `$grill-me-with-context`.
   are not supported by user input, repo evidence, or project memory.
 - Ask for confirmation before writing a PRD file or publishing to an issue
   tracker unless the user explicitly asked to write or publish, or
-  `plan-feature` passed explicit run authorization after resolving gates.
+  `plan-feature` passed explicit run authorization after resolving planning
+  blockers.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
 - In GitHub or GitHub coordination modes, do not persist repo-local PRD mirrors
@@ -194,10 +195,12 @@ Include a `## Delivery Mode` section in every PRD. For `one-feature-branch`,
 record branch naming such as `feature/<feature-slug>`, one draft PR for the
 feature, and the validation required before implementation issues close. For
 `one-pr-per-repo`, record the branch name to use in each affected repo, the
-expected draft PR per repo, repo PR links or placeholders, and the cross-repo
-proof needed before coordination issues close. Use `one-pr-per-issue` or
-`direct-commit` only when explicitly authorized and record the authorization
-reason.
+expected draft PR per repo, expected repo PR slots or pre-implementation
+placeholders, and the cross-repo proof needed before coordination issues close.
+Use `one-pr-per-issue` or `direct-commit` only when explicitly authorized and
+record the authorization reason. Placeholders in the PRD are delivery
+expectations, not completion proof; `$codex-orchestrator` records real PR links
+or equivalent integration proof during closeout.
 
 Treat the PRD as the canonical source for delivery mode and branch/PR details.
 The issue phase owns issue splitting and validates the generated issue graph
@@ -221,7 +224,10 @@ from that handoff without re-asking unless this phase finds a new blocker or
 unresolved question. Do not treat "local file writes allowed" as permission to
 mutate GitHub or another hosted tracker. In hosted tracker modes, local file
 write authorization applies only to explicit local mirrors or dry-run targets;
-hosted body-file inputs are transient files outside the repo.
+hosted body-file inputs are transient files outside the repo. Hosted tracker
+mutation in this phase is limited to PRD planning-artifact publication and
+metadata; implementation lifecycle comments, labels, direct closure, and
+closeout mutations after scheduling starts belong to `$codex-orchestrator`.
 
 Immediately before handing content to `$github-issues`, re-scan the final PRD
 body for machine-local absolute paths and replace them with sanitized evidence

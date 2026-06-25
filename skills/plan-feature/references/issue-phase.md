@@ -36,11 +36,11 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   owner-authorized issue-level exception.
 - Treat the generated issue set as the execution graph. Before returning or
   publishing issues, validate issue order, dependency references, acyclicity,
-  startability waves, and cross-repo gates from the final hardened issue bodies
-  themselves after `$plan-harder` has been merged. Do not create a separate
-  planning issue, local plan file, PRD plan section, or inline scheduling
-  artifact. If the user asks for a summary, label it as a non-authoritative view
-  derived from the generated issues.
+  startability waves, and cross-repo integration proof requirements from the
+  final hardened issue bodies themselves after `$plan-harder` has been merged.
+  Do not create a separate planning issue, local plan file, PRD plan section, or
+  inline scheduling artifact. If the user asks for a summary, label it as a
+  non-authoritative view derived from the generated issues.
 - Treat local file write authorization and external issue-tracker mutation
   authorization as separate permissions.
 - Use structured values for multi-choice issue body fields. This phase owns the
@@ -63,7 +63,8 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   only", or "tests only" when a vertical slice is practical.
 - Ask for confirmation before writing local issue files or publishing to a
   hosted issue tracker unless the user explicitly asked to write/publish or
-  `plan-feature` passes explicit run authorization after resolving gates.
+  `plan-feature` passes explicit run authorization after resolving planning
+  blockers.
 
 ## Structured Issue Values
 
@@ -209,7 +210,7 @@ commands, or mutating hosted trackers, revalidate the final hardened issue bodie
 as the execution graph. Every `Parallelization`, `Dependencies`, `blocks`, and
 `depends-on` reference must resolve to a generated issue ID in this feature set,
 the graph must be acyclic, startability waves must still make sense, and
-cross-repo gates must still name the required integration proof.
+cross-repo integration requirements must still name the required proof.
 
 ### 4. Apply Issue Type And Triage State
 
@@ -290,10 +291,11 @@ or unsupported, publish without a type and keep the mapped state labels.
 
 For orchestrator workspace issues, include affected repos, cross-repo contract
 notes, integration gates by name or link, repo-local PR or implementation issue
-links, and the proof required before the issue can move to `done` or close.
-Repo PR links may be placeholders before implementation when the issue is
-otherwise agent-ready, but completion must require replacing them with real PR
-links or recording equivalent integration proof.
+links when they exist, expected repo PR slots or pre-implementation
+placeholders, and the proof required before the issue can move to `done` or
+close. Placeholders are delivery expectations for scheduling, not completion
+proof; `$codex-orchestrator` records real PR links or equivalent integration
+proof during source closeout.
 
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
@@ -365,7 +367,11 @@ without re-asking unless this phase finds a new blocker or unresolved question.
 Do not treat "local file writes allowed" as permission to mutate GitHub or
 another hosted tracker. In hosted tracker modes, local file write authorization
 applies only to explicit local mirrors or dry-run targets; hosted body-file
-inputs are transient files outside the repo.
+inputs are transient files outside the repo. Hosted tracker mutation in this
+phase is limited to generated planning issue publication, parent/sub-issue
+links, issue type metadata, and initial workflow-state labels. After
+implementation scheduling starts, issue lifecycle comments, label changes,
+direct closure, and closeout mutations belong to `$codex-orchestrator`.
 
 Immediately before returning issue bodies, writing local issue files, handing
 content to `$github-issues`, or generating draft publish commands, re-scan every
@@ -381,7 +387,7 @@ commands, or use the configured local dry-run target when one is recorded. In
 must create the PRD first, capture the hosted PRD number, replace the draft ref
 with `Source PRD: #<number>`, and then create or attach implementation issues.
 When a blocker or unresolved question appears under `plan-feature`, return it
-as an issue-splitting gate instead of publishing a `needs-info` issue by
+as an issue-splitting blocker instead of publishing a `needs-info` issue by
 default.
 
 ### 6. Report Completion

@@ -13,6 +13,9 @@ REMOVED_ISSUE_PATH = "skills/to" + "-issues"
 LEGACY_WORKER_AUTH_KEY = "default" + "_worker_authorization"
 LEGACY_WORKER_AUTH_HEADING = "Worker " + "Authorization Defaults"
 LEGACY_DEFAULT_WORKER_AUTH = "Default worker " + "authorization"
+STALE_NO_GATES_REMAIN = "no " + "gates remain"
+STALE_GATES_RESOLVED = "gates " + "resolved or deferred"
+STALE_REPO_PR_PLACEHOLDERS = "repo PR links " + "or placeholders"
 ACTIVE_TEXT_SUFFIXES = {".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml"}
 
 
@@ -96,14 +99,21 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
         self.assertIn("Do not include worker authorization defaults", plan_feature)
+        self.assertIn("planning blockers", plan_feature)
+        self.assertIn("issue lifecycle comments, labels, direct closure", plan_feature)
+        self.assertNotIn(STALE_NO_GATES_REMAIN, plan_feature)
+        self.assertNotIn(STALE_GATES_RESOLVED, plan_feature)
         self.assertIn("references/prd-phase.md", plan_feature)
         self.assertIn("references/issue-phase.md", plan_feature)
         self.assertIn("tracker-publishing.md", prd_phase)
         self.assertIn("PRD body fingerprint", prd_phase)
+        self.assertIn("PRD planning-artifact publication", prd_phase)
         self.assertIn("tracker-publishing.md", issue_phase)
         self.assertIn("Do not add worker authorization defaults", issue_phase)
         self.assertIn("final hardened issue bodies", issue_phase)
         self.assertIn("machine-local absolute paths", issue_phase)
+        self.assertIn("generated planning issue publication", issue_phase)
+        self.assertNotIn(STALE_REPO_PR_PLACEHOLDERS, issue_phase)
         self.assertIn("references/issue-body-template.md", issue_phase)
         self.assertNotIn("# <feature-slug>: <NN> <vertical outcome>", issue_phase)
         self.assertIn("# PRD: [Feature Name]", prd_template)
@@ -112,10 +122,14 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("Source PRD: [path, issue number, or stable draft ref;", issue_template)
         self.assertIn("never for agent-ready", issue_template)
         self.assertIn("portable references", issue_template)
+        self.assertIn("Placeholders are scheduling expectations", issue_template)
         self.assertIn("## Dependency Rules", vertical_slices)
         self.assertIn("circular dependencies", vertical_slices)
+        self.assertIn("orchestrator closeout", vertical_slices)
         self.assertIn("draft-prd:<...>", prd_delivery)
         self.assertIn("resolved per workstream", prd_delivery)
+        self.assertIn("source lifecycle and closeout mutations are orchestrator-owned", prd_delivery)
+        self.assertIn("Repo PR placeholders copied from PRDs", prd_delivery)
 
     def test_worker_authorization_is_orchestrator_owned(self) -> None:
         ledger = read("codex-orchestrator/references/ledger.md")

@@ -158,11 +158,12 @@ contracts, or cross-repo contracts, stop and resolve them before returning or
 publishing `ready-for-agent` issues. A deferred question is safe only when it
 is explicitly classified as non-blocking for the generated issue set.
 
-For orchestrator issues, repo PR links may be placeholders before
-implementation starts when all other implementation details are agent-ready.
-Completion must still require replacing those placeholders with real PR links
-or recording equivalent integration proof before the issue moves to `done` or
-closes.
+For orchestrator issues, expected repo PR slots or pre-implementation
+placeholders may appear before implementation starts when all other
+implementation details are agent-ready. Treat those placeholders as scheduling
+expectations, not completion proof. Completion remains an orchestrator closeout
+responsibility and requires real PR links or equivalent integration proof before
+the issue moves to `done` or closes.
 
 Mark an issue `ready-for-human` when the next step requires human judgment,
 business approval, design approval, or manual operational access before an
