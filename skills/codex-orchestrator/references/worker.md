@@ -36,6 +36,27 @@ owner-facing checkpoint, `Execution mode` is only a display summary inferred
 from the selected surfaces and caps; do not treat it as a separate enum or
 source of truth.
 
+## Surface Wording Rules
+
+In owner worker-surface wording, `thread` means a visible Codex App thread.
+Phrases such as `worker thread`, `new thread`, `separate thread`, `Codex
+thread`, `visible thread`, or `use a thread` resolve `delegated_worker_surface`
+and `actual_workstream_surface` to `codex-app-thread`. Do not spawn a
+`cli-subagent` for a request that says `thread` unless the owner explicitly
+approves that fallback after the missing or changed surface is stated.
+
+Use `cli-subagent` only when the owner requests or accepts `subagent`, `/agent`,
+`CLI worker`, or similar non-thread worker wording, or when the owner left the
+surface open and the checkpoint explicitly resolves it to `cli-subagent`.
+If owner wording mixes `thread` and `subagent`, treat it as conflicting
+surface intent, present the concrete surface choices in the checkpoint, and
+wait for approval before dispatch.
+
+If Codex App thread tools are requested but unavailable, stop before dispatch
+and report the missing create/read/message thread surface. Do not silently
+downgrade to `cli-subagent`; ask for explicit fallback authorization or keep
+the work in the root thread.
+
 ## Delegation Rules
 
 - Create one worker per independent ownership boundary: repository, package,

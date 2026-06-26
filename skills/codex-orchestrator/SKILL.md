@@ -162,10 +162,16 @@ these entrypoint rules in force:
   and session. Ignore the legacy project-memory worker-authorization setup key
   if it appears; it is stale setup state, not authority.
 - `auto` permits choosing among owner-authorized surfaces; it is not a quota.
-- Visible Codex App threads require explicit owner intent for visible, new,
-  separate, or background workers.
+- In owner worker-surface wording, `thread` means a visible Codex App thread.
+  Phrases such as `worker thread`, `new thread`, `separate thread`, `Codex
+  thread`, `visible thread`, or `use a thread` resolve the delegated worker
+  surface to `codex-app-thread`; do not satisfy them with `cli-subagent`.
+- If requested Codex App thread tools are unavailable, stop before dispatch,
+  report the missing surface, and ask for an explicit fallback instead of
+  silently downgrading to a CLI/subagent worker.
 - CLI/subagent workers are valid for owner-authorized, inspectable bounded work
-  when visible App threads were not requested.
+  only when the owner requested or accepted `subagent`, `/agent`, `CLI worker`,
+  or no owner wording implied a visible Codex App thread.
 - Split workers by independent ownership boundary: repository, package,
   service, path set, or tightly scoped workstream.
 - Keep small, overlapping, shared-contract, dependency/config, migration,
