@@ -4,18 +4,39 @@ Use these commands for GitHub issue lifecycle work after confirming mutation
 authority. Add `--repo <owner>/<repo>` when the current checkout is not the
 target repo or the caller supplied an explicit repository.
 
-## Mutation Prompt
+## Tracker Write Policy
 
-When the resolved tracker configuration says `tracker_mode: github` and
-`external_tracker_mutation: allowed`, ask the user immediately whether to create
-the GitHub issues whenever the current work has produced issue-ready PRD/task
-content but the user or calling workflow has not explicitly chosen mutation or
-non-mutation. Do not quietly leave publishable GitHub issue content as local
-drafts, deferred work, or unasked next steps.
+Prefer the compact tracker policy when it is available:
 
-Skip this prompt only when the user or calling workflow already gave an explicit
+```md
+tracker_mode: github # github | local
+tracker_writes: prompt # disabled | prompt | auto
+```
+
+`tracker_mode` selects the artifact target:
+
+- `github`: write tracker artifacts as GitHub issues.
+- `local`: write tracker artifacts as local files; this GitHub skill should not
+  create GitHub issues unless the user explicitly supplies a GitHub target.
+
+`tracker_writes` selects the write behavior:
+
+- `disabled`: do not write tracker artifacts. Return exact draft bodies and
+  commands instead.
+- `prompt`: when issue-ready PRD/task content exists, ask the user immediately
+  whether to write it to the configured tracker target.
+- `auto`: write issue-ready content to the configured tracker target as soon as
+  repository context, duplicate checks, labels, types, and relationships are
+  resolved.
+
+Skip the prompt only when the user or calling workflow already gave an explicit
 instruction such as create/publish/open the issues, do not mutate GitHub, dry
 run, draft only, or local-only.
+
+For legacy tracker configs without `tracker_writes`, treat
+`external_tracker_mutation: allowed` as `tracker_writes: prompt` for GitHub
+targets. Do not infer `auto` from legacy `allowed` fields; `auto` must be
+explicit.
 
 ## Repository Context
 
@@ -172,12 +193,14 @@ gh issue close <number-or-url> --reason "not planned" --comment "<closing ration
 ```
 
 Before closing partially satisfied work, create or link an owner-visible
-follow-up when mutation is authorized. If follow-up mutation is not authorized,
-keep the source issue open and report the proposed follow-up title/body.
+follow-up when `tracker_writes` permits the write. If writes are disabled or
+not authorized, keep the source issue open and report the proposed follow-up
+title/body.
 
 ## Dry Runs
 
-When external mutation is not authorized, do not run mutating commands. Return:
+When `tracker_writes: disabled` or external mutation is otherwise not
+authorized, do not run mutating commands. Return:
 
 - the exact issue title and body or comment body,
 - the exact `gh` command that would be run,
