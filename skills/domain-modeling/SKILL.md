@@ -92,12 +92,38 @@ When invoked by an automation, scheduled review, or other batch workflow:
 - Do not create ADRs from batch review alone unless the decision is clearly
   accepted and load-bearing.
 
+Use a compact closeout shape so repeated reviews stay comparable:
+
+```markdown
+## Accepted Updates
+
+- Durable term, rule, boundary, open question, or accepted decision captured
+  now, with destination doc.
+
+## Deferred Candidates
+
+- Plausible durable knowledge that still needs acceptance, stronger repo
+  evidence, or tracker/source confirmation before capture.
+
+## ADR-worthy Decisions
+
+- Accepted, load-bearing decisions that may deserve an ADR if they are not yet
+  recorded.
+
+## No Durable Change
+
+- Explicitly state this when the review found nothing worth capturing.
+```
+
+Omit empty sections unless `No Durable Change` is the only correct result.
+
 ### 5. Report what changed
 
 When returning to the user or calling skill, summarize:
 
 - docs created or updated,
 - terms, rules, or decisions captured,
+- deferred candidates left out of durable docs and why,
 - unresolved domain questions,
 - any decision that may deserve a future ADR.
 

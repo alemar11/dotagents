@@ -67,10 +67,15 @@ closest existing doc over creating new files.
 Stop when the plan is actionable, the user asks to proceed, or remaining
 uncertainty no longer blocks action.
 
+If one or more durable decisions landed during the session, the closeout must
+say which ones were captured in docs and which ones were consciously deferred.
+Do not end with a generic `docs updated` line when the real outcome was "no
+doc write yet"; name the deferred capture and the reason.
+
 Summarize:
 
 - resolved decisions,
-- docs updated,
+- docs updated, or explicitly deferred documentation with reason,
 - remaining risks,
 - deferred questions,
 - recommended next action.
@@ -81,4 +86,6 @@ Summarize:
 - Do not implement the plan unless the user explicitly switches to execution.
 - Do not let documentation work interrupt the one-question flow; write docs
   between questions or when a decision has clearly landed.
+- Do not silently leave durable accepted decisions undocumented; capture them or
+  explicitly defer capture in the closeout.
 - Do not create broad project doctrine from a single narrow decision.
