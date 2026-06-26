@@ -4,19 +4,19 @@ Cross-repo PRDs and vertical feature issues live as markdown files in this
 orchestrator workspace. The workspace coordinates external repos; it does not
 replace their repo-local project memory or code ownership.
 
-Tracker mode: `orchestrator-local`
-Local PRD path pattern:
+tracker_mode: `orchestrator-local`
+tracker_writes: `auto`
+local_prd_path_pattern:
 `projects/<project-slug>/features/<feature-slug>/PRD.md`
-Local issue path pattern:
+local_issue_path_pattern:
 `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
-Done issue path pattern:
+done_issue_path_pattern:
 `projects/<project-slug>/features/<feature-slug>/issues/done/<NN>-<slug>.md`
-External mutation policy: local files only unless the user explicitly
-authorizes a hosted tracker in the current run.
 
-Current-run override: record any temp, dry-run, rehearsal, or no-external
-constraint here. Do not treat a current-run override as a durable coordination
-backend change unless the user explicitly says to make it persistent.
+Current-run override: record any temp, dry-run, rehearsal, or disabled-write
+constraint as `tracker_writes: disabled`. Do not treat a current-run override
+as a durable coordination backend change unless the user explicitly says to make
+it persistent.
 
 ## Conventions
 

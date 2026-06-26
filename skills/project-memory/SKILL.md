@@ -50,13 +50,32 @@ when reading existing artifacts; rewrite touched values to lower-kebab-case.
 | Key | Values |
 | --- | --- |
 | `setup_mode` | `fresh-setup`, `existing-project-bootstrap`, `orchestrator-workspace` |
-| `tracker_mode` | `github`, `local-markdown`, `orchestrator-local`, `orchestrator-github`, `other` |
-| `effective_target` | `configured-tracker`, `local-dry-run`, `draft-publish-commands` |
-| `local_artifact_writes`, `external_tracker_mutation` | `allowed`, `disallowed` |
+| `tracker_mode` | `github`, `local`, `orchestrator-local`, `orchestrator-github`, `other` |
+| `tracker_writes` | `disabled`, `prompt`, `auto` |
 | `delivery_mode` | `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, `direct-commit` |
 | `domain_memory_layout` | `single-context`, `multi-context`, `orchestrator-context` |
 | `context_seed_mode` | `seed-context`, `routing-only` |
 | `translation_memory` | `enabled`, `not-applicable`, `needs-confirmation` |
+
+Legacy tracker aliases:
+
+- Treat `local-markdown` as `tracker_mode: local` when reading existing
+  artifacts.
+- Treat `external_tracker_mutation: allowed` as `tracker_writes: prompt` for
+  GitHub targets unless `tracker_writes` is already present.
+- Treat `local_artifact_writes: allowed` as `tracker_writes: auto` for local
+  targets unless `tracker_writes` is already present.
+- Remove `effective_target`, `local_artifact_writes`, and
+  `external_tracker_mutation` from any `issue-tracker.md` file you touch.
+
+When touching `project-memory/agents/issue-tracker.md`, normalize the setup
+header:
+
+- use `lower_snake_case` keys;
+- wrap structured values in backticks;
+- require `tracker_writes` whenever `tracker_mode` is present;
+- use `github_repo` for GitHub targets, not prose keys like `GitHub repo`;
+- preserve unrelated custom prose, labels, delivery rules, and dry-run notes.
 
 Detailed meanings and generated-file shapes live in the references listed
 below.
@@ -72,8 +91,9 @@ below.
   candidates.
 - Use `orchestrator-workspace` only for a parent coordination workspace that
   plans across independent repos. Do not treat it as a monorepo.
-- For temp, rehearsal, validation, or dry-run work, keep external mutation
-  disallowed unless the user explicitly authorizes it.
+- For temp, rehearsal, validation, or dry-run work, use a current-run
+  `tracker_writes: disabled` override unless the user explicitly authorizes
+  tracker writes.
 
 ### 2. Inspect Evidence
 
@@ -112,7 +132,7 @@ use `Unknown` when absent or ambiguous.
 
 Resolve these decisions for new setup or requested edits:
 
-- issue tracker and current-run mutation authority;
+- issue tracker and `tracker_writes` policy;
 - delivery mode defaults;
 - issue type and triage state mappings;
 - domain-memory layout and context seed mode;
@@ -157,12 +177,15 @@ After confirmation:
   product naming, or user-facing copy. Do not require the pointer or create
   broken links.
 - In orchestrator workspace mode, do not create project or feature folders.
+- Before reporting completion, grep any touched `issue-tracker.md` for legacy
+  keys: `effective_target`, `local_artifact_writes`, and
+  `external_tracker_mutation`. Remove them or report why they must remain.
 
 ### 6. Report Completion
 
 Report setup mode, files written, reviewed/changed settings, tracker target,
-run authorization, delivery defaults, mappings, domain layout,
-localization decision, `AGENTS.md` minimization, context/translation/ADR seeds,
+`tracker_writes`, delivery defaults, mappings, domain layout, localization
+decision, `AGENTS.md` minimization, context/translation/ADR seeds,
 session-history usage, and the workflows that can now consume this setup.
 
 If session history is unavailable or weak, say so plainly. Future

@@ -11,9 +11,9 @@ changes:
 
 - `setup_mode`
 - `tracker_mode`
-- `effective_target`
-- `run_authorization`: `local_artifact_writes` and `external_tracker_mutation`,
-  including whether each value is durable or current-run only
+- `tracker_writes`, including whether the value is durable or current-run only
+- tracker target such as `github_repo`, `coordination_repo`, or local path
+  patterns
 - `delivery_mode`
 - `issue_type` mapping
 - `triage_state` mapping
@@ -39,7 +39,7 @@ and tracker-specific values unless the user explicitly changes them.
 Editable sections:
 
 - `issue-tracker`
-- `run-authorization`
+- `tracker-writes`
 - `delivery-mode`
 - `issue-type-mapping`
 - `triage-state-mapping`
@@ -52,11 +52,11 @@ Editable sections:
 For each selected section, show the current value first, then `keep-current`
 and the relevant alternatives:
 
-- `issue-tracker`: `github`, `local-markdown`, `orchestrator-local`,
+- `issue-tracker`: `github`, `local`, `orchestrator-local`,
   `orchestrator-github`, `other`.
-- `run-authorization`: `local-artifacts-only`, `external-tracker-only`,
-  `both-allowed`, `both-disallowed`. Treat as current-run authority unless the
-  user explicitly asks for durable defaults.
+- `tracker-writes`: `disabled`, `prompt`, `auto`. Treat no-write and dry-run
+  choices as current-run overrides unless the user explicitly asks for durable
+  defaults.
 - `delivery-mode`: `one-feature-branch`, `one-pr-per-repo`,
   `one-pr-per-issue`, `direct-commit`.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
@@ -76,9 +76,11 @@ confirmation before writing.
 
 - Default to GitHub for code repos with a GitHub remote; default to local
   markdown when no clear GitHub issue tracker exists.
-- For dry runs or no-external-mutation runs, do not let a GitHub remote force
-  GitHub mutation. Record any override as current-run only unless the user says
-  to persist it.
+- Default `tracker_writes` to `prompt` for GitHub/hosted trackers and `auto`
+  for local trackers unless the user or existing setup says otherwise.
+- For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
+  mutation. Record `tracker_writes: disabled` as current-run only unless the
+  user says to persist it.
 - Default delivery mode to `one-feature-branch` for one git repo and
   `one-pr-per-repo` for true multi-repo or orchestrator work.
 - Do not define worker authorization in project memory. `$codex-orchestrator`
@@ -122,6 +124,9 @@ After confirmation:
 - Create `project-memory/agents/` if needed.
 - Write or update the three setup files under `project-memory/agents/`.
 - In review mode, update only files needed for confirmed changes.
+- Normalize any touched `issue-tracker.md` setup header to lower-snake-case
+  keys with backticked structured values. Remove legacy `effective_target`,
+  `local_artifact_writes`, and `external_tracker_mutation` fields.
 - Create or update `AGENTS.md` pointer block and apply only confirmed
   minimization.
 - Create or update `CONTEXT.md` with `$domain-modeling` when seed/bootstrap is
@@ -171,7 +176,7 @@ Summarize:
 - files written;
 - settings reviewed and changed;
 - selected issue tracker;
-- run authorization and whether it is durable or current-run only;
+- `tracker_writes` and whether it is durable or current-run only;
 - delivery mode defaults;
 - issue-type and triage-state mapping;
 - domain-memory layout;

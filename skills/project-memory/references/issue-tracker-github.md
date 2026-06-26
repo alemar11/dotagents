@@ -3,9 +3,12 @@
 PRDs and implementation issues for this repo live as GitHub issues. Use
 `$github-issues` for GitHub issue lifecycle operations.
 
-Tracker mode: `github`
-GitHub repo: infer from `git remote -v` unless this file records a specific
-`<owner>/<repo>`.
+tracker_mode: `github`
+tracker_writes: `prompt`
+github_repo: `<owner>/<repo>`
+
+Infer `github_repo` from `git remote -v` only when this file does not record a
+specific target.
 
 GitHub is the authoritative artifact store in this mode. Do not create or keep
 repo-local `.scratch/` PRD/issue mirrors, `project-memory/features/` mirrors, or
@@ -16,17 +19,17 @@ explicitly asks to keep a local mirror.
 ## Non-Mutating Runs
 
 If this setup is being used for a temp exercise, validation pass, rehearsal,
-dry run, or any workflow where external GitHub mutation is not authorized, do
-not mutate GitHub. Use local markdown only when a local dry-run target is
-configured or explicitly chosen for that run, or ask `$github-issues` to return
-draft issue bodies and exact `gh` commands without executing them.
+dry run, or any workflow where tracker writes are explicitly disabled, do not
+mutate GitHub. Use local markdown only when a local dry-run target is configured
+or explicitly chosen for that run, or ask `$github-issues` to return draft issue
+bodies and exact `gh` commands without executing them.
 When returning draft commands before the PRD issue exists, use
 `source_prd_ref=draft-prd:<feature-slug>` and publish the PRD first; generated
 issue bodies must replace that draft ref with `Source PRD: #<prd-number>` before
 hosted mutation.
-Record the non-mutating choice as a current-run override in
-`project-memory/agents/issue-tracker.md`; do not treat it as a durable tracker
-preference change unless the user explicitly says so.
+Record any non-mutating choice as a current-run `tracker_writes: disabled`
+override in `project-memory/agents/issue-tracker.md`; do not treat it as a
+durable tracker preference change unless the user explicitly says so.
 
 ## Conventions
 

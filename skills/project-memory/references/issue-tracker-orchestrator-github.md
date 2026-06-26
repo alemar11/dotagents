@@ -5,7 +5,10 @@ coordination repository. The coordination repository groups and tracks
 cross-repo outcomes; actual product code changes still happen in the owning
 repos.
 
-Tracker mode: `orchestrator-github`
+tracker_mode: `orchestrator-github`
+tracker_writes: `prompt`
+coordination_repo: `<owner>/<repo>`
+project_label_format: `<project-slug>`
 
 The coordination repository is the authoritative artifact store in this mode.
 Do not create or keep repo-local `.scratch/`, local `projects/.../features/...`,
@@ -18,8 +21,8 @@ unless the user explicitly asks to keep a local mirror.
 Record the coordination repository in `project-memory/agents/issue-tracker.md`:
 
 ```text
-Coordination repo: <owner>/<repo>
-Project label format: <project-slug>
+coordination_repo: `<owner>/<repo>`
+project_label_format: `<project-slug>`
 ```
 
 Use `$github-issues` with the configured coordination repository. GitHub issue
@@ -29,15 +32,15 @@ the coordination repository.
 ## Non-Mutating Runs
 
 If this setup is being used for a temp exercise, validation pass, rehearsal,
-dry run, or any workflow where external GitHub mutation is not authorized, do
-not mutate GitHub. Use local orchestrator markdown only when a local dry-run
-target is configured or explicitly chosen for that run, or ask `$github-issues`
-to return draft issue bodies and exact `gh` commands without executing them.
+dry run, or any workflow where tracker writes are explicitly disabled, do not
+mutate GitHub. Use local orchestrator markdown only when a local dry-run target
+is configured or explicitly chosen for that run, or ask `$github-issues` to
+return draft issue bodies and exact `gh` commands without executing them.
 When returning draft commands before the PRD issue exists, use
 `source_prd_ref=draft-prd:<project-slug>/<feature-slug>` and publish the PRD
 first; generated issue bodies must replace that draft ref with
 `Source PRD: #<prd-number>` before hosted mutation.
-Record this as a current-run override in
+Record this as a current-run `tracker_writes: disabled` override in
 `project-memory/agents/issue-tracker.md`; do not treat it as a durable
 coordination backend change unless the user explicitly says so.
 
