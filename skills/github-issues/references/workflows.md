@@ -4,6 +4,19 @@ Use these commands for GitHub issue lifecycle work after confirming mutation
 authority. Add `--repo <owner>/<repo>` when the current checkout is not the
 target repo or the caller supplied an explicit repository.
 
+## Mutation Prompt
+
+When the resolved tracker configuration says `tracker_mode: github` and
+`external_tracker_mutation: allowed`, ask the user immediately whether to create
+the GitHub issues whenever the current work has produced issue-ready PRD/task
+content but the user or calling workflow has not explicitly chosen mutation or
+non-mutation. Do not quietly leave publishable GitHub issue content as local
+drafts, deferred work, or unasked next steps.
+
+Skip this prompt only when the user or calling workflow already gave an explicit
+instruction such as create/publish/open the issues, do not mutate GitHub, dry
+run, draft only, or local-only.
+
 ## Repository Context
 
 ```bash

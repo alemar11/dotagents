@@ -32,6 +32,11 @@ This skill only handles GitHub Issues.
   user or calling workflow has explicit mutation authority.
 - If external mutation is not authorized, return exact draft commands and issue
   bodies instead of running mutating commands.
+- If the configured tracker says `tracker_mode: github` and
+  `external_tracker_mutation: allowed`, and the current work has produced
+  issue-ready PRD/task content without an explicit publish/create instruction,
+  ask the user immediately whether to create the GitHub issues now. Do not
+  quietly leave the result as local drafts or implicit future work.
 - Do not create new label taxonomy unless the repo's tracker configuration or
   user explicitly asks for it.
 
@@ -41,16 +46,20 @@ This skill only handles GitHub Issues.
    - current checkout repo,
    - explicit `--repo <owner>/<repo>`,
    - or a target repository supplied by the user or calling workflow.
-2. Read the relevant issue or label state before mutation.
-3. Apply the smallest GitHub issue operation needed:
+2. If the resolved tracker configuration has `tracker_mode: github` and
+   `external_tracker_mutation: allowed`, but the user or calling workflow has
+   not explicitly chosen mutation or non-mutation for issue-ready content, ask
+   whether to create the GitHub issues immediately.
+3. Read the relevant issue or label state before mutation.
+4. Apply the smallest GitHub issue operation needed:
    - create issues with the requested title, body, type, labels, or parent,
    - set issue type,
    - add or remove labels,
    - add comments,
    - attach parent/sub-issue relationships,
    - close only after the requested disposition is explicit.
-4. Verify the changed issue or queue state after mutation.
-5. Report the issue URL/number, commands run or drafted, and any skipped
+5. Verify the changed issue or queue state after mutation.
+6. Report the issue URL/number, commands run or drafted, and any skipped
    mutation because authorization was missing.
 
 ## Routing
