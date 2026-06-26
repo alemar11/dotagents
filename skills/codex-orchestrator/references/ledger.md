@@ -177,10 +177,11 @@ Exceptions:
 
 Each implementation workstream records effective delivery mode, inheritance or
 override source, issue-level parallelization, dependencies, blocks, closeout,
-branch/PR expectation, current wave, integration proof target, and, for
-PRD-backed workflows, separate delivery, publication, and issue-mutation
-authority. Workers may not choose a different branch or PR strategy without a
-root-owned ledger update and authorization check.
+branch/PR expectation, publication checkout, caller checkout policy, current
+wave, integration proof target, and, for PRD-backed workflows, separate
+delivery, publication, and issue-mutation authority. Workers may not choose a
+different branch or PR strategy without a root-owned ledger update and
+authorization check.
 
 Startability is issue-level: `independent` may start when gates allow,
 `depends-on <issue>` waits for root-verifiable dependency proof,
@@ -222,7 +223,7 @@ when those fields apply.
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; publication checkout; caller checkout policy; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### autonomous
 
@@ -256,9 +257,10 @@ when those fields apply.
 ### completed
 
 - <source id/ref, delivery mode, branch/PR/proof, validation, source closeout target and
-  whether it was updated/closed>
-- <worker id/title, integration method, worker lifecycle decision, generated
-  ignored artifacts removed/retained/left in helper worktree>
+  whether it was updated/closed, publication checkout, caller checkout disposition>
+- <worker id/title, integration method, publication checkout, caller checkout
+  disposition, worker lifecycle decision, generated ignored artifacts
+  removed/retained/left in helper worktree>
 
 ### released
 
@@ -312,7 +314,7 @@ claim and in `## Notes`.
 | `ready-next` | Owner-ready work still needing review, commit, push, PR, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
-| `completed` | Required gates passed and delivery contract is satisfied. Record commits/PRs, validation, proof, source closeout, integration method, lifecycle decision, and generated ignored artifact disposition. Blocked publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
+| `completed` | Required gates passed and delivery contract is satisfied. Record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
 | `deferred` | Residual work intentionally outside current closeout. Link the follow-up or proposed body; use only for real residual scope, blocked live proof, or owner-visible follow-up work. |
 | `released` | Release gate passed and actual product/package/version release, deploy, or tag proof is recorded. Ordinary implementation remains `completed` unless a release happened. |
 
@@ -338,8 +340,8 @@ Before marking a ledger `complete`, verify:
 - `deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
 - `completed` records the final proof, source closeout state, integration
-  method, publication state, and worker lifecycle decision for each completed
-  worker-backed item.
+  method, publication state, publication checkout, caller checkout disposition,
+  and worker lifecycle decision for each completed worker-backed item.
 - Generated ignored artifacts and helper worktrees are either removed, retained
   for inspection with a reason, left only inside a helper worktree with an
   explicit lifecycle decision, or explicitly handed off.

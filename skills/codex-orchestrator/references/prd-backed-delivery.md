@@ -87,7 +87,10 @@ This PRD-backed publication authority is sufficient for the root orchestrator
 to use `$git-commit` for commit/push-only delivery, or `$yeet` when the resolved
 delivery path requires draft PR creation or updating an existing PR. It is not
 sufficient for merge, release, production deploy, final issue closure by direct
-mutation, or broad GitHub cleanup.
+mutation, broad GitHub cleanup, or switching the caller checkout away from its
+current branch. When worker or integration worktrees are available, the root
+should publish from one of those checkouts and preserve the caller checkout
+unless the checkpoint explicitly approves using it as the publication checkout.
 
 Direct commit remains a special case. Use `direct-commit` only when the PRD,
 generated issue, or owner request explicitly says direct commit is authorized
@@ -104,8 +107,8 @@ Before scheduling or publishing PRD-backed work:
 2. Resolve the effective delivery mode from the PRD first, then apply only
    issue-level overrides that are explicit and authorized.
 3. Record delivery authority, publication authority, issue mutation authority,
-   closeout vehicle, branch expectation, PR expectation, and integration proof
-   target in the ledger.
+   closeout vehicle, branch expectation, PR expectation, publication checkout,
+   caller checkout policy, and integration proof target in the ledger.
 4. Build the wave graph from the generated issues' dependency and
    parallelization fields. Queue-ready does not mean start-ready when an issue
    depends on another incomplete issue.
@@ -124,8 +127,9 @@ For PRD-backed implementation, local code completion is not enough for
 - dependency and integration proof targets are satisfied;
 - the expected branch and draft PR exist when PRD-backed publication is
   authorized; and
-- the ledger records the PR URL or records why publication is blocked and moves
-  the remaining action to `needs-owner`, `blocked`, or `deferred`.
+- the ledger records the PR URL, publication checkout, and caller checkout
+  disposition, or records why publication is blocked and moves the remaining
+  action to `needs-owner`, `blocked`, or `deferred`.
 
 If PRD-backed publication is authorized and the only remaining action is
 commit, push, or draft PR creation, keep that action in `ready-next` and
@@ -160,9 +164,11 @@ explicitly.
 
 For `one-feature-branch`, workers do not create independent feature PRs.
 They provide patches, helper worktree diffs, or reviewed commits for root
-integration into the shared branch. For `one-pr-per-repo`, a repo-scoped
-worker may prepare that repo's branch or draft PR only if the root assigned
-repo-scoped `commit`, `push`, or `pr` authority matching each intended action.
+integration into the shared branch. The shared feature branch may live in a
+worker worktree or a dedicated integration worktree; it does not require using
+the caller checkout. For `one-pr-per-repo`, a repo-scoped worker may prepare
+that repo's branch or draft PR only if the root assigned repo-scoped `commit`,
+`push`, or `pr` authority matching each intended action.
 
 ## Ad Hoc And Legacy Sources
 

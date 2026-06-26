@@ -22,6 +22,8 @@ worker-authorization setup appears, ignore it as stale, non-authoritative state.
 | `worker_lifecycle` | `integrated`, `retained-for-inspection`, `abandoned`, `handoff-pending` | Root decision about worker output. |
 | `branch_expectation` | `shared-feature-branch`, `repo-feature-branch`, `issue-branch`, `direct-commit-target`, `none` | Expected landing target. |
 | `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, dispatch-time `pending` | Root integration path. Replace `pending` before lifecycle closeout or record that no output was integrated. |
+| `caller_checkout_policy` | `preserve-current-branch`, `caller-checkout-approved`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
+| `publication_checkout` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, and draft PR publication will run. |
 | `source_disposition` | `completed`, `partial`, `blocked`, `needs-owner`, `deferred`, `unchanged` | Source outcome from the worker's perspective. |
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
@@ -58,6 +60,12 @@ source of truth.
 - Workers must preserve unrelated local changes and stage only authorized
   paths. Only the root creates, reuses, forks, assigns, renames, messages,
   archives, closes, interrupts, or replaces worker threads.
+- When visible Codex App workers provide helper worktrees, preserve the caller
+  checkout branch by default. Root-owned integration, validation, commit, push,
+  and PR creation should run from the worker worktree or a dedicated integration
+  worktree. Switching the caller checkout is allowed only when the checkpoint
+  explicitly chooses `caller-checkout-approved`, or when no helper/integration
+  checkout is available and the owner approves that fallback.
 
 ## Approach Checkpoint
 
@@ -100,6 +108,8 @@ Then use this decision table shape:
 | CLI subagents | <yes/no; max active if yes> | Whether background CLI/subagent workers will be spawned. |
 | Visible App threads | <yes/no; planned titles if yes> | Whether new visible Codex App worker threads will appear. |
 | Root-owned work | <integration, shared files, broad tests, autoreview, publication, closeout> | Work the orchestrator root keeps instead of delegating. |
+| Caller checkout policy | <preserve current branch OR caller checkout approved OR not applicable> | Whether the checkout where the owner invoked the orchestrator may switch branches. Preserve it by default when worker or integration worktrees exist. |
+| Publication checkout | <worker worktree OR dedicated integration worktree OR caller checkout with approval OR not applicable> | The checkout where commit, push, and draft PR publication will run. |
 | Authorization modes | <inspect, implement, commit, push, pr, ci-rerun-fix, merge-close, release> | The exact actions allowed by this approval. |
 | Delivery path | <branch, PR, closeout expectation> | Where implementation lands and how source items close. |
 | Gates before closeout | <tests, autoreview, CI, integration proof, owner decisions> | Required proof before the source can be marked complete. |
@@ -140,7 +150,7 @@ assignment they receive.
 
 | Mode | Worker handling |
 | --- | --- |
-| `one-feature-branch` | Root owns the shared branch/PR. Worker provides patch, helper-worktree diff, handoff, or reviewed commit unless root explicitly grants publication modes. |
+| `one-feature-branch` | Root owns the shared branch/PR. The shared branch may live in a worker worktree or dedicated integration worktree; it does not require using or switching the caller checkout. Worker provides patch, helper-worktree diff, handoff, or reviewed commit unless root explicitly grants publication modes. |
 | `one-pr-per-repo` | Repo-scoped worker may prepare that repo branch/PR only when `commit`, `push`, and/or `pr` modes are explicitly listed. |
 | `one-pr-per-issue` | Use only for explicitly isolated issue work. |
 | `direct-commit` | Use only with explicit owner authorization recorded in the prompt and ledger. |
@@ -228,17 +238,21 @@ per worker output:
   surface when the worker's checkout should become the integration checkout.
 - `worker-commit`: accept a worker-prepared commit or branch only when the
   authorization modes include `commit` and the root has reviewed the diff.
-- `patch-apply`: apply a worker diff or patch in the root checkout, then inspect
-  conflicts and rerun root gates.
-- `manual-root`: reimplement or copy the relevant change in the root checkout
-  when the worker output is partial, stale, conflicting, or easier to reproduce
-  safely than to apply directly.
+- `patch-apply`: apply a worker diff or patch in the explicitly named
+  integration checkout, then inspect conflicts and rerun root gates. Prefer a
+  worker worktree or dedicated integration worktree when one exists; use the
+  caller checkout only when the approach checkpoint approved that branch switch.
+- `manual-root`: reimplement or copy the relevant change in the explicitly
+  named integration checkout when the worker output is partial, stale,
+  conflicting, or easier to reproduce safely than to apply directly. Preserve
+  the caller checkout unless it was approved as the integration checkout.
 
 For every path, inspect the tracked diff, preserve unrelated local changes,
 exclude generated ignored artifacts, rerun the required root gates, and record
-the integration method and proof in the ledger. Do not commit, push, merge,
-close, release, or mutate external services unless the current authorization
-modes and gate state permit it.
+the integration method, publication checkout, caller checkout disposition, and
+proof in the ledger. Do not commit, push, merge, close, release, or mutate
+external services unless the current authorization modes and gate state permit
+it.
 
 ## Generated Artifacts
 
@@ -273,8 +287,8 @@ After a worker reports `done`, `ready-for-review`, `blocked`, or `needs-owner`,
 the root orchestrator decides the worker lifecycle state before final owner
 status:
 
-- `integrated`: output was accepted into the root checkout, root gates passed,
-  and the worker can be archived or its helper worktree removed.
+- `integrated`: output was accepted into the chosen integration checkout, root
+  gates passed, and the worker can be archived or its helper worktree removed.
 - `retained-for-inspection`: output or artifacts are intentionally kept for
   owner/root review; record what remains and why.
 - `abandoned`: output was not used; record the reason and confirm there is no
@@ -357,6 +371,8 @@ Scope:
 - Branch expectation: <shared-feature-branch|repo-feature-branch|issue-branch|direct-commit-target|none>
 - Issue integration shape: <shared-feature-branch|repo-pr|issue-pr|direct-commit|inspect-only>
 - Root integration method: <handoff|worker-commit|patch-apply|manual-root|pending>
+- Caller checkout policy: <preserve-current-branch|caller-checkout-approved|not-applicable>
+- Publication checkout: <worker-worktree path|integration-worktree path|caller-checkout path|not-applicable>
 - Report channel: this worker thread only
 - Helper checkout/worktree: <path or unknown>
 - Heartbeat/next checkpoint: <interval/time or none>
@@ -387,7 +403,7 @@ Final report:
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
 - Delivery: delivery mode, branch or PR used, closeout path, and PR links or
-  `none`
+  `none`; include publication checkout and caller checkout disposition
 - Scheduling: current wave assignment, unlock state, and dependency source
 - Gate status: pass|fail|blocked|not-applicable with root-verifiable evidence
 - Generated artifacts: ignored local files or directories created, or none

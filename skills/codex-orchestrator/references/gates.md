@@ -33,7 +33,8 @@ these `gate_status` values in the ledger gate matrix:
 - `not-applicable`: gate does not apply, with a short recorded reason.
 
 `publication-safety` owns `push_policy`, `branch_target_guard`,
-`pr_diff_status`, and `post_push_verification` values.
+`publication_checkout_guard`, `caller_checkout_guard`, `pr_diff_status`, and
+`post_push_verification` values.
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
@@ -62,13 +63,21 @@ Before push or draft PR publication, evaluate `publication-safety`. Record:
 - `push_policy`: `no-push`, `explicit-refspec-only`, or `block-plain-push`.
 - `branch_target_guard`: `default-branch-blocked`,
   `protected-branch-blocked`, or `verified-feature-branch`.
+- `publication_checkout_guard`: `worker-worktree`, `integration-worktree`,
+  `caller-checkout-approved`, or `blocked`.
+- `caller_checkout_guard`: `preserved`, `explicitly-approved-switch`, or
+  `not-applicable`.
 - `pr_diff_status`: `non-empty`, `empty`, or `not-checked`.
 - `post_push_verification`: `verified`, `failed`, or `not-applicable`.
 
 Publication should use an explicit refspec, target the expected feature branch,
-and verify the pushed branch or draft PR state after push. If the PR diff is
-empty or the target is the default/protected branch without explicit
-authorization, stop and record `blocked`.
+run from the recorded publication checkout, and verify the pushed branch or
+draft PR state after push. When worker or integration worktrees are available,
+the caller checkout should remain on its original branch; if the caller checkout
+was switched, the gate must record the explicit approval that allowed it. If the
+PR diff is empty, the publication checkout is not on the expected branch, or
+the target is the default/protected branch without explicit authorization, stop
+and record `blocked`.
 
 ### Live Proof Gate
 
