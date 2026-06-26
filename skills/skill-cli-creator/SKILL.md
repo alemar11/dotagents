@@ -1,6 +1,6 @@
 ---
 name: skill-cli-creator
-description: Build a composable embedded CLI that lives inside a skill or plugin. Use when Codex needs to create or refactor an embedded command surface under `scripts/`, keep normal runtime usage on that `scripts/...` surface, and optionally maintain one or more larger CLI implementations in a maintenance-only project under `projects/`.
+description: Create or refactor embedded CLIs that ship from `scripts/<tool>` inside an existing skill or plugin.
 ---
 
 # Skill CLI Creator

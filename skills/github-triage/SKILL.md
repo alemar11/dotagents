@@ -1,6 +1,6 @@
 ---
 name: github-triage
-description: Use for current-repository GitHub issue, pull request, label, milestone, or queue-health triage and URL-first read-only queue summaries. Prefer direct gh read commands; route GitHub issue lifecycle mutations to $github-issues.
+description: Inspect current-repo GitHub issues, PRs, labels, milestones, and queue health read-only; route mutations to $github-issues.
 ---
 
 # GitHub Triage

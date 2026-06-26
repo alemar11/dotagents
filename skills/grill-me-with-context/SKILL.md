@@ -1,6 +1,6 @@
 ---
 name: grill-me-with-context
-description: Stress-test a codebase-backed plan with project context while updating durable docs. Use when the user asks to be grilled with context, sharpen a feature or architecture plan in a repo, build shared language during planning, or preserve decisions in CONTEXT.md or ADRs as the grilling session progresses.
+description: Stress-test repo-backed plans through project context and capture accepted decisions in docs or ADRs.
 ---
 
 # Grill Me With Context

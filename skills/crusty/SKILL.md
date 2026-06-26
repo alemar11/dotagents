@@ -1,6 +1,6 @@
 ---
 name: crusty
-description: Direct invocation only. Use only when the user explicitly invokes `$crusty` or asks for Crusty to challenge a work decision, implementation, architecture, plan, boundary, name, definition, or tradeoff.
+description: Direct-only skeptical critique for explicitly requested work decisions, architecture, plans, naming, and tradeoffs.
 ---
 
 # Crusty

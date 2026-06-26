@@ -15,6 +15,7 @@ asks for compaction opportunities before refactoring.
 ## Task Boundary
 - Default scope per target skill:
   - `SKILL.md`
+  - `SKILL.md` frontmatter descriptions when they duplicate trigger rules, workflow details, or guardrails
   - directly referenced `references/*.md`
   - `agents/openai.yaml` when metadata wording contributes to duplicated or
     conflicting runtime instructions
@@ -38,6 +39,7 @@ asks for compaction opportunities before refactoring.
    - safety or mutation guardrail
    - output contract
    - metadata or repo-doc alignment
+   - description selection value and prompt-budget pressure
    - optional-tool or portability boundary
 4. Classify every candidate:
    - `safe trim`: remove redundant wording without changing behavior

@@ -1,6 +1,6 @@
 ---
 name: code-wiki
-description: Explore and study a local repository or git URL source code, then generate an evidence-backed linked HTML code wiki that gives a developer a comprehensive mental model of the codebase. Use when the user asks to study, understand, document, explain, map, or onboard onto a repo in depth, including repository scope, ownership boundaries, major modules, class/type/function interactions, call paths, dependencies, code patterns, basic and advanced flows, testing/ops, deterministic diagrams, optional conceptual images, and a browsable wiki artifact.
+description: Study, explain, document, or onboard onto a local repo or git URL by generating an evidence-backed linked HTML code wiki.
 ---
 
 # Code Wiki

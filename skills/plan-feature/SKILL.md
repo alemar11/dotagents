@@ -18,6 +18,16 @@ Use this skill to turn rough feature intent into a written PRD and agent-ready
 vertical issues. In orchestrator workspaces, those issues may be cross-repo
 vertical outcomes. Do not implement the feature.
 
+## Invocation Boundary
+
+- Use only when the user explicitly invokes `$plan-feature`, explicitly asks to
+  run the Plan Feature skill, or a manually invoked parent workflow explicitly
+  routes to `$plan-feature`.
+- Do not auto-select this skill for ordinary feature, planning, PRD, issue
+  splitting, implementation, or triage requests.
+- If feature planning would help but the user did not invoke this skill, answer
+  or plan normally and ask before switching into the Plan Feature workflow.
+
 ## Modes
 
 Choose the smallest mode that satisfies the request:

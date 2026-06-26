@@ -22,6 +22,7 @@ when a brand-new skill scaffold is needed.
 ## What to Align
 - Skill identity and purpose (`name`, `description`, display labels)
 - Trigger intent in `SKILL.md` vs UI-facing `short_description`
+- Description compactness and selection value across `SKILL.md` frontmatter, `agents/openai.yaml` short descriptions, and README one-liners
 - README skill list and one-line descriptions
 - Any install prompts or usage snippets that list skill names
 - Plugin names, descriptions, marketplace entries, and usage snippets when plugins are in scope
@@ -34,6 +35,7 @@ when a brand-new skill scaffold is needed.
    - `SKILL.md` frontmatter `name` and `description`
    - `agents/openai.yaml` interface fields (`display_name`, `short_description`, `default_prompt`)
    - README entry wording for that skill
+   - description length and duplication against trigger rules, workflow details, and guardrails already present in the skill body
 3. Update mismatches with minimal wording drift.
 4. Reconcile README lists so added, removed, or renamed skills are reflected.
 5. Confirm descriptions remain one-line and user-facing in README/openai metadata.
@@ -51,5 +53,6 @@ when a brand-new skill scaffold is needed.
 - Every listed skill has both `SKILL.md` and `agents/openai.yaml`.
 - No stale skill names remain in README/install prompts.
 - Description changes preserve original intent while improving consistency.
+- Descriptions are compact enough for prompt-budget inventory and do not carry detailed workflow contracts that belong in the skill body.
 - `PASS`: no metadata/doc drift remains.
 - `FAIL`: unresolved drift in any of `SKILL.md`, `agents/openai.yaml`, or README mapping.

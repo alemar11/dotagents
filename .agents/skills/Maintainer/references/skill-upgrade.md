@@ -33,6 +33,7 @@ or more existing skills or plugins.
    - workflow structure
    - guardrail precision
    - Codex dependency labeling or portability-boundary clarity when relevant
+   - description compactness, selection value, and alignment across metadata surfaces
    - metadata/doc sync
    - moving dense guidance into `references/` when that improves maintainability
 3. Apply minimal, meaningful edits that preserve each target's current intent.
@@ -57,6 +58,7 @@ or more existing skills or plugins.
 ## Quality Gates
 - Each upgraded target has a concrete rationale; avoid cosmetic rewrites with no practical gain.
 - Touched docs stay aligned across `SKILL.md`, `agents/openai.yaml`, `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, and `README.md` when those files are in scope.
+- Touched descriptions stay concise and preserve trigger family without duplicating detailed workflow or guardrail text.
 - `AGENTS.md` changes happen only when the upgrade introduces durable repository guidance.
 - If a touched skill is Codex-dependent, its required Codex tools/runtime contracts are named plainly; if it is portable, Codex-only helpers remain optional.
 - Return `PASS (NOOP)` when no meaningful improvement is needed after inspection.

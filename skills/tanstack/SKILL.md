@@ -1,6 +1,6 @@
 ---
 name: tanstack
-description: Review, design, and implement TanStack product and integration patterns across Query, Router, Start, Form, Table, Virtual, Store, DB, CLI, AI, Config, Devtools, Pacer, Ranger, and cross-stack ownership. Use when Codex works on TanStack apps, migrations, route/data boundaries, typed forms, tables, virtualization, CLI workflows, package setup, or Query + Router + Start integration.
+description: Review or implement TanStack apps and cross-stack patterns across Query, Router, Start, Form, Table, Virtual, Store, DB, CLI, AI, Config, Devtools, Pacer, and Ranger.
 ---
 
 # TanStack

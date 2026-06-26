@@ -1,6 +1,6 @@
 ---
 name: grill-me
-description: Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. Use when the user explicitly asks to be grilled, challenged, interviewed, pressure-tested, or stress-tested, including phrases like "grill me", "challenge this", "stress-test this", "pressure-test this", or an explicit `$grill-me` invocation.
+description: Stress-test plans, decisions, drafts, workflows, and coding approaches when the user explicitly asks to be grilled or challenged.
 ---
 
 # Grill Me

@@ -14,6 +14,7 @@ or other default maintenance requests.
 - `run` may update multiple skills or plugins when each change has a concrete rationale and low ambiguity.
 - Auto-apply only safe maintenance items such as:
   - metadata and docs alignment
+  - compacting long descriptions that duplicate trigger or workflow detail already present in `SKILL.md`
   - clearer triggers, workflow, guardrails, examples, or references navigation
   - stale path or wording fixes
   - Codex-dependency labeling and optional-tool fallback clarity
@@ -29,6 +30,7 @@ or other default maintenance requests.
    - related `README.md` and `AGENTS.md` entries
 2. Inspect for actionable drift and shortlist the packages with clear, maintainable improvements.
    - Include stale Codex-dependency inventory or ambiguous Codex-tool wording in this inspection.
+   - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short descriptions, and README one-liners when they are too long, duplicated, or misaligned.
 3. For each shortlisted target, apply a targeted upgrade using the rules from `skill-upgrade.md`.
 4. Run `metadata-sync.md` for the touched skills, plugins, and coupled repo docs.
 5. Run the relevant checks from `doc-consistency.md` across touched areas and repo-level reference drift.

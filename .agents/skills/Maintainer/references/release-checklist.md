@@ -5,6 +5,7 @@ Run this checklist before finalizing maintainer updates.
 ## Pre-commit Validation
 1. Metadata and docs
 - Confirm skill names/descriptions are aligned across `SKILL.md`, `agents/openai.yaml`, and README entries.
+- Confirm touched descriptions are compact and do not duplicate detailed trigger, workflow, or guardrail text from the skill body.
 - Confirm no stale references to removed or renamed skills.
 - If Codex-dependency boundaries changed, confirm `AGENTS.md` and the maintainer playbooks reflect the updated classification.
 

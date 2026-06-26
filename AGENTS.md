@@ -131,6 +131,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Plan Feature skill
 - Keep `plan-feature` as the single public planning surface for full feature planning, prd-only drafting, and existing PRD issue generation; keep dense PRD writing and issue splitting guidance in its internal `references/` phase files.
+- Keep `plan-feature` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary feature, planning, PRD, issue splitting, implementation, or triage requests must not auto-select it. (Codex learning)
 - `plan-feature` may run its PRD phase and issue phase only after setup exists and no blocking gates remain; keep local file write authorization separate from GitHub or other external tracker mutation authorization. (Codex learning)
 - In monorepo or multi-context planning, carry the accepted product slug, workspace path, context file, and authoritative feature slug through `plan-feature` and its internal phases; prefer explicit or path-derived slugs over title-derived slugs. (Codex learning)
 - Keep the `plan-feature` PRD phase focused on producing or publishing PRD artifacts from clarified requirements; do not let it split implementation issues.
@@ -200,6 +201,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Orchestrator skill
 - Keep `codex-orchestrator` as a standalone reusable skill under `skills/codex-orchestrator/`, using standalone Git/GitHub companion skills for queue, issue lifecycle, CI, review, release, commit, and publish workflows.
+- Keep `codex-orchestrator` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary implementation, planning, triage, GitHub, commit, PR, or multi-repo requests must not auto-select it. (Codex learning)
 - Treat one active `codex-orchestrator` root as the owner for a project or portfolio source graph. Parallel implementation should run as scoped workers under that root, not as multiple independent orchestrator roots in the same repo or overlapping source graph.
 - Keep runtime orchestration, worker, gate, active-root, target-repo `AGENTS.md`, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, with one ledger per named portfolio by default.

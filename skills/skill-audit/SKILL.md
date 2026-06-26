@@ -1,6 +1,6 @@
 ---
 name: skill-audit
-description: Audit installed or user-specified Codex skills, plugins, or bundled plugin skills using project history, repo evidence, memory, sessions, and current context to plan updates, additions, merges, or disables. Use when a user asks how their installed Codex surfaces are performing, wants a one-by-one refinement roadmap, asks to audit a skill, a plugin, or a bundled plugin skill, or wants evidence-based recommendations before changing those surfaces.
+description: Audit installed Codex skills, plugins, and bundled plugin skills for usage, overlap, prompt budget, and improvement roadmap.
 ---
 
 # Skill Audit

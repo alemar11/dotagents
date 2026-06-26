@@ -3,3 +3,5 @@ interface:
   short_description: "Plan a feature through PRD and agent-ready issues, or run prd-only and issues-from-existing-prd modes."
   brand_color: "#10B981"
   default_prompt: "Use $plan-feature to inspect project memory, choose full-flow, prd-only, or issues-from-existing-prd mode, run setup if needed, resolve run authorization, planning identity, and delivery mode, grill the feature with context when needed, produce or use the PRD, split it into vertical issues when requested, run $plan-harder once per generated issue, write local artifacts only when local_artifact_writes is allowed, and mutate hosted trackers only when external_tracker_mutation is allowed. Use $github-issues for GitHub publishing, issue metadata, parent/sub-issue relationships, and dry-run command mechanics."
+policy:
+  allow_implicit_invocation: false

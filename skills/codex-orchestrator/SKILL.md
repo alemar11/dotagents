@@ -20,6 +20,16 @@ lightweight: it owns routing, lifecycle, integration, gates, ledger updates,
 and final publication, while delegated workers own substantial repository
 inspection or implementation whenever delegation is authorized and useful.
 
+## Invocation Boundary
+
+- Use only when the user explicitly invokes `$codex-orchestrator` or explicitly
+  asks to run the Codex Orchestrator skill.
+- Do not auto-select this skill for ordinary implementation, planning, triage,
+  GitHub, commit, PR, or multi-repo requests.
+- If a task appears to need orchestration but the user did not invoke this
+  skill, handle the task with the normal local workflow or ask before switching
+  to orchestration.
+
 ## Root Ownership Contract
 
 - The root orchestrator owns routing, ledger updates, worker lifecycle,

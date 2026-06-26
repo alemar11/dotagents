@@ -1,6 +1,6 @@
 ---
 name: git-commit
-description: Use when committing local changes, preparing commit messages, staging explicit paths, splitting changes into commits, or doing commit-and-push flows that do not open a pull request. Use direct git commands only; route PR publishing to yeet.
+description: Commit or commit-and-push local changes with explicit staging and direct git; route PR publishing to yeet.
 ---
 
 # Git Commit

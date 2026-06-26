@@ -1,6 +1,6 @@
 ---
 name: xcode-changelog
-description: Resolve the active Xcode version, include latest available notes when the installed Xcode is behind, look up a requested Xcode version, or list available Xcode release notes from the official Apple release-notes site.
+description: Resolve active, latest, or requested Xcode release notes from Apple official release-notes pages.
 ---
 
 # Xcode Changelog

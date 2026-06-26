@@ -1,6 +1,6 @@
 ---
 name: plan-harder
-description: Create a higher-rigor implementation plan or harden a single issue before coding. Use when the user explicitly asks for deeper planning, a harder plan, a stress-tested plan, or an agent-ready issue brief; research first, ask focused clarifying questions, and review for gaps before implementation starts.
+description: Create higher-rigor implementation plans or harden a single issue into an agent-ready brief before coding.
 ---
 
 # Plan Harder

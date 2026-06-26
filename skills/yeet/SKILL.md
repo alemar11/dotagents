@@ -1,6 +1,6 @@
 ---
 name: yeet
-description: Use when publishing local work from a checkout to GitHub by confirming scope, composing or reusing a commit, pushing a branch, and opening or updating a draft pull request. This is a scriptless convenience orchestration skill.
+description: Publish local work to GitHub by committing, pushing, and opening or updating a draft PR.
 ---
 
 # Yeet

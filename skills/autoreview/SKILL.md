@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: Run a Codex-only structured closeout review for local git changes, branch diffs, or commits before final, commit, PR, or ship. Use when the user asks for autoreview, Codex review, second-model review, a final check, or after non-trivial code edits before handing work back.
+description: Run Codex-only structured closeout review before final, commit, PR, or ship.
 ---
 
 # Auto Review
