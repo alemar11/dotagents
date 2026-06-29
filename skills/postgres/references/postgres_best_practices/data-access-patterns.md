@@ -52,6 +52,50 @@ values ($1, $2)
 returning id, created_at;
 ```
 
+## 7) Keep exploratory reads bounded
+Avoid unbounded `SELECT *` in application paths and ad-hoc inspection. Project only the columns needed and use a deterministic `ORDER BY` with a practical `LIMIT`.
+
+```sql
+select id, created_at, status
+from orders
+where created_at >= now() - interval '7 days'
+order by created_at desc, id desc
+limit 100;
+```
+
+## 8) Keep predicates index-friendly
+Prefer predicates that let the planner use indexes directly. Avoid wrapping indexed columns in functions unless the same expression is indexed.
+
+```sql
+-- Better than date(created_at) = current_date for a plain created_at index:
+select id
+from events
+where created_at >= current_date
+  and created_at < current_date + interval '1 day';
+```
+
+## 9) Prefer `UNION ALL` and `EXISTS` when semantics allow
+Use `UNION ALL` when duplicate removal is not required, and use `EXISTS` for existence checks that do not need row materialization.
+
+```sql
+select id from invoices where status = 'open'
+union all
+select id from invoices where status = 'overdue';
+
+select 1
+from orders o
+where exists (
+  select 1
+  from order_items i
+  where i.order_id = o.id
+);
+```
+
+## 10) Shape tables for write-heavy workloads
+For high-ingest tables, keep secondary indexes minimal, batch writes, and use `COPY` when loading large files. Consider `UNLOGGED` only for rebuildable staging data where crash recovery and replication tradeoffs are acceptable.
+
+For update-heavy tables, avoid repeatedly updating indexed columns, keep transactions short, and consider table-specific `fillfactor` only after measuring page churn and HOT update behavior.
+
 ## Verification References
 - https://www.postgresql.org/docs/current/sql-copy.html
 - https://www.postgresql.org/docs/current/sql-insert.html
@@ -59,3 +103,7 @@ returning id, created_at;
 - https://www.postgresql.org/docs/current/indexes-multicolumn.html
 - https://www.postgresql.org/docs/current/sql-prepare.html
 - https://www.postgresql.org/docs/current/dml-returning.html
+- https://www.postgresql.org/docs/current/indexes-expressional.html
+- https://www.postgresql.org/docs/current/queries-union.html
+- https://www.postgresql.org/docs/current/sql-createtable.html#SQL-CREATETABLE-UNLOGGED
+- https://www.postgresql.org/docs/current/storage-hot.html

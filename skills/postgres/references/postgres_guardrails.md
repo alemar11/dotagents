@@ -13,6 +13,13 @@ Use this reference when the task touches schema changes or migration release.
 - After any schema change, run the least expensive validation query that proves
   the change landed.
 
+## Schema evolution footguns
+
+- `CREATE INDEX CONCURRENTLY` and `DROP INDEX CONCURRENTLY` cannot run inside a transaction block. If a repo's migration runner wraps every file in one transaction, use that repo's documented non-transactional migration path or ask before proceeding.
+- Adding a column with a volatile default can rewrite or lock more data than expected on large tables. Prefer staged changes when the table is large or latency-sensitive.
+- Changing a function signature can create an overload rather than replacing the old function. Drop or replace the intended signature explicitly and verify call sites.
+- Dropping indexes, constraints, columns, tables, or partitions is destructive. Confirm the target object and the rollback path before applying the DDL.
+
 ## Canonical terms
 
 - “pending migration file”
@@ -63,3 +70,10 @@ The command:
 - Released filenames use `YYYYMMDDHHMMSS.sql`
 - Add `_<slug>` only on same-second collision
 - If still colliding, append `_01`, `_02`, and so on
+
+## Verification References
+
+- https://www.postgresql.org/docs/current/sql-createindex.html
+- https://www.postgresql.org/docs/current/sql-dropindex.html
+- https://www.postgresql.org/docs/current/ddl-alter.html
+- https://www.postgresql.org/docs/current/xfunc-overload.html
