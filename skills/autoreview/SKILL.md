@@ -18,7 +18,19 @@ Use this skill when the user asks for or clearly implies:
 - `review before PR`
 - `review before ship`
 - `review again after fixes`
-- a final closeout check after non-trivial code edits
+- a final closeout check after non-trivial code edits where an independent
+  bug-finding pass is likely to change the outcome
+
+Do not use this skill for:
+
+- answer-only turns with no file edits
+- exploratory analysis or planning unless the user explicitly asks for review
+- docs-only edits that do not alter runtime behavior, generated commands,
+  install instructions, security posture, or public contracts
+- tiny mechanical fixes such as typo corrections, formatting-only changes,
+  comment-only edits, or metadata-only sync
+- ordinary final responses after focused tests or proof already cover the
+  changed behavior
 
 ## Canonical Closeout Sequence
 
