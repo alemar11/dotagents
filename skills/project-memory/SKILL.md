@@ -46,19 +46,24 @@ orchestration dispatch policy, domain-memory layout, localization policy, or
 
 ## Structured Values
 
+Use human-first Markdown with typed configuration tables for behavior-affecting
+settings. `$project-memory` is the normal editor for these tables: read current
+values, ask for the changed settings, preserve custom prose, normalize known
+keys, and report unknown keys instead of silently deleting them.
+
 Use `lower_snake_case` keys and `lower-kebab-case` values for setup-owned
 structured fields. Treat older uppercase kebab-case values as legacy aliases
 when reading existing artifacts; rewrite touched values to lower-kebab-case.
 
-| Key | Values |
-| --- | --- |
-| `setup_mode` | `fresh-setup`, `existing-project-bootstrap`, `orchestrator-workspace` |
-| `tracker_mode` | `github`, `local`, `orchestrator-local`, `orchestrator-github`, `other` |
-| `tracker_writes` | `disabled`, `prompt`, `auto` |
-| `delivery_mode` | `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, `direct-commit` |
-| `domain_memory_layout` | `single-context`, `multi-context`, `orchestrator-context` |
-| `context_seed_mode` | `seed-context`, `routing-only` |
-| `translation_memory` | `enabled`, `not-applicable`, `needs-confirmation` |
+| Key | Type | Allowed values | Owner |
+| --- | --- | --- | --- |
+| `setup_mode` | enum | `fresh-setup`, `existing-project-bootstrap`, `orchestrator-workspace` | `project-memory` |
+| `tracker_mode` | enum | `github`, `local`, `orchestrator-local`, `orchestrator-github`, `other` | `issue-tracker.md` |
+| `tracker_writes` | enum | `disabled`, `prompt`, `auto` | `issue-tracker.md` |
+| `delivery_mode` | enum | `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, `direct-commit` | PRD and tracker defaults |
+| `domain_memory_layout` | enum | `single-context`, `multi-context`, `orchestrator-context` | `domain.md` |
+| `context_seed_mode` | enum | `seed-context`, `routing-only` | `project-memory` |
+| `translation_memory` | enum | `enabled`, `not-applicable`, `needs-confirmation` | `project-memory` |
 
 Legacy tracker aliases:
 
@@ -76,6 +81,7 @@ header:
 
 - use `lower_snake_case` keys;
 - wrap structured values in backticks;
+- keep behavior-affecting fields in a typed configuration table before prose;
 - require `tracker_writes` whenever `tracker_mode` is present;
 - use `github_repo` for GitHub targets, not prose keys like `GitHub repo`;
 - preserve unrelated custom prose, labels, delivery rules, and dry-run notes.

@@ -4,14 +4,16 @@ Cross-repo PRDs and vertical feature issues live as markdown files in this
 orchestrator workspace. The workspace coordinates external repos; it does not
 replace their repo-local project memory or code ownership.
 
-tracker_mode: `orchestrator-local`
-tracker_writes: `auto`
-local_prd_path_pattern:
-`projects/<project-slug>/features/<feature-slug>/PRD.md`
-local_issue_path_pattern:
-`projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md`
-done_issue_path_pattern:
-`projects/<project-slug>/features/<feature-slug>/issues/done/<NN>-<slug>.md`
+## Configuration
+
+| Key | Type | Value | Allowed values | Meaning |
+| --- | --- | --- | --- | --- |
+| `tracker_mode` | enum | `orchestrator-local` | `orchestrator-local` | Local orchestrator workspace files are the authoritative cross-repo planning store. |
+| `tracker_writes` | enum | `auto` | `disabled`, `prompt`, `auto` | Whether local orchestrator tracker writes are disabled, confirmation-gated, or automatic. |
+| `local_prd_path_pattern` | path-pattern | `projects/<project-slug>/features/<feature-slug>/PRD.md` | repo-relative path pattern | Local cross-repo PRD location. |
+| `local_issue_path_pattern` | path-pattern | `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` | repo-relative path pattern | Active local vertical issue location. |
+| `done_issue_path_pattern` | path-pattern | `projects/<project-slug>/features/<feature-slug>/issues/done/<NN>-<slug>.md` | repo-relative path pattern | Completed local vertical issue location. |
+| `delivery_mode` | enum | `one-pr-per-repo` | `one-pr-per-repo`, `one-feature-branch`, `one-pr-per-issue`, `direct-commit` | Default delivery shape for true multi-repo work. |
 
 Current-run override: record any temp, dry-run, rehearsal, or disabled-write
 constraint as `tracker_writes: disabled`. Do not treat a current-run override
@@ -60,7 +62,7 @@ actually planned or written.
   `integration-gates.md`, but does not create or refresh those supporting files
   unless the user explicitly asks for that broader orchestrator artifact update.
 
-## Delivery Mode Defaults
+## Delivery Defaults
 
 - Default `delivery_mode`: `one-pr-per-repo` for true multi-repo orchestrator work.
 - Branch naming: default to `feature/<feature-slug>` in each affected repo

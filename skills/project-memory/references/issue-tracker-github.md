@@ -3,9 +3,14 @@
 PRDs and implementation issues for this repo live as GitHub issues. Use
 `$github-issues` for GitHub issue lifecycle operations.
 
-tracker_mode: `github`
-tracker_writes: `prompt`
-github_repo: `<owner>/<repo>`
+## Configuration
+
+| Key | Type | Value | Allowed values | Meaning |
+| --- | --- | --- | --- | --- |
+| `tracker_mode` | enum | `github` | `github` | GitHub issues are the authoritative PRD and implementation issue store. |
+| `tracker_writes` | enum | `prompt` | `disabled`, `prompt`, `auto` | Whether GitHub issue writes are disabled, confirmation-gated, or automatic. |
+| `github_repo` | repo | `<owner>/<repo>` | GitHub `owner/repo` | Repository where PRDs and implementation issues are created. |
+| `delivery_mode` | enum | `one-feature-branch` | `one-feature-branch`, `one-pr-per-issue`, `direct-commit` | Default feature delivery shape for generated issues. |
 
 Infer `github_repo` from `git remote -v` only when this file does not record a
 specific target.
@@ -56,7 +61,7 @@ If GitHub issue types are disabled or customized for the organization, record
 the actual available values or fallback label convention in
 `project-memory/agents/triage-labels.md`.
 
-## Delivery Mode Defaults
+## Delivery Defaults
 
 - Default `delivery_mode`: `one-feature-branch` for a single project or monorepo in
   this git repo.

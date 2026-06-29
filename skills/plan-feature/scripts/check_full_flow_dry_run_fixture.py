@@ -115,7 +115,9 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertIn(ORCHESTRATION_POLICY_PATH, project_memory)
         self.assertIn("orchestration-policy", setup_workflow)
-        self.assertIn(AUTO_DISPATCH_KEY + ": `false`", policy)
+        self.assertIn("typed configuration tables", project_memory)
+        self.assertIn("| Key | Type | Value | Allowed values | Meaning |", policy)
+        self.assertIn("| `auto_dispatch` | boolean | `false` |", policy)
         self.assertIn(WORKER_SURFACES_KEY, policy)
         self.assertIn(AUTHORIZATION_CEILING_KEY, policy)
         self.assertIn("optional runtime configuration", policy)
@@ -133,6 +135,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         ):
             contents = read(relative)
             with self.subTest(file=relative):
+                self.assertIn("## Configuration", contents)
+                self.assertIn("| Key | Type | Value | Allowed values | Meaning |", contents)
                 self.assertIn(ORCHESTRATION_POLICY_PATH, contents)
                 self.assertIn("Tracker setup records artifact routing", contents)
                 for field in RUNTIME_POLICY_FIELDS:

@@ -15,18 +15,22 @@ automation:
 ```markdown
 # Orchestration Policy
 
-auto_dispatch: `false`
-eligible_sources: `durable-generated-issue-with-handoff`
-excluded_sources: `draft-prd-ref, missing-handoff, ambiguous-delivery-mode, cyclic-dependency-graph`
-worker_surfaces: `none`
-max_active_delegated_workers: `0`
-max_active_cli_subagents: `0`
-max_active_codex_app_threads: `0`
-session_wide_delegated_worker_cap: `0`
-authorization_ceiling: `inspect, implement`
-publication_policy: `none`
-issue_mutation_policy: `pr-body-closeout-only`
-heartbeat: `manual`
+## Configuration
+
+| Key | Type | Value | Allowed values | Meaning |
+| --- | --- | --- | --- | --- |
+| `auto_dispatch` | boolean | `false` | `true`, `false` | Whether a matching bounded wave may dispatch without chat approval. |
+| `eligible_sources` | list | `durable-generated-issue-with-handoff` | `durable-generated-issue-with-handoff`, `local-checklist` | Source shapes eligible for auto-dispatch. |
+| `excluded_sources` | list | `draft-prd-ref`, `missing-handoff`, `ambiguous-delivery-mode`, `cyclic-dependency-graph` | any source shape or blocker slug | Source shapes that always stop for owner input. |
+| `worker_surfaces` | list | `none` | `none`, `cli-subagent`, `codex-app-thread`, `auto` | Worker surfaces the orchestrator may choose from. |
+| `max_active_delegated_workers` | integer | `0` | `0` or positive integer | Total delegated worker cap across surfaces. |
+| `max_active_cli_subagents` | integer | `0` | `0` or positive integer | CLI/subagent worker cap. |
+| `max_active_codex_app_threads` | integer | `0` | `0` or positive integer | Visible Codex App thread cap. |
+| `session_wide_delegated_worker_cap` | integer | `0` | `0` or positive integer | Session-wide delegated worker cap. |
+| `authorization_ceiling` | list | `inspect`, `implement` | `inspect`, `implement`, `commit`, `push`, `pr`, `ci-rerun-fix`, `merge-close`, `release` | Maximum runtime capabilities policy may allow. |
+| `publication_policy` | enum | `none` | `none`, `prd-backed-after-gates`, `explicit-owner-authorization` | Whether commit, push, or PR publication may run automatically after gates. |
+| `issue_mutation_policy` | enum | `pr-body-closeout-only` | `none`, `pr-body-closeout-only`, `explicit-direct-mutation` | Allowed issue mutation path. |
+| `heartbeat` | enum | `manual` | `disabled`, `manual`, `every-5-minutes`, `custom` | Monitoring cadence for active orchestration. |
 
 ## Stop For Owner
 
@@ -67,8 +71,10 @@ heartbeat: `manual`
 - `heartbeat`: `manual`, `disabled`, `every-5-minutes`, or a custom policy
   when monitoring is configured.
 
-Lower-snake-case keys and lower-kebab-case values are canonical. Lists may be
-stored as comma-separated values or short Markdown lists when that is clearer.
+Lower-snake-case keys and lower-kebab-case values are canonical. Use the
+configuration table as the source of truth. For long list values, keep the table
+row and add a short explanatory list below it rather than replacing the table
+with prose.
 
 ## Ownership Boundary
 

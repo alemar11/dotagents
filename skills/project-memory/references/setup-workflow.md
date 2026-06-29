@@ -144,6 +144,10 @@ After confirmation:
 - Normalize any touched `issue-tracker.md` setup header to lower-snake-case
   keys with backticked structured values. Remove legacy `effective_target`,
   `local_artifact_writes`, and `external_tracker_mutation` fields.
+- Keep behavior-affecting setup fields in typed configuration tables with
+  `Key`, `Type`, `Value`, and `Meaning` columns before explanatory prose.
+- Preserve custom prose outside known configuration tables. Report unknown
+  configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only confirmed
   minimization.
 - Create or update `CONTEXT.md` with `$domain-modeling` when seed/bootstrap is

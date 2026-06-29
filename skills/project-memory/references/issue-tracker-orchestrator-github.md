@@ -5,10 +5,15 @@ coordination repository. The coordination repository groups and tracks
 cross-repo outcomes; actual product code changes still happen in the owning
 repos.
 
-tracker_mode: `orchestrator-github`
-tracker_writes: `prompt`
-coordination_repo: `<owner>/<repo>`
-project_label_format: `<project-slug>`
+## Configuration
+
+| Key | Type | Value | Allowed values | Meaning |
+| --- | --- | --- | --- | --- |
+| `tracker_mode` | enum | `orchestrator-github` | `orchestrator-github` | GitHub coordination issues are the authoritative cross-repo planning store. |
+| `tracker_writes` | enum | `prompt` | `disabled`, `prompt`, `auto` | Whether coordination-repo writes are disabled, confirmation-gated, or automatic. |
+| `coordination_repo` | repo | `<owner>/<repo>` | GitHub `owner/repo` | Repository where PRDs and vertical feature issues are created. |
+| `project_label_format` | label-pattern | `<project-slug>` | GitHub label text | Project grouping label applied to PRDs and vertical issues. |
+| `delivery_mode` | enum | `one-pr-per-repo` | `one-pr-per-repo`, `one-feature-branch`, `one-pr-per-issue`, `direct-commit` | Default delivery shape for true multi-repo work. |
 
 The coordination repository is the authoritative artifact store in this mode.
 Do not create or keep repo-local `.scratch/`, local `projects/.../features/...`,
@@ -18,12 +23,8 @@ unless the user explicitly asks to keep a local mirror.
 
 ## Required Configuration
 
-Record the coordination repository in `project-memory/agents/issue-tracker.md`:
-
-```text
-coordination_repo: `<owner>/<repo>`
-project_label_format: `<project-slug>`
-```
+Record `coordination_repo` and `project_label_format` in the configuration
+table in `project-memory/agents/issue-tracker.md`.
 
 Use `$github-issues` with the configured coordination repository. GitHub issue
 commands must target `--repo <owner>/<repo>` unless the current checkout is
@@ -72,7 +73,7 @@ the project label exists. Use `$github-issues` to create the PRD parent issue,
 create vertical issues under the PRD, and attach existing issues to the PRD
 when needed.
 
-## Delivery Mode Defaults
+## Delivery Defaults
 
 - Default `delivery_mode`: `one-pr-per-repo` for true multi-repo orchestrator work.
 - Branch naming: default to `feature/<feature-slug>` in each affected repo

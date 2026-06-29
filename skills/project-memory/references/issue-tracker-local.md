@@ -3,11 +3,16 @@
 PRDs and implementation issues for this repo live as markdown files under
 `.scratch/`.
 
-tracker_mode: `local`
-tracker_writes: `auto`
-local_prd_path_pattern: `.scratch/<feature-slug>/PRD.md`
-local_issue_path_pattern: `.scratch/<feature-slug>/issues/<NN>-<slug>.md`
-done_issue_path_pattern: `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
+## Configuration
+
+| Key | Type | Value | Allowed values | Meaning |
+| --- | --- | --- | --- | --- |
+| `tracker_mode` | enum | `local` | `local` | Local Markdown files are the authoritative PRD and issue store. |
+| `tracker_writes` | enum | `auto` | `disabled`, `prompt`, `auto` | Whether local tracker file writes are disabled, confirmation-gated, or automatic. |
+| `local_prd_path_pattern` | path-pattern | `.scratch/<feature-slug>/PRD.md` | repo-relative path pattern | Local PRD location. |
+| `local_issue_path_pattern` | path-pattern | `.scratch/<feature-slug>/issues/<NN>-<slug>.md` | repo-relative path pattern | Active local issue location. |
+| `done_issue_path_pattern` | path-pattern | `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md` | repo-relative path pattern | Completed local issue location. |
+| `delivery_mode` | enum | `one-feature-branch` | `one-feature-branch`, `one-pr-per-issue`, `direct-commit` | Default feature delivery shape for generated issues. |
 
 This root `.scratch/` tree is the authoritative local-markdown tracker path. Do
 not relocate these feature artifacts under `project-memory/features/` unless the
@@ -52,7 +57,7 @@ it persistent.
 - When a PRD has an accepted `Planning Identity`, use that `feature_slug`
   rather than deriving a new slug from the PRD title.
 
-## Delivery Mode Defaults
+## Delivery Defaults
 
 - Default `delivery_mode`: `one-feature-branch` for a single project or monorepo in
   this git repo.
