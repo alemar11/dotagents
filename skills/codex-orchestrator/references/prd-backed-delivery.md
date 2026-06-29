@@ -11,6 +11,7 @@ Apply this reference when any of these are true:
 - the user asks to implement a PRD issue or a set of generated implementation
   issues;
 - an issue body contains `Source PRD: #<number>` or a linked PRD path;
+- an issue body contains `## Orchestrator Handoff`;
 - the source item was produced by `$plan-feature`;
 - the source item has a `## Delivery`, `Delivery Mode`, `Completion`, or
   closeout section that defines branch, PR, or issue-closing behavior.
@@ -25,14 +26,22 @@ or tracker mutation requires a hosted PRD number, a local PRD path, or an
 explicit owner decision recorded with separate publication and issue-mutation
 authority.
 
+For generated implementation issues, `## Orchestrator Handoff` is the
+canonical issue-level dispatch contract. It must restate the source PRD,
+feature slug, delivery mode, affected repos or product scope, scope, start rule,
+dependencies, validation, and closeout path. The handoff is not an
+authorization grant: worker authorization, publication authority, and issue
+mutation authority are still resolved by the root orchestrator from the owner
+request, linked PRD, issue body, gate state, and current session authority.
+
 ## Authority Model
 
 Record these three authorities separately in the ledger:
 
 - **Delivery authority**: where the branch, PR shape, dependency graph, and
   closeout path come from. For generated issues this is usually the linked
-  `Source PRD` plus the generated issue's copied delivery label and issue-level
-  dependency fields.
+  `Source PRD` plus the generated issue's copied delivery label, issue-level
+  dependency fields, and `## Orchestrator Handoff`.
 - **Publication authority**: whether the root may commit, push, and open the
   draft PR after gates pass.
 - **Issue mutation authority**: whether the root may directly comment, label,
@@ -104,16 +113,23 @@ Before scheduling or publishing PRD-backed work:
    `draft-prd:<...>`, stop before implementation scheduling unless the owner
    explicitly authorizes temporary-source execution and separately records the
    publication and issue-mutation authority that execution may use.
-2. Resolve the effective delivery mode from the PRD first, then apply only
+2. For generated issues, read `## Orchestrator Handoff` and verify it contains
+   source PRD, feature slug, delivery mode, affected repos or product scope,
+   scope, start rule, dependencies, validation, and closeout. If it is missing
+   or contradicts the issue body, stop as `needs-owner` or route back through
+   `$plan-feature` issue generation instead of dispatching implementation.
+3. Resolve the effective delivery mode from the PRD first, then apply only
    issue-level overrides that are explicit and authorized.
-3. Record delivery authority, publication authority, issue mutation authority,
+4. Record delivery authority, publication authority, issue mutation authority,
    closeout vehicle, branch expectation, PR expectation, publication checkout,
-   caller checkout policy, and integration proof target in the ledger.
-4. Build the wave graph from the generated issues' dependency and
-   parallelization fields. Queue-ready does not mean start-ready when an issue
-   depends on another incomplete issue.
-5. Stop as `needs-owner` or `blocked` if the PRD, issue body, dependency graph,
-   branch expectation, or closeout path is missing, contradictory, or unsafe.
+   caller checkout policy, integration proof target, and handoff projection in
+   the ledger.
+5. Build the wave graph from the generated issues' handoff start rules,
+   dependency fields, and parallelization fields. Queue-ready does not mean
+   start-ready when an issue depends on another incomplete issue.
+6. Stop as `needs-owner` or `blocked` if the PRD, issue body, handoff,
+   dependency graph, branch expectation, or closeout path is missing,
+   contradictory, or unsafe.
 
 ## Closeout Rules
 

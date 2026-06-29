@@ -35,6 +35,31 @@ single-repo issues, `current repository`; for orchestrator issues, use
 - Integration mode: [omitted when obvious from Source PRD; otherwise
   shared-feature-branch | repo-pr | issue-pr | direct-commit | inspect-only]
 
+## Orchestrator Handoff
+
+- Source PRD: [same value as the header `Source PRD` line]
+- Feature slug: [authoritative lowercase feature slug]
+- Delivery mode: [same effective delivery mode and inheritance or override
+  source as `## Delivery`]
+- Affected repos or product scope: [repo slugs, workspace path, or current
+  repository]
+- Scope:
+  - [Only this issue's implementation slice.]
+- Start rule: [independent | depends-on <issue-id>[, <issue-id>] | blocks
+  <issue-id>[, <issue-id>] | root-integrated]
+- Dependencies: [generated issue IDs and reason, or `None`.]
+- Validation: [commands, checks, or proof required for this issue.]
+- Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
+  issue-pr-closes-issue | direct-commit-closes-issue |
+  local-done-move-after-proof]
+
+Do not include worker authorization modes, worker surfaces, worker caps,
+checkpoint approval, auto-approval policy, publication authority, or issue
+mutation authority in this section. Do not copy values from
+`project-memory/agents/orchestration-policy.md` into generated issues.
+`$codex-orchestrator` resolves runtime authorization after registering the
+issue as a workstream.
+
 ## Goal
 
 [One vertical outcome.]

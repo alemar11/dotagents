@@ -15,6 +15,10 @@ changes:
 - tracker target such as `github_repo`, `coordination_repo`, or local path
   patterns
 - `delivery_mode`
+- `auto_dispatch`
+- worker surfaces and caps from `orchestration-policy.md`
+- `authorization_ceiling`
+- orchestration stop-for-owner policy
 - `issue_type` mapping
 - `triage_state` mapping
 - `domain_memory_layout`
@@ -41,6 +45,7 @@ Editable sections:
 - `issue-tracker`
 - `tracker-writes`
 - `delivery-mode`
+- `orchestration-policy`
 - `issue-type-mapping`
 - `triage-state-mapping`
 - `domain-memory`
@@ -59,6 +64,9 @@ and the relevant alternatives:
   defaults.
 - `delivery-mode`: `one-feature-branch`, `one-pr-per-repo`,
   `one-pr-per-issue`, `direct-commit`.
+- `orchestration-policy`: keep current, create conservative defaults, enable
+  auto-dispatch with bounded worker caps, or disable auto-dispatch while
+  preserving a documented worker policy.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
   custom per canonical type.
 - `triage-state-mapping`: default GitHub lowercase labels, canonical local
@@ -83,8 +91,14 @@ confirmation before writing.
   user says to persist it.
 - Default delivery mode to `one-feature-branch` for one git repo and
   `one-pr-per-repo` for true multi-repo or orchestrator work.
-- Do not define worker authorization in project memory. `$codex-orchestrator`
-  resolves worker capability modes per workstream and session.
+- Default orchestration policy to `auto_dispatch: false`, no delegated workers,
+  `authorization_ceiling: inspect, implement`, no publication, no direct issue
+  mutation, and manual monitoring unless the owner explicitly enables a broader
+  policy.
+- Do not define worker assignments in project memory. `orchestration-policy.md`
+  may define allowed surfaces, caps, and authorization ceilings, but
+  `$codex-orchestrator` resolves actual worker capability modes per workstream
+  and session.
 - Default domain layout to `single-context` unless `CONTEXT-MAP.md`, repo
   evidence, or orchestrator mode implies otherwise.
 - Recommend `seed-context` only when non-empty repo evidence supports useful
@@ -101,6 +115,7 @@ Before writing, show:
 - intended `AGENTS.md` pointer block;
 - `AGENTS.md` minimization plan;
 - intended `project-memory/agents/issue-tracker.md`;
+- intended `project-memory/agents/orchestration-policy.md`;
 - intended `project-memory/agents/triage-labels.md`;
 - intended `project-memory/agents/domain.md`;
 - intended `CONTEXT.md` seed, or why none should be written;
@@ -116,13 +131,15 @@ For orchestrator workspace mode, preserve these points in the draft:
 - child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional
   `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs;
 - `codex-orchestrator` owns runtime worker state and ledgers.
+- `orchestration-policy.md` owns auto-dispatch bounds; issue bodies and
+  `issue-tracker.md` must not carry worker surfaces, caps, or approval policy.
 
 ## Write Rules
 
 After confirmation:
 
 - Create `project-memory/agents/` if needed.
-- Write or update the three setup files under `project-memory/agents/`.
+- Write or update the confirmed setup files under `project-memory/agents/`.
 - In review mode, update only files needed for confirmed changes.
 - Normalize any touched `issue-tracker.md` setup header to lower-snake-case
   keys with backticked structured values. Remove legacy `effective_target`,
@@ -154,6 +171,10 @@ exists or is confirmed:
 
 [one-line summary of issue type and state vocabulary]. See `project-memory/agents/triage-labels.md`.
 
+### Orchestration policy
+
+[one-line summary of auto-dispatch and worker-surface policy]. See `project-memory/agents/orchestration-policy.md`.
+
 ### Domain memory
 
 [one-line summary of single-context, multi-context, or orchestrator layout]. See `project-memory/agents/domain.md`.
@@ -178,6 +199,8 @@ Summarize:
 - selected issue tracker;
 - `tracker_writes` and whether it is durable or current-run only;
 - delivery mode defaults;
+- orchestration auto-dispatch, worker-surface caps, authorization ceiling, and
+  stop-for-owner policy;
 - issue-type and triage-state mapping;
 - domain-memory layout;
 - localization-memory decision and evidence;

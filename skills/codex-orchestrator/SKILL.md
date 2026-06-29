@@ -67,13 +67,21 @@ migrates it.
 | Rough feature or product intent without durable PRD plus generated issues | Route through `$plan-feature` full-flow before implementation scheduling. |
 | Existing durable PRD without generated issues | Route through `$plan-feature` `issues-from-existing-prd` mode unless the owner only asked for inspect-only review. |
 | Generated issue with `Source PRD: draft-prd:<...>` | Register only for dry-run inspection or planning review. Do not dispatch, commit, push, open PRs, close issues, or mutate trackers until the source is a hosted PRD number, local PRD path, or explicit owner decision with separate publication and issue-mutation authority. |
-| Durable generated issue, PR, CI failure, bug, local checklist, implementation plan, or explicit implementation request | Register directly as source items and decompose into workstreams. |
+| Durable generated issue with `## Orchestrator Handoff` | Register directly as a source item and use the handoff as the canonical issue-level dispatch contract. |
+| Durable generated issue missing `## Orchestrator Handoff` | Register only for inspection or route through `$plan-feature` `issues-from-existing-prd` / issue regeneration before implementation scheduling, unless the owner explicitly authorizes ad hoc execution from the current issue body. |
+| PR, CI failure, bug, local checklist, implementation plan, or explicit implementation request | Register directly as source items and decompose into workstreams. |
 
 `$plan-feature` owns PRD and generated issue publication before implementation
 scheduling. Once a generated issue is registered as an implementation
 workstream, the root orchestrator owns lifecycle and closeout mutations for that
 source item, including issue comments, label changes, direct closure when
 authorized, real PR link recording, and integration proof.
+For generated issues, treat `## Orchestrator Handoff` as the canonical
+dispatch section. Copy its source PRD, feature slug, delivery mode, affected
+repos or product scope, scope, start rule, dependencies, validation, and
+closeout into the ledger as runtime state. Do not treat ledger copies as the
+durable planning source, and do not infer worker authorization, publication
+authority, or issue mutation authority from the handoff.
 
 For Markdown plans or checklists, enumerate unchecked items with nearest heading
 context and a stable path plus line or anchor. Preserve parent context, map each
@@ -134,6 +142,9 @@ Required surfaces depend on the resolved workstream:
   monitoring.
 - `$autoreview`, standalone Git/GitHub companions, `$plan-feature`, and ledger
   storage at `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
+- Optional repo policy at `project-memory/agents/orchestration-policy.md` for
+  auto-dispatch bounds, allowed worker surfaces, caps, authorization ceilings,
+  monitoring defaults, and stop-for-owner rules.
 
 If a required Codex tool is not visible, search the tool registry by operation
 name before treating it as unavailable. Record the actual callable tool name
@@ -142,9 +153,11 @@ unavailable, continue only with safe work and report the exact missing surface.
 
 ## Delegation Policy
 
-Before creating workers, resolve and record the owner-authorized worker and
-monitoring policy in the ledger. If a broad, worker-oriented, or parallelizable
-request omits surface, limits, or monitoring, ask once:
+Before creating workers, read `project-memory/agents/orchestration-policy.md`
+when it exists, then resolve and record the effective worker and monitoring
+policy in the ledger. Missing policy preserves the interactive default. If a
+broad, worker-oriented, or parallelizable request omits surface, limits, or
+monitoring and no matching auto-dispatch policy exists, ask once:
 
 > How should I run orchestration for this session: `cli-subagent`,
 > `codex-app-thread`, `auto`, or `none`? What max active count should I use
@@ -153,6 +166,12 @@ request omits surface, limits, or monitoring, ask once:
 
 While waiting, do only root-owned discovery or planning that does not create
 workers, create visible App threads, mutate source state, or assume a quota.
+
+Treat `orchestration-policy.md` values as ceilings, not assignments. The root
+still chooses the actual workstream surface, worker count, authorization modes,
+publication checkout, and stop conditions from the source graph, current repo
+state, gates, and available tools. Do not copy policy values into PRDs,
+generated issue bodies, draft publish commands, or `## Orchestrator Handoff`.
 
 Use `references/worker.md` for worker surfaces, caps, authorization modes,
 prompt shape, lifecycle, resync, integration, artifacts, and closeout. Keep
@@ -179,13 +198,19 @@ these entrypoint rules in force:
   work in the root thread.
 - Before sending overlapping new scope to an existing worker, resync or replace
   the worker.
-- Before dispatching implementation, present the `Approach Checkpoint` from
-  `references/worker.md` and wait for explicit owner approval. The root may do
-  read-only discovery, planning, source registration, and wave shaping before
-  approval, but it must not create workers, create visible App threads, start
-  implementation edits, mutate source state, commit, push, or open PRs until
-  that checkpoint is approved. The checkpoint decision table must include a
-  short `Meaning` column that explains the current behavior inferred from each
+- Before dispatching implementation, build the `Approach Checkpoint` from
+  `references/worker.md`. If `orchestration-policy.md` is missing, has
+  `auto_dispatch: false`, or does not match the source graph, present the
+  checkpoint and wait for explicit owner approval. If `auto_dispatch: true`
+  matches the source graph and all planned values stay within policy ceilings,
+  record the checkpoint as policy-auto-dispatched, show a concise
+  non-blocking auto-dispatch summary, and dispatch without waiting. The root
+  may do read-only discovery, planning, source registration, and wave shaping
+  before approval or policy auto-dispatch, but it must not create workers,
+  create visible App threads, start implementation edits, mutate source state,
+  commit, push, or open PRs until the checkpoint is owner-approved or
+  policy-auto-dispatched. The checkpoint decision table must include a short
+  `Meaning` column that explains the current behavior inferred from each
   planned value in owner-facing terms, and the checkpoint should start with a
   brief `Approach Summary` paragraph before the tables.
 - For PRD or feature implementation with a clear generated issue graph, prefer
@@ -194,14 +219,16 @@ these entrypoint rules in force:
   workstreams are not yet specified enough, depend on unresolved owner
   decisions, or require different surface, cap, authorization, or delivery
   boundaries.
-- After the owner approves a bounded multi-wave checkpoint, continue from one
-  wave to the next without pausing as dependencies are satisfied, as long as
-  later waves stay inside the approved source items, worker surfaces, caps,
-  authorization modes, delivery path, and stop conditions.
+- After the owner approves or policy-auto-dispatches a bounded multi-wave
+  checkpoint, continue from one wave to the next without pausing as
+  dependencies are satisfied, as long as later waves stay inside the recorded
+  source items, worker surfaces, caps, authorization modes, delivery path, and
+  stop conditions.
 - If the selected worker surface is `auto`, the checkpoint must show the
   resolved surface for the current wave. If the owner changes the split, worker
-  surface, cap, authorization, or delivery path, regenerate the checkpoint and
-  wait for approval before dispatch.
+  surface, cap, authorization, or delivery path, or if an auto-dispatched wave
+  would exceed policy ceilings, regenerate the checkpoint and wait for approval
+  before dispatch.
 - For root-only waves, use the owner-facing wording from
   `references/worker.md`: `Execution mode: root thread only; no separate
   workers` and `Worker surface: no-delegation`. Do not display
@@ -232,9 +259,10 @@ Use issue-level scheduling fields as the wave graph:
 | `root-integrated` | Keep implementation in root; workers may inspect or prove only if integration stays root-owned. |
 
 If dependency refs, `Source PRD`, closeout path, delivery mode, or
-parallelization are missing, malformed, cyclical, contradictory, or unsafe,
-classify the workstream as `needs-owner` or `blocked` instead of inventing
-semantics. Workers may not invent branch or PR strategy.
+parallelization are missing, malformed, cyclical, contradictory, or unsafe, or
+if a generated issue's `## Orchestrator Handoff` is missing or contradicts the
+issue body, classify the workstream as `needs-owner` or `blocked` instead of
+inventing semantics. Workers may not invent branch or PR strategy.
 
 ## Companion Skill Routing
 
@@ -262,7 +290,8 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    explicit takeover.
 2. Snapshot and register task sources: repos, source ids/refs, closeout targets,
    mutation authority, owner constraints, delivery or `Source PRD` inheritance,
-   scheduling constraints, gate overrides, and suppressed items.
+   scheduling constraints, gate overrides, suppressed items, and, for generated
+   issues, the `## Orchestrator Handoff` projection.
 3. Route sources with the table above and pick the smallest companion skill.
    Broad discovery uses `$github-portfolio-triage`; focused GitHub work uses the
    specific current-repo companion. Decompose durable generated issues,
@@ -271,17 +300,20 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 4. Classify every workstream with the `references/ledger.md` vocabulary. Each
    item needs source id, acceptance criteria, scheduling constraints,
    dependencies, selected gates, proof target, and closeout target.
-5. Resolve the worker and monitoring policy, then read `references/worker.md`
-   before delegation. Prepare the implementation plan and first wave, display
-   the required approach checkpoint with explicit approval scope, and wait for
-   owner approval before creating workers, creating visible App threads, or
-   starting root-owned implementation. After approval, create at most one worker
-   per independent ownership boundary in the current wave, name visible App
-   threads immediately, and give each worker explicit scope, per-workstream
-   authorization modes, delivery/publication authority, dependency state, gates,
-   proof, branch/integration expectations, and final report shape. If the
-   approval scope is bounded multi-wave, continue into newly unblocked waves
-   without another checkpoint while the approved boundaries still hold.
+5. Resolve the worker and monitoring policy from the owner request plus
+   optional `project-memory/agents/orchestration-policy.md`, then read
+   `references/worker.md` before delegation. Prepare the implementation plan
+   and first wave, build the approach checkpoint with explicit approval scope,
+   and either wait for owner approval or record a matching
+   policy-auto-dispatch before creating workers, creating visible App threads,
+   or starting root-owned implementation. After approval or policy
+   auto-dispatch, create at most one worker per independent ownership boundary
+   in the current wave, name visible App threads immediately, and give each
+   worker explicit scope, per-workstream authorization modes,
+   delivery/publication authority, dependency state, gates, proof,
+   branch/integration expectations, and final report shape. If the approval
+   scope is bounded multi-wave, continue into newly unblocked waves without
+   another checkpoint while the recorded boundaries still hold.
 6. Monitor using the recorded policy. Read a worker before steering, renaming,
    archiving, interrupting, replacing, closing, reusing, or integrating it.
    Record status, blockers, validation, risks, resync state, integration method,
@@ -320,6 +352,9 @@ Before handing control back to the owner, return a compact owner-facing report:
   produced under current authorization;
 - active-root claim, collision, takeover, or handoff decisions, plus any
   target-repo `AGENTS.md` update applied or proposed;
+- orchestration policy file used or missing, whether the checkpoint was
+  owner-approved or policy-auto-dispatched, and the effective worker caps and
+  stop conditions;
 - gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
   a proof path was unavailable;
 - remaining owner decisions, blocked access, deferred follow-ups, and the next

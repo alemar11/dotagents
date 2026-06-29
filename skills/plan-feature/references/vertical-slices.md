@@ -127,6 +127,9 @@ Mark an issue `ready-for-agent` only when it has:
   metadata,
 - parallelization status, expected closeout path, and any delivery or
   integration exception,
+- a `## Orchestrator Handoff` section that restates the dispatchable source
+  PRD, feature slug, delivery mode, affected repos or product scope, scope,
+  start rule, dependencies, validation, and closeout,
 - acceptance criteria,
 - validation steps,
 - implementation guidance enriched by `$plan-harder`,

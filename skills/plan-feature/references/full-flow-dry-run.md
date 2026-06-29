@@ -38,6 +38,9 @@ prd_body_fingerprint: sha256:7f4a9c21d003
 5. `$codex-orchestrator` may inspect the resulting issue graph in dry-run mode
    but must not dispatch implementation workers, commit, push, create PRs, or
    close issues from the draft PRD ref.
+6. Any `project-memory/agents/orchestration-policy.md` values remain runtime
+   policy for `$codex-orchestrator`; they are not copied into the PRD, generated
+   issue bodies, `## Orchestrator Handoff`, or draft publish commands.
 
 ## Expected Draft Publish Plan
 
@@ -61,5 +64,8 @@ prd_body_fingerprint: sha256:7f4a9c21d003
   ref alone.
 - Draft PRDs, generated issues, and draft publish commands include worker
   authorization fields or worker capability modes.
+- Draft PRDs, generated issues, or draft publish commands include
+  orchestration-policy values such as worker surfaces, worker caps, checkpoint
+  approval, publication authority, or issue mutation authority.
 - Generated issues use a prose `Source PRD` such as the PRD title when a stable
   draft ref is available.

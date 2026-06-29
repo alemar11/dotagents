@@ -80,6 +80,11 @@ validation, publication target, permissions, or cross-repo contracts.
   PRDs, generated issues, local issue files, hosted issue bodies, or draft
   publish commands. `$codex-orchestrator` resolves worker authorization per
   workstream and session.
+- Treat `project-memory/agents/orchestration-policy.md` as runtime-only
+  `$codex-orchestrator` configuration. Do not copy its auto-dispatch settings,
+  worker surfaces, caps, authorization ceilings, publication limits, or issue
+  mutation limits into PRDs, generated issues, `## Orchestrator Handoff`, local
+  issue files, hosted issue bodies, or draft publish commands.
 
 ## External Skill Calls
 
@@ -285,6 +290,16 @@ Require every issue to copy the effective `Delivery mode` label from the PRD and
 mark it as feature-level inherited metadata. Do not duplicate the full PRD
 branch/PR details in each issue; use explicit issue-level delivery exceptions
 only when an issue intentionally differs from the feature-level mode.
+Require every generated implementation issue to include a
+`## Orchestrator Handoff` section. This section is the dispatchable issue-level
+contract `$codex-orchestrator` consumes after the issue is registered as a
+workstream. It must restate the source PRD, feature slug, delivery mode,
+affected repos or product scope, work scope, start rule, dependencies,
+validation, and closeout path from the issue body. It must not include worker
+authorization modes, worker surfaces, worker caps, checkpoint approval, or
+publication permission; `$codex-orchestrator` resolves those at runtime from
+the source graph, current session authority, and optional
+`project-memory/agents/orchestration-policy.md`.
 Do not add worker authorization fields to generated issues; worker capability
 decisions are an orchestration-time concern.
 

@@ -8,9 +8,12 @@ Codex worker threads or subagents.
 Resolve the ledger worker policy before delegation.
 
 Worker authorization is resolved per workstream and session by the root
-orchestrator. Do not read it from project-memory defaults, tracker templates,
-generated issues, or draft publish commands. If legacy project-memory
-worker-authorization setup appears, ignore it as stale, non-authoritative state.
+orchestrator. `project-memory/agents/orchestration-policy.md`, when present,
+may define auto-dispatch bounds, allowed surfaces, caps, authorization ceilings,
+monitoring defaults, and stop-for-owner rules. Do not read worker assignments
+from project-memory defaults, tracker templates, generated issues, or draft
+publish commands. If legacy project-memory worker-authorization setup appears,
+ignore it as stale, non-authoritative state.
 
 | Field | Values | Meaning |
 | --- | --- | --- |
@@ -35,6 +38,22 @@ The canonical execution values are the worker-surface fields above. In the
 owner-facing checkpoint, `Execution mode` is only a display summary inferred
 from the selected surfaces and caps; do not treat it as a separate enum or
 source of truth.
+
+## Project Orchestration Policy
+
+Read `project-memory/agents/orchestration-policy.md` before dispatch when the
+file exists. If it is missing, malformed, disabled with `auto_dispatch: false`,
+or does not match the source graph, preserve the interactive checkpoint flow.
+
+When `auto_dispatch: true` matches all source shapes and the selected wave
+stays within the allowed surfaces, caps, authorization ceiling, publication
+policy, issue mutation policy, and stop-for-owner rules, the root may record
+the checkpoint as `policy-auto-dispatched`, show a concise non-blocking summary,
+and dispatch without waiting for chat approval.
+
+Policy values are ceilings, not quotas or assignments. The root may still keep
+work in the root thread, choose fewer workers than allowed, or stop for owner
+input when source, repo, dependency, gate, or tool state makes dispatch unsafe.
 
 ## Surface Wording Rules
 
@@ -90,12 +109,14 @@ the work in the root thread.
 
 ## Approach Checkpoint
 
-Before dispatching implementation, present an approach checkpoint and wait for
-owner approval. This is an execution brief, not a generic "can I start?"
+Before dispatching implementation, build an approach checkpoint. Present it and
+wait for owner approval unless a matching `orchestration-policy.md` permits
+policy auto-dispatch. This is an execution brief, not a generic "can I start?"
 prompt. The root may do read-only discovery, planning, source registration, and
-wave shaping before approval, but it must not create workers, create visible
-App threads, start implementation edits, mutate source state, commit, push, or
-open PRs until the checkpoint is approved.
+wave shaping before approval or policy auto-dispatch, but it must not create
+workers, create visible App threads, start implementation edits, mutate source
+state, commit, push, or open PRs until the checkpoint is owner-approved or
+policy-auto-dispatched.
 
 The checkpoint must state its approval scope. For PRD or feature
 implementation with a clear generated issue graph, prefer a bounded multi-wave
@@ -104,11 +125,12 @@ waves. Use current-wave-only approval when later workstreams are not yet
 specified enough, depend on unresolved owner decisions, or require different
 surface, cap, authorization, or delivery boundaries.
 
-When a bounded multi-wave checkpoint is approved, continue from one wave to the
-next without pausing as dependencies are satisfied, as long as later waves stay
-inside the approved source items, worker surfaces, caps, authorization modes,
-delivery path, and stop conditions. Regenerate the checkpoint and wait for
-approval before doing work outside those boundaries.
+When a bounded multi-wave checkpoint is owner-approved or
+policy-auto-dispatched, continue from one wave to the next without pausing as
+dependencies are satisfied, as long as later waves stay inside the recorded
+source items, worker surfaces, caps, authorization modes, delivery path, and
+stop conditions. Regenerate the checkpoint and wait for approval before doing
+work outside those boundaries.
 
 Start with a short `Approach Summary` paragraph in plain language. Summarize
 the approval scope, starting wave, root-owned coordination, worker usage, and
@@ -120,6 +142,7 @@ Then use this decision table shape:
 | Decision | Planned value | Meaning |
 | --- | --- | --- |
 | Source items | <issue/PR/PRD/checklist refs> | The durable work sources this approval covers. |
+| Checkpoint source | <owner-approved OR policy-auto-dispatched> | Whether dispatch waits for owner approval or is allowed by the recorded orchestration policy. |
 | Approval scope | <current wave only OR bounded multi-wave plan through source refs> | Whether approval covers only the first wave or the whole bounded graph. |
 | Overall workstreams | <all workstreams covered by this checkpoint> | Complete work graph; each workstream is a unit of work, not necessarily a worker. |
 | Workstreams starting now | <count and short names> | The work units that can start immediately. |
@@ -149,18 +172,23 @@ the root orchestrator thread owns that slice directly.
 
 If `Worker surface` is `auto`, the checkpoint must show the resolved surface
 for the current wave. Explicit natural-language acceptance such as `approve`,
-`go ahead`, `ok proceed`, or `looks good` approves the checkpoint. If the owner
-changes the split, worker surface, cap, authorization, or delivery path, revise
-the checkpoint and ask again before dispatch.
+`go ahead`, `ok proceed`, or `looks good` approves a blocking checkpoint. If the
+owner changes the split, worker surface, cap, authorization, or delivery path,
+revise the checkpoint and ask again before dispatch.
 
 For root-only work, do not write `none; root-owned` in the owner-facing
 checkpoint. Write `Execution mode: root thread only; no separate workers`,
 `Worker surface: no-delegation`, `CLI subagents: no`, and
 `Visible App threads: no`.
 
-End every approach checkpoint with this exact text:
+End every blocking approach checkpoint with this exact text:
 
 > Reply approve to dispatch the approved scope, or send edits to the split, worker surface, cap, authorization, delivery path, approval scope, or stop conditions. I will not start implementation workers or root-owned implementation until you approve.
+
+For policy auto-dispatch, do not use the blocking approval sentence. Instead
+show a concise summary that names the policy file, checkpoint scope, starting
+wave, resolved surfaces and caps, authorization ceiling, publication and issue
+mutation limits, and stop-for-owner conditions before dispatching.
 
 ## Delivery Mode Rules
 
@@ -168,6 +196,12 @@ The root passes the effective delivery mode plus whether it is inherited from
 `Source PRD` or an issue-level override. `prd-backed-delivery.md` owns the full
 delivery/publication/issue-mutation authority model; workers only enforce the
 assignment they receive.
+
+For generated implementation issues, the root also passes the validated
+`## Orchestrator Handoff` projection. Workers may use the handoff for scope,
+start rule, dependencies, validation, and closeout, but they must not treat it
+as worker authorization, publication authority, issue mutation authority, or
+permission to change branch/PR strategy.
 
 | Mode | Worker handling |
 | --- | --- |
@@ -385,6 +419,7 @@ Scope:
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Delivery mode: <one-feature-branch|one-pr-per-repo|one-pr-per-issue|direct-commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
 - Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
+- Orchestrator handoff: <source PRD; feature slug; affected repos/product scope; scope; start rule; validation; closeout, or none for ad hoc work>
 - Publication authority: <none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|blocked, with reason>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
 - Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>

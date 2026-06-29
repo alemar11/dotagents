@@ -75,14 +75,17 @@ actually planned or written.
   one git repo; `one-pr-per-issue` only for isolated work; `direct-commit` only
   with explicit maintainer authorization.
 
-## Worker Policy Boundary
+## Runtime Policy Boundary
 
-- Project memory does not define worker authorization defaults.
 - Tracker setup records artifact routing, delivery-mode defaults, and closeout
-  conventions only. `$codex-orchestrator` resolves worker capability modes per
-  workstream and session from the owner request, source item, linked
-  `Source PRD`, publication authority, issue mutation authority, selected worker
-  surface, dependencies, dirty-worktree state, and gates.
+  conventions only.
+- `project-memory/agents/orchestration-policy.md` records optional
+  `$codex-orchestrator` auto-dispatch bounds, allowed worker surfaces, caps,
+  authorization ceilings, monitoring defaults, and stop-for-owner rules.
+- `$codex-orchestrator` resolves actual worker capability modes per workstream
+  and session from the owner request, source item, linked `Source PRD`,
+  publication authority, issue mutation authority, orchestration policy,
+  selected worker surface, dependencies, dirty-worktree state, and gates.
 - If an existing setup file contains the legacy worker-authorization setup key,
   treat it as stale state and remove it when touching the file. Do not copy it
   into PRDs, generated issues, draft commands, ledgers, or worker prompts.

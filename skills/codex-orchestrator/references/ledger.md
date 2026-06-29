@@ -140,7 +140,11 @@ worker, authorized `ready-next` action, or root-owned closeout action remaining.
 
 ## Worker Policy
 
+Policy source: <project-memory/agents/orchestration-policy.md, missing, or owner-session-only>
+Policy fingerprint: <checksum, timestamp, summary, or not-recorded>
+Auto-dispatch: true|false
 Authorization resolution: per-workstream
+Authorization ceiling: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
 Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
 Delegated worker surface: auto|codex-app-thread|cli-subagent|none
 Max active delegated workers: <number>
@@ -156,12 +160,12 @@ Visible worker title format: <Project>: <short current task>
 Worker policy values follow `worker.md`. Caps are not quotas. Preserve separate
 CLI/App/session caps, list each authorization mode explicitly, and record
 `Surface=no-delegation`, `Worker ID=root`, and the reason when root owns work.
-Authorization modes are not project-memory defaults; the root resolves them for
-each workstream from owner request, source item, linked `Source PRD`,
-publication authority, issue mutation authority, selected worker surface,
-dependencies, dirty-worktree state, and gates. Ignore legacy
-project-memory worker-authorization setup values as stale, non-authoritative
-state.
+`project-memory/agents/orchestration-policy.md` may provide policy ceilings and
+auto-dispatch bounds, but the root resolves actual authorization modes for each
+workstream from owner request, source item, linked `Source PRD`, publication
+authority, issue mutation authority, selected worker surface, dependencies,
+dirty-worktree state, and gates. Ignore legacy project-memory
+worker-authorization setup values as stale, non-authoritative state.
 
 ## Delivery Mode Policy
 
@@ -182,6 +186,12 @@ wave, integration proof target, and, for PRD-backed workflows, separate
 delivery, publication, and issue-mutation authority. Workers may not choose a
 different branch or PR strategy without a root-owned ledger update and
 authorization check.
+
+For generated implementation issues, also record the validated
+`## Orchestrator Handoff` projection from the issue body: source PRD, feature
+slug, affected repos or product scope, scope, start rule, dependencies,
+validation, and closeout. This ledger entry is runtime state copied from the
+issue; the issue body and linked PRD remain the durable planning authority.
 
 Startability is issue-level: `independent` may start when gates allow,
 `depends-on <issue>` waits for root-verifiable dependency proof,
@@ -223,7 +233,7 @@ when those fields apply.
 
 | ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; publication checkout; caller checkout policy; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; handoff projection; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; publication checkout; caller checkout policy; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
 
 ### autonomous
 
@@ -269,19 +279,22 @@ when those fields apply.
 
 ## Wave Checkpoints
 
-Record the owner checkpoint approval before dispatch. Include the approval
-timestamp, approver wording, approval scope (`current-wave` or
-`bounded-multi-wave`), selected worker surface, resolved surface when `auto` is
-used, worker cap, stop conditions, and any owner edits to split, surface, cap,
-authorization, or delivery path. If a bounded multi-wave checkpoint is approved,
-record its boundaries and continue later waves only while they stay inside the
-approved source items, surface, cap, authorization, delivery path, and stop
-conditions. If approval is pending, planned work may remain in the ledger, but
+Record the checkpoint before dispatch. Include whether it was
+`owner-approved` or `policy-auto-dispatched`, the policy file path and
+fingerprint when used, approval timestamp or auto-dispatch timestamp,
+approval scope (`current-wave` or `bounded-multi-wave`), selected worker
+surface, resolved surface when `auto` is used, worker cap, authorization
+ceiling, stop conditions, and any owner edits to split, surface, cap,
+authorization, or delivery path. If a bounded multi-wave checkpoint is approved
+or policy-auto-dispatched, record its boundaries and continue later waves only
+while they stay inside the recorded source items, surface, cap, authorization,
+delivery path, and stop conditions. If approval is pending and policy
+auto-dispatch does not apply, planned work may remain in the ledger, but
 implementation workers and root-owned implementation must not start.
 
-| Wave | Started | Finished | Sources Scanned | Items Processed | Owner Checkpoint | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
+| Wave | Started | Finished | Sources Scanned | Items Processed | Checkpoint | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <approval time, wording, scope, surface/cap, stop conditions, edits, or pending> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| 1 | <time> | <time> | <source ids> | <count> | <owner-approved, policy-auto-dispatched, or pending; policy path/fingerprint; scope; surface/cap; authorization ceiling; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
 ## Notes
 

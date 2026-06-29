@@ -20,6 +20,11 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 - Do not publish or return an issue as ready for execution until it includes
   the hardened implementation guidance and provenance line.
 - Include a `## Completion` section in every generated implementation issue.
+- Include a `## Orchestrator Handoff` section in every generated implementation
+  issue. The handoff is the canonical dispatch grouping for
+  `$codex-orchestrator`; it restates issue-level scheduling and closeout data
+  already present elsewhere in the issue body without granting worker
+  authorization.
 - Do not use `needs-info` as a normal output state for generated
   implementation issues. Treat unresolved product, domain, dependency, or
   acceptance-criteria questions as blockers to resolve before publishing,
@@ -51,6 +56,12 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   surface choices to PRDs, generated issues, issue files, hosted issue bodies,
   or draft publish commands. `$codex-orchestrator` resolves those per
   workstream and session.
+- Do not add checkpoint approval, auto-approval, publication permission, or
+  issue mutation permission to `## Orchestrator Handoff`. Those are runtime
+  authorization decisions owned by `$codex-orchestrator`.
+- Treat `project-memory/agents/orchestration-policy.md` as runtime-only
+  orchestration configuration. Do not copy its values into PRDs, generated
+  issues, local issue files, hosted issue bodies, or draft publish commands.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
   behavior in draft command runs, use `$project-memory`
   `references/tracker-publishing.md`.
@@ -174,6 +185,9 @@ Every issue should:
 - include a durable `Source PRD` pointer, copied feature-level delivery mode,
   issue-level parallelization, dependencies, closeout, and any delivery or
   integration exception,
+- include a `## Orchestrator Handoff` section that restates the dispatchable
+  source PRD, feature slug, delivery mode, affected repos or product scope,
+  scope, start rule, dependencies, validation, and closeout,
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
@@ -209,8 +223,11 @@ Before assigning final tracker type/status, writing files, generating draft
 commands, or mutating hosted trackers, revalidate the final hardened issue bodies
 as the execution graph. Every `Parallelization`, `Dependencies`, `blocks`, and
 `depends-on` reference must resolve to a generated issue ID in this feature set,
-the graph must be acyclic, startability waves must still make sense, and
-cross-repo integration requirements must still name the required proof.
+the graph must be acyclic, startability waves must still make sense, every
+`## Orchestrator Handoff` section must agree with the corresponding
+`## Delivery`, `## Validation`, `## Completion`, and `## Dependencies`
+sections, and cross-repo integration requirements must still name the required
+proof.
 
 ### 4. Apply Issue Type And Triage State
 
@@ -296,6 +313,29 @@ placeholders, and the proof required before the issue can move to `done` or
 close. Placeholders are delivery expectations for scheduling, not completion
 proof; `$codex-orchestrator` records real PR links or equivalent integration
 proof during source closeout.
+
+Every generated implementation issue must include:
+
+```markdown
+## Orchestrator Handoff
+
+- Source PRD: <same value as the issue header>
+- Feature slug: <authoritative feature slug>
+- Delivery mode: <effective delivery mode and inheritance or override source>
+- Affected repos or product scope: <repo slugs, workspace path, or current repository>
+- Scope: <one or more bullets describing only this issue's implementation slice>
+- Start rule: <independent | depends-on <issue-id>[, <issue-id>] | blocks <issue-id>[, <issue-id>] | root-integrated>
+- Dependencies: <None or generated issue IDs plus reason>
+- Validation: <commands, checks, or proof required for this issue>
+- Closeout: <feature-pr-closes-issue | repo-pr-closes-issue | issue-pr-closes-issue | direct-commit-closes-issue | local-done-move-after-proof>
+```
+
+The handoff may repeat structured data from `## Delivery`, `## Validation`,
+`## Completion`, and `## Dependencies` so an orchestrator can register the issue
+without inferring from loose prose. It must not contain worker authorization
+modes, worker surfaces, worker caps, auto-approval policy, publication
+authority, issue mutation authority, or values from
+`project-memory/agents/orchestration-policy.md`.
 
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
@@ -401,6 +441,8 @@ Summarize:
 - delivery mode inherited,
 - number of issues produced,
 - issue graph validation summary, including dependency and acyclicity checks,
+- confirmation that each issue includes a validated `## Orchestrator Handoff`
+  section,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
 - issue types and labels/statuses assigned,

@@ -13,13 +13,16 @@ Configure the repo memory that other skills consume:
 - `project-memory/agents/issue-tracker.md` for PRD and issue routing.
 - `project-memory/agents/triage-labels.md` for issue type and state mappings.
 - `project-memory/agents/domain.md` for context, translation, and ADR layout.
+- `project-memory/agents/orchestration-policy.md` for optional
+  `$codex-orchestrator` auto-dispatch bounds.
 - `CONTEXT.md` and optional `project-memory/adr/` for domain memory.
 - `TRANSLATION.md` when localization support or translation rules are real.
 
 Run this once per code repo, monorepo, or orchestrator workspace before
 planning, publishing PRDs, splitting issues, triaging, or updating
 project-backed domain memory. Re-run it when tracker routing, mappings,
-domain-memory layout, localization policy, or `AGENTS.md` pointers change.
+orchestration dispatch policy, domain-memory layout, localization policy, or
+`AGENTS.md` pointers change.
 
 ## Boundaries
 
@@ -116,7 +119,7 @@ before writing:
 - move project purpose, vocabulary, boundaries, and open questions to
   `CONTEXT.md`;
 - move localization policy to `TRANSLATION.md`;
-- move tracker, triage, delivery, and domain layout to
+- move tracker, triage, delivery, orchestration policy, and domain layout to
   `project-memory/agents/*`;
 - move accepted load-bearing decisions to ADRs;
 - preserve or ask about stale, conflicting, or weakly evidenced content.
@@ -134,6 +137,7 @@ Resolve these decisions for new setup or requested edits:
 
 - issue tracker and `tracker_writes` policy;
 - delivery mode defaults;
+- orchestration auto-dispatch and worker-surface policy;
 - issue type and triage state mappings;
 - domain-memory layout and context seed mode;
 - localization memory state;
@@ -151,6 +155,7 @@ Use these references as starting points:
 - `references/issue-tracker-local.md`
 - `references/issue-tracker-orchestrator-github.md`
 - `references/issue-tracker-orchestrator-local.md`
+- `references/orchestration-policy.md`
 - `references/tracker-publishing.md`
 - `references/triage-labels.md`
 - `references/domain.md`
@@ -177,6 +182,9 @@ After confirmation:
   product naming, or user-facing copy. Do not require the pointer or create
   broken links.
 - In orchestrator workspace mode, do not create project or feature folders.
+- Keep runtime orchestration policy in
+  `project-memory/agents/orchestration-policy.md`, not in
+  `issue-tracker.md`, generated PRDs, or generated issue bodies.
 - Before reporting completion, grep any touched `issue-tracker.md` for legacy
   keys: `effective_target`, `local_artifact_writes`, and
   `external_tracker_mutation`. Remove them or report why they must remain.
@@ -184,9 +192,10 @@ After confirmation:
 ### 6. Report Completion
 
 Report setup mode, files written, reviewed/changed settings, tracker target,
-`tracker_writes`, delivery defaults, mappings, domain layout, localization
-decision, `AGENTS.md` minimization, context/translation/ADR seeds,
-session-history usage, and the workflows that can now consume this setup.
+`tracker_writes`, delivery defaults, orchestration policy, mappings, domain
+layout, localization decision, `AGENTS.md` minimization,
+context/translation/ADR seeds, session-history usage, and the workflows that
+can now consume this setup.
 
 If session history is unavailable or weak, say so plainly. Future
 `$domain-modeling`, `$grill-me-with-context`, and planning workflows can keep
@@ -195,7 +204,10 @@ filling project memory incrementally.
 ## Reference Responsibilities
 
 - `issue-tracker-*.md`: tracker-specific artifact locations, publication rules,
-  delivery defaults, worker policy boundaries, title formats, and completion.
+  delivery defaults, runtime policy boundaries, title formats, and completion.
+- `orchestration-policy.md`: optional auto-dispatch, worker-surface caps,
+  authorization ceilings, monitoring defaults, and stop-for-owner rules for
+  `$codex-orchestrator`.
 - `tracker-publishing.md`: shared effective target, draft publish, temporary
   body-file, and `source_prd_ref` contract.
 - `triage-labels.md`: canonical issue type and workflow-state mappings.
