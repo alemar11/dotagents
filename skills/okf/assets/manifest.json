@@ -1,0 +1,10 @@
+{
+  "repo": "GoogleCloudPlatform/knowledge-catalog",
+  "ref": "main",
+  "resolved_commit": "d44368c15e38e7c92481c5992e4f9b5b421a801d",
+  "source_subpath": "okf/SPEC.md",
+  "content_sha256": "b9655e607346dbbdc6de21190e9a953313eda6a7eba68d4d272a65975940ad6e",
+  "spec_version": "0.1 \u2014 Draft",
+  "downloaded_at": "2026-06-29T13:16:09.016318+00:00",
+  "official_tree_url": "https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf"
+}

@@ -32,6 +32,7 @@ If the user asks what this skill can do, answer with these two capability groups
    - Review TanStack Intent coverage for `skills/tanstack/`, update the reusable skill plus `references/` layout when new first-party Intent surfaces appear, and refresh the local fetch-source mapping for current TanStack package or doc versions.
    - Compare the local TanStack skill portfolio against `tanstack-skills/tanstack-skills/plugins`, map missing product-level coverage into the single reusable skill, and verify product details against TanStack-owned docs.
    - Check the current Codex worker/thread tool surface so `skills/codex-orchestrator/` stays aligned with how subagents are spawned and Codex App threads are created.
+   - Refresh the bundled OKF spec for `skills/okf/` from the official GoogleCloudPlatform knowledge-catalog repository and validate the runtime OKF reference layer.
    - Keep regeneration mechanics and maintainer-only internals out of runtime skills.
 
 ## Available Tasks (User Menu)
@@ -74,6 +75,11 @@ When the user asks what this skill can do, offer this task list:
    - Compare the discovered surface against `skills/codex-orchestrator/` runtime requirements, worker-surface rules, and prompt templates.
    - Update `codex-orchestrator` only when the actual tool names, visibility behavior, lifecycle capabilities, or authorization boundaries have materially changed.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
+11) `refresh okf spec`
+   - Check `skills/okf/assets/manifest.json` and the bundled official spec copy against `GoogleCloudPlatform/knowledge-catalog/okf/SPEC.md`.
+   - Refresh `skills/okf/assets/spec.md` and the manifest when stale.
+   - Validate the OKF runtime skill shape, reference links, CLI executable, and tests.
+   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 
 ## Trigger Rules
 Use this skill when users ask to:
@@ -92,6 +98,7 @@ Use this skill when users ask to:
 - Refresh the TanStack skill's `references/` layout or upstream-version fetch guidance when official TanStack Router, Start, CLI, or Intent surfaces change
 - Refresh TanStack skills coverage for the local `skills/tanstack/` skill when the upstream `tanstack-skills/tanstack-skills` plugin tree changes
 - Refresh or audit the Codex worker/thread tool surface, especially subagent spawning, subagent lifecycle, Codex App thread creation, visible worker behavior, or `codex-orchestrator` worker-surface contracts
+- Refresh the bundled OKF spec or align `skills/okf/` with the latest official Open Knowledge Format spec from `GoogleCloudPlatform/knowledge-catalog`
 - Integrate a newly scaffolded skill or plugin into repo metadata after `$skill-creator` or `$plugin-creator` has already created the package
 
 ## Workflow
@@ -109,7 +116,8 @@ Use this skill when users ask to:
 9) For TanStack Intent coverage refresh on `skills/tanstack/`, follow `references/tanstack-intent-refresh.md`.
 10) For TanStack skills coverage refresh on `skills/tanstack/`, follow `references/tanstack-skills-alignment.md`.
 11) For Codex worker/thread tool surface refresh, follow `references/codex-tool-surface-refresh.md`.
-12) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
+12) For OKF official spec refresh on `skills/okf/`, follow `references/okf-spec-refresh.md`.
+13) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
 
 ## References
 
@@ -128,6 +136,8 @@ Use this skill when users ask to:
 - `references/tanstack-intent-refresh.md`: use for maintainer-only review of new TanStack Intent coverage relevant to `skills/tanstack/`.
 - `references/tanstack-skills-alignment.md`: use for maintainer-only comparison of local `skills/tanstack/` coverage against `tanstack-skills/tanstack-skills/plugins`.
 - `references/codex-tool-surface-refresh.md`: use for maintainer-only review of current Codex subagent and Codex App thread tool surfaces that affect `skills/codex-orchestrator/`.
+- `references/okf-spec-refresh.md`: use for maintainer-only refresh of the bundled official OKF spec copy and runtime OKF validation layer.
+- `references/okf-spec-runbook.md`: canonical refresh and review procedure for the `okf` skill.
 - `references/release-checklist.md`: use at the end of mixed or multi-step maintenance tasks.
 
 ## Subagent Usage

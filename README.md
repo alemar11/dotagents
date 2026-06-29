@@ -40,6 +40,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `github-review-threads` | Inspect PR review threads, post discussion comments, and route selected replies with a focused `reviews` CLI. |
 | `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
 | `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
+| `okf` | Write, scaffold, and validate Open Knowledge Format markdown bundles with a focused `okf` CLI. |
 | `triage` | Triage existing GitHub or local markdown issues into typed, agent-ready states. |
 | `grill-me-with-context` | Stress-test repo-backed plans with project context and capture docs or ADRs. |
 | `improve-codebase-architecture` | Find architecture candidates, then pressure-test the selected refactor. |
@@ -112,7 +113,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-issues skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-issues skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/okf skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
 ```
 
 Install one reusable skill by passing only its path:
@@ -150,6 +151,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill github-review-threads \
   --skill github-stars \
   --skill github-triage \
+  --skill okf \
   --skill triage \
   --skill grill-me-with-context \
   --skill improve-codebase-architecture \

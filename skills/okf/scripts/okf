@@ -1,0 +1,495 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import json
+import os
+import re
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+VERSION = "1.0.0"
+SPEC_REQUIRED = ("type",)
+REFERENCE_AGENT_REQUIRED = ("type", "title", "description", "timestamp")
+RECOMMENDED = ("title", "description", "resource", "tags", "timestamp")
+PREFERRED_KEY_ORDER = ("type", "title", "description", "resource", "tags", "timestamp")
+FRONTMATTER_DELIM = "---"
+MARKDOWN_LINK_RE = re.compile(r"(?<!!)\[[^\]]+\]\(([^)]+)\)")
+DATE_HEADING_RE = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})\s*$")
+
+try:  # pragma: no cover - exercised only when PyYAML is installed.
+    import yaml  # type: ignore
+except Exception:  # pragma: no cover - default in this repo's Python.
+    yaml = None
+
+
+@dataclass
+class Message:
+    severity: str
+    path: str
+    message: str
+
+
+@dataclass
+class ValidationResult:
+    ok: bool = True
+    errors: list[Message] = field(default_factory=list)
+    warnings: list[Message] = field(default_factory=list)
+    files_checked: int = 0
+    concepts_checked: int = 0
+    mode: str = "spec"
+    pyyaml: bool = yaml is not None
+
+    def error(self, path: Path | str, message: str) -> None:
+        self.ok = False
+        self.errors.append(Message("error", str(path), message))
+
+    def warn(self, path: Path | str, message: str) -> None:
+        self.warnings.append(Message("warning", str(path), message))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "mode": self.mode,
+            "pyyaml": self.pyyaml,
+            "files_checked": self.files_checked,
+            "concepts_checked": self.concepts_checked,
+            "errors": [message.__dict__ for message in self.errors],
+            "warnings": [message.__dict__ for message in self.warnings],
+        }
+
+
+class OkfError(ValueError):
+    pass
+
+
+def _parse_scalar(value: str) -> Any:
+    value = value.strip()
+    if not value:
+        return ""
+    if (value.startswith('"') and value.endswith('"')) or (
+        value.startswith("'") and value.endswith("'")
+    ):
+        return value[1:-1]
+    if value.startswith("[") and value.endswith("]"):
+        inner = value[1:-1].strip()
+        if not inner:
+            return []
+        return [_parse_scalar(part.strip()) for part in inner.split(",")]
+    if value in {"true", "false"}:
+        return value == "true"
+    return value
+
+
+def limited_yaml_load(text: str) -> tuple[dict[str, Any], list[str]]:
+    data: dict[str, Any] = {}
+    warnings = ["PyYAML is not installed; using limited frontmatter parser."]
+    current_list_key: str | None = None
+    for line_no, raw in enumerate(text.splitlines(), 1):
+        line = raw.rstrip()
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if current_list_key and stripped.startswith("- "):
+            if not isinstance(data.get(current_list_key), list):
+                data[current_list_key] = []
+            data[current_list_key].append(_parse_scalar(stripped[2:]))
+            continue
+        current_list_key = None
+        if ":" not in stripped:
+            raise OkfError(f"Limited parser could not parse frontmatter line {line_no}: {raw}")
+        key, value = stripped.split(":", 1)
+        key = key.strip()
+        if not key:
+            raise OkfError(f"Empty frontmatter key on line {line_no}")
+        if not value.strip():
+            data[key] = ""
+            current_list_key = key
+        else:
+            data[key] = _parse_scalar(value)
+    return data, warnings
+
+
+def parse_frontmatter(text: str) -> tuple[dict[str, Any], str, list[str]]:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != FRONTMATTER_DELIM:
+        raise OkfError("Missing YAML frontmatter block")
+    end_idx: int | None = None
+    for idx in range(1, len(lines)):
+        if lines[idx].strip() == FRONTMATTER_DELIM:
+            end_idx = idx
+            break
+    if end_idx is None:
+        raise OkfError("Unterminated YAML frontmatter block")
+
+    raw_frontmatter = "\n".join(lines[1:end_idx])
+    if yaml is not None:
+        try:
+            loaded = yaml.safe_load(raw_frontmatter) or {}
+        except Exception as exc:
+            raise OkfError(f"Invalid YAML frontmatter: {exc}") from exc
+        if not isinstance(loaded, dict):
+            raise OkfError("Frontmatter must be a YAML mapping")
+        frontmatter = dict(loaded)
+        warnings: list[str] = []
+    else:
+        frontmatter, warnings = limited_yaml_load(raw_frontmatter)
+
+    body = "\n".join(lines[end_idx + 1 :])
+    if body.startswith("\n"):
+        body = body[1:]
+    return frontmatter, body, warnings
+
+
+def is_reserved(path: Path) -> bool:
+    return path.name in {"index.md", "log.md"}
+
+
+def iter_markdown_files(bundle: Path) -> list[Path]:
+    return sorted(path for path in bundle.rglob("*.md") if path.is_file())
+
+
+def validate_reserved_file(bundle: Path, path: Path, result: ValidationResult) -> None:
+    rel = path.relative_to(bundle)
+    text = read_utf8(path, rel, result)
+    if text is None:
+        return
+    if path.name == "index.md":
+        body = text
+        if text.splitlines()[:1] == [FRONTMATTER_DELIM]:
+            try:
+                fm, body, warnings = parse_frontmatter(text)
+            except OkfError as exc:
+                result.error(rel, f"Invalid index.md frontmatter: {exc}")
+                return
+            if rel != Path("index.md"):
+                result.error(rel, "Only the bundle-root index.md may include frontmatter.")
+            extra = set(fm).difference({"okf_version"})
+            if extra:
+                result.error(rel, f"index.md frontmatter may only contain okf_version, found {sorted(extra)!r}.")
+            for warning in warnings:
+                result.warn(rel, warning)
+        validate_index_body(rel, body, result)
+    elif path.name == "log.md":
+        validate_log_body(rel, text, result)
+
+
+def validate_index_body(rel: Path, body: str, result: ValidationResult) -> None:
+    if not body.strip():
+        result.error(rel, "index.md must contain at least one section heading and entry.")
+        return
+    saw_heading = False
+    for line_no, line in enumerate(body.splitlines(), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            saw_heading = True
+            continue
+        if stripped.startswith(("* ", "- ")):
+            if not saw_heading:
+                result.error(rel, f"index.md bullet entry on line {line_no} appears before a section heading.")
+            continue
+        result.error(rel, f"index.md line {line_no} must be a section heading or bullet entry.")
+    if not saw_heading:
+        result.error(rel, "index.md must contain at least one section heading.")
+
+
+def validate_log_body(rel: Path, body: str, result: ValidationResult) -> None:
+    if not body.strip():
+        result.error(rel, "log.md must contain at least one dated update group.")
+        return
+    saw_date = False
+    for line_no, line in enumerate(body.splitlines(), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("# "):
+            continue
+        if stripped.startswith("## "):
+            if DATE_HEADING_RE.match(stripped):
+                saw_date = True
+            else:
+                result.error(rel, f"log.md date heading on line {line_no} must use YYYY-MM-DD.")
+            continue
+        if stripped.startswith("#"):
+            result.error(rel, f"log.md line {line_no} has an unsupported heading level.")
+            continue
+        if not saw_date:
+            result.error(rel, f"log.md entry on line {line_no} appears before a YYYY-MM-DD date heading.")
+    if not saw_date:
+        result.error(rel, "log.md must contain at least one YYYY-MM-DD date heading.")
+
+
+def link_target_exists(bundle: Path, source: Path, target: str) -> bool | None:
+    clean = target.split("#", 1)[0].strip()
+    if not clean or clean.startswith(("#", "http://", "https://", "mailto:")):
+        return None
+    if not clean.endswith(".md"):
+        return None
+    bundle_root = bundle.resolve()
+    if clean.startswith("/"):
+        candidate = (bundle / clean.lstrip("/")).resolve()
+    else:
+        candidate = (source.parent / clean).resolve()
+    try:
+        candidate.relative_to(bundle_root)
+    except ValueError:
+        return False
+    return candidate.exists()
+
+
+def read_utf8(path: Path, rel: Path, result: ValidationResult) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as exc:
+        result.error(rel, f"File is not valid UTF-8: {exc}")
+        return None
+
+
+def validate_concept_file(
+    bundle: Path,
+    path: Path,
+    result: ValidationResult,
+    *,
+    mode: str,
+    strict_links: bool,
+) -> None:
+    rel = path.relative_to(bundle)
+    result.concepts_checked += 1
+    text = read_utf8(path, rel, result)
+    if text is None:
+        return
+    try:
+        frontmatter, body, parser_warnings = parse_frontmatter(text)
+    except OkfError as exc:
+        result.error(rel, str(exc))
+        return
+
+    required = REFERENCE_AGENT_REQUIRED if mode == "reference-agent" else SPEC_REQUIRED
+    invalid_required: list[str] = []
+    for key in required:
+        value = frontmatter.get(key)
+        if key == "timestamp" and isinstance(value, (dt.date, dt.datetime)):
+            continue
+        if not isinstance(value, str) or not value.strip():
+            invalid_required.append(key)
+    if invalid_required:
+        result.error(
+            rel,
+            f"Required frontmatter keys for {mode} must be non-empty strings: {', '.join(invalid_required)}.",
+        )
+
+    if mode == "spec":
+        for key in RECOMMENDED:
+            if key not in frontmatter:
+                result.warn(rel, f"Recommended frontmatter key is missing: {key}.")
+
+    for warning in parser_warnings:
+        result.warn(rel, warning)
+
+    for target in MARKDOWN_LINK_RE.findall(body):
+        exists = link_target_exists(bundle, path, target)
+        if exists is False:
+            message = f"Broken local markdown link: {target}."
+            if strict_links:
+                result.error(rel, message)
+            else:
+                result.warn(rel, message)
+
+
+def validate_bundle(bundle: Path, *, mode: str, strict_links: bool) -> ValidationResult:
+    result = ValidationResult(mode=mode)
+    if not bundle.exists() or not bundle.is_dir():
+        result.error(bundle, "Bundle path does not exist or is not a directory.")
+        return result
+
+    files = iter_markdown_files(bundle)
+    result.files_checked = len(files)
+    if not files:
+        result.warn(bundle, "No markdown files found in bundle.")
+        return result
+
+    for path in files:
+        if is_reserved(path):
+            validate_reserved_file(bundle, path, result)
+        else:
+            validate_concept_file(bundle, path, result, mode=mode, strict_links=strict_links)
+    return result
+
+
+def print_validation(result: ValidationResult, *, as_json: bool) -> int:
+    if as_json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        status = "PASS" if result.ok else "FAIL"
+        print(f"OKF validation {status}")
+        print(f"- mode: {result.mode}")
+        print(f"- PyYAML available: {'yes' if result.pyyaml else 'no'}")
+        print(f"- files checked: {result.files_checked}")
+        print(f"- concepts checked: {result.concepts_checked}")
+        for message in result.errors + result.warnings:
+            print(f"{message.severity.upper()}: {message.path}: {message.message}")
+    return 0 if result.ok else 65
+
+
+def ordered_frontmatter(frontmatter: dict[str, Any]) -> dict[str, Any]:
+    ordered: dict[str, Any] = {}
+    for key in PREFERRED_KEY_ORDER:
+        if key in frontmatter and frontmatter[key] not in (None, "", []):
+            ordered[key] = frontmatter[key]
+    for key, value in frontmatter.items():
+        if key not in ordered and value not in (None, "", []):
+            ordered[key] = value
+    return ordered
+
+
+def yaml_quote(value: str) -> str:
+    return json.dumps(value)
+
+
+def serialize_frontmatter(frontmatter: dict[str, Any]) -> str:
+    lines = [FRONTMATTER_DELIM]
+    for key, value in ordered_frontmatter(frontmatter).items():
+        if isinstance(value, list):
+            lines.append(f"{key}: [{', '.join(yaml_quote(str(item)) for item in value)}]")
+        else:
+            lines.append(f"{key}: {yaml_quote(str(value))}")
+    lines.append(FRONTMATTER_DELIM)
+    return "\n".join(lines) + "\n"
+
+
+def concept_path(bundle: Path, concept_id: str) -> Path:
+    cid = concept_id.strip().strip("/")
+    if cid.endswith(".md"):
+        cid = cid[:-3]
+    if not cid or cid.startswith(".") or ".." in Path(cid).parts:
+        raise OkfError("Concept ID must be a safe bundle-relative path.")
+    path = bundle / f"{cid}.md"
+    if path.name in {"index.md", "log.md"}:
+        raise OkfError("Reserved filenames index.md and log.md cannot be concept IDs.")
+    bundle_root = bundle.resolve()
+    resolved_path = path.parent.resolve() / path.name
+    try:
+        resolved_path.relative_to(bundle_root)
+    except ValueError as exc:
+        raise OkfError("Concept path resolves outside the bundle root.") from exc
+    return path
+
+
+def utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    payload = {
+        "ok": True,
+        "version": VERSION,
+        "checks": {
+            "python": sys.version.split()[0],
+            "pyyaml": bool(yaml is not None),
+            "executable": os.access(Path(__file__), os.X_OK),
+        },
+    }
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(f"okf {VERSION}")
+        print(f"- Python: {payload['checks']['python']}")
+        print(f"- PyYAML available: {'yes' if yaml is not None else 'no'}")
+        if yaml is None:
+            print("- YAML parser: limited stdlib fallback")
+    return 0
+
+
+def command_validate(args: argparse.Namespace) -> int:
+    result = validate_bundle(Path(args.bundle), mode=args.mode, strict_links=args.strict_links)
+    return print_validation(result, as_json=args.json)
+
+
+def command_scaffold(args: argparse.Namespace) -> int:
+    bundle = Path(args.bundle)
+    path = concept_path(bundle, args.concept_id)
+    if path.exists() and not args.force:
+        print(f"Refusing to overwrite existing concept: {path}", file=sys.stderr)
+        return 73
+
+    timestamp = args.timestamp
+    if timestamp == "now":
+        timestamp = utc_now()
+
+    frontmatter: dict[str, Any] = {
+        "type": args.type,
+        "title": args.title,
+        "description": args.description,
+        "resource": args.resource,
+        "tags": args.tag or [],
+        "timestamp": timestamp,
+    }
+    required = REFERENCE_AGENT_REQUIRED if args.mode == "reference-agent" else SPEC_REQUIRED
+    missing = [key for key in required if not frontmatter.get(key)]
+    if missing:
+        print(f"Missing required scaffold fields for {args.mode}: {', '.join(missing)}", file=sys.stderr)
+        return 64
+
+    if args.body_file:
+        body = Path(args.body_file).read_text(encoding="utf-8")
+    else:
+        body = f"# {args.title or args.concept_id}\n\n"
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(serialize_frontmatter(frontmatter) + "\n" + body, encoding="utf-8")
+    print(path)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="okf", description="Work with Open Knowledge Format bundles.")
+    parser.add_argument("--version", action="version", version=VERSION)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    doctor = subparsers.add_parser("doctor")
+    doctor.add_argument("--json", action="store_true")
+    doctor.set_defaults(func=command_doctor)
+
+    validate = subparsers.add_parser("validate")
+    validate.add_argument("bundle")
+    validate.add_argument("--mode", choices=("spec", "reference-agent"), default="spec")
+    validate.add_argument("--json", action="store_true")
+    validate.add_argument("--strict-links", action="store_true")
+    validate.set_defaults(func=command_validate)
+
+    scaffold = subparsers.add_parser("scaffold")
+    scaffold.add_argument("bundle")
+    scaffold.add_argument("concept_id")
+    scaffold.add_argument("--type", required=True)
+    scaffold.add_argument("--title")
+    scaffold.add_argument("--description")
+    scaffold.add_argument("--resource")
+    scaffold.add_argument("--tag", action="append", default=[])
+    scaffold.add_argument("--timestamp")
+    scaffold.add_argument("--mode", choices=("spec", "reference-agent"), default="spec")
+    scaffold.add_argument("--body-file")
+    scaffold.add_argument("--force", action="store_true")
+    scaffold.set_defaults(func=command_scaffold)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return args.func(args)
+    except OkfError as exc:
+        print(f"okf: {exc}", file=sys.stderr)
+        return 64
+    except OSError as exc:
+        print(f"okf: {exc}", file=sys.stderr)
+        return 74
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
