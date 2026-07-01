@@ -15,9 +15,15 @@ from project-memory defaults, tracker templates, generated issues, or draft
 publish commands. If legacy project-memory worker-authorization setup appears,
 ignore it as stale, non-authoritative state.
 
+Product surface references: visible Codex App thread creation is documented in
+<https://developers.openai.com/codex/app/features>, CLI/App subagents are
+documented in <https://developers.openai.com/codex/subagents>, and Codex
+instruction discovery is documented in
+<https://developers.openai.com/codex/guides/agents-md>.
+
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `delegated_worker_surface` | `auto`, `codex-app-thread`, `cli-subagent`, `none` | Owner-authorized delegation policy. `auto` chooses among authorized surfaces; in CLI this resolves to `cli-subagent`, while in App it may use visible App threads or subagents. |
+| `delegated_worker_surface` | `auto`, `codex-app-thread`, `cli-subagent`, `none` | Owner-authorized delegation policy. `cli-subagent` may run under policy auto-dispatch when all bounds match. `codex-app-thread` allows the visible App thread surface but does not by itself authorize creating App threads. `auto` chooses only among surfaces that are both policy-allowed and product-authorized for the current request. |
 | `actual_workstream_surface` | `codex-app-thread`, `cli-subagent`, `no-delegation` | Where the workstream actually runs. Do not present hidden subagents as visible App threads. |
 | `max_active_delegated_workers`, `max_active_cli_subagents`, `max_active_codex_app_threads`, `session_wide_delegated_worker_cap` | numbers or `none` | Caps, not quotas. Preserve separate surface caps instead of collapsing them. Title-case ledger labels are display aliases. |
 | `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. |
@@ -51,6 +57,11 @@ policy, issue mutation policy, and stop-for-owner rules, the root may record
 the checkpoint as `policy-auto-dispatched`, show a concise non-blocking summary,
 and dispatch without waiting for chat approval.
 
+Policy-auto-dispatch may create CLI subagents when the policy and source graph
+match. It must not create visible Codex App worker threads unless the current
+owner request explicitly asks for App/thread workers, or the owner approves a
+checkpoint that explicitly says `Visible App threads: yes`.
+
 Policy values are ceilings, not quotas or assignments. The root may still keep
 work in the root thread, choose fewer workers than allowed, or stop for owner
 input when source, repo, dependency, gate, or tool state makes dispatch unsafe.
@@ -67,6 +78,10 @@ approves that fallback after the missing or changed surface is stated.
 Use `cli-subagent` only when the owner requests or accepts `subagent`, `/agent`,
 `CLI worker`, or similar non-thread worker wording, or when the owner left the
 surface open and the checkpoint explicitly resolves it to `cli-subagent`.
+If `auto_dispatch: true` matches but the resolved surface would be
+`codex-app-thread` without explicit App/thread wording in the current request,
+stop before dispatch and ask: `Do you want me to create visible Codex App
+worker threads for this wave, use CLI subagents, or keep it root-only?`
 If owner wording mixes `thread` and `subagent`, treat it as conflicting
 surface intent, present the concrete surface choices in the checkpoint, and
 wait for approval before dispatch.

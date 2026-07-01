@@ -7,6 +7,12 @@ This file is optional runtime configuration for `$codex-orchestrator`. It does
 not replace `project-memory/agents/issue-tracker.md`, the linked `Source PRD`,
 generated issue bodies, or the orchestrator ledger.
 
+Related Codex product references: visible Codex App thread creation is
+documented in <https://developers.openai.com/codex/app/features>, CLI/App
+subagents are documented in <https://developers.openai.com/codex/subagents>,
+and Codex instruction discovery is documented in
+<https://developers.openai.com/codex/guides/agents-md>.
+
 ## Default Shape
 
 Use conservative defaults unless the owner explicitly chooses stronger
@@ -19,10 +25,10 @@ automation:
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `auto_dispatch` | boolean | `false` | `true`, `false` | Whether a matching bounded wave may dispatch without chat approval. |
+| `auto_dispatch` | boolean | `false` | `true`, `false` | Whether a matching bounded wave may dispatch without chat approval, except that visible Codex App thread creation still requires explicit current-session App/thread authorization. |
 | `eligible_sources` | list | `durable-generated-issue-with-handoff` | `durable-generated-issue-with-handoff`, `local-checklist` | Source shapes eligible for auto-dispatch. |
 | `excluded_sources` | list | `draft-prd-ref`, `missing-handoff`, `ambiguous-delivery-mode`, `cyclic-dependency-graph` | any source shape or blocker slug | Source shapes that always stop for owner input. |
-| `worker_surfaces` | list | `none` | `none`, `cli-subagent`, `codex-app-thread`, `auto` | Worker surfaces the orchestrator may choose from. |
+| `worker_surfaces` | list | `none` | `none`, `cli-subagent`, `codex-app-thread`, `auto` | Worker surfaces the orchestrator may choose from as ceilings, not assignments. `codex-app-thread` allows the visible App thread surface but does not by itself authorize creating App threads. |
 | `max_active_delegated_workers` | integer | `0` | `0` or positive integer | Total delegated worker cap across surfaces. |
 | `max_active_cli_subagents` | integer | `0` | `0` or positive integer | CLI/subagent worker cap. |
 | `max_active_codex_app_threads` | integer | `0` | `0` or positive integer | Visible Codex App thread cap. |
@@ -38,6 +44,8 @@ automation:
 - `## Orchestrator Handoff` is missing or contradicts the issue body
 - delivery mode, dependency graph, closeout, or gates are missing or unsafe
 - requested worker surface is unavailable
+- policy-auto-dispatch would create visible Codex App worker threads without
+  explicit current-session App/thread authorization
 - requested authorization exceeds `authorization_ceiling`
 - commit, push, PR, direct issue mutation, merge, release, or deployment is
   required but not explicitly authorized
@@ -49,7 +57,10 @@ automation:
 
 - `auto_dispatch`: `true` lets `$codex-orchestrator` dispatch a matching
   bounded wave without interactive approval after it records and reports the
-  checkpoint. `false` preserves the blocking Approach Checkpoint flow.
+  checkpoint. It may bypass chat approval for CLI subagents when all policy
+  bounds match, but it must not create visible Codex App worker threads unless
+  the current owner request explicitly authorized App/thread workers. `false`
+  preserves the blocking Approach Checkpoint flow.
 - `eligible_sources`: source shapes that may use auto-dispatch, normally
   `durable-generated-issue-with-handoff` or `local-checklist`.
 - `excluded_sources`: source shapes that must stop for owner input. Always
@@ -57,6 +68,11 @@ automation:
   and cyclic dependency graphs.
 - `worker_surfaces`: allowed surfaces such as `none`, `cli-subagent`,
   `codex-app-thread`, or `auto`. These are ceilings, not assignments.
+  `cli-subagent` may be policy-auto-dispatched when the source graph, caps, and
+  authorization ceilings match. `codex-app-thread` is a visible Codex App
+  surface and requires explicit current-session App/thread authorization before
+  creation. `auto` may resolve autonomously to `cli-subagent`, but not to
+  `codex-app-thread` without that explicit authorization.
 - `max_active_delegated_workers`, `max_active_cli_subagents`,
   `max_active_codex_app_threads`, and
   `session_wide_delegated_worker_cap`: caps, not quotas. The orchestrator may
@@ -81,6 +97,8 @@ with prose.
 `orchestration-policy.md` controls when `$codex-orchestrator` may dispatch
 runtime work without asking again. It never grants planning authority, tracker
 publication authority, worker assignments, or issue body fields by itself.
+It also does not make `AGENTS.md` the dispatch contract; `AGENTS.md` should
+only point to this policy when setup pointers are needed.
 
 Do not copy this policy into PRDs, generated implementation issues,
 `## Orchestrator Handoff`, draft publish commands, or tracker templates. The

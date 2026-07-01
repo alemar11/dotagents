@@ -99,6 +99,11 @@ confirmation before writing.
   may define allowed surfaces, caps, and authorization ceilings, but
   `$codex-orchestrator` resolves actual worker capability modes per workstream
   and session.
+- Treat `codex-app-thread` as a visible Codex App surface. Even when
+  `orchestration-policy.md` allows it, App thread creation requires explicit
+  current-session App/thread authorization or an approved checkpoint with
+  `Visible App threads: yes`. `auto_dispatch: true` may dispatch matching
+  CLI-subagent work without chat approval, but not visible App thread creation.
 - Default domain layout to `single-context` unless `CONTEXT-MAP.md`, repo
   evidence, or orchestrator mode implies otherwise.
 - Recommend `seed-context` only when non-empty repo evidence supports useful
@@ -131,8 +136,9 @@ For orchestrator workspace mode, preserve these points in the draft:
 - child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional
   `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs;
 - `codex-orchestrator` owns runtime worker state and ledgers.
-- `orchestration-policy.md` owns auto-dispatch bounds; issue bodies and
-  `issue-tracker.md` must not carry worker surfaces, caps, or approval policy.
+- `orchestration-policy.md` owns auto-dispatch bounds; issue bodies,
+  `issue-tracker.md`, and `AGENTS.md` must not carry worker surfaces, caps, or
+  approval policy.
 
 ## Write Rules
 
@@ -177,7 +183,7 @@ exists or is confirmed:
 
 ### Orchestration policy
 
-[one-line summary of auto-dispatch and worker-surface policy]. See `project-memory/agents/orchestration-policy.md`.
+[one-line summary of auto-dispatch and worker-surface policy; mention visible Codex App threads are explicit-only when enabled]. See `project-memory/agents/orchestration-policy.md`.
 
 ### Domain memory
 
@@ -189,9 +195,12 @@ exists or is confirmed:
 ```
 
 Keep this block concise. Do not paste domain vocabulary, tracker procedures,
-delivery details, localization rules, or context seed material into `AGENTS.md`.
-For orchestrator workspaces, explicitly say the workspace coordinates external
-repos and child repos keep their own project memory and code ownership.
+delivery details, localization rules, worker-dispatch rules, or context seed
+material into `AGENTS.md`. `AGENTS.md` may point to
+`project-memory/agents/orchestration-policy.md`, but that policy file remains
+the dispatch contract. For orchestrator workspaces, explicitly say the
+workspace coordinates external repos and child repos keep their own project
+memory and code ownership.
 
 ## Completion Report
 

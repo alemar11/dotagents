@@ -146,6 +146,12 @@ Required surfaces depend on the resolved workstream:
   auto-dispatch bounds, allowed worker surfaces, caps, authorization ceilings,
   monitoring defaults, and stop-for-owner rules.
 
+Product surface references: Codex App thread creation is documented in
+<https://developers.openai.com/codex/app/features>, CLI/App subagents are
+documented in <https://developers.openai.com/codex/subagents>, and Codex
+instruction discovery is documented in
+<https://developers.openai.com/codex/guides/agents-md>.
+
 If a required Codex tool is not visible, search the tool registry by operation
 name before treating it as unavailable. Record the actual callable tool name
 when it differs from the logical name. If a tool or companion skill remains
@@ -170,8 +176,9 @@ workers, create visible App threads, mutate source state, or assume a quota.
 Treat `orchestration-policy.md` values as ceilings, not assignments. The root
 still chooses the actual workstream surface, worker count, authorization modes,
 publication checkout, and stop conditions from the source graph, current repo
-state, gates, and available tools. Do not copy policy values into PRDs,
-generated issue bodies, draft publish commands, or `## Orchestrator Handoff`.
+state, gates, available tools, and Codex product-surface rules. Do not copy
+policy values into PRDs, generated issue bodies, draft publish commands, or
+`## Orchestrator Handoff`.
 
 Use `references/worker.md` for worker surfaces, caps, authorization modes,
 prompt shape, lifecycle, resync, integration, artifacts, and closeout. Keep
@@ -181,10 +188,17 @@ these entrypoint rules in force:
   and session. Ignore the legacy project-memory worker-authorization setup key
   if it appears; it is stale setup state, not authority.
 - `auto` permits choosing among owner-authorized surfaces; it is not a quota.
+  Policy-auto-dispatch may resolve to `cli-subagent` when policy, source
+  eligibility, caps, and authorization ceilings match. It must not resolve to
+  `codex-app-thread` unless the current owner request explicitly asks for
+  App/thread workers, or the owner approves a checkpoint that says
+  `Visible App threads: yes`.
 - In owner worker-surface wording, `thread` means a visible Codex App thread.
   Phrases such as `worker thread`, `new thread`, `separate thread`, `Codex
   thread`, `visible thread`, or `use a thread` resolve the delegated worker
   surface to `codex-app-thread`; do not satisfy them with `cli-subagent`.
+- `codex-app-thread` in `orchestration-policy.md` means the visible App thread
+  surface is allowed. It is not automatic consent to create App threads.
 - If requested Codex App thread tools are unavailable, stop before dispatch,
   report the missing surface, and ask for an explicit fallback instead of
   silently downgrading to a CLI/subagent worker.
@@ -229,6 +243,10 @@ these entrypoint rules in force:
   surface, cap, authorization, or delivery path, or if an auto-dispatched wave
   would exceed policy ceilings, regenerate the checkpoint and wait for approval
   before dispatch.
+- If an otherwise policy-auto-dispatchable wave would create visible Codex App
+  worker threads without current explicit App/thread authorization, stop and
+  ask whether to create visible App worker threads, use CLI subagents, or keep
+  the work root-only.
 - For root-only waves, use the owner-facing wording from
   `references/worker.md`: `Execution mode: root thread only; no separate
   workers` and `Worker surface: no-delegation`. Do not display

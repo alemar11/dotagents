@@ -211,9 +211,10 @@ filling project memory incrementally.
 
 - `issue-tracker-*.md`: tracker-specific artifact locations, publication rules,
   delivery defaults, runtime policy boundaries, title formats, and completion.
-- `orchestration-policy.md`: optional auto-dispatch, worker-surface caps,
-  authorization ceilings, monitoring defaults, and stop-for-owner rules for
-  `$codex-orchestrator`.
+- `orchestration-policy.md`: durable `$codex-orchestrator` worker-dispatch
+  policy, including optional auto-dispatch, worker-surface caps, authorization
+  ceilings, monitoring defaults, visible App thread explicitness, and
+  stop-for-owner rules.
 - `tracker-publishing.md`: shared effective target, draft publish, temporary
   body-file, and `source_prd_ref` contract.
 - `triage-labels.md`: canonical issue type and workflow-state mappings.
