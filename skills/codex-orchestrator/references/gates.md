@@ -106,7 +106,9 @@ matches the recorded delivery mode and closeout path, and verify that direct
 dependencies or blocking relationships recorded in the issue are satisfied
 before declaring closure. Close through the relevant PR body by default. Use
 final-commit closure only when the issue records `direct-commit` or another
-explicit maintainer authorization.
+explicit final-commit closeout path. For local markdown sources, completion is
+the configured move to `issues/done/` after validation and proof; do not treat a
+commit alone as local issue closure.
 
 For PRD-backed workflows with authorized branch plus draft PR delivery, do not
 declare the workstream `completed` while the expected draft PR remains
@@ -199,9 +201,9 @@ across repo boundaries before owner-ready status: shared API shape, version
 pinning, migration order, deploy order, fixtures, or an explicit integration
 test.
 
-For `one-pr-per-repo`, also require the real repo PR links or equivalent
-integration proof promised by the coordination PRD or issue before declaring
-the coordination issue closed, merge-ready, or complete.
+For multi-repo `pull-request` delivery, also require the real repo PR links or
+equivalent integration proof promised by the PRD or issue before declaring the
+cross-repo issue closed, merge-ready, or complete.
 
 ### Credential And Access Gate
 

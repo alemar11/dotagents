@@ -39,9 +39,10 @@ request and initial task sources.
 
 Before creating workers, starting root-owned implementation, or mutating source
 state, the root orchestrator verifies that no live root already claims the same
-portfolio, repo realpath, or source id. The ledger is the source of truth for
-this advisory claim; do not introduce a separate filesystem lock as the
-authoritative state.
+portfolio, repo realpath, or source id. The ledger is an advisory coordination
+record, not a filesystem or database lock. Treat it as the owner-visible record
+for root claims, but do not use it to justify racing duplicate publication or
+source mutation.
 
 Use canonical local repo realpaths when available. Portfolio names can alias the
 same checkout, so a new root should check the target ledger and any known
@@ -49,17 +50,17 @@ ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/` for
 overlapping active-root claims before dispatch.
 
 If another non-stale active root claims overlapping repo realpaths or source
-ids, stop as `needs-owner`. Report the claiming root, overlap, last heartbeat,
+ids, stop as `needs-owner`. Report the claiming root, overlap, last progress read,
 and options: resume the existing root, wait, hand off, or explicitly take over.
 If the prior root is stale, record the takeover before dispatching new workers
 or mutating sources.
 
 Staleness is recovery logic, not permission to race. Use explicit owner
-approval when heartbeat freshness is unclear, when workers may still contain
+approval when ledger freshness is unclear, when workers may still contain
 unintegrated output, or when source mutation or publication could be duplicated.
-Default heartbeat policy is `every-5-minutes` when monitoring is active; a
-takeover should require at least two missed heartbeats plus a grace window or
-explicit owner approval.
+Use `Last Progress Read` plus active workstream `Next Check` values to decide
+whether a claim is stale; take over only after a recorded stale-read note plus a
+grace window or explicit owner approval.
 
 ## Structured Ledger Values
 
@@ -75,12 +76,12 @@ Use these ledger-owned values:
   worker or root flow took over, and `root-owned` means root owns integration or
   follow-up.
 - `active_root_status`: `claimed` means this root currently owns the portfolio
-  source graph, `stale` means the claim missed the recorded heartbeat policy,
+  source graph, `stale` means the claim missed the recorded ledger check window,
   `released` means closeout completed, and `takeover-recorded` means a new root
   explicitly recorded a takeover from a stale or owner-approved prior root.
 - `active_root_takeover_policy`: `owner-approval` requires an explicit owner
-  decision, while `stale-heartbeat` permits takeover only after the recorded
-  heartbeat threshold and takeover note are present.
+  decision, while `stale-ledger-check` permits takeover only after the recorded
+  stale-read note and takeover note are present.
 
 Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
 and gate values are owned by `worker.md`, `prd-backed-delivery.md`, and
@@ -122,9 +123,9 @@ Status: claimed|stale|released|takeover-recorded
 Root ID: <thread id, session id, or root descriptor>
 Root surface: codex-app-thread|cli|unknown
 Started: <YYYY-MM-DD HH:MM TZ>
-Last heartbeat: <YYYY-MM-DD HH:MM TZ>
-Heartbeat policy: disabled|manual|every-5-minutes|custom
-Takeover policy: owner-approval|stale-heartbeat
+Last Progress Read: <YYYY-MM-DD HH:MM TZ>
+Next Root Check: <YYYY-MM-DD HH:MM TZ or none>
+Takeover policy: owner-approval|stale-ledger-check
 Claimed repo realpaths:
 - <absolute realpath or unknown>; source=<scope evidence>
 Claimed source ids:
@@ -134,69 +135,26 @@ Active workers:
 Takeover history:
 - <date, previous root id, overlap, stale/owner approval evidence, worker disposition>
 
-Refresh `Last heartbeat` during each wave or heartbeat check. Release or mark
-the active-root claim `released` during final closeout when there is no active
-worker, authorized `ready-next` action, or root-owned closeout action remaining.
+Refresh `Last Progress Read` during each wave or due ledger check. Release or
+mark the active-root claim `released` during final closeout when there is no
+active worker, authorized `ready-next` action, or root-owned closeout action
+remaining.
 
-## Worker Policy
+## Worker And Delivery References
 
-Policy source: <project-memory/agents/orchestration-policy.md, missing, or owner-session-only>
-Policy fingerprint: <checksum, timestamp, summary, or not-recorded>
-Auto-dispatch: true|false
 Authorization resolution: per-workstream
-Authorization ceiling: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
 Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
-Delegated worker surface: auto|codex-app-thread|cli-subagent|none
-Max active delegated workers: <number>
-Max active CLI/subagents: <number or none>
-Max active Codex App threads: <number or none>
-Session-wide delegated worker cap: <number or none>
-Heartbeat: disabled|manual|every-5-minutes|custom
+Session CLI subagents approved: true|false
+Session Codex App threads approved: true|false
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true
 Visible worker title format: <Project>: <short current task>
 
-Worker policy values follow `worker.md`. Caps are not quotas. Preserve separate
-CLI/App/session caps, list each authorization mode explicitly, and record
-`Surface=no-delegation`, `Worker ID=root`, and the reason when root owns work.
-`project-memory/agents/orchestration-policy.md` may provide policy ceilings and
-auto-dispatch bounds, but the root resolves actual authorization modes for each
-workstream from owner request, source item, linked `Source PRD`, publication
-authority, issue mutation authority, selected worker surface, dependencies,
-dirty-worktree state, and gates. Ignore legacy project-memory
-worker-authorization setup values as stale, non-authoritative state.
-
-## Delivery Mode Policy
-
-Default delivery mode:
-- `one-feature-branch` for a single git repo, including monorepos.
-- `one-pr-per-repo` for true multi-repo features.
-
-Exceptions:
-- `one-pr-per-issue` only when the issue is isolated from shared contracts,
-  migrations, lockfiles, generated files, broad validation, and other active
-  issue work.
-- `direct-commit` only with explicit owner authorization.
-
-Each implementation workstream records effective delivery mode, inheritance or
-override source, issue-level parallelization, dependencies, blocks, closeout,
-branch/PR expectation, publication checkout, caller checkout policy, current
-wave, integration proof target, and, for PRD-backed workflows, separate
-delivery, publication, and issue-mutation authority. Workers may not choose a
-different branch or PR strategy without a root-owned ledger update and
-authorization check.
-
-For generated implementation issues, also record the validated
-`## Orchestrator Handoff` projection from the issue body: source PRD, feature
-slug, affected repos or product scope, scope, start rule, dependencies,
-validation, and closeout. This ledger entry is runtime state copied from the
-issue; the issue body and linked PRD remain the durable planning authority.
-
-Startability is issue-level: `independent` may start when gates allow,
-`depends-on <issue>` waits for root-verifiable dependency proof,
-`blocks <issue>` starts when otherwise eligible while dependents wait, and
-`root-integrated` stays in root except for read-only or proof-only workers.
+Worker fields follow `worker.md`. Delivery, publication, and issue-mutation
+authority follow `prd-backed-delivery.md`. Gates follow `gates.md`. Keep only
+the current session summary here; put full source contracts in PRDs, generated
+issues, owner requests, or the linked references.
 
 ## Gate Policy
 
@@ -231,9 +189,21 @@ when those fields apply.
 
 ### active
 
-| ID | Source ID | Source Ref | Repo | Surface | Worker ID | Wave | Title | Objective | Delivery | Acceptance Criteria | Status | Last Read | Root Baseline | Resync State | Next Check |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A-001 | github-issue:owner/repo#123 | <url/path:line> | owner/repo | codex-app-thread | <thread id or root> | 1 | <Project>: <short task> | <objective> | <Source PRD; handoff projection; delivery mode; delivery authority; publication authority; issue mutation authority; parallelization; dependencies; blocks; branch/PR expectation; publication checkout; caller checkout policy; closeout> | <source acceptance criteria> | active | <time> | <commit/ledger wave> | synced, needs-resync, replaced, or root-owned | <time/action> |
+Use one compact block per active workstream:
+
+#### A-001: <Project>: <short task>
+
+| Field | Value |
+| --- | --- |
+| Source | <source id/ref and closeout target> |
+| Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
+| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; approved=<true|false>; actual=<root|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
+| Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
+| Objective | <one concrete outcome> |
+| Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
+| Delivery | <pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation> |
+| Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
+| Gates / proof | <required gates and current proof target> |
 
 ### autonomous
 
@@ -279,22 +249,25 @@ when those fields apply.
 
 ## Wave Checkpoints
 
-Record the checkpoint before dispatch. Include whether it was
-`owner-approved` or `policy-auto-dispatched`, the policy file path and
-fingerprint when used, approval timestamp or auto-dispatch timestamp,
-approval scope (`current-wave` or `bounded-multi-wave`), selected worker
-surface, resolved surface when `auto` is used, worker cap, authorization
-ceiling, stop conditions, and any owner edits to split, surface, cap,
-authorization, or delivery path. If a bounded multi-wave checkpoint is approved
-or policy-auto-dispatched, record its boundaries and continue later waves only
-while they stay inside the recorded source items, surface, cap, authorization,
-delivery path, and stop conditions. If approval is pending and policy
-auto-dispatch does not apply, planned work may remain in the ledger, but
-implementation workers and root-owned implementation must not start.
+Record the startup checkpoint before dispatch. Include whether it was
+`owner-approved` or `pending`, approval timestamp, approval scope
+(`current-wave` or `bounded-multi-wave`), session worker settings, selected
+worker surface, orchestrator-chosen split for the first wave, authorization
+modes, stop conditions, and any owner edits to split, surface, authorization, or
+delivery path. If a bounded multi-wave checkpoint is approved, record its
+boundaries and continue later waves only while they stay inside the recorded
+source items, approved session surfaces, authorization modes, delivery path, and
+stop conditions. If approval is pending, planned work may remain in the ledger,
+but implementation workers and root-owned implementation must not start.
 
 | Wave | Started | Finished | Sources Scanned | Items Processed | Checkpoint | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <owner-approved, policy-auto-dispatched, or pending; policy path/fingerprint; scope; surface/cap; authorization ceiling; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| 1 | <time> | <time> | <source ids> | <count> | <owner-approved or pending; scope; session surfaces; worker split; authorization modes; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+
+Record worker evidence every time the approved worker surface and actual worker
+surface differ. Include the requested surface, owner approval, actual surface,
+tool or session id when one exists, fallback reason, and whether execution was
+parallel, sequential, root-owned, or simulated.
 
 ## Notes
 
@@ -322,7 +295,7 @@ claim and in `## Notes`.
 | State | Meaning and required record |
 | --- | --- |
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
-| `autonomous` | Candidate safe to delegate under current policy. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
+| `autonomous` | Candidate safe to delegate under current session authorization and checkpoint boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
 | `ready-next` | Owner-ready work still needing review, commit, push, PR, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |

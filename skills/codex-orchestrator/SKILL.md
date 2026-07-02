@@ -10,8 +10,8 @@ description: Coordinate Codex workers, portfolio ledgers, gates, autoreview, Git
 Use this Codex-dependent skill as the control plane for maintainer work across
 one or more repositories. It coordinates named portfolio ledgers, read-only
 standalone Git/GitHub companion skills, visible Codex App worker threads,
-CLI/subagent worker threads, heartbeat monitoring, gates, `$autoreview`, and
-owner-ready status reports.
+CLI/subagent worker threads, ledger-driven progress monitoring, gates,
+`$autoreview`, and owner-ready status reports.
 
 This skill is not a worker. It delegates scoped work, monitors progress, keeps
 the ledger current, and decides when a task is ready for owner review, commit,
@@ -66,7 +66,7 @@ migrates it.
 | --- | --- |
 | Rough feature or product intent without durable PRD plus generated issues | Route through `$plan-feature` full-flow before implementation scheduling. |
 | Existing durable PRD without generated issues | Route through `$plan-feature` `issues-from-existing-prd` mode unless the owner only asked for inspect-only review. |
-| Generated issue with `Source PRD: draft-prd:<...>` | Register only for dry-run inspection or planning review. Do not dispatch, commit, push, open PRs, close issues, or mutate trackers until the source is a hosted PRD number, local PRD path, or explicit owner decision with separate publication and issue-mutation authority. |
+| PRD-backed issue, workspace partial PRD, or generated issue with `Source PRD` | Load `references/prd-backed-delivery.md` before scheduling. It owns partial-PRD graph expansion, draft PRD handling, delivery, publication, and issue-mutation authority. |
 | Durable generated issue with `## Orchestrator Handoff` | Register directly as a source item and use the handoff as the canonical issue-level dispatch contract. |
 | Durable generated issue missing `## Orchestrator Handoff` | Register only for inspection or route through `$plan-feature` `issues-from-existing-prd` / issue regeneration before implementation scheduling, unless the owner explicitly authorizes ad hoc execution from the current issue body. |
 | PR, CI failure, bug, local checklist, implementation plan, or explicit implementation request | Register directly as source items and decompose into workstreams. |
@@ -77,11 +77,15 @@ workstream, the root orchestrator owns lifecycle and closeout mutations for that
 source item, including issue comments, label changes, direct closure when
 authorized, real PR link recording, and integration proof.
 For generated issues, treat `## Orchestrator Handoff` as the canonical
-dispatch section. Copy its source PRD, feature slug, delivery mode, affected
-repos or product scope, scope, start rule, dependencies, validation, and
-closeout into the ledger as runtime state. Do not treat ledger copies as the
-durable planning source, and do not infer worker authorization, publication
-authority, or issue mutation authority from the handoff.
+dispatch section. Copy only the runtime projection needed for scheduling into
+the ledger. The issue body and linked PRD remain the durable planning source.
+
+In workspace mode, there is no required global PRD. A GitHub issue or local
+issue may point at one repo-scoped partial PRD whose links identify sibling
+partial PRDs for the same feature. Treat that connected partial-PRD graph as the
+durable feature scope, record every partial PRD/source item in the ledger, and
+run independent repo work in parallel only when their dependencies and
+integration gates allow it.
 
 For Markdown plans or checklists, enumerate unchecked items with nearest heading
 context and a stable path plus line or anchor. Preserve parent context, map each
@@ -113,7 +117,7 @@ Run orchestration as bounded waves, not as a one-pass checklist:
 2. Snapshot authorized task sources and reconcile them with existing ledger
    workstreams by stable source id.
 3. Select the next root-owned and delegated wave.
-4. Execute, monitor, integrate, and gate the wave.
+4. Execute, monitor through the ledger, integrate, and gate the wave.
 5. Update the ledger and any authorized source closeout targets.
 6. Rescan due sources, then repeat only while there are `active` items,
    actionable `autonomous` candidates, due next checks, authorized `ready-next`
@@ -128,29 +132,14 @@ loop silently on the same worker status or source snapshot.
 Required surfaces depend on the resolved workstream:
 
 - Codex App thread tools for visible App workers: create/read/message/rename,
-  archive, handoff, fork, and optional list/pin. Logical operations map to
-  `codex_app.create_thread`, `codex_app.read_thread`,
-  `codex_app.send_message_to_thread`, `codex_app.set_thread_title`,
-  `codex_app.set_thread_archived`, `codex_app.handoff_thread`,
-  `codex_app.fork_thread`, and optionally `codex_app.list_threads` or
-  `codex_app.set_thread_pinned`.
+  archive, handoff, fork, and optional list/pin.
 - CLI/subagent worker tools for inspectable CLI workers: spawn, wait, send, and
-  close through `multi_agent_v1.spawn_agent`, `multi_agent_v1.wait_agent`,
-  `multi_agent_v1.send_input`, `multi_agent_v1.close_agent`, or the CLI
-  `/agent` equivalent.
-- Codex heartbeat or automation support only when the owner selects periodic
-  monitoring.
+  close through the current runtime's subagent or `/agent` equivalent.
+- Codex App automation support only when the owner explicitly asks to schedule
+  recurring or delayed ledger checks and the current runtime exposes automation
+  tooling.
 - `$autoreview`, standalone Git/GitHub companions, `$plan-feature`, and ledger
   storage at `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`.
-- Optional repo policy at `project-memory/agents/orchestration-policy.md` for
-  auto-dispatch bounds, allowed worker surfaces, caps, authorization ceilings,
-  monitoring defaults, and stop-for-owner rules.
-
-Product surface references: Codex App thread creation is documented in
-<https://developers.openai.com/codex/app/features>, CLI/App subagents are
-documented in <https://developers.openai.com/codex/subagents>, and Codex
-instruction discovery is documented in
-<https://developers.openai.com/codex/guides/agents-md>.
 
 If a required Codex tool is not visible, search the tool registry by operation
 name before treating it as unavailable. Record the actual callable tool name
@@ -159,100 +148,50 @@ unavailable, continue only with safe work and report the exact missing surface.
 
 ## Delegation Policy
 
-Before creating workers, read `project-memory/agents/orchestration-policy.md`
-when it exists, then resolve and record the effective worker and monitoring
-policy in the ledger. Missing policy preserves the interactive default. If a
-broad, worker-oriented, or parallelizable request omits surface, limits, or
-monitoring and no matching auto-dispatch policy exists, ask once:
+When invoked to implement work, ask for session settings before creating
+workers or starting implementation. These settings are PRD-agnostic and
+issue-agnostic; they apply to the current orchestrator session. Present the
+initial Approach Checkpoint and wait for owner approval. Ask these two
+worker-surface questions once:
 
-> How should I run orchestration for this session: `cli-subagent`,
-> `codex-app-thread`, `auto`, or `none`? What max active count should I use
-> for each allowed worker surface? Should I monitor progress manually, or create
-> a heartbeat? Default heartbeat is `every-5-minutes`, and you can change it.
+> For this orchestrator session, should I use CLI subagents? If we are in the
+> Codex App and visible worker threads are available, should I also use Codex App
+> worker threads? I will choose the number of workers and the split for each
+> implementation wave after you approve the checkpoint.
 
 While waiting, do only root-owned discovery or planning that does not create
 workers, create visible App threads, mutate source state, or assume a quota.
 
-Treat `orchestration-policy.md` values as ceilings, not assignments. The root
-still chooses the actual workstream surface, worker count, authorization modes,
-publication checkout, and stop conditions from the source graph, current repo
-state, gates, available tools, and Codex product-surface rules. Do not copy
-policy values into PRDs, generated issue bodies, draft publish commands, or
-`## Orchestrator Handoff`.
+After session approval, the root chooses the actual workstream surface, worker
+count, authorization modes, publication checkout, and stop conditions from the
+source graph, current repo state, gates, available tools, and Codex
+product-surface rules. Do not copy session worker choices into PRDs, generated
+issue bodies, draft publish commands, or `## Orchestrator Handoff`.
 
-Use `references/worker.md` for worker surfaces, caps, authorization modes,
-prompt shape, lifecycle, resync, integration, artifacts, and closeout. Keep
-these entrypoint rules in force:
+Use `references/worker.md` for worker surfaces, session settings,
+authorization modes, checkpoint shape, prompt shape, lifecycle, resync,
+integration, artifacts, recurring PRD automation, and closeout. The entrypoint
+contract is:
 
 - Worker authorization is resolved only by the root orchestrator per workstream
-  and session. Ignore the legacy project-memory worker-authorization setup key
-  if it appears; it is stale setup state, not authority.
-- `auto` permits choosing among owner-authorized surfaces; it is not a quota.
-  Policy-auto-dispatch may resolve to `cli-subagent` when policy, source
-  eligibility, caps, and authorization ceilings match. It must not resolve to
-  `codex-app-thread` unless the current owner request explicitly asks for
-  App/thread workers, or the owner approves a checkpoint that says
-  `Visible App threads: yes`.
+  and session.
+- Worker surface approval is current-session approval, not durable config or
+  PRD/issue metadata. Project memory must not grant App-thread, automation,
+  publication, or issue-mutation consent.
 - In owner worker-surface wording, `thread` means a visible Codex App thread.
-  Phrases such as `worker thread`, `new thread`, `separate thread`, `Codex
-  thread`, `visible thread`, or `use a thread` resolve the delegated worker
-  surface to `codex-app-thread`; do not satisfy them with `cli-subagent`.
-- `codex-app-thread` in `orchestration-policy.md` means the visible App thread
-  surface is allowed. It is not automatic consent to create App threads.
-- If requested Codex App thread tools are unavailable, stop before dispatch,
-  report the missing surface, and ask for an explicit fallback instead of
-  silently downgrading to a CLI/subagent worker.
-- CLI/subagent workers are valid for owner-authorized, inspectable bounded work
-  only when the owner requested or accepted `subagent`, `/agent`, `CLI worker`,
-  or no owner wording implied a visible Codex App thread.
-- Split workers by independent ownership boundary: repository, package,
-  service, path set, or tightly scoped workstream.
-- Keep small, overlapping, shared-contract, dependency/config, migration,
-  generated-snapshot, broad-test, conflict-resolution, and final integration
-  work in the root thread.
-- Before sending overlapping new scope to an existing worker, resync or replace
-  the worker.
+  Do not silently downgrade requested App threads to CLI subagents.
+- Automations are explicit-only and runtime-tool-dependent. The ledger owns
+  monitoring state through source status, `Last Read`, and `Next Check` /
+  `Next Scan/Check`; unavailable automation tooling means draft instructions,
+  not scheduled work.
+- Split workers by independent ownership boundary, keep shared or overlapping
+  integration work in the root, and resync or replace a worker before assigning
+  overlapping new scope.
 - Before dispatching implementation, build the `Approach Checkpoint` from
-  `references/worker.md`. If `orchestration-policy.md` is missing, has
-  `auto_dispatch: false`, or does not match the source graph, present the
-  checkpoint and wait for explicit owner approval. If `auto_dispatch: true`
-  matches the source graph and all planned values stay within policy ceilings,
-  record the checkpoint as policy-auto-dispatched, show a concise
-  non-blocking auto-dispatch summary, and dispatch without waiting. The root
-  may do read-only discovery, planning, source registration, and wave shaping
-  before approval or policy auto-dispatch, but it must not create workers,
-  create visible App threads, start implementation edits, mutate source state,
-  commit, push, or open PRs until the checkpoint is owner-approved or
-  policy-auto-dispatched. The checkpoint decision table must include a short
-  `Meaning` column that explains the current behavior inferred from each
-  planned value in owner-facing terms, and the checkpoint should start with a
-  brief `Approach Summary` paragraph before the tables.
-- For PRD or feature implementation with a clear generated issue graph, prefer
-  a bounded multi-wave approval scope that covers all listed source items and
-  dependency-unlocked waves. Use current-wave-only approval only when later
-  workstreams are not yet specified enough, depend on unresolved owner
-  decisions, or require different surface, cap, authorization, or delivery
-  boundaries.
-- After the owner approves or policy-auto-dispatches a bounded multi-wave
-  checkpoint, continue from one wave to the next without pausing as
-  dependencies are satisfied, as long as later waves stay inside the recorded
-  source items, worker surfaces, caps, authorization modes, delivery path, and
-  stop conditions.
-- If the selected worker surface is `auto`, the checkpoint must show the
-  resolved surface for the current wave. If the owner changes the split, worker
-  surface, cap, authorization, or delivery path, or if an auto-dispatched wave
-  would exceed policy ceilings, regenerate the checkpoint and wait for approval
-  before dispatch.
-- If an otherwise policy-auto-dispatchable wave would create visible Codex App
-  worker threads without current explicit App/thread authorization, stop and
-  ask whether to create visible App worker threads, use CLI subagents, or keep
-  the work root-only.
-- For root-only waves, use the owner-facing wording from
-  `references/worker.md`: `Execution mode: root thread only; no separate
-  workers` and `Worker surface: no-delegation`. Do not display
-  `none; root-owned` as the worker surface.
-- Treat explicit natural-language acceptance such as `approve`, `go ahead`,
-  `ok proceed`, or `looks good` as approval for the displayed checkpoint.
+  `references/worker.md` and wait for owner approval. Bounded multi-wave
+  approval may continue across dependency-unlocked waves while source items,
+  worker surfaces, authorization modes, delivery path, and stop conditions stay
+  inside the approved checkpoint.
 
 ## Delivery And Scheduling
 
@@ -318,24 +257,25 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 4. Classify every workstream with the `references/ledger.md` vocabulary. Each
    item needs source id, acceptance criteria, scheduling constraints,
    dependencies, selected gates, proof target, and closeout target.
-5. Resolve the worker and monitoring policy from the owner request plus
-   optional `project-memory/agents/orchestration-policy.md`, then read
-   `references/worker.md` before delegation. Prepare the implementation plan
-   and first wave, build the approach checkpoint with explicit approval scope,
-   and either wait for owner approval or record a matching
-   policy-auto-dispatch before creating workers, creating visible App threads,
-   or starting root-owned implementation. After approval or policy
-   auto-dispatch, create at most one worker per independent ownership boundary
-   in the current wave, name visible App threads immediately, and give each
+5. Resolve session worker settings from the owner request and this skill's
+   delegation policy, then read `references/worker.md` before delegation.
+   Prepare the implementation plan and first wave, build the approach checkpoint
+   with explicit approval scope, and wait for owner approval before creating
+   workers, creating visible App threads, or starting root-owned implementation.
+   After approval, create workers according to the orchestrator's chosen split
+   for the current wave, name visible App threads immediately, and give each
    worker explicit scope, per-workstream authorization modes,
    delivery/publication authority, dependency state, gates, proof,
    branch/integration expectations, and final report shape. If the approval
    scope is bounded multi-wave, continue into newly unblocked waves without
    another checkpoint while the recorded boundaries still hold.
-6. Monitor using the recorded policy. Read a worker before steering, renaming,
-   archiving, interrupting, replacing, closing, reusing, or integrating it.
-   Record status, blockers, validation, risks, resync state, integration method,
-   artifacts, lifecycle decision, and next action in the ledger.
+6. Monitor from the ledger state. Read the ledger before each owner-facing
+   progress update and report the current wave, active workstreams, blockers,
+   proof changes, and next scan/check from the ledger. Read a worker before
+   steering, renaming, archiving, interrupting, replacing, closing, reusing, or
+   integrating it. Record status, blockers, validation, risks, resync state,
+   integration method, artifacts, lifecycle decision, and next action in the
+   ledger.
 7. Keep root ownership over orchestration, integration, gates, publication, and
    source closeout. Apply `references/gates.md` before owner-ready, issue-closed,
    merge-ready, release-ready, or final status. For non-trivial edits, require
@@ -366,13 +306,15 @@ Before handing control back to the owner, return a compact owner-facing report:
 - source items reconciled, with source ids/refs and closeout state;
 - workers used, integration method per worker, and any worker output left
   unintegrated;
+- worker evidence: requested, approved, and actual surface; worker id or
+  session evidence; unavailable or failed tool evidence; fallback reason; and
+  whether work ran in parallel, sequentially, root-owned, or simulated;
 - commits, branches, PRs, issue updates, releases, or draft mutation commands
   produced under current authorization;
 - active-root claim, collision, takeover, or handoff decisions, plus any
   target-repo `AGENTS.md` update applied or proposed;
-- orchestration policy file used or missing, whether the checkpoint was
-  owner-approved or policy-auto-dispatched, and the effective worker caps and
-  stop conditions;
+- session worker settings, checkpoint approval state, worker split, and stop
+  conditions;
 - gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
   a proof path was unavailable;
 - remaining owner decisions, blocked access, deferred follow-ups, and the next

@@ -11,6 +11,8 @@ Apply this reference when any of these are true:
 - the user asks to implement a PRD issue or a set of generated implementation
   issues;
 - an issue body contains `Source PRD: #<number>` or a linked PRD path;
+- a workspace PRD or generated issue links sibling repo-scoped partial PRDs for
+  the same feature;
 - an issue body contains `## Orchestrator Handoff`;
 - the source item was produced by `$plan-feature`;
 - the source item has a `## Delivery`, `Delivery Mode`, `Completion`, or
@@ -33,6 +35,13 @@ dependencies, validation, and closeout path. The handoff is not an
 authorization grant: worker authorization, publication authority, and issue
 mutation authority are still resolved by the root orchestrator from the owner
 request, linked PRD, issue body, gate state, and current session authority.
+
+For workspace features split across multiple repositories, a repo-scoped
+partial PRD may be the entry point. Before scheduling, expand its linked sibling
+partial PRDs and register the connected graph in the ledger. Treat each partial
+PRD and generated issue as its own source item, use their cross-links to
+understand which repo work can run together, and require cross-repo integration
+proof before marking the feature graph complete.
 
 ## Authority Model
 
@@ -105,6 +114,12 @@ Direct commit remains a special case. Use `direct-commit` only when the PRD,
 generated issue, or owner request explicitly says direct commit is authorized
 and records the target branch plus closeout behavior.
 
+For local markdown trackers, `direct-commit` proves delivery but does not close
+the local issue by itself. After validation and commit proof are recorded, move
+the issue file to `issues/done/` unless the current run explicitly keeps
+completed files in place for inspection. Use final-commit closure only for
+hosted or custom sources that explicitly support that closeout path.
+
 ## Required Resolution Steps
 
 Before scheduling or publishing PRD-backed work:
@@ -118,16 +133,19 @@ Before scheduling or publishing PRD-backed work:
    scope, start rule, dependencies, validation, and closeout. If it is missing
    or contradicts the issue body, stop as `needs-owner` or route back through
    `$plan-feature` issue generation instead of dispatching implementation.
-3. Resolve the effective delivery mode from the PRD first, then apply only
+3. If the linked PRD is a workspace partial PRD, expand the connected sibling
+   partial-PRD graph and record each partial PRD/source item plus cross-link in
+   the ledger before building waves.
+4. Resolve the effective delivery mode from the PRD first, then apply only
    issue-level overrides that are explicit and authorized.
-4. Record delivery authority, publication authority, issue mutation authority,
+5. Record delivery authority, publication authority, issue mutation authority,
    closeout vehicle, branch expectation, PR expectation, publication checkout,
    caller checkout policy, integration proof target, and handoff projection in
    the ledger.
-5. Build the wave graph from the generated issues' handoff start rules,
+6. Build the wave graph from the generated issues' handoff start rules,
    dependency fields, and parallelization fields. Queue-ready does not mean
    start-ready when an issue depends on another incomplete issue.
-6. Stop as `needs-owner` or `blocked` if the PRD, issue body, handoff,
+7. Stop as `needs-owner` or `blocked` if the PRD, issue body, handoff,
    dependency graph, branch expectation, or closeout path is missing,
    contradictory, or unsafe.
 
@@ -178,13 +196,12 @@ mode for a specific repo, branch/refspec, PR shape, and closeout target. These
 modes are capability flags, not a cumulative ladder; list every allowed action
 explicitly.
 
-For `one-feature-branch`, workers do not create independent feature PRs.
-They provide patches, helper worktree diffs, or reviewed commits for root
-integration into the shared branch. The shared feature branch may live in a
-worker worktree or a dedicated integration worktree; it does not require using
-the caller checkout. For `one-pr-per-repo`, a repo-scoped worker may prepare
-that repo's branch or draft PR only if the root assigned repo-scoped `commit`,
-`push`, or `pr` authority matching each intended action.
+For `pull-request`, workers do not create independent feature PRs unless the
+source graph assigns them repo-scoped publication authority. In single-repo or
+monorepo work, they provide patches, helper worktree diffs, or reviewed commits
+for root integration into the feature branch. In multi-repo work, a repo-scoped
+worker may prepare that repo's branch or draft PR only if the root assigned
+repo-scoped `commit`, `push`, or `pr` authority matching each intended action.
 
 ## Ad Hoc And Legacy Sources
 
