@@ -49,18 +49,21 @@ same checkout, so a new root should check the target ledger and any known
 ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/` for
 overlapping active-root claims before dispatch.
 
-If another non-stale active root claims overlapping repo realpaths or source
-ids, stop as `needs-owner`. Report the claiming root, overlap, last progress read,
-and options: resume the existing root, wait, hand off, or explicitly take over.
-If the prior root is stale, record the takeover before dispatching new workers
-or mutating sources.
+Classify each overlapping active-root claim as live, stale, released, or
+non-overlapping by reading only the active-root claim, active workers,
+`autonomous`, `ready-next`, and recent notes. If another non-stale active root
+claims overlapping repo realpaths or source ids, stop as `needs-owner`. Report
+the claiming root, overlap, last progress read, and options: resume the
+existing root, wait, hand off, or explicitly take over.
 
-Staleness is recovery logic, not permission to race. Use explicit owner
-approval when ledger freshness is unclear, when workers may still contain
-unintegrated output, or when source mutation or publication could be duplicated.
-Use `Last Progress Read` plus active workstream `Next Check` values to decide
-whether a claim is stale; take over only after a recorded stale-read note plus a
-grace window or explicit owner approval.
+Staleness is recovery logic, not permission to race. Use `Last Progress Read`
+plus active workstream `Next Check` values to decide whether a claim is stale.
+For a stale overlap with no active workers and no actionable `autonomous` or
+authorized `ready-next` items, preserve history: mark the prior claim
+`released` or `takeover-recorded`, add a dated note naming the new owning
+ledger/root, then continue only after the current ledger has a clear
+active-root claim. Use explicit owner approval when freshness, worker output,
+source mutation, or publication safety is unclear.
 
 ## Structured Ledger Values
 
@@ -310,6 +313,10 @@ Before marking a ledger `complete`, verify:
 
 - All discovery sources were rescanned or intentionally skipped with a recorded
   reason, cursor, and fingerprint.
+- The current active-root claim is `released`. If orchestration still has a
+  concrete active worker, root-owned next check, or authorized next action, do
+  not mark the ledger `complete`; keep the ledger active, paused, or blocked
+  and say so in the final report.
 - `active` contains no worker that is merely done; every active row needs a real
   next check or root-owned closeout action.
 - `autonomous` is empty, or every item was reclassified as non-actionable under
