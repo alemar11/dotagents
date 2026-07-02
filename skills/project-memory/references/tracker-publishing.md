@@ -16,8 +16,11 @@ Use `tracker_backend` to choose the durable artifact target:
   configured local conventions, or return draft paths and bodies when the
   current run is non-mutating.
 
-No-mutation, dry-run, temp, and rehearsal behavior is current-run policy, not a
-durable issue-tracker configuration row.
+By default, `tracker_backend` is the write authority for planning artifacts:
+`github` publishes to GitHub and `local` writes local tracker files after
+`$plan-feature` resolves setup, planning identity, and blockers. No-mutation,
+dry-run, temp, and rehearsal behavior is current-run policy, not a durable
+issue-tracker configuration row.
 
 For legacy tracker configs, map old fields before acting:
 
@@ -71,9 +74,9 @@ explicit owner decision to use the full PRD body as the temporary source.
 - The `$plan-feature` issue phase owns generated implementation issue bodies,
   issue local writes, issue hosted creation, sub-issue attachment, and
   replacement of draft PRD refs in hosted publish commands.
-- `$plan-feature` owns passing the same tracker backend, current-run mutation
-  authorization, planning identity, delivery mode, and `source_prd_ref` through
-  the full planning pipeline and its phase modes.
+- `$plan-feature` owns passing the same tracker backend, effective target,
+  no-mutation override, planning identity, delivery mode, and `source_prd_ref`
+  through the full planning pipeline and its phase modes.
 - `$codex-orchestrator` may consume generated issues only after the `Source PRD`
   is durable enough for the requested action.
 

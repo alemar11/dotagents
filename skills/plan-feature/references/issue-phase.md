@@ -46,8 +46,10 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   Do not create a separate planning issue, local plan file, PRD plan section, or
   inline scheduling artifact. If the user asks for a summary, label it as a
   non-authoritative view derived from the generated issues.
-- Treat local file write authorization and external issue-tracker mutation
-  authorization as separate permissions.
+- Treat `tracker_backend` as planning-artifact write authority. When the
+  effective target is the configured tracker, publish GitHub issues for
+  `github` backends and write Markdown files for `local` backends. Return draft
+  bodies or commands only for explicit no-mutation overrides.
 - Use structured values for multi-choice issue body fields. This phase owns the
   `parallelization`, `closeout_mode`, and `integration_mode` values documented
   below; `delivery_mode` comes from the PRD, and `issue_type` / `triage_state`
@@ -72,10 +74,10 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 - Do not rewrite the PRD unless the user explicitly asks for a PRD update.
 - Do not create horizontal layer tickets such as "backend only", "frontend
   only", or "tests only" when a vertical slice is practical.
-- Ask for confirmation before writing local issue files or publishing to a
-  hosted issue tracker unless the user explicitly asked to write/publish or
-  `plan-feature` passes explicit run authorization after resolving planning
-  blockers.
+- Do not ask for separate issue write/publish confirmation after `plan-feature`
+  has resolved setup, planning identity, blockers, and effective target. Ask
+  only when the target is missing, ambiguous, or contradicted by an explicit
+  no-mutation request.
 
 ## Structured Issue Values
 
@@ -390,18 +392,16 @@ local markdown issue headings:
 
 Example: `team-invitations: 02 Accept invitation into team`.
 
-If the user did not ask to publish and `plan-feature` did not pass explicit run
-authorization, return the hardened issue bodies in chat. If `plan-feature`
-passes explicit run authorization, use the effective target from that handoff
-without re-asking unless this phase finds a new blocker or unresolved question.
-Do not treat "local file writes allowed" as permission to mutate GitHub or
-another hosted tracker. In hosted tracker modes, local file write authorization
-applies only to explicit local mirrors or dry-run targets; hosted body-file
-inputs are transient files outside the repo. Hosted tracker mutation in this
-phase is limited to generated planning issue publication, parent/sub-issue
-links, issue type metadata, and initial workflow-state labels. After
-implementation scheduling starts, issue lifecycle comments, label changes,
-direct closure, and closeout mutations belong to `$codex-orchestrator`.
+Use the effective target from the `plan-feature` handoff without re-asking
+unless this phase finds a new blocker or unresolved question. When the effective
+target is the configured tracker, create the GitHub issues or write the local
+issue files. In hosted tracker modes, local file writes apply only to explicit
+local mirrors or dry-run targets; hosted body-file inputs are transient files
+outside the repo. Hosted tracker mutation in this phase is limited to generated
+planning issue publication, parent/sub-issue links, issue type metadata, and
+initial workflow-state labels. After implementation scheduling starts, issue
+lifecycle comments, label changes, direct closure, and closeout mutations belong
+to `$codex-orchestrator`.
 
 Immediately before returning issue bodies, writing local issue files, handing
 content to `$github-issues`, or generating draft publish commands, re-scan every
@@ -409,9 +409,9 @@ final issue body for machine-local absolute paths and replace them with
 sanitized evidence references. Treat any remaining unsanitized developer path as
 a blocker for hosted publication or shared draft command output.
 
-If the configured target is GitHub but external mutation is not authorized, do
-not mutate GitHub. Ask `$github-issues` for exact draft commands, or use the
-configured local dry-run target when one is recorded. In
+If the configured target is GitHub but the current run explicitly requested
+no-mutation output, do not mutate GitHub. Ask `$github-issues` for exact draft
+commands, or use the configured local dry-run target when one is recorded. In
 `draft-publish-commands` mode, generated issue bodies may use
 `Source PRD: draft-prd:<...>` only in returned draft output; the publish plan
 must create the PRD first, capture the hosted PRD number, replace the draft ref

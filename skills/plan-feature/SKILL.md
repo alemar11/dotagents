@@ -55,8 +55,12 @@ validation, publication target, permissions, or cross-repo contracts.
 - Load and follow `$plan-harder` once for every generated implementation issue.
 - Write or publish artifacts only after setup is available and no planning
   blockers remain.
-- Separate local file write authorization from external issue-tracker mutation
-  authorization. Local writes never imply GitHub or other hosted mutation.
+- Treat the configured `tracker_backend` as planning-artifact write authority:
+  `github` publishes PRDs and generated issues through `$github-issues`, while
+  `local` writes the configured Markdown files.
+- Use draft output only when the current run explicitly asks for a dry run,
+  temp/rehearsal/validation pass, disabled writes, or another no-mutation
+  override.
 - Treat persistent local planning artifacts separately from temporary hosted
   issue body files. In hosted tracker mode, do not keep
   repo-local PRD, issue, `.scratch/`, or `project-memory/features/` mirrors
@@ -122,25 +126,29 @@ or feature folders.
 Before writing or publishing, resolve the effective target for the current run:
 
 - configured tracker backend from `project-memory/agents/issue-tracker.md`,
-- whether local file writes are allowed,
-- whether GitHub or other external tracker mutation is explicitly authorized in
-  this run,
-- any local dry-run target or current-run override.
+- any explicit no-mutation override such as dry run, temp, rehearsal,
+  validation pass, disabled writes, or draft-only output,
+- any local dry-run target or explicit local mirror request.
 
 For tracker publishing mechanics, use `$project-memory`
 `references/tracker-publishing.md`; this includes `source_prd_ref` handling for
 `draft-publish-commands`.
 
 If the user asked for a rehearsal, temp run, dry run, validation pass, or other
-non-mutating run, treat external mutation as disallowed even when persisted
-setup points at GitHub. Use the configured local dry-run target when one exists;
-otherwise ask for a local target or return draft publish commands.
+non-mutating run, do not write local tracker files or mutate a hosted tracker
+even when persisted setup points at a writable target. Use the configured local
+dry-run target when one exists; otherwise ask for a local target or return draft
+publish commands.
 
-When `tracker_backend` is `github` and external mutation is authorized, the
-hosted tracker is authoritative. Temporary files needed for `$github-issues` or
-`gh --body-file` must be created outside the repo and removed after mutation. Do
-not use `.scratch/` as a staging area in hosted tracker mode unless the user
-explicitly asks to keep a local mirror.
+When `tracker_backend` is `github` and no no-mutation override is active, the
+hosted tracker is authoritative and the PRD/issues should be published there.
+Temporary files needed for `$github-issues` or `gh --body-file` must be created
+outside the repo and removed after mutation. Do not use `.scratch/` as a staging
+area in hosted tracker mode unless the user explicitly asks to keep a local
+mirror.
+
+When `tracker_backend` is `local` and no no-mutation override is active, write
+the PRD and generated implementation issues to the configured Markdown paths.
 
 Resolve the planning identity before writing:
 
@@ -195,17 +203,16 @@ Load `references/prd-phase.md` and pass the phase handoff fields:
 ```text
 Plan-feature mode: <full-flow|prd-only|issues-from-existing-prd>
 
-Run authorization:
-- Persistent local artifact writes: <allowed|disallowed>, allowed only when
-  `tracker_backend` is `local`, the effective target is a local dry run, or the
-  run explicitly requested a local mirror.
-- External tracker mutation: <allowed|disallowed>, based on explicit
-  authorization in this run.
+Publishing target:
 - Hosted tracker body-file temp files: transient outside the repo and cleaned
   up after mutation.
 - Configured tracker backend: <tracker_backend from project-memory/agents/issue-tracker.md>.
 - Effective target for this run:
   <configured-tracker|local-dry-run|draft-publish-commands>.
+- No-mutation override:
+  <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-only>.
+- Local mirror:
+  <not-requested|requested>.
 - Source PRD ref:
   <pending until PRD phase returns #<number>, local path, or draft-prd:<slug>>.
 
@@ -256,9 +263,11 @@ labels, title formats, PRD parent/sub-issue relationships, and related issue
 links when those modes apply. The issue phase must run
 `$plan-harder` once per generated implementation issue and verify that every
 `Parallelization` dependency resolves to a known issue ID in an acyclic graph
-after the final hardened issue bodies are assembled. If external mutation is
-disallowed, it must write to the effective local target or return draft publish
-commands instead.
+after the final hardened issue bodies are assembled. If the effective target is
+`configured-tracker`, it must write or publish the issues to the configured
+tracker. If the effective target is `local-dry-run` or
+`draft-publish-commands`, it must return draft paths, bodies, or commands
+instead.
 
 Require generated implementation issues to copy the effective `Delivery mode`
 label from the PRD and include the `## Orchestrator Handoff` shape from
@@ -289,7 +298,8 @@ Summarize:
 - orchestrator project/feature path and affected repos, when applicable,
 - issue types and labels/statuses applied,
 - completion instructions included,
-- run authorization applied, including whether external mutation occurred,
+- effective target used, including whether configured tracker artifacts were
+  written/published or draft-only output was returned,
 - planning identity used, including feature slug and product/context/project
   scope when applicable,
 - delivery mode used,

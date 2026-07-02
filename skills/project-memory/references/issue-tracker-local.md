@@ -15,6 +15,12 @@ not relocate these feature artifacts under `project-memory/features/` unless the
 repo records a custom tracker mode; `project-memory/` remains routing, domain,
 and ADR memory.
 
+Feature-planning workflows write PRDs and generated implementation issues to
+the configured local Markdown tracker by default after setup, planning identity,
+and blockers are resolved. They do not need a separate per-run confirmation to
+create those files unless the current request explicitly asks for dry-run or
+no-mutation output.
+
 Current-run override: treat any temp, dry-run, rehearsal, or disabled-write
 constraint as run-specific behavior. Do not record it as a durable
 issue-tracker configuration row.

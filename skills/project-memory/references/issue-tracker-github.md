@@ -16,6 +16,11 @@ other local planning copies merely to feed `gh --body-file`. Temporary body
 files must live outside the repo and be removed after mutation unless the user
 explicitly asks to keep a local mirror.
 
+Feature-planning workflows write to GitHub by default in this mode after setup,
+planning identity, and blockers are resolved. They do not need a separate
+per-run confirmation to create PRD or generated implementation issues unless the
+current request explicitly asks for dry-run or no-mutation output.
+
 ## Non-Mutating Runs
 
 If this setup is being used for a temp exercise, validation pass, rehearsal,

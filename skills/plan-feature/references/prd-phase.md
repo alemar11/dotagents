@@ -16,12 +16,10 @@ question set or route back through `$grill-me-with-context`.
 - Do not split the PRD into implementation issues; the issue phase owns that.
 - Do not invent requirements, users, constraints, or acceptance criteria that
   are not supported by user input, repo evidence, or project memory.
-- Ask for confirmation before writing a PRD file or publishing to an issue
-  tracker unless the user explicitly asked to write or publish, or
-  `plan-feature` passed explicit run authorization after resolving planning
-  blockers.
-- Treat local file write authorization and external issue-tracker mutation
-  authorization as separate permissions.
+- Do not ask for separate PRD write/publish confirmation after `plan-feature`
+  has resolved setup, planning identity, blockers, and effective target.
+  `tracker_backend` is the planning-artifact write authority unless the current
+  run explicitly requested no-mutation output.
 - In GitHub tracker mode, do not persist repo-local PRD mirrors
   or `.scratch/` staging copies unless the tracker config, current-run override,
   or user explicitly asks for a local mirror.
@@ -159,20 +157,20 @@ Read `project-memory/agents/issue-tracker.md` to determine where PRDs live.
 Also read `$project-memory` `references/tracker-publishing.md` for the
 shared effective-target and `source_prd_ref` contract.
 
-- `Tracker backend: github`: publish only after confirmation through
+- `Tracker backend: github`: publish through
   `$github-issues`, using the title format `PRD: <Feature Name>` and the
   mapped `feature` issue type when available. Do not write
   `.scratch/<feature-slug>/PRD.md` or `project-memory/features/...` as part of
   GitHub publishing unless explicitly asked for a local mirror.
 - `Tracker backend: local`: write to the configured repo-local PRD path,
-  normally `.scratch/<feature-slug>/PRD.md`, only after confirmation. Derive or
-  ask for `<feature-slug>` before writing. In multi-context repos, require the
-  accepted product/workspace context and use the tracker's product-scoped slug
-  convention when one is recorded.
+  normally `.scratch/<feature-slug>/PRD.md`. Derive or ask for
+  `<feature-slug>` before writing. In multi-context repos, require the accepted
+  product/workspace context and use the tracker's product-scoped slug convention
+  when one is recorded.
 - Local workspace PRDs: when the planning target is an orchestrator workspace,
-  write `projects/<project-slug>/features/<feature-slug>/PRD.md` only after
-  confirmation. Derive or ask for both `<project-slug>` and `<feature-slug>`
-  before writing. The PRD phase owns the PRD and may create or update
+  write `projects/<project-slug>/features/<feature-slug>/PRD.md`. Derive or ask
+  for both `<project-slug>` and `<feature-slug>` before writing. The PRD phase
+  owns the PRD and may create or update
   `projects/<project-slug>/PROJECT.md`,
   `projects/<project-slug>/repos/<repo-slug>.md`, and
   `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
@@ -224,14 +222,12 @@ publish the PRD without a type and keep the PRD title/body convention intact.
 Use `$github-issues` for GitHub create, type, label, and dry-run command
 mechanics.
 
-If `plan-feature` passes explicit run authorization, use the effective target
-from that handoff without re-asking unless this phase finds a new blocker or
-unresolved question. Do not treat "local file writes allowed" as permission to
-mutate GitHub or another hosted tracker. In hosted tracker modes, local file
-write authorization applies only to explicit local mirrors or dry-run targets;
-hosted body-file inputs are transient files outside the repo. Hosted tracker
-mutation in this phase is limited to PRD planning-artifact publication and
-metadata; implementation lifecycle comments, labels, direct closure, and
+Use the effective target from the `plan-feature` handoff without re-asking
+unless this phase finds a new blocker or unresolved question. In hosted tracker
+modes, local file writes apply only to explicit local mirrors or dry-run
+targets; hosted body-file inputs are transient files outside the repo. Hosted
+tracker mutation in this phase is limited to PRD planning-artifact publication
+and metadata; implementation lifecycle comments, labels, direct closure, and
 closeout mutations after scheduling starts belong to `$codex-orchestrator`.
 
 Immediately before handing content to `$github-issues`, re-scan the final PRD
@@ -239,9 +235,9 @@ body for machine-local absolute paths and replace them with sanitized evidence
 references. Treat any remaining unsanitized developer path as a blocker for
 hosted publication.
 
-If the configured target is GitHub but external mutation is not authorized, do
-not mutate GitHub. Ask `$github-issues` for the exact draft publish command and
-return it with the PRD body and stable
+If the configured target is GitHub but the current run explicitly requested
+no-mutation output, do not mutate GitHub. Ask `$github-issues` for the exact
+draft publish command and return it with the PRD body and stable
 `source_prd_ref`, or use the configured local dry-run target when one is
 recorded. For `draft-publish-commands`, also return the PRD title,
 `feature_slug`, `project_slug` when applicable, and a short PRD body fingerprint

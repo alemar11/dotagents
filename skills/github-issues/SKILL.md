@@ -30,10 +30,14 @@ This skill only handles GitHub Issues.
   `issueType`; do not request `type`, which is not a valid issue JSON field.
 - Do not create labels, close issues, or mutate issue relationships unless the
   user or calling workflow has explicit mutation authority.
-- Treat `tracker_writes: auto` as mutation authority for issue-ready content
-  after repository context and duplicate checks are complete. Treat an accepted
-  `tracker_writes: prompt` confirmation the same way.
-- Resolve tracker write policy from `tracker_writes` when it is present:
+- Treat a calling workflow handoff with `tracker_backend=github` and
+  `effective_target=configured-tracker` as mutation authority for issue-ready
+  planning artifacts after repository context, duplicate checks, labels, issue
+  types, and relationships are resolved.
+- Treat direct user instructions such as create, publish, or open the issue as
+  mutation authority for the requested GitHub issue operation unless the same
+  request explicitly says dry run, draft only, local only, or do not mutate.
+- Resolve legacy tracker write policy from `tracker_writes` when it is present:
   - `disabled`: do not write tracker artifacts; return exact draft commands and
     issue bodies instead.
   - `prompt`: when issue-ready PRD/task content exists, ask the user
@@ -47,24 +51,27 @@ This skill only handles GitHub Issues.
     GitHub target; local artifact writes belong to the caller's local tracker
     workflow.
 - For legacy tracker configs without `tracker_writes`, treat
-  `external_tracker_mutation: allowed` as `tracker_writes: prompt` for GitHub
-  targets. Do not infer `auto` from legacy `allowed` fields; `auto` must be
-  explicit.
+  `tracker_backend=github` or `tracker_mode=github` as the target. If a
+  no-mutation override is present, draft commands only; otherwise follow the
+  user or calling workflow's create/publish/open instruction.
 - Do not create new label taxonomy unless the repo's tracker configuration or
   user explicitly asks for it.
 
 ## Workflow
 
-1. Resolve the target repository and authorization:
+1. Resolve the target repository and write mode:
    - current checkout repo,
    - explicit `--repo <owner>/<repo>`,
    - or a target repository supplied by the user or calling workflow.
-2. Resolve tracker policy from `tracker_mode` and `tracker_writes`.
-3. If `tracker_writes: disabled`, return draft issue bodies and exact `gh`
-   commands without mutating GitHub.
-4. If `tracker_mode: github` and `tracker_writes: prompt`, but the user or
-   calling workflow has not explicitly chosen mutation or non-mutation for
-   issue-ready content, ask whether to create the GitHub issues immediately.
+2. Resolve the effective target from the user request or calling workflow
+   handoff. `tracker_backend=github` with `effective_target=configured-tracker`
+   means create or update the requested GitHub issues.
+3. If the request, handoff, or legacy `tracker_writes: disabled` policy says
+   dry run, draft only, local only, or do not mutate, return draft issue bodies
+   and exact `gh` commands without mutating GitHub.
+4. If legacy `tracker_writes: prompt` is the only write policy and no
+   create/publish/open instruction was provided, ask whether to create the
+   GitHub issues immediately.
 5. Read the relevant issue or label state before mutation.
 6. Apply the smallest GitHub issue operation needed:
    - create issues with the requested title, body, type, labels, or parent,
@@ -75,7 +82,7 @@ This skill only handles GitHub Issues.
    - close only after the requested disposition is explicit.
 7. Verify the changed issue or queue state after mutation.
 8. Report the issue URL/number, commands run or drafted, and any skipped
-   mutation because authorization was missing.
+   mutation because a no-mutation override was active.
 
 ## Routing
 

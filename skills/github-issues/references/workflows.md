@@ -1,42 +1,49 @@
 # GitHub Issue Workflows
 
-Use these commands for GitHub issue lifecycle work after confirming mutation
-authority. Add `--repo <owner>/<repo>` when the current checkout is not the
-target repo or the caller supplied an explicit repository.
+Use these commands for GitHub issue lifecycle work after resolving repository
+context and write mode. Add `--repo <owner>/<repo>` when the current checkout is
+not the target repo or the caller supplied an explicit repository.
 
 ## Tracker Write Policy
 
-Prefer the compact tracker policy when it is available:
+For current project-memory setups, prefer the compact tracker backend:
+
+```md
+tracker_backend: github # github | local
+effective_target: configured-tracker # configured-tracker | draft-publish-commands | local-dry-run
+```
+
+`tracker_backend` selects the artifact target:
+
+- `github`: write tracker artifacts as GitHub issues.
+- `local`: write tracker artifacts as local files; this GitHub skill should not
+  create GitHub issues unless the user explicitly supplies a GitHub target.
+
+`effective_target` selects the current run behavior:
+
+- `configured-tracker`: create or update the requested GitHub issues as soon as
+  repository context, duplicate checks, labels, types, and relationships are
+  resolved.
+- `draft-publish-commands`: return exact draft bodies and commands instead of
+  mutating GitHub.
+- `local-dry-run`: do not create GitHub issues; local artifact handling belongs
+  to the caller.
+
+Direct user instructions such as create, publish, or open the issues also grant
+write mode for the requested operation unless the same request says do not
+mutate GitHub, dry run, draft only, or local-only.
+
+Legacy tracker configs may still use:
 
 ```md
 tracker_mode: github # github | local
 tracker_writes: prompt # disabled | prompt | auto
 ```
 
-`tracker_mode` selects the artifact target:
-
-- `github`: write tracker artifacts as GitHub issues.
-- `local`: write tracker artifacts as local files; this GitHub skill should not
-  create GitHub issues unless the user explicitly supplies a GitHub target.
-
-`tracker_writes` selects the write behavior:
-
-- `disabled`: do not write tracker artifacts. Return exact draft bodies and
-  commands instead.
-- `prompt`: when issue-ready PRD/task content exists, ask the user immediately
-  whether to write it to the configured tracker target.
-- `auto`: write issue-ready content to the configured tracker target as soon as
-  repository context, duplicate checks, labels, types, and relationships are
-  resolved.
-
-Skip the prompt only when the user or calling workflow already gave an explicit
-instruction such as create/publish/open the issues, do not mutate GitHub, dry
-run, draft only, or local-only.
-
-For legacy tracker configs without `tracker_writes`, treat
-`external_tracker_mutation: allowed` as `tracker_writes: prompt` for GitHub
-targets. Do not infer `auto` from legacy `allowed` fields; `auto` must be
-explicit.
+When present, `tracker_writes: disabled` returns draft commands,
+`tracker_writes: prompt` asks only if no create/publish/open instruction was
+provided, and `tracker_writes: auto` writes issue-ready content after the normal
+repository and duplicate checks.
 
 ## Repository Context
 
@@ -183,8 +190,8 @@ remaining blocker. Do not paste raw logs or unrelated session text.
 ## Closing
 
 Only close when the user or calling workflow explicitly authorizes the
-disposition and the issue acceptance criteria are satisfied or intentionally
-not planned.
+disposition and the issue acceptance criteria are satisfied or intentionally not
+planned.
 
 ```bash
 gh issue close <number-or-url> --comment "<closing rationale>"
@@ -193,14 +200,15 @@ gh issue close <number-or-url> --reason "not planned" --comment "<closing ration
 ```
 
 Before closing partially satisfied work, create or link an owner-visible
-follow-up when `tracker_writes` permits the write. If writes are disabled or
-not authorized, keep the source issue open and report the proposed follow-up
+follow-up when the effective target permits the write. If a no-mutation override
+is active, keep the source issue open and report the proposed follow-up
 title/body.
 
 ## Dry Runs
 
-When `tracker_writes: disabled` or external mutation is otherwise not
-authorized, do not run mutating commands. Return:
+When `effective_target=draft-publish-commands`, `tracker_writes: disabled`, or
+another explicit no-mutation override is active, do not run mutating commands.
+Return:
 
 - the exact issue title and body or comment body,
 - the exact `gh` command that would be run,
