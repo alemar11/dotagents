@@ -84,6 +84,11 @@ Use `references/common-workflows.md` for copy/paste playbooks:
   - default to `access=read` and require an explicit confirmation before any write/DDL
 - Always ask for approval before DDL changes.
 - Keep schema changes in a pending migration file; do not edit released files.
+- Before editing migrations, resolve the repo's exact `migrations_path` and
+  pending migration filename by inspecting `.skills/postgres/config.toml` and
+  the existing migration directory.
+- If a `prerelease*.sql` file exists, use it for pending work instead of
+  creating a timestamped migration file.
 - Use `references/postgres_guardrails.md` as the canonical migration workflow.
 
 ## References

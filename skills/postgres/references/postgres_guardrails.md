@@ -6,6 +6,12 @@ Use this reference when the task touches schema changes or migration release.
 
 - Always ask for approval before making DDL changes.
 - Keep pending work in a pending migration file such as `prerelease.sql`.
+- Before editing migrations, resolve the repo's exact `migrations_path` and
+  pending migration filename by inspecting `.skills/postgres/config.toml` and
+  the existing migration directory. Some repos use names such as
+  `prerelease_cdr.sql` instead of the launcher default.
+- If a `prerelease*.sql` file exists, use it for pending work instead of
+  creating a timestamped migration file.
 - Do not edit existing released SQL files.
 - Do not create a new file under `released/` for pending work.
 - Only move a pending migration into `released/` when the user explicitly
@@ -36,6 +42,15 @@ Preferred command:
 DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local \
   /path/to/postgres-skill/scripts/postgres migration release \
   --summary "Add agent-context prompt sections"
+```
+
+For a repo with a non-default pending filename, pass it explicitly:
+
+```sh
+DB_PROJECT_ROOT=/path/to/project DB_PROFILE=local-cdr \
+  /path/to/postgres-skill/scripts/postgres migration release \
+  --pending-file prerelease_cdr.sql \
+  --summary "Add CDR timestamp suffix columns"
 ```
 
 Dry run:
