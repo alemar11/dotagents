@@ -30,6 +30,15 @@ SOURCE_MAP_PATH = REFERENCES_DIR / "source-map.md"
 LEGACY_OFFICIAL_DIR = REFERENCES_DIR / "official"
 LEGACY_UPSTREAM_DIR = REFERENCES_DIR / "upstream"
 LEGACY_MANIFEST_PATH = REFERENCES_DIR / "source-manifest.json"
+SYMBOLS_PATH = ASSET_DOCC_DIR / "docc.symbols.json"
+MEDIA_SOURCE_DIRECTIVES = {
+    "__docc_universal_symbol_reference_$Image",
+    "__docc_universal_symbol_reference_$Video",
+}
+SOURCE_PARAMETER_LINES = [
+    {"text": "  - source: A reference to the source file for the media item."},
+    {"text": "     **(required)**"},
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -153,6 +162,7 @@ def refresh_assets(catalog: dict, repo: str, ref: str) -> int:
             raise FileNotFoundError(f"Missing upstream DocCDocumentation.docc at {upstream_root}")
         ASSETS_DIR.mkdir(parents=True, exist_ok=True)
         shutil.copytree(upstream_root, ASSET_DOCC_DIR)
+        ensure_media_source_parameter_docs()
 
     for topic in catalog["topics"]:
         asset_path = SKILL_DIR / topic["asset_path"]
@@ -162,6 +172,28 @@ def refresh_assets(catalog: dict, repo: str, ref: str) -> int:
             )
 
     return sum(1 for path in ASSET_DOCC_DIR.rglob("*") if path.is_file())
+
+
+def ensure_media_source_parameter_docs() -> bool:
+    if not SYMBOLS_PATH.exists():
+        return False
+    data = json.loads(SYMBOLS_PATH.read_text(encoding="utf-8"))
+    changed = False
+    for symbol in data.get("symbols", []):
+        precise = symbol.get("identifier", {}).get("precise")
+        if precise not in MEDIA_SOURCE_DIRECTIVES:
+            continue
+        lines = symbol.get("docComment", {}).get("lines", [])
+        if any(line.get("text", "").startswith("  - source:") for line in lines):
+            continue
+        for index, line in enumerate(lines):
+            if line.get("text") == "- Parameters:":
+                lines[index + 1:index + 1] = SOURCE_PARAMETER_LINES
+                changed = True
+                break
+    if changed:
+        SYMBOLS_PATH.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    return changed
 
 
 def write_manifest(repo: str, ref: str, commit: str) -> None:

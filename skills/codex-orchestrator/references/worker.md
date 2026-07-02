@@ -20,6 +20,8 @@ Product surface references: visible Codex App thread creation is documented in
 documented in <https://developers.openai.com/codex/subagents>, and Codex
 instruction discovery is documented in
 <https://developers.openai.com/codex/guides/agents-md>.
+In the current Codex App surface, project-scoped visible-thread creation uses
+`codex_app.list_projects` before `codex_app.create_thread`.
 
 Session fields:
 
@@ -321,7 +323,8 @@ would be harder to reason about than replacement.
 The root orchestrator owns integration. Choose and record one integration path
 per worker output:
 
-- `handoff`: use `codex_app.handoff_thread` or the equivalent inspected worker
+- `handoff`: use `codex_app.handoff_thread` and read completion with
+  `codex_app.get_handoff_status`, or use the equivalent inspected worker
   surface when the worker's checkout should become the integration checkout.
 - `worker-commit`: accept a worker-prepared commit or branch only when the
   authorization modes include `commit` and the root has reviewed the diff.

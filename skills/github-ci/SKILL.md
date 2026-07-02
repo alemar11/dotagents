@@ -1,6 +1,6 @@
 ---
 name: github-ci
-description: Use when inspecting GitHub Actions runs, PR check failures, pending checks, or CI logs. Run scripts/ci-inspect for focused failing-PR log extraction when direct gh output is not enough.
+description: Inspect GitHub Actions checks and failing PR logs with direct gh reads or the focused ci-inspect CLI.
 ---
 
 # GitHub CI

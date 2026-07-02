@@ -32,7 +32,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `crusty` | Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs. |
 | `domain-modeling` | Build and maintain project domain language and durable decisions while work is being clarified. |
 | `git-commit` | Handle commit and push-only requests with direct `git` commands and explicit staging. |
-| `github-ci` | Inspect GitHub Actions checks and failing PR logs with a focused `ci-inspect` CLI. |
+| `github-ci` | Inspect GitHub Actions checks and failing PR logs with direct `gh` reads or the focused `ci-inspect` CLI. |
 | `github-deep-review` | Review GitHub issues, PRs, and fixes by tracing root cause, provenance, proof, and fix quality. |
 | `github-issues` | Create, update, label, type, comment, close, and relate GitHub issues with direct `gh` commands. |
 | `github-portfolio-triage` | Scan multiple explicit GitHub repositories read-only for queue, CI, release, and next-action summaries. |
@@ -40,13 +40,13 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `github-review-threads` | Inspect PR review threads, post discussion comments, and route selected replies with a focused `reviews` CLI. |
 | `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
 | `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
-| `okf` | Write, scaffold, and validate Open Knowledge Format markdown bundles with a focused `okf` CLI. |
+| `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `triage` | Triage existing GitHub or local markdown issues into typed, agent-ready states. |
 | `grill-me-with-context` | Stress-test repo-backed plans with project context and capture docs or ADRs. |
 | `improve-codebase-architecture` | Find architecture candidates, then pressure-test the selected refactor. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review and implement TanStack product and integration patterns through one reusable skill with focused references. |
-| `codex-changelog` | Check installed Codex CLI and Codex App versions, then print CLI and app changelog sections. |
+| `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `plan-feature` | Plan a feature from grilling to PRD to configured agent-ready issues, with prd-only and existing PRD issue modes. |
@@ -54,7 +54,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
 | `project-memory` | Configure tracker, delivery, context, and localization memory. |
 | `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with plan-feature gates, workers, ledgers, and closeout. |
-| `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
+| `postgres` | Connect to Postgres, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC documentation using curated summaries and a bundled upstream DocC source tree. |

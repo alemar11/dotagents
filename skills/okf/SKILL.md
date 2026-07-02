@@ -1,6 +1,6 @@
 ---
 name: okf
-description: Write, scaffold, inspect, and validate Open Knowledge Format (OKF) markdown knowledge bundles. Use when working with OKF, Open Knowledge Format, knowledge bundles, markdown files with OKF YAML frontmatter, concept documents, bundle indexes/logs, or when converting structured knowledge into portable agent-readable markdown.
+description: Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI.
 ---
 
 # OKF

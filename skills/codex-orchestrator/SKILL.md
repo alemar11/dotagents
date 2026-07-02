@@ -131,8 +131,9 @@ loop silently on the same worker status or source snapshot.
 
 Required surfaces depend on the resolved workstream:
 
-- Codex App thread tools for visible App workers: create/read/message/rename,
-  archive, handoff, fork, and optional list/pin.
+- Codex App thread tools for visible App workers: project lookup before
+  project-scoped creation, create/read/message/rename, archive, fork,
+  handoff plus handoff-status reads, and optional list/pin.
 - CLI/subagent worker tools for inspectable CLI workers: spawn, wait, send, and
   close through the current runtime's subagent or `/agent` equivalent.
 - Codex App automation support only when the owner explicitly asks to schedule

@@ -1,6 +1,6 @@
 ---
 name: codex-changelog
-description: Check the installed Codex CLI and Codex App versions, then print separate changelog sections for the CLI from GitHub Releases and the app from the OpenAI Codex changelog page.
+description: Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page.
 ---
 
 # Codex Changelog

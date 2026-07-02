@@ -22,6 +22,11 @@ LEGACY_OFFICIAL_DIR = REFERENCES_DIR / "official"
 LEGACY_UPSTREAM_DIR = REFERENCES_DIR / "upstream"
 LEGACY_MANIFEST_PATH = REFERENCES_DIR / "source-manifest.json"
 RUNTIME_SCRIPTS_DIR = SKILL_DIR / "scripts"
+SYMBOLS_PATH = ASSET_DOCC_DIR / "docc.symbols.json"
+MEDIA_SOURCE_DIRECTIVES = {
+    "__docc_universal_symbol_reference_$Image": "@Image",
+    "__docc_universal_symbol_reference_$Video": "@Video",
+}
 SUMMARY_FILES = [
     "README.md",
     "document-a-swift-package.md",
@@ -83,6 +88,33 @@ def render_source_map(catalog: dict) -> str:
         )
     lines.append("")
     return "\n".join(lines)
+
+
+def validate_media_source_parameter_docs(errors: list[str]) -> None:
+    if not SYMBOLS_PATH.exists():
+        errors.append(f"Missing DocC symbols file: {SYMBOLS_PATH}")
+        return
+    symbols = load_json(SYMBOLS_PATH).get("symbols", [])
+    by_precise = {
+        symbol.get("identifier", {}).get("precise"): symbol
+        for symbol in symbols
+    }
+    for precise, directive in MEDIA_SOURCE_DIRECTIVES.items():
+        symbol = by_precise.get(precise)
+        if symbol is None:
+            errors.append(f"Missing media directive symbol: {directive}")
+            continue
+        fragments = symbol.get("declarationFragments", [])
+        has_required_source = any(
+            fragment.get("kind") == "identifier" and fragment.get("spelling") == "source"
+            for fragment in fragments
+        )
+        has_source_docs = any(
+            line.get("text", "").startswith("  - source:")
+            for line in symbol.get("docComment", {}).get("lines", [])
+        )
+        if has_required_source and not has_source_docs:
+            errors.append(f"{directive} documents no source parameter, but its declaration still requires one.")
 
 
 def main() -> int:
@@ -184,6 +216,8 @@ def main() -> int:
     expected_source_map = render_source_map(catalog)
     if SOURCE_MAP_PATH.read_text(encoding="utf-8") != expected_source_map:
         errors.append("source-map.md is out of date with catalog.json.")
+
+    validate_media_source_parameter_docs(errors)
 
     allowed_local_targets = {(REFERENCES_DIR / summary).resolve() for summary in SUMMARY_FILES}
     allowed_local_targets.update((SKILL_DIR / topic["asset_path"]).resolve() for topic in topics)
