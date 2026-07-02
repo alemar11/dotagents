@@ -5,32 +5,29 @@ write local artifacts, mutate a hosted tracker, or return draft publish
 commands. `project-memory/agents/issue-tracker.md` remains the repo-specific
 source of truth; this file defines the shared mechanics.
 
-## Tracker Write Policy
+## Tracker Backend
 
-Use `tracker_mode` to choose the durable artifact target and `tracker_writes`
-to choose write behavior:
+Use `tracker_backend` to choose the durable artifact target:
 
-- `tracker_writes=disabled`: do not write tracker artifacts. Return bodies plus
-  exact local paths or hosted commands without executing them.
-- `tracker_writes=prompt`: ask the user immediately before writing issue-ready
-  PRD/task content to the configured tracker target.
-- `tracker_writes=auto`: write issue-ready content to the configured tracker
-  target as soon as repository context, duplicate checks, labels, types, and
-  relationships are resolved.
+- `github`: write PRDs and implementation issues as GitHub issues through
+  `$github-issues`, or return exact draft `gh` commands when the current run is
+  non-mutating.
+- `local`: write PRDs and implementation issues as Markdown files in the
+  configured local conventions, or return draft paths and bodies when the
+  current run is non-mutating.
 
-For legacy tracker configs without `tracker_writes`, map old fields before
-acting:
+No-mutation, dry-run, temp, and rehearsal behavior is current-run policy, not a
+durable issue-tracker configuration row.
 
-- `external_tracker_mutation=allowed` maps to `tracker_writes=prompt` for
-  GitHub or hosted targets.
-- `local_artifact_writes=allowed` maps to `tracker_writes=auto` for local
-  targets.
+For legacy tracker configs, map old fields before acting:
+
+- `tracker_mode=github` or `tracker_mode=orchestrator-github` maps to
+  `tracker_backend=github`.
+- `tracker_mode=local`, `tracker_mode=local-markdown`, or
+  `tracker_mode=orchestrator-local` maps to `tracker_backend=local`.
 - `effective_target=local-dry-run` or
-  `effective_target=draft-publish-commands` maps to a current-run
-  `tracker_writes=disabled` override.
-
-Do not infer `tracker_writes=auto` for hosted trackers from legacy `allowed`
-fields; hosted auto-publish must be explicit.
+  `effective_target=draft-publish-commands` maps to a current-run no-mutation
+  override.
 
 Hosted body-file inputs are temporary transport files. They must live outside
 the repo and be removed after mutation unless the user explicitly requests a
@@ -44,8 +41,8 @@ Every PRD-to-generated-issues handoff must carry `source_prd_ref`:
 - Local PRD exists: `source_prd_ref=<repo-relative-prd-path>`.
 - Draft command run before hosted mutation: use a deterministic draft ref,
   `source_prd_ref=draft-prd:<feature-slug>` for one repo or
-  `source_prd_ref=draft-prd:<project-slug>/<feature-slug>` for orchestrator
-  coordination.
+  `source_prd_ref=draft-prd:<project-slug>/<feature-slug>` for workspace
+  planning.
 
 When using a draft PRD ref, also return the PRD title, `feature_slug`,
 `project_slug` when applicable, and a short PRD body fingerprint so later
@@ -74,21 +71,19 @@ explicit owner decision to use the full PRD body as the temporary source.
 - The `$plan-feature` issue phase owns generated implementation issue bodies,
   issue local writes, issue hosted creation, sub-issue attachment, and
   replacement of draft PRD refs in hosted publish commands.
-- `$plan-feature` owns passing the same `tracker_writes`, planning identity,
-  delivery mode, and `source_prd_ref` through the full planning pipeline and
-  its phase modes.
+- `$plan-feature` owns passing the same tracker backend, current-run mutation
+  authorization, planning identity, delivery mode, and `source_prd_ref` through
+  the full planning pipeline and its phase modes.
 - `$codex-orchestrator` may consume generated issues only after the `Source PRD`
   is durable enough for the requested action.
 
 ## Mode Summary
 
-| Tracker mode | PRD owner output | Issue owner output |
+| Tracker backend | PRD owner output | Issue owner output |
 | --- | --- | --- |
-| `github` | PRD GitHub issue, or PRD body plus draft command | GitHub sub-issues under the PRD, or issue bodies plus draft commands |
-| `local` | `.scratch/<feature-slug>/PRD.md` | `.scratch/<feature-slug>/issues/<NN>-<slug>.md` |
-| `orchestrator-github` | coordination PRD issue with `<project-slug>` label | coordination vertical feature issues under the PRD with the same label |
-| `orchestrator-local` | `projects/<project-slug>/features/<feature-slug>/PRD.md` | `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` |
+| `github` | PRD GitHub issue, linked partial PRD issues for multi-repo work, or PRD body plus draft command | GitHub sub-issues under the PRD, linked repo issues for multi-repo work, or issue bodies plus draft commands |
+| `local` | `.scratch/<feature-slug>/PRD.md` or `projects/<project-slug>/features/<feature-slug>/PRD.md` for local workspaces | `.scratch/<feature-slug>/issues/<NN>-<slug>.md` or `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` for local workspaces |
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-and `local-markdown` as legacy aliases when reading existing artifacts, and
-rewrite touched structured values to lower-kebab-case.
+and legacy tracker modes as aliases when reading existing artifacts, and rewrite
+touched structured values to lower-kebab-case.

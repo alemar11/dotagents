@@ -12,11 +12,10 @@ during an issue's lifetime.
 Choose the tracker-specific values before writing this file. Do not copy the
 GitHub examples into local markdown modes.
 
-- GitHub and GitHub coordination mode: use native issue types when available,
-  normally `Bug`, `Feature`, and `Task`.
-- Local markdown and local orchestrator mode: use canonical `bug`, `feature`,
-  and `task` unless the repo already has a committed tracker-specific
-  convention.
+- GitHub backend: use native issue types when available, normally `Bug`,
+  `Feature`, and `Task`.
+- Local backend: use canonical `bug`, `feature`, and `task` unless the repo
+  already has a committed tracker-specific convention.
 
 | Canonical type | Tracker value | Meaning |
 | --- | --- | --- |
@@ -26,8 +25,7 @@ GitHub examples into local markdown modes.
 
 The table above uses the default GitHub type names. Rewrite the right-hand
 `Tracker value` cells only when the actual tracker uses different values. For
-local markdown and local orchestrator tracking, prefer canonical values such as
-`bug`, `feature`, and `task`.
+local tracking, prefer canonical values such as `bug`, `feature`, and `task`.
 
 In GitHub issue-tracker mode, use `$github-issues` to apply native GitHub
 Issue Type values when available.

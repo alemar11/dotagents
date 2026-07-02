@@ -1,5 +1,5 @@
 interface:
   display_name: "Project Memory"
-  short_description: "Configure lean project-memory, context seeds, and optional translation memory."
+  short_description: "Configure tracker, delivery, context, and localization memory."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $project-memory to inspect this workspace, choose repo, monorepo, or orchestrator setup mode, confirm issue tracker, delivery mode defaults, current-run mutation overrides, orchestration auto-dispatch policy, triage types and labels, domain-memory layout, monorepo slug conventions, whether localization evidence warrants TRANSLATION.md, whether AGENTS.md should be minimized into pointer-first rules, and whether a non-empty repo should receive an initial CONTEXT.md seed, then write lean AGENTS.md pointers plus project-memory/agents files and seed CONTEXT.md, TRANSLATION.md, or ADRs when evidence is strong. Route GitHub issue lifecycle mechanics to $github-issues."
+  default_prompt: "Use $project-memory to inspect setup evidence, confirm tracker_backend and delivery_mode, review triage/domain/localization routing, and write only confirmed project-memory files."

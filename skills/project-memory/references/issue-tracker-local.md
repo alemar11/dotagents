@@ -7,22 +7,17 @@ PRDs and implementation issues for this repo live as markdown files under
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_mode` | enum | `local` | `local` | Local Markdown files are the authoritative PRD and issue store. |
-| `tracker_writes` | enum | `auto` | `disabled`, `prompt`, `auto` | Whether local tracker file writes are disabled, confirmation-gated, or automatic. |
-| `local_prd_path_pattern` | path-pattern | `.scratch/<feature-slug>/PRD.md` | repo-relative path pattern | Local PRD location. |
-| `local_issue_path_pattern` | path-pattern | `.scratch/<feature-slug>/issues/<NN>-<slug>.md` | repo-relative path pattern | Active local issue location. |
-| `done_issue_path_pattern` | path-pattern | `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md` | repo-relative path pattern | Completed local issue location. |
-| `delivery_mode` | enum | `one-feature-branch` | `one-feature-branch`, `one-pr-per-issue`, `direct-commit` | Default feature delivery shape for generated issues. |
+| `tracker_backend` | enum | `local` | `github`, `local` | PRDs and implementation issues are written as local Markdown files. |
+| `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
 
-This root `.scratch/` tree is the authoritative local-markdown tracker path. Do
+This root `.scratch/` tree is the authoritative local Markdown tracker path. Do
 not relocate these feature artifacts under `project-memory/features/` unless the
 repo records a custom tracker mode; `project-memory/` remains routing, domain,
 and ADR memory.
 
-Current-run override: record any temp, dry-run, rehearsal, or disabled-write
-constraint as `tracker_writes: disabled`. Do not treat a current-run override
-as a durable tracker preference change unless the user explicitly says to make
-it persistent.
+Current-run override: treat any temp, dry-run, rehearsal, or disabled-write
+constraint as run-specific behavior. Do not record it as a durable
+issue-tracker configuration row.
 
 ## Conventions
 
@@ -40,17 +35,8 @@ it persistent.
 - Triage state is recorded as a `Status:` line near the top of each issue file,
   using the state strings from `project-memory/agents/triage-labels.md`
 - Comments and conversation history append under a `## Comments` heading
-- Each implementation issue body includes `Source PRD:` pointing to
-  `.scratch/<feature-slug>/PRD.md`.
-- Each implementation issue body includes `## Delivery` with issue-level
-  `Parallelization` and `Closeout`.
-- Each implementation issue body copies the effective PRD `Delivery mode` and
-  labels it as feature-level metadata inherited from `Source PRD`, for example
-  `Delivery mode: one-feature-branch (feature-level, inherited from Source
-  PRD)`. Feature-level means the mode applies to the whole Source PRD feature.
-- Add issue-level `Delivery mode` or `Integration mode` exception lines only
-  when the issue intentionally differs from the PRD, and include the
-  authorization or reason.
+- `$plan-feature` owns PRD and generated issue body shape, including `Source
+  PRD`, delivery metadata, partial-PRD links, and issue graph validation.
 - In multi-context repos or monorepos, feature slugs must include the accepted
   product or workspace slug when needed to avoid collisions, for example
   `customer-portal-weekly-digest` instead of `weekly-digest`.
@@ -59,29 +45,30 @@ it persistent.
 
 ## Delivery Defaults
 
-- Default `delivery_mode`: `one-feature-branch` for a single project or monorepo in
-  this git repo.
+- Default `delivery_mode`: `pull-request`.
 - Branch naming: default to `feature/<feature-slug>`.
-- PR shape: one draft PR for the feature when the work is later published.
-  Local issue files are scheduling units and move to `issues/done/` only after
-  validation and the configured proof are complete.
-- Exceptions: `one-pr-per-issue` only for isolated work; `direct-commit`
-  only with explicit maintainer authorization.
+- PR shape: one draft PR for a single repo or monorepo feature when the work is
+  later published. In multi-repo work, every involved repo uses the same branch
+  name and opens its own PR. Local issue files are scheduling units and move to
+  `issues/done/` only after validation and the configured proof are complete.
+- Direct-commit shape: `direct-commit` is delivery proof, not the local issue
+  lifecycle. Implement on the current branch, validate, commit, record the
+  commit/proof in the issue or ledger, then move the local issue file to
+  `issues/done/` unless the current run explicitly asks to keep completed issue
+  files in place for inspection.
+- Multi-repo PRD shape: use a single PRD only when that is the accepted
+  planning source. Otherwise use linked repo-scoped partial PRDs or generated
+  issue files; each one names its affected repo and links the siblings that
+  define the same feature. A global PRD is not required as durable setup
+  configuration.
+- Exceptions: `direct-commit` only with explicit maintainer authorization.
 
-## Runtime Policy Boundary
+## Runtime Boundary
 
 - Tracker setup records artifact routing, delivery-mode defaults, and closeout
   conventions only.
-- `project-memory/agents/orchestration-policy.md` records optional
-  `$codex-orchestrator` auto-dispatch bounds, allowed worker surfaces, caps,
-  authorization ceilings, monitoring defaults, and stop-for-owner rules.
-- `$codex-orchestrator` resolves actual worker capability modes per workstream
-  and session from the owner request, source item, linked `Source PRD`,
-  publication authority, issue mutation authority, orchestration policy,
-  selected worker surface, dependencies, dirty-worktree state, and gates.
 - If an existing setup file contains the legacy worker-authorization setup key,
-  treat it as stale state and remove it when touching the file. Do not copy it
-  into PRDs, generated issues, draft commands, ledgers, or worker prompts.
+  treat it as stale state and remove it when touching the file.
 
 Implementation issues created from a PRD usually use `Type: task`. PRD files
 do not need `Type:` or `Status:` lines unless the repo chooses to treat PRDs as
@@ -94,6 +81,12 @@ When all acceptance criteria pass and validation is complete, move the issue
 file from `.scratch/<feature-slug>/issues/<NN>-<slug>.md` to
 `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`.
 
+For `delivery_mode: direct-commit`, commit on the authorized current branch and
+record the commit/proof before moving the issue file. Use
+`local-done-move-after-proof` as the local markdown closeout mode even when the
+delivery mode is `direct-commit`; `direct-commit-closes-issue` is not a local
+markdown lifecycle signal.
+
 Do not delete completed issue files. Do not add a `done` status; the
 `issues/done/` folder is the completion signal, while `Status:` remains the
 triage/workflow state used for active issues. If `issues/done/` does not
@@ -102,8 +95,8 @@ exist yet, create it when completing the first issue.
 ## When a skill says "publish to the issue tracker"
 
 Create a new file under `.scratch/<feature-slug>/`, creating the directory if
-needed. If a current-run `tracker_writes: disabled` override is active, return
-draft file paths and bodies instead of writing local tracker files.
+needed. If a current-run no-mutation override is active, return draft file paths
+and bodies instead of writing local tracker files.
 
 ## When a skill says "fetch the relevant issue"
 

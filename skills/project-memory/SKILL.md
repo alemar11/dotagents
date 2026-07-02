@@ -1,6 +1,6 @@
 ---
 name: project-memory
-description: Configure or review lean project-memory before planning, PRD, issue-splitting, triage, or domain-memory workflows, including CONTEXT.md seeds and optional TRANSLATION.md memory.
+description: Configure project-memory for tracker, delivery, context, and localization setup.
 ---
 
 # Project Memory
@@ -13,16 +13,13 @@ Configure the repo memory that other skills consume:
 - `project-memory/agents/issue-tracker.md` for PRD and issue routing.
 - `project-memory/agents/triage-labels.md` for issue type and state mappings.
 - `project-memory/agents/domain.md` for context, translation, and ADR layout.
-- `project-memory/agents/orchestration-policy.md` for optional
-  `$codex-orchestrator` auto-dispatch bounds.
 - `CONTEXT.md` and optional `project-memory/adr/` for domain memory.
 - `TRANSLATION.md` when localization support or translation rules are real.
 
 Run this once per code repo, monorepo, or orchestrator workspace before
 planning, publishing PRDs, splitting issues, triaging, or updating
 project-backed domain memory. Re-run it when tracker routing, mappings,
-orchestration dispatch policy, domain-memory layout, localization policy, or
-`AGENTS.md` pointers change.
+domain-memory layout, localization policy, or `AGENTS.md` pointers change.
 
 ## Boundaries
 
@@ -55,26 +52,23 @@ Use `lower_snake_case` keys and `lower-kebab-case` values for setup-owned
 structured fields. Treat older uppercase kebab-case values as legacy aliases
 when reading existing artifacts; rewrite touched values to lower-kebab-case.
 
-| Key | Type | Allowed values | Owner |
-| --- | --- | --- | --- |
-| `setup_mode` | enum | `fresh-setup`, `existing-project-bootstrap`, `orchestrator-workspace` | `project-memory` |
-| `tracker_mode` | enum | `github`, `local`, `orchestrator-local`, `orchestrator-github`, `other` | `issue-tracker.md` |
-| `tracker_writes` | enum | `disabled`, `prompt`, `auto` | `issue-tracker.md` |
-| `delivery_mode` | enum | `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, `direct-commit` | PRD and tracker defaults |
-| `domain_memory_layout` | enum | `single-context`, `multi-context`, `orchestrator-context` | `domain.md` |
-| `context_seed_mode` | enum | `seed-context`, `routing-only` | `project-memory` |
-| `translation_memory` | enum | `enabled`, `not-applicable`, `needs-confirmation` | `project-memory` |
+| Key | Type | Allowed values | Meaning | Owner |
+| --- | --- | --- | --- | --- |
+| `tracker_backend` | enum | `github`, `local` | Where durable PRDs and implementation issues are written. | `issue-tracker.md` |
+| `delivery_mode` | enum | `pull-request`, `direct-commit` | How implementation work is published after validation. | `issue-tracker.md`, PRDs, and generated issues |
 
-Legacy tracker aliases:
+Do not add durable setup keys for workspace shape, setup flow, GitHub repo,
+coordination repo, worker surfaces, worker counts, publication authority, issue
+mutation authority, scheduled checks, or dry-run/no-mutation intent. Record
+real repo targets, path conventions, and cross-repo links in prose, PRDs,
+generated issues, or the orchestrator ledger as appropriate.
 
-- Treat `local-markdown` as `tracker_mode: local` when reading existing
-  artifacts.
-- Treat `external_tracker_mutation: allowed` as `tracker_writes: prompt` for
-  GitHub targets unless `tracker_writes` is already present.
-- Treat `local_artifact_writes: allowed` as `tracker_writes: auto` for local
-  targets unless `tracker_writes` is already present.
-- Remove `effective_target`, `local_artifact_writes`, and
-  `external_tracker_mutation` from any `issue-tracker.md` file you touch.
+Legacy cleanup:
+
+- Map old tracker and delivery fields through `references/tracker-publishing.md`
+  before acting.
+- Remove current-run or runtime-only fields from any `issue-tracker.md` file you
+  touch; `references/setup-workflow.md` owns the exact write-normalization rule.
 
 When touching `project-memory/agents/issue-tracker.md`, normalize the setup
 header:
@@ -82,8 +76,11 @@ header:
 - use `lower_snake_case` keys;
 - wrap structured values in backticks;
 - keep behavior-affecting fields in a typed configuration table before prose;
-- require `tracker_writes` whenever `tracker_mode` is present;
-- use `github_repo` for GitHub targets, not prose keys like `GitHub repo`;
+- require `tracker_backend` and `delivery_mode`;
+- remove legacy durable rows such as `tracker_mode`, `tracker_writes`,
+  `setup_mode`, `github_repo`, `coordination_repo`, `project_label_format`, and
+  path-pattern keys from the configuration table; preserve real custom targets
+  or path conventions in prose when they are still needed;
 - preserve unrelated custom prose, labels, delivery rules, and dry-run notes.
 
 Detailed meanings and generated-file shapes live in the references listed
@@ -91,7 +88,7 @@ below.
 
 ## Workflow
 
-### 1. Choose Setup Mode
+### 1. Choose Setup Flow
 
 - Use `fresh-setup` when setup files are missing. In non-empty repos, also check
   whether evidence supports an initial `CONTEXT.md` seed.
@@ -99,10 +96,11 @@ below.
   project memory, accepted knowledge, recent same-repo session history, or ADR
   candidates.
 - Use `orchestrator-workspace` only for a parent coordination workspace that
-  plans across independent repos. Do not treat it as a monorepo.
+  plans across independent repos. Do not treat it as a monorepo, and do not
+  require a global PRD when linked partial PRDs describe the workspace feature.
 - For temp, rehearsal, validation, or dry-run work, use a current-run
-  `tracker_writes: disabled` override unless the user explicitly authorizes
-  tracker writes.
+  no-mutation override unless the user explicitly authorizes tracker writes. Do
+  not persist no-mutation intent as a durable issue-tracker config row.
 
 ### 2. Inspect Evidence
 
@@ -125,7 +123,7 @@ before writing:
 - move project purpose, vocabulary, boundaries, and open questions to
   `CONTEXT.md`;
 - move localization policy to `TRANSLATION.md`;
-- move tracker, triage, delivery, orchestration policy, and domain layout to
+- move tracker, triage, delivery, and domain layout to
   `project-memory/agents/*`;
 - move accepted load-bearing decisions to ADRs;
 - preserve or ask about stale, conflicting, or weakly evidenced content.
@@ -141,9 +139,8 @@ use `Unknown` when absent or ambiguous.
 
 Resolve these decisions for new setup or requested edits:
 
-- issue tracker and `tracker_writes` policy;
-- delivery mode defaults;
-- orchestration auto-dispatch and worker-surface policy;
+- issue tracker backend;
+- delivery mode;
 - issue type and triage state mappings;
 - domain-memory layout and context seed mode;
 - localization memory state;
@@ -159,9 +156,6 @@ Use these references as starting points:
 
 - `references/issue-tracker-github.md`
 - `references/issue-tracker-local.md`
-- `references/issue-tracker-orchestrator-github.md`
-- `references/issue-tracker-orchestrator-local.md`
-- `references/orchestration-policy.md`
 - `references/tracker-publishing.md`
 - `references/triage-labels.md`
 - `references/domain.md`
@@ -170,8 +164,10 @@ Use these references as starting points:
 - `references/session-history.md`
 - `references/setup-workflow.md`
 
-For `tracker_mode=other`, write `issue-tracker.md` from the user's described
-workflow instead of forcing a hosted-tracker template.
+For custom tracker workflows, write `issue-tracker.md` from the user's described
+workflow instead of forcing a hosted-tracker template, but keep the durable
+configuration table focused on `tracker_backend` and `delivery_mode` when the
+workflow still reduces to local or GitHub artifacts.
 
 ### 5. Write Confirmed Setup
 
@@ -188,18 +184,18 @@ After confirmation:
   product naming, or user-facing copy. Do not require the pointer or create
   broken links.
 - In orchestrator workspace mode, do not create project or feature folders.
-- Keep runtime orchestration policy in
-  `project-memory/agents/orchestration-policy.md`, not in
-  `issue-tracker.md`, generated PRDs, or generated issue bodies.
+- Do not create extra orchestration setup files; session worker questions belong
+  in `$codex-orchestrator`, and runtime worker state belongs in the orchestrator
+  checkpoint and ledger.
 - Before reporting completion, grep any touched `issue-tracker.md` for legacy
-  keys: `effective_target`, `local_artifact_writes`, and
-  `external_tracker_mutation`. Remove them or report why they must remain.
+  keys: `tracker_mode`, `tracker_writes`, `effective_target`,
+  `local_artifact_writes`, and `external_tracker_mutation`. Remove them or
+  report why they must remain.
 
 ### 6. Report Completion
 
-Report setup mode, files written, reviewed/changed settings, tracker target,
-`tracker_writes`, delivery defaults, orchestration policy, mappings, domain
-layout, localization decision, `AGENTS.md` minimization,
+Report setup flow, files written, reviewed/changed settings, tracker backend,
+delivery mode, mappings, domain layout, localization decision, `AGENTS.md` minimization,
 context/translation/ADR seeds, session-history usage, and the workflows that
 can now consume this setup.
 
@@ -210,11 +206,7 @@ filling project memory incrementally.
 ## Reference Responsibilities
 
 - `issue-tracker-*.md`: tracker-specific artifact locations, publication rules,
-  delivery defaults, runtime policy boundaries, title formats, and completion.
-- `orchestration-policy.md`: durable `$codex-orchestrator` worker-dispatch
-  policy, including optional auto-dispatch, worker-surface caps, authorization
-  ceilings, monitoring defaults, visible App thread explicitness, and
-  stop-for-owner rules.
+  delivery defaults, runtime boundaries, title formats, and completion.
 - `tracker-publishing.md`: shared effective target, draft publish, temporary
   body-file, and `source_prd_ref` contract.
 - `triage-labels.md`: canonical issue type and workflow-state mappings.

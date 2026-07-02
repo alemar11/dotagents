@@ -7,13 +7,8 @@ PRDs and implementation issues for this repo live as GitHub issues. Use
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_mode` | enum | `github` | `github` | GitHub issues are the authoritative PRD and implementation issue store. |
-| `tracker_writes` | enum | `prompt` | `disabled`, `prompt`, `auto` | Whether GitHub issue writes are disabled, confirmation-gated, or automatic. |
-| `github_repo` | repo | `<owner>/<repo>` | GitHub `owner/repo` | Repository where PRDs and implementation issues are created. |
-| `delivery_mode` | enum | `one-feature-branch` | `one-feature-branch`, `one-pr-per-issue`, `direct-commit` | Default feature delivery shape for generated issues. |
-
-Infer `github_repo` from `git remote -v` only when this file does not record a
-specific target.
+| `tracker_backend` | enum | `github` | `github`, `local` | PRDs and implementation issues are written as GitHub issues. |
+| `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
 
 GitHub is the authoritative artifact store in this mode. Do not create or keep
 repo-local `.scratch/` PRD/issue mirrors, `project-memory/features/` mirrors, or
@@ -32,9 +27,8 @@ When returning draft commands before the PRD issue exists, use
 `source_prd_ref=draft-prd:<feature-slug>` and publish the PRD first; generated
 issue bodies must replace that draft ref with `Source PRD: #<prd-number>` before
 hosted mutation.
-Record any non-mutating choice as a current-run `tracker_writes: disabled`
-override in `project-memory/agents/issue-tracker.md`; do not treat it as a
-durable tracker preference change unless the user explicitly says so.
+Treat any non-mutating choice as a current-run override. Do not record it as a
+durable issue-tracker configuration row.
 
 ## Conventions
 
@@ -63,28 +57,25 @@ the actual available values or fallback label convention in
 
 ## Delivery Defaults
 
-- Default `delivery_mode`: `one-feature-branch` for a single project or monorepo in
-  this git repo.
+- Default `delivery_mode`: `pull-request`.
 - Branch naming: default to `feature/<feature-slug>`.
-- PR shape: one draft PR for the feature. Generated implementation issues are
-  scheduling units and normally close from that feature PR body.
-- Exceptions: `one-pr-per-issue` only for isolated work; `direct-commit`
-  only with explicit maintainer authorization.
+- PR shape: one draft PR for a single repo or monorepo feature. In multi-repo
+  work, every involved repo uses the same branch name and opens its own PR.
+  Generated implementation issues are scheduling units and normally close from
+  the relevant PR body.
+- Multi-repo PRD shape: use a single PRD only when that is the accepted
+  planning source. Otherwise use linked repo-scoped partial PRDs or generated
+  issues; each one names its affected repo and links the siblings that define
+  the same feature. No central repo, central issue, project label, or global
+  PRD is required as durable setup configuration.
+- Exceptions: `direct-commit` only with explicit maintainer authorization.
 
-## Runtime Policy Boundary
+## Runtime Boundary
 
 - Tracker setup records artifact routing, delivery-mode defaults, and closeout
   conventions only.
-- `project-memory/agents/orchestration-policy.md` records optional
-  `$codex-orchestrator` auto-dispatch bounds, allowed worker surfaces, caps,
-  authorization ceilings, monitoring defaults, and stop-for-owner rules.
-- `$codex-orchestrator` resolves actual worker capability modes per workstream
-  and session from the owner request, source item, linked `Source PRD`,
-  publication authority, issue mutation authority, orchestration policy,
-  selected worker surface, dependencies, dirty-worktree state, and gates.
 - If an existing setup file contains the legacy worker-authorization setup key,
-  treat it as stale state and remove it when touching the file. Do not copy it
-  into PRDs, generated issues, draft commands, ledgers, or worker prompts.
+  treat it as stale state and remove it when touching the file.
 
 ## Title Format
 
@@ -112,18 +103,8 @@ For feature planning:
   `Task` unless the repo maps `task` to a different value.
 - Implementation issue titles use
   `<feature-slug>: <NN> <vertical outcome>`.
-- Each implementation issue body must also include `Source PRD: #<number>` for
-  searchability and backlinks.
-- Each implementation issue body must include `## Delivery` with issue-level
-  `Parallelization` and `Closeout`.
-- Each implementation issue body must copy the effective PRD `Delivery mode`
-  and label it as feature-level metadata inherited from `Source PRD`, for
-  example `Delivery mode: one-feature-branch (feature-level, inherited from
-  Source PRD)`. Feature-level means the mode applies to the whole Source PRD
-  feature.
-- Add issue-level `Delivery mode` or `Integration mode` exception lines only
-  when the issue intentionally differs from the PRD, and include the
-  authorization or reason.
+- `$plan-feature` owns PRD and generated issue body shape, including `Source
+  PRD`, delivery metadata, partial-PRD links, and issue graph validation.
 
 For triage:
 
@@ -139,10 +120,9 @@ For triage:
 
 When all acceptance criteria pass and validation is complete, close that
 implementation issue from the relevant PR body with a GitHub closing keyword
-such as `Closes #<issue-number>`. For the default `one-feature-branch`
-delivery mode, the feature PR closes generated
-implementation issues. Final-commit closure is allowed only when the issue
-records `direct-commit` or another
+such as `Closes #<issue-number>`. For the default `pull-request` delivery mode,
+the relevant feature or repo PR closes generated implementation issues.
+Final-commit closure is allowed only when the issue records `direct-commit` or another
 explicit maintainer authorization. The issue closes when that PR or authorized
 commit reaches the default branch.
 
