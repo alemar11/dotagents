@@ -75,10 +75,32 @@ body files outside checkout-owned artifact paths and remove the temp directory
 after the command succeeds or fails, unless the user or calling workflow
 explicitly provided a persistent body-file or local mirror path.
 
+Generated Markdown bodies are untrusted shell input. Do not place them inside
+double-quoted shell strings, `echo`, command substitutions, or unquoted heredocs
+such as `<<EOF`; backticks and `$...` must remain literal. Use a runtime
+file-write tool when available. If writing from a shell, use a quoted heredoc
+delimiter such as `<<'EOF'` or another non-interpolating writer.
+
+For multi-issue publication, especially PRD plus child issues, publish in
+checkpoints:
+
+1. Create or update the parent issue.
+2. Verify the parent number and metadata.
+3. Create child issue body files from sanitized final bodies.
+4. Create only missing child issues, attaching the parent relationship when
+   supported.
+5. Verify issue type, labels, parent/sub-issue state, and URLs before reporting.
+
+If a command fails after an earlier issue was created, stop and inspect the
+tracker before retrying. Reuse the created issue numbers and retry only missing
+or incorrect operations; do not rerun the full create sequence from local
+assumptions.
+
 ```bash
 tmpdir="$(mktemp -d)"
 body_file="$tmpdir/issue.md"
-# Write the generated body to "$body_file", then run one of:
+# Write the generated body to "$body_file" without shell interpolation, then
+# run one of:
 gh issue create --title "<title>" --body-file "$body_file"
 gh issue create --title "<title>" --body-file "$body_file" --type "<type>"
 gh issue create --title "<title>" --body-file "$body_file" --label "<label>"
@@ -91,7 +113,8 @@ For an explicit target repo:
 ```bash
 tmpdir="$(mktemp -d)"
 body_file="$tmpdir/issue.md"
-# Write the generated body to "$body_file", then run one of:
+# Write the generated body to "$body_file" without shell interpolation, then
+# run one of:
 gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file"
 gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --type "<type>"
 gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --label "<label>"

@@ -220,7 +220,11 @@ When GitHub issue types are available, create or update the PRD issue with that
 mapped type, usually `Feature`. If issue types are disabled or unsupported,
 publish the PRD without a type and keep the PRD title/body convention intact.
 Use `$github-issues` for GitHub create, type, label, and dry-run command
-mechanics.
+mechanics. In mutating GitHub runs, pass the sanitized PRD title, body, target
+repo, type, and labels to `$github-issues`; do not assemble a direct `gh issue
+create` shell command with generated Markdown in this phase. `$github-issues`
+owns safe temporary body-file creation, non-interpolating body writes, cleanup,
+state verification, and partial-failure recovery.
 
 Use the effective target from the `plan-feature` handoff without re-asking
 unless this phase finds a new blocker or unresolved question. In hosted tracker

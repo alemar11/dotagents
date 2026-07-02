@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Use direct gh commands for GitHub issue lifecycle, labels, types, parent/sub-issues, explicit repo targeting, and dry-run commands.
+description: Use when GitHub issue lifecycle work needs direct gh commands: create/edit issues, labels, types, parent/sub-issues, comments, closure, or dry-run commands.
 ---
 
 # GitHub Issues
@@ -24,6 +24,13 @@ This skill only handles GitHub Issues.
 - Create temporary `--body-file` inputs outside checkout-owned artifact paths
   and remove them after mutation unless the user or calling workflow explicitly
   provides a persistent body-file or local mirror path.
+- Own safe body-file transport for composing workflows. When a caller supplies
+  generated Markdown body text, this skill creates the transient body files,
+  writes them with a non-interpolating method, runs `gh --body-file`, verifies
+  state, and cleans up.
+- Never embed generated Markdown bodies in shell command strings, `echo`,
+  unquoted heredocs, command substitutions, or other interpolating shell input.
+  Markdown bodies commonly contain backticks, `$...`, and fenced code.
 - Inspect current labels, issue type, state, and relationships before changing
   them.
 - When verifying native GitHub Issue Types with `gh issue view --json`, request
@@ -73,15 +80,21 @@ This skill only handles GitHub Issues.
    create/publish/open instruction was provided, ask whether to create the
    GitHub issues immediately.
 5. Read the relevant issue or label state before mutation.
-6. Apply the smallest GitHub issue operation needed:
+6. For create, edit, or comment operations with generated Markdown, prepare
+   safe body files using the pattern in `references/workflows.md`.
+7. Apply the smallest GitHub issue operation needed:
    - create issues with the requested title, body, type, labels, or parent,
    - set issue type,
    - add or remove labels,
    - add comments,
    - attach parent/sub-issue relationships,
    - close only after the requested disposition is explicit.
-7. Verify the changed issue or queue state after mutation.
-8. Report the issue URL/number, commands run or drafted, and any skipped
+8. If any multi-issue publication step fails after a partial mutation, stop,
+   verify the current tracker state, clean up temp files, and retry only the
+   missing or incorrect operations. Do not create duplicates from stale local
+   assumptions.
+9. Verify the changed issue or queue state after mutation.
+10. Report the issue URL/number, commands run or drafted, and any skipped
    mutation because a no-mutation override was active.
 
 ## Routing

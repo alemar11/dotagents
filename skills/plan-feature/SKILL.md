@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: Plan a feature through full-flow, prd-only, or issues-from-existing-prd modes before implementation.
+description: Use when explicitly invoked to plan a feature into a PRD and agent-ready issues, including prd-only and issues-from-existing-prd modes.
 ---
 
 # Plan Feature
@@ -107,6 +107,11 @@ This skill may call:
   generated implementation issues. After implementation scheduling starts,
   issue lifecycle comments, labels, direct closure, and closeout mutation belong
   to `$codex-orchestrator` using `$github-issues`.
+- In GitHub tracker mode, `$github-issues` owns safe `gh --body-file`
+  transport, transient body-file cleanup, partial-publication recovery, and
+  dry-run command mechanics. `plan-feature` supplies sanitized titles, bodies,
+  metadata, target repo, and parent relationships; it must not embed generated
+  Markdown bodies in ad hoc shell commands.
 
 ## Workflow
 
@@ -146,10 +151,10 @@ publish commands.
 
 When `tracker_backend` is `github` and no no-mutation override is active, the
 hosted tracker is authoritative and the PRD/issues should be published there.
-Temporary files needed for `$github-issues` or `gh --body-file` must be created
-outside the repo and removed after mutation. Do not use `.scratch/` as a staging
-area in hosted tracker mode unless the user explicitly asks to keep a local
-mirror.
+`$github-issues` owns the transient `gh --body-file` transport, including
+creating body files outside the repo, using non-interpolating writes, verifying
+tracker state, and cleaning up. Do not use `.scratch/` as a staging area in
+hosted tracker mode unless the user explicitly asks to keep a local mirror.
 
 When `tracker_backend` is `local` and no no-mutation override is active, write
 the PRD and generated implementation issues to the configured Markdown paths.

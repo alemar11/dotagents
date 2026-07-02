@@ -310,7 +310,10 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   to the PRD parent when the PRD source is a GitHub issue, set the mapped
   `task` issue type when available, then apply mapped labels such as
   `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
-  `.scratch/` mirror unless the user explicitly requested one.
+  `.scratch/` mirror unless the user explicitly requested one. Pass sanitized
+  issue titles, bodies, target repo, labels, types, and parent/sub-issue intent
+  to `$github-issues`; do not assemble direct mutating `gh issue create` shell
+  commands with generated Markdown in this phase.
 - GitHub workspace issues: create linked repo or partial issues through
   `$github-issues`, using PRD parent/sub-issue relationships where available.
   Derive `<project-slug>` and affected repos from the PRD/project context or ask
@@ -440,11 +443,11 @@ unless this phase finds a new blocker or unresolved question. When the effective
 target is the configured tracker, create the GitHub issues or write the local
 issue files. In hosted tracker modes, local file writes apply only to explicit
 local mirrors or dry-run targets; hosted body-file inputs are transient files
-outside the repo. Hosted tracker mutation in this phase is limited to generated
-planning issue publication, parent/sub-issue links, issue type metadata, and
-initial workflow-state labels. After implementation scheduling starts, issue
-lifecycle comments, label changes, direct closure, and closeout mutations belong
-to `$codex-orchestrator`.
+outside the repo and are owned by `$github-issues`. Hosted tracker mutation in
+this phase is limited to generated planning issue publication, parent/sub-issue
+links, issue type metadata, and initial workflow-state labels. After
+implementation scheduling starts, issue lifecycle comments, label changes,
+direct closure, and closeout mutations belong to `$codex-orchestrator`.
 
 Immediately before returning issue bodies, writing local issue files, handing
 content to `$github-issues`, or generating draft publish commands, re-scan every

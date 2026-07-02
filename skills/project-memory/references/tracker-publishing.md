@@ -34,7 +34,10 @@ For legacy tracker configs, map old fields before acting:
 
 Hosted body-file inputs are temporary transport files. They must live outside
 the repo and be removed after mutation unless the user explicitly requests a
-local mirror.
+local mirror. For GitHub tracker runs, `$github-issues` owns this transport:
+create transient body files with non-interpolating writes, run `gh --body-file`,
+verify tracker state after mutation, clean up temp files, and recover partial
+publication by inspecting GitHub before retrying missing operations.
 
 ## Stable Source PRD References
 
