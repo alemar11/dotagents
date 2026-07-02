@@ -52,7 +52,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `plan-feature` | Plan a feature from grilling to PRD to configured agent-ready issues, with prd-only and existing PRD issue modes. |
 | `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
 | `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
-| `project-memory` | Configure lean project memory, AGENTS pointers, context seeds, and optional translation memory. |
+| `project-memory` | Configure tracker, delivery, context, and localization memory. |
 | `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with plan-feature gates, workers, ledgers, and closeout. |
 | `postgres` | Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |

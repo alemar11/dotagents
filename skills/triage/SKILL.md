@@ -64,10 +64,9 @@ the actual tracker issue types, labels, or markdown status values.
 - Do not run `$plan-harder` or post an agent brief for `needs-info`; preserve
   established facts and ask concrete questions instead.
 - Do not implement the issue.
-- Do not use `project-memory/agents/orchestration-policy.md` for ordinary
-  triage classification or tracker routing. That file only controls
-  `$codex-orchestrator` runtime dispatch after an issue is already ready for an
-  agent queue.
+- Do not use orchestration runtime state for ordinary triage classification or
+  tracker routing. `$codex-orchestrator` owns dispatch only after an issue is
+  already ready for an agent queue.
 - Do not close an issue or mark it `wontfix` without explicit user or
   maintainer confirmation.
 
