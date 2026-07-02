@@ -150,32 +150,48 @@ unavailable, continue only with safe work and report the exact missing surface.
 
 When invoked to implement work, ask for session settings before creating
 workers or starting implementation. These settings are PRD-agnostic and
-issue-agnostic; they apply to the current orchestrator session. Present the
-initial Approach Checkpoint and wait for owner approval. Ask these two
-worker-surface questions once:
+issue-agnostic; they apply to the current orchestrator session. Ask once for
+explicit delegation consent before creating workers, creating visible App
+threads, or starting implementation:
 
-> For this orchestrator session, should I use CLI subagents? If we are in the
-> Codex App and visible worker threads are available, should I also use Codex App
-> worker threads? I will choose the number of workers and the split for each
-> implementation wave after you approve the checkpoint.
+> Before I orchestrate this work, I need explicit delegation consent.
+>
+> May I use CLI subagents if useful? If we are in the Codex App and visible
+> worker threads are available, may I also create or use visible worker threads
+> if useful? You can also set max concurrent worker counts.
+>
+> Example replies:
+> - "CLI subagents: yes, max 2; visible worker threads: no"
+> - "CLI subagents: yes, max 2; visible worker threads: yes, max 1"
+> - "No delegation; root thread only"
+
+When the current runtime is not the Codex App or visible thread tools are not
+available, omit the visible worker thread sentence and use CLI-only examples:
+
+> Example replies:
+> - "CLI subagents: yes, max 2"
+> - "No delegation; root thread only"
+
+Make the answer shape explicit enough that a bare `yes` cannot accidentally
+authorize multiple surfaces.
 
 While waiting, do only root-owned discovery or planning that does not create
 workers, create visible App threads, mutate source state, or assume a quota.
 
-After session approval, the root chooses the actual workstream surface, worker
+After session consent, the root chooses the actual workstream surface, worker
 count, authorization modes, publication checkout, and stop conditions from the
 source graph, current repo state, gates, available tools, and Codex
 product-surface rules. Do not copy session worker choices into PRDs, generated
 issue bodies, draft publish commands, or `## Orchestrator Handoff`.
 
 Use `references/worker.md` for worker surfaces, session settings,
-authorization modes, checkpoint shape, prompt shape, lifecycle, resync,
+authorization modes, execution report shape, prompt shape, lifecycle, resync,
 integration, artifacts, recurring PRD automation, and closeout. The entrypoint
 contract is:
 
 - Worker authorization is resolved only by the root orchestrator per workstream
   and session.
-- Worker surface approval is current-session approval, not durable config or
+- Worker surface consent is current-session consent, not durable config or
   PRD/issue metadata. Project memory must not grant App-thread, automation,
   publication, or issue-mutation consent.
 - In owner worker-surface wording, `thread` means a visible Codex App thread.
@@ -187,11 +203,11 @@ contract is:
 - Split workers by independent ownership boundary, keep shared or overlapping
   integration work in the root, and resync or replace a worker before assigning
   overlapping new scope.
-- Before dispatching implementation, build the `Approach Checkpoint` from
-  `references/worker.md` and wait for owner approval. Bounded multi-wave
-  approval may continue across dependency-unlocked waves while source items,
-  worker surfaces, authorization modes, delivery path, and stop conditions stay
-  inside the approved checkpoint.
+- Before dispatching implementation for each source batch, build the
+  non-blocking execution report from `references/worker.md`. The report is not
+  an approval prompt; continue automatically while source items, consented
+  worker surfaces and limits, authorization modes, delivery path, and stop
+  conditions stay inside the recorded boundaries.
 
 ## Delivery And Scheduling
 
@@ -259,16 +275,17 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    dependencies, selected gates, proof target, and closeout target.
 5. Resolve session worker settings from the owner request and this skill's
    delegation policy, then read `references/worker.md` before delegation.
-   Prepare the implementation plan and first wave, build the approach checkpoint
-   with explicit approval scope, and wait for owner approval before creating
-   workers, creating visible App threads, or starting root-owned implementation.
-   After approval, create workers according to the orchestrator's chosen split
-   for the current wave, name visible App threads immediately, and give each
+   Prepare the implementation plan and first wave, build the execution report,
+   and keep it visible before dispatching the source batch. Create workers
+   according to the orchestrator's chosen split for the current wave, name
+   visible App threads immediately, and give each
    worker explicit scope, per-workstream authorization modes,
    delivery/publication authority, dependency state, gates, proof,
-   branch/integration expectations, and final report shape. If the approval
-   scope is bounded multi-wave, continue into newly unblocked waves without
-   another checkpoint while the recorded boundaries still hold.
+   branch/integration expectations, and final report shape. Continue into newly
+   unblocked waves without another consent prompt while the recorded boundaries
+   and session delegation consent still hold. Stop for owner input only when the
+   run needs broader worker surfaces or limits, a changed delivery/authorization
+   boundary, risk acceptance, credentials, or another explicit stop condition.
 6. Monitor from the ledger state. Read the ledger before each owner-facing
    progress update and report the current wave, active workstreams, blockers,
    proof changes, and next scan/check from the ledger. Read a worker before
@@ -306,14 +323,14 @@ Before handing control back to the owner, return a compact owner-facing report:
 - source items reconciled, with source ids/refs and closeout state;
 - workers used, integration method per worker, and any worker output left
   unintegrated;
-- worker evidence: requested, approved, and actual surface; worker id or
+- worker evidence: requested, consented, and actual surface; worker id or
   session evidence; unavailable or failed tool evidence; fallback reason; and
   whether work ran in parallel, sequentially, root-owned, or simulated;
 - commits, branches, PRs, issue updates, releases, or draft mutation commands
   produced under current authorization;
 - active-root claim, collision, takeover, or handoff decisions, plus any
   target-repo `AGENTS.md` update applied or proposed;
-- session worker settings, checkpoint approval state, worker split, and stop
+- session worker consent, execution report boundaries, worker split, and stop
   conditions;
 - gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
   a proof path was unavailable;

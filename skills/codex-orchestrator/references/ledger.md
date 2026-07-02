@@ -147,8 +147,8 @@ remaining.
 
 Authorization resolution: per-workstream
 Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
-Session CLI subagents approved: true|false
-Session Codex App threads approved: true|false
+Session CLI subagents consented: true|false; max=<n|unspecified>
+Session Codex App threads consented: true|false; max=<n|unspecified>
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true
@@ -200,7 +200,7 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; approved=<true|false>; actual=<root|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
+| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
@@ -250,25 +250,28 @@ Use one compact block per active workstream:
 - <source id/ref, repo/version/tag/date, release gate proof, release action or
   deploy proof>
 
-## Wave Checkpoints
+## Wave Reports
 
-Record the startup checkpoint before dispatch. Include whether it was
-`owner-approved` or `pending`, approval timestamp, approval scope
-(`current-wave` or `bounded-multi-wave`), session worker settings, selected
-worker surface, orchestrator-chosen split for the first wave, authorization
-modes, stop conditions, and any owner edits to split, surface, authorization, or
-delivery path. If a bounded multi-wave checkpoint is approved, record its
-boundaries and continue later waves only while they stay inside the recorded
-source items, approved session surfaces, authorization modes, delivery path, and
-stop conditions. If approval is pending, planned work may remain in the ledger,
-but implementation workers and root-owned implementation must not start.
+Record startup delegation consent before dispatch. Include CLI subagent consent,
+visible Codex App worker thread consent when that surface is available, and any
+per-surface max concurrent worker limits. Record each non-blocking execution
+report with its source items, selected worker surface, orchestrator-chosen split
+for the current wave, authorization modes, delivery path, stop conditions, and
+any owner edits to consent, surface, authorization, or delivery path.
 
-| Wave | Started | Finished | Sources Scanned | Items Processed | Checkpoint | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
+The execution report is not an approval prompt. Continue later waves while they
+stay inside the recorded source items, session consent, authorization modes,
+delivery path, and stop conditions. If delegation consent is missing or a wave
+would exceed consented surfaces or limits, planned work may remain in the
+ledger, but implementation workers and root-owned implementation must not start
+until the owner gives the missing consent.
+
+| Wave | Started | Finished | Sources Scanned | Items Processed | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <owner-approved or pending; scope; session surfaces; worker split; authorization modes; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| 1 | <time> | <time> | <source ids> | <count> | <reported; session consent; worker split; authorization modes; delivery path; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
-Record worker evidence every time the approved worker surface and actual worker
-surface differ. Include the requested surface, owner approval, actual surface,
+Record worker evidence every time the consented worker surface and actual worker
+surface differ. Include the requested surface, owner consent, actual surface,
 tool or session id when one exists, fallback reason, and whether execution was
 parallel, sequential, root-owned, or simulated.
 
@@ -298,7 +301,7 @@ claim and in `## Notes`.
 | State | Meaning and required record |
 | --- | --- |
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
-| `autonomous` | Candidate safe to delegate under current session authorization and checkpoint boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
+| `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
 | `ready-next` | Owner-ready work still needing review, commit, push, PR, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |

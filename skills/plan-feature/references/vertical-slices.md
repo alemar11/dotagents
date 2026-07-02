@@ -93,6 +93,7 @@ Avoid issues whose only goal is:
 - build the frontend,
 - add tests,
 - update docs,
+- add fixtures,
 - refactor shared utilities,
 - create database tables,
 - wire configuration,
@@ -111,6 +112,41 @@ is allowed only when all of these are true:
 Name allowed enabling issues by the capability they unlock, not by the layer.
 Prefer "Enable authenticated draft storage for Issue 02 and Issue 03" over
 "Add database tables."
+
+## Verticality Gate
+
+Before generated implementation issues are written, returned, or published,
+review the final hardened issue bodies as the source of truth. This is a
+blocking gate, not a summary pass.
+
+For each issue, confirm that:
+
+- the title and goal name a user-visible or system-verifiable outcome,
+- acceptance criteria prove the outcome instead of listing internal tasks,
+- validation can prove the issue independently after its direct dependencies
+  are complete,
+- tests, docs, fixtures, migrations, configuration, and observability work are
+  inside the vertical issue whose outcome they prove unless an enabling-slice
+  exception applies,
+- any enabling-slice exception lists the later issue IDs it unlocks and why no
+  useful vertical issue can land before it,
+- dependencies use generated issue IDs and remain direct, minimal, and
+  acyclic,
+- orchestrator or multi-repo issues name affected repos, integration gates, and
+  proof required for closeout.
+
+If an issue fails the gate, repair the issue set before output:
+
+- merge chore-only work into the vertical issue that needs it,
+- split mixed work by independently verifiable behavior instead of code layer,
+- reframe infrastructure work only when it is a real independently verifiable
+  system outcome,
+- keep separate enabling work only when all exception rules above are satisfied,
+- withhold unresolved anomalies instead of publishing them as
+  `ready-for-agent`.
+
+After any repair, rerun hardening for materially changed issues and revalidate
+the final graph before issue bodies are returned or published.
 
 ## Ready vs Blocked
 

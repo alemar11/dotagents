@@ -25,7 +25,7 @@ Session fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces approved for the current orchestrator session. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner approved that surface. |
+| `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces consented for the current orchestrator session. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner consented to that surface. |
 | `actual_workstream_surface` | `codex-app-thread`, `cli-subagent`, `no-delegation` | Where the workstream actually runs. Do not present hidden subagents as visible App threads. |
 | `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. |
 
@@ -52,9 +52,9 @@ as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
 subset.
 
 The canonical execution values are the worker-surface fields above. In the
-owner-facing checkpoint, `Execution mode` is only a display summary inferred
-from the selected surfaces and worker split; do not treat it as a separate enum or
-source of truth.
+owner-facing execution report, `Execution mode` is only a display summary
+inferred from the selected surfaces and worker split; do not treat it as a
+separate enum or source of truth.
 
 Automation creation, updates, and scheduling are explicit-only and
 runtime-tool-dependent. Project memory does not store scheduled check timing and
@@ -63,13 +63,13 @@ The ledger is the monitoring surface: record source status,
 worker/workstream status, blockers, `Last Read`, and `Next Check` /
 `Next Scan/Check` there. The root may create, update, or schedule an automation
 only when the current runtime exposes automation tooling and the current owner
-request explicitly asks for an automation, reminder, monitor, recurring run, or
-approves a checkpoint that explicitly says `Automation: yes`. If automation
-tooling is unavailable, do not imply anything was scheduled; draft the proposed
-automation instructions, schedule, and handoff text for owner action.
+request explicitly asks for an automation, reminder, monitor, or recurring run.
+If automation tooling is unavailable, do not imply anything was scheduled;
+draft the proposed automation instructions, schedule, and handoff text for
+owner action.
 
-After the owner approves the session settings, the root chooses the number of
-workers and the split across approved surfaces for each implementation wave. The
+After the owner gives the session settings, the root chooses the number of
+workers and the split across consented surfaces for each implementation wave. The
 root may still keep work in the root thread or stop for owner input when source,
 repo, dependency, gate, or tool state makes dispatch unsafe.
 
@@ -80,14 +80,14 @@ Phrases such as `worker thread`, `new thread`, `separate thread`, `Codex
 thread`, `visible thread`, or `use a thread` resolve `delegated_worker_surface`
 and `actual_workstream_surface` to `codex-app-thread`. Do not spawn a
 `cli-subagent` for a request that says `thread` unless the owner explicitly
-approves that fallback after the missing or changed surface is stated.
+authorizes that fallback after the missing or changed surface is stated.
 
 Use `cli-subagent` only when the owner requests or accepts `subagent`, `/agent`,
 `CLI worker`, or similar non-thread worker wording, or when the owner left the
-surface open and the checkpoint explicitly resolves it to `cli-subagent`.
+surface open and startup consent explicitly resolves it to `cli-subagent`.
 If owner wording mixes `thread` and `subagent`, treat it as conflicting
-surface intent, present the concrete surface choices in the checkpoint, and
-wait for approval before dispatch.
+surface intent, ask the startup consent question with concrete surface choices,
+and wait for an explicit answer before dispatch.
 
 If Codex App thread tools are requested but unavailable, stop before dispatch
 and report the missing create/read/message thread surface. Do not silently
@@ -121,50 +121,72 @@ the work in the root thread.
 - When visible Codex App workers provide helper worktrees, preserve the caller
   checkout branch by default. Root-owned integration, validation, commit, push,
   and PR creation should run from the worker worktree or a dedicated integration
-  worktree. Switching the caller checkout is allowed only when the checkpoint
-  explicitly chooses `caller-checkout-approved`, or when no helper/integration
-  checkout is available and the owner approves that fallback.
+  worktree. Switching the caller checkout is allowed only when the owner
+  explicitly authorizes `caller-checkout-approved`, or when no
+  helper/integration checkout is available and the owner explicitly authorizes
+  that fallback.
 
-## Approach Checkpoint
+## Startup Consent
 
-Before dispatching implementation, build a startup approach checkpoint with
-session-scoped worker settings. Present it and wait for owner approval. This is
-an execution brief, not a generic "can I start?" prompt. The root may do
-read-only discovery, planning, source registration, and wave shaping before
-approval, but it must not create workers, create visible App threads, start
-implementation edits, mutate source state, commit, push, or open PRs until the
-checkpoint is owner-approved.
+When the user invokes the orchestrator, ask once for session-scoped delegation
+consent before creating workers, creating visible App threads, or starting
+implementation. This consent is PRD-agnostic and issue-agnostic for the current
+orchestrator session.
 
-The checkpoint must state its approval scope. For PRD or feature
-implementation with a clear generated issue graph, prefer a bounded multi-wave
-approval scope that covers all listed source items and dependency-unlocked
-waves. Use current-wave-only approval when later workstreams are not yet
-specified enough, depend on unresolved owner decisions, or require different
-surface, worker split, authorization, or delivery boundaries.
+Use this prompt shape when visible Codex App worker threads may be available:
 
-When a bounded multi-wave checkpoint is owner-approved, continue from one wave
-to the next without pausing as dependencies are satisfied, as long as later
-waves stay inside the recorded source items, approved worker surfaces,
-authorization modes, delivery path, and stop conditions. Regenerate the
-checkpoint and wait for approval before doing work outside those boundaries.
+> Before I orchestrate this work, I need explicit delegation consent.
+>
+> May I use CLI subagents if useful? If we are in the Codex App and visible
+> worker threads are available, may I also create or use visible worker threads
+> if useful? You can also set max concurrent worker counts.
+>
+> Example replies:
+> - "CLI subagents: yes, max 2; visible worker threads: no"
+> - "CLI subagents: yes, max 2; visible worker threads: yes, max 1"
+> - "CLI subagents: no; visible worker threads: yes, max 1"
+> - "No delegation; root thread only"
 
-Start with a short `Approach Summary` paragraph in plain language. Summarize
-the session settings, approval scope, starting wave, root-owned coordination,
-worker usage, and stop conditions. Keep concrete selected values in the tables;
-keep raw internal field names out of the owner-facing checkpoint unless
-debugging.
+When the current runtime is not the Codex App or visible thread tools are not
+available, omit the visible worker thread sentence and use CLI-only examples:
+
+> Example replies:
+> - "CLI subagents: yes, max 2"
+> - "No delegation; root thread only"
+
+Use explicit surface names in examples; accept shorthand such as `CLI yes,
+visible threads yes, max 3`, but do not present shorthand as the preferred
+answer.
+
+While waiting for startup consent, do only root-owned discovery, planning,
+source registration, and wave shaping that does not create workers, create
+visible App threads, start implementation edits, mutate source state, commit,
+push, or open PRs.
+
+Session consent is the only normal delegation gate. For later PRDs or newly
+unblocked waves in the same orchestrator session, ask again only if the run
+would require a worker surface or concurrency limit the owner did not consent
+to, a changed delivery or authorization boundary, risk acceptance, credentials,
+or another explicit stop condition.
+
+## Execution Report
+
+Before dispatching implementation for each source batch, present a non-blocking
+execution report. This report is not an approval prompt and must not ask the
+owner to confirm before dispatch. The root may continue after displaying it as
+long as the source batch stays inside the current session consent, delivery
+authority, gates, and stop conditions.
+
+Start with a short `Execution Summary` paragraph in plain language. Summarize
+the starting wave, root-owned coordination, worker usage, and stop conditions.
+Keep concrete selected values in the tables; keep raw internal field names out
+of the owner-facing report unless debugging.
 
 Then use this compact decision table:
 
 | Decision | Planned value | Meaning |
 | --- | --- | --- |
-| Source items | <issue/PR/PRD/checklist refs> | Durable work sources this approval covers. |
-| Approval scope | <current wave only OR bounded multi-wave plan through source refs> | Whether approval covers only the first wave or the bounded graph. |
-| Session surfaces | <CLI subagents yes/no; visible App threads yes/no; automation yes/no> | PRD-agnostic and issue-agnostic session choices. |
-| Execution split | <root-only OR root + workers with count/scope> | Which work stays root-owned and which work is delegated. |
-| Workstreams starting now | <count and short names> | Work units that can start immediately. |
-| Checkouts | <caller checkout policy; publication checkout> | Where integration/publication will run and whether caller branch is preserved. |
-| Authorization modes | <inspect, implement, commit, push, pr, ci-rerun-fix, merge-close, release> | The exact actions allowed by this approval. |
+| Source items | <issue/PR/PRD/checklist refs> | Durable work sources this report covers. |
 | Delivery and gates | <branch/PR/closeout plus tests/autoreview/CI/integration proof> | Landing path and proof before closeout. |
 | Stop condition | <scope/surface/auth/delivery/gate change, blocker, or completion> | When the orchestrator must return to the owner. |
 
@@ -178,27 +200,18 @@ A workstream defines the implementation slice. It creates a worker only when
 its `Surface` is `cli-subagent` or `codex-app-thread`; `no-delegation` means
 the root orchestrator thread owns that slice directly.
 
-Explicit natural-language acceptance such as `approve`, `go ahead`, `ok
-proceed`, or `looks good` approves a blocking checkpoint. If the owner changes
-the split, worker surface, authorization, or delivery path, revise the
-checkpoint and ask again before dispatch.
-
 For root-only work, do not write `none; root-owned` in the owner-facing
-checkpoint. Write `Execution mode: root thread only; no separate workers`,
-`Worker surface: no-delegation`, `CLI subagents: no`, and
-`Visible App threads: no`. If no automation will be created or updated, write
-`Automation: no`.
-
-End every blocking approach checkpoint with this exact text:
-
-> Reply approve to dispatch the approved scope, or send edits to the split, worker surface, authorization, delivery path, approval scope, or stop conditions. I will not start implementation workers or root-owned implementation until you approve.
+report. Write `Surface: root thread (no-delegation)` in the wave table. If no
+automation will be created or updated, do not mention automation in the report
+unless it is relevant to a stop condition.
 
 ## Recurring PRD Automation
 
 When the owner asks for a recurring automation that searches for new PRDs and
-implements them, the startup checkpoint must say that the two session worker
+implements them, the startup consent prompt must say that the session worker
 surface answers apply to every automation run. Ask no additional PRD-specific
-worker-surface questions.
+worker-surface questions unless an automation run would exceed the consented
+surfaces or limits.
 
 Process one PRD at a time. If a PRD stops as `blocked`, `needs-owner`, or
 `deferred`, record that PRD's blocker and continue to the next unrelated
@@ -271,7 +284,7 @@ Before sending a new instruction, changing a title, archiving, interrupting,
 closing, replacing, or handing off a worker, read its latest state with the
 available thread/subagent inspection tool. Base any steering message on the
 current worker status, files touched, blockers, validation, risks, and next
-checkpoint.
+check.
 
 Do not send broad new scope into a worker without recording why the existing
 scope changed. If the latest state is unavailable, stop and report the missing
@@ -315,11 +328,12 @@ per worker output:
 - `patch-apply`: apply a worker diff or patch in the explicitly named
   integration checkout, then inspect conflicts and rerun root gates. Prefer a
   worker worktree or dedicated integration worktree when one exists; use the
-  caller checkout only when the approach checkpoint approved that branch switch.
+  caller checkout only when the owner explicitly authorized that branch switch.
 - `manual-root`: reimplement or copy the relevant change in the explicitly
   named integration checkout when the worker output is partial, stale,
   conflicting, or easier to reproduce safely than to apply directly. Preserve
-  the caller checkout unless it was approved as the integration checkout.
+  the caller checkout unless the owner authorized it as the integration
+  checkout.
 
 For every path, inspect the tracked diff, preserve unrelated local changes,
 exclude generated ignored artifacts, rerun the required root gates, and record
@@ -429,7 +443,7 @@ Scope:
 - Worker surface: <codex-app-thread|cli-subagent>
 - Worker ID/title: <id/title or pending>
 - Worker evidence: requested=<none|cli-subagent|codex-app-thread>;
-  approved=<true|false>; actual=<root|cli-subagent|codex-app-thread>;
+  consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
 - Wave: <number>
@@ -483,7 +497,7 @@ Final report:
 - Validation: commands run and outcomes
 - Delivery: delivery mode, branch or PR used, closeout path, and PR links or
   `none`; include publication checkout and caller checkout disposition
-- Worker evidence: requested, approved, and actual surface; worker id or session
+- Worker evidence: requested, consented, and actual surface; worker id or session
   evidence; unavailable or failed tool evidence; fallback reason; and whether
   execution was parallel, sequential, root-owned, or simulated
 - Scheduling: current wave assignment, unlock state, and dependency source
@@ -503,13 +517,13 @@ ledger is available.
 
 When a worker or workstream is due for a check, read the worker state first when
 the surface supports it, then ask for status, blocker, validation, risks, and
-expected next checkpoint only if the latest state is stale or insufficient. Do
+expected next check only if the latest state is stale or insufficient. Do
 not interrupt a worker with new scope unless the user changed priority, a
 contract mismatch was discovered, or a gate failed.
 
 For each progress check, update the ledger with last-read time, worker status,
 validation or proof delta, blocker, risk delta, and next check. If a worker
-misses its next checkpoint or produces the same status for two consecutive
+misses its next check or produces the same status for two consecutive
 checks without new proof, send one focused unblock request. After the next
 no-progress check, choose a root-owned action: continue with a reason, steer,
 replace, abandon, retain for inspection, classify as `blocked` or

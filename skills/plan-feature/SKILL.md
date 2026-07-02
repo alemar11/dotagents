@@ -53,6 +53,10 @@ validation, publication target, permissions, or cross-repo contracts.
 - Load `references/prd-template.md`, `references/issue-body-template.md`, and
   `references/vertical-slices.md` when the relevant phase requires them.
 - Load and follow `$plan-harder` once for every generated implementation issue.
+- Before writing, returning, or publishing generated implementation issues, run
+  the issue phase verticality gate from `references/vertical-slices.md`; repair,
+  merge, split, re-harden, or withhold any issue that is horizontal,
+  chore-only, or otherwise not a justified vertical/enabling slice.
 - Write or publish artifacts only after setup is available and no planning
   blockers remain.
 - Treat the configured `tracker_backend` as planning-artifact write authority:
@@ -261,11 +265,12 @@ Plan-feature mode: <full-flow|issues-from-existing-prd>
 Require the issue phase to use the configured issue target, issue types,
 labels, title formats, PRD parent/sub-issue relationships, and related issue
 links when those modes apply. The issue phase must run
-`$plan-harder` once per generated implementation issue and verify that every
-`Parallelization` dependency resolves to a known issue ID in an acyclic graph
-after the final hardened issue bodies are assembled. If the effective target is
-`configured-tracker`, it must write or publish the issues to the configured
-tracker. If the effective target is `local-dry-run` or
+`$plan-harder` once per generated implementation issue, run the verticality
+gate from `references/vertical-slices.md` after hardening, and verify that
+every `Parallelization` dependency resolves to a known issue ID in an acyclic
+graph after the final publishable issue bodies are assembled. If the effective
+target is `configured-tracker`, it must write or publish the issues to the
+configured tracker. If the effective target is `local-dry-run` or
 `draft-publish-commands`, it must return draft paths, bodies, or commands
 instead.
 
@@ -303,6 +308,8 @@ Summarize:
 - planning identity used, including feature slug and product/context/project
   scope when applicable,
 - delivery mode used,
+- verticality gate result, including repairs, merges, splits, justified
+  enabling-slice exceptions, or withheld anomalies,
 - issue graph validation summary, including dependency and acyclicity checks,
 - planning blockers resolved or deferred,
 - any issue still blocked and why.

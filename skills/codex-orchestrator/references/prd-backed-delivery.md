@@ -108,7 +108,7 @@ sufficient for merge, release, production deploy, final issue closure by direct
 mutation, broad GitHub cleanup, or switching the caller checkout away from its
 current branch. When worker or integration worktrees are available, the root
 should publish from one of those checkouts and preserve the caller checkout
-unless the checkpoint explicitly approves using it as the publication checkout.
+unless the owner explicitly authorizes using it as the publication checkout.
 
 Direct commit remains a special case. Use `direct-commit` only when the PRD,
 generated issue, or owner request explicitly says direct commit is authorized

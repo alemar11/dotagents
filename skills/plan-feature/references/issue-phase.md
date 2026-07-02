@@ -19,6 +19,10 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   preserve it in the withheld result or explicitly authorized partial issue.
 - Do not publish or return an issue as ready for execution until it includes
   the hardened implementation guidance and provenance line.
+- Before assigning final tracker metadata, writing files, returning bodies,
+  generating draft commands, or mutating hosted trackers, run the verticality
+  gate from `references/vertical-slices.md` against the final hardened issue
+  bodies. Repair, merge, split, re-harden, or withhold anomalies before output.
 - Include a `## Completion` section in every generated implementation issue.
 - Include a `## Orchestrator Handoff` section in every generated implementation
   issue. The handoff is the canonical dispatch grouping for
@@ -221,17 +225,56 @@ multiple issues into one `$plan-harder` call. If a blocker cannot be resolved
 from the PRD, repo evidence, or project memory, stop and return the blocker
 instead of publishing an agent-ready issue.
 
-Before assigning final tracker type/status, writing files, generating draft
-commands, or mutating hosted trackers, revalidate the final hardened issue bodies
-as the execution graph. Every `Parallelization`, `Dependencies`, `blocks`, and
-`depends-on` reference must resolve to a generated issue ID in this feature set,
-the graph must be acyclic, startability waves must still make sense, every
-`## Orchestrator Handoff` section must agree with the corresponding
-`## Delivery`, `## Validation`, `## Completion`, and `## Dependencies`
-sections, and cross-repo integration requirements must still name the required
-proof.
+### 4. Run The Verticality Gate
 
-### 4. Apply Issue Type And Triage State
+Before assigning final tracker type/status, writing files, returning issue
+bodies, generating draft commands, or mutating hosted trackers, review every
+final hardened issue body against `references/vertical-slices.md`.
+
+For each issue, verify that it:
+
+- delivers one independently verifiable product or system outcome,
+- has acceptance criteria written as outcomes, not internal chores,
+- is not only a layer ticket such as frontend-only, backend-only, tests-only,
+  docs-only, fixture-only, refactor-only, migration-only, configuration-only,
+  or observability-only work,
+- includes the minimum layers needed to make the outcome real,
+- can be validated on its own,
+- lists only direct dependencies by generated issue ID,
+- has no hidden ordering assumption that is only implied by issue numbering,
+- keeps the `## Orchestrator Handoff`, `## Delivery`, `## Validation`,
+  `## Completion`, and `## Dependencies` sections consistent.
+
+Allow a separate enabling issue only when it satisfies all exception rules from
+`references/vertical-slices.md`: no useful vertical slice can be implemented
+before it, it unblocks at least one named later vertical issue, it is
+independently verifiable, it has clear acceptance criteria, it is small enough
+for one focused implementation pass, and its dependencies and consumers are
+listed explicitly. Name the issue by the capability it unlocks, not the code
+layer it changes.
+
+If the gate finds an anomaly:
+
+- merge chore-only tests, docs, fixtures, migrations, configuration, or
+  observability work into the vertical issue whose outcome they prove,
+- split mixed issues by independently verifiable behavior rather than by code
+  layer,
+- reframe infrastructure work as a concrete system outcome only when that is
+  true and independently verifiable,
+- keep a separate enabling issue only with a visible enabling-slice exception
+  rationale in its context or requirements,
+- re-run `$plan-harder` for any issue whose scope materially changes,
+- revalidate dependency IDs, acyclicity, startability waves, handoff
+  consistency, and cross-repo proof after every repair,
+- withhold issues whose blocker cannot be resolved from the PRD, repo evidence,
+  or project memory.
+
+Do not publish or return a normal `ready-for-agent` issue set until the
+verticality gate passes for every issue or withholds every unresolved anomaly.
+If the gate changes issue IDs, dependencies, titles, validation, or affected
+repos, update all affected issue bodies before output.
+
+### 5. Apply Issue Type And Triage State
 
 Read `project-memory/agents/triage-labels.md` and map canonical issue types
 and triage states to the repo's tracker values.
@@ -257,7 +300,7 @@ value from `project-memory/agents/triage-labels.md`. In default GitHub mode,
 `ready-for-agent` maps to the same lowercase label. In custom tracker setups,
 do not assume the canonical string is the label; read the mapping first.
 
-### 5. Publish Or Return Issues
+### 6. Publish Or Return Issues
 
 Use `project-memory/agents/issue-tracker.md` for the target, and read
 `$project-memory` `references/tracker-publishing.md` for shared
@@ -420,7 +463,7 @@ When a blocker or unresolved question appears under `plan-feature`, return it
 as an issue-splitting blocker instead of publishing a `needs-info` issue by
 default.
 
-### 6. Report Completion
+### 7. Report Completion
 
 Summarize:
 
@@ -430,6 +473,8 @@ Summarize:
   applicable,
 - delivery mode inherited,
 - number of issues produced,
+- verticality gate result, including any repairs, merges, splits,
+  enabling-slice exceptions, or withheld anomalies,
 - issue graph validation summary, including dependency and acyclicity checks,
 - confirmation that each issue includes a validated `## Orchestrator Handoff`
   section,
