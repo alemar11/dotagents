@@ -58,7 +58,7 @@ validation, publication target, permissions, or cross-repo contracts.
 - Separate local file write authorization from external issue-tracker mutation
   authorization. Local writes never imply GitHub or other hosted mutation.
 - Treat persistent local planning artifacts separately from temporary hosted
-  issue body files. In GitHub or GitHub-coordination modes, do not keep
+  issue body files. In hosted tracker mode, do not keep
   repo-local PRD, issue, `.scratch/`, or `project-memory/features/` mirrors
   unless the configured target or current run explicitly asks for a local
   artifact target.
@@ -66,8 +66,7 @@ validation, publication target, permissions, or cross-repo contracts.
   product or project slug, workspace path when applicable, and authoritative
   feature slug.
 - Carry accepted delivery mode through every phase using structured values:
-  `one-feature-branch`, `one-pr-per-repo`, `one-pr-per-issue`, or
-  `direct-commit`.
+  `pull-request` or `direct-commit`.
 - Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
   the issue phase. In `draft-publish-commands` runs, use the stable draft ref
   from `$project-memory` `references/tracker-publishing.md` until a
@@ -80,11 +79,11 @@ validation, publication target, permissions, or cross-repo contracts.
   PRDs, generated issues, local issue files, hosted issue bodies, or draft
   publish commands. `$codex-orchestrator` resolves worker authorization per
   workstream and session.
-- Treat `project-memory/agents/orchestration-policy.md` as runtime-only
-  `$codex-orchestrator` configuration. Do not copy its auto-dispatch settings,
-  worker surfaces, caps, authorization ceilings, publication limits, or issue
-  mutation limits into PRDs, generated issues, `## Orchestrator Handoff`, local
-  issue files, hosted issue bodies, or draft publish commands.
+- Treat `$codex-orchestrator` worker choices as runtime-only session decisions.
+  Do not copy worker surfaces, worker counts, checkpoint approval, publication
+  authority, or issue mutation authority into PRDs, generated issues,
+  `## Orchestrator Handoff`, local issue files, hosted issue bodies, or draft
+  publish commands.
 
 ## External Skill Calls
 
@@ -122,7 +121,7 @@ or feature folders.
 
 Before writing or publishing, resolve the effective target for the current run:
 
-- configured tracker mode from `project-memory/agents/issue-tracker.md`,
+- configured tracker backend from `project-memory/agents/issue-tracker.md`,
 - whether local file writes are allowed,
 - whether GitHub or other external tracker mutation is explicitly authorized in
   this run,
@@ -137,11 +136,11 @@ non-mutating run, treat external mutation as disallowed even when persisted
 setup points at GitHub. Use the configured local dry-run target when one exists;
 otherwise ask for a local target or return draft publish commands.
 
-When `tracker_mode` is `github` or `orchestrator-github` and external mutation
-is authorized, the hosted tracker is authoritative. Temporary files needed for
-`$github-issues` or `gh --body-file` must be created outside the repo and
-removed after mutation. Do not use `.scratch/` as a staging area in hosted
-tracker mode unless the user explicitly asks to keep a local mirror.
+When `tracker_backend` is `github` and external mutation is authorized, the
+hosted tracker is authoritative. Temporary files needed for `$github-issues` or
+`gh --body-file` must be created outside the repo and removed after mutation. Do
+not use `.scratch/` as a staging area in hosted tracker mode unless the user
+explicitly asks to keep a local mirror.
 
 Resolve the planning identity before writing:
 
@@ -150,11 +149,12 @@ Resolve the planning identity before writing:
   `workspace_path`, and `context_file` selected from `CONTEXT-MAP.md` or
   project memory.
 - For orchestrator workspaces: accepted `project_slug` and `feature_slug`.
-- `delivery_mode`: `one-feature-branch` for a single git repo, including
-  monorepos; `one-pr-per-repo` for orchestrator or true cross-repo features;
-  `one-pr-per-issue` or `direct-commit` only when explicitly authorized.
+- `delivery_mode`: `pull-request` by default. For a single repo or monorepo, use
+  one feature branch and PR. For true multi-repo work, every involved repo uses
+  the same branch name and opens its own PR. Use `direct-commit` only when
+  explicitly authorized.
 
-If a multi-context local-markdown repo has no accepted product/context or the
+If a multi-context local Markdown repo has no accepted product/context or the
 feature slug is not product/workspace namespaced according to tracker
 conventions, stop before PRD writing or issue writing and resolve that identity
 first. If the delivery mode is ambiguous because the feature might cross
@@ -190,21 +190,20 @@ issue splitting.
 Skip this step only in `issues-from-existing-prd` mode when the PRD is already
 durable and the user did not request a PRD update.
 
-Load `references/prd-phase.md` and pass:
+Load `references/prd-phase.md` and pass the phase handoff fields:
 
 ```text
 Plan-feature mode: <full-flow|prd-only|issues-from-existing-prd>
 
 Run authorization:
-- Persistent local artifact writes: <allowed|disallowed>, allowed only when the
-  `tracker_mode` is `local-markdown` or `orchestrator-local`, the
-  `effective_target` is `local-dry-run`, or the run explicitly requested a
-  local mirror.
+- Persistent local artifact writes: <allowed|disallowed>, allowed only when
+  `tracker_backend` is `local`, the effective target is a local dry run, or the
+  run explicitly requested a local mirror.
 - External tracker mutation: <allowed|disallowed>, based on explicit
   authorization in this run.
 - Hosted tracker body-file temp files: transient outside the repo and cleaned
   up after mutation.
-- Configured tracker: <tracker_mode from project-memory/agents/issue-tracker.md>.
+- Configured tracker backend: <tracker_backend from project-memory/agents/issue-tracker.md>.
 - Effective target for this run:
   <configured-tracker|local-dry-run|draft-publish-commands>.
 - Source PRD ref:
@@ -216,7 +215,7 @@ Planning identity:
 - workspace_path: <accepted workspace path, for monorepos/multi-context repos>
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
-- delivery_mode: <one-feature-branch|one-pr-per-repo|one-pr-per-issue|direct-commit>
+- delivery_mode: <pull-request|direct-commit>
 ```
 
 Require the PRD phase to return `source_prd_ref`. In `draft-publish-commands`
@@ -237,71 +236,36 @@ After the PRD is written, published, supplied as an existing durable PRD, or
 returned as a `draft-publish-commands` dry-run with a deterministic
 `source_prd_ref`, load `references/issue-phase.md`. In
 `draft-publish-commands` mode, the issue phase may only generate draft issue
-commands or bodies for inspection. It must not mutate external trackers or mark
-the generated issues agent-ready until the draft `Source PRD` ref is replaced
-with the hosted PRD number or durable local PRD path.
+commands or bodies for inspection. Draft commands may show the intended future
+mapped labels, but they are not executable agent-ready issues until the draft
+`Source PRD` ref is replaced with the hosted PRD number or durable local PRD
+path.
 
-Pass explicit run authorization:
+Pass the same phase handoff fields, with `source_prd_ref` resolved or carried
+from the draft handoff:
 
 ```text
 Plan-feature mode: <full-flow|issues-from-existing-prd>
 
-Run authorization:
-- Persistent local artifact writes: <allowed|disallowed>, allowed only when the
-  `tracker_mode` is `local-markdown` or `orchestrator-local`, the
-  `effective_target` is `local-dry-run`, or the run explicitly requested a
-  local mirror.
-- External tracker mutation: <allowed|disallowed>, based on explicit
-  authorization in this run.
-- Hosted tracker body-file temp files: transient outside the repo and cleaned
-  up after mutation.
-- Configured tracker: <tracker_mode from project-memory/agents/issue-tracker.md>.
-- Effective target for this run:
-  <configured-tracker|local-dry-run|draft-publish-commands>.
 - Source PRD ref:
   <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
-
-Planning identity:
-- feature_slug: <authoritative slug from plan-feature, PRD phase, or PRD path>
-- product_slug: <accepted product slug, for monorepos/multi-context repos>
-- workspace_path: <accepted workspace path, for monorepos/multi-context repos>
-- context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
-- project_slug: <accepted orchestrator project slug, for orchestrator modes>
-- delivery_mode: <mode recorded in the PRD Delivery Mode section>
 ```
 
 Require the issue phase to use the configured issue target, issue types,
-labels, title formats, PRD parent/sub-issue relationships, and GitHub
-coordination project label when those modes apply. The issue phase must run
+labels, title formats, PRD parent/sub-issue relationships, and related issue
+links when those modes apply. The issue phase must run
 `$plan-harder` once per generated implementation issue and verify that every
 `Parallelization` dependency resolves to a known issue ID in an acyclic graph
 after the final hardened issue bodies are assembled. If external mutation is
 disallowed, it must write to the effective local target or return draft publish
 commands instead.
 
-In orchestrator workspace mode, require generated issues to include affected
-repos, cross-repo contracts, integration gates, expected repo PR slots or
-pre-implementation placeholders, issue-level scheduling and closeout metadata,
-and completion instructions that require cross-repo integration proof before
-closing or moving to `issues/done/`. Generated placeholders are delivery
-expectations, not closeout proof; `$codex-orchestrator` records real PR links or
-equivalent integration proof during source closeout.
-Require every issue to copy the effective `Delivery mode` label from the PRD and
-mark it as feature-level inherited metadata. Do not duplicate the full PRD
-branch/PR details in each issue; use explicit issue-level delivery exceptions
-only when an issue intentionally differs from the feature-level mode.
-Require every generated implementation issue to include a
-`## Orchestrator Handoff` section. This section is the dispatchable issue-level
-contract `$codex-orchestrator` consumes after the issue is registered as a
-workstream. It must restate the source PRD, feature slug, delivery mode,
-affected repos or product scope, work scope, start rule, dependencies,
-validation, and closeout path from the issue body. It must not include worker
-authorization modes, worker surfaces, worker caps, checkpoint approval, or
-publication permission; `$codex-orchestrator` resolves those at runtime from
-the source graph, current session authority, and optional
-`project-memory/agents/orchestration-policy.md`.
-Do not add worker authorization fields to generated issues; worker capability
-decisions are an orchestration-time concern.
+Require generated implementation issues to copy the effective `Delivery mode`
+label from the PRD and include the `## Orchestrator Handoff` shape from
+`references/issue-body-template.md`. Workspace issues also need affected repos,
+cross-repo contracts, integration gates, expected repo PR slots or
+pre-implementation placeholders, and closeout proof requirements. Generated
+placeholders are delivery expectations, not closeout proof.
 
 If the issue phase discovers a product, domain, dependency, or
 acceptance-criteria blocker, pause issue writing and route the blocker back
@@ -341,7 +305,7 @@ Summarize:
 - Do not create PRDs or issues in locations not configured by
   `project-memory/agents/issue-tracker.md`.
 - Do not keep repo-local `.scratch/` or `project-memory/features/` copies for
-  GitHub/GitHub-coordination runs unless the user explicitly asked for a local
+  hosted tracker runs unless the user explicitly asked for a local
   mirror or the effective target is a local dry-run override.
 - Do not treat `needs-info` issues as agent-ready output; they are waiting for
   human/reporter input and must be re-triaged before implementation.
@@ -358,6 +322,6 @@ Summarize:
 - `references/issue-body-template.md`: generated implementation issue body
   template.
 - `references/vertical-slices.md`: issue splitting rules.
-- `references/full-flow-dry-run.md`: dry-run fixture for the
+- `references/full-flow-dry-run.md`: validation fixture for the
   `plan-feature` -> PRD phase -> issue phase -> `$codex-orchestrator`
   planning and orchestration handoff.

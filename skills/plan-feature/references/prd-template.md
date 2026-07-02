@@ -6,12 +6,9 @@ Use this shape unless the project already has a stronger local PRD format.
 
 Use these `delivery_mode` values in every PRD:
 
-- `one-feature-branch`: one shared feature branch and usually one draft PR for a
-  single repo or monorepo feature.
-- `one-pr-per-repo`: one feature branch and draft PR per affected repo for true
-  multi-repo work.
-- `one-pr-per-issue`: one branch and PR per generated issue, only for
-  explicitly isolated exceptions.
+- `pull-request`: feature branch plus PR delivery. In a single repo or monorepo,
+  use one feature branch and PR. In multi-repo work, every involved repo uses
+  the same branch name and opens its own PR.
 - `direct-commit`: direct commit path, only with explicit maintainer
   authorization.
 
@@ -71,13 +68,13 @@ What user or system problem this solves.
 
 ## Delivery Mode
 
-- Delivery mode: `one-feature-branch` for single-repo or monorepo work,
-  `one-pr-per-repo` for true multi-repo work, `one-pr-per-issue` only for
-  isolated exceptions, or `direct-commit` only with explicit authorization.
-- Branch naming: default to `feature/<feature-slug>`; for `one-pr-per-repo`,
-  use that branch name in each affected repo unless repo policy differs.
-- PR shape: one draft PR for the feature, one draft PR per affected repo, one
-  PR per issue by exception, or no PR only for an authorized direct commit.
+- Delivery mode: `pull-request` by default, or `direct-commit` only with
+  explicit authorization.
+- Branch naming: default to `feature/<feature-slug>`; for multi-repo work, use
+  that same branch name in each affected repo unless repo policy differs.
+- PR shape: one draft PR for the feature in a single repo or monorepo; one draft
+  PR per affected repo in multi-repo work; no PR only for an authorized direct
+  commit.
 - Integration proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
 - Issue inheritance: generated issues link this PRD with `Source PRD`, copy the
@@ -88,9 +85,9 @@ What user or system problem this solves.
 
 ## Cross-Repo Contracts
 
-- For orchestrator workspace PRDs only: API shape, schema, version, migration,
-  fixture, deploy, or compatibility contracts that issue splitting must
-  preserve. Use `N/A` for ordinary single-repo PRDs.
+Include only when multiple repositories or packages must remain compatible:
+API shape, schema, version, migration, fixture, deploy, or compatibility
+contracts that issue splitting must preserve.
 
 ## Acceptance Criteria
 
@@ -111,9 +108,6 @@ What user or system problem this solves.
 
 ## Integration Gates
 
-- For orchestrator workspace PRDs: proof required before a vertical issue can
-  move to `issues/done/` or close in the coordination tracker.
-- For single-repo or monorepo PRDs: validation or release proof that affects
-  issue splitting, or `N/A` when no separate integration proof requirement
-  exists.
+Include only when separate validation, release, or cross-repo proof affects issue
+splitting or closeout.
 ```

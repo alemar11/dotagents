@@ -56,11 +56,11 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   surface choices to PRDs, generated issues, issue files, hosted issue bodies,
   or draft publish commands. `$codex-orchestrator` resolves those per
   workstream and session.
-- Do not add checkpoint approval, auto-approval, publication permission, or
-  issue mutation permission to `## Orchestrator Handoff`. Those are runtime
-  authorization decisions owned by `$codex-orchestrator`.
-- Treat `project-memory/agents/orchestration-policy.md` as runtime-only
-  orchestration configuration. Do not copy its values into PRDs, generated
+- Do not add checkpoint approval, publication permission, or issue mutation
+  permission to `## Orchestrator Handoff`. Those are runtime authorization
+  decisions owned by `$codex-orchestrator`.
+- Treat `$codex-orchestrator` session settings as runtime-only. Do not copy
+  worker surfaces, worker counts, or checkpoint choices into PRDs, generated
   issues, local issue files, hosted issue bodies, or draft publish commands.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
   behavior in draft command runs, use `$project-memory`
@@ -86,11 +86,13 @@ Use these values in generated issue bodies:
   unlocks later work after completion; `root-integrated` stays in the root
   thread.
 - `closeout_mode`: `feature-pr-closes-issue`, `repo-pr-closes-issue`,
-  `issue-pr-closes-issue`, `direct-commit-closes-issue`, or
-  `local-done-move-after-proof` names the concrete completion path.
-- `integration_mode`: `shared-feature-branch`, `repo-pr`, `issue-pr`,
-  `direct-commit`, `inspect-only`, or `omitted` records how issue output lands
-  when it is not obvious from the PRD.
+  `direct-commit-closes-issue`, or `local-done-move-after-proof` names the
+  concrete completion path. Use `local-done-move-after-proof` for local
+  markdown issues even when the delivery mode is `direct-commit`;
+  `direct-commit-closes-issue` is only for hosted trackers or other sources
+  where an authorized final commit can close the source item.
+- `integration_mode`: `single-repo-pr`, `repo-pr`, `direct-commit`, or
+  `omitted` records how issue output lands when it is not obvious from the PRD.
 
 `delivery_mode` is copied from the PRD. `issue_type` and `triage_state` are
 mapped through `project-memory/agents/triage-labels.md`. Lower-kebab-case
@@ -107,7 +109,7 @@ Find or ask for the PRD source:
 - `.scratch/<feature-slug>/PRD.md`,
 - a GitHub PRD issue,
 - `projects/<project-slug>/features/<feature-slug>/PRD.md`,
-- a GitHub coordination-repo PRD issue,
+- a linked GitHub workspace PRD issue,
 - a handoff `source_prd_ref` from the PRD phase or an existing durable PRD
   source,
 - pasted PRD text,
@@ -121,8 +123,8 @@ Also inspect:
 - `TRANSLATION.md`, when present for the selected context,
 - `project-memory/adr/`,
 - orchestrator workspace docs such as `projects/<project>/PROJECT.md`,
-  `projects/<project>/repos/*.md`, and feature `integration-gates.md` when the
-  tracker config uses orchestrator mode,
+  `projects/<project>/repos/*.md`, and feature `integration-gates.md` when
+  planning from a local orchestrator workspace,
 - nearby source files, tests, and docs relevant to the PRD.
 
 If there is no PRD-quality source, stop and ask the user to provide one or run
@@ -136,16 +138,14 @@ Resolve and carry the planning identity before splitting:
   `context_file`.
 - For orchestrator workspaces: `project_slug` and affected repos.
 - `delivery_mode`: inherit from the PRD `## Delivery Mode` section. If the PRD
-  lacks it, infer `one-feature-branch` only for unambiguous single-repo or
-  monorepo work and `one-pr-per-repo` only for unambiguous orchestrator or
-  cross-repo work; otherwise stop and require the PRD delivery mode to be
-  resolved.
+  lacks it, infer `pull-request` when repo shape and affected repo set are
+  unambiguous; otherwise stop and require the PRD delivery mode to be resolved.
 - `source_prd_ref`: use the durable PRD issue number, local PRD path, or stable
   draft ref passed by the PRD phase or existing durable PRD source. In
   `draft-publish-commands` mode, keep the draft ref in returned bodies but
   include the replacement step required before hosted mutation.
 
-If a multi-context local-markdown repo lacks an accepted product/context or the
+If a multi-context local Markdown repo lacks an accepted product/context or the
 feature slug can collide with another product according to tracker conventions,
 stop and resolve that identity before writing issues.
 
@@ -261,27 +261,24 @@ Use `project-memory/agents/issue-tracker.md` for the target, and read
 `$project-memory` `references/tracker-publishing.md` for shared
 effective-target, temporary body-file, and `source_prd_ref` rules:
 
-- `Tracker mode: github`: create issues through `$github-issues`, attach them
+- `Tracker backend: github`: create issues through `$github-issues`, attach them
   to the PRD parent when the PRD source is a GitHub issue, set the mapped
   `task` issue type when available, then apply mapped labels such as
   `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
   `.scratch/` mirror unless the user explicitly requested one.
-- `Tracker mode: orchestrator-github`: create vertical feature issues in the
-  configured coordination repo through `$github-issues`, using the PRD parent
-  relationship and the required `<project-slug>` label. Derive
-  `<project-slug>` from the PRD/project context or ask for it, ensure the label
-  exists in the coordination repo, and apply it to every generated vertical
-  feature issue. Repo-local implementation PRs or child issues are linked from
-  the coordination issue; repo-local child issues are optional in v1. Do not
-  create local orchestrator feature artifacts or `.scratch/` mirrors unless the
-  user explicitly requested one.
-- `Tracker mode: local-markdown`: write to the configured repo-local issue
+- GitHub workspace issues: create linked repo or partial issues through
+  `$github-issues`, using PRD parent/sub-issue relationships where available.
+  Derive `<project-slug>` and affected repos from the PRD/project context or ask
+  for them. Repo-local implementation PRs or child issues link back to the
+  relevant PRD or partial issue. Do not create local orchestrator feature
+  artifacts or `.scratch/` mirrors unless the user explicitly requested one.
+- `Tracker backend: local`: write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
   and `Status:` lines near the top and a heading that follows the local issue
   title convention `<feature-slug>: <NN> <vertical outcome>`. Use the
   authoritative feature slug from the handoff or PRD path; derive it from the
   PRD title only when no accepted slug/path exists.
-- `Tracker mode: orchestrator-local`: write to
+- Local workspace issues: write to
   `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` with
   `Type:` and `Status:` lines near the top and a heading that follows the local
   issue title convention `<feature-slug>: <NN> <vertical outcome>`. Create the
@@ -290,17 +287,12 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   `PROJECT.md`, `repos/*.md`, and `integration-gates.md`; it does not create or
   refresh those supporting files unless the user explicitly asks for that
   broader orchestrator artifact update.
-- Other tracker: follow the repo-specific instructions.
-
-For GitHub PRDs and GitHub coordination PRDs, every generated implementation or
-vertical feature issue must be attached to the PRD issue as a sub-issue. If an
+For GitHub PRDs, every generated implementation or vertical feature issue must
+be attached to the PRD issue as a sub-issue when the tracker supports it. If an
 issue is created before the parent relationship is set, use `$github-issues` to
-attach it afterward. Keep `Source PRD: #<prd-number>` in the issue body as
-well.
-
-For GitHub coordination PRDs, every generated vertical feature issue must share
-the same project label as the PRD parent issue, named exactly `<project-slug>`.
-This label is separate from issue type and workflow-state labels.
+attach it afterward. Keep `Source PRD: #<prd-number>` in the issue body as well.
+For multi-repo work, related partial PRDs and repo issues must link to each
+other by URL or issue number.
 
 When GitHub issue types are available, create or update each implementation
 issue with the mapped `task` type, usually `Task`. If issue types are disabled
@@ -314,28 +306,12 @@ close. Placeholders are delivery expectations for scheduling, not completion
 proof; `$codex-orchestrator` records real PR links or equivalent integration
 proof during source closeout.
 
-Every generated implementation issue must include:
-
-```markdown
-## Orchestrator Handoff
-
-- Source PRD: <same value as the issue header>
-- Feature slug: <authoritative feature slug>
-- Delivery mode: <effective delivery mode and inheritance or override source>
-- Affected repos or product scope: <repo slugs, workspace path, or current repository>
-- Scope: <one or more bullets describing only this issue's implementation slice>
-- Start rule: <independent | depends-on <issue-id>[, <issue-id>] | blocks <issue-id>[, <issue-id>] | root-integrated>
-- Dependencies: <None or generated issue IDs plus reason>
-- Validation: <commands, checks, or proof required for this issue>
-- Closeout: <feature-pr-closes-issue | repo-pr-closes-issue | issue-pr-closes-issue | direct-commit-closes-issue | local-done-move-after-proof>
-```
-
-The handoff may repeat structured data from `## Delivery`, `## Validation`,
+Every generated agent-ready implementation issue must include the
+`## Orchestrator Handoff` shape from `references/issue-body-template.md`. The
+handoff may repeat structured data from `## Delivery`, `## Validation`,
 `## Completion`, and `## Dependencies` so an orchestrator can register the issue
-without inferring from loose prose. It must not contain worker authorization
-modes, worker surfaces, worker caps, auto-approval policy, publication
-authority, issue mutation authority, or values from
-`project-memory/agents/orchestration-policy.md`.
+without inferring from loose prose. It must not contain worker authorization,
+publication, issue mutation, or orchestration session settings.
 
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
@@ -344,11 +320,11 @@ metadata without duplicating the full PRD branch and PR details:
   Use a stable `draft-prd:<...>` ref only for draft command output before
   hosted mutation.
 - `Delivery mode`: required. Copy the effective value from the PRD and mark it
-  as feature-level, such as `one-feature-branch (feature-level, inherited from
-  Source PRD)`. Feature-level means the mode applies to the whole Source PRD
-  feature, not only this generated issue. For an exception, record the
-  issue-level override and authorization reason, such as `one-pr-per-issue
-  (issue-level override, authorized by <owner/date>)`.
+  as feature-level, such as `pull-request (feature-level, inherited from Source
+  PRD)`. Feature-level means the mode applies to the whole Source PRD feature,
+  not only this generated issue. For an exception, record the issue-level
+  override and authorization reason, such as `direct-commit (issue-level
+  override, authorized by <owner/date>)`.
 - `Parallelization`: required. Use `independent`,
   `depends-on <issue-id>[, <issue-id>]`, `blocks <issue-id>[, <issue-id>]`, or
   `root-integrated`.
@@ -356,19 +332,33 @@ metadata without duplicating the full PRD branch and PR details:
   dependency reason.
 - `Closeout`: required. State the concrete completion path, such as
   `feature-pr-closes-issue`, `repo-pr-closes-issue`,
-  `issue-pr-closes-issue`, `direct-commit-closes-issue`, or
-  `local-done-move-after-proof`.
+  `direct-commit-closes-issue`, or `local-done-move-after-proof`.
+  For local markdown trackers, use `local-done-move-after-proof` even when
+  `Delivery mode` is `direct-commit`.
 - `Integration mode`: optional for ordinary issues that inherit from the PRD.
   Include it when the issue is cross-repo, exceptional, or otherwise not
   obvious from the PRD delivery mode.
 
-For ordinary single-repo or monorepo `one-feature-branch` issues, the
+### Validation Commands
+
+Generated issues should name the preferred validation command and, when repo
+evidence suggests runners may differ by environment, an equivalent fallback.
+Examples: prefer the repo script in `package.json`, `pyproject.toml`, `Makefile`,
+or project docs; include `pytest` as a fallback when `python -m pytest` may be
+unavailable because the Python shim or module path is missing.
+
+If the preferred command fails only because the command wrapper is unavailable
+and an equivalent fallback passes, record both outcomes in validation proof
+instead of treating the issue as blocked. Do not hide real test failures behind
+a fallback.
+
+For ordinary single-repo or monorepo `pull-request` issues, the
 `## Delivery` section can be as small as:
 
 ```markdown
 ## Delivery
 
-- Delivery mode: one-feature-branch (feature-level, inherited from Source PRD)
+- Delivery mode: pull-request (feature-level, inherited from Source PRD)
 - Parallelization: independent
 - Closeout: feature-pr-closes-issue
 ```
@@ -419,9 +409,9 @@ final issue body for machine-local absolute paths and replace them with
 sanitized evidence references. Treat any remaining unsanitized developer path as
 a blocker for hosted publication or shared draft command output.
 
-If the configured target is GitHub or GitHub coordination but external mutation
-is not authorized, do not mutate GitHub. Ask `$github-issues` for exact draft
-commands, or use the configured local dry-run target when one is recorded. In
+If the configured target is GitHub but external mutation is not authorized, do
+not mutate GitHub. Ask `$github-issues` for exact draft commands, or use the
+configured local dry-run target when one is recorded. In
 `draft-publish-commands` mode, generated issue bodies may use
 `Source PRD: draft-prd:<...>` only in returned draft output; the publish plan
 must create the PRD first, capture the hosted PRD number, replace the draft ref

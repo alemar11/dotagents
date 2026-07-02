@@ -13,7 +13,7 @@ REMOVED_ISSUE_PATH = "skills/to" + "-issues"
 LEGACY_WORKER_AUTH_KEY = "default" + "_worker_authorization"
 LEGACY_WORKER_AUTH_HEADING = "Worker " + "Authorization Defaults"
 LEGACY_DEFAULT_WORKER_AUTH = "Default worker " + "authorization"
-ORCHESTRATION_POLICY_PATH = "project-memory/agents/orchestration-policy.md"
+ORCHESTRATION_POLICY_PATH = "project-memory/agents/orchestration" + "-policy.md"
 STALE_NO_GATES_REMAIN = "no " + "gates remain"
 STALE_GATES_RESOLVED = "gates " + "resolved or deferred"
 STALE_REPO_PR_PLACEHOLDERS = "repo PR links " + "or placeholders"
@@ -105,39 +105,32 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("Replace `Source PRD: draft-prd:<...>`", contract)
         self.assertIn("Do not dispatch implementation workers", contract)
 
-    def test_project_memory_owns_orchestration_policy_setup(self) -> None:
+    def test_project_memory_does_not_own_orchestration_policy_setup(self) -> None:
         project_memory = read("project-memory/SKILL.md")
         setup_workflow = read("project-memory/references/setup-workflow.md")
-        policy = read("project-memory/references/orchestration-policy.md")
         orchestrator = read("codex-orchestrator/SKILL.md")
         worker = read("codex-orchestrator/references/worker.md")
         ledger = read("codex-orchestrator/references/ledger.md")
 
-        self.assertIn(ORCHESTRATION_POLICY_PATH, project_memory)
-        self.assertIn("orchestration-policy", setup_workflow)
+        self.assertNotIn(ORCHESTRATION_POLICY_PATH, project_memory)
+        self.assertNotIn("orchestration-policy", setup_workflow)
         self.assertIn("typed configuration tables", project_memory)
-        self.assertIn("| Key | Type | Value | Allowed values | Meaning |", policy)
-        self.assertIn("| `auto_dispatch` | boolean | `false` |", policy)
-        self.assertIn(WORKER_SURFACES_KEY, policy)
-        self.assertIn(AUTHORIZATION_CEILING_KEY, policy)
-        self.assertIn("optional runtime configuration", policy)
-        self.assertIn(ORCHESTRATION_POLICY_PATH, orchestrator)
-        self.assertIn("policy-auto-dispatched", worker)
-        self.assertIn("policy-auto-dispatched", ledger)
+        self.assertNotIn(ORCHESTRATION_POLICY_PATH, orchestrator)
+        self.assertIn("session-scoped worker settings", worker)
+        self.assertNotIn("policy-auto-dispatched", worker)
+        self.assertNotIn("policy-auto-dispatched", ledger)
         self.assertIn("owner-approved", ledger)
 
     def test_issue_tracker_templates_stay_tracker_focused(self) -> None:
         for relative in (
             "project-memory/references/issue-tracker-github.md",
             "project-memory/references/issue-tracker-local.md",
-            "project-memory/references/issue-tracker-orchestrator-github.md",
-            "project-memory/references/issue-tracker-orchestrator-local.md",
         ):
             contents = read(relative)
             with self.subTest(file=relative):
                 self.assertIn("## Configuration", contents)
                 self.assertIn("| Key | Type | Value | Allowed values | Meaning |", contents)
-                self.assertIn(ORCHESTRATION_POLICY_PATH, contents)
+                self.assertNotIn(ORCHESTRATION_POLICY_PATH, contents)
                 self.assertIn("Tracker setup records artifact routing", contents)
                 for field in RUNTIME_POLICY_FIELDS:
                     self.assertNotIn(field, contents)
@@ -153,7 +146,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
         self.assertIn("Do not include worker authorization defaults", plan_feature)
-        self.assertIn(ORCHESTRATION_POLICY_PATH, plan_feature)
+        self.assertNotIn(ORCHESTRATION_POLICY_PATH, plan_feature)
         self.assertIn("planning blockers", plan_feature)
         self.assertIn("issue lifecycle comments, labels, direct closure", plan_feature)
         self.assertNotIn(STALE_NO_GATES_REMAIN, plan_feature)
@@ -161,11 +154,12 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("references/prd-phase.md", plan_feature)
         self.assertIn("references/issue-phase.md", plan_feature)
         self.assertIn("tracker-publishing.md", prd_phase)
+        self.assertIn("## PRD Target Model", prd_phase)
         self.assertIn("PRD body fingerprint", prd_phase)
         self.assertIn("PRD planning-artifact publication", prd_phase)
         self.assertIn("tracker-publishing.md", issue_phase)
         self.assertIn("Do not add worker authorization defaults", issue_phase)
-        self.assertIn(ORCHESTRATION_POLICY_PATH, issue_phase)
+        self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_phase)
         self.assertIn("final hardened issue bodies", issue_phase)
         self.assertIn("machine-local absolute paths", issue_phase)
         self.assertIn("generated planning issue publication", issue_phase)
@@ -179,7 +173,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("# <feature-slug>: <NN> <vertical outcome>", issue_template)
         self.assertIn("## Orchestrator Handoff", issue_template)
         self.assertIn("Do not include worker authorization modes", issue_template)
-        self.assertIn(ORCHESTRATION_POLICY_PATH, issue_template)
+        self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_template)
         self.assertIn("Source PRD: [path, issue number, or stable draft ref;", issue_template)
         self.assertIn("never for agent-ready", issue_template)
         self.assertIn("portable references", issue_template)
@@ -193,6 +187,13 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("resolved per workstream", prd_delivery)
         self.assertIn("source lifecycle and closeout mutations are orchestrator-owned", prd_delivery)
         self.assertIn("Repo PR placeholders copied from PRDs", prd_delivery)
+        self.assertIn("direct-commit` proves delivery", prd_delivery)
+        self.assertIn("issues/done/", prd_delivery)
+        self.assertIn("Validation Commands", issue_phase)
+        self.assertIn("equivalent fallback", issue_phase)
+        self.assertIn("local-done-move-after-proof", issue_phase)
+        self.assertIn("Fallback:", issue_template)
+        self.assertIn("commit/proof is recorded", issue_template)
 
     def test_plan_feature_outputs_do_not_define_runtime_policy(self) -> None:
         for relative in (
@@ -214,8 +215,12 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertIn("Authorization resolution: per-workstream", ledger)
         self.assertIn("per workstream and session", worker)
-        self.assertIn("Ignore the legacy project-memory worker-authorization", orchestrator)
+        self.assertIn("Worker authorization is resolved only by the root orchestrator", orchestrator)
         self.assertIn("Authorization modes:", worker)
+        self.assertIn("Worker evidence", ledger)
+        self.assertIn("Worker evidence", worker)
+        self.assertIn("parallelism=<parallel|sequential|root-owned|simulated>", ledger)
+        self.assertIn("fallback reason", orchestrator)
 
     def test_project_memory_no_longer_defines_worker_auth_defaults(self) -> None:
         for path in iter_active_text_files():

@@ -16,24 +16,24 @@ Source PRD: [path, issue number, or stable draft ref; use `draft-prd:<...>`
 only for draft command output before hosted mutation, never for agent-ready
 implementation issues]
 
-Affected Repos: [for orchestrator issues, repo slugs or `N/A`]
+Affected Repos: [include for workspace issues; otherwise omit]
 
 Product Scope: [for monorepos, workspace path and selected context file; for
-single-repo issues, `current repository`; for orchestrator issues, use
+single-repo issues, `current repository`; for workspace issues, use
 `Affected Repos`]
 
 ## Delivery
 
-- Delivery mode: [one-feature-branch | one-pr-per-repo | one-pr-per-issue |
-  direct-commit] ([feature-level, inherited from Source PRD] or [issue-level
-  override with authorization reason])
+- Delivery mode: [pull-request | direct-commit] ([feature-level, inherited from
+  Source PRD] or [issue-level override with authorization reason])
 - Parallelization: [independent | depends-on <issue-id>[, <issue-id>] | blocks
   <issue-id>[, <issue-id>] | root-integrated]
 - Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
-  issue-pr-closes-issue | direct-commit-closes-issue |
-  local-done-move-after-proof]
+  direct-commit-closes-issue | local-done-move-after-proof; use
+  local-done-move-after-proof for local markdown even with direct-commit
+  delivery]
 - Integration mode: [omitted when obvious from Source PRD; otherwise
-  shared-feature-branch | repo-pr | issue-pr | direct-commit | inspect-only]
+  single-repo-pr | repo-pr | direct-commit]
 
 ## Orchestrator Handoff
 
@@ -50,13 +50,13 @@ single-repo issues, `current repository`; for orchestrator issues, use
 - Dependencies: [generated issue IDs and reason, or `None`.]
 - Validation: [commands, checks, or proof required for this issue.]
 - Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
-  issue-pr-closes-issue | direct-commit-closes-issue |
-  local-done-move-after-proof]
+  direct-commit-closes-issue | local-done-move-after-proof; use
+  local-done-move-after-proof for local markdown even with direct-commit
+  delivery]
 
-Do not include worker authorization modes, worker surfaces, worker caps,
-checkpoint approval, auto-approval policy, publication authority, or issue
-mutation authority in this section. Do not copy values from
-`project-memory/agents/orchestration-policy.md` into generated issues.
+Do not include worker authorization modes, worker surfaces, worker counts,
+checkpoint approval, publication authority, issue mutation authority, or
+orchestration session settings in this section.
 `$codex-orchestrator` resolves runtime authorization after registering the
 issue as a workstream.
 
@@ -74,17 +74,16 @@ issue as a workstream.
 
 ## Cross-Repo Notes
 
-[For orchestrator issues only: affected repos, interface contracts,
+[Include only for workspace issues: affected repos, interface contracts,
 existing repo PR links, expected repo PR slots or pre-implementation
-placeholders, and validation order. Use `N/A` for ordinary single-repo issues.
-Placeholders are scheduling expectations, not completion proof; orchestrator
-closeout records real PR links or equivalent integration proof.]
+placeholders, and validation order. Placeholders are scheduling expectations,
+not completion proof; orchestrator closeout records real PR links or equivalent
+integration proof.]
 
 ## Integration Gates
 
-[For orchestrator issues only: named integration gates or a link to
-`integration-gates.md`, plus proof required before completion. Use `N/A` for
-ordinary single-repo issues.]
+[Include only when separate validation, release, or cross-repo proof affects
+completion.]
 
 ## Requirements
 
@@ -105,7 +104,9 @@ sections.]
 
 ## Validation
 
-- [Command, test, or manual check.]
+- Preferred: [Command, test, or manual check.]
+- Fallback: [Equivalent runner when the preferred command wrapper is
+  unavailable, or `None`.]
 
 ## Completion
 
@@ -121,7 +122,8 @@ When all acceptance criteria pass and validation is complete:
   `direct-commit` or another explicit authorization. Do not close the parent PRD
   unless the maintainer says the whole PRD is complete.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
-  `issues/done/` on demand. For orchestrator workspace issues, move it only
+  `issues/done/` on demand after validation and, for `direct-commit`, after the
+  commit/proof is recorded. For orchestrator workspace issues, move it only
   after cross-repo integration proof is recorded. Do not delete the file or add
   a `done` status.
 

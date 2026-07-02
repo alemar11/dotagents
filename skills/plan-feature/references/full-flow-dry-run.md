@@ -14,12 +14,12 @@ commands instead.
 ## Setup Snapshot
 
 ```text
-tracker_mode: github
+tracker_backend: github
 effective_target: draft-publish-commands
 local_artifact_writes: disallowed
 external_tracker_mutation: disallowed
 feature_slug: account-settings-export
-delivery_mode: one-feature-branch
+delivery_mode: pull-request
 source_prd_ref: draft-prd:account-settings-export
 prd_body_fingerprint: sha256:7f4a9c21d003
 ```
@@ -38,9 +38,9 @@ prd_body_fingerprint: sha256:7f4a9c21d003
 5. `$codex-orchestrator` may inspect the resulting issue graph in dry-run mode
    but must not dispatch implementation workers, commit, push, create PRs, or
    close issues from the draft PRD ref.
-6. Any `project-memory/agents/orchestration-policy.md` values remain runtime
-   policy for `$codex-orchestrator`; they are not copied into the PRD, generated
-   issue bodies, `## Orchestrator Handoff`, or draft publish commands.
+6. Any `$codex-orchestrator` session settings remain runtime-only; they are not
+   copied into the PRD, generated issue bodies, `## Orchestrator Handoff`, or
+   draft publish commands.
 
 ## Expected Draft Publish Plan
 
@@ -52,7 +52,9 @@ prd_body_fingerprint: sha256:7f4a9c21d003
   `Source PRD: #$PRD_NUMBER` before creating hosted implementation issues.
 - Attach each generated implementation issue to the PRD parent when the tracker
   supports parent/sub-issues.
-- Keep `ready-for-agent` labels lowercase through the tracker mapping.
+- Draft commands may include the intended future `ready-for-agent` labels, but
+  the issues are not executable agent-ready output until `Source PRD` is replaced
+  with the durable PRD issue number.
 - Return exact commands without executing them.
 
 ## Failure Conditions
@@ -64,8 +66,8 @@ prd_body_fingerprint: sha256:7f4a9c21d003
   ref alone.
 - Draft PRDs, generated issues, and draft publish commands include worker
   authorization fields or worker capability modes.
-- Draft PRDs, generated issues, or draft publish commands include
-  orchestration-policy values such as worker surfaces, worker caps, checkpoint
-  approval, publication authority, or issue mutation authority.
+- Draft PRDs, generated issues, or draft publish commands include orchestration
+  session values such as worker surfaces, worker counts, checkpoint approval,
+  publication authority, or issue mutation authority.
 - Generated issues use a prose `Source PRD` such as the PRD title when a stable
   draft ref is available.
