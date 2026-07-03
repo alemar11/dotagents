@@ -16,70 +16,15 @@ For the repo-wide pass, inspect the local skills and plugins, choose the ones wi
 Treat domain-refresh work as explicit tasks, not default behavior. For brand-new skills, start with `$skill-creator`; this skill is for maintaining and integrating existing skill and plugin packages.
 
 ## User-facing Capability Summary
-If the user asks what this skill can do, answer with these two capability groups:
-1) Maintain one or more existing skills or plugins:
-   - Inspect reusable and project-local skills for actionable drift.
-   - Maintain targeted skills through `SKILL.md`, `agents/openai.yaml`, `references/*.md`, and directly coupled repo docs.
-   - Compare and update local `SKILL.md`, `agents/openai.yaml`, `README.md`, and `AGENTS.md` when drift is found.
-   - Review skill descriptions for prompt-budget pressure, selection value, and drift from `agents/openai.yaml` or README wording.
-   - Review instruction density and propose lower-instruction equivalents without refactoring until the user approves.
-   - Audit which skills are Codex-dependent versus portable and tighten runtime-tool wording where needed.
-   - Run consistency checks and report `PASS`, `PASS (NOOP)`, or `FAIL`.
-   - Keep repo-local plugin manifests, marketplace metadata, and coupled repo docs aligned when plugin layout or naming changes.
-2) Run skill-specific maintainer workflows:
-   - Refresh bundled Swift-DocC authored sources and validate the fast-path reference layer.
-   - Refresh the bundled Swift API Design guideline source and validate the thin reference layer.
-   - Review TanStack Intent coverage for `skills/tanstack/`, update the reusable skill plus `references/` layout when new first-party Intent surfaces appear, and refresh the local fetch-source mapping for current TanStack package or doc versions.
-   - Compare the local TanStack skill portfolio against `tanstack-skills/tanstack-skills/plugins`, map missing product-level coverage into the single reusable skill, and verify product details against TanStack-owned docs.
-   - Check the current Codex worker/thread tool surface so `skills/codex-orchestrator/` stays aligned with how subagents are spawned and Codex App threads are created.
-   - Refresh the bundled OKF spec for `skills/okf/` from the official GoogleCloudPlatform knowledge-catalog repository and validate the runtime OKF reference layer.
-   - Keep regeneration mechanics and maintainer-only internals out of runtime skills.
+If the user asks what this skill can do, answer with two capability groups:
 
-## Available Tasks (User Menu)
-When the user asks what this skill can do, offer this task list:
-1) `maintain skills`
-   - Inspect one or more skills or plugins, ensure there is no meaningful drift, and compare or update local `SKILL.md`, `agents/openai.yaml`, `.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`, `README.md`, and `AGENTS.md` as needed.
-   - With no named targets, default scope is all local skills and repo-local plugins in this repository.
-   - With named targets, keep the pass targeted to those skills or plugins.
-   - With explicit metadata/docs wording, stay in metadata-only alignment mode.
-   - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short descriptions, and README one-liners in metadata drift and prompt-budget checks.
-   - Finish with audit and release-style reporting when the scope is broader than metadata-only alignment.
-2) `audit consistency`
-   - Run structure, rules, and reference checks across the repo or the touched skills.
-3) `review instruction density`
-   - Inspect one or more existing skills or plugins and identify where the same runtime behavior can be achieved with fewer instructions.
-   - Classify each proposal as `safe trim`, `move to reference`, `behavior-risk`, or `leave as-is`.
-   - Return a read-only proposal first; do not refactor, edit, or commit compaction changes until the user explicitly approves that refactor.
-4) `review skill descriptions`
-   - Inspect `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short descriptions, and README one-liners for length, clarity, selection value, and alignment.
-   - Prefer compact descriptions that identify purpose and trigger family; keep detailed trigger rules and workflow contracts in `SKILL.md` sections or references.
-   - Return proposed wording first when behavior or invocation boundaries could change; apply safe metadata trims directly during approved maintenance passes.
-5) `audit codex dependencies`
-   - Verify which skills are Codex-dependent versus portable, keep the repo inventory current, and ensure Codex-specific tools or filesystem contracts are named precisely.
-6) `refresh swift-docc references`
-   - Check the bundled Swift-DocC manifest, refresh the local `DocCDocumentation.docc` asset tree when stale, and validate or tighten the local `references/*.md` fast paths.
-7) `refresh swift-api-design references`
-   - Check the bundled Swift API Design manifest, refresh the local guideline source file when stale, and validate the local `references/*.md` routing layer.
-8) `refresh tanstack intent coverage`
-   - Review the current TanStack Intent registry and relevant TanStack package skill pages for `skills/tanstack/`.
-   - Update local skill metadata, `$tanstack` routing, `references/*.md` fast paths, and related docs only when newly shipped first-party Intent coverage materially changes the right guidance.
-   - Use the current TanStack skill layout: `$tanstack` is the primary entrypoint, with dense product and domain slices living under `references/` instead of separate narrow skill directories.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-9) `refresh tanstack skills coverage`
-   - Compare local `skills/tanstack/` product-level references against the upstream `tanstack-skills/tanstack-skills` plugin tree.
-   - Ignore upstream bundle aliases such as `tanstack-all`, `tanstack-core`, `tanstack-data`, and `tanstack-ui` unless the local reusable-skill packaging model intentionally changes.
-   - Verify product-specific API and best-practice details against TanStack-owned docs before updating local runtime guidance.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-10) `refresh codex tool surface`
-   - Inspect the currently exposed Codex subagent and Codex App thread tools, including spawn, wait, send/resume/close, create-thread, read/rename/archive/handoff, and related lifecycle operations.
-   - Compare the discovered surface against `skills/codex-orchestrator/` runtime requirements, worker-surface rules, and prompt templates.
-   - Update `codex-orchestrator` only when the actual tool names, visibility behavior, lifecycle capabilities, or authorization boundaries have materially changed.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-11) `refresh okf spec`
-   - Check `skills/okf/assets/manifest.json` and the bundled official spec copy against `GoogleCloudPlatform/knowledge-catalog/okf/SPEC.md`.
-   - Refresh `skills/okf/assets/spec.md` and the manifest when stale.
-   - Validate the OKF runtime skill shape, reference links, CLI executable, and tests.
-   - Keep this task explicit; do not fold it into generic repo-wide maintenance.
+1. Maintain existing skills or plugins through targeted package/docs/metadata
+   updates, description and instruction-density reviews, consistency checks, and
+   Codex-dependency audits.
+2. Run explicit skill-specific refresh workflows for Swift-DocC, Swift API
+   Design, TanStack coverage, Codex worker/thread surfaces, and OKF.
+
+For the exact user-facing task menu, open `references/task-menu.md`.
 
 ## Trigger Rules
 Use this skill when users ask to:
@@ -122,6 +67,7 @@ Use this skill when users ask to:
 ## References
 
 - `references/maintenance-router.md`: route the request to the correct maintenance workflow first.
+- `references/task-menu.md`: exact user-facing task menu and capability details.
 - `references/run-maintenance.md`: use for proactive repo maintenance across one or more existing skills or plugins.
 - `references/skill-upgrade.md`: use for scoped improvements to one or more existing skills or plugins.
 - `references/metadata-sync.md`: use for `SKILL.md`, `agents/openai.yaml`, and repo-doc alignment.

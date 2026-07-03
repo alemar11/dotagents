@@ -44,23 +44,9 @@ This skill only handles GitHub Issues.
 - Treat direct user instructions such as create, publish, or open the issue as
   mutation authority for the requested GitHub issue operation unless the same
   request explicitly says dry run, draft only, local only, or do not mutate.
-- Resolve legacy tracker write policy from `tracker_writes` when it is present:
-  - `disabled`: do not write tracker artifacts; return exact draft commands and
-    issue bodies instead.
-  - `prompt`: when issue-ready PRD/task content exists, ask the user
-    immediately whether to write it to the configured tracker target.
-  - `auto`: write issue-ready content to the configured tracker target as soon
-    as repository context, duplicate checks, labels, types, and relationships
-    are resolved.
-- Use `tracker_mode` to identify the tracker target:
-  - `github`: create or edit GitHub issues through this skill.
-  - `local`: do not create GitHub issues unless the user explicitly supplies a
-    GitHub target; local artifact writes belong to the caller's local tracker
-    workflow.
-- For legacy tracker configs without `tracker_writes`, treat
-  `tracker_backend=github` or `tracker_mode=github` as the target. If a
-  no-mutation override is present, draft commands only; otherwise follow the
-  user or calling workflow's create/publish/open instruction.
+- Resolve compact and legacy tracker write policy through
+  `references/workflows.md`; keep the top-level contract focused on the final
+  write mode and requested GitHub operation.
 - Do not create new label taxonomy unless the repo's tracker configuration or
   user explicitly asks for it.
 
@@ -70,15 +56,13 @@ This skill only handles GitHub Issues.
    - current checkout repo,
    - explicit `--repo <owner>/<repo>`,
    - or a target repository supplied by the user or calling workflow.
-2. Resolve the effective target from the user request or calling workflow
-   handoff. `tracker_backend=github` with `effective_target=configured-tracker`
-   means create or update the requested GitHub issues.
-3. If the request, handoff, or legacy `tracker_writes: disabled` policy says
-   dry run, draft only, local only, or do not mutate, return draft issue bodies
-   and exact `gh` commands without mutating GitHub.
-4. If legacy `tracker_writes: prompt` is the only write policy and no
-   create/publish/open instruction was provided, ask whether to create the
-   GitHub issues immediately.
+2. Resolve the effective target and write mode from the user request or calling
+   workflow handoff, using `references/workflows.md` for legacy tracker fields.
+3. If the resolved write mode says dry run, draft only, local only, or do not
+   mutate, return draft issue bodies and exact `gh` commands without mutating
+   GitHub.
+4. If the resolved write mode requires a user decision before publishing, ask
+   whether to create or update the GitHub issues immediately.
 5. Read the relevant issue or label state before mutation.
 6. For create, edit, or comment operations with generated Markdown, prepare
    safe body files using the pattern in `references/workflows.md`.

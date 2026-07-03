@@ -29,12 +29,15 @@ no implicit config.
 
 1. Resolve the target PR and repository.
 2. List review context before replying.
-3. Draft comments or replies that reference the implemented change and
+3. Draft comments or replies by default. Reference the implemented change and
    verification.
-4. Use `scripts/reviews comment` for top-level PR discussion comments.
-5. Use dry-run mode for multi-comment replies unless the user explicitly asks
-   to post.
-6. Post only to selected comments or threads.
+4. Post only when the user explicitly asks to post and the target comments or
+   threads are selected.
+5. Use `scripts/reviews comment --dry-run` for draft or multi-comment replies
+   until posting authority is explicit.
+6. Use `scripts/reviews comment` for authorized top-level PR discussion
+   comments; use direct `gh` fallback only when the helper cannot perform the
+   selected operation.
 
 ## References
 

@@ -30,24 +30,10 @@ Do not use this skill for:
 ## Quick workflow
 
 1. Start with [references/README.md](references/README.md).
-2. Pick the summary page that matches the request:
-   - [document-a-swift-package.md](references/document-a-swift-package.md)
-   - [document-public-symbols.md](references/document-public-symbols.md)
-   - [document-api-lifecycle-and-behavior.md](references/document-api-lifecycle-and-behavior.md)
-   - [add-a-docc-catalog.md](references/add-a-docc-catalog.md)
-   - [preview-and-publish.md](references/preview-and-publish.md)
-   - [tutorial-workflow.md](references/tutorial-workflow.md)
-   - [start-here.md](references/start-here.md)
-   - [symbol-docs.md](references/symbol-docs.md)
-   - [articles-and-structure.md](references/articles-and-structure.md)
-   - [linking.md](references/linking.md)
-   - [formatting-and-assets.md](references/formatting-and-assets.md)
-   - [tutorials.md](references/tutorials.md)
-   - [publishing-and-customization.md](references/publishing-and-customization.md)
-   - [directive-map.md](references/directive-map.md)
-3. If the user asks in task language rather than DocC terminology, use
+2. If the user asks in task language rather than DocC terminology, use
    [source-map.md](references/source-map.md) to map the request to the right
    summary page and bundled local source file.
+3. Pick the matching summary page from the References list below.
 4. Open the exact local source file under `assets/DocCDocumentation.docc/` when
    the summary page points to it.
 5. Keep answers authoring-first. If the user drifts into compiler/render

@@ -163,42 +163,28 @@ subagents for the current session.
 
 Visible Codex App worker threads are not authorized by default. Before creating
 visible App worker threads, ask once for session-scoped consent with a bounded
-maximum. A bare `yes` cannot authorize unbounded visible threads. Use
-`references/worker.md` for the exact startup prompt, visible-thread wording
-rules, CLI subagent limit examples, execution report shape, worker lifecycle,
-resync, integration, artifacts, recurring PRD automation, and closeout.
+maximum. CLI subagents are authorized by invoking `$codex-orchestrator` unless
+the owner disables delegation.
 
-The root chooses the actual workstream surface, CLI subagent count, visible
-worker-thread count up to the consented maximum, authorization modes,
-publication checkout, and stop conditions from the source graph, current repo
-state, gates, available tools, and Codex product-surface rules. Do not copy
-session worker choices into PRDs, generated issue bodies, draft publish
-commands, or `## Orchestrator Handoff`.
+Before delegation, load `references/worker.md`. It owns the exact startup
+prompt, visible-thread wording, execution report, worker lifecycle, resync,
+integration, artifacts, recurring PRD automation, and closeout details.
 
 The entrypoint contract is:
 
 - Worker authorization is resolved only by the root orchestrator per workstream
   and session.
-- CLI subagents are authorized by invoking `$codex-orchestrator` unless the
-  owner disables delegation. Visible Codex App worker-thread consent is
-  current-session consent, not durable config or PRD/issue metadata. Project
-  memory must not grant App-thread, automation, publication, or issue-mutation
-  consent.
+- Visible-thread consent is current-session consent, not durable config or
+  PRD/issue metadata.
 - In owner worker-surface wording, `thread` means a visible Codex App thread.
   Do not silently downgrade requested App threads to CLI subagents.
-- Automations are explicit-only and runtime-tool-dependent. The ledger owns
-  monitoring state through source status, `Last Read`, and `Next Check` /
-  `Next Scan/Check`; unavailable automation tooling means draft instructions,
-  not scheduled work.
+- Do not copy session worker choices into PRDs, generated issue bodies, draft
+  publish commands, project memory, or `## Orchestrator Handoff`.
+- Automations are explicit-only and runtime-tool-dependent; unavailable
+  automation tooling means draft instructions, not scheduled work.
 - Split workers by independent ownership boundary, keep shared or overlapping
-  integration work in the root, and resync or replace a worker before assigning
-  overlapping new scope.
-- Before dispatching implementation for each source batch, build the
-  non-blocking execution report from `references/worker.md`. The report is not
-  an approval prompt; continue automatically while source items, CLI subagent
-  defaults or consented visible worker-thread surfaces and limits,
-  authorization modes, delivery path, and stop conditions stay inside the
-  recorded boundaries.
+  integration work in the root, and build the non-blocking execution report from
+  `references/worker.md` before dispatch.
 
 ## Delivery And Scheduling
 

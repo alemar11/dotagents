@@ -23,12 +23,11 @@ Escalate to broader diff review or split commits only when the worktree is
 mixed, generated files are involved, or the staged scope is still unclear.
 
 If the user asks for a PR, draft PR, branch publication, or "publish", use
-`yeet` instead. If the user says "commit and push" without PR language, ask
-"PR or push-only?" and default to push-only when unclear. When the user
-explicitly authorizes direct-to-main issue closure, use issue-closing commit
-trailers such as `Closes #123` only after staging the intended paths and
-verifying the diff. Route GitHub issue comments, labels, type changes, follow-up
-issue creation, or manual closure to `$github-issues`.
+`yeet` instead. If the user says "commit and push" without PR language, treat it
+as push-only. When the user explicitly authorizes direct-to-main issue closure,
+use issue-closing commit trailers such as `Closes #123` only after staging the
+intended paths and verifying the diff. Route GitHub issue comments, labels,
+type changes, follow-up issue creation, or manual closure to `$github-issues`.
 
 ## Trigger Cues
 
@@ -52,8 +51,8 @@ from session traces:
 ```bash
 git status --short --branch
 git diff -- <path>
-git diff --staged
 git add -- <explicit-paths>
+git diff --staged
 git commit -F <message-file>
 git log -1 --pretty=fuller
 ```

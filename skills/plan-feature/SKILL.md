@@ -83,13 +83,8 @@ validation, publication target, permissions, or cross-repo contracts.
   draft handoff.
 - Use structured values from setup, the PRD phase, and the issue phase. Keep
   prose values only for explanations, reasons, and free-form notes.
-- Do not include worker authorization defaults or worker capability modes in
-  PRDs, generated issues, local issue files, hosted issue bodies, or draft
-  publish commands. `$codex-orchestrator` resolves worker authorization per
-  workstream and session.
-- Treat `$codex-orchestrator` worker choices as runtime-only session decisions.
-  Do not copy worker surfaces, worker counts, checkpoint approval, publication
-  authority, or issue mutation authority into PRDs, generated issues,
+- Treat `$codex-orchestrator` worker choices and runtime authorization as
+  session-only decisions. Do not copy them into PRDs, generated issues,
   `## Orchestrator Handoff`, local issue files, hosted issue bodies, or draft
   publish commands.
 

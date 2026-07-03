@@ -82,9 +82,8 @@ Read:
 - `CONTEXT.md` or `CONTEXT-MAP.md`, when relevant
 - existing issue templates or local tracker docs, when present
 
-If the configured tracker is `other`, follow the repo-specific instructions in
-`project-memory/agents/issue-tracker.md` instead of assuming GitHub or local
-markdown commands.
+If the configured tracker backend is not `github` or `local`, stop and route
+the setup through `$project-memory` instead of inventing tracker semantics.
 
 ### 2. Select issue or queue
 

@@ -126,10 +126,10 @@ slices sequentially. In all cases, require file-backed evidence and keep
 synthesis in the main agent.
 
 For multi-repo runs, strict runs, or repositories with `data/inventory.json`
-`counts.files >= 500`, use reader subagents by default after generation unless
-the user explicitly declines. Reader subagents must inspect only the generated
-HTML/SVG wiki and report whether it is sufficient for expert developer
-onboarding. Treat a reader FAIL as a real failure and iterate.
+`counts.files >= 500`, run a generated-wiki review after generation. When
+delegation is explicitly authorized and allowed by the current runtime, use
+reader subagents for that review; otherwise inspect the generated HTML/SVG
+sequentially. Treat a reader FAIL as a real failure and iterate.
 
 ### 4. Scaffold and Fill the Wiki
 

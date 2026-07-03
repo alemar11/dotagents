@@ -138,56 +138,10 @@ When returning to the user or calling skill, summarize:
 - unresolved domain questions,
 - any decision that may deserve a future ADR.
 
-## Documentation Shapes
+## References
 
-Use simple Markdown shapes unless the project already has a stronger local
-format.
-
-For `CONTEXT.md`:
-
-```markdown
-# Context
-
-## Glossary
-
-### Term
-
-Short project-specific definition.
-
-- Also called: optional alias
-- Not: nearby concept it should not be confused with
-- Source: optional issue, file, or ADR link
-
-## Rules
-
-- Durable rule or invariant.
-
-## Open Questions
-
-- Question that remains unresolved.
-```
-
-For ADRs under `project-memory/adr/`:
-
-```markdown
-# ADR-0001: Decision title
-
-## Status
-
-Accepted
-
-## Context
-
-Why this decision is needed.
-
-## Decision
-
-What was decided.
-
-## Consequences
-
-What this enables, costs, or rules out.
-```
+- `references/documentation-shapes.md`: default `CONTEXT.md` and ADR Markdown
+  shapes when the project does not already have stronger local formats.
 
 ## Guardrails
 

@@ -22,14 +22,8 @@ patterns, and manage migration release flow through the shipped
   path first and run `<postgres-skill-root>/scripts/postgres`.
 - `<postgres-skill-root>/scripts/postgres --version` is the runtime version
   check.
-- `scripts/postgres` dispatches to platform-specific Rust binaries under
-  `scripts/bin/`, currently named `postgres-<os>-<arch>`.
-- Supported shipped binary names are `postgres-darwin-arm64`,
-  `postgres-darwin-x86_64`, `postgres-linux-arm64`, and
-  `postgres-linux-x86_64`; a platform is usable only when its executable is
-  present.
-- The implementation lives in `projects/postgres/` and is maintenance-only.
-  Normal usage stays on the `scripts/postgres` surface.
+- Runtime model, platform binary, and maintenance implementation details live in
+  `references/postgres_usage.md`.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 - Profile `access` modes are local CLI safety guards with values `read`,
   `write`, and `read_write`; they do not replace PostgreSQL roles, grants, RLS,
