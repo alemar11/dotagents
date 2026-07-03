@@ -37,6 +37,8 @@ Do not assume the problem belongs to the bundled skill alone.
   - docs only
 - whether cache/install behavior is hiding a packaging problem rather than a
   skill-contract problem
+- whether `references/writing-style-review.md` is needed for bundled-skill
+  trigger clarity, prompt load, information hierarchy, or pruning issues
 
 ## Evidence Workflow
 

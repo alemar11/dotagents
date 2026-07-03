@@ -37,6 +37,8 @@ skill roots.
   specialization
 - whether it adds prompt weight without enough value when current context
   exposes that signal
+- whether `references/writing-style-review.md` is needed to diagnose trigger
+  clarity, prompt load, information hierarchy, or pruning issues
 
 ## Evidence Workflow
 

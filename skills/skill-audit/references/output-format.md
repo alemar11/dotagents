@@ -17,6 +17,8 @@ decision-oriented, and evidence-backed.
    - behavior evidence status: session-confirmed, summary-only, or no
      invocation evidence found
    - evidence source
+   - writing-style diagnosis when `references/writing-style-review.md` changes
+     prioritization or clarifies the fix
    - highest-value next update
    - owning surface for the fix: `skill`, `bundled plugin skill`, `plugin`,
      or `docs`

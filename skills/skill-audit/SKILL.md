@@ -119,6 +119,10 @@ After detecting the target kind, open the matching workflow reference:
   - Use when deciding whether skills should be merged, disabled, trimmed,
     deduplicated, or kept because of inventory, prompt-budget, root, or usage
     evidence.
+- `references/writing-style-review.md`
+  - Use after the target-kind workflow when a skill or bundled skill audit
+    needs a writing-quality lens for trigger clarity, prompt load, information
+    hierarchy, pruning, or instruction-density recommendations.
 
 Open only the references needed for the current target and questions. Do not
 bulk-load all reference files by default.

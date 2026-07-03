@@ -28,10 +28,12 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
 - `budget`: prompt-inventory pressure. Treat this as a prioritization signal,
   not a deletion trigger by itself.
 - `description_candidates`: long descriptions that may be worth tightening
-  while preserving trigger nouns.
+  while preserving trigger nouns. Use `references/writing-style-review.md`
+  when the audit needs to explain the description problem precisely.
 - `duplicates`: same names, same bodies, or same descriptions across installed,
   repo-local, shared, or cached roots. Verify the editable owner before
-  recommending changes.
+  recommending changes; use `references/writing-style-review.md` to distinguish
+  repeated trigger branches from useful shared vocabulary.
 - `unused_candidates`: no recent heuristic evidence in scanned logs. Inspect at
   least one representative surface before claiming a skill is low-value.
 - `root_summary`: where the inventory came from, useful for spotting cache

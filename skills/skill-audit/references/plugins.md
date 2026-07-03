@@ -33,6 +33,9 @@ itself, not just its bundled skills.
 - whether `.agents/plugins/marketplace.json` matches the plugin package
 - whether the bundled skill set is coherent, overlapping, or missing an obvious
   owner boundary
+- whether bundled skill descriptions or contracts need
+  `references/writing-style-review.md` for trigger clarity, prompt load,
+  information hierarchy, or pruning issues
 - whether shared `scripts/*` and `projects/*` still follow the documented
   runtime versus maintenance split
 - whether assets and repo-relative paths are valid from the plugin root
