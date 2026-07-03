@@ -133,6 +133,9 @@ For routine issue-hardening runs, prefer a compact brief that reaches
 
 ### 5. Draft the Output
 
+Use `references/templates.md` for the exact full-plan and issue-hardening
+Markdown shapes.
+
 In full-plan mode, create a phased plan with:
 
 - a short overview
@@ -190,94 +193,6 @@ Keep the brief small enough to paste into an issue body or issue comment.
 - Otherwise, perform the same review locally before returning.
 - Incorporate useful review feedback before finishing.
 
-## Plan Template
-
-Use this for full-plan mode.
-
-```markdown
-# Plan: [Task Name]
-
-**Generated**: [Date]
-**Estimated Complexity**: [Low/Medium/High]
-
-## Overview
-[Summary of the work and the recommended approach]
-
-## Prerequisites
-- [Dependencies or requirements]
-- [Tools, libraries, access, or docs needed]
-
-## Sprint 1: [Name]
-**Goal**: [What this phase accomplishes]
-**Demo/Validation**:
-- [How to demo or verify the phase]
-
-### Task 1.1: [Name]
-- **Location**: [File paths or areas]
-- **Description**: [What to do]
-- **Complexity**: [1-10]
-- **Dependencies**: [Earlier tasks or `None`]
-- **Acceptance Criteria**:
-  - [Specific outcome]
-- **Validation**:
-  - [Tests or verification steps]
-
-### Task 1.2: [Name]
-[...]
-
-## Sprint 2: [Name]
-[...]
-
-## Testing Strategy
-- [How to validate the work]
-- [What to verify per phase]
-
-## Potential Risks & Gotchas
-- [What could go wrong]
-- [Mitigation]
-
-## Rollback Plan
-- [How to safely undo or disable the change]
-```
-
-## Issue-Hardening Template
-
-Use this for issue-hardening mode.
-
-```markdown
-## Implementation Plan
-
-### Goal
-[The exact vertical slice this issue should deliver.]
-
-### Non-Goals
-- [What this issue should not attempt.]
-
-### Resolved Interpretation
-- [Assumptions or decisions this plan relies on.]
-
-### Approach
-- [Concrete implementation approach.]
-
-### Likely Touch Points
-- [Files, modules, routes, tests, or docs to inspect or modify.]
-
-### Dependencies
-- [Blocking issues, prerequisites, or `None`.]
-
-### Acceptance Criteria
-- [ ] [Specific, verifiable outcome.]
-
-### Validation
-- [Command, test, manual check, or log/metric to verify.]
-
-### Risks & Rollback
-- [Risk and mitigation.]
-
-### Handoff
-[One short instruction to the implementation agent about where to start and what not to broaden.]
-```
-
 ## Output Expectations
 
 - Return the final plan or hardened issue brief directly in chat.
@@ -297,3 +212,7 @@ Use this for issue-hardening mode.
 - "Give me a deeper, stress-tested implementation plan for this feature."
 - "Harden this issue before I give it to an agent."
 - "Make this vertical slice agent-ready without creating a separate plan file."
+
+## References
+
+- `references/templates.md`: full-plan and issue-hardening output templates.

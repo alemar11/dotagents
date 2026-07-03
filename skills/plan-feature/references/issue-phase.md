@@ -69,8 +69,7 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   worker surfaces, worker counts, or checkpoint choices into PRDs, generated
   issues, local issue files, hosted issue bodies, or draft publish commands.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
-  behavior in draft command runs, use `$project-memory`
-  `references/tracker-publishing.md`.
+  behavior in draft command runs, use `$project-memory`'s `references/tracker-publishing.md`.
 
 ## Boundaries
 
@@ -82,6 +81,19 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   has resolved setup, planning identity, blockers, and effective target. Ask
   only when the target is missing, ambiguous, or contradicted by an explicit
   no-mutation request.
+
+## Phase Handoff Inputs
+
+When called by `plan-feature`, receive the same publishing target and planning
+identity fields used by the PRD phase, with `source_prd_ref` resolved or
+carried from the draft handoff:
+
+```text
+Plan-feature mode: <full-flow|issues-from-existing-prd>
+
+- Source PRD ref:
+  <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
+```
 
 ## Structured Issue Values
 
@@ -303,7 +315,7 @@ do not assume the canonical string is the label; read the mapping first.
 ### 6. Publish Or Return Issues
 
 Use `project-memory/agents/issue-tracker.md` for the target, and read
-`$project-memory` `references/tracker-publishing.md` for shared
+`$project-memory`'s `references/tracker-publishing.md` for shared
 effective-target, temporary body-file, and `source_prd_ref` rules:
 
 - `Tracker backend: github`: create issues through `$github-issues`, attach them
@@ -504,5 +516,5 @@ include it only for explicitly authorized partial `needs-info` output.
 - `references/vertical-slices.md`: issue splitting rules.
 - `references/issue-body-template.md`: generated implementation issue body
   template.
-- `$project-memory` `references/tracker-publishing.md`: shared tracker
+- `$project-memory`'s `references/tracker-publishing.md`: shared tracker
   publication and `source_prd_ref` contract.

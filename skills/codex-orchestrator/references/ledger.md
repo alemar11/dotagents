@@ -147,8 +147,8 @@ remaining.
 
 Authorization resolution: per-workstream
 Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
-CLI subagents authorized by invocation unless disabled: true|false
-Session visible Codex App worker threads consented: true|false; max=<n|unspecified>
+Session CLI subagents consented: authorized-by-invocation|disabled|limited; max=<n|unbounded>
+Session Codex App threads consented: true|false; max=<n|unspecified>
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true

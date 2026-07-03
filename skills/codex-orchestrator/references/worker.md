@@ -144,6 +144,9 @@ work in the root thread.
 Visible Codex App worker threads require explicit session-scoped consent before
 creation. Ask once for visible-thread consent when visible Codex App worker
 threads may be useful and the runtime exposes thread tools.
+Visible-thread delegation
+consent is session-scoped; it is not project-memory setup, PRD metadata, issue
+metadata, or standing approval for future unrelated sessions.
 
 Use this prompt shape when visible Codex App worker threads may be available:
 

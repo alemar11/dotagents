@@ -158,46 +158,15 @@ surface by default. The root may choose whether, when, and how many CLI
 subagents to use for scoped inspection, implementation support, or review,
 while staying inside the owner request, source graph, worker rules, and runtime
 limits. If the owner says `root only`, `no delegation`, `no subagents`, or
-equivalent, do not create CLI subagents.
+equivalent, do not create CLI subagents. The owner may also limit CLI
+subagents for the current session.
 
 Visible Codex App worker threads are not authorized by default. Before creating
 visible App worker threads, ask once for session-scoped consent with a bounded
-maximum. These settings are PRD-agnostic and issue-agnostic; they apply to the
-current orchestrator session:
-
-> `$codex-orchestrator` may use CLI subagents by default unless you say root
-> only or no subagents. You can also limit CLI subagents for this session, for
-> example `CLI subagents max 1`.
->
-> May I also create visible Codex App worker threads for this session? If yes,
-> set a max concurrent worker-thread count.
->
-> Example replies:
-> - "Visible worker threads: no"
-> - "Visible worker threads: yes, max 1"
-> - "Visible worker threads: yes, max 3"
-> - "CLI subagents max 1; visible worker threads: no"
-> - "No delegation; root thread only"
-
-When the current runtime is not the Codex App or visible thread tools are not
-available, do not ask for visible worker-thread consent. Continue with CLI
-subagents authorized by default unless the owner disables delegation:
-
-> Example replies:
-> - "CLI subagents max 1"
-> - "No delegation; root thread only"
-> - "No subagents; root thread only"
-
-Make the answer shape explicit enough that a bare `yes` cannot authorize
-visible worker threads without a bounded maximum. If the owner says only `yes`
-to visible worker threads without a max, treat that as `max 1` unless the task
-clearly needs more, in which case ask for the max before creating more than one
-visible thread.
-
-While waiting, do only root-owned discovery or planning that does not create
-visible App threads, mutate source state, or assume a visible-thread quota.
-CLI subagent use does not need this waiting step unless the owner disabled or
-restricted delegation.
+maximum. A bare `yes` cannot authorize unbounded visible threads. Use
+`references/worker.md` for the exact startup prompt, visible-thread wording
+rules, CLI subagent limit examples, execution report shape, worker lifecycle,
+resync, integration, artifacts, recurring PRD automation, and closeout.
 
 The root chooses the actual workstream surface, CLI subagent count, visible
 worker-thread count up to the consented maximum, authorization modes,
@@ -206,10 +175,7 @@ state, gates, available tools, and Codex product-surface rules. Do not copy
 session worker choices into PRDs, generated issue bodies, draft publish
 commands, or `## Orchestrator Handoff`.
 
-Use `references/worker.md` for worker surfaces, session settings,
-authorization modes, execution report shape, prompt shape, lifecycle, resync,
-integration, artifacts, recurring PRD automation, and closeout. The entrypoint
-contract is:
+The entrypoint contract is:
 
 - Worker authorization is resolved only by the root orchestrator per workstream
   and session.
@@ -245,16 +211,8 @@ and overrides.
 Before scheduling or publishing PRD-backed work, load
 `references/prd-backed-delivery.md`. That reference owns delivery authority,
 publication authority, issue mutation authority, draft PRD handling,
-PRD-backed publication, ad hoc publication limits, and closeout rules.
-
-Use issue-level scheduling fields as the wave graph:
-
-| Field | Start rule |
-| --- | --- |
-| `independent` | May start when authorization, ownership boundaries, and gates allow it. |
-| `depends-on <issue>` | Queue-ready is not start-ready; wait for root-verifiable dependency proof. |
-| `blocks <issue>` | May start when otherwise eligible; dependent work remains unassigned. |
-| `root-integrated` | Keep implementation in root; workers may inspect or prove only if integration stays root-owned. |
+PRD-backed publication, issue-level scheduling values, ad hoc publication
+limits, and closeout rules.
 
 If dependency refs, `Source PRD`, closeout path, delivery mode, or
 parallelization are missing, malformed, cyclical, contradictory, or unsafe, or
@@ -342,26 +300,13 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 
 ## Final Report
 
-Before handing control back to the owner, return a compact owner-facing report:
-
-- overall status: `completed`, `needs-owner`, `blocked`, `deferred`,
-  `released`, or mixed with the blocking reason;
-- source items reconciled, with source ids/refs and closeout state;
-- workers used, integration method per worker, and any worker output left
-  unintegrated;
-- worker evidence: requested, authorized or consented, and actual surface; worker id or
-  session evidence; unavailable or failed tool evidence; fallback reason; and
-  whether work ran in parallel, sequentially, root-owned, or simulated;
-- commits, branches, PRs, issue updates, releases, or draft mutation commands
-  produced under current authorization;
-- active-root claim, collision, takeover, or handoff decisions, plus any
-  target-repo `AGENTS.md` update applied or proposed;
-- CLI subagent baseline, visible-thread consent, execution report boundaries, worker split, and stop
-  conditions;
-- gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
-  a proof path was unavailable;
-- remaining owner decisions, blocked access, deferred follow-ups, and the next
-  safe action.
+Before handing control back to the owner, return a compact owner-facing report
+that covers status, reconciled source items, worker usage and evidence,
+delivery/publication mutations, active-root decisions, gates and proof,
+remaining owner decisions, fallback reason for any planned worker surface that
+was unavailable or intentionally unused, and the next safe action. Use
+`references/worker.md` and `references/ledger.md` for the detailed worker
+evidence, execution-mode, lifecycle, and ledger closeout fields.
 
 ## References
 

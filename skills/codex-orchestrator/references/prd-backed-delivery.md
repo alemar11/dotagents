@@ -93,6 +93,17 @@ as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
 lower-kebab-case.
 
+## Scheduling Values
+
+Use generated issue scheduling fields as the wave graph:
+
+| Field | Start rule |
+| --- | --- |
+| `independent` | May start when authorization, ownership boundaries, and gates allow it. |
+| `depends-on <issue>` | Queue-ready is not start-ready; wait for root-verifiable dependency proof. |
+| `blocks <issue>` | May start when otherwise eligible; dependent work remains unassigned. |
+| `root-integrated` | Keep implementation in root; workers may inspect or prove only if integration stays root-owned. |
+
 ## PRD-Backed Publication
 
 When the owner asks to implement a PRD or generated PRD issue, and the PRD or

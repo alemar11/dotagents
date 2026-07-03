@@ -139,9 +139,8 @@ Before writing or publishing, resolve the effective target for the current run:
   validation pass, disabled writes, or draft-only output,
 - any local dry-run target or explicit local mirror request.
 
-For tracker publishing mechanics, use `$project-memory`
-`references/tracker-publishing.md`; this includes `source_prd_ref` handling for
-`draft-publish-commands`.
+For tracker publishing mechanics, use `$project-memory`'s `references/tracker-publishing.md`;
+this includes `source_prd_ref` handling for `draft-publish-commands`.
 
 If the user asked for a rehearsal, temp run, dry run, validation pass, or other
 non-mutating run, do not write local tracker files or mutate a hosted tracker
@@ -212,32 +211,9 @@ issue splitting.
 Skip this step only in `issues-from-existing-prd` mode when the PRD is already
 durable and the user did not request a PRD update.
 
-Load `references/prd-phase.md` and pass the phase handoff fields:
-
-```text
-Plan-feature mode: <full-flow|prd-only|issues-from-existing-prd>
-
-Publishing target:
-- Hosted tracker body-file temp files: transient outside the repo and cleaned
-  up after mutation.
-- Configured tracker backend: <tracker_backend from project-memory/agents/issue-tracker.md>.
-- Effective target for this run:
-  <configured-tracker|local-dry-run|draft-publish-commands>.
-- No-mutation override:
-  <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-only>.
-- Local mirror:
-  <not-requested|requested>.
-- Source PRD ref:
-  <pending until PRD phase returns #<number>, local path, or draft-prd:<slug>>.
-
-Planning identity:
-- feature_slug: <accepted feature slug>
-- product_slug: <accepted product slug, for monorepos/multi-context repos>
-- workspace_path: <accepted workspace path, for monorepos/multi-context repos>
-- context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
-- project_slug: <accepted orchestrator project slug, for orchestrator modes>
-- delivery_mode: <pull-request|direct-commit>
-```
+Load `references/prd-phase.md` and pass the phase handoff fields defined there,
+including mode, effective target, no-mutation override, source PRD ref state,
+planning identity, and delivery mode.
 
 Require the PRD phase to return `source_prd_ref`. In `draft-publish-commands`
 mode, this is a deterministic `draft-prd:<feature-slug>` or
@@ -262,34 +238,15 @@ mapped labels, but they are not executable agent-ready issues until the draft
 `Source PRD` ref is replaced with the hosted PRD number or durable local PRD
 path.
 
-Pass the same phase handoff fields, with `source_prd_ref` resolved or carried
-from the draft handoff:
+Pass the same phase handoff fields defined in `references/issue-phase.md`, with
+`source_prd_ref` resolved or carried from the draft handoff.
 
-```text
-Plan-feature mode: <full-flow|issues-from-existing-prd>
-
-- Source PRD ref:
-  <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
-```
-
-Require the issue phase to use the configured issue target, issue types,
-labels, title formats, PRD parent/sub-issue relationships, and related issue
-links when those modes apply. The issue phase must run
-`$plan-harder` once per generated implementation issue, run the verticality
-gate from `references/vertical-slices.md` after hardening, and verify that
-every `Parallelization` dependency resolves to a known issue ID in an acyclic
-graph after the final publishable issue bodies are assembled. If the effective
-target is `configured-tracker`, it must write or publish the issues to the
-configured tracker. If the effective target is `local-dry-run` or
-`draft-publish-commands`, it must return draft paths, bodies, or commands
-instead.
-
-Require generated implementation issues to copy the effective `Delivery mode`
-label from the PRD and include the `## Orchestrator Handoff` shape from
-`references/issue-body-template.md`. Workspace issues also need affected repos,
-cross-repo contracts, integration gates, expected repo PR slots or
-pre-implementation placeholders, and closeout proof requirements. Generated
-placeholders are delivery expectations, not closeout proof.
+Require the issue phase to use the configured issue target, mapped issue
+metadata, PRD parent/sub-issue relationships, related issue links, `$plan-harder`
+per issue, the verticality gate, graph validation, copied delivery mode, and the
+`## Orchestrator Handoff` shape from `references/issue-body-template.md`.
+`references/issue-phase.md` owns the detailed issue body, workspace,
+publication, draft-output, and placeholder rules.
 
 If the issue phase discovers a product, domain, dependency, or
 acceptance-criteria blocker, pause issue writing and route the blocker back

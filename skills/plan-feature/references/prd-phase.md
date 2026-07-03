@@ -27,8 +27,36 @@ question set or route back through `$grill-me-with-context`.
   from project memory, and use the `delivery_mode` values documented in
   `references/prd-template.md`.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
-  behavior in draft command runs, use `$project-memory`
-  `references/tracker-publishing.md`.
+  behavior in draft command runs, use `$project-memory`'s `references/tracker-publishing.md`.
+
+## Phase Handoff Inputs
+
+When called by `plan-feature`, receive these fields from the entrypoint:
+
+```text
+Plan-feature mode: <full-flow|prd-only|issues-from-existing-prd>
+
+Publishing target:
+- Hosted tracker body-file temp files: transient outside the repo and cleaned
+  up after mutation.
+- Configured tracker backend: <tracker_backend from project-memory/agents/issue-tracker.md>.
+- Effective target for this run:
+  <configured-tracker|local-dry-run|draft-publish-commands>.
+- No-mutation override:
+  <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-only>.
+- Local mirror:
+  <not-requested|requested>.
+- Source PRD ref:
+  <pending until PRD phase returns #<number>, local path, or draft-prd:<slug>>.
+
+Planning identity:
+- feature_slug: <accepted feature slug>
+- product_slug: <accepted product slug, for monorepos/multi-context repos>
+- workspace_path: <accepted workspace path, for monorepos/multi-context repos>
+- context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
+- project_slug: <accepted orchestrator project slug, for orchestrator modes>
+- delivery_mode: <pull-request|direct-commit>
+```
 
 ## Workflow
 
@@ -154,7 +182,7 @@ or the generated implementation issues, not in the PRD content itself.
 ### 4. Choose Publication Target
 
 Read `project-memory/agents/issue-tracker.md` to determine where PRDs live.
-Also read `$project-memory` `references/tracker-publishing.md` for the
+Also read `$project-memory`'s `references/tracker-publishing.md` for the
 shared effective-target and `source_prd_ref` contract.
 
 - `Tracker backend: github`: publish through
@@ -290,5 +318,5 @@ Return:
 ## References
 
 - `references/prd-template.md`: default PRD shape.
-- `$project-memory` `references/tracker-publishing.md`: shared tracker
+- `$project-memory`'s `references/tracker-publishing.md`: shared tracker
   publication and `source_prd_ref` contract.

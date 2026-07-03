@@ -133,7 +133,7 @@ onboarding. Treat a reader FAIL as a real failure and iterate.
 
 ### 4. Scaffold and Fill the Wiki
 
-Run:
+Run the scaffold helper:
 
 ```bash
 scripts/code-wiki scaffold --out <wiki-out> --title <repo-name>
@@ -145,111 +145,23 @@ If the user asked to store cloned source locally beside the wiki, add:
 scripts/code-wiki scaffold --out <wiki-out> --title <repo-name> --local-source-cache
 ```
 
-Then replace placeholders using `references/wiki-html-contract.md`. Use the
-template's documentation UI patterns: `lead` for page summaries, `meta-bar` for
-compact repo/run facts, `doc-section` for substantive sections,
-`diagram-frame` or `hybrid-diagram` for diagrams, and collapsible
-`details.evidence` blocks when a section carries many source links.
+Then replace placeholders using `references/wiki-html-contract.md`. That
+reference owns required pages and assets, page responsibilities, source-backed
+decision aids, deterministic diagrams, evidence-chip commands, HTML rules,
+deep-dive expectations, and validation semantics.
 
-Required output:
-
-- `index.html`
-- `pages/project-context.html`
-- `pages/overview.html`
-- `pages/public-interfaces.html`
-- `pages/architecture.html`
-- `pages/runtime-state.html`
-- `pages/dependencies.html`
-- `pages/code-patterns.html`
-- `pages/flows-basic.html`
-- `pages/flows-advanced.html`
-- `pages/testing-and-ops.html`
-- `pages/change-guide.html`
-- `pages/source-map.html`
-- `pages/deep-dives/index.html`
-- `assets/style.css`
-- `assets/app.js`
-- `assets/diagrams/`
-- `assets/images/`
-- `data/inventory.json`
-
-For large or multi-surface repositories, create two to five adaptive deep-dive
-pages under `pages/deep-dives/`. Choose these pages from source evidence, not a
-fixed taxonomy. Good deep dives usually follow the repo's natural subsystems:
-public API families, protocol/runtime layers, plugin systems, storage models,
-build matrices, language bindings, worker/event loops, or failure-prone
-integration paths. Link every deep dive from `pages/deep-dives/index.html`.
-
-Every non-trivial wiki must include structured, source-backed decision aids:
-
-- a project context/use-case table with adoption constraints, governance,
-  support, license, and official docs signals when present
-- a public surface matrix that helps readers choose the right API, command,
-  package export, route, plugin hook, schema, binding, or module surface
-- a runtime state/lifecycle table naming state carriers, creators, mutators,
-  observers, and cleanup owners
-- an advanced failure table with triggers, detection branches, owner,
-  caller/user effect, recovery, retry, fallback, abort, or rollback behavior
-- exact validation command tables for testing and operations
-- a change safety matrix with compatibility risk, validation, and rollback
-  notes for common changes
-
-Use deterministic local SVG or HTML diagrams for factual architecture, type or
-module collaboration, and flow content. Every non-trivial wiki should include at
-least:
-
-- one component/module boundary diagram
-- one interaction or call-path diagram showing how important types/modules
-  collaborate
-- one flow or lifecycle diagram for the primary runtime path
-
-Diagrams must show relationships, not just labels. Use arrows with short
-relationship verbs and readable labels. If a diagram truncates important text or
-only repeats section headings, fix the diagram before reporting the wiki
-complete.
-
-For polished architecture or flow visuals, use a hybrid diagram path:
-
-1. Build the source-backed diagram as deterministic SVG/HTML first.
-2. Validate the exact nodes, arrows, labels, and layout.
-3. Use `$imagegen` only as a visual polish pass from that SVG/spec.
-4. Save the raster under `<wiki-out>/assets/images/`.
-5. Keep or link the deterministic SVG adjacent to the raster, and add
-   `data-source-diagram="../assets/diagrams/<name>.svg"` to the raster image.
-
-Never let a generated bitmap replace the deterministic diagram for exact
-topology, labels, or relationship evidence. If exact labels matter in the
-polished visual, overlay them with deterministic SVG/HTML or keep the exact SVG
-directly below the raster.
-
-Keep page and asset links local so the wiki opens from `index.html` without a
-server. For evidence references, prefer online commit-pinned source links when
-the analyzed repo has a supported hosted remote.
-
-For GitHub repos, generate source links with:
-
-```bash
-scripts/code-wiki evidence-link --repo <repo-path> --evidence <path:start-end> --html
-```
-
-Use the emitted evidence chip in wiki evidence blocks. For multiple refs, use:
-
-```bash
-scripts/code-wiki evidence-link --batch --repo <repo-path> --in <refs.txt|json|-> --html
-```
-
-Use the claim matrix as the page outline: every major section should map back to
-ready claims, and every ready claim should be rendered as repo-specific prose,
-tables, diagrams, or change guidance in its target page.
+Use the claim matrix as the page outline: every major section should map back
+to ready claims, and every ready claim should be rendered as repo-specific
+prose, tables, diagrams, or change guidance in its target page.
 
 ### 5. Use Images Selectively
 
 Open `references/image-guidance.md` before generating images.
 
 Use `$imagegen` for conceptual overview visuals, illustrative flow art, or the
-hybrid diagram polish pass described above. Do not use generated images as the
-only source for exact architecture, class names, API paths, dependency names, or
-other factual claims.
+hybrid diagram polish pass described in `references/image-guidance.md`. Do not
+use generated images as the only source for exact architecture, class names, API
+paths, dependency names, or other factual claims.
 
 Any project-referenced image must be copied into `<wiki-out>/assets/images/`.
 Never leave a referenced image only under `$CODEX_HOME/generated_images/`.
@@ -271,23 +183,11 @@ For multi-repo runs, strict runs, or repositories with `data/inventory.json`
 scripts/code-wiki validate --wiki <wiki-out> --strict
 ```
 
-Fix broken local links, missing pages, missing required assets, invalid
-`data/inventory.json`, missing or incomplete `data/claim-matrix.json` in strict
-runs, scaffold placeholders, thin or non-comprehensive page content, missing
-clickable evidence links, invalid evidence paths, broad-only claim evidence,
-reused broad evidence, duplicated claim text, and repeated boilerplate prose.
-Warnings about empty diagrams are acceptable only if the user explicitly asked
-for a minimal wiki; otherwise add deterministic diagram assets. Do not add
-filler raster images only to satisfy validation.
-If strict validation reports a polished diagram image without a deterministic
-source diagram, add or link the SVG/spec instead of treating the raster as
-authoritative.
-If validation reports UI-pattern warnings, adjust the HTML structure rather
-than hiding evidence or removing diagrams.
-
-Validation prints `PASS` only for clean runs, `PASS_WITH_WARNINGS` when warnings
-remain, and `FAIL` when errors remain. Report the exact status instead of
-describing a warning-only run as a clean pass.
+Use `references/wiki-html-contract.md` to interpret validation failures and
+warnings. Fix structural errors, weak evidence, thin pages, broken links,
+missing deterministic diagrams, unsupported polished-image claims, and generic
+filler before reporting the wiki complete. Report the exact validator status:
+`PASS`, `PASS_WITH_WARNINGS`, or `FAIL`.
 
 ## Output
 
@@ -304,3 +204,11 @@ cloned, say `Source was not cloned; analyzed local path:
 Do not claim the wiki is complete unless each major page has evidence-backed
 developer-grade content, the wiki explains scope and interactions rather than
 only file layout, and validation passes.
+
+## References
+
+- `references/repo-study-playbook.md`: source-study slices and claim quality.
+- `references/wiki-html-contract.md`: required HTML output, page contract,
+  diagrams, evidence links, and validation expectations.
+- `references/image-guidance.md`: optional raster image and hybrid diagram
+  rules.
