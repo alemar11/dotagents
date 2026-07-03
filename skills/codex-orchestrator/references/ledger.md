@@ -147,8 +147,8 @@ remaining.
 
 Authorization resolution: per-workstream
 Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
-Session CLI subagents consented: true|false; max=<n|unspecified>
-Session Codex App threads consented: true|false; max=<n|unspecified>
+CLI subagents authorized by invocation unless disabled: true|false
+Session visible Codex App worker threads consented: true|false; max=<n|unspecified>
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true
@@ -200,7 +200,7 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
+| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; authorized_or_consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
@@ -252,28 +252,31 @@ Use one compact block per active workstream:
 
 ## Wave Reports
 
-Record startup delegation consent before dispatch. Include CLI subagent consent,
-visible Codex App worker thread consent when that surface is available, and any
-per-surface max concurrent worker limits. Record each non-blocking execution
-report with its source items, selected worker surface, orchestrator-chosen split
-for the current wave, authorization modes, delivery path, stop conditions, and
-any owner edits to consent, surface, authorization, or delivery path.
+Record the startup delegation baseline before dispatch. Include that CLI
+subagents are authorized by invoking `$codex-orchestrator` unless the owner
+disabled delegation, visible Codex App worker thread consent when that surface
+is available, and any visible-thread max concurrent worker limit. Record each
+non-blocking execution report with its source items, selected worker surface,
+orchestrator-chosen split for the current wave, authorization modes, delivery
+path, stop conditions, and any owner edits to surface, authorization, or
+delivery path.
 
 The execution report is not an approval prompt. Continue later waves while they
-stay inside the recorded source items, session consent, authorization modes,
-delivery path, and stop conditions. If delegation consent is missing or a wave
-would exceed consented surfaces or limits, planned work may remain in the
-ledger, but implementation workers and root-owned implementation must not start
-until the owner gives the missing consent.
+stay inside the recorded source items, CLI subagent default, visible-thread
+session consent, authorization modes, delivery path, and stop conditions. If
+visible-thread consent is missing, delegation was disabled, or a wave would
+exceed consented visible-thread limits, planned work may remain in the ledger,
+but unauthorized visible workers or disabled delegation must not start until
+the owner gives the missing consent.
 
 | Wave | Started | Finished | Sources Scanned | Items Processed | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <reported; session consent; worker split; authorization modes; delivery path; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| 1 | <time> | <time> | <source ids> | <count> | <reported; startup baseline; worker split; authorization modes; delivery path; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
-Record worker evidence every time the consented worker surface and actual worker
-surface differ. Include the requested surface, owner consent, actual surface,
-tool or session id when one exists, fallback reason, and whether execution was
-parallel, sequential, root-owned, or simulated.
+Record worker evidence every time the requested or available worker surface and
+actual worker surface differ. Include the requested surface, owner consent when
+required, actual surface, tool or session id when one exists, fallback reason,
+and whether execution was parallel, sequential, root-owned, or simulated.
 
 ## Notes
 

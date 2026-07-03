@@ -29,6 +29,10 @@ inspection or implementation whenever delegation is authorized and useful.
 - If a task appears to need orchestration but the user did not invoke this
   skill, handle the task with the normal local workflow or ask before switching
   to orchestration.
+- Invoking `$codex-orchestrator` authorizes the root to use CLI subagents when
+  useful unless the owner says `root only`, `no delegation`, `no subagents`, or
+  equivalent. Visible Codex App worker threads still require explicit
+  session-scoped consent.
 
 ## Root Ownership Contract
 
@@ -47,9 +51,9 @@ inspection or implementation whenever delegation is authorized and useful.
 - A worker never becomes a second root: workers do not create active-root
   claims, edit ledgers, create workers, or decide takeover, handoff, source
   mutation, branch strategy, or closeout.
-- If no inspectable worker surface is available, delegation is not explicitly
-  authorized, or the work is too small or overlapping, keep the work in the
-  root thread.
+- If no inspectable worker surface is available, the owner disabled
+  delegation, visible-thread consent is missing for visible App workers, or the
+  work is too small or overlapping, keep the work in the root thread.
 
 ## Source Routing
 
@@ -149,41 +153,55 @@ unavailable, continue only with safe work and report the exact missing surface.
 
 ## Delegation Policy
 
-When invoked to implement work, ask for session settings before creating
-workers or starting implementation. These settings are PRD-agnostic and
-issue-agnostic; they apply to the current orchestrator session. Ask once for
-explicit delegation consent before creating workers, creating visible App
-threads, or starting implementation:
+When invoked to implement work, CLI subagents are an authorized orchestration
+surface by default. The root may choose whether, when, and how many CLI
+subagents to use for scoped inspection, implementation support, or review,
+while staying inside the owner request, source graph, worker rules, and runtime
+limits. If the owner says `root only`, `no delegation`, `no subagents`, or
+equivalent, do not create CLI subagents.
 
-> Before I orchestrate this work, I need explicit delegation consent.
+Visible Codex App worker threads are not authorized by default. Before creating
+visible App worker threads, ask once for session-scoped consent with a bounded
+maximum. These settings are PRD-agnostic and issue-agnostic; they apply to the
+current orchestrator session:
+
+> `$codex-orchestrator` may use CLI subagents by default unless you say root
+> only or no subagents.
 >
-> May I use CLI subagents if useful? If we are in the Codex App and visible
-> worker threads are available, may I also create or use visible worker threads
-> if useful? You can also set max concurrent worker counts.
+> May I also create visible Codex App worker threads for this session? If yes,
+> set a max concurrent worker-thread count.
 >
 > Example replies:
-> - "CLI subagents: yes, max 2; visible worker threads: no"
-> - "CLI subagents: yes, max 2; visible worker threads: yes, max 1"
+> - "Visible worker threads: no"
+> - "Visible worker threads: yes, max 1"
+> - "Visible worker threads: yes, max 3"
 > - "No delegation; root thread only"
 
 When the current runtime is not the Codex App or visible thread tools are not
-available, omit the visible worker thread sentence and use CLI-only examples:
+available, do not ask for visible worker-thread consent. Continue with CLI
+subagents authorized by default unless the owner disables delegation:
 
 > Example replies:
-> - "CLI subagents: yes, max 2"
 > - "No delegation; root thread only"
+> - "No subagents; root thread only"
 
-Make the answer shape explicit enough that a bare `yes` cannot accidentally
-authorize multiple surfaces.
+Make the answer shape explicit enough that a bare `yes` cannot authorize
+visible worker threads without a bounded maximum. If the owner says only `yes`
+to visible worker threads without a max, treat that as `max 1` unless the task
+clearly needs more, in which case ask for the max before creating more than one
+visible thread.
 
 While waiting, do only root-owned discovery or planning that does not create
-workers, create visible App threads, mutate source state, or assume a quota.
+visible App threads, mutate source state, or assume a visible-thread quota.
+CLI subagent use does not need this waiting step unless the owner disabled or
+restricted delegation.
 
-After session consent, the root chooses the actual workstream surface, worker
-count, authorization modes, publication checkout, and stop conditions from the
-source graph, current repo state, gates, available tools, and Codex
-product-surface rules. Do not copy session worker choices into PRDs, generated
-issue bodies, draft publish commands, or `## Orchestrator Handoff`.
+The root chooses the actual workstream surface, CLI subagent count, visible
+worker-thread count up to the consented maximum, authorization modes,
+publication checkout, and stop conditions from the source graph, current repo
+state, gates, available tools, and Codex product-surface rules. Do not copy
+session worker choices into PRDs, generated issue bodies, draft publish
+commands, or `## Orchestrator Handoff`.
 
 Use `references/worker.md` for worker surfaces, session settings,
 authorization modes, execution report shape, prompt shape, lifecycle, resync,
@@ -192,9 +210,11 @@ contract is:
 
 - Worker authorization is resolved only by the root orchestrator per workstream
   and session.
-- Worker surface consent is current-session consent, not durable config or
-  PRD/issue metadata. Project memory must not grant App-thread, automation,
-  publication, or issue-mutation consent.
+- CLI subagents are authorized by invoking `$codex-orchestrator` unless the
+  owner disables delegation. Visible Codex App worker-thread consent is
+  current-session consent, not durable config or PRD/issue metadata. Project
+  memory must not grant App-thread, automation, publication, or issue-mutation
+  consent.
 - In owner worker-surface wording, `thread` means a visible Codex App thread.
   Do not silently downgrade requested App threads to CLI subagents.
 - Automations are explicit-only and runtime-tool-dependent. The ledger owns
@@ -206,9 +226,10 @@ contract is:
   overlapping new scope.
 - Before dispatching implementation for each source batch, build the
   non-blocking execution report from `references/worker.md`. The report is not
-  an approval prompt; continue automatically while source items, consented
-  worker surfaces and limits, authorization modes, delivery path, and stop
-  conditions stay inside the recorded boundaries.
+  an approval prompt; continue automatically while source items, CLI subagent
+  defaults or consented visible worker-thread surfaces and limits,
+  authorization modes, delivery path, and stop conditions stay inside the
+  recorded boundaries.
 
 ## Delivery And Scheduling
 
@@ -283,10 +304,11 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    worker explicit scope, per-workstream authorization modes,
    delivery/publication authority, dependency state, gates, proof,
    branch/integration expectations, and final report shape. Continue into newly
-   unblocked waves without another consent prompt while the recorded boundaries
-   and session delegation consent still hold. Stop for owner input only when the
-   run needs broader worker surfaces or limits, a changed delivery/authorization
-   boundary, risk acceptance, credentials, or another explicit stop condition.
+   unblocked waves while the recorded boundaries, CLI subagent default or
+   disabled-delegation choice, and visible-thread consent limits still hold.
+   Stop for owner input only when the run needs visible worker-thread consent or
+   higher visible-thread limits, a changed delivery/authorization boundary, risk
+   acceptance, credentials, or another explicit stop condition.
 6. Monitor from the ledger state. Read the ledger before each owner-facing
    progress update and report the current wave, active workstreams, blockers,
    proof changes, and next scan/check from the ledger. Read a worker before
@@ -324,14 +346,14 @@ Before handing control back to the owner, return a compact owner-facing report:
 - source items reconciled, with source ids/refs and closeout state;
 - workers used, integration method per worker, and any worker output left
   unintegrated;
-- worker evidence: requested, consented, and actual surface; worker id or
+- worker evidence: requested, authorized or consented, and actual surface; worker id or
   session evidence; unavailable or failed tool evidence; fallback reason; and
   whether work ran in parallel, sequentially, root-owned, or simulated;
 - commits, branches, PRs, issue updates, releases, or draft mutation commands
   produced under current authorization;
 - active-root claim, collision, takeover, or handoff decisions, plus any
   target-repo `AGENTS.md` update applied or proposed;
-- session worker consent, execution report boundaries, worker split, and stop
+- CLI subagent baseline, visible-thread consent, execution report boundaries, worker split, and stop
   conditions;
 - gates and proof: tests, CI, autoreview, live proof, cross-repo proof, or why
   a proof path was unavailable;

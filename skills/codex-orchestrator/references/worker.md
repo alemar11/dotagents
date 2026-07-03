@@ -27,7 +27,7 @@ Session fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces consented for the current orchestrator session. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner consented to that surface. |
+| `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces available for the current orchestrator session. `cli-subagent` is authorized by invoking `$codex-orchestrator` unless the owner disables delegation. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner consented to that surface. |
 | `actual_workstream_surface` | `codex-app-thread`, `cli-subagent`, `no-delegation` | Where the workstream actually runs. Do not present hidden subagents as visible App threads. |
 | `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. |
 
@@ -70,10 +70,12 @@ If automation tooling is unavailable, do not imply anything was scheduled;
 draft the proposed automation instructions, schedule, and handoff text for
 owner action.
 
-After the owner gives the session settings, the root chooses the number of
-workers and the split across consented surfaces for each implementation wave. The
-root may still keep work in the root thread or stop for owner input when source,
-repo, dependency, gate, or tool state makes dispatch unsafe.
+The root chooses the number of CLI subagents and the split across available
+surfaces for each implementation wave. It may use CLI subagents autonomously
+unless the owner disabled delegation. It may create visible Codex App worker
+threads only up to the current session's consented maximum. The root may still
+keep work in the root thread or stop for owner input when source, repo,
+dependency, gate, or tool state makes dispatch unsafe.
 
 ## Surface Wording Rules
 
@@ -84,9 +86,11 @@ and `actual_workstream_surface` to `codex-app-thread`. Do not spawn a
 `cli-subagent` for a request that says `thread` unless the owner explicitly
 authorizes that fallback after the missing or changed surface is stated.
 
-Use `cli-subagent` only when the owner requests or accepts `subagent`, `/agent`,
-`CLI worker`, or similar non-thread worker wording, or when the owner left the
-surface open and startup consent explicitly resolves it to `cli-subagent`.
+Use `cli-subagent` for hidden CLI subagent workers selected by the root after
+`$codex-orchestrator` is invoked, unless the owner says `root only`,
+`no delegation`, `no subagents`, or equivalent. Owner wording such as
+`subagent`, `/agent`, `CLI worker`, or similar non-thread worker language
+explicitly confirms that surface.
 If owner wording mixes `thread` and `subagent`, treat it as conflicting
 surface intent, ask the startup consent question with concrete surface choices,
 and wait for an explicit answer before dispatch.
@@ -130,54 +134,68 @@ the work in the root thread.
 
 ## Startup Consent
 
-When the user invokes the orchestrator, ask once for session-scoped delegation
-consent before creating workers, creating visible App threads, or starting
-implementation. This consent is PRD-agnostic and issue-agnostic for the current
-orchestrator session.
+When the user invokes the orchestrator, CLI subagents are authorized by default
+as an internal orchestration surface. The root may choose how many CLI
+subagents to use and may also choose to use none. This authorization is
+PRD-agnostic and issue-agnostic for the current orchestrator session. If the
+owner says `root only`, `no delegation`, `no subagents`, or equivalent, keep all
+work in the root thread.
+
+Visible Codex App worker threads require explicit session-scoped consent before
+creation. Ask once for visible-thread consent when visible Codex App worker
+threads may be useful and the runtime exposes thread tools.
 
 Use this prompt shape when visible Codex App worker threads may be available:
 
-> Before I orchestrate this work, I need explicit delegation consent.
+> `$codex-orchestrator` may use CLI subagents by default unless you say root
+> only or no subagents.
 >
-> May I use CLI subagents if useful? If we are in the Codex App and visible
-> worker threads are available, may I also create or use visible worker threads
-> if useful? You can also set max concurrent worker counts.
+> May I also create visible Codex App worker threads for this session? If yes,
+> set a max concurrent worker-thread count.
 >
 > Example replies:
-> - "CLI subagents: yes, max 2; visible worker threads: no"
-> - "CLI subagents: yes, max 2; visible worker threads: yes, max 1"
-> - "CLI subagents: no; visible worker threads: yes, max 1"
+> - "Visible worker threads: no"
+> - "Visible worker threads: yes, max 1"
+> - "Visible worker threads: yes, max 3"
 > - "No delegation; root thread only"
 
 When the current runtime is not the Codex App or visible thread tools are not
-available, omit the visible worker thread sentence and use CLI-only examples:
+available, do not ask a CLI-only startup consent question. Continue with CLI
+subagents authorized by default unless the owner disables delegation. If the
+owner asks what can be constrained, use these examples:
 
 > Example replies:
-> - "CLI subagents: yes, max 2"
 > - "No delegation; root thread only"
+> - "No subagents; root thread only"
 
-Use explicit surface names in examples; accept shorthand such as `CLI yes,
-visible threads yes, max 3`, but do not present shorthand as the preferred
-answer.
+Use explicit visible-thread surface names in examples. Accept shorthand such as
+`visible threads yes, max 3`, but do not present shorthand as the preferred
+answer. A bare `yes` is not enough to authorize unbounded visible threads; if
+the owner says only `yes` for visible threads, treat it as `max 1` unless the
+task clearly needs more and ask for the max before creating more than one
+visible thread.
 
 While waiting for startup consent, do only root-owned discovery, planning,
-source registration, and wave shaping that does not create workers, create
-visible App threads, start implementation edits, mutate source state, commit,
-push, or open PRs.
+source registration, and wave shaping that does not create visible App threads,
+start implementation edits, mutate source state, commit, push, or open PRs. Do
+not wait before using CLI subagents unless the owner disabled or restricted
+delegation.
 
-Session consent is the only normal delegation gate. For later PRDs or newly
-unblocked waves in the same orchestrator session, ask again only if the run
-would require a worker surface or concurrency limit the owner did not consent
-to, a changed delivery or authorization boundary, risk acceptance, credentials,
-or another explicit stop condition.
+Visible-thread session consent is the only normal visible-thread gate. For
+later PRDs or newly unblocked waves in the same orchestrator session, ask again
+only if the run would require visible App worker threads or a visible-thread
+concurrency limit the owner did not consent to, a changed delivery or
+authorization boundary, risk acceptance, credentials, or another explicit stop
+condition.
 
 ## Execution Report
 
 Before dispatching implementation for each source batch, present a non-blocking
 execution report. This report is not an approval prompt and must not ask the
 owner to confirm before dispatch. The root may continue after displaying it as
-long as the source batch stays inside the current session consent, delivery
-authority, gates, and stop conditions.
+long as the source batch stays inside the CLI subagent default or
+disabled-delegation choice, visible-thread consent limits, delivery authority,
+gates, and stop conditions.
 
 Start with a short `Execution Summary` paragraph in plain language. Summarize
 the starting wave, root-owned coordination, worker usage, and stop conditions.
@@ -210,10 +228,11 @@ unless it is relevant to a stop condition.
 ## Recurring PRD Automation
 
 When the owner asks for a recurring automation that searches for new PRDs and
-implements them, the startup consent prompt must say that the session worker
-surface answers apply to every automation run. Ask no additional PRD-specific
-worker-surface questions unless an automation run would exceed the consented
-surfaces or limits.
+implements them, the startup prompt must say that CLI subagent default
+authorization and any visible-thread consent limits apply to every automation
+run. Ask no additional PRD-specific worker-surface questions unless an
+automation run would require visible worker threads or visible-thread limits
+outside the recorded consent.
 
 Process one PRD at a time. If a PRD stops as `blocked`, `needs-owner`, or
 `deferred`, record that PRD's blocker and continue to the next unrelated
@@ -446,7 +465,7 @@ Scope:
 - Worker surface: <codex-app-thread|cli-subagent>
 - Worker ID/title: <id/title or pending>
 - Worker evidence: requested=<none|cli-subagent|codex-app-thread>;
-  consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>;
+  authorized_or_consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
 - Wave: <number>
@@ -500,7 +519,7 @@ Final report:
 - Validation: commands run and outcomes
 - Delivery: delivery mode, branch or PR used, closeout path, and PR links or
   `none`; include publication checkout and caller checkout disposition
-- Worker evidence: requested, consented, and actual surface; worker id or session
+- Worker evidence: requested, authorized or consented, and actual surface; worker id or session
   evidence; unavailable or failed tool evidence; fallback reason; and whether
   execution was parallel, sequential, root-owned, or simulated
 - Scheduling: current wave assignment, unlock state, and dependency source
