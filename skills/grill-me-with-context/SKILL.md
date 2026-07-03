@@ -71,11 +71,15 @@ If one or more durable decisions landed during the session, the closeout must
 say which ones were captured in docs and which ones were consciously deferred.
 Do not end with a generic `docs updated` line when the real outcome was "no
 doc write yet"; name the deferred capture and the reason.
+If capture was deferred because the repo has no suitable `CONTEXT.md`, ADR, or
+other destination yet, say that explicitly and name the missing destination
+file or surface.
 
 Summarize:
 
 - resolved decisions,
-- docs updated, or explicitly deferred documentation with reason,
+- docs updated, or explicitly deferred documentation with destination and
+  reason,
 - remaining risks,
 - deferred questions,
 - recommended next action.
@@ -87,5 +91,6 @@ Summarize:
 - Do not let documentation work interrupt the one-question flow; write docs
   between questions or when a decision has clearly landed.
 - Do not silently leave durable accepted decisions undocumented; capture them or
-  explicitly defer capture in the closeout.
+  explicitly defer capture in the closeout with the missing or chosen
+  destination.
 - Do not create broad project doctrine from a single narrow decision.

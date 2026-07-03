@@ -166,7 +166,8 @@ maximum. These settings are PRD-agnostic and issue-agnostic; they apply to the
 current orchestrator session:
 
 > `$codex-orchestrator` may use CLI subagents by default unless you say root
-> only or no subagents.
+> only or no subagents. You can also limit CLI subagents for this session, for
+> example `CLI subagents max 1`.
 >
 > May I also create visible Codex App worker threads for this session? If yes,
 > set a max concurrent worker-thread count.
@@ -175,6 +176,7 @@ current orchestrator session:
 > - "Visible worker threads: no"
 > - "Visible worker threads: yes, max 1"
 > - "Visible worker threads: yes, max 3"
+> - "CLI subagents max 1; visible worker threads: no"
 > - "No delegation; root thread only"
 
 When the current runtime is not the Codex App or visible thread tools are not
@@ -182,6 +184,7 @@ available, do not ask for visible worker-thread consent. Continue with CLI
 subagents authorized by default unless the owner disables delegation:
 
 > Example replies:
+> - "CLI subagents max 1"
 > - "No delegation; root thread only"
 > - "No subagents; root thread only"
 

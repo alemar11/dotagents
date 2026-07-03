@@ -192,6 +192,11 @@ Use it to resolve:
 - domain terms, rules, and accepted decisions,
 - open planning blockers that would change the PRD or issue split.
 
+If this clarification resolves durable terms, rules, boundaries, or accepted
+decisions, carry forward whether `$grill-me-with-context` captured them in docs
+or explicitly deferred them because the destination was missing or out of
+scope.
+
 If planning blockers emerge, continue the grill-style one-question flow until
 they are resolved or explicitly deferred as non-blocking. Do not write or
 publish the PRD or issues while a planning blocker remains unresolved or
@@ -317,6 +322,8 @@ Summarize:
   enabling-slice exceptions, or withheld anomalies,
 - issue graph validation summary, including dependency and acyclicity checks,
 - planning blockers resolved or deferred,
+- durable domain or architecture decisions captured during clarification, or
+  explicit deferred capture with destination and reason,
 - any issue still blocked and why.
 
 ## Guardrails
@@ -324,6 +331,9 @@ Summarize:
 - Do not implement the feature.
 - Do not write broad docs directly from this skill; `$grill-me-with-context` and
   `$domain-modeling` own durable context and ADR updates.
+- Do not let durable terms, rules, or accepted decisions stop only in PRDs,
+  issue bodies, or chat when clarification resolved them; report where they
+  were captured or explicitly defer them with destination and reason.
 - Do not create PRDs or issues in locations not configured by
   `project-memory/agents/issue-tracker.md`.
 - Do not keep repo-local `.scratch/` or `project-memory/features/` copies for

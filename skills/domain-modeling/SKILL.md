@@ -43,6 +43,10 @@ durable.
 - Prefer updating an existing relevant file over creating a new one.
 - If no domain context file exists and a durable term or rule needs a home,
   create `CONTEXT.md` at the project root.
+- If no suitable durable destination exists and the current caller is not
+  setting up project memory or otherwise creating new context surfaces, do not
+  invent a shadow home in chat. Mark the capture as deferred, name the missing
+  destination explicitly, and say which file would have been updated.
 
 ### 2. Sharpen the model
 
@@ -76,6 +80,8 @@ Keep docs practical:
 - Link to relevant source files, issues, or ADRs when they are available.
 - Avoid generic domain-driven-design exposition.
 - Do not rewrite broad docs just to add one clarified term.
+- If the right destination is missing, return the smallest explicit deferral:
+  the durable item, the missing file or doc surface, and why capture stopped.
 
 ### 4. Periodic context review
 
@@ -91,6 +97,9 @@ When invoked by an automation, scheduled review, or other batch workflow:
   have recorded it.
 - Do not create ADRs from batch review alone unless the decision is clearly
   accepted and load-bearing.
+- When the right destination doc does not exist, keep the candidate in
+  `Deferred Candidates` and name the missing destination instead of implying the
+  knowledge was captured somewhere durable.
 
 Use a compact closeout shape so repeated reviews stay comparable:
 
@@ -123,6 +132,8 @@ When returning to the user or calling skill, summarize:
 
 - docs created or updated,
 - terms, rules, or decisions captured,
+- any capture deferred because the destination surface was missing, including
+  the file that should exist,
 - deferred candidates left out of durable docs and why,
 - unresolved domain questions,
 - any decision that may deserve a future ADR.
