@@ -1,6 +1,6 @@
 ---
 name: swift-api-design
-description: Design or review Swift APIs using the official Swift API Design Guidelines, with focus on naming, argument labels, documentation comments, side effects, and call-site clarity.
+description: Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines.
 ---
 
 # Swift API Design

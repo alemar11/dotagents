@@ -1,6 +1,6 @@
 ---
 name: swift-docc
-description: Write, structure, review, and publish Swift-DocC documentation using curated local summaries and a bundled upstream DocC source tree.
+description: Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources.
 ---
 
 # Swift-DocC

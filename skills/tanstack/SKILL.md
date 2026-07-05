@@ -1,6 +1,6 @@
 ---
 name: tanstack
-description: Review or implement TanStack apps and cross-stack patterns across Query, Router, Start, Form, Table, Virtual, Store, DB, CLI, AI, Config, Devtools, Pacer, and Ranger.
+description: Review or build TanStack apps across Query, Router, Start, Form, Table, Virtual, Store, DB, AI, CLI, and integrations.
 ---
 
 # TanStack

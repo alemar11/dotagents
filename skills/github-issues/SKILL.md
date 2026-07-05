@@ -1,6 +1,6 @@
 ---
 name: github-issues
-description: Use when GitHub issue lifecycle work needs direct gh commands: create/edit issues, labels, types, parent/sub-issues, comments, closure, or dry-run commands.
+description: Manage GitHub issues with gh for creation, edits, labels, types, comments, closure, relationships, and dry-runs.
 ---
 
 # GitHub Issues

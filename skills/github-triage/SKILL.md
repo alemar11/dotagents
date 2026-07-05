@@ -1,6 +1,6 @@
 ---
 name: github-triage
-description: Inspect current-repo GitHub issues, PRs, labels, milestones, and queue health read-only; route mutations to $github-issues.
+description: Inspect current-repo GitHub issue and PR queues read-only; route mutations to $github-issues.
 ---
 
 # GitHub Triage

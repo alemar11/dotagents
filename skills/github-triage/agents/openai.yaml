@@ -1,5 +1,5 @@
 interface:
   display_name: "GitHub Triage"
-  short_description: "Inspect current-repo GitHub queues and guard issue closure."
+  short_description: "Inspect current-repo GitHub issue and PR queues read-only."
   brand_color: "#0369A1"
   default_prompt: "Use $github-triage to produce a URL-first current-repo issue and PR triage report with direct gh read commands. Route GitHub issue lifecycle mutations to $github-issues, and before recommending closure of partial work require a linked or proposed follow-up issue for deferred acceptance criteria."

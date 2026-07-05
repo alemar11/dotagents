@@ -1,6 +1,6 @@
 ---
 name: improve-codebase-architecture
-description: Find evidence-backed architecture improvement candidates, then use grill-me-with-context to sharpen the selected refactor before implementation.
+description: Find evidence-backed architecture candidates, then pressure-test the selected refactor before implementation.
 ---
 
 # Improve Codebase Architecture

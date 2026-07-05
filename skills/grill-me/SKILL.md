@@ -1,6 +1,6 @@
 ---
 name: grill-me
-description: Stress-test plans, decisions, drafts, workflows, and coding approaches when the user explicitly asks to be grilled or challenged.
+description: Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request.
 ---
 
 # Grill Me

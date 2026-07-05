@@ -28,36 +28,36 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | Skill | Purpose |
 | --- | --- |
 | `autoreview` | Run Codex-only structured closeout review before final, commit, PR, or ship. |
-| `code-wiki` | Explore a local repository or git URL, then generate an evidence-backed linked HTML code wiki. |
+| `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs. |
 | `domain-modeling` | Build and maintain project domain language and durable decisions while work is being clarified. |
 | `git-commit` | Handle commit and push-only requests with direct `git` commands and explicit staging. |
 | `github-ci` | Inspect GitHub Actions checks and failing PR logs with direct `gh` reads or the focused `ci-inspect` CLI. |
 | `github-deep-review` | Review GitHub issues, PRs, and fixes by tracing root cause, provenance, proof, and fix quality. |
-| `github-issues` | Create, update, label, type, comment, close, and relate GitHub issues with direct `gh` commands. |
-| `github-portfolio-triage` | Scan multiple explicit GitHub repositories read-only for queue, CI, release, and next-action summaries. |
-| `github-releases` | Check, plan, draft, publish, and validate GitHub Releases, tags, notes, and package availability. |
-| `github-review-threads` | Inspect PR review threads, post discussion comments, and route selected replies with a focused `reviews` CLI. |
+| `github-issues` | Manage GitHub issues with direct `gh` commands for creation, edits, labels, types, comments, closure, relationships, and dry-runs. |
+| `github-portfolio-triage` | Scan multiple GitHub repos read-only for queue, PR, issue, CI, release, blocker, and next-action summaries. |
+| `github-releases` | Check, plan, draft, publish, and validate GitHub releases, tags, release notes, and packages. |
+| `github-review-threads` | Inspect PR review threads, draft or post replies, and manage conversation comments. |
 | `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
-| `github-triage` | Inspect and triage current-repo GitHub issue and PR queues with direct `gh` commands. |
+| `github-triage` | Inspect current-repo GitHub issue and PR queues read-only; route mutations to `github-issues`. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
-| `triage` | Triage existing GitHub or local markdown issues into typed, agent-ready states. |
+| `triage` | Triage GitHub or local markdown issues into typed workflow states and agent-ready queues. |
 | `grill-me-with-context` | Stress-test repo-backed plans with project context and capture docs or ADRs. |
-| `improve-codebase-architecture` | Find architecture candidates, then pressure-test the selected refactor. |
+| `improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor before implementation. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
-| `tanstack` | Review and implement TanStack product and integration patterns through one reusable skill with focused references. |
+| `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Virtual, Store, DB, AI, CLI, and integrations. |
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `plan-feature` | Plan a feature from grilling to PRD to configured agent-ready issues, with prd-only and existing PRD issue modes. |
-| `grill-me` | Stress-test plans, decisions, designs, drafts, strategies, workflows, and coding approaches before action. |
-| `learn` | Capture durable corrections or preferences and write confirmed learnings only to `AGENTS.md`. |
+| `plan-feature` | Manual feature planning into PRDs and agent-ready issues, including prd-only and issues-from-existing-prd modes. |
+| `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
+| `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Configure tracker, delivery, context, and localization memory. |
 | `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with plan-feature gates, CLI subagents, opt-in App threads, ledgers, and closeout. |
-| `postgres` | Connect to Postgres, run SQL and diagnostics, inspect schemas and migrations, and review query performance. |
+| `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
-| `swift-api-design` | Design or review Swift APIs using curated summaries and a bundled copy of the official Swift API Design Guidelines. |
-| `swift-docc` | Write, structure, review, and publish Swift-DocC documentation using curated summaries and a bundled upstream DocC source tree. |
+| `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
+| `swift-docc` | Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources. |
 | `yeet` | Publish local work as a branch and draft PR by composing standalone git and GitHub skills. |
 
 ### TanStack References
@@ -86,7 +86,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 | Skill | Path | Purpose |
 | --- | --- | --- |
-| Maintainer | `.agents/skills/Maintainer/` | Maintain and improve skills or plugins, including description-budget and instruction-density reviews. |
+| Maintainer | `.agents/skills/Maintainer/` | Maintain repo skills and plugins through metadata, description, consistency, and refresh workflows. |
 
 Project-local skills are repository-specific and are not included in reusable install commands.
 

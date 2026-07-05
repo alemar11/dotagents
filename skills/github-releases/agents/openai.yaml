@@ -1,5 +1,5 @@
 interface:
   display_name: "GitHub Releases"
-  short_description: "Plan, check, and publish GitHub releases."
+  short_description: "Check, plan, draft, publish, and validate GitHub releases."
   brand_color: "#7C3AED"
   default_prompt: "Use $github-releases to check tags, GitHub Releases, generated notes, and package availability with direct git, gh, and registry commands."

@@ -1,6 +1,6 @@
 ---
 name: github-portfolio-triage
-description: Use when scanning multiple explicit GitHub repositories for read-only queue, PR, issue, CI, release, blocker, and next-action summaries.
+description: Scan multiple GitHub repos read-only for queue, PR, issue, CI, release, blocker, and next-action summaries.
 ---
 
 # GitHub Portfolio Triage

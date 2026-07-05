@@ -1,6 +1,6 @@
 ---
 name: code-wiki
-description: Study, explain, document, or onboard onto a local repo or git URL by generating an evidence-backed linked HTML code wiki.
+description: Generate an evidence-backed linked HTML wiki for a local repository or git URL.
 ---
 
 # Code Wiki

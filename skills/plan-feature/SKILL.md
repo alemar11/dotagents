@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: Use when explicitly invoked to plan a feature into a PRD and agent-ready issues, including prd-only and issues-from-existing-prd modes.
+description: Manual feature planning into PRDs and agent-ready issues, including prd-only and issues-from-existing-prd modes.
 ---
 
 # Plan Feature

@@ -1,6 +1,6 @@
 ---
 name: github-review-threads
-description: Use when listing, understanding, drafting, or posting replies to GitHub pull request review threads and conversation comments.
+description: Inspect PR review threads, draft or post replies, and manage conversation comments.
 ---
 
 # GitHub Review Threads

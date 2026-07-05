@@ -1,6 +1,6 @@
 ---
 name: github-releases
-description: Use when checking, planning, drafting, publishing, or validating GitHub Releases, git tags, generated release notes, or package availability after release.
+description: Check, plan, draft, publish, and validate GitHub releases, tags, release notes, and packages.
 ---
 
 # GitHub Releases

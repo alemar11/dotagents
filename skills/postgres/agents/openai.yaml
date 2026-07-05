@@ -1,6 +1,6 @@
 interface:
   display_name: "Postgres"
-  short_description: "Connect to Postgres, run SQL and diagnostics, inspect schemas and migrations, and review query performance."
+  short_description: "Connect to Postgres, run SQL/diagnostics, inspect schemas, and review queries."
   brand_color: "#0064a5"
   icon_small: "./assets/postgresql-small.svg"
   icon_large: "./assets/postgresql.png"

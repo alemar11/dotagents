@@ -1,6 +1,6 @@
 ---
 name: Maintainer
-description: Maintain and improve one or more skills or plugins in this repository with shared upgrade workflows and skill-specific refresh tasks.
+description: Maintain repo skills and plugins through metadata, description, consistency, and refresh workflows.
 ---
 
 # Maintainer

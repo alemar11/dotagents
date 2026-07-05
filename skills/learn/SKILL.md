@@ -1,6 +1,6 @@
 ---
 name: learn
-description: Capture durable corrections or preferences and write confirmed learnings only to AGENTS.md. Use when the user sets lasting guidance.
+description: Capture confirmed durable corrections or preferences and write them only to AGENTS.md.
 ---
 
 # Learn From Mistakes

@@ -1,6 +1,6 @@
 ---
 name: postgres
-description: Connect to Postgres databases, run SQL and diagnostics, inspect schemas and migrations, review query performance, and use common PostGIS or pgvector patterns.
+description: Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns.
 ---
 
 # Postgres
