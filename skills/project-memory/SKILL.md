@@ -25,7 +25,8 @@ domain-memory layout, localization policy, or `AGENTS.md` pointers change.
 
 - Always use `AGENTS.md` for setup pointers when an agent-instruction file is
   needed.
-- Keep `AGENTS.md` pointer-first: operating rules stay there; domain context,
+- Keep `AGENTS.md` pointer-first: it is an operating index, not the durable
+  home for project knowledge. Operating rules stay there; domain context,
   tracker detail, planning history, localization rules, and accepted decisions
   move to project memory.
 - Load and follow `$domain-modeling` before creating or updating `CONTEXT.md`

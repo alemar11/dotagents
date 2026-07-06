@@ -175,6 +175,13 @@ Keep the PRD implementation-facing:
 - risks and open questions,
 - notes for later issue splitting.
 
+Before returning, writing, or publishing the PRD, run a small documentation
+gate: verify that evidence references are portable, runtime worker settings are
+absent, delivery expectations are not presented as completion proof, open
+questions are explicit, and rationale is sufficient for issue splitting without
+turning the PRD into an implementation plan. Repair the PRD before output when
+this gate fails.
+
 Do not include workflow status fields such as `Status: Draft` in the PRD body.
 PRD readiness and lifecycle state belong in the issue tracker, mapped labels,
 or the generated implementation issues, not in the PRD content itself.

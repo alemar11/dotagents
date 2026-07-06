@@ -286,6 +286,14 @@ verticality gate passes for every issue or withholds every unresolved anomaly.
 If the gate changes issue IDs, dependencies, titles, validation, or affected
 repos, update all affected issue bodies before output.
 
+Before assigning final metadata, returning bodies, writing files, or publishing
+issues, run a small documentation gate over the final issue bodies. Verify that
+each issue has portable evidence references, no runtime worker settings,
+consistent handoff/delivery/completion wording, enough rationale for the next
+agent to act without rereading the entire PRD, and no duplicated or nested
+sections introduced by `$plan-harder`. Repair the issue bodies before output
+when this gate fails.
+
 ### 5. Apply Issue Type And Triage State
 
 Read `project-memory/agents/triage-labels.md` and map canonical issue types

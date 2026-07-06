@@ -39,7 +39,8 @@ Do not use this skill for:
 3. Verify each finding in the real code before accepting it.
 4. Fix only the accepted findings.
 5. Rerun focused tests or proof if code changed.
-6. Rerun the same `scripts/autoreview` mode.
+6. Rerun the same `scripts/autoreview` mode, verifying previously accepted
+   findings before treating newly surfaced broad concerns as actionable.
 7. Stop once the helper is clean or the remaining findings were consciously
    rejected with a reason.
 
@@ -75,7 +76,9 @@ Do not use this skill for:
 5. Prefer small fixes at the right ownership boundary. Do not refactor unless it
    clearly addresses the accepted bug class.
 6. If a review-triggered fix changes code, rerun focused tests and rerun
-   `scripts/autoreview` on the updated target.
+   `scripts/autoreview` on the updated target. First verify that the accepted
+   findings from the previous pass are resolved; treat unrelated new findings
+   as advisory unless they expose a concrete regression in the changed scope.
 7. Stop once the helper exits cleanly with no accepted/actionable findings. Do
    not run an extra review only to get nicer closeout wording.
 

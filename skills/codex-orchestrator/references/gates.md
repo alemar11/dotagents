@@ -22,6 +22,26 @@ PR or issue links, resolved review-thread links, Markdown checkbox diffs,
 TODO-removal diffs, screenshots, rendered artifacts, API responses, release
 URLs, timestamps, and owner decisions.
 
+## Gate Lenses And Stable Review Items
+
+Use the narrowest review lens that matches the current phase:
+
+- `source-readiness`: source scope, PRD or issue readiness, dependencies, and
+  blockers.
+- `implementation`: code behavior, regressions, tests, and live proof.
+- `documentation`: durable wording, portable evidence, rationale, and handoff
+  clarity.
+- `publication`: branch, checkout, PR, source mutation, and closeout safety.
+- `integration`: cross-repo or cross-package compatibility and proof.
+
+When a gate or review pass finds actionable items, keep those items stable until
+they are resolved or consciously rejected. A stable item needs an id, lens,
+scope, check or finding, evidence, status, and disposition. On reruns, verify
+the existing accepted items first; add new items only when new evidence or a
+changed scope exposes a distinct issue. Do not create a separate review
+artifact only to hold these items when the ledger, issue comment, or final
+report already records them clearly.
+
 ## Structured Gate Values
 
 Use the gate names listed in `## Universal Gates` and the sections below. Use
