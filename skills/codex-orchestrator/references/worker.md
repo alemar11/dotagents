@@ -28,8 +28,8 @@ Session fields:
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces available for the current orchestrator session. `cli-subagent` is authorized by invoking `$codex-orchestrator` unless the owner disables delegation. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner consented to that surface. |
-| `actual_workstream_surface` | `codex-app-thread`, `cli-subagent`, `no-delegation` | Where the workstream actually runs. Do not present hidden subagents as visible App threads. |
-| `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. |
+| `actual_workstream_surface` | `root-thread`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-thread` owner-facing as `root thread (no-delegation)`. Do not present hidden subagents as visible App threads. |
+| `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `review-ready`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. `review-ready` also requires exact root-listed sub-actions. |
 
 Worker report fields:
 
@@ -46,7 +46,7 @@ Integration fields:
 | `branch_expectation` | `feature-branch`, `repo-feature-branch`, `direct-commit-target`, `none` | Expected landing target. |
 | `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, `pending` | Root integration path. Replace `pending` before lifecycle closeout or record that no output was integrated. |
 | `caller_checkout_policy` | `preserve-current-branch`, `caller-checkout-approved`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
-| `publication_checkout` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, and draft PR publication will run. |
+| `publication_checkout` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, draft PR publication, and ready-for-review transition will run. |
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
@@ -223,8 +223,8 @@ Then include one row per workstream:
 | <wave> | <name/ref> | <root thread (no-delegation), cli-subagent, or codex-app-thread> | <repo/package/paths> | <independent, depends-on proof, or root-integrated> | <authorization modes and limits> | <patch/report/commit/PR> |
 
 A workstream defines the implementation slice. It creates a worker only when
-its `Surface` is `cli-subagent` or `codex-app-thread`; `no-delegation` means
-the root orchestrator thread owns that slice directly.
+its `Surface` is `cli-subagent` or `codex-app-thread`; `root thread
+(no-delegation)` means the root orchestrator thread owns that slice directly.
 
 For root-only work, do not write `none; root-owned` in the owner-facing
 report. Write `Surface: root thread (no-delegation)` in the wave table. If no
@@ -266,14 +266,15 @@ permission to change branch/PR strategy.
 
 | Mode | Worker handling |
 | --- | --- |
-| `pull-request` | Root owns the branch/PR shape. In single-repo or monorepo work, workers provide patches, helper-worktree diffs, handoff, or reviewed commits unless root explicitly grants publication modes. In multi-repo work, repo-scoped workers may prepare their repo branch/PR only when `commit`, `push`, and/or `pr` modes are explicitly listed. |
+| `pull-request` | Root owns the branch/PR shape, Codex review disposition, and merge-ready decision. In single-repo or monorepo work, workers provide patches, helper-worktree diffs, handoff, or reviewed commits unless root explicitly grants publication modes. In multi-repo work, repo-scoped workers may prepare their repo branch/PR only when `commit`, `push`, `pr`, and/or `review-ready` modes plus exact `review-ready` sub-actions are explicitly listed. |
 | `direct-commit` | Use only with explicit owner authorization recorded in the prompt and ledger. |
 
 If assigned delivery mode conflicts with repo reality, stop and report
 `needs-owner`; do not choose a new branch or PR strategy. Workers may commit,
-push, or open a draft PR only when the prompt names the exact repository,
-branch/refspec, PR shape, closeout target, and corresponding authorization
-modes. `pr` is not a shortcut for commit or push.
+push, open a draft PR, mark a PR ready for review, or request Codex review only
+when the prompt names the exact repository, branch/refspec, PR shape, closeout
+target, corresponding authorization modes, and, for `review-ready`, exact
+sub-actions. `pr` is not a shortcut for commit, push, or `review-ready`.
 
 ## Worker Status Vs Root Lifecycle
 
@@ -424,9 +425,10 @@ Record one or more authorization modes for the specific workstream. Modes are
 capability flags, not a cumulative ladder. The root derives them from the owner
 request, source item, linked `Source PRD`, publication authority, issue mutation
 authority, selected worker surface, dependency state, dirty-worktree state, and
-gates. If a worker may edit, commit, push, and open a draft PR, record
-`implement, commit, push, pr`. If it may only open a PR from an already-pushed
-branch, record `pr` only.
+gates. If a worker may edit, commit, push, open a draft PR, mark it ready for
+review, and request Codex review, record `implement, commit, push, pr,
+review-ready` plus the `mark-ready` and `request-codex-review` sub-actions. If
+it may only open a PR from an already-pushed branch, record `pr` only.
 
 - `inspect`: read-only investigation, issue/PR/CI inspection, repo scan, or
   design review. No file edits unless explicitly listed in allowed surfaces.
@@ -450,7 +452,18 @@ branch, record `pr` only.
   is the first mode that may place GitHub closing keywords such as `Closes #123`
   in a PR body when the generated issue's closeout path calls for PR-body
   closure. It does not permit local commits or push unless those modes are also
-  listed, and it does not authorize merge, release, or direct issue mutation.
+  listed, and it does not authorize ready-for-review transition, Codex review
+  request, merge, release, or direct issue mutation.
+- `review-ready`: umbrella capability for exact root-listed PR-review
+  sub-actions: `mark-ready`, `request-codex-review`, `poll-codex-review`, and
+  `post-root-supplied-disposition`. A worker may perform only the listed
+  sub-actions for the assigned PR. Posting a disposition requires
+  root-supplied text and supporting evidence; evaluating Codex feedback,
+  deciding whether fixes are needed, and accepting residual risk remain
+  root-owned unless the root also explicitly lists the needed `implement`,
+  `commit`, or `push` modes. It does not permit code edits, commits, pushes,
+  asking Codex to fix issues with a cloud task, merge, release, or direct issue
+  mutation unless those modes or instructions are also explicitly listed.
 - `ci-rerun-fix`: rerun checks, inspect CI logs, and diagnose or verify a known
   PR or branch when the root assignment names the failing checks. Any edits,
   commits, or pushes for CI repair also require the corresponding `implement`,
@@ -471,7 +484,7 @@ Scope:
 - Worker surface: <codex-app-thread|cli-subagent>
 - Worker ID/title: <id/title or pending>
 - Worker evidence: requested=<none|cli-subagent|codex-app-thread>;
-  authorized_or_consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>;
+  authorized_or_consented=<true|false>; actual=<root-thread|cli-subagent|codex-app-thread>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
 - Wave: <number>
@@ -480,13 +493,15 @@ Scope:
 - Source ref: <URL, path:line, heading, run id, or ledger item>
 - Acceptance criteria: <source-owned completion criteria>
 - Closeout target: <issue close, PR reply, file checkbox/patch, CI rerun, ledger status>
-- Authorization modes: <one or more of inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release>
+- Authorization modes: <one or more of inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|merge-close|release>
+- Review-ready sub-actions: <mark-ready|request-codex-review|poll-codex-review|post-root-supplied-disposition or not-applicable>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Delivery mode: <pull-request|direct-commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
 - Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
 - Orchestrator handoff: <source PRD; feature slug; affected repos/product scope; scope; start rule; validation; closeout, or none for ad hoc work>
-- Publication authority: <none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|blocked, with reason>
+- Publication authority: <none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked, with reason>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
+- Codex PR review: <not-applicable|not-requested|requested|received|passed|blocked>
 - Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <feature-branch|repo-feature-branch|direct-commit-target|none>
@@ -498,8 +513,8 @@ Scope:
 - Helper checkout/worktree: <path or unknown>
 - Next ledger check: <time/action or none>
 - Forbidden actions: no subdelegation, no ledger edits, no unrelated cleanup,
-  no worker/thread/chat management, no commit/push/PR/merge/release unless this
-  mode explicitly permits it.
+  no worker/thread/chat management, no commit/push/PR/Codex-review
+  request/merge/release unless this mode explicitly permits it.
 
 Context:
 - Owner request: <summary>
@@ -524,7 +539,8 @@ Final report:
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
 - Delivery: delivery mode, branch or PR used, closeout path, and PR links or
-  `none`; include publication checkout and caller checkout disposition
+  `none`; include ready-for-review state, Codex review state, publication
+  checkout, and caller checkout disposition
 - Worker evidence: requested, authorized or consented, and actual surface; worker id or session
   evidence; unavailable or failed tool evidence; fallback reason; and whether
   execution was parallel, sequential, root-owned, or simulated

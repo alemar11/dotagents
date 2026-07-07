@@ -8,12 +8,14 @@ should not weaken these defaults without explicit owner approval.
 
 Gate selection is per workstream. Always evaluate `authorization` and
 `closure`. Add `live-proof` for user-facing behavior, `autoreview` for
-non-trivial code edits, `ci` for merge or release readiness, `owner-decision`
-when progress depends on approval or risk acceptance, `release` only for tag,
-package, deploy, or promotion work, `public-model-identifier` only when public
-names or API fields are changed or exposed, `cross-repo-integration` only when
-multiple repositories or packages must remain compatible, and
-`publication-safety` before push or draft PR publication. Record
+non-trivial code edits, `ci` for merge or release readiness,
+`codex-pr-review` before declaring pull-request delivery merge-ready,
+`owner-decision` when progress depends on approval or risk acceptance,
+`release` only for tag, package, deploy, or promotion work,
+`public-model-identifier` only when public names or API fields are changed or
+exposed, `cross-repo-integration` only when multiple repositories or packages
+must remain compatible, and `publication-safety` before push, draft PR
+publication, or a ready-for-review transition. Record
 `not-applicable` only with a short reason in the ledger gate matrix.
 
 Proof means root-verifiable evidence, not only a worker assertion. Acceptable
@@ -53,8 +55,8 @@ these `gate_status` values in the ledger gate matrix:
 - `not-applicable`: gate does not apply, with a short recorded reason.
 
 `publication-safety` owns `push_policy`, `branch_target_guard`,
-`publication_checkout_guard`, `caller_checkout_guard`, `pr_diff_status`, and
-`post_push_verification` values.
+`publication_checkout_guard`, `caller_checkout_guard`, `pr_diff_status`,
+`ready_for_review_state`, and `post_push_verification` values.
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
@@ -72,13 +74,20 @@ to imply local commit creation.
 For PRD-backed workflows, branch plus draft PR delivery in the PRD or generated
 issue can satisfy authorization for commit, push, and draft PR creation after
 tests, integration checks, and `$autoreview` pass, unless the owner restricted
-the request to local-only, inspect-only, no-push, or no-PR work. Record that as
-publication authority in the ledger. This does not authorize merge, release,
-direct issue mutation, production deploy, or unrelated GitHub cleanup.
+the request to local-only, inspect-only, no-push, no-PR, or equivalent work.
+Ready-for-review transition and a Codex PR review request require separate
+merge-ready closeout authority from the source or current owner request, such
+as `publication_authority=prd-backed-merge-ready-pr` or
+`publication_authority=explicit-owner-authorization` with those actions named.
+`stay-draft` or equivalent wording blocks the transition until the owner
+changes that decision. Record the resolved publication authority in the ledger.
+This does not authorize merge, release, direct issue mutation, production
+deploy, or unrelated GitHub cleanup.
 
 ### Publication Safety Gate
 
-Before push or draft PR publication, evaluate `publication-safety`. Record:
+Before push, draft PR publication, or ready-for-review transition, evaluate
+`publication-safety`. Record:
 
 - `push_policy`: `no-push`, `explicit-refspec-only`, or `block-plain-push`.
 - `branch_target_guard`: `default-branch-blocked`,
@@ -88,6 +97,7 @@ Before push or draft PR publication, evaluate `publication-safety`. Record:
 - `caller_checkout_guard`: `preserved`, `explicitly-approved-switch`, or
   `not-applicable`.
 - `pr_diff_status`: `non-empty`, `empty`, or `not-checked`.
+- `ready_for_review_state`: `draft`, `ready`, `not-checked`, or `not-applicable`.
 - `post_push_verification`: `verified`, `failed`, or `not-applicable`.
 
 Publication should use an explicit refspec, target the expected feature branch,
@@ -131,12 +141,22 @@ the configured move to `issues/done/` after validation and proof; do not treat a
 commit alone as local issue closure.
 
 For PRD-backed workflows with authorized branch plus draft PR delivery, do not
-declare the workstream `completed` while the expected draft PR remains
-uncreated. Either record the draft PR URL and PR-body closeout path, or record
-the blocker and move the publication action to `needs-owner`, `blocked`, or
+declare the workstream `completed` while the expected PR remains uncreated.
+When merge-ready closeout authority exists, also do not declare completion while
+the PR is still draft after local gates pass or missing a satisfied
+`codex-pr-review` gate. Either record the PR URL, ready-for-review state, Codex
+review evidence when required, and PR-body closeout path, or record the blocker
+and move the publication or review action to `needs-owner`, `blocked`, or
 `deferred`. Treat direct issue comments, labels, manual issue closure, parent
 PRD closure, merge, and release as separate mutations that require explicit
 authority.
+
+For local markdown sources using `pull-request` delivery with merge-ready
+closeout authority or a merge-ready closeout target, do not move the issue to
+`issues/done/` until local validation, real PR proof, required CI or integration
+proof, and Codex review evidence plus disposition are recorded. If any proof is
+missing, keep the local issue open and record the remaining action as
+`needs-owner`, `blocked`, or `deferred`.
 
 If the implementation intentionally satisfies only part of the source item,
 keep the source item open or move it to `needs-owner` until the deferred scope
@@ -180,6 +200,46 @@ issues, then rerun focused tests and `$autoreview`.
 Before merge-ready or release-ready status, require current CI state or a clear
 reason CI is unavailable. Failing checks need a short failure summary, link, and
 owner-ready next action.
+
+### Codex PR Review Gate
+
+For `pull-request` delivery with merge-ready closeout authority or a merge-ready
+closeout target, require a Codex GitHub review before declaring the PR
+merge-ready or the workstream complete. This is distinct from local
+`$autoreview` and from Codex sandbox auto-review. If merge-ready closeout is
+expected but not authorized, stop as `needs-owner` or `blocked` before marking
+the PR ready for review.
+
+1. Verify the PR exists, targets the expected branch/base, contains the latest
+   intended commit, and has passed required local gates plus current CI or a
+   recorded CI blocker.
+2. If the PR is still draft, mark it ready for review with `gh pr ready <pr>`
+   or an equivalent authorized GitHub action, then record the non-draft state.
+3. Use `$github-review-threads` to post a top-level PR comment requesting Codex
+   review. The current official Codex GitHub trigger is exactly
+   `@codex review`; add a short focus after that phrase only when useful.
+4. Wait or poll until Codex reacts and posts a completed GitHub review for the
+   latest PR state. Do not treat a non-review PR comment, status update, cloud
+   task reply, or error response as review completion. If Codex does not post a
+   review, record the blocker and troubleshooting evidence: Code review enabled
+   for the repository, Codex cloud configured for the repository, and exact
+   `@codex review` trigger used.
+5. Evaluate Codex feedback. Fix accepted actionable findings, rerun the relevant
+   tests, `$autoreview`, CI, and review-thread checks, then push the update and
+   request or verify a fresh completed Codex review when the diff materially
+   changed.
+6. For findings judged non-actionable, not applicable, or intentionally
+   deferred, post a PR discussion update with the disposition, evidence, and
+   validation so the discussion is not left silent. If Codex reports no
+   findings, or every finding is fully addressed by commits plus validation,
+   record `no-update-needed` in the ledger instead of posting a redundant
+   comment.
+
+This gate passes only when the PR is non-draft, a completed Codex GitHub review
+exists for the current PR state, actionable feedback is fixed or explicitly
+dispositioned, the PR discussion was updated or explicitly marked
+`no-update-needed`, and no required check blocks human merge. It does not
+authorize merging the PR.
 
 ### Owner Decision Gate
 

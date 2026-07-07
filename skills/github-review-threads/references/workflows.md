@@ -19,7 +19,9 @@ skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <n
 skills/github-review-threads/scripts/reviews address --repo <owner/repo> --pr <number> --comment-ids "123456" --reply-body "<body>"
 ```
 
-Use `--dry-run` for batch replies unless the user already approved posting.
+Use `--dry-run` for batch replies unless the user already approved posting or a
+calling skill assignment names the exact PR, selected comments, reply body, and
+posting authority.
 
 ## Post Top-Level PR Discussion Comments
 
@@ -31,7 +33,13 @@ skills/github-review-threads/scripts/reviews comment --repo <owner/repo> --pr <n
 skills/github-review-threads/scripts/reviews comment --repo <owner/repo> --pr <number> --body-file <message-file>
 ```
 
-Use `--dry-run` unless the user explicitly asked to post the discussion comment.
+Use `--dry-run` unless the user explicitly asked to post the discussion comment
+or a calling skill assignment names the exact PR, comment body, and posting
+authority. `$codex-orchestrator` may use resolved
+`publication_authority=prd-backed-merge-ready-pr` or
+`publication_authority=explicit-owner-authorization` with those actions named
+to post the top-level `@codex review` request and any required root-supplied PR
+discussion disposition for that assigned PR.
 
 ## Fallback Direct Commands
 

@@ -53,7 +53,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Configure tracker, delivery, context, and localization memory. |
-| `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with plan-feature gates, CLI subagents, opt-in App threads, ledgers, and closeout. |
+| `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with Goal mode, gates, workers, ledgers, Codex PR review, and authorized merge-ready closeout. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |

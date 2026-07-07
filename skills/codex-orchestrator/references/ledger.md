@@ -125,6 +125,9 @@ Out of scope:
 Status: claimed|stale|released|takeover-recorded
 Root ID: <thread id, session id, or root descriptor>
 Root surface: codex-app-thread|cli|unknown
+Goal mode: active|unavailable|not-applicable
+Goal objective: <goal text or ledger fallback objective>
+Goal fallback reason: <none or why /goal/runtime goal tool was unavailable>
 Started: <YYYY-MM-DD HH:MM TZ>
 Last Progress Read: <YYYY-MM-DD HH:MM TZ>
 Next Root Check: <YYYY-MM-DD HH:MM TZ or none>
@@ -146,7 +149,7 @@ remaining.
 ## Worker And Delivery References
 
 Authorization resolution: per-workstream
-Assignable authorization modes: inspect|implement|commit|push|pr|ci-rerun-fix|merge-close|release
+Assignable authorization modes: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|merge-close|release
 Session CLI subagents consented: authorized-by-invocation|disabled|limited; max=<n|unbounded>
 Session Codex App threads consented: true|false; max=<n|unspecified>
 No subdelegation: true
@@ -168,6 +171,7 @@ Available gates:
 - live-proof
 - autoreview
 - ci
+- codex-pr-review
 - owner-decision
 - risk-follow-up
 - release
@@ -200,11 +204,11 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; authorized_or_consented=<true|false>; actual=<root|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
+| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; authorized_or_consented=<true|false>; actual=<root-thread|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
-| Delivery | <pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation> |
+| Delivery | <pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
@@ -239,8 +243,9 @@ Use one compact block per active workstream:
 
 ### completed
 
-- <source id/ref, delivery mode, branch/PR/proof, validation, source closeout target and
-  whether it was updated/closed, publication checkout, caller checkout disposition>
+- <source id/ref, delivery mode, branch/PR/proof, ready-for-review state, Codex
+  review proof, validation, source closeout target and whether it was
+  updated/closed, publication checkout, caller checkout disposition>
 - <worker id/title, integration method, publication checkout, caller checkout
   disposition, worker lifecycle decision, generated ignored artifacts
   removed/retained/left in helper worktree>
@@ -306,7 +311,7 @@ claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Owner-ready work still needing review, commit, push, PR, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. |
+| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. Ready-for-review transition and Codex review request require merge-ready closeout authority, such as `publication_authority=prd-backed-merge-ready-pr` or `publication_authority=explicit-owner-authorization` with those actions named. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
 | `completed` | Required gates passed and delivery contract is satisfied. Record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
@@ -319,6 +324,9 @@ Before marking a ledger `complete`, verify:
 
 - All discovery sources were rescanned or intentionally skipped with a recorded
   reason, cursor, and fingerprint.
+- The Goal mode objective is achieved, or Goal mode was unavailable and the
+  equivalent ledger fallback objective is achieved. If the objective is blocked,
+  record the concrete gate or blocker instead of marking the ledger complete.
 - The current active-root claim is `released`. If orchestration still has a
   concrete active worker, root-owned next check, or authorized next action, do
   not mark the ledger `complete`; keep the ledger active, paused, or blocked
@@ -331,16 +339,20 @@ Before marking a ledger `complete`, verify:
   `needs-owner`, `blocked`, or `deferred` with the missing authorization,
   decision, or follow-up.
 - PRD-backed work with authorized branch plus draft PR delivery either records
-  the published draft PR URL or records the exact blocker that prevents
-  publication; do not mark it complete while authorized commit, push, or draft
-  PR creation remains in `ready-next`.
+  the published PR URL or records the exact blocker that prevents publication;
+  do not mark it complete while authorized commit, push, or draft PR creation
+  remains in `ready-next`. When merge-ready closeout authority exists, also
+  record non-draft state, Codex review proof, and discussion disposition, and do
+  not mark it complete while ready-for-review transition, Codex review request,
+  completed-review wait, or review-triggered fix remains in `ready-next`.
 - `needs-owner` and `blocked` entries are explicitly non-Codex-actionable and
   include decision briefs, blockers, evidence, and minimum next actions.
 - `deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
 - `completed` records the final proof, source closeout state, integration
-  method, publication state, publication checkout, caller checkout disposition,
-  and worker lifecycle decision for each completed worker-backed item.
+  method, publication state, ready-for-review state, Codex review proof,
+  publication checkout, caller checkout disposition, and worker lifecycle
+  decision for each completed worker-backed item.
 - Generated ignored artifacts and helper worktrees are either removed, retained
   for inspection with a reason, left only inside a helper worktree with an
   explicit lifecycle decision, or explicitly handed off.

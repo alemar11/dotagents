@@ -29,10 +29,16 @@ no implicit config.
 
 1. Resolve the target PR and repository.
 2. List review context before replying.
-3. Draft comments or replies by default. Reference the implemented change and
-   verification.
+3. Draft comments or replies by default unless posting authority is explicit.
+   Reference the implemented change and verification.
 4. Post only when the user explicitly asks to post and the target comments or
-   threads are selected.
+   threads are selected, or when a calling skill assignment names the exact PR,
+   comment action, and posting authority. For `$codex-orchestrator`, resolved
+   `publication_authority=prd-backed-merge-ready-pr` or
+   `publication_authority=explicit-owner-authorization` with those actions named
+   is enough to post the top-level `@codex review` request and any required
+   root-supplied PR discussion disposition for that assigned PR. Do not infer
+   posting authority from an ordinary inspect, review, or draft request.
 5. Use `scripts/reviews comment --dry-run` for draft or multi-comment replies
    until posting authority is explicit.
 6. Use `scripts/reviews comment` for authorized top-level PR discussion

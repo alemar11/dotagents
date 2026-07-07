@@ -1,6 +1,6 @@
 ---
 name: codex-orchestrator
-description: Coordinate Codex workers, portfolio ledgers, gates, autoreview, Git/GitHub companion skills, and owner-ready closeout.
+description: Coordinate Codex Goal mode, workers, portfolio ledgers, gates, autoreview, Git/GitHub companion skills, and authorized merge-ready closeout.
 ---
 
 # Codex Orchestrator
@@ -10,15 +10,17 @@ description: Coordinate Codex workers, portfolio ledgers, gates, autoreview, Git
 Use this Codex-dependent skill as the control plane for maintainer work across
 one or more repositories. It coordinates named portfolio ledgers, read-only
 standalone Git/GitHub companion skills, visible Codex App worker threads,
-CLI/subagent worker threads, ledger-driven progress monitoring, gates,
-`$autoreview`, and owner-ready status reports.
+CLI/subagent worker threads, Codex Goal mode when available, ledger-driven
+progress monitoring, gates, `$autoreview`, and owner-ready or authorized
+merge-ready status reports.
 
 This skill is not a worker. It delegates scoped work, monitors progress, keeps
 the ledger current, and decides when a task is ready for owner review, commit,
 PR, release, or another explicit decision. Keep the root orchestrator thread
 lightweight: it owns routing, lifecycle, integration, gates, ledger updates,
-and final publication, while delegated workers own substantial repository
-inspection or implementation whenever delegation is authorized and useful.
+and final publication/authorized merge-ready closeout, while delegated workers
+own substantial repository inspection or implementation whenever delegation is
+authorized and useful.
 
 ## Invocation Boundary
 
@@ -37,7 +39,8 @@ inspection or implementation whenever delegation is authorized and useful.
 ## Root Ownership Contract
 
 - The root orchestrator owns routing, ledger updates, worker lifecycle,
-  integration choice, gate evaluation, and final closeout decisions.
+  integration choice, gate evaluation, Goal mode or ledger fallback state, and
+  final closeout decisions.
 - One active root orchestrator owns a project or portfolio source graph at a
   time. Before creating workers, starting root-owned implementation, or
   mutating source state, verify the active-root claim in the ledger and stop
@@ -70,7 +73,7 @@ migrates it.
 | --- | --- |
 | Rough feature or product intent without durable PRD plus generated issues | Route through `$plan-feature` full-flow before implementation scheduling. |
 | Existing durable PRD without generated issues | Route through `$plan-feature` `issues-from-existing-prd` mode unless the owner only asked for inspect-only review. |
-| PRD-backed issue, workspace partial PRD, or generated issue with `Source PRD` | Load `references/prd-backed-delivery.md` before scheduling. It owns partial-PRD graph expansion, draft PRD handling, delivery, publication, and issue-mutation authority. |
+| PRD-backed issue, workspace partial PRD, or generated issue with `Source PRD` | Load `references/prd-backed-delivery.md` before scheduling. It owns partial-PRD graph expansion, draft PRD handling, delivery, publication, Codex PR review, authorized merge-ready closeout, and issue-mutation authority. |
 | Durable generated issue with `## Orchestrator Handoff` | Register directly as a source item and use the handoff as the canonical issue-level dispatch contract. |
 | Durable generated issue missing `## Orchestrator Handoff` | Register only for inspection or route through `$plan-feature` `issues-from-existing-prd` / issue regeneration before implementation scheduling, unless the owner explicitly authorizes ad hoc execution from the current issue body. |
 | PR, CI failure, bug, local checklist, implementation plan, or explicit implementation request | Register directly as source items and decompose into workstreams. |
@@ -130,6 +133,34 @@ Run orchestration as bounded waves, not as a one-pass checklist:
 Each wave must produce at least one ledger state transition, new proof, source
 update, owner decision brief, or explicit no-progress/blocker record. Do not
 loop silently on the same worker status or source snapshot.
+
+## Goal Mode And Stop Contract
+
+For implementation or publication orchestration, establish an explicit Codex
+goal after resolving the active-root scope and before dispatching workers or
+starting root-owned work. In a Codex surface with Goal mode, set it with
+`/goal` or the equivalent runtime goal tool. Use a goal in this shape:
+
+```text
+Complete <portfolio/source scope> through validated closeout and, for
+pull-request delivery, an authorized merge-ready PR state. Keep going until
+completion or a real gate/blocker stops progress.
+```
+
+Real gates or blockers include missing owner decisions, missing credentials or
+access, failed required gates, unsafe or contradictory source contracts,
+unavailable required runtime tools, unresolved dependency proof, external CI or
+Codex review waits that cannot be polled from the current runtime or have a
+recorded timeout/blocker, missing merge-ready closeout authority, or explicit
+owner stop conditions. They do not include ordinary multi-step work, newly
+unblocked waves, review-triggered fixes, pollable CI or Codex review waits, or
+authorized `ready-next` actions.
+
+If Goal mode is unavailable, disabled, or not exposed in the current surface, do
+not block only for that reason. Record the same objective and fallback reason in
+the ledger's active-root section, then run the same stop contract from the
+ledger. Do not use `/goal` to bypass gates, authorization boundaries, owner
+decisions, or source closeout rules.
 
 ## Runtime Surfaces
 
@@ -197,8 +228,8 @@ and overrides.
 Before scheduling or publishing PRD-backed work, load
 `references/prd-backed-delivery.md`. That reference owns delivery authority,
 publication authority, issue mutation authority, draft PRD handling,
-PRD-backed publication, issue-level scheduling values, ad hoc publication
-limits, and closeout rules.
+PRD-backed publication, Codex PR review, issue-level scheduling values, ad hoc
+publication limits, and closeout rules.
 
 If dependency refs, `Source PRD`, closeout path, delivery mode, or
 parallelization are missing, malformed, cyclical, contradictory, or unsafe, or
@@ -217,7 +248,7 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
 | GitHub issue creation, comments, labels, issue types, closure, or parent/sub-issue relationships | `$github-issues` |
 | Evidence-first issue, PR, bug, root-cause, or fix-quality review | `$github-deep-review` |
 | GitHub Actions runs, pending checks, or failing PR logs | `$github-ci` |
-| PR review threads, comment context, or selected replies | `$github-review-threads` |
+| PR review threads, Codex review requests, comment context, or selected replies | `$github-review-threads` |
 | Release readiness, tags, GitHub Releases, notes, assets, or package availability | `$github-releases` |
 | Local staging, commit authoring, and push-only flows | `$git-commit` |
 | Full local checkout publish flow to branch plus draft PR | `$yeet` |
@@ -229,7 +260,9 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    the active-root claim before creating workers, starting implementation, or
    mutating source state. If another live root claims an overlapping repo or
    source id, stop as `needs-owner` and offer resume, wait, handoff, or
-   explicit takeover.
+   explicit takeover. After the active-root scope is known, establish the Goal
+   Mode And Stop Contract above or record its ledger fallback before worker
+   dispatch or root-owned implementation.
 2. Snapshot and register task sources: repos, source ids/refs, closeout targets,
    mutation authority, owner constraints, delivery or `Source PRD` inheritance,
    scheduling constraints, gate overrides, suppressed items, and, for generated
@@ -267,16 +300,25 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    source closeout. Apply `references/gates.md` before owner-ready, issue-closed,
    merge-ready, release-ready, or final status. For non-trivial edits, require
    focused tests and `$autoreview`; rerun both after review-triggered changes.
+   For `pull-request` delivery with merge-ready closeout authority, the root may
+   not declare merge-ready until the PR is out of draft, a Codex GitHub review
+   was requested with `@codex review`, a completed Codex GitHub review exists
+   for the latest PR state, and actionable feedback has been resolved or
+   explicitly dispositioned under the `codex-pr-review` gate. If only draft PR
+   publication is authorized, record the draft PR state and stop short of
+   merge-ready.
 8. Mutate source state and target-repo `AGENTS.md` only when authorized. For
    target-repo instructions, apply the `Target Repo Instructions` rules above.
    For source items published by
    `$plan-feature`, treat the published PRD and generated issues as planning
    inputs; after workstream registration, lifecycle comments, labels, direct
-   closure, real PR links, and integration proof are orchestrator closeout work.
+   closure, real PR links, Codex PR review evidence, and integration proof are
+   orchestrator closeout work.
    Use `$github-issues` for GitHub issue lifecycle work,
-   `$github-review-threads` for PR replies, `$git-commit` for commit/push-only
-   delivery, and `$yeet` when draft PR creation or update is part of the
-   resolved path. If partial source closeout cannot be applied, keep the
+   `$github-review-threads` for PR replies, Codex review requests, and
+   PR-discussion updates, `$git-commit` for commit/push-only delivery, and
+   `$yeet` when draft PR creation or update is part of the resolved path. If
+   partial source closeout cannot be applied, keep the
    proposed update owner-ready rather than calling the source complete.
 9. Before stopping, execute every authorized `ready-next` action. If anything
    actionable remains, return to source reconciliation and start the next
@@ -301,7 +343,8 @@ evidence, execution-mode, lifecycle, and ledger closeout fields.
 - `references/worker.md`: worker prompt template, authorization modes, no
   subdelegation rule, and final report format.
 - `references/prd-backed-delivery.md`: PRD/generated-issue delivery contracts,
-  publication authority, and closeout rules.
+  publication authority, Codex PR review, authorized merge-ready closeout, and
+  closeout rules.
 - `references/gates.md`: universal gate catalog for owner-ready, merge, release,
   CI, autoreview, and cross-repo integration decisions.
 

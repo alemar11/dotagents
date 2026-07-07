@@ -1,7 +1,7 @@
 interface:
   display_name: "Codex Orchestrator"
-  short_description: "Coordinate PRD-backed or queue-driven work with $plan-feature gates, CLI subagents, opt-in App threads, ledgers, and closeout."
+  short_description: "Coordinate PRD-backed or queue-driven work with Goal mode, gates, workers, ledgers, Codex PR review, and authorized merge-ready closeout."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $codex-orchestrator for explicit orchestration sessions: reconcile sources, route planning through $plan-feature when needed, use CLI subagents by default unless I say root only or no subagents, ask before creating bounded visible Codex App worker threads, maintain the ledger, apply gates, and return owner-ready closeout."
+  default_prompt: "Use $codex-orchestrator for explicit orchestration sessions: reconcile sources, set a Codex goal when Goal mode is available, route planning through $plan-feature when needed, use CLI subagents by default unless I say root only or no subagents, ask before creating bounded visible Codex App worker threads, maintain the ledger, apply gates, keep going until completion or a real gate/blocker, and drive pull-request delivery through Codex PR review before authorized merge-ready closeout."
 policy:
   allow_implicit_invocation: false
