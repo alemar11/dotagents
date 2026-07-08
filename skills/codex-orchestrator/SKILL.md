@@ -304,9 +304,12 @@ Use the smallest standalone companion skill for each Git or GitHub workstream:
    not declare merge-ready until the PR is out of draft, a Codex GitHub review
    was requested with `@codex review`, a completed Codex GitHub review exists
    for the latest PR state, and actionable feedback has been resolved or
-   explicitly dispositioned under the `codex-pr-review` gate. If only draft PR
-   publication is authorized, record the draft PR state and stop short of
-   merge-ready.
+   explicitly dispositioned under the `codex-pr-review` gate. Do not final-answer
+   as complete, released, or merge-ready while the review is only requested,
+   accepted feedback is still local, uncommitted, unpushed, pending validation,
+   pending fresh review, or the publication checkout still has review-fix
+   changes. If only draft PR publication is authorized, record the draft PR state
+   and stop short of merge-ready.
 8. Mutate source state and target-repo `AGENTS.md` only when authorized. For
    target-repo instructions, apply the `Target Repo Instructions` rules above.
    For source items published by

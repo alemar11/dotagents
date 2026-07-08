@@ -235,6 +235,26 @@ the PR ready for review.
    record `no-update-needed` in the ledger instead of posting a redundant
    comment.
 
+Use this closeout state order for merge-ready PR work:
+
+1. `draft-pr-published`
+2. `ready-for-review`
+3. `codex-review-requested`
+4. `latest-head-review-received`
+5. `feedback-dispositioned`
+6. `fixes-validated-and-pushed`
+7. `post-fix-ci-current`
+8. `fresh-latest-head-review-current`
+9. `merge-ready-report`
+
+Do not final-answer from an intermediate state as complete, released, or
+merge-ready. In particular, keep the ledger active, `ready-next`, or blocked
+while review is only requested, accepted findings are unresolved, a review fix is
+dirty in any publication checkout, a fix is committed but unpushed, checks are
+pending for the pushed fix, a fresh latest-head Codex review is pending after a
+material diff change, or PR review threads remain unresolved without an explicit
+disposition.
+
 This gate passes only when the PR is non-draft, a completed Codex GitHub review
 exists for the current PR state, actionable feedback is fixed or explicitly
 dispositioned, the PR discussion was updated or explicitly marked

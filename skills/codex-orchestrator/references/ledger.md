@@ -344,7 +344,14 @@ Before marking a ledger `complete`, verify:
   remains in `ready-next`. When merge-ready closeout authority exists, also
   record non-draft state, Codex review proof, and discussion disposition, and do
   not mark it complete while ready-for-review transition, Codex review request,
-  completed-review wait, or review-triggered fix remains in `ready-next`.
+  completed-review wait, review-triggered fix, post-fix validation, fresh-review
+  wait, or PR-thread disposition remains in `ready-next`.
+- For merge-ready closeout, verify the publication checkout is clean, accepted
+  review fixes are committed and pushed to the PR branch, current CI belongs to
+  the pushed head, the latest Codex review covers that same head, and unresolved
+  review threads are either fixed, explicitly dispositioned, or recorded as a
+  blocker. If any check fails, keep the ledger active, `ready-next`, or blocked
+  instead of `complete`.
 - `needs-owner` and `blocked` entries are explicitly non-Codex-actionable and
   include decision briefs, blockers, evidence, and minimum next actions.
 - `deferred` contains only residual work with a linked or proposed
