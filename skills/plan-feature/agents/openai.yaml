@@ -1,7 +1,7 @@
 interface:
   display_name: "Plan Feature"
-  short_description: "Manual feature planning into PRDs and agent-ready issues."
+  short_description: "Manual feature planning into Product Requirements Documents (PRDs) and agent-ready issues."
   brand_color: "#10B981"
-  default_prompt: "Use $plan-feature to choose the planning mode, ensure project-memory setup, write or publish the PRD to the configured tracker by default, and split it into hardened vertical issues when requested."
+  default_prompt: "Use $plan-feature to choose the planning mode, ensure project-memory setup, write or publish the Product Requirements Document (PRD) to the configured tracker by default, and split it into hardened vertical issues when requested."
 policy:
   allow_implicit_invocation: false

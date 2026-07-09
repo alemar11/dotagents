@@ -1,6 +1,6 @@
 ---
 name: plan-feature
-description: Manual feature planning into PRDs and agent-ready issues, including prd-only and issues-from-existing-prd modes.
+description: Manual feature planning into Product Requirements Documents (PRDs) and agent-ready issues, including prd-only and issues-from-existing-prd modes.
 ---
 
 # Plan Feature
@@ -8,7 +8,7 @@ description: Manual feature planning into PRDs and agent-ready issues, including
 ## Goal
 
 Run feature planning from one public invocation. This skill owns the planning
-pipeline and its internal PRD and issue phases:
+pipeline and its internal Product Requirements Document (PRD) and issue phases:
 
 `$project-memory` if needed -> `$grill-me-with-context` when scope needs
 clarification -> PRD phase -> issue phase with `$plan-harder` per generated
@@ -17,6 +17,10 @@ issue.
 Use this skill to turn rough feature intent into a written PRD and agent-ready
 vertical issues. In orchestrator workspaces, those issues may be cross-repo
 vertical outcomes. Do not implement the feature.
+
+A feature is the capability or outcome being planned; the PRD is the durable
+planning artifact that describes that feature's scope, requirements, acceptance
+criteria, and delivery mode.
 
 ## Invocation Boundary
 

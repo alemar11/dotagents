@@ -49,7 +49,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `plan-feature` | Manual feature planning into PRDs and agent-ready issues, including prd-only and issues-from-existing-prd modes. |
+| `plan-feature` | Manual feature planning into Product Requirements Documents (PRDs) and agent-ready issues, including prd-only and issues-from-existing-prd modes. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Configure tracker, delivery, context, and localization memory. |
