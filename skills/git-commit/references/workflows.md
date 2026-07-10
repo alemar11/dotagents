@@ -16,6 +16,7 @@ Use when changes are tiny, cohesive, and low risk:
 
 ```bash
 git status --short --branch
+git diff --staged --name-status
 git diff -- <path>
 git add -- <path>
 git diff --staged --stat
@@ -26,7 +27,9 @@ git log -1 --pretty=fuller
 ```
 
 Keep this command order when practical so session evidence stays easy to
-recognize during audits.
+recognize during audits. The first staged-path read must happen before any
+`git add`; otherwise pre-existing staged work is indistinguishable from the
+newly selected commit scope.
 
 ## Safe Path
 
@@ -35,6 +38,8 @@ matters:
 
 ```bash
 git status --short --branch
+git diff --staged --name-status
+git diff --staged --stat
 git diff --stat
 git diff -- <path>
 git add -- <explicit-paths>
@@ -42,7 +47,34 @@ git diff --staged --stat
 git diff --staged
 ```
 
-Do not commit if staged files and the commit message describe different work.
+Compare the staged paths recorded before `git add` with the intended paths. Do
+not commit if staged files and the commit message describe different work. Do
+not run `git reset`, `git restore --staged`, or another index rewrite merely to
+clear unrelated staged work; it belongs to the user.
+
+## Pre-existing Staged Work
+
+When the initial `git diff --staged --name-status` is non-empty:
+
+- Continue normally only when every pre-existing staged path is part of the
+  explicitly intended commit and its staged content has been reviewed.
+- Stop when any pre-existing staged path is unrelated or its ownership is
+  unclear. Report the paths and leave the index untouched.
+- If the user explicitly wants a commit of complete intended files while
+  preserving unrelated staged entries, review the full intended path contents
+  against `HEAD`, then isolate with Git's path-limited commit:
+
+```bash
+git diff HEAD -- <explicit-paths>
+git commit --only -F "$message_file" -- <explicit-paths>
+git status --short --branch
+git diff --staged --name-status
+```
+
+`git commit --only` commits the current complete contents of the named paths
+while excluding other staged paths. Do not use it when only selected hunks of
+an intended file should be committed; stop and ask the user to finish or
+authorize index isolation instead.
 
 If the user said only `commit`, stop after commit verification unless they also
 asked to push.
@@ -60,6 +92,7 @@ PR.
 
 ```bash
 git status --short --branch
+git diff --staged --name-status
 git diff --stat
 git diff -- <explicit-paths>
 git add -- <explicit-paths>

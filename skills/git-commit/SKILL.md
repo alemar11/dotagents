@@ -13,11 +13,13 @@ For the common case of a small cohesive change and a user ask like `commit`,
 `commit this`, or `commit and push`, stay on the shortest safe path:
 
 1. `git status --short --branch`
-2. `git diff -- <path>` for the intended files
-3. `git add -- <explicit-paths>`
-4. `git diff --staged`
-5. `git commit -F <message-file>`
-6. `git push` only if the user asked to push
+2. `git diff --staged --name-status` to identify anything staged before this
+   workflow
+3. `git diff -- <path>` for the intended files
+4. `git add -- <explicit-paths>`
+5. `git diff --staged`
+6. `git commit -F <message-file>`
+7. `git push` only if the user asked to push
 
 Escalate to broader diff review or split commits only when the worktree is
 mixed, generated files are involved, or the staged scope is still unclear.
@@ -50,6 +52,7 @@ from session traces:
 
 ```bash
 git status --short --branch
+git diff --staged --name-status
 git diff -- <path>
 git add -- <explicit-paths>
 git diff --staged
@@ -65,18 +68,26 @@ git push
 
 ## Workflow
 
-1. Inspect the worktree with `git status --short --branch`.
-2. For small cohesive work, inspect only the intended files first. Expand to
+1. Inspect the worktree with `git status --short --branch`, then inspect and
+   record the pre-existing index with `git diff --staged --name-status` before
+   running any `git add` command.
+2. If unrelated changes are already staged, stop by default without resetting
+   or rewriting the user's index. Continue only after the unrelated staged work
+   is committed separately, or isolate fully reviewed intended path contents
+   with the path-limited workflow in `references/workflows.md` when that scope
+   is explicit. Do not use path-limited commit isolation for partial-hunk work.
+3. For small cohesive work, inspect only the intended files first. Expand to
    `git diff --stat` or broader review only when the scope is mixed or unclear.
-3. Stage only intended paths with explicit pathspecs such as
+4. Stage only intended paths with explicit pathspecs such as
    `git add -- <path>`.
-4. Re-check `git diff --staged` before committing.
-5. Write a concise imperative subject and a body with summary, rationale, and
+5. Re-check `git diff --staged` before committing, and compare its path set with
+   the recorded pre-existing staged set and the intended commit scope.
+6. Write a concise imperative subject and a body with summary, rationale, and
    validation.
-6. Commit with `git commit -F <message-file>`.
-7. Verify with `git status --short --branch` and
+7. Commit with `git commit -F <message-file>`.
+8. Verify with `git status --short --branch` and
    `git log -1 --pretty=fuller`.
-8. For push-only requests, use `git push` or `git push -u origin HEAD`.
+9. For push-only requests, use `git push` or `git push -u origin HEAD`.
 
 ## References
 

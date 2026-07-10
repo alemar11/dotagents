@@ -32,13 +32,21 @@ Prefer the shortest publish path that matches the state in front of you:
 
 ## Workflow
 
-1. Inspect branch and worktree state.
-2. Confirm the intended scope when the worktree is mixed.
+1. Run the complete publish preflight before any push: require a named branch,
+   reject the repository default branch, verify `gh` authentication, verify the
+   `origin` repository and any configured upstream match the current branch,
+   and look up an existing open PR for that branch.
+2. Inspect worktree state and confirm the intended scope when it is mixed.
 3. Reuse the current commit when it already represents the intended scope.
-   Otherwise create one through the `git-commit` workflow.
-4. Push the branch with direct `git push`.
-5. Open a draft PR with `gh pr create`, or update the existing PR with
-   `gh pr edit` when one is already attached to the branch.
+   Otherwise create one through `$git-commit` in commit-only mode; Yeet retains
+   ownership of push.
+4. Rerun the complete publish preflight immediately before pushing. Use a
+   normal push to the verified upstream, or `git push -u origin HEAD` only when
+   no upstream exists. Never infer permission to force-push.
+5. Re-check for an existing PR after push. Open a draft PR only when none
+   exists; otherwise update the existing PR. After an ambiguous create failure,
+   look up the PR again before retrying so a successful first request cannot
+   create a duplicate.
 6. Return branch, PR URL, commit hash, and verification performed.
 
 ## References
