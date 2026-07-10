@@ -47,10 +47,13 @@ the actual tracker issue types, labels, or markdown status values.
 ## Hard Requirements
 
 - Load `project-memory/agents/issue-tracker.md` and
-  `project-memory/agents/triage-labels.md` before mutating anything.
-- If required project-memory files are missing, load and run
-  `$project-memory` before triaging unless the user explicitly asks for a
-  one-off best-effort pass.
+  `project-memory/agents/triage-labels.md` before mapped tracker mutations when
+  they exist.
+- Do not require broad project-memory setup merely to inspect or classify one
+  named issue. If routing or mappings are missing, use the one-issue
+  best-effort fallback below. For queue-wide work or mutations whose target or
+  metadata cannot be resolved safely, run only `$project-memory`'s
+  `tracker-routing` slice.
 - Every triaged issue must have exactly one type/category and one workflow
   state.
 - In GitHub mode, use native GitHub Issue Type for `bug`, `feature`, or `task`
@@ -58,7 +61,8 @@ the actual tracker issue types, labels, or markdown status values.
 - In local markdown mode, record type and state as frontmatter-like lines near
   the top of the issue file.
 - Before marking an issue `ready-for-agent`, load and run `$plan-harder` in
-  issue-hardening mode and embed or post the resulting agent brief.
+  issue-hardening mode on its caller surface and embed or post the resulting
+  agent brief.
 - If the issue is underspecified, load and run `$grill-me-with-context` to resolve
   the smallest blocking question set before writing an agent-ready brief.
 - Do not run `$plan-harder` or post an agent brief for `needs-info`; preserve
@@ -70,20 +74,41 @@ the actual tracker issue types, labels, or markdown status values.
 - Do not close an issue or mark it `wontfix` without explicit user or
   maintainer confirmation.
 
+## One-Issue Best-Effort Fallback
+
+For exactly one named issue, continue when project-memory setup or a companion
+skill is unavailable instead of forcing a broad setup detour:
+
+- inspect the issue, current tracker state, and focused repo evidence;
+- classify it in chat with canonical type and state names;
+- mutate only fields whose target and tracker mapping are unambiguous from the
+  named issue, repo configuration, or existing tracker conventions;
+- if `$grill-me-with-context` is unavailable, ask the smallest blocking
+  question directly and keep the issue at `needs-info` in the proposed result;
+- if `$plan-harder` is unavailable, do not apply `ready-for-agent`; return a
+  candidate classification and a draft brief marked as awaiting hardening;
+- report every unavailable setup file or companion and every skipped mutation.
+
+This fallback does not invent durable mappings, weaken the agent-ready gate, or
+apply to bulk or queue triage. Run `$project-memory` only when durable routing
+or mappings are actually needed.
+
 ## Workflow
 
 ### 1. Load tracker rules
 
-Read:
+Read when present and relevant:
 
 - `project-memory/agents/issue-tracker.md`
 - `project-memory/agents/triage-labels.md`
-- `project-memory/agents/domain.md`
+- `project-memory/agents/domain.md` only when domain context affects the issue
 - `CONTEXT.md` or `CONTEXT-MAP.md`, when relevant
 - existing issue templates or local tracker docs, when present
 
-If the configured tracker backend is not `github` or `local`, stop and route
-the setup through `$project-memory` instead of inventing tracker semantics.
+If the configured tracker backend is not `github` or `local`, or required
+routing is absent, use the one-issue fallback for one named issue. For a queue
+or requested mutation that cannot be routed safely, run `$project-memory` for
+the `tracker-routing` slice instead of inventing tracker semantics.
 
 ### 2. Select issue or queue
 
@@ -163,7 +188,9 @@ If blocker resolution still depends on the reporter or requester, stop at
 brief, and do not call it ready for implementation.
 
 If the issue is queue-ready for agent execution, use `$plan-harder` once on
-that single issue and embed the result using `references/agent-brief.md`.
+that single issue in issue-hardening caller mode and embed the structured result
+using `references/agent-brief.md`. If a companion required for the current issue
+is unavailable, apply the one-issue fallback instead of broadening setup.
 
 ### 6. Write changes
 
@@ -202,6 +229,7 @@ Return:
 - selected state,
 - labels/statuses or GitHub issue type applied,
 - whether `$grill-me-with-context` or `$plan-harder` was used,
+- any missing setup or companion that triggered the one-issue fallback,
 - next action owner,
 - any write that was skipped because confirmation was not granted.
 

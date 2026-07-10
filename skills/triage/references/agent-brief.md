@@ -1,6 +1,8 @@
 # Agent Brief
 
-Use this shape when an issue is marked `ready-for-agent`.
+Use this shape when an issue is marked `ready-for-agent`. `$plan-harder` must
+first run in issue-hardening mode on its caller surface for this same issue.
+Merge its structured result into this shape without duplicating issue sections.
 
 The brief should be durable enough for a later agent to execute without
 re-reading the whole discussion. Keep it concrete, evidence-backed, and scoped

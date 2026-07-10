@@ -47,6 +47,10 @@ For `prd-only` mode, stop after the PRD phase report. For
 `issues-from-existing-prd` mode, skip feature grilling unless the PRD has
 unresolved blockers that affect scope, acceptance criteria, dependencies,
 validation, publication target, permissions, or cross-repo contracts.
+If the user supplies new feature intent without naming a mode or asking to stop
+at the PRD, use `full-flow`; issue splitting is part of that default. Use
+`prd-only` only when the user explicitly requests a PRD without generated
+issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
 
 ## Hard Requirements
 
@@ -56,13 +60,17 @@ validation, publication target, permissions, or cross-repo contracts.
 - Load `references/issue-phase.md` before splitting a PRD into issues.
 - Load `references/prd-template.md`, `references/issue-body-template.md`, and
   `references/vertical-slices.md` when the relevant phase requires them.
-- Load and follow `$plan-harder` once for every generated implementation issue.
+- Load and follow `$plan-harder` once for every generated implementation issue,
+  using issue-hardening mode on its caller surface.
 - Before writing, returning, or publishing generated implementation issues, run
   the issue phase verticality gate from `references/vertical-slices.md`; repair,
   merge, split, re-harden, or withhold any issue that is horizontal,
   chore-only, or otherwise not a justified vertical/enabling slice.
-- Write or publish artifacts only after setup is available and no planning
-  blockers remain.
+- Write or publish `ready-for-agent` artifacts only after the required tracker
+  routing is available and no planning blockers remain. An explicit request for
+  partial non-agent-ready output is the only exception: unresolved items may be
+  returned or published as `needs-info` or `ready-for-human`, never as
+  `ready-for-agent`, and only after their target and metadata are resolved.
 - Treat the configured `tracker_backend` as planning-artifact write authority:
   `github` publishes PRDs and generated issues through `$github-issues`, while
   `local` writes the configured Markdown files.
@@ -88,16 +96,17 @@ validation, publication target, permissions, or cross-repo contracts.
 - Use structured values from setup, the PRD phase, and the issue phase. Keep
   prose values only for explanations, reasons, and free-form notes.
 - Treat `$codex-orchestrator` worker choices and runtime authorization as
-  session-only decisions. Do not copy them into PRDs, generated issues,
-  `## Orchestrator Handoff`, local issue files, hosted issue bodies, or draft
-  publish commands.
+  session-only decisions. Do not include worker authorization defaults or copy
+  session worker choices into PRDs, generated issues, `## Orchestrator Handoff`,
+  local issue files, hosted issue bodies, or draft publish commands.
 
 ## External Skill Calls
 
 This skill may call:
 
-- `$project-memory` when project memory or tracker setup is missing or
-  needs review.
+- `$project-memory`'s `tracker-routing` slice when required tracker setup is
+  missing or needs review; broader setup remains out of scope unless separately
+  requested.
 - `$grill-me-with-context` when feature scope, terms, decisions, or planning
   blockers need repo-backed clarification.
 - `$plan-harder` once per generated implementation issue.
@@ -119,17 +128,21 @@ This skill may call:
 Inspect the user request and source material to choose `full-flow`, `prd-only`,
 or `issues-from-existing-prd`.
 
-Inspect the repo for:
+Inspect the repo for the setup required by the selected mode:
 
 - `project-memory/agents/issue-tracker.md`,
-- `project-memory/agents/triage-labels.md`,
-- `project-memory/agents/domain.md`.
+- `project-memory/agents/triage-labels.md`.
 
-If any of these files are missing, incomplete, stale, or inconsistent with the
-current planning target, load and run `$project-memory` first. Use the
-user's planning goal as context, but keep setup focused on routing and memory.
-In orchestrator workspace mode, setup is config-only and must not create project
-or feature folders.
+Read `project-memory/agents/domain.md`, `CONTEXT.md`, or `CONTEXT-MAP.md` when
+they exist or when context selection is material. Missing domain or localization
+memory alone does not require broad setup before planning.
+
+If tracker routing or issue mappings are missing, incomplete, stale, or
+inconsistent with the current planning target, load `$project-memory`'s
+`tracker-routing` slice, scoped to only the missing values. Use the user's
+planning goal as context; do not bootstrap unrelated domain, localization, ADR,
+or `AGENTS.md` content. In orchestrator workspace mode, setup is config-only
+and must not create project or feature folders.
 
 Before writing or publishing, resolve the effective target for the current run:
 
@@ -197,9 +210,11 @@ scope.
 
 If planning blockers emerge, continue the grill-style one-question flow until
 they are resolved or explicitly deferred as non-blocking. Do not write or
-publish the PRD or issues while a planning blocker remains unresolved or
+publish agent-ready artifacts while a planning blocker remains unresolved or
 deferred in a way that can affect scope, acceptance criteria, dependencies,
-validation, publication target, permissions, or cross-repo contracts.
+validation, publication target, permissions, or cross-repo contracts. If the
+user explicitly requested partial non-agent-ready output, carry the blocker
+into that output and apply the exception defined in the issue phase.
 
 For `issues-from-existing-prd`, inspect the PRD's open questions first. Use
 `$grill-me-with-context` only if the PRD has blockers that materially affect
@@ -242,8 +257,9 @@ Pass the same phase handoff fields defined in `references/issue-phase.md`, with
 
 Require the issue phase to use the configured issue target, mapped issue
 metadata, PRD parent/sub-issue relationships, related issue links, `$plan-harder`
-per issue, the verticality gate, graph validation, copied delivery mode, and the
-`## Orchestrator Handoff` shape from `references/issue-body-template.md`.
+in issue-hardening caller mode per issue, the verticality gate, graph
+validation, copied delivery mode, and the `## Orchestrator Handoff` shape from
+`references/issue-body-template.md`.
 `references/issue-phase.md` owns the detailed issue body, workspace,
 publication, draft-output, and placeholder rules.
 
@@ -297,8 +313,12 @@ Summarize:
   mirror or the effective target is a local dry-run override.
 - Do not treat `needs-info` issues as agent-ready output; they are waiting for
   human/reporter input and must be re-triaged before implementation.
-- If setup cannot be completed or a planning blocker remains unresolved, stop
-  with the current state and next question instead of writing partial artifacts.
+- If required tracker setup cannot be completed, stop with the current state
+  and next question instead of writing tracker artifacts.
+- If a planning blocker remains unresolved, withhold agent-ready artifacts and
+  return the blocker. Only an explicit request for partial non-agent-ready
+  output permits a `needs-info` or `ready-for-human` artifact; keep its blocker
+  visible and do not describe it as executable.
 
 ## References
 

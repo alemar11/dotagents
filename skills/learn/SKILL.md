@@ -21,7 +21,8 @@ description: Capture confirmed durable corrections or preferences and write them
 - If the user asks for a docs or reference file and also calls a behavior a "hard rule", run this learn flow for the agent-facing rule even when the docs file should also be updated.
 - Do not use for one-off instructions limited to the current task or files.
 - This skill only writes to `AGENTS.md`; never write or update `MEMORY.md`, `memory_summary.md`, or other memory files.
-- Always confirm the target AGENTS.md and intended wording before writing durable guidance.
+- Always show the exact target `AGENTS.md` and intended wording, then wait for
+  an affirmative user reply before writing durable guidance.
 
 ## Quick flow
 - Find the most recent **durable** correction/avoidance/preference in the current conversation.
@@ -34,14 +35,19 @@ description: Capture confirmed durable corrections or preferences and write them
 - If the learning is new (not already in AGENTS.md), propose:
   - Short summary (1 line)
   - Detailed instruction (1–3 bullets)
-- Confirmation should be lightweight: state what you will write and where.
+- Confirmation should be lightweight: state exactly what you will write and
+  where, then pause. Write only after the user affirmatively approves both the
+  target and wording. Silence, an unrelated follow-up, a target-selection reply,
+  or the absence of an objection is not approval.
 - Assume strong durable-language signals are durable, but do not assume global scope when the target is unclear. User can reply "no", "stop", "project", "global", or similar to change/cancel.
 - If nothing new is found in context (or it already exists), run the shipped
   helper script from this skill package, scan the JSONL from the last user
   message backward to find the most recent **durable** correction, then repeat
   the steps above.
 - After this flow finishes, do not continue writing durable changes into AGENTS.md without following the steps above.
-- Always confirm before writing into AGENTS.md when triggered by a durable preference.
+- Never propose and write in the same turn. Confirmation requires an
+  affirmative user reply such as "yes", "approved", or an equally explicit
+  approval of the shown target and wording.
 
 ## Durability filter
 - Keep long-lived preferences and permanent mistake corrections.
@@ -75,7 +81,13 @@ description: Capture confirmed durable corrections or preferences and write them
   - If no sub-AGENTS.md exists, propose the repo AGENTS.md first.
   - Always show the full path when suggesting a sub-AGENTS.md so the user can evaluate the scope.
   - Always leave the final choice to the user.
-- If the chosen target does not exist, ask to create it (still default to global unless user says otherwise).
+- If the chosen project, project-root, workspace, or sub-area target does not
+  exist, propose creating that exact `AGENTS.md` and wait for affirmative
+  approval. Never fall back or redirect to global because a project-scoped
+  target is missing.
+- Use global only when the durable rule is genuinely cross-project and the user
+  approves the global target. If an approved target cannot be created or
+  written, stop and report the blocker instead of selecting another target.
 
 ## Script output
 `scripts/extract_recent_transcript.py` returns JSON with `session_id`,

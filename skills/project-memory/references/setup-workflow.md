@@ -6,8 +6,9 @@ rules, `AGENTS.md` pointer block, and completion report. Keep the public
 
 ## Current Settings Summary
 
-When reviewing existing setup, summarize available values before recommending
-changes:
+When reviewing existing setup, summarize values in the selected setup slice
+before recommending changes. Include the full list only for an explicit full
+review:
 
 - setup flow: `fresh-setup`, `existing-project-bootstrap`, or
   `orchestrator-workspace` (runtime classification, not a stored key)
@@ -25,14 +26,15 @@ to view current settings, stop after the summary.
 
 If existing setup files contain the legacy worker-authorization setup key,
 report it as stale orchestrator-owned state. Remove it from any touched
-`project-memory/agents/*` file after confirmation; do not offer it as an
-editable project-memory setting.
+`project-memory/agents/*` file when that file is authorized for writing; do not
+offer it as an editable project-memory setting.
 
 ## Settings Editor
 
-When editing setup, ask which section to change and preserve unrelated custom
-prose, comments, mappings, path conventions, dry-run overrides, project labels,
-and tracker-specific values unless the user explicitly changes them.
+When the requested section is unclear, ask which section to change. Otherwise
+edit only the named or required section and preserve unrelated custom prose,
+comments, mappings, path conventions, dry-run overrides, project labels, and
+tracker-specific values unless the user explicitly changes them.
 
 Editable sections:
 
@@ -61,8 +63,15 @@ and the relevant alternatives:
 - `agents-pointers`: create missing pointer block, refresh stale pointer block,
   or minimize copied setup detail into project-memory pointers.
 
-After edits, show intended changed files and before/after settings. Ask for
-confirmation before writing.
+After edits, show intended changed files and before/after settings. An explicit
+request to set up, configure, initialize, update, or refresh project memory is
+write authority for that scope, so proceed without a second confirmation. For
+review-only, recommendation, dry-run, or indirectly suggested setup, wait for
+affirmative confirmation before writing.
+
+Ask only about a materially ambiguous target or behavior-affecting value that
+repo evidence and the defaults below cannot resolve. Do not force the user
+through unrelated editable sections.
 
 ## Decision Defaults
 
@@ -86,7 +95,7 @@ confirmation before writing.
 
 ## Draft Checklist
 
-Before writing, show:
+Before writing, show only applicable items from this list:
 
 - current settings summary for review mode;
 - before/after summary for proposed changes;
@@ -114,11 +123,11 @@ For orchestrator workspace mode, preserve these points in the draft:
 
 ## Write Rules
 
-After confirmation:
+After direct write authority or separate affirmative confirmation:
 
 - Create `project-memory/agents/` if needed.
-- Write or update the confirmed setup files under `project-memory/agents/`.
-- In review mode, update only files needed for confirmed changes.
+- Write or update the authorized setup files under `project-memory/agents/`.
+- In review mode, update only files needed for separately confirmed changes.
 - Normalize any touched `issue-tracker.md` setup header to lower-snake-case
   keys with backticked structured values. Remove legacy `tracker_mode`,
   `tracker_writes`, `effective_target`, `local_artifact_writes`, and
@@ -128,7 +137,7 @@ After confirmation:
   explanatory prose.
 - Preserve custom prose outside known configuration tables. Report unknown
   configuration keys instead of silently deleting them.
-- Create or update `AGENTS.md` pointer block and apply only confirmed
+- Create or update `AGENTS.md` pointer block and apply only authorized
   minimization.
 - Create or update `CONTEXT.md` with `$domain-modeling` when seed/bootstrap is
   accepted.
@@ -141,8 +150,9 @@ After confirmation:
 
 ## AGENTS.md Pointer Block
 
-Use this shape and omit the `Localization` section unless `TRANSLATION.md`
-exists or is confirmed:
+Use this shape as a menu. Include only sections whose target file exists or is
+authorized in the selected slice. Omit `Localization` unless `TRANSLATION.md`
+exists or is authorized; never create a broken pointer:
 
 ```markdown
 ## Agent skills
@@ -173,7 +183,7 @@ repos keep their own project memory and code ownership.
 
 ## Completion Report
 
-Summarize:
+Summarize only the applicable fields:
 
 - setup flow;
 - files written;

@@ -206,6 +206,40 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("Fallback:", issue_template)
         self.assertIn("commit/proof is recorded", issue_template)
 
+    def test_planning_entrypoints_have_unambiguous_output_contracts(self) -> None:
+        plan_feature = read("plan-feature/SKILL.md")
+        plan_feature_metadata = read("plan-feature/agents/openai.yaml")
+        issue_phase = read("plan-feature/references/issue-phase.md")
+        plan_harder = read("plan-harder/SKILL.md")
+        plan_harder_templates = read("plan-harder/references/templates.md")
+
+        self.assertIn("use `full-flow`; issue splitting is part of that default", plan_feature)
+        self.assertIn("in full-flow mode by default", plan_feature_metadata)
+        self.assertNotIn("split it into hardened vertical issues when requested", plan_feature_metadata)
+        self.assertIn("partial non-agent-ready output is the only exception", plan_feature)
+        self.assertIn("caller surface", issue_phase)
+        self.assertIn("status: ready | blocked", plan_harder_templates)
+        self.assertIn("Do not auto-select this skill merely because an implementation request", plan_harder)
+        self.assertIn(
+            "return only the structured issue-hardening result", plan_harder
+        )
+        self.assertIn("instead of starting a separate user-facing question loop", plan_harder)
+
+    def test_project_memory_triage_and_learn_keep_narrow_authority(self) -> None:
+        project_memory = read("project-memory/SKILL.md")
+        setup_workflow = read("project-memory/references/setup-workflow.md")
+        triage = read("triage/SKILL.md")
+        learn = read("learn/SKILL.md")
+
+        self.assertIn("Select the smallest setup slice needed", project_memory)
+        self.assertIn("write authority for the requested setup slice", project_memory)
+        self.assertIn("Ask only when the target or a behavior-affecting value is materially", project_memory)
+        self.assertIn("proceed without a second confirmation", setup_workflow)
+        self.assertIn("## One-Issue Best-Effort Fallback", triage)
+        self.assertIn("do not apply `ready-for-agent`", triage)
+        self.assertIn("wait for\n  an affirmative user reply", learn)
+        self.assertIn("Never fall back or redirect to global", learn)
+
     def test_plan_feature_outputs_do_not_define_runtime_policy(self) -> None:
         for relative in (
             "plan-feature/references/prd-template.md",

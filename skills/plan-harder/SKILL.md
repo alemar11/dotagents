@@ -20,6 +20,15 @@ Plan Harder has two modes:
 - **Issue-hardening mode**: make one vertical slice or issue agent-ready by
   adding the missing execution detail an implementation agent needs.
 
+It also has two output surfaces:
+
+- **Standalone surface**: return the plan or hardened issue brief to the user
+  in chat.
+- **Caller surface**: when another skill explicitly invokes Plan Harder in
+  issue-hardening mode, return the structured result to that workflow so it can
+  merge or persist the brief. Do not emit standalone closeout text on this
+  surface. Full-plan mode remains standalone.
+
 Default to the smallest valid route:
 
 - If the input is one issue, one slice, or one task from another planning
@@ -36,8 +45,8 @@ Default to the smallest valid route:
   into coding after the plan.
 - Do not write Markdown files under `plans/`.
 - Do not create or update repo files as part of this skill. Return the plan or
-  hardened issue brief in chat so the user or calling workflow can decide where
-  to persist it.
+  hardened issue brief to the user or calling workflow so that owner can decide
+  where to persist it.
 - If the broader request includes later implementation, issue creation, or
   orchestration, finish the plan first and make the handoff explicit instead of
   blending phases together.
@@ -50,14 +59,19 @@ Default to the smallest valid route:
   agent-ready, or de-risk a single issue or vertical slice before implementation.
 - Use issue-hardening mode when another skill invokes `plan-harder` on one
   issue as a pre-implementation rigor pass.
-- Use when the task is ambiguous, high-risk, multi-phase, or likely to hide
-  ordering problems or missing validation steps.
+- Use for ambiguous, high-risk, or multi-phase work only when the user has
+  explicitly asked for planning, plan hardening, or a pre-implementation rigor
+  pass.
+- Do not auto-select this skill merely because an implementation request is
+  complex, risky, or underspecified. Keep ordinary execution planning inside
+  the implementation workflow unless the user or a calling planning skill
+  explicitly requests Plan Harder.
 - Do not use for straightforward planning work that does not need an extra
   review pass.
 
-## Output Mode
+## Output Surface
 
-- Always return the plan or issue-hardening brief in chat.
+- On the standalone surface, return the plan or issue-hardening brief in chat.
 - Never save to `plans/`, create `plans/`, or write a Markdown plan file.
 - If the user asks to save the plan, explain that this skill only plans harder
   and returns the result; a separate workflow can persist it afterward.
@@ -69,6 +83,22 @@ Default to the smallest valid route:
 For routine issue-hardening runs, prefer a compact brief that reaches
 `## Implementation Plan` quickly instead of repeating generic planning doctrine.
 
+On the caller surface:
+
+- require the caller to name `issue-hardening` mode and provide one bounded work
+  item plus the minimum relevant context;
+- return the structured caller template from `references/templates.md`, with
+  `status` set to `ready` or `blocked`;
+- include every unresolved blocker in `blockers`; never infer `ready` when that
+  list is non-empty;
+- resolve unknowns from the supplied context and focused repo evidence when
+  possible; otherwise return them in `blockers` for the caller to clarify
+  instead of starting a separate user-facing question loop;
+- do not add a user-facing summary, a claim that no files were written, or a
+  standalone implementation handoff after the structured result;
+- do not persist anything. The caller owns any later issue, tracker, or file
+  write.
+
 ## Workflow
 
 ### 1. Choose the Mode
@@ -78,7 +108,8 @@ For routine issue-hardening runs, prefer a compact brief that reaches
 - Use issue-hardening mode for one existing issue, one vertical slice, or one
   work item produced by a PRD or issue-splitting skill.
 - If another skill calls Plan Harder with an issue body, treat that as
-  issue-hardening mode unless it explicitly asks for a full multi-step plan.
+  issue-hardening mode on the caller surface. Full-plan mode uses the standalone
+  surface.
 
 ### 2. Research First
 
@@ -90,8 +121,10 @@ For routine issue-hardening runs, prefer a compact brief that reaches
 
 ### 3. Clarify High-Risk Unknowns
 
-- Ask focused clarifying questions before drafting the plan when ambiguity
-  could materially change the work.
+- On the standalone surface, ask focused clarifying questions before drafting
+  when ambiguity could materially change the work. On the caller surface,
+  return unresolved material questions in `blockers` so the caller can apply
+  its own clarification workflow.
 - Ask only the minimum question batch needed to eliminate wrong plan branches.
 - Prefer `request_user_input` when available.
 - Respect the runtime limit of 1-3 questions per `request_user_input` call;
@@ -133,8 +166,8 @@ For routine issue-hardening runs, prefer a compact brief that reaches
 
 ### 5. Draft the Output
 
-Use `references/templates.md` for the exact full-plan and issue-hardening
-Markdown shapes.
+Use `references/templates.md` for the exact standalone shapes and the caller
+surface result envelope.
 
 In full-plan mode, create a phased plan with:
 
@@ -187,23 +220,21 @@ Keep the brief small enough to paste into an issue body or issue comment.
   - ordering failures
   - unhandled edge cases
   - vague or untestable tasks
-- If explicit delegation is allowed in the current run, you may ask a subagent
-  to perform this review. Tell the reviewer not to ask questions and to return
-  only actionable feedback.
+- If the active runtime policy permits delegation and an independent pass adds
+  value, you may ask a subagent to perform this review. Tell the reviewer not
+  to ask questions and to return only actionable feedback.
 - Otherwise, perform the same review locally before returning.
 - Incorporate useful review feedback before finishing.
 
 ## Output Expectations
 
-- Return the final plan or hardened issue brief directly in chat.
-- Explicitly say that no repo files were written and no `plans/` Markdown file
-  was created.
-- Summarize the main phases, the riskiest assumptions, and any open questions
-  that remain.
-- If clarification was needed, restate the resolved interpretation before
-  summarizing the plan.
-- Include the explicit handoff boundary for any later implementation,
-  orchestration, or GitHub follow-up.
+- On the standalone surface, return the final plan or hardened issue brief
+  directly in chat, explicitly say that no repo files or `plans/` Markdown were
+  created, summarize the riskiest assumptions and remaining questions, and
+  include the handoff boundary for later implementation or publication.
+- On the caller surface, return only the structured issue-hardening result
+  envelope. The caller owns user-facing closeout, persistence, and any
+  implementation or publication handoff.
 - Do not implement the plan.
 
 ## Example Requests

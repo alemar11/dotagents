@@ -110,7 +110,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Plan Harder skill
 - Keep `plan-harder` as the single reusable home for higher-rigor planning support in this repo; do not reintroduce a separate lightweight clarification skill unless that package boundary is intentionally restored. (Codex learning)
 - Keep `plan-harder` runtime workflow, clarification behavior, and output details in `skills/plan-harder/SKILL.md` and its references, not in this `AGENTS.md`.
-- Keep `plan-harder` chat-output-only: it must not create `plans/`, write Markdown plan files, or edit repo files as part of its own runtime workflow.
+- Keep `plan-harder` output-only: its standalone surface returns chat output and
+  its issue-hardening caller surface returns a structured result to the
+  invoking workflow. It must not create `plans/`, write Markdown plan files, or
+  edit repo files as part of its own runtime workflow.
 
 ### Grill and Domain Modeling skills
 - Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-me-with-context`.
@@ -157,7 +160,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Generated implementation issues may be `ready-for-agent` while listing unfinished dependencies; that means the issue is specified enough for the queue, but consumers must wait for dependencies to complete before starting it. Dependencies must be explicit, acyclic, and must not create retain cycles that lock the queue.
 - Generated implementation issues must include a `## Completion` section: GitHub issues close through a closing keyword on the relevant PR by default, with final-commit closure allowed only as an explicitly authorized exception, while local markdown issues are moved into the configured `issues/done/` folder after validation rather than being deleted or marked with a `done` status. Create `issues/done/` on demand when moving the first completed issue. In orchestrator workspace mode, moving to `done` requires cross-repo integration proof.
 - For local markdown issues with `delivery_mode: direct-commit`, treat the commit as delivery proof, then move the issue to `issues/done/`; do not use final-commit closure as the local issue lifecycle signal.
-- The `plan-feature` issue phase owns any issue tracker or local markdown writes it performs; `$plan-harder` remains chat-output-only and must not write plan files or issue files.
+- The `plan-feature` issue phase owns any issue tracker or local markdown writes
+  it performs; `$plan-harder` remains output-only and must not write plan files
+  or issue files.
 - Generated implementation issues should include a standard plan-hardening provenance line under `## Implementation Plan` so one `$plan-harder` pass per issue is auditable; the rest of the `$plan-harder` output should be merged into the appropriate issue sections instead of pasted wholesale.
 - Orchestrator implementation issues must include integration gates by name or link; repo PR placeholders may be `ready-for-agent` inputs before implementation, but completion requires real repo PR links or equivalent integration proof. (Codex learning)
 - Orchestrator reports and ledgers must record worker evidence when delegation is requested or approved: requested surface, approved surface, actual surface, worker/session id or failure evidence, fallback reason, and parallel/sequential/root-owned execution. (Codex learning)

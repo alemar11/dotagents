@@ -1,8 +1,10 @@
 # Plan Harder Templates
 
-Use these templates only after `$plan-harder` has selected the matching output
-mode. Keep the returned plan or issue-hardening brief in chat; do not create
-`plans/` or write Markdown files from this skill.
+Use these templates only after `$plan-harder` has selected the matching mode and
+output surface. On the standalone surface, keep the returned plan or
+issue-hardening brief in chat. The caller surface applies only to
+issue-hardening mode and returns its structured result to the calling workflow.
+Never create `plans/` or write files from this skill.
 
 ## Full-Plan Template
 
@@ -90,4 +92,35 @@ Use this for issue-hardening mode.
 
 ### Handoff
 [One short instruction to the implementation agent about where to start and what not to broaden.]
+```
+
+## Caller-Surface Issue-Hardening Result
+
+Use this exact field structure when another skill invokes issue-hardening mode.
+Return only this result; do not append standalone closeout text. Use `[]` for an
+empty list and set `status: blocked` whenever `blockers` is non-empty.
+
+```yaml
+status: ready | blocked
+goal: >-
+  Exact vertical outcome.
+non_goals:
+  - Explicit scope exclusion.
+resolved_interpretation:
+  - Assumption or accepted decision.
+implementation_plan:
+  - Concrete implementation step.
+likely_touch_points:
+  - Repo-relative file, module, route, test, or documentation area.
+dependencies:
+  - Direct prerequisite or None.
+acceptance_criteria:
+  - Specific verifiable outcome.
+validation:
+  - Command, test, manual check, or runtime proof.
+risks_and_rollback:
+  - Risk, mitigation, or rollback action.
+handoff: >-
+  One bounded instruction to the implementation agent.
+blockers: []
 ```

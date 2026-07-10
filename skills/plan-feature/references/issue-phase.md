@@ -12,7 +12,8 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 ## Hard Requirements
 
 - Load and follow `$plan-harder` for every issue.
-- Pass exactly one issue at a time to `$plan-harder` in issue-hardening mode.
+- Pass exactly one issue at a time to `$plan-harder` in issue-hardening mode on
+  its caller surface, and request the structured caller result.
 - Use the returned `$plan-harder` brief to enrich `## Implementation Plan` and
   merge acceptance, validation, dependency, and blocker details into the
   matching top-level sections. If `$plan-harder` finds an unresolved blocker,
@@ -33,8 +34,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   implementation issues. Treat unresolved product, domain, dependency, or
   acceptance-criteria questions as blockers to resolve before publishing,
   unless the user explicitly asks for partial non-agent-ready backlog output.
-- Remember that `$plan-harder` is chat-output-only. It must not write files;
-  this phase owns any issue tracker or local markdown writes.
+- `$plan-harder` must not write files. On its caller surface it returns only the
+  structured hardening result; this phase owns issue-body merging and any issue
+  tracker or local Markdown writes.
 - Use the authoritative feature slug in this order: explicit slug from
   `plan-feature`, PRD file path directory, configured tracker path, then PRD
   title-derived slug as a fallback only.
@@ -216,10 +218,15 @@ Every issue should:
 ### 3. Harden Every Issue With `$plan-harder`
 
 For each issue, call `$plan-harder` in issue-hardening mode with only that
-issue's draft body and the minimum relevant PRD context.
+issue's draft body and the minimum relevant PRD context. Explicitly request the
+caller surface and the structured result from
+`$plan-harder`'s `references/templates.md`.
 
 After `$plan-harder` returns:
 
+- require `status`, `implementation_plan`, `acceptance_criteria`, `validation`,
+  `dependencies`, and `blockers`; treat a non-empty `blockers` list or
+  `status: blocked` as a blocker rather than an agent-ready brief,
 - add concise implementation guidance under `## Implementation Plan` only when
   the issue is ready for the queue,
 - add the first line under that heading as:
@@ -484,7 +491,10 @@ must create the PRD first, capture the hosted PRD number, replace the draft ref
 with `Source PRD: #<number>`, and then create or attach implementation issues.
 When a blocker or unresolved question appears under `plan-feature`, return it
 as an issue-splitting blocker instead of publishing a `needs-info` issue by
-default.
+default. If the user explicitly requested partial non-agent-ready output, the
+phase may return or publish the affected issue as `needs-info` or
+`ready-for-human` after target resolution, with the blocker visible and no
+agent-ready claim.
 
 ### 7. Report Completion
 
