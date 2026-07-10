@@ -12,7 +12,7 @@ from shutil import which
 from typing import Any
 
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
 
@@ -238,9 +238,17 @@ def collect_entries(repo: str, pr: int, include_resolved: bool) -> list[dict[str
 
 def selected_entries(entries: list[dict[str, Any]], selection: str | None, comment_ids: str | None) -> list[dict[str, Any]]:
     if selection and comment_ids:
-        raise ReviewError("Use either --selection or --comment-ids with --reply-body, not both.", code="invalid_arguments", exit_code=64)
+        raise ReviewError(
+            "Use either --selection or --comment-ids with a reply body, not both.",
+            code="invalid_arguments",
+            exit_code=64,
+        )
     if not selection and not comment_ids:
-        raise ReviewError("--reply-body requires --selection or --comment-ids.", code="invalid_arguments", exit_code=64)
+        raise ReviewError(
+            "--reply-body or --reply-body-file requires --selection or --comment-ids.",
+            code="invalid_arguments",
+            exit_code=64,
+        )
     key = "index" if selection else "comment_id"
     lookup = {str(entry[key]): entry for entry in entries}
     selected: list[dict[str, Any]] = []
@@ -251,18 +259,30 @@ def selected_entries(entries: list[dict[str, Any]], selection: str | None, comme
     return selected
 
 
-def read_body(body: str | None, body_file: str | None) -> str:
+def read_body(body: str | None, body_file: str | None, *, option_prefix: str = "body") -> str:
     if body and body_file:
-        raise ReviewError("Use either --body or --body-file, not both.", code="invalid_arguments", exit_code=64)
+        raise ReviewError(
+            f"Use either --{option_prefix} or --{option_prefix}-file, not both.",
+            code="invalid_arguments",
+            exit_code=64,
+        )
     if body_file:
         try:
             value = Path(body_file).read_text(encoding="utf-8")
-        except OSError as exc:
-            raise ReviewError(f"Could not read --body-file '{body_file}': {exc}", code="invalid_arguments", exit_code=64) from exc
+        except (OSError, UnicodeError) as exc:
+            raise ReviewError(
+                f"Could not read --{option_prefix}-file '{body_file}': {exc}",
+                code="invalid_arguments",
+                exit_code=64,
+            ) from exc
     else:
         value = body or ""
     if not value.strip():
-        raise ReviewError("A non-empty --body or --body-file is required.", code="invalid_arguments", exit_code=64)
+        raise ReviewError(
+            f"A non-empty --{option_prefix} or --{option_prefix}-file is required.",
+            code="invalid_arguments",
+            exit_code=64,
+        )
     return value
 
 
@@ -355,6 +375,7 @@ def build_parser() -> argparse.ArgumentParser:
     address.add_argument("--selection", help="Space or comma separated row indexes to reply to.")
     address.add_argument("--comment-ids", help="Space or comma separated GitHub comment ids to reply to.")
     address.add_argument("--reply-body", help="Reply body. Requires --selection or --comment-ids.")
+    address.add_argument("--reply-body-file", help="Read the reply body from a UTF-8 file. Requires --selection or --comment-ids.")
     address.add_argument("--dry-run", action="store_true", help="Preview reply actions without posting.")
     address.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
     comment = subparsers.add_parser("comment", help="Post a top-level PR discussion comment.")
@@ -406,11 +427,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         entries = collect_entries(repo, pr, args.include_resolved)
         payload: dict[str, Any] = {"repo": repo, "pr": pr, "entries": entries}
-        if args.reply_body:
+        if args.reply_body or args.reply_body_file:
             targets = selected_entries(entries, args.selection, args.comment_ids)
-            payload["actions"] = post_replies(repo, pr, targets, args.reply_body, args.dry_run)
+            reply_body = read_body(args.reply_body, args.reply_body_file, option_prefix="reply-body")
+            payload["actions"] = post_replies(repo, pr, targets, reply_body, args.dry_run)
         elif args.selection or args.comment_ids:
-            raise ReviewError("--selection and --comment-ids require --reply-body.", code="invalid_arguments", exit_code=64)
+            raise ReviewError(
+                "--selection and --comment-ids require --reply-body or --reply-body-file.",
+                code="invalid_arguments",
+                exit_code=64,
+            )
         if args.json:
             emit_success(payload, ["address"])
         else:

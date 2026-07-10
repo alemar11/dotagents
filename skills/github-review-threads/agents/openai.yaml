@@ -2,4 +2,4 @@ interface:
   display_name: "GitHub Review Threads"
   short_description: "Inspect PR review threads, draft or post replies, and manage comments."
   brand_color: "#9333EA"
-  default_prompt: "Use $github-review-threads to inspect PR review threads, draft comments or replies by default, and post only with explicit user or calling-skill authority through scripts/reviews first; use direct gh only as a stated fallback."
+  default_prompt: "Use $github-review-threads to inspect PR review threads, resolve the installed skill root from SKILL.md, use <skill-root>/scripts/reviews with file-backed bodies, draft by default, and post only with explicit authority; use direct gh only as a stated fallback."

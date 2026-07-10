@@ -2,4 +2,4 @@ interface:
   display_name: "GitHub CI"
   short_description: "Inspect GitHub Actions failures and logs."
   brand_color: "#DC2626"
-  default_prompt: "Use $github-ci to inspect GitHub Actions checks, prefer direct gh reads, and run scripts/ci-inspect for failing PR log extraction when needed."
+  default_prompt: "Use $github-ci to inspect GitHub Actions checks, prefer direct gh reads, resolve the installed skill root from SKILL.md, and run <skill-root>/scripts/ci-inspect for failing PR log extraction when needed."

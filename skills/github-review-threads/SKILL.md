@@ -8,18 +8,21 @@ description: Inspect PR review threads, draft or post replies, and manage conver
 ## Role
 
 Handle PR review threads, PR discussion comments, and comment replies. Use the
-shipped `scripts/reviews` helper first for normal PR discussion comments,
-thread-aware comment listing, and selected reply routing. Use direct `gh` only
-as a fallback when the helper is unavailable or lacks the needed GitHub
-operation, and state that fallback reason.
+shipped `<skill-root>/scripts/reviews` helper first for normal PR discussion
+comments, thread-aware comment listing, and selected reply routing. Use direct
+`gh` only as a fallback when the helper is unavailable or lacks the needed
+GitHub operation, and state that fallback reason.
 
 ## Public Script
 
+Resolve `<skill-root>` as the absolute directory containing this `SKILL.md`,
+then invoke the shipped helper from that installed package:
+
 ```bash
-skills/github-review-threads/scripts/reviews --help
-skills/github-review-threads/scripts/reviews --version
-skills/github-review-threads/scripts/reviews --json doctor
-skills/github-review-threads/scripts/reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
+<skill-root>/scripts/reviews --help
+<skill-root>/scripts/reviews --version
+<skill-root>/scripts/reviews --json doctor
+<skill-root>/scripts/reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
 ```
 
 The script emits stable JSON success/error envelopes for JSON mode and writes
@@ -39,11 +42,13 @@ no implicit config.
    is enough to post the top-level `@codex review` request and any required
    root-supplied PR discussion disposition for that assigned PR. Do not infer
    posting authority from an ordinary inspect, review, or draft request.
-5. Use `scripts/reviews comment --dry-run` for draft or multi-comment replies
-   until posting authority is explicit.
-6. Use `scripts/reviews comment` for authorized top-level PR discussion
-   comments; use direct `gh` fallback only when the helper cannot perform the
-   selected operation.
+5. Put reply text in a UTF-8 file outside the repository and use the installed
+   helper's `address --reply-body-file <message-file> --dry-run` surface for
+   draft or multi-comment replies until posting authority is explicit. Never
+   interpolate arbitrary reply text into a shell command.
+6. Use `<skill-root>/scripts/reviews comment` for authorized top-level PR
+   discussion comments; use direct `gh` fallback only when the helper cannot
+   perform the selected operation.
 
 ## References
 

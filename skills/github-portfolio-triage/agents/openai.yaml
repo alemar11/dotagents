@@ -2,4 +2,4 @@ interface:
   display_name: "GitHub Portfolio Triage"
   short_description: "Scan multiple GitHub repos read-only for queue and next-action summaries."
   brand_color: "#15803D"
-  default_prompt: "Use $github-portfolio-triage to scan explicit GitHub repositories with scripts/portfolio-scan and return a URL-first read-only queue report."
+  default_prompt: "Use $github-portfolio-triage to scan explicit GitHub repositories by resolving the installed skill root from SKILL.md, running <skill-root>/scripts/portfolio-scan, and returning a URL-first read-only queue report."

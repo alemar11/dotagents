@@ -3,12 +3,15 @@
 ## Commands
 
 ```bash
-skills/github-portfolio-triage/scripts/portfolio-scan --help
-skills/github-portfolio-triage/scripts/portfolio-scan --version
-skills/github-portfolio-triage/scripts/portfolio-scan doctor
-skills/github-portfolio-triage/scripts/portfolio-scan --json doctor
-skills/github-portfolio-triage/scripts/portfolio-scan --repo <owner/repo>
+<skill-root>/scripts/portfolio-scan --help
+<skill-root>/scripts/portfolio-scan --version
+<skill-root>/scripts/portfolio-scan doctor
+<skill-root>/scripts/portfolio-scan --json doctor
+<skill-root>/scripts/portfolio-scan --repo <owner/repo>
 ```
+
+Resolve `<skill-root>` as the absolute directory containing the owning
+`SKILL.md`; never assume the caller is in the dotagents checkout.
 
 ## JSON Mode
 

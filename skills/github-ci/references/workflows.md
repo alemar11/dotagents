@@ -20,9 +20,13 @@ Prefer run URLs and job names in summaries. Quote only short log snippets.
 
 ## Focused Failure Extraction
 
+Resolve `<skill-root>` as the absolute directory containing the owning
+`SKILL.md`; this may be an installed or linked package outside the current
+checkout.
+
 ```bash
-skills/github-ci/scripts/ci-inspect --repo <owner/repo> --pr <number>
-skills/github-ci/scripts/ci-inspect --json --repo <owner/repo> --pr <number>
+<skill-root>/scripts/ci-inspect --repo <owner/repo> --pr <number>
+<skill-root>/scripts/ci-inspect --json --repo <owner/repo> --pr <number>
 ```
 
 Use this when direct logs are too large and the task is to find the actionable

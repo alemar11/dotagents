@@ -3,12 +3,15 @@
 ## Commands
 
 ```bash
-skills/github-ci/scripts/ci-inspect --help
-skills/github-ci/scripts/ci-inspect --version
-skills/github-ci/scripts/ci-inspect doctor
-skills/github-ci/scripts/ci-inspect --json doctor
-skills/github-ci/scripts/ci-inspect --repo <owner/repo> --pr <number>
+<skill-root>/scripts/ci-inspect --help
+<skill-root>/scripts/ci-inspect --version
+<skill-root>/scripts/ci-inspect doctor
+<skill-root>/scripts/ci-inspect --json doctor
+<skill-root>/scripts/ci-inspect --repo <owner/repo> --pr <number>
 ```
+
+Resolve `<skill-root>` as the absolute directory containing the owning
+`SKILL.md`; never assume the caller is in the dotagents checkout.
 
 ## JSON Mode
 

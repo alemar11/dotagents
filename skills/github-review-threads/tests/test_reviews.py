@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "reviews"
@@ -26,14 +27,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "1.1.0")
+        self.assertEqual(stdout.getvalue().strip(), "1.1.1")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -61,7 +62,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -77,6 +78,91 @@ class ReviewsContractTests(unittest.TestCase):
     def test_read_body_rejects_ambiguous_input(self) -> None:
         with self.assertRaises(cli.ReviewError):
             cli.read_body("body", "message.md")
+
+    def test_read_body_rejects_invalid_utf8(self) -> None:
+        with tempfile.NamedTemporaryFile("wb") as handle:
+            handle.write(b"\xff")
+            handle.flush()
+            with self.assertRaises(cli.ReviewError) as raised:
+                cli.read_body(None, handle.name, option_prefix="reply-body")
+
+        self.assertEqual(raised.exception.code, "invalid_arguments")
+
+    def test_address_reads_reply_body_from_file(self) -> None:
+        entry = {
+            "index": 1,
+            "type": "review_comment",
+            "comment_id": 123456,
+            "author": "reviewer",
+            "updated": "2026-07-10T00:00:00Z",
+            "body": "Please clarify this.",
+            "body_preview": "Please clarify this.",
+            "path": "src/example.py",
+            "line": 12,
+            "start_line": 12,
+            "is_resolved": False,
+            "is_outdated": False,
+        }
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            handle.write("Addressed in the latest revision.")
+            handle.flush()
+            stdout = io.StringIO()
+            with mock.patch.object(cli, "collect_entries", return_value=[entry]):
+                with contextlib.redirect_stdout(stdout):
+                    code = cli.main(
+                        [
+                            "--json",
+                            "address",
+                            "--repo",
+                            "owner/repo",
+                            "--pr",
+                            "12",
+                            "--comment-ids",
+                            "123456",
+                            "--reply-body-file",
+                            handle.name,
+                            "--dry-run",
+                        ]
+                    )
+
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
+
+    def test_address_rejects_inline_and_file_reply_bodies_together(self) -> None:
+        entry = {
+            "index": 1,
+            "type": "review_comment",
+            "comment_id": 123456,
+        }
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            handle.write("file body")
+            handle.flush()
+            stdout = io.StringIO()
+            with mock.patch.object(cli, "collect_entries", return_value=[entry]):
+                with contextlib.redirect_stdout(stdout):
+                    code = cli.main(
+                        [
+                            "--json",
+                            "address",
+                            "--repo",
+                            "owner/repo",
+                            "--pr",
+                            "12",
+                            "--comment-ids",
+                            "123456",
+                            "--reply-body",
+                            "inline body",
+                            "--reply-body-file",
+                            handle.name,
+                            "--dry-run",
+                        ]
+                    )
+
+        self.assertEqual(code, 64)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
 
 if __name__ == "__main__":

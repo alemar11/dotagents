@@ -2,10 +2,14 @@
 
 ## Scan Explicit Repositories
 
+Resolve `<skill-root>` as the absolute directory containing the owning
+`SKILL.md`; this may be an installed or linked package outside the current
+checkout.
+
 ```bash
-skills/github-portfolio-triage/scripts/portfolio-scan --repo <owner/repo> --repo <owner/repo>
-skills/github-portfolio-triage/scripts/portfolio-scan --repo-file <repos.txt>
-skills/github-portfolio-triage/scripts/portfolio-scan --json --repo <owner/repo>
+<skill-root>/scripts/portfolio-scan --repo <owner/repo> --repo <owner/repo>
+<skill-root>/scripts/portfolio-scan --repo-file <repos.txt>
+<skill-root>/scripts/portfolio-scan --json --repo <owner/repo>
 ```
 
 Repo files should contain one `owner/repo` per line. Blank lines and `#`
