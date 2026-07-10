@@ -208,7 +208,7 @@ Use one compact block per active workstream:
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
-| Delivery | <pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
@@ -243,7 +243,7 @@ Use one compact block per active workstream:
 
 ### completed
 
-- <source id/ref, delivery mode, branch/PR/proof, ready-for-review state, Codex
+- <source id/ref, runtime delivery, branch/PR/proof, ready-for-review state, Codex
   review proof, validation, source closeout target and whether it was
   updated/closed, publication checkout, caller checkout disposition>
 - <worker id/title, integration method, publication checkout, caller checkout
@@ -314,7 +314,7 @@ claim and in `## Notes`.
 | `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. Ready-for-review transition and Codex review request require merge-ready closeout authority, such as `publication_authority=prd-backed-merge-ready-pr` or `publication_authority=explicit-owner-authorization` with those actions named. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
-| `completed` | Required gates passed and delivery contract is satisfied. Record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
+| `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked required publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
 | `deferred` | Residual work intentionally outside current closeout. Link the follow-up or proposed body; use only for real residual scope, blocked live proof, or owner-visible follow-up work. |
 | `released` | Release gate passed and actual product/package/version release, deploy, or tag proof is recorded. Ordinary implementation remains `completed` unless a release happened. |
 

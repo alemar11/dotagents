@@ -253,7 +253,9 @@ progress, blockers, proof, or the next check before stopping.
 
 ## Delivery Mode Rules
 
-The root passes the effective delivery mode plus whether it is inherited from
+The root passes the effective runtime delivery plus its source. Use
+`local-only` for ad-hoc or legacy implementation without a PRD delivery
+contract. Otherwise pass the PRD-backed mode plus whether it is inherited from
 `Source PRD` or an issue-level override. `prd-backed-delivery.md` owns the full
 delivery/publication/issue-mutation authority model; workers only enforce the
 assignment they receive.
@@ -266,6 +268,7 @@ permission to change branch/PR strategy.
 
 | Mode | Worker handling |
 | --- | --- |
+| `local-only` | Implement and validate within the assigned paths. Do not commit, push, create or transition a PR, request Codex review, mutate issues, merge, release, or deploy. Missing PRD delivery metadata is expected, not a blocker. |
 | `pull-request` | Root owns the branch/PR shape, Codex review disposition, and merge-ready decision. In single-repo or monorepo work, workers provide patches, helper-worktree diffs, handoff, or reviewed commits unless root explicitly grants publication modes. In multi-repo work, repo-scoped workers may prepare their repo branch/PR only when `commit`, `push`, `pr`, and/or `review-ready` modes plus exact `review-ready` sub-actions are explicitly listed. |
 | `direct-commit` | Use only with explicit owner authorization recorded in the prompt and ledger. |
 
@@ -492,12 +495,12 @@ Scope:
 - Source ID: <stable source id>
 - Source ref: <URL, path:line, heading, run id, or ledger item>
 - Acceptance criteria: <source-owned completion criteria>
-- Closeout target: <issue close, PR reply, file checkbox/patch, CI rerun, ledger status>
+- Closeout target: <local acceptance criteria plus validation, issue close, PR reply, file checkbox/patch, CI rerun, or ledger status>
 - Authorization modes: <one or more of inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|merge-close|release>
 - Review-ready sub-actions: <mark-ready|request-codex-review|poll-codex-review|post-root-supplied-disposition or not-applicable>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
-- Delivery mode: <pull-request|direct-commit> (<feature-level, inherited from Source PRD|issue-level override with authorization>)
-- Delivery mode source: <Source PRD path/issue, explicit owner request, or issue-level override reason>
+- Runtime delivery: <local-only|pull-request|direct-commit> (<ad-hoc default|feature-level inherited from Source PRD|issue-level override with authorization>)
+- Delivery source: <ad-hoc or legacy source, Source PRD path/issue, explicit owner request, or issue-level override reason>
 - Orchestrator handoff: <source PRD; feature slug; affected repos/product scope; scope; start rule; validation; closeout, or none for ad hoc work>
 - Publication authority: <none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked, with reason>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
@@ -505,7 +508,7 @@ Scope:
 - Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <feature-branch|repo-feature-branch|direct-commit-target|none>
-- Issue integration shape: <feature-pr|repo-pr|direct-commit>
+- Issue integration shape: <none|feature-pr|repo-pr|direct-commit>
 - Root integration method: <handoff|worker-commit|patch-apply|manual-root|pending>
 - Caller checkout policy: <preserve-current-branch|caller-checkout-approved|not-applicable>
 - Publication checkout: <worker-worktree path|integration-worktree path|caller-checkout path|not-applicable>
@@ -538,7 +541,7 @@ Final report:
 - Source disposition: completed|partial|blocked|needs-owner|deferred|unchanged
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
-- Delivery: delivery mode, branch or PR used, closeout path, and PR links or
+- Delivery: runtime delivery, branch or PR used, closeout path, and PR links or
   `none`; include ready-for-review state, Codex review state, publication
   checkout, and caller checkout disposition
 - Worker evidence: requested, authorized or consented, and actual surface; worker id or session

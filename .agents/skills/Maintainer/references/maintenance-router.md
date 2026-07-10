@@ -66,7 +66,7 @@ Use this file first to route maintenance requests to the right playbook.
 - Do not silently run `codex-tool-surface`; it is an explicit task because Codex tool availability is runtime-dependent.
 
 ## Parallel Delegation Rule
-- If subagent tools are available and the user explicitly asked for delegation or parallel agent work, spawn multiple subagents only after the request has been routed to a concrete playbook.
+- When the active runtime policy permits, use internal subagents only after the request has been routed to a concrete playbook and delegation materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
 - Prefer explorer subagents for independent read-only inspections and worker subagents only when write ownership is clearly separated.
 - Keep routing, playbook selection, final synthesis, and final report assembly in the main agent.
 

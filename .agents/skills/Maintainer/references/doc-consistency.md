@@ -42,7 +42,7 @@ Use this playbook for repository-wide structure and policy checks.
 - `rg -n "request_user_input|subagent|\\$CODEX_HOME|~/.codex|Codex CLI|Codex App|MEMORY.md|memory_summary.md" -S`
 
 ## Parallel Subagent Pattern
-- Use this only when subagent tools are available and the user explicitly asked for delegation or parallel agent work.
+- Use internal subagents when the active runtime policy permits and the split materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
 - Safe explorer split:
   - one subagent for naming/layout and required-file checks
   - one subagent for script/reference integrity

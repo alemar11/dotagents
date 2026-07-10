@@ -41,7 +41,7 @@ when a brand-new skill scaffold is needed.
 5. Confirm descriptions remain one-line and user-facing in README/openai metadata.
 
 ## Parallel Subagent Pattern
-- Use this only when subagent tools are available and the user explicitly asked for delegation or parallel agent work.
+- Use internal subagents when the active runtime policy permits and independent inspection materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
 - After manifest enumeration, spawn multiple explorer subagents for independent inspection slices:
   - one for `SKILL.md` frontmatter and trigger wording
   - one for `agents/openai.yaml` display text and prompt alignment

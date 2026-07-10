@@ -18,8 +18,13 @@ Apply this reference when any of these are true:
 - the source item has a `## Delivery`, `Delivery Mode`, `Completion`, or
   closeout section that defines branch, PR, or issue-closing behavior.
 
-If none of those are true, treat the source as ad hoc or legacy work and use
-the conservative authorization rules in `worker.md`.
+If none of those are true, treat the source as ad hoc or legacy work. Default
+implementation to local code/docs edits plus validation, without requiring a
+delivery mode, branch, PR, parallelization, handoff, or source-closeout field.
+Project that default into the ledger as runtime delivery `local-only`,
+publication `none`, issue mutation `none`, and closeout through local acceptance
+criteria plus validation. Use `worker.md` for worker authorization, and require
+explicit owner authorization before any publication or external mutation.
 
 If `Source PRD` is a draft ref such as `draft-prd:<...>`, treat it as a dry-run
 planning reference, not durable implementation authority. The root may inspect
@@ -266,3 +271,10 @@ changes plus validation only. Commit, push, draft PR, ready-for-review
 transition, Codex review request, issue mutation, merge, and release require
 explicit owner authorization or a later `commit`, `push`, `pr`, `review-ready`,
 `merge-close`, or `release` mode.
+
+Do not block ad hoc or legacy implementation merely because PRD fields are
+absent. In the ledger, use runtime delivery `local-only`, publication `none`,
+issue mutation `none`, branch and publication checkout `not-applicable`, and a
+closeout target of satisfied local acceptance criteria plus validation. If the
+source contains contradictory or unsafe instructions, resolve that conflict as
+`needs-owner` or `blocked`; missing PRD metadata by itself is not a conflict.

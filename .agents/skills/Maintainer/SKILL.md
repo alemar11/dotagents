@@ -87,7 +87,8 @@ Use this skill when users ask to:
 - `references/release-checklist.md`: use at the end of mixed or multi-step maintenance tasks.
 
 ## Subagent Usage
-- If the runtime exposes subagent tools and the user explicitly asks for delegation or parallel agent work, spawn multiple subagents for independent analysis slices or disjoint write scopes.
+- Use internal subagents for independent analysis slices or disjoint write scopes when the active runtime policy permits and delegation materially improves speed or quality.
+- Ask before delegation only when runtime policy requires it or when creating visible user-owned Codex App threads.
 - Prefer explorer subagents for read-only inspection and worker subagents only when file ownership is clearly split.
 - Good candidates for parallel delegation in this skill:
   - unified maintenance: split reusable skills, project-local skills, coupled repo-doc inspection, or metadata-only verification into disjoint analysis buckets.
@@ -101,5 +102,5 @@ Use this skill when users ask to:
 - Do not infer `refresh` or new-skill creation from generic maintenance requests.
 - Use `$skill-creator` first when the user wants to create a brand-new skill.
 - Keep changes scoped to the selected or discovered skills.
-- Only spawn subagents when delegation is explicitly allowed in the current run.
+- Keep internal delegation within the active runtime policy and the user's scope; do not treat it as authority for external writes or broader maintenance.
 - If no meaningful updates are needed, return `PASS (NOOP)` and avoid persistent file edits.

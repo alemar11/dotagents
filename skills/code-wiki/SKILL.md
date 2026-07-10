@@ -34,8 +34,8 @@ replace it with a source-backed statement from this repository.
 
 This skill is Codex-dependent. It can use:
 
-- Codex subagents for parallel read-only repo study only when the user and
-  current runtime explicitly allow delegation.
+- Codex subagents for parallel read-only repo study when the active runtime
+  policy permits delegation.
 - `$imagegen` for selected raster overview or conceptual images when a bitmap
   adds value beyond deterministic local diagrams.
 - `~/.cache/dotagents/skills/code-wiki/` for default disposable git clones and
@@ -111,8 +111,8 @@ structure from inventory.
 
 Open `references/repo-study-playbook.md` before a non-trivial wiki run.
 
-When delegation is explicitly authorized and allowed by the current runtime, use
-read-only parallel explorer subagents for:
+When the active runtime policy permits delegation, use read-only parallel
+explorer subagents when they materially improve coverage or speed for:
 
 - architecture and module boundaries
 - repository scope and ownership boundaries
@@ -121,15 +121,16 @@ read-only parallel explorer subagents for:
 - APIs, data flow, and user/business flows
 - code patterns, conventions, risks, and extension points
 
-If subagents are unavailable or not explicitly authorized, perform the same
-slices sequentially. In all cases, require file-backed evidence and keep
-synthesis in the main agent.
+Ask before delegation only when runtime policy requires it or when creating
+visible user-owned Codex App threads. If internal subagents are unavailable or
+disallowed, perform the same slices sequentially. In all cases, require
+file-backed evidence and keep synthesis in the main agent.
 
 For multi-repo runs, strict runs, or repositories with `data/inventory.json`
-`counts.files >= 500`, run a generated-wiki review after generation. When
-delegation is explicitly authorized and allowed by the current runtime, use
-reader subagents for that review; otherwise inspect the generated HTML/SVG
-sequentially. Treat a reader FAIL as a real failure and iterate.
+`counts.files >= 500`, run a generated-wiki review after generation. When the
+active runtime policy permits delegation, use read-only reader subagents for
+that review when useful; otherwise inspect the generated HTML/SVG sequentially.
+Treat a reader FAIL as a real failure and iterate.
 
 ### 4. Scaffold and Fill the Wiki
 

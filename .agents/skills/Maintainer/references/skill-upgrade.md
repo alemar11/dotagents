@@ -46,7 +46,7 @@ or more existing skills or plugins.
 6. Finish with `references/release-checklist.md` and report `PASS`, `PASS (NOOP)`, or `FAIL`.
 
 ## Parallel Subagent Pattern
-- Use this only when subagent tools are available and the user explicitly asked for delegation or parallel agent work.
+- Use internal subagents when the active runtime policy permits and the split materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
 - Safe split for an upgrade request:
   - one explorer subagent reviews the target package (`SKILL.md`, `.codex-plugin/plugin.json`, `references/*.md`, `scripts/*`, `projects/*`)
   - one explorer subagent reviews directly coupled metadata/docs (`agents/openai.yaml`, `.agents/plugins/marketplace.json`, `README.md`, `AGENTS.md`)

@@ -60,8 +60,11 @@ workers to a live task, or update unrelated skills.
   names when they differ.
 - Keep visible Codex App threads distinct from subagents unless the current
   runtime explicitly exposes the same surface as both.
-- Do not create real worker threads or subagents merely to inspect the tool
-  schema. Spawn only when the user explicitly asks for live validation.
+- Do not create visible Codex App threads merely to inspect the tool schema.
+  Use a bounded internal subagent for live validation only when the active
+  runtime policy permits it and the validation adds material evidence. Ask
+  before delegation only when runtime policy requires it or when creating a
+  visible user-owned Codex App thread.
 - Keep runtime skills self-contained; do not mention this Maintainer playbook
   from runtime `SKILL.md` files.
 

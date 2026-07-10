@@ -114,15 +114,14 @@ tool, language, platform, or framework behavior could have changed.
 
 ## Subagent Rule
 
-Ask before using subagents.
+For broad or high-risk reviews, use focused read-only explorer or reviewer
+subagents when the active runtime policy permits and delegation materially
+improves the critique. Give each subagent a narrow scope, require file-backed
+findings, and synthesize the results in the main response.
 
-For broad or high-risk reviews, ask the user whether to spawn focused
-read-only explorer or reviewer subagents. If authorized and the runtime
-supports subagents, give each subagent a narrow scope and require file-backed
-findings. Synthesize the results yourself in the main response.
-
-If subagents are unavailable or not authorized, perform the same review
-sequentially.
+Ask before delegation only when the active runtime policy requires it or when
+creating visible user-owned Codex App threads. If internal subagents are
+unavailable or disallowed, perform the same review sequentially.
 
 ## Output Shape
 

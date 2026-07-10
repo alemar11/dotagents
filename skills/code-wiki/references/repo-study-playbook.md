@@ -195,11 +195,12 @@ Before synthesis, sanity-check the inventory against language conventions:
 
 ## Parallel Study Slices
 
-Use independent read-only explorer prompts only when the user explicitly asks for
-subagents/delegation/parallel agent work and the current runtime allows it. Do
-not treat ordinary `$code-wiki` invocation as implicit delegation permission. Do
-not ask subagents to write files. Ask for concise findings with evidence paths
-and line numbers.
+Use independent read-only explorer prompts when the active runtime policy
+permits delegation and parallel study materially improves coverage or speed.
+Ordinary `$code-wiki` invocation does not expand file-write or external-mutation
+authority: subagents remain read-only and must return concise findings with
+evidence paths and line numbers. Ask before delegation only when runtime policy
+requires it or when creating visible user-owned Codex App threads.
 
 Architecture prompt:
 
@@ -266,8 +267,8 @@ testing/ops, and task-specific change recipes? Report concrete missing areas.
 Do not edit files.
 ```
 
-If delegation is unavailable or not explicitly authorized, run these slices
-sequentially in the main agent.
+If internal delegation is unavailable or disallowed by runtime policy, run
+these slices sequentially in the main agent.
 
 ## Evidence Rules
 
