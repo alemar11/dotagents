@@ -18,8 +18,9 @@ the skill package.
 - `DB_LOCK_TIMEOUT_MS`
   - Session lock timeout.
 - `DB_AUTO_UPDATE_SSLMODE=1`
-  - Auto-persist `sslmode=true` after a successful retry against a saved
-    profile in canonical `config.toml`.
+  - Explicitly authorize persisting `sslmode=true` after a successful retry
+    against a saved profile in canonical `config.toml`. Without this opt-in,
+    connection and inspection paths never update config.
 
 ## Docs lookup
 

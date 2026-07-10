@@ -25,6 +25,9 @@ patterns, and manage migration release flow through the shipped
 - Runtime model, platform binary, and maintenance implementation details live in
   `references/postgres_usage.md`.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
+- Ordinary runtime commands read and normalize config only in memory. Use
+  `profile migrate-toml`, `profile bootstrap --save`, `profile set-ssl`, or the
+  documented `DB_AUTO_UPDATE_SSLMODE=1` opt-in when a config write is intended.
 - Profile `access` modes are local CLI safety guards with values `read`,
   `write`, and `read_write`; they do not replace PostgreSQL roles, grants, RLS,
   or server-side read-only settings.

@@ -45,7 +45,8 @@ migrations_path = "db/migrations"
 - `[tools.postgres.profiles.<name>].access` stores the profile access mode:
   `read`, `write`, or `read_write`.
 - Missing `access` values are treated as `read_write` for compatibility and are
-  written explicitly per profile during light migration.
+  normalized in memory for ordinary runtime commands. They are written
+  explicitly only by an authorized config write such as `profile migrate-toml`.
 - `access` is a local CLI safety guard. PostgreSQL roles, grants, RLS, and
   server-side read-only settings remain authoritative.
 - `sslmode` must be boolean in TOML (`true` / `false`), not a string.
@@ -58,12 +59,16 @@ migrations_path = "db/migrations"
 ## Migration rules
 
 - If canonical `config.toml` exists, it is always the source of truth.
-- Existing `2.0.0` canonical configs migrate in place to `2.1.0`.
+- Existing `2.0.0` canonical configs normalize in memory to `2.1.0` for
+  ordinary runtime commands and migrate in place only when the operator runs
+  `profile migrate-toml` or another explicit config-writing command.
 - During `2.1.0` migration, every profile missing `access` gets an explicit
   value using this precedence: profile `access`, then `[tools.postgres].access`,
   then `read_write`.
 - If canonical `config.toml` is absent and legacy `postgres.toml` exists,
-  runtime migrates it one-way into canonical `config.toml`.
+  ordinary runtime commands read and normalize it without writing. Running
+  `profile migrate-toml` performs the one-way persistence into canonical
+  `config.toml`.
 - When a consuming repo previously ignored legacy `postgres.toml`, update its
   ignore rules to cover canonical `config.toml` in the same rollout; do not
   leave the migrated canonical file unignored.

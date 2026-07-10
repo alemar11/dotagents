@@ -235,8 +235,9 @@ The CLI resolves connections in this order:
 4. libpq vars: `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`,
    `PGSSLMODE`
 5. `<project-root>/.skills/postgres/config.toml`
-6. legacy `<project-root>/.skills/postgres/postgres.toml` as one-way migration
-   input when canonical `config.toml` is absent
+6. legacy `<project-root>/.skills/postgres/postgres.toml` as a read-only
+   compatibility input when canonical `config.toml` is absent; persist the
+   canonical form only with `profile migrate-toml`
 
 Project-root precedence:
 
@@ -252,8 +253,11 @@ Profiles may declare `access = "read"`, `access = "write"`, or
 
 - Missing `access` values are backward compatible and resolve to `read_write`.
 - Loading a `2.0.0` config or a `2.1.0` config with missing access values
-  performs a light migration to `schema_version = "2.1.0"` and writes explicit
-  per-profile `access` values.
+  normalizes it to `schema_version = "2.1.0"` with explicit per-profile
+  `access` values in memory. Health, inspection, query, dry-run, and other
+  ordinary runtime paths never persist that normalization.
+- `profile migrate-toml` is the explicit config-migration write path. It
+  persists canonical schema and access normalization.
 - `[tools.postgres].access` is allowed only as an inheritance/default source;
   prefer explicit per-profile access.
 - `read` permits read-oriented profile, query, activity, and schema inspection
@@ -268,7 +272,8 @@ Profiles may declare `access = "read"`, `access = "write"`, or
 ## Canonical commands
 
 - `doctor`
-  - Check config resolution and runtime readiness without mutating config.
+  - Check config resolution and runtime readiness without creating, migrating,
+    or rewriting config.
 - `profile resolve`
   - Show active profile, URL, access mode, and source.
 - `profile bootstrap [--save]`
@@ -284,8 +289,9 @@ Profiles may declare `access = "read"`, `access = "write"`, or
 - `profile version`
   - Show server version.
 - `profile migrate-toml`
-  - Migrate legacy `postgres.toml` into canonical `config.toml` and update
-    ignore coverage so `.skills/postgres/config.toml` stays untracked too.
+  - Explicitly persist legacy `postgres.toml` or an older canonical schema as
+    canonical `config.toml`; update ignore coverage so
+    `.skills/postgres/config.toml` stays untracked too.
 - `profile set-ssl <profile> <true|false>`
   - Persist `sslmode`.
 - `query run`

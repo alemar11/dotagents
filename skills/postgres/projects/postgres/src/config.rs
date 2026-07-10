@@ -265,7 +265,7 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
         );
     }
 
-    let config = load_and_migrate_config(&config_path)?;
+    let config = load_config(&config_path)?;
     let profile_name = choose_profile(
         &config,
         options
@@ -293,7 +293,28 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
     })
 }
 
+/// Load and normalize config in memory without creating or rewriting files.
+pub fn load_config(path: &Path) -> Result<SkillConfig> {
+    let (config, _) = load_config_from_disk(path)?;
+    Ok(config)
+}
+
+/// Load config and explicitly persist any legacy or schema normalization.
+/// Callers must already have mutation authority.
 pub fn load_and_migrate_config(path: &Path) -> Result<SkillConfig> {
+    let (config, loaded) = load_config_from_disk(path)?;
+    if should_save_loaded_config(path, &loaded.read_path, &loaded.original, &config) {
+        save_config(path, &config)?;
+    }
+    Ok(config)
+}
+
+struct LoadedConfig {
+    read_path: PathBuf,
+    original: SkillConfig,
+}
+
+fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
     let read_path = if path.exists() {
         path.to_path_buf()
     } else if let Some(legacy_path) = sibling_legacy_config_path(path).filter(|p| p.exists()) {
@@ -310,10 +331,13 @@ pub fn load_and_migrate_config(path: &Path) -> Result<SkillConfig> {
     let mut config = parse_config(&raw)?;
     let original = config.clone();
     migrate_config_in_place(&mut config)?;
-    if should_save_loaded_config(path, &read_path, &original, &config) {
-        save_config(path, &config)?;
-    }
-    Ok(config)
+    Ok((
+        config,
+        LoadedConfig {
+            read_path,
+            original,
+        },
+    ))
 }
 
 pub fn save_config(path: &Path, config: &SkillConfig) -> Result<()> {
@@ -740,7 +764,11 @@ pub fn prompt(text: &str, default: Option<&str>, secret: bool) -> Result<String>
 pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
     let mut config =
         if path.exists() || sibling_legacy_config_path(path).is_some_and(|p| p.exists()) {
-            load_and_migrate_config(path)?
+            if save {
+                load_and_migrate_config(path)?
+            } else {
+                load_config(path)?
+            }
         } else {
             SkillConfig::default()
         };
@@ -880,6 +908,63 @@ path = "db/migrations"
         assert!(written.contains("[tools.postgres.profiles.local]"));
         assert!(!written.contains("pg_bin_dir"));
         assert!(!written.contains("python_bin"));
+    }
+
+    #[test]
+    fn load_config_reads_legacy_without_writing_canonical_config() {
+        let temp = tempdir().unwrap();
+        let project_root = temp.path();
+        let legacy_path = legacy_config_path(project_root);
+        let canonical_path = canonical_config_path(project_root);
+        fs::create_dir_all(legacy_path.parent().unwrap()).unwrap();
+        fs::write(
+            &legacy_path,
+            r#"[database.local]
+database = "app"
+user = "postgres"
+password = "postgres"
+"#,
+        )
+        .unwrap();
+
+        let config = load_config(&canonical_path).unwrap();
+
+        assert_eq!(
+            config.schema_version.as_deref(),
+            Some(LATEST_SCHEMA_VERSION)
+        );
+        assert_eq!(
+            config.tools.postgres.profiles["local"].access,
+            Some(AccessMode::ReadWrite)
+        );
+        assert!(!canonical_path.exists());
+        assert!(legacy_path.exists());
+    }
+
+    #[test]
+    fn load_config_normalizes_missing_access_without_rewriting_canonical_config() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        let original = r#"schema_version = "2.0.0"
+
+[tools.postgres]
+access = "read"
+
+[tools.postgres.profiles.local]
+database = "app"
+user = "postgres"
+password = "postgres"
+"#;
+        fs::write(&canonical_path, original).unwrap();
+
+        let config = load_config(&canonical_path).unwrap();
+
+        assert_eq!(
+            config.tools.postgres.profiles["local"].access,
+            Some(AccessMode::Read)
+        );
+        assert_eq!(fs::read_to_string(&canonical_path).unwrap(), original);
     }
 
     #[test]

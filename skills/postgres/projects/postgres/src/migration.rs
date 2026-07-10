@@ -1,5 +1,5 @@
 use crate::cli::MigrationReleaseArgs;
-use crate::config::{RuntimeContext, load_and_migrate_config};
+use crate::config::{RuntimeContext, load_config};
 use anyhow::{Context, Result, anyhow, bail};
 use chrono::{Datelike, Timelike};
 use serde::Serialize;
@@ -30,7 +30,7 @@ pub fn build_release_plan(
         .config_path
         .clone()
         .ok_or_else(|| anyhow!("config.toml is required for migration release."))?;
-    let config = load_and_migrate_config(&config_path)?;
+    let config = load_config(&config_path)?;
     let profile = ctx.profile_name.clone();
     let postgres = &config.tools.postgres;
 
@@ -41,7 +41,12 @@ pub fn build_release_plan(
             .migrations_path
             .as_ref()
             .map(|value| absolutize(&project_root, &PathBuf::from(value)))
-            .or_else(|| postgres.migrations_path.as_ref().map(|value| absolutize(&project_root, &PathBuf::from(value))))
+            .or_else(|| {
+                postgres
+                    .migrations_path
+                    .as_ref()
+                    .map(|value| absolutize(&project_root, &PathBuf::from(value)))
+            })
             .unwrap_or_else(|| project_root.join("db/migrations"))
     } else {
         project_root.join("db/migrations")
