@@ -275,6 +275,20 @@ blockers and do not produce `ready-for-agent` issues.
 
 ### 5. Report Completion
 
+Every completion report, including `prd-only`, must include exactly one
+`Domain knowledge` outcome:
+
+- `Domain knowledge: captured in <path or durable surface>` when clarification
+  produced durable terms, rules, boundaries, or accepted decisions and
+  `$grill-me-with-context` or `$domain-modeling` recorded them.
+- `Domain knowledge: deferred to <path or durable surface> because <reason>`
+  when durable capture is warranted but cannot be completed during planning.
+- `Domain knowledge: no durable change` when planning introduced no new durable
+  project knowledge.
+
+Publishing a GitHub PRD or implementation issues does not by itself count as
+domain-knowledge capture.
+
 Summarize:
 
 - selected mode,
@@ -294,8 +308,7 @@ Summarize:
   enabling-slice exceptions, or withheld anomalies,
 - issue graph validation summary, including dependency and acyclicity checks,
 - planning blockers resolved or deferred,
-- durable domain or architecture decisions captured during clarification, or
-  explicit deferred capture with destination and reason,
+- the mandatory `Domain knowledge` outcome,
 - any issue still blocked and why.
 
 ## Guardrails
