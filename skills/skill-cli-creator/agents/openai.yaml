@@ -1,5 +1,5 @@
 interface:
   display_name: "Skill CLI Creator"
   short_description: "Build host-aware embedded CLIs that run from a shipped `scripts/<tool>` artifact inside a skill or plugin."
-  default_prompt: "Create or refactor an embedded CLI inside a skill or plugin. Resolve the host mode, owner root, artifact path, config namespace, and CLI/tool name first. Keep normal execution on the shipped `scripts/<tool>` artifact, use direct scripts for simple single-file CLIs, reserve `projects/<tool>/` for real multi-file or build-backed maintenance implementations, require `--version` from one semver source of truth, use owner-aligned `config.toml`, and document the CLI Maintenance path."
+  default_prompt: "Use $skill-cli-creator to create or refactor an embedded CLI, keep normal execution on its shipped `scripts/<tool>` artifact, and validate the finished command through that artifact."
   brand_color: "#2563EB"

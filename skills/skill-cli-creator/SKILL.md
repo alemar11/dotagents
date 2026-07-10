@@ -10,96 +10,87 @@ description: Create or refactor embedded CLIs that ship from `scripts/<tool>` in
 Create or refactor an embedded CLI that future agents run from a shipped
 artifact inside an existing skill or plugin bundle.
 
-Build for embedded host use only. Do not use this skill for standalone global
-CLIs, separate personal CLI repos, or PATH-first packaging.
+Use this skill only for embedded host CLIs. Standalone global or PATH-first CLI
+packages need a different workflow.
 
-## Start
+## Resolve The Contract
 
-This skill assumes the owning skill or plugin already exists. If the host does
-not exist yet, scaffold it first with `$skill-creator` or `$plugin-creator` when
-those Codex helpers are available. Outside Codex, create the equivalent host
-directory, `SKILL.md` or plugin manifest, and metadata by hand, then return here
-once the host boundary is real.
+The owning skill or plugin must exist first. Use `$skill-creator` or
+`$plugin-creator` when available to scaffold a missing host; outside Codex,
+create the equivalent host before continuing.
 
-Before creating files, capture:
+Resolve these values before editing:
 
 - Host mode: `skill` or `plugin`
-- Host owner:
-  - `host=skill`: the skill directory that owns the CLI surface
-  - `host=plugin`: the plugin directory, plus whether one bundled skill or
-    multiple bundled skills own the runtime surface
+- Owner root: the skill directory, one bundled skill, or a plugin-shared root
 - CLI/tool name: the runtime noun that owns `scripts/<tool>` and, when needed,
   `projects/<tool>/`
-- Source: API docs, OpenAPI JSON, SDK docs, curl examples, browser app, existing
-  internal script, article, or working shell history
-- Jobs: literal reads and writes such as `list drafts`, `download failed job
-  logs`, `search messages`, `upload media`, or `read queue schedule`
-- Artifact path: the shipped runnable artifact path such as
-  `scripts/ci-logs`, `scripts/slack-cli`, or `scripts/buildkite-logs`
+- Artifact path: the owner-root-relative shipped executable under `scripts/`
+- Jobs and source evidence: the concrete reads, writes, APIs, fixtures, or
+  existing scripts the command must support
 
-Choose the host owner and the CLI/tool name independently by default. Reuse the
-skill or plugin name only when it is intentionally the clearest runtime command
-name.
+Choose owner and command name independently. Reuse the host name only when it
+is intentionally the clearest runtime noun.
+
+## Progressive Reference Routing
+
+Load only what the current change needs:
+
+| Change shape | Reference |
+| --- | --- |
+| New/moved paths, plugin ownership, config namespace, cache, or multi-OS packaging | `references/embedded-cli-layout.md` |
+| Runtime selection, implementation/build changes, auth, or validation lane | `references/implementation-workflow.md` |
+| New/changed commands, JSON, pagination, files, writes, or raw escape hatch | `references/agent-cli-patterns.md` |
+
+A small fix to an existing skill-owned script does not require loading the
+plugin, migration, or multi-OS sections. A docs-only correction does not require
+the implementation workflow.
 
 ## Core Workflow
 
-1. Resolve ownership before layout.
-   Read [references/embedded-cli-layout.md](references/embedded-cli-layout.md)
-   before creating `scripts/`, `projects/<tool>/`, config paths, or cache paths.
-2. Check for collisions from the resolved owner root.
+1. Inspect the existing host and resolve the contract above. Check for path
+   collisions from the owner root:
    ```bash
    test -e <artifact-path> && echo "artifact exists"
    test -e projects/<tool-name> && echo "project exists"
    ```
-   If either exists, evolve the existing command or choose a clearer name.
-3. Choose the runtime and layout deliberately.
-   Use [references/implementation-workflow.md](references/implementation-workflow.md)
-   to inspect installed toolchains, pick Rust/TypeScript/Python/shell, choose
-   direct `scripts/` versus `projects/<tool>/`, and state the reason before
-   scaffolding.
-4. Sketch the command contract before coding.
-   Include discovery commands, resolve or ID-lookup commands, read commands,
-   write commands, raw escape hatch, auth/config choice, JSON behavior, and
-   rebuild behavior.
-5. Build toward the shipped artifact.
-   Normal execution must run through `<artifact-path>` under `scripts/`, not from
-   `projects/<tool>/`, `target/`, `dist/`, virtualenvs, or other build outputs.
-6. Verify through the artifact.
+   Evolve an existing command rather than creating a duplicate.
+2. Load the applicable reference branches and choose the smallest viable
+   layout. Keep a simple script directly under `scripts/`; add
+   `projects/<tool>/` only for a real multi-file or build-backed implementation.
+3. Sketch new or changed command behavior before coding: discovery and resolve
+   paths, reads, writes, auth/config, JSON, file transport, raw fallback, and
+   rebuild behavior that actually apply.
+4. Implement toward the shipped `<artifact-path>`. Normal execution never runs
+   from `projects/<tool>/`, `target/`, `dist/`, virtualenvs, or other build
+   outputs.
+5. Verify through the shipped artifact:
    Run `<artifact-path> --help`, `<artifact-path> --version`,
    `<artifact-path> --json doctor`, runtime-appropriate build/test checks, and at
-   least one safe fixture, dry-run, or read-only end-to-end check.
-7. Update the owning docs.
-   Add or update a `CLI Maintenance` section in the owning skill or plugin docs
-   so future agents know the artifact path, maintenance project, version source
-   of truth, rebuild path, config path, and safe read/write boundaries.
+   least one safe fixture, dry-run, or read-only end-to-end check. For a runtime
+   change, add the API-backed, local/offline, or hybrid lane from
+   `references/implementation-workflow.md`; a docs-only correction may validate
+   only the documented artifact path and examples it changes.
+6. Update the owning docs with the artifact path, optional maintenance project,
+   version source, rebuild path, config path, and safe read/write boundaries.
 
-## Non-Negotiable Invariants
+## Invariants
 
 - `scripts/` contains the shipped runnable artifact used during normal
   execution.
 - `projects/<tool>/` is optional and maintenance-only; introduce it only when
   the implementation benefits from a real project layout.
-- A direct executable under `scripts/<tool>` is enough for a single-file script,
-  a small dependency-free Python or shell tool, or a shim that does not need
-  build metadata, generated outputs, or multiple source modules.
-- Do not create `projects/<tool>/` just to hold one script plus tests. Keep
-  script-owned tests beside the skill or plugin owner, such as
-  `<skill-root>/tests/`, unless a real maintenance project exists.
 - The shipped artifact, optional maintenance project, persistent config
   namespace, runtime docs, and examples must share the same owner boundary.
-- Runtime examples use `<artifact-path> ...`, `<resolved-tool> ...`, or an
-  absolute installed artifact path unless the host docs explicitly define a
-  wrapper, alias, or `PATH` contract for bare `<tool> ...`.
+- Runtime examples use the owner-root-relative artifact or a resolved absolute
+  installed path. Bare commands require a documented wrapper or `PATH` setup.
 - `<artifact-path> --version` is required and must report one semver source of
   truth.
-- Owner-aligned config lives in `config.toml` under `.skills/...` or
-  `.plugins/...`; create it only through explicit `init`, `login`, or
-  `configure` flows.
+- Create or migrate config only through an explicit mutating command. Reads and
+  health checks, including `doctor`, must not write config.
 - Runtime caches under `~/.cache/dotagents/...` are only for rebuildable
   downloaded or generated runtime artifacts, never for user config or normal repo
   content.
-- If `projects/<tool>/` exists, keep project-local generated state ignored there
-  with a scoped `.gitignore` only when generated state actually exists.
 - If `projects/<tool>/` exists, add `projects/<tool>/AGENTS.md` with build,
   test, rebuild, runtime prerequisites, safe-maintenance instructions, version
   source of truth, and semver bump policy.
@@ -115,17 +106,3 @@ name.
 - [references/agent-cli-patterns.md](references/agent-cli-patterns.md):
   command-shape examples, composable CLI patterns, JSON conventions, pagination,
   file outputs, writes, raw escape hatches, and `doctor` output.
-
-## Validation Summary
-
-Always validate from the shipped artifact path. The minimum closeout is:
-
-```bash
-<artifact-path> --help
-<artifact-path> --version
-<artifact-path> --json doctor
-```
-
-Then add the matching lane from
-[references/implementation-workflow.md](references/implementation-workflow.md):
-API-backed, local/offline, or hybrid.

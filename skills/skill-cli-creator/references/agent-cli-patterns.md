@@ -1,84 +1,14 @@
 # Codex CLI Patterns
 
-Use this reference when designing the command surface for an embedded CLI Codex should run from a shipped artifact inside a skill or plugin bundle.
+Use this reference only when designing or changing an embedded CLI's command
+surface. It owns command naming, JSON and file transport, pagination, writes,
+and raw escape hatches. Ownership, artifact placement, config, cache, and
+multi-OS packaging belong to [embedded-cli-layout.md](embedded-cli-layout.md);
+runtime choice, implementation, and validation lanes belong to
+[implementation-workflow.md](implementation-workflow.md).
 
-## Mental model
-
-The CLI is Codex's command layer inside its owning host. It should turn a service, app, API, log source, or database into shell commands Codex can run repeatedly from the shipped runnable artifact stored in that owner's `scripts/` directory.
-
-Good CLIs for Codex expose composable primitives. Avoid a single command that tries to "do the whole investigation" when smaller discover, read, resolve, download, inspect, draft, and upload commands would compose better.
-
-Keep one shared owner model:
-
-- shipped runtime artifact in `scripts/`
-- optional maintenance project in `projects/<tool>/`
-- persisted working-project config under the matching owner namespace
-
-For a small script-native CLI, `scripts/<tool>` can be both the shipped
-artifact and the maintained source. Add `projects/<tool>/` only when the tool
-actually needs a multi-file or build-backed maintenance project.
-
-## Path vocabulary
-
-- `owner root`: the directory from which canonical executable examples run
-- `project root`: the root of the consuming workspace or repository where local operator config is stored; this is distinct from the `owner root`
-- `artifact path`: the owner-root-relative shipped runnable artifact, usually `scripts/<tool>` or `scripts/<tool>.<ext>`
-- `public runtime noun`: optional shorthand such as `<tool>` only when the owning docs explicitly define how that command becomes executable
-
-Use `/` separators for repository-relative template paths such as
-`scripts/<tool>` and `projects/<tool>/`. For real per-user filesystem paths,
-write concrete OS examples with the right home-directory notation:
-
-- macOS / Linux: `$HOME/...`
-- Windows CMD-style: `%USERPROFILE%\...` or `%HOMEDRIVE%%HOMEPATH%\...`
-- Windows PowerShell: `$env:USERPROFILE\...`
-
-Do not use `%HOMEPATH%` alone because it omits the drive.
-
-## Owner boundary
-
-Resolve the owner before designing the command surface.
-
-For skill-owned CLIs:
-
-- runtime artifact: `<skill-root>/scripts/<tool>`
-- maintenance project: `<skill-root>/projects/<tool>/`
-- working-project config: `<project-root>/.skills/<skill>/config.toml`
-
-For plugin-owned CLIs used by exactly one bundled skill:
-
-- runtime artifact: `<plugin-root>/skills/<skill>/scripts/<tool>`
-- maintenance project: `<plugin-root>/skills/<skill>/projects/<tool>/`
-- working-project config: `<project-root>/.plugins/<plugin>/skills/<skill>/config.toml`
-
-For plugin-owned CLIs shared by multiple bundled skills:
-
-- runtime artifact: `<plugin-root>/scripts/<tool>`
-- maintenance project: `<plugin-root>/projects/<tool>/`
-- working-project config: `<project-root>/.plugins/<plugin>/config.toml`
-
-Do not split ownership. `artifact path`, `projects/<tool>/`, and the persistent config namespace must stay under the same resolved owner model.
-
-Treat plugin-root `scripts/` as a repo convention, not as an official Codex plugin manifest component.
-
-## Naming the host vs the CLI
-
-Treat these as separate names:
-
-- host name: the skill or plugin guidance/package container
-- CLI/tool name: the runtime command noun used in `scripts/<tool>` and `projects/<tool>/`
-
-Default to different names when the runtime command is narrower than the host. Only reuse the host name when it is intentionally the clearest standard runtime noun.
-
-Good divergent examples:
-
-- `postgres` skill -> `scripts/pgops` with `projects/pgops/`
-- `github-ci` skill -> `scripts/ci-inspect` with `projects/ci-inspect/` when the embedded CLI focuses on PR checks and failing Action logs
-- `ops-toolkit` plugin -> `scripts/logs` with `projects/logs/` when multiple bundled skills share the same log-reading surface
-
-Allowed matching-name exception:
-
-- reuse the host name when the runtime noun is already the clearest standard surface and inventing a different command would be more awkward or more misleading than helpful
+Prefer composable discover, resolve, read, context, download, draft, and write
+commands over one command that performs an entire investigation.
 
 ## Help is interface
 
@@ -124,100 +54,24 @@ The important rule is consistency. Do not mix many styles unless the product voc
 
 ## Runtime surface
 
-When the CLI is embedded inside a host:
-
-- run the tool from `<artifact-path>` during normal execution
-- treat `<artifact-path>` as the shipped runnable artifact or launcher for normal execution
-- use `<artifact-path> --version` as the stable version check
-- choose the CLI/tool name intentionally; do not assume it must match the host name
-- use the same CLI/tool name consistently for `<artifact-path>` and
-  `projects/<tool>/` when a maintenance project exists
-- do not inspect `projects/<tool>/` during normal execution
-- open `projects/<tool>/` only when it exists and you are fixing, improving,
-  rebuilding, or extending the implementation behind the `<artifact-path>`
-  surface
-- keep the command shape stable even if the implementation language or internal layout changes
-- do not treat `target/`, `dist/`, virtualenv paths, or other build directories as supported runtime entrypoints
-- keep manifests, lockfiles, dependency installs, caches, intermediate build
-  outputs, and project-local build/test config inside `projects/<tool>/` when a
-  real maintenance project exists
-
-Keep one semver source of truth. Use the runtime-native manifest version when available, otherwise keep one explicit version constant or file and have `--version` read from it.
-
-If the runtime produces a compiled executable, copy, install, or generate the shipped artifact into `scripts/`. For multi-OS compiled runtimes, keep `<artifact-path>` as a launcher and store platform binaries in `scripts/bin/<tool>-<os>-<arch>` using suffixes such as `darwin-arm64`, `darwin-x86_64`, `linux-arm64`, and `linux-x86_64`; for example, a `postgres` tool would use the `postgres-<os>-<arch>` naming style. Script-native runtimes may keep the shipped script itself in `scripts/` when that script is the real artifact.
-
-For multi-OS compiled runtimes, add a maintainer helper under
-`projects/<tool>/scripts/`, usually `install-runtime-binary`, that builds the
-current platform or requested target and copies the result to
-`scripts/bin/<tool>-<os>-<arch>`. Cross-builds may need OS-specific toolchains,
-such as a Linux linker when building Linux binaries from macOS. The launcher
-must fail clearly when the current platform binary is missing.
-
-If the scaffold also creates project-local generated state, keep that ignore policy close to `projects/<tool>/`:
-
-- create or update `projects/<tool>/.gitignore` only when the CLI introduces build, cache, module, or environment directories inside that project
-- keep the local `.gitignore` limited to those project-local generated paths
-- do not create a no-op local `.gitignore` when there is nothing project-local to ignore
+Run examples through `<artifact-path>` and keep the command contract stable
+across implementation changes. Artifact placement, maintenance-project,
+compiled-launcher, and semver rules live in
+[embedded-cli-layout.md](embedded-cli-layout.md).
 
 ## Working-project config
 
-Use one owner-aligned `config.toml` namespace, not one TOML file per tool.
-
-Normative shape:
-
-```toml
-schema_version = "1.0.0"
-
-[defaults]
-profile = "staging"
-
-[auth]
-source = "env"
-
-[tools.logs]
-workspace = "mobile"
-
-[tools.deploys]
-confirm = "interactive"
-
-[meta]
-written_by = "logs"
-written_by_version = "0.9.0"
-```
-
-Rules:
-
-- `schema_version` is the config format version
-- owner-wide settings live only in explicitly documented shared sections such as `[defaults]`, `[auth]`, or `[profiles]`
-- `[tools.<tool>]` stores tool-specific persisted settings
-- when multiple CLIs share one `config.toml`, each CLI may write only its own `[tools.<tool>]` subtree plus any shared section it uniquely owns as the documented single writer
-- `[meta]` is optional provenance only
-- do not use top-level `version` as normative config state
-- do not require per-tool version fields
-- write config only through explicit init/login/configure flows
-- never create config implicitly during reads or health checks
+Use the owner-aligned `config.toml` contract in
+[embedded-cli-layout.md](embedded-cli-layout.md). Command design must keep reads
+and health checks non-mutating and reserve config writes for explicit
+`init`, `login`, `configure`, or migration commands.
 
 ## Runtime cache paths
 
-Use a per-user runtime cache only for reusable downloaded or generated runtime
-artifacts that should survive across consuming repos. Keep operator config in
-the owner-aligned `config.toml`, and keep build outputs or dependency caches
-inside `projects/<tool>/`.
-
-When a cache is needed, scope it by owner:
-
-- skill-owned: `~/.cache/dotagents/skills/<skill-name>/...`
-- plugin-owned shared: `~/.cache/dotagents/plugins/<plugin-name>/...`
-- plugin-owned but local to one skill: `~/.cache/dotagents/plugins/<plugin-name>/skills/<skill-name>/...`
-
-Equivalent concrete forms:
-
-- macOS / Linux: `$HOME/.cache/dotagents/...`
-- Windows CMD-style: `%USERPROFILE%\.cache\dotagents\...` or `%HOMEDRIVE%%HOMEPATH%\.cache\dotagents\...`
-- Windows PowerShell: `$env:USERPROFILE\.cache\dotagents\...`
-
-Treat cache contents as disposable and rebuildable; never use the runtime cache
-as the sole source of truth for user state.
+Cache ownership and platform path forms live in
+[embedded-cli-layout.md](embedded-cli-layout.md). Command contracts may use a
+cache only for disposable, rebuildable runtime artifacts, never user config or
+the sole copy of user state.
 
 ## Useful shapes from mature CLIs
 

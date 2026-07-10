@@ -7,131 +7,66 @@ description: Audit installed Codex skills, plugins, and bundled plugin skills fo
 
 ## Overview
 
-Audit installed Codex surfaces before proposing new ones.
+Audit installed standalone skills, plugin packages, and bundled plugin skills
+before proposing new surfaces. Prefer improving, merging, or disabling an
+existing owner when the evidence supports it.
 
-Treat the installed surface portfolio as the primary subject by default.
-Supported target kinds are:
-
-- standalone skill
-- plugin package
-- bundled plugin skill
-
-Prefer updating, merging, or disabling existing surfaces before recommending
-new ones. Treat project-local specializations as a last resort.
-
-Default full-scope audits should stay workflow-first and mixed. Start from the
-current workflow, repo docs, named tasks, and relevant local surfaces, then
-widen only when the workflow or named target requires it.
-
-This skill is Codex-dependent. It may use Codex prompt context, Codex memory
-artifacts, rollout summaries, and session JSONL when those are available.
-Treat those surfaces as evidence only; the editable source of truth lives in
-the owning checkout or install root.
-When raw session behavior matters, the skill-owned helper
-`scripts/session-evidence` can extract target-specific invocation evidence
-from Codex session JSONL files. It is a shipped runtime helper for audit work;
-do not edit or route fixes to session archives themselves.
-When portfolio-level hygiene matters, the skill-owned helper
-`scripts/portfolio-health` can report live inventory pressure, duplicate
-skills, long descriptions, root summaries, and heuristic recent-usage signals.
-Treat its output as audit evidence, not an automatic cleanup instruction.
-
-If the user explicitly names one or more targets, such as `audit skill
-$my-skill`, `audit plugin $my-plugin`, or `audit [$my-plugin:publish](...)`,
-treat those named targets as the required audit scope and resolve them before
-any broader workflow discovery.
-
-Treat `skill-audit` self-audit as opt-in only. Unless the user explicitly
-names `skill-audit`, do not audit it, do not add it implicitly because it
-appears relevant, and do not include it in the audited set.
-
-In full-portfolio audits, exclude `skill-audit` from the audited set by
-default. After presenting the suggestions for the other audited targets,
-explicitly ask the user whether they want a follow-up audit of `skill-audit`
-too.
+This skill is Codex-dependent. Repo files and installed manifests are the
+editable source of truth; Codex memory, rollout summaries, session JSONL, and
+cache copies are evidence only.
 
 ## Non-negotiables
 
-- **Audits are read-only by default.**
-  - Do not modify files under the audited target (including its `SKILL.md` or
-    `references/*`) while performing an audit.
-  - Record findings in the audit output; make file changes only after the user
-    explicitly asks to apply updates to that specific target.
-- **Do not “fix as you audit”.**
-  - Audits should not create PRs/commits or edit audited target docs unless the
-    user explicitly transitions the request from *audit* to *implementation*.
-- **When implementing changes to an audited target, avoid “append-only” edits.**
-  - Re-read the whole `SKILL.md` and reorganize sections if needed so it stays
-    a compact entrypoint.
-  - Prefer moving long-form guidance into `references/*` and linking to it from
-    `SKILL.md` rather than growing `SKILL.md` indefinitely.
-- **Cache copies are verification-only evidence.**
-  - Never route fixes to `~/.codex/plugins/cache/...`.
-- **Stay compact.**
-  - Keep audit findings decision-oriented; prefer dedicated reference files for
-    long-form content.
+- Audits are read-only. Record findings; edit, commit, or publish only after the
+  user explicitly switches the named target to implementation mode.
+- Never edit session archives or `~/.codex/plugins/cache/...`.
+- Named targets are the primary and normally exclusive scope. Include another
+  target only to explain a concrete overlap or ownership conflict.
+- Self-audit is opt-in: include `skill-audit` only when the user names it. For a
+  full-portfolio audit, exclude it and offer a separate follow-up.
+- Keep findings decision-oriented and evidence-backed.
 
 ## Target Resolution
 
-- Resolve user-provided scope first.
-  - If the user names one or more targets explicitly, those names define the
-    primary audit target set.
-  - Accept singular or plural phrasing such as `audit skill $my-skill`, `audit
-    plugin $my-plugin`, `audit [$my-plugin:publish](...)`, or `review only
-    $my-skill`.
-- Detect target kind before going deep.
-  - Treat a standalone skill root or skill path as `skill`.
-  - Treat a plugin root or plugin name as `plugin`.
-  - Treat a bundled skill under a plugin package or cache snapshot as
-    `bundled plugin skill`.
-- Keep targeted audits targeted.
-  - If the user names specific targets, do not expand to a wider portfolio
-    scan.
-  - In that mode, never auto-include `skill-audit`; include it only when it
-    was explicitly requested.
-  - Only bring in non-requested targets when needed to explain overlap, merge
-    candidates, or ownership conflicts.
-- Keep full-portfolio audits scoped too.
-  - When auditing the installed portfolio, do not auto-include `skill-audit`
-    in the findings.
-  - After presenting the non-`skill-audit` recommendations, ask the user
-    whether they want to audit `skill-audit` too.
-- Be explicit about misses.
-  - If a named target cannot be resolved, say so clearly.
-  - Do not silently substitute a near match or widen the audit scope.
+1. Resolve each named target before broader discovery.
+2. Classify it as `standalone skill`, `plugin package`, or `bundled plugin
+   skill`.
+3. If a target cannot be resolved, report the miss; do not substitute a near
+   match.
+4. For an unnamed portfolio audit, start from the current workflow and relevant
+   installed surfaces, then widen only when the question requires it.
 
 ## Reference Routing
 
-After detecting the target kind, open the matching workflow reference:
+Open only the branch needed for the current question:
 
-- `references/standalone-skills.md`
-  - Use for standalone project-local, shared, or global skills.
-- `references/plugins.md`
-  - Use for plugin package audits.
-- `references/bundled-plugin-skills.md`
-  - Use for bundled plugin skills.
-  - When auditing a bundled plugin skill, also inspect the owning plugin
-    package, including `.codex-plugin/plugin.json`.
-- `references/cache-resolution.md`
-  - Use whenever a target path lives under `~/.codex/plugins/cache/...` or when
-    a bundled target's editable owner is unclear.
-- `references/portfolio-hygiene.md`
-  - Use when deciding whether skills should be merged, disabled, trimmed,
-    deduplicated, or kept because of inventory, prompt-budget, root, or usage
-    evidence.
-- `references/writing-style-review.md`
-  - Use after the target-kind workflow when a skill or bundled skill audit
-    needs a writing-quality lens for trigger clarity, prompt load, information
-    hierarchy, pruning, or instruction-density recommendations.
+| Question | Reference |
+| --- | --- |
+| Standalone skill | `references/standalone-skills.md` |
+| Plugin package | `references/plugins.md` |
+| Bundled plugin skill | `references/bundled-plugin-skills.md` plus the owning manifest |
+| Cached or unclear editable owner | `references/cache-resolution.md` |
+| Merge, disable, duplicate, usage, or prompt-budget decision | `references/portfolio-hygiene.md` |
+| Trigger clarity or instruction-density review | `references/writing-style-review.md` |
 
-Open only the references needed for the current target and questions. Do not
-bulk-load all reference files by default.
+## Evidence Workflow
 
-## Session Evidence Helper
+1. Read the target's current discovery metadata, entrypoint, directly relevant
+   references, owning manifest, and adjacent repo docs.
+2. Check cheap history and consistency evidence such as `git log` before deep
+   session scans.
+3. Search the memory index first, then open only the one to three most relevant
+   rollout summaries.
+4. When claiming runtime behavior, false triggers, missed triggers, correctness,
+   or low value, inspect a representative raw session when practical. If none is
+   available, state that limitation.
+5. Use the helpers below instead of ad hoc parsers for repeated session or
+   portfolio checks. Treat their output as evidence, not automatic cleanup
+   authority.
 
-Use `scripts/session-evidence` when a raw-session scan would otherwise require
-custom parsing. Keep targets explicit and pass concrete paths from the skill,
-plugin, workspace, or installed cache being audited:
+### Session evidence
+
+Run from the resolved skill root:
 
 ```bash
 scripts/session-evidence \
@@ -143,14 +78,11 @@ scripts/session-evidence \
   --include-zero
 ```
 
-The helper reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
-`runtime-command` buckets. Treat its output as evidence to interpret, not as a
-replacement for reading a representative trace when a claim is high-risk.
+It reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
+`runtime-command` buckets. Read a representative trace before making a
+high-risk behavior claim.
 
-## Portfolio Health Helper
-
-Use `scripts/portfolio-health` when an audit needs inventory-level evidence
-before recommending merges, disables, description trims, or cleanup:
+### Portfolio health
 
 ```bash
 scripts/portfolio-health --help
@@ -159,32 +91,9 @@ scripts/portfolio-health --json doctor
 scripts/portfolio-health scan --months 3
 ```
 
-The helper reports prompt-budget estimates, long description candidates,
-duplicate names/bodies/descriptions, root summaries, and heuristic recent
-usage evidence. Use `references/portfolio-hygiene.md` to interpret the output.
-Do not delete, disable, or rewrite a skill solely because the helper reports no
-recent usage.
-
-## Shared Evidence Rules
-
-- Start from relevant local surfaces first, then widen only when needed.
-- Search the memory index first, then open only the 1-3 most relevant rollout
-  summaries.
-- For portfolio-level merge, disable, duplicate, or prompt-budget claims, run
-  `scripts/portfolio-health` unless the scope is too small for it to add value.
-- Check cheap maintenance signals such as `git log` and adjacent docs before
-  deep session scans.
-- If the audit is making a behavior, correctness, false-positive,
-  false-negative, or low-value claim and raw sessions exist, inspect at least
-  one representative session trace when practical.
-- For repeated or portfolio-style raw-session checks, prefer
-  `scripts/session-evidence` before ad hoc shell scripts. Pass explicit
-  `--target` values, optional `--target-path` values for installed or cached
-  `SKILL.md` files, and target-bound `--runtime-pattern TARGET=REGEX`
-  arguments only for runtime commands that are truly meaningful for the
-  audited surface.
-- If representative invocation evidence cannot be found, say that explicitly
-  instead of implying runtime behavior from docs or summaries alone.
+Use `references/portfolio-hygiene.md` to interpret its inventory, duplicate,
+prompt-budget, root, and heuristic usage signals. No recent usage alone is not
+enough to delete, disable, or rewrite a surface.
 
 ## Output Expectations
 
@@ -201,38 +110,6 @@ Return a compact audit using the format in
 - Re-verify touched helpers with `--help`, `--version`, and `--json doctor`
   before relying on them in an audit.
 
-## Decision Rules
-
-- Audit installed surfaces before proposing new ones.
-- Audit project-local surfaces before widening to shared/global surfaces.
-- Keep default full-scope audits workflow-first and mixed.
-- Treat `skill-audit` self-audit as explicit-scope only; never include it
-  unless the user names it.
-- When the user names specific targets, treat those named targets as the
-  primary and usually exclusive audit scope.
-- Prefer improving an existing installed surface before adding a new one.
-- Prefer improving a bundled plugin skill or repo docs when the problem does
-  not justify a plugin-level change.
-- Recommend a new surface only after checking whether an audited installed
-  surface could own the workflow cleanly.
-- If auditing a bundled plugin skill, inspect both the bundled skill contract
-  and the owning plugin package.
-
-## Failure Shields
-
-- Do not invent recurring patterns without repo, memory, or session evidence.
-- Do not confuse recurrence with effectiveness.
-- Do not claim runtime behavior, correctness, or low-value triggering from docs
-  or rollout summaries alone when raw session evidence is available.
-- Do not flatten skill, bundled plugin skill, plugin, and docs issues into one
-  bucket; keep ownership decisions explicit.
-- Do not jump to new-surface recommendations before evaluating existing
-  installed surfaces as possible owners.
-- Do not audit `skill-audit` unless the user explicitly requested
-  `skill-audit` in scope.
-- Do not bulk-load all rollout summaries or raw sessions; stay targeted.
-- Do not silently expand a user-targeted audit into a wider portfolio review.
-
 ## Follow-up
 
 If the user asks to create a brand-new skill or substantially reshape one,
@@ -242,15 +119,3 @@ audit.
 If the user asks to update an existing plugin package, bundled plugin skill, or
 standalone skill, leave audit mode and switch into implementation mode using
 the owning project's maintenance workflow.
-
-## Examples
-
-- "Audit the installed skills used in this workflow and tell me which ones
-  should be updated first."
-- "Audit plugin $my-plugin and suggest the highest-value improvements."
-- "Audit [$my-plugin:publish](...) and tell me whether the bundled skill or the
-  plugin package is the real owner of the problems."
-- "Before we add a new skill, check whether an existing installed surface or
-  repo docs should own this workflow instead."
-- "Audit only $my-planning-skill and $skill-audit and call out any overlap or
-  weak guardrails."
