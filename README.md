@@ -42,7 +42,7 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `github-triage` | Inspect current-repo GitHub issue and PR queues read-only; route mutations to `github-issues`. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `triage` | Triage GitHub or local markdown issues into typed workflow states and agent-ready queues. |
-| `grill-me-with-context` | Stress-test repo-backed plans with project context and capture docs or ADRs. |
+| `grill-me-with-context` | Stress-test repo-backed plans and capture or hand off durable decisions. |
 | `improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor before implementation. |
 | `skill-cli-creator` | Build host-aware embedded CLIs that live inside a skill or plugin under `scripts/`. |
 | `tanstack` | Review or build TanStack apps across Query, Router, Start, Form, Table, Virtual, Store, DB, AI, CLI, and integrations. |
@@ -75,7 +75,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work: `$github-triage`, `$github-issues`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`. It routes rough new feature intent and existing PRDs without generated implementation issues through `$plan-feature` before scheduling implementation work.
-- `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop and update project context docs or ADRs inline.
+- `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop, update project context docs or ADRs inline for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification, PRD writing, and configured agent-ready issue generation. It uses `$github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
 - `project-memory` requires `$domain-modeling` when seeding or enriching `CONTEXT.md` or ADRs from repo, workspace, session evidence, or project context moved out of `AGENTS.md`.
