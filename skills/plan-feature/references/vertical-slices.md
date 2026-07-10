@@ -59,6 +59,12 @@ backtracking:
    retries, empty states, and compatibility fallbacks.
 5. **Operational polish**: observability, docs, cleanup, or migration follow-up
    only when tied to a concrete delivered behavior.
+6. **Integration and knowledge closeout**: when Plan Feature carries a required
+   domain-knowledge delta, the last task validates the integrated feature and
+   updates the named durable context/docs/ADR surfaces to match what landed.
+   Prefer enriching an existing terminal integration task and make it depend on
+   every other terminal issue; otherwise append a final task that depends on
+   every terminal issue.
 
 Each issue must list only direct prerequisites in `## Dependencies`. If issue
 `03` depends on issue `01` but not issue `02`, say that directly. Do not rely
@@ -84,6 +90,11 @@ Dependencies must be explicit, minimal, and implementable:
   If it depends only on another generated implementation issue being completed,
   it may still be `ready-for-agent`; queue consumers must wait for the listed
   dependency to finish before starting it.
+
+For final-closeout selection, normalize dependency edges from prerequisite to
+downstream consumer: `02 depends-on 01` and `01 blocks 02` both mean
+`01 -> 02`. A terminal issue is a pre-closeout issue with no downstream
+generated consumer.
 
 ## Avoid Horizontal Tickets
 
@@ -113,6 +124,14 @@ Name allowed enabling issues by the capability they unlock, not by the layer.
 Prefer "Enable authenticated draft storage for Issue 02 and Issue 03" over
 "Add database tables."
 
+A final integration and domain-knowledge closeout task is allowed only when a
+required delta exists and no existing terminal issue owns feature-level
+integration proof. It is not a docs-only exception: it must depend on every
+terminal implementation issue, validate the integrated feature, update only the
+carried target surfaces, and prove the durable docs match the implemented
+behavior. It must be the last generated task and must be hardened like every
+other issue.
+
 ## Verticality Gate
 
 Before generated implementation issues are written, returned, or published,
@@ -134,6 +153,9 @@ For each issue, confirm that:
   acyclic,
 - orchestrator or multi-repo issues name affected repos, integration gates, and
   proof required for closeout.
+- a required domain-knowledge delta has exactly one final owner, that owner is
+  last in the graph, and its outcome includes integration proof rather than
+  documentation alone.
 
 If an issue fails the gate, repair the issue set before output:
 

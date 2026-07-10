@@ -14,6 +14,8 @@ question set or route back through `$grill-me-with-context`.
 
 - Do not implement the feature.
 - Do not split the PRD into implementation issues; the issue phase owns that.
+- Do not edit `CONTEXT.md`, project domain docs, or ADRs. Carry accepted durable
+  knowledge as the caller-provided `domain_knowledge_delta`.
 - Do not invent requirements, users, constraints, or acceptance criteria that
   are not supported by user input, repo evidence, or project memory.
 - Do not ask for separate PRD write/publish confirmation after `plan-feature`
@@ -56,7 +58,20 @@ Planning identity:
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
 - delivery_mode: <pull-request|direct-commit>
+
+Domain knowledge:
+- capture_mode: defer-to-caller
+- domain_knowledge_delta:
+    status: <required|none>
+    decisions: <accepted durable terms, rules, boundaries, or decisions>
+    target_surfaces: <current-repository paths or repo-slug-qualified context/docs/ADR destinations>
+    evidence: <portable current-repository, repo-slug-qualified, or hosted references>
+    unresolved: <empty for agent-ready planning, otherwise blockers>
 ```
+
+The handoff is mandatory even when no grilling occurred. Use `status: none`
+with empty `decisions`, `target_surfaces`, `evidence`, and `unresolved` lists
+when planning introduced no durable project knowledge.
 
 ## Workflow
 
@@ -125,6 +140,7 @@ Identify the source material:
 
 - user conversation or pasted notes,
 - output from `$grill-me-with-context`,
+- the structured `domain_knowledge_delta` returned by deferred clarification,
 - an existing issue, doc, or planning note,
 - repo behavior that needs to become a defined product surface.
 
@@ -174,6 +190,15 @@ Keep the PRD implementation-facing:
 - acceptance criteria,
 - risks and open questions,
 - notes for later issue splitting.
+
+When `domain_knowledge_delta.status` is `required`, include a
+`## Domain Knowledge Handoff` section using `references/prd-template.md`. Keep
+the decisions and target surfaces portable and specific enough for the final
+implementation task to update the repository after the behavior lands. This
+section is a deferred-work carrier, not proof that domain docs were captured.
+For multi-repo work, use `<repo-slug>/<repo-relative-path>` for every target and
+repo-local evidence item; never publish an ambiguous bare `CONTEXT.md` or ADR
+path.
 
 Before returning, writing, or publishing the PRD, run a small documentation
 gate: verify that evidence references are portable, runtime worker settings are
@@ -307,6 +332,8 @@ Return:
 - support docs created or updated and the accepted source used for each, when
   applicable,
 - any open questions,
+- `domain_knowledge_delta` status and whether the PRD contains a
+  `## Domain Knowledge Handoff`,
 - whether it is ready for the issue phase to create generated implementation
   issues.
 
@@ -316,6 +343,8 @@ Return:
 - Do not make the PRD a broad architecture plan; keep implementation details at
   the level needed for issue splitting.
 - Do not create implementation issues from the PRD in this phase.
+- Do not treat the PRD's `## Domain Knowledge Handoff` as completed durable
+  capture.
 - Preserve existing PRD content when updating a local PRD file; revise only the
   sections needed for the current source material.
 - Do not leak developer-machine paths in PRD evidence, source, or publication

@@ -12,7 +12,8 @@ pipeline and its internal Product Requirements Document (PRD) and issue phases:
 
 `$project-memory` if needed -> `$grill-me-with-context` when scope needs
 clarification -> PRD phase -> issue phase with `$plan-harder` per generated
-issue.
+issue -> final integration and domain-knowledge closeout task when issues are
+generated and durable knowledge changed.
 
 Use this skill to turn rough feature intent into a written PRD and agent-ready
 vertical issues. In orchestrator workspaces, those issues may be cross-repo
@@ -87,6 +88,21 @@ issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
   feature slug.
 - Carry accepted delivery mode through every phase using structured values:
   `pull-request` or `direct-commit`.
+- When calling `$grill-me-with-context`, always pass
+  `capture_mode: defer-to-caller`. Planning may read project context but must
+  not edit `CONTEXT.md`, project docs, ADRs, or other durable domain surfaces.
+- Initialize every run with a canonical `domain_knowledge_delta` using
+  `status: none` and empty `decisions`, `target_surfaces`, `evidence`, and
+  `unresolved` lists. Replace it with the deferred clarification result or
+  planning-derived durable decisions when required, then carry it through the
+  PRD and issue phases. In issue-generating modes, when its status is
+  `required`, assign its capture and verification to the final generated
+  integration task. If the issue graph has no suitable final integration task,
+  append one that depends on every terminal implementation issue. If an
+  existing terminal integration task is reused, make it depend on every other
+  terminal issue. The final task must prove the integrated feature and must not
+  be a docs-only horizontal ticket. In `prd-only`, preserve a required delta in
+  the PRD handoff and do not generate an issue.
 - Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
   the issue phase. In `draft-publish-commands` runs, use the stable draft ref
   from `$project-memory` `references/tracker-publishing.md` until a
@@ -107,8 +123,10 @@ This skill may call:
 - `$project-memory`'s `tracker-routing` slice when required tracker setup is
   missing or needs review; broader setup remains out of scope unless separately
   requested.
-- `$grill-me-with-context` when feature scope, terms, decisions, or planning
-  blockers need repo-backed clarification.
+- `$grill-me-with-context` in `capture_mode: defer-to-caller` when feature
+  scope, terms, decisions, or planning blockers need repo-backed clarification.
+  Consume its structured `domain_knowledge_delta`; do not allow it to edit
+  repository docs during Plan Feature.
 - `$plan-harder` once per generated implementation issue.
 - `$github-issues` only for GitHub issue publishing, issue type/label handling,
   parent/sub-issue relationships, and dry-run command mechanics for PRDs and
@@ -204,9 +222,14 @@ Use it to resolve:
 - open planning blockers that would change the PRD or issue split.
 
 If this clarification resolves durable terms, rules, boundaries, or accepted
-decisions, carry forward whether `$grill-me-with-context` captured them in docs
-or explicitly deferred them because the destination was missing or out of
-scope.
+decisions, require `$grill-me-with-context` to return them in
+`domain_knowledge_delta` with intended repo-relative target surfaces and
+evidence, qualified by repository slug for multi-repo work. Do not capture them
+in repository docs during planning. If the source
+is already clear enough to skip grilling but planning still resolves new
+durable knowledge, build the same delta directly from accepted source material
+and user decisions. If grilling is skipped and planning introduces no durable
+change, preserve the initialized `status: none` delta with all lists empty.
 
 If planning blockers emerge, continue the grill-style one-question flow until
 they are resolved or explicitly deferred as non-blocking. Do not write or
@@ -227,7 +250,7 @@ durable and the user did not request a PRD update.
 
 Load `references/prd-phase.md` and pass the phase handoff fields defined there,
 including mode, effective target, no-mutation override, source PRD ref state,
-planning identity, and delivery mode.
+planning identity, delivery mode, and `domain_knowledge_delta`.
 
 Require the PRD phase to return `source_prd_ref`. In `draft-publish-commands`
 mode, this is a deterministic `draft-prd:<feature-slug>` or
@@ -253,7 +276,9 @@ mapped labels, but they are not executable agent-ready issues until the draft
 path.
 
 Pass the same phase handoff fields defined in `references/issue-phase.md`, with
-`source_prd_ref` resolved or carried from the draft handoff.
+`source_prd_ref` resolved or carried from the draft handoff and
+`domain_knowledge_delta` preserved from clarification or the PRD's
+`## Domain Knowledge Handoff` section.
 
 Require the issue phase to use the configured issue target, mapped issue
 metadata, PRD parent/sub-issue relationships, related issue links, `$plan-harder`
@@ -262,6 +287,15 @@ validation, copied delivery mode, and the `## Orchestrator Handoff` shape from
 `references/issue-body-template.md`.
 `references/issue-phase.md` owns the detailed issue body, workspace,
 publication, draft-output, and placeholder rules.
+
+When `domain_knowledge_delta.status` is `required`, require the issue phase to
+make domain capture part of the final integration task. Prefer enriching an
+existing terminal integration task and add direct dependencies on every other
+terminal issue. Otherwise append a final integration and domain-knowledge
+closeout task that depends on every terminal issue, runs the feature-level
+proof, updates the named context/docs/ADR surfaces to match the implemented
+behavior, and verifies the diff. Harden and validate that task like every other
+generated issue.
 
 If the issue phase discovers a product, domain, dependency, or
 acceptance-criteria blocker, pause issue writing and route the blocker back
@@ -278,16 +312,20 @@ blockers and do not produce `ready-for-agent` issues.
 Every completion report, including `prd-only`, must include exactly one
 `Domain knowledge` outcome:
 
-- `Domain knowledge: captured in <path or durable surface>` when clarification
-  produced durable terms, rules, boundaries, or accepted decisions and
-  `$grill-me-with-context` or `$domain-modeling` recorded them.
-- `Domain knowledge: deferred to <path or durable surface> because <reason>`
-  when durable capture is warranted but cannot be completed during planning.
+- `Domain knowledge: deferred to <final task ref> because Plan Feature assigns
+  durable capture to implementation closeout` when a required delta was placed
+  in the final generated task.
+- In `prd-only` when `domain_knowledge_delta.status` is `required`, use
+  `Domain knowledge: deferred to the final implementation task generated from
+  <source_prd_ref> because prd-only stops before issue creation` and preserve
+  the delta in the PRD's `## Domain Knowledge Handoff` section.
 - `Domain knowledge: no durable change` when planning introduced no new durable
-  project knowledge.
+  project knowledge, including `prd-only` runs whose delta remains
+  `status: none`.
 
 Publishing a GitHub PRD or implementation issues does not by itself count as
-domain-knowledge capture.
+domain-knowledge capture. Plan Feature does not report `captured` because it
+does not modify durable domain surfaces during planning.
 
 Summarize:
 
@@ -309,16 +347,23 @@ Summarize:
 - issue graph validation summary, including dependency and acyclicity checks,
 - planning blockers resolved or deferred,
 - the mandatory `Domain knowledge` outcome,
+- the final task that owns domain capture in issue-generating modes, or the PRD
+  handoff that preserves it in `prd-only`, when a knowledge delta is required,
 - any issue still blocked and why.
 
 ## Guardrails
 
 - Do not implement the feature.
-- Do not write broad docs directly from this skill; `$grill-me-with-context` and
-  `$domain-modeling` own durable context and ADR updates.
-- Do not let durable terms, rules, or accepted decisions stop only in PRDs,
-  issue bodies, or chat when clarification resolved them; report where they
-  were captured or explicitly defer them with destination and reason.
+- Do not write durable domain docs directly or indirectly during Plan Feature.
+  Always call `$grill-me-with-context` in `defer-to-caller` mode and carry its
+  delta into planning artifacts.
+- Do not let durable terms, rules, or accepted decisions stop only in the PRD,
+  ordinary implementation issues, or chat. Put the exact delta and target
+  surfaces in the final integration task, or in the PRD handoff until issue
+  generation occurs.
+- Do not create a docs-only domain-capture issue. The final owner must also run
+  the integrated feature proof and verify that durable docs describe the
+  behavior that actually landed.
 - Do not create PRDs or issues in locations not configured by
   `project-memory/agents/issue-tracker.md`.
 - Do not keep repo-local `.scratch/` or `project-memory/features/` copies for

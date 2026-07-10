@@ -52,6 +52,12 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   Do not create a separate planning issue, local plan file, PRD plan section, or
   inline scheduling artifact. If the user asks for a summary, label it as a
   non-authoritative view derived from the generated issues.
+- When `domain_knowledge_delta.status` is `required`, make its capture and
+  verification part of the final integration task. Prefer an existing terminal
+  task that already owns feature-level integration proof. Otherwise append one
+  final integration and domain-knowledge closeout task that depends on every
+  terminal implementation issue. This final task must be system-verifiable and
+  must not be a docs-only horizontal ticket.
 - Treat `tracker_backend` as planning-artifact write authority. When the
   effective target is the configured tracker, publish GitHub issues for
   `github` backends and write Markdown files for `local` backends. Return draft
@@ -95,6 +101,9 @@ Plan-feature mode: <full-flow|issues-from-existing-prd>
 
 - Source PRD ref:
   <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
+- Domain knowledge delta:
+  <structured `domain_knowledge_delta` from deferred clarification or the PRD's
+  `## Domain Knowledge Handoff` section>.
 ```
 
 ## Structured Issue Values
@@ -147,6 +156,11 @@ Also inspect:
   planning from a local orchestrator workspace,
 - nearby source files, tests, and docs relevant to the PRD.
 
+Load `domain_knowledge_delta` from the Plan Feature handoff. For
+`issues-from-existing-prd`, reconstruct it from `## Domain Knowledge Handoff`
+when that section exists. Treat an unresolved item that changes implementation
+scope as a blocker; do not silently move product questions into the final task.
+
 If there is no PRD-quality source, stop and ask the user to provide one or run
 the PRD phase first.
 
@@ -190,11 +204,43 @@ list:
 - dependency edge validity check: every `depends-on` / `blocks` reference must
   resolve to a generated issue ID in this feature set (`01`, `02`, ...), and
   the graph must be acyclic.
+- Normalize each dependency edge from prerequisite to downstream consumer:
+  `02 depends-on 01` and `01 blocks 02` both produce `01 -> 02`. Before adding
+  domain closeout, snapshot terminal issues as pre-closeout nodes with no
+  downstream consumers (out-degree zero). When an existing terminal issue is
+  selected as the final owner, exclude it from the terminal prerequisites added
+  to itself.
 - startability waves and unblock conditions.
 - repo-level boundaries and integration proof requirements for orchestrator
   work.
 - Treat the issue bodies as the durable ordering contract for scheduling and
   worker-routing. Do not persist a separate scheduling artifact.
+
+When `domain_knowledge_delta.status` is `required`, choose its final owner from
+that pre-closeout terminal snapshot after the initial graph is formed:
+
+1. If exactly one terminal issue already runs the end-to-end integration or
+   release proof, add domain closeout to that issue and make it depend directly
+   on every other terminal issue so it cannot start before sibling outcomes
+   land.
+2. Otherwise append the last generated issue as a final integration and
+   domain-knowledge closeout task. It depends directly on every terminal issue,
+   reruns the feature-level integration proof, updates the named context/docs/ADR
+   targets through the feature delivery path, and verifies the resulting docs
+   against the implemented behavior.
+3. Add the exact decisions, target surfaces, and evidence under
+   `## Domain Knowledge Closeout`; merge corresponding work into Requirements,
+   Acceptance Criteria, Validation, Completion, and Orchestrator Handoff.
+4. Mark the task `root-integrated` only when root ownership is actually
+   required; otherwise use explicit `depends-on` IDs.
+
+The final owner is part of the implementation graph and must be passed through
+`$plan-harder`. Never append a documentation-only task. When the delta status is
+`none`, do not create a synthetic closeout issue. After choosing or appending
+the owner, revalidate generated IDs, direct dependency edges, acyclicity,
+startability waves, and final-task ordering before hardening begins. Treat an
+existing integration owner that does not depend on every other terminal issue
+as an invalid graph.
 
 Every issue should:
 
@@ -214,6 +260,18 @@ Every issue should:
 - keep dependency references in issue `Parallelization` lines as issue IDs
   (`01`, `02`, ...) rather than prose titles,
 - avoid circular dependencies that can lock the queue.
+
+The final domain owner must additionally:
+
+- validate the integrated feature after all terminal dependencies complete,
+- update only the target durable surfaces named by the knowledge delta, using
+  `current-repository/<path>` or `<repo-slug>/<path>` ownership so multi-repo
+  destinations are unambiguous,
+- reconcile provisional planning language with the behavior that actually
+  landed rather than copying the PRD blindly,
+- include `git diff --check` or the repository's equivalent documentation diff
+  check,
+- record one completion proof covering both integration and durable capture.
 
 ### 3. Harden Every Issue With `$plan-harder`
 
@@ -264,6 +322,11 @@ For each issue, verify that it:
 - keeps the `## Orchestrator Handoff`, `## Delivery`, `## Validation`,
   `## Completion`, and `## Dependencies` sections consistent.
 
+For the final domain owner, also verify that `## Domain Knowledge Closeout`
+contains the carried decisions, target surfaces, and evidence, and that its goal
+and acceptance criteria prove integrated behavior in addition to documentation.
+Reject ambiguous bare target or repo-local evidence paths in multi-repo work.
+
 Allow a separate enabling issue only when it satisfies all exception rules from
 `references/vertical-slices.md`: no useful vertical slice can be implemented
 before it, it unblocks at least one named later vertical issue, it is
@@ -276,6 +339,9 @@ If the gate finds an anomaly:
 
 - merge chore-only tests, docs, fixtures, migrations, configuration, or
   observability work into the vertical issue whose outcome they prove,
+- keep required domain capture in the final integration owner; if the proposed
+  owner is docs-only, merge it into an existing terminal integration issue or
+  broaden it only to the real feature-level integration proof,
 - split mixed issues by independently verifiable behavior rather than by code
   layer,
 - reframe infrastructure work as a concrete system outcome only when that is
@@ -387,6 +453,12 @@ handoff may repeat structured data from `## Delivery`, `## Validation`,
 `## Completion`, and `## Dependencies` so an orchestrator can register the issue
 without inferring from loose prose. It must not contain worker authorization,
 publication, issue mutation, or orchestration session settings.
+
+When a final domain owner exists, publish or write it last, attach it to the
+same PRD parent, and keep its dependency metadata in the generated feature-ID
+space (`01`, `02`, ...), including after hosted issue numbers or local paths
+exist. Track those published or local refs separately. In draft command mode,
+preserve the same last-task ordering and replacement rules.
 
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
@@ -516,6 +588,8 @@ Summarize:
 - issue types and labels/statuses assigned,
 - completion instruction included,
 - any blocked issues and why,
+- `domain_knowledge_delta` status and the exact final issue ref that owns
+  capture, or confirmation that no durable change was introduced,
 - whether any non-agent-ready partial issues were withheld or explicitly
   published as `needs-info` / `ready-for-human`,
 - confirmation that `$plan-harder` was run once per issue, that each issue

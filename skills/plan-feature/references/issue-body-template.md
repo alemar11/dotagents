@@ -85,6 +85,23 @@ integration proof.]
 [Include only when separate validation, release, or cross-repo proof affects
 completion.]
 
+## Domain Knowledge Closeout
+
+[Include only on the final integration task when the Source PRD carries a
+required domain-knowledge handoff. This task must also prove integrated feature
+behavior; never use this section to justify a docs-only issue.]
+
+- Decisions:
+  - [Accepted durable term, rule, boundary, or decision carried from the PRD.]
+- Target surfaces:
+  - [`current-repository/<repo-relative-path>` or
+    `<repo-slug>/<repo-relative-path>` destination.]
+- Evidence:
+  - [Portable current-repository, repo-slug-qualified, hosted, or accepted
+    implementation evidence.]
+- Closeout proof:
+  - [Integration validation plus documentation diff/consistency verification.]
+
 ## Requirements
 
 - [Requirement this issue must satisfy.]

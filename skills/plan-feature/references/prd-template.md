@@ -110,4 +110,22 @@ contracts that issue splitting must preserve.
 
 Include only when separate validation, release, or cross-repo proof affects issue
 splitting or closeout.
+
+## Domain Knowledge Handoff
+
+Include only when planning resolved new durable project knowledge. This is a
+deferred handoff for the final implementation task, not completed capture.
+
+- Decisions:
+  - Accepted durable term, rule, boundary, or decision.
+- Target surfaces:
+  - `current-repository/<repo-relative-path>` for single-repo work, or
+    `<repo-slug>/<repo-relative-path>` for multi-repo context, project doc, or
+    ADR destinations.
+- Evidence:
+  - Portable current-repository, repo-slug-qualified, hosted, or accepted
+    conversation evidence.
+- Closeout proof:
+  - Update the target surfaces after implementation and verify they describe
+    the integrated behavior that actually landed.
 ```
