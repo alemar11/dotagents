@@ -100,6 +100,7 @@ carried from the draft handoff:
 
 ```text
 Plan-feature mode: <full-flow|issues-from-existing-prd>
+Execution profile: <lean-issues|standard>
 
 - Source PRD ref:
   <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
@@ -166,6 +167,14 @@ scope as a blocker; do not silently move product questions into the final task.
 
 If there is no PRD-quality source, stop and ask the user to provide one or run
 the PRD phase first.
+
+For `lean-issues`, read the durable PRD once, then inspect only tracker/type
+mappings and source/tests directly needed to validate its candidate slices.
+Keep the profile only when one repo/context is unambiguous, no more than two
+vertical issues are expected, and no cross-repo gate, enabling slice, unresolved
+blocker, or separate domain-closeout owner appears. Otherwise widen to
+`standard`, load the broader context above, and record the first failed lean
+condition. The lean profile does not weaken any hardening or output gate.
 
 Resolve and carry the planning identity before splitting:
 
@@ -594,6 +603,7 @@ agent-ready claim.
 Summarize:
 
 - source PRD,
+- execution profile used and any widening reason,
 - authoritative `feature_slug`,
 - product/workspace/context or orchestrator project identity used, when
   applicable,
@@ -616,6 +626,32 @@ Summarize:
 - confirmation that `$plan-harder` was run once per issue, that each issue
   includes the standard plan-hardening provenance line, and that the hardening
   output was merged into the issue without duplicated sections.
+
+## Evidence And Phase Metrics
+
+Keep one PRD snapshot keyed by `source_prd_ref` and fingerprint. For each issue,
+store its current body in the configured target or transient body file and
+carry only the issue id/ref, body fingerprint, changed headings, hardening
+status, and failed-gate excerpts into the next pass. Do not repeat unchanged
+PRD or issue bodies between `$plan-harder`, repair, graph, and publication
+steps. Re-open or emit a complete body only when its fingerprint changed, a
+gate needs the relevant section, draft/chat output requires it, or final
+publication/review needs it.
+
+When run-scoped counters cover uncontaminated intervals, checkpoint and report
+these independent deltas:
+
+```text
+phase=issue-split; tokens=<exact delta|unavailable>
+phase=issue-hardening:<issue-id>; tokens=<exact delta|unavailable>
+phase=issue-graph-and-publication; tokens=<exact delta|unavailable>
+```
+
+Also report the references actually loaded and final body fingerprints. Label
+an interleaved cumulative delta `exact-interval` and do not attribute it to an
+issue phase or hardening call. If exact counters are unavailable, record one
+`tokens=unavailable` result for the issue phase; never estimate, reread session
+archives, or block publication to obtain metrics.
 
 ## Issue Body Shape
 

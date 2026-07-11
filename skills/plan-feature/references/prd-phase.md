@@ -37,6 +37,7 @@ When called by `plan-feature`, receive these fields from the entrypoint:
 
 ```text
 Plan-feature mode: <full-flow|prd-only|issues-from-existing-prd>
+Execution profile: <lean-prd|standard>
 
 Publishing target:
 - Hosted tracker body-file temp files: transient outside the repo and cleaned
@@ -78,7 +79,21 @@ when planning introduced no durable project knowledge.
 
 ### 1. Ground In Project Memory
 
-Inspect the current project context before drafting:
+For `lean-prd`, begin with only:
+
+- `project-memory/agents/issue-tracker.md`;
+- `project-memory/agents/triage-labels.md`;
+- the shape/ownership routing in `project-memory/agents/domain.md` and
+  `CONTEXT-MAP.md` when either exists, without loading unrelated content;
+- the selected `CONTEXT.md` only when needed to resolve terminology or scope;
+- the supplied intent plus directly relevant source, tests, or product docs.
+
+Do not scan every ADR, sibling workspace doc, translation memory, or broad
+source tree on the lean path unless the minimum evidence is missing,
+contradictory, or reveals multi-context/cross-repo ownership. Widen to
+`standard` immediately when a lean prerequisite fails and record why.
+
+For `standard`, inspect the current project context before drafting:
 
 - `project-memory/agents/issue-tracker.md`
 - `project-memory/agents/triage-labels.md`
@@ -332,6 +347,7 @@ If no issue-tracker setup exists, return the PRD in chat and recommend running
 Return:
 
 - PRD title,
+- execution profile used and any widening reason,
 - authoritative `feature_slug`,
 - product/workspace/context or orchestrator project identity used, when
   applicable,
@@ -349,6 +365,35 @@ Return:
   `## Domain Knowledge Handoff`,
 - whether it is ready for the issue phase to create generated implementation
   issues.
+
+## Evidence And Phase Metrics
+
+Read each unchanged source body once. Keep a compact working index containing
+its portable path/ref, fingerprint, and relevant headings. After drafting or
+repairing the PRD, carry only the target path/ref, body fingerprint, changed
+headings, and failed-gate excerpts between passes. Re-open or emit the complete
+body only when its fingerprint changed, a gate requires the relevant section,
+the effective target is chat/draft output, or final publication needs it.
+
+For configured local or hosted targets, completion output should identify the
+PRD and its fingerprint instead of repeating the complete body. Draft/chat
+output still returns the requested body.
+
+When root-scoped runtime token counters cover an uncontaminated PRD interval,
+capture start and end checkpoints and return:
+
+```text
+phase=prd
+tokens=<exact delta|unavailable>
+references_loaded=<paths actually opened>
+artifact=<source_prd_ref>; fingerprint=<sha256 or hosted revision>
+full_body_emitted=<no|chat-output|draft-output|publication|gate-failure>
+```
+
+If the interval contains other activity, label its delta `exact-interval` and
+do not attribute it to the PRD phase. If exact counters are unavailable, record
+`tokens=unavailable` once without probing session archives, estimating from
+text size, or blocking the phase.
 
 ## Guardrails
 

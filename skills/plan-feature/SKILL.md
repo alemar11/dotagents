@@ -32,6 +32,24 @@ In `issues-from-existing-prd`, skip clarification unless unresolved PRD
 questions affect scope, acceptance criteria, dependencies, validation,
 publication, permissions, or cross-repo contracts.
 
+## Execution Profiles
+
+Select an internal profile after resolving mode and identity:
+
+- `lean-prd`: use only for `prd-only` when tracker routing exists, one
+  repo/context is unambiguous, the supplied intent is PRD-ready, and no
+  clarification or cross-repo contract is needed.
+- `lean-issues`: use only for `issues-from-existing-prd` when the durable PRD is
+  unambiguous, one repo/context is involved, at most two candidate vertical
+  issues are expected, and no cross-repo gate, enabling slice, or separate
+  domain-closeout owner is needed.
+- `standard`: use for every other run and whenever lean-path evidence becomes
+  incomplete or contradictory.
+
+Lean profiles reduce discovery and repeated output only. They never skip
+templates, `$plan-harder`, verticality, graph, documentation, publication, or
+domain-closeout gates required by the selected mode.
+
 ## Non-Negotiable Invariants
 
 - Keep PRD writing and issue splitting as internal phases. Load
@@ -76,6 +94,15 @@ publication, permissions, or cross-repo contracts.
 - Keep worker surfaces, worker counts, publication authority, issue mutation
   authority, and other `$codex-orchestrator` session choices out of PRDs,
   generated issues, handoffs, local tracker files, and draft commands.
+- Snapshot each source or artifact in full at most once per unchanged
+  fingerprint. On later passes use paths, fingerprints, changed sections, and
+  failed-gate excerpts; emit a full body only when chat/draft output requires
+  it or at the final publication/review boundary.
+- When the runtime exposes counters scoped to this run, checkpoint only
+  uncontaminated phase intervals and report deltas for routing, clarification,
+  PRD work, each issue-hardening call, and final validation/publication. Label
+  interleaved cumulative deltas `exact-interval`, not phase usage; otherwise
+  record `unavailable`. Never estimate or make metrics a completion gate.
 
 ## Composed Skills
 
@@ -104,6 +131,7 @@ is config-only and does not create project or feature artifacts.
 
 Resolve:
 
+- execution profile: `lean-prd`, `lean-issues`, or `standard`;
 - effective target: `configured-tracker`, `local-dry-run`, or
   `draft-publish-commands`;
 - no-mutation override: `none`, `dry-run`, `temp`, `rehearsal`, `validation`,
@@ -134,8 +162,9 @@ those that block a safe split.
 
 Skip only when `issues-from-existing-prd` uses an unchanged durable PRD.
 Otherwise load `references/prd-phase.md` and its required template, then pass
-the resolved mode, target, no-mutation override, planning identity, delivery
-values, source-ref state, and domain delta.
+the resolved mode, execution profile, target, no-mutation override, planning
+identity, delivery values, source-ref state, and domain delta. A `lean-prd`
+run reads only the phase's minimum evidence set unless a gate forces widening.
 
 Require a durable local/hosted `source_prd_ref`, or a deterministic
 `draft-prd:<feature-slug>` / `draft-prd:<project-slug>/<feature-slug>` plus
@@ -146,7 +175,9 @@ material blocker back through clarification. Stop here for `prd-only`.
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 `references/vertical-slices.md`. Pass the same identity, delivery, source-ref,
-target, and domain-delta fields.
+target, domain-delta, and execution-profile fields. A `lean-issues` run still
+hardens and validates every issue separately; it only narrows discovery and
+uses delta evidence between issue passes.
 
 The issue phase owns vertical splitting, one `$plan-harder` pass per issue,
 mapped metadata, dependency/acyclicity validation, PRD parent/sub-issue links,
@@ -163,8 +194,10 @@ like every other issue.
 ### 5. Report Completion
 
 Return the phase locations/counts and the effective target, planning identity,
-delivery values, verticality repairs/exceptions, graph validation, blockers,
-and applied tracker metadata. Include exactly one domain outcome:
+execution profile, delivery values, verticality repairs/exceptions, graph
+validation, blockers, applied tracker metadata, artifact fingerprints, and
+phase-token evidence (`exact-phase`, `exact-interval`, or `unavailable`).
+Include exactly one domain outcome:
 
 - `Domain knowledge: deferred to <final task ref> because Plan Feature assigns durable capture to implementation closeout`;
 - for required `prd-only` deltas: `Domain knowledge: deferred to the final implementation task generated from <source_prd_ref> because prd-only stops before issue creation`; or

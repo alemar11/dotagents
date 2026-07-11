@@ -42,6 +42,17 @@ implementation, validation, and report.
   raw Git worktree fallback. CLI-only sessions are exempt.
 - Read-only discovery never grants GitHub, release, automation, or other
   external mutation authority.
+- Treat the ledger `## Recovery Packet` as a compact derived projection, never
+  as authority. On resume, use it only after its repo HEAD/worktree and source
+  fingerprints match current state; otherwise invalidate it and run full
+  reconciliation before mutation or dispatch.
+- After the first full snapshot, carry evidence by path/ref, fingerprint,
+  changed section, proof command/result, and failed-gate excerpt. Do not re-emit
+  complete unchanged ledgers or diffs during ordinary controller iterations.
+- Record exact phase-token deltas only from root-scoped counters over an
+  uncontaminated phase interval. Label interleaved cumulative deltas as
+  `exact-interval`, not phase usage; otherwise use `unavailable`. Usage metrics
+  never weaken gates or block progress.
 
 ## Source Routing
 
@@ -75,6 +86,8 @@ Run this deterministic loop:
 
 1. **CLAIM** — resolve the ledger, canonicalize repo realpaths, acquire or
    verify the active-root claim, and establish Goal mode or its ledger fallback.
+   On recovery, read and validate the compact recovery packet first; when fresh,
+   load only its named active rows, gate rows, sources, and next action.
 2. **REGISTER** — snapshot authorized sources by stable id and preserve their
    criteria, constraints, authority, dependencies, proof, and closeout target.
 3. **ROUTE** — apply source routing, load only the selected references, choose
@@ -84,12 +97,18 @@ Run this deterministic loop:
 5. **INTEGRATE** — read current worker state, revalidate capabilities, accept or
    reject output, rerun root-owned proof, and record lifecycle decisions.
 6. **GATE** — apply `references/gates.md`, focused validation, `$autoreview` for
-   non-trivial edits, and only authorized publication/source mutations.
+   non-trivial edits, and only authorized publication/source mutations. Use
+   status, diff stat/name lists, and focused hunks during iteration; read the
+   complete relevant diff only for review/publication or a failing gate.
 7. **RECONCILE** — rescan due sources, replace stale projections, record the
    reconciliation result, and return to **REGISTER** while action remains.
 
 Every wave must produce a ledger transition, proof, authorized source update,
 owner decision brief, or explicit no-progress record. Never loop silently.
+Update the recovery packet, delta evidence index, and exact phase metrics (or
+one `unavailable` record) at the same boundary.
+Load `references/runtime-efficiency.md` before resuming from a packet, entering
+a second wave, or recording exact counters; a simple first wave need not load it.
 Before final closeout, reconcile again and require no active worker,
 `autonomous` candidate, authorized `ready-next` action, due check, or newly
 surfaced source item.
@@ -188,7 +207,10 @@ operation/evidence, fallback reason/operation, reused authority, and result.
 
 Return a compact ledger-derived status: reconciled sources, worker evidence,
 edits/validation, publication/source mutations, active-root decision, gates and
-proof, blockers/owner decisions, fallbacks, and next safe action. Use
+proof, blockers/owner decisions, fallbacks, next safe action, recovery-packet
+freshness, and phase-token evidence (`exact-phase`, `exact-interval`, or
+`unavailable`). Reference full artifacts by path/ref and fingerprint instead of
+repeating them. Use
 `references/worker.md` and `references/ledger.md` for exact fields.
 
 ## References
@@ -201,3 +223,5 @@ proof, blockers/owner decisions, fallbacks, and next safe action. Use
   issue mutation, review, and closeout.
 - `references/gates.md`: authorization, proof, review, integration, release,
   and closeout gates.
+- `references/runtime-efficiency.md`: conditional recovery validation,
+  delta-evidence transport, and exact phase-token metrics.

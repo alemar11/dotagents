@@ -166,6 +166,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Orchestrator reports and ledgers must record worker evidence when delegation is requested or approved: requested surface, approved surface, actual surface, worker/session id or failure evidence, fallback reason, and parallel/sequential/root-owned execution. (Codex learning)
 - In local orchestrator mode, the `plan-feature` PRD phase owns the PRD and accepted project/repo/gate support files, while the issue phase owns issue files and should not refresh `PROJECT.md`, `repos/*.md`, or `integration-gates.md` unless explicitly asked.
 - Both `plan-feature` phases should read `project-memory/agents/issue-tracker.md` and related project memory before deciding where PRDs or issues belong.
+- Keep `plan-feature` lean profiles internal and evidence-driven: they may narrow discovery and repeated output for clear PRD-only or small existing-PRD runs, but must not skip `$plan-harder`, verticality, graph, publication, or domain-closeout gates. Record exact phase-token deltas only for run-scoped uncontaminated counter intervals; label interleaved deltas as intervals or report `unavailable` without estimation. (Codex learning)
 
 ### Triage skill
 - Keep `triage` focused on existing incoming GitHub or local markdown issues; new feature planning should still go through `plan-feature`.
@@ -219,6 +220,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep merge root-owned and unavailable by default: publication and merge-ready authority do not imply merge, and only an explicit owner instruction may select owner-approved or automatic-after-gates merge behavior. (Codex learning)
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 - When an owner intentionally splits orchestration across separate roots, require explicit non-overlapping repo/source boundaries or an explicit takeover/handoff decision.
+- Keep recovery packets compact, derived, and freshness-validated against every recorded repo and source checkpoint before reuse; the authoritative ledger and source items still own decisions. Use delta evidence after the first snapshot and record exact per-phase token usage only for root-scoped uncontaminated counter intervals. (Codex learning)
 
 
 ### Learn skill

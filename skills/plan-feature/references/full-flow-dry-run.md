@@ -82,6 +82,18 @@ domain_knowledge_delta:
   with the durable PRD issue number.
 - Return exact commands without executing them.
 
+## Expected Runtime Efficiency Evidence
+
+- Snapshot the supplied intent, generated PRD, and each issue body once per
+  fingerprint; carry paths/refs, fingerprints, changed headings, and gate
+  excerpts between phases.
+- Full bodies are returned only because this fixture explicitly requests draft
+  publish output.
+- Report `routing`, `prd`, each `issue-hardening:<id>`, and
+  `issue-graph-and-publication` token deltas only for run-scoped,
+  uncontaminated counter intervals. Label interleaved deltas `exact-interval`;
+  otherwise report one `tokens=unavailable` result without estimation.
+
 ## Failure Conditions
 
 - A repo-local `.scratch/` PRD or issue file is created.
@@ -102,3 +114,5 @@ domain_knowledge_delta:
 - The final integration task permits direct edits to `CONTEXT.md`, domain docs,
   or ADRs without invoking `$project-memory domain-memory` and running its
   internal domain-modeling workflow.
+- Unchanged PRD or issue bodies are repeatedly emitted between phases without a
+  draft-output, publication, or failed-gate reason.

@@ -94,6 +94,11 @@ Use these ledger-owned values:
 - `github_primary_transport`: `connector`; authenticated `gh` is fallback only.
 - `github_fallback_reason`: `none`, `connector-unavailable`,
   `capability-unsupported`, or `transport-failure`.
+- `recovery_packet_status`: `fresh`, `stale`, `invalid`, or `unavailable`;
+  `fresh` requires current repo and source fingerprints to match the packet.
+- `metric_status`: `exact-phase` for a root-scoped uncontaminated interval,
+  `exact-interval` for an interleaved interval that must not be attributed to a
+  phase, or `unavailable`. Never estimate.
 
 Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
 and gate values are owned by `worker.md`, `prd-backed-delivery.md`, and
@@ -150,6 +155,7 @@ Claimed source ids:
 - <source id/ref>
 Active workers:
 - <worker id/title or none>
+Recovery packet content fingerprint: <sha256 from runtime-efficiency.md or none>
 Takeover history:
 - <date, previous root id, overlap, stale/owner approval evidence, worker disposition>
 
@@ -157,6 +163,32 @@ Refresh `Last Progress Read` during each wave or due ledger check. Release or
 mark the active-root claim `released` during final closeout when there is no
 active worker, authorized `ready-next` action, or root-owned closeout action
 remaining.
+
+## Recovery Packet
+
+Packet version: 1
+Status: fresh|stale|invalid|unavailable
+Updated: <YYYY-MM-DD HH:MM TZ>
+Projection fingerprint: <sha256 of ledger content before Notes, excluding this Recovery Packet, using runtime-efficiency.md canonical extraction>
+Content fingerprint: <sha256 of packet derived fields, excluding status/timestamps/fingerprints, also recorded under Active Root>
+Root: <root id>; claim=<status>; goal=<objective ref>; active-workers=<ids or none>
+Current wave: <wave id/status>; current-workstreams=<ids>; next-action=<one bounded action or blocker>
+Authority: source-mutation=<none|propose|write>; publication=<value>; issue-mutation=<value>; merge=<value>; worker-modes=<values>
+Repo checkpoints:
+- <repo realpath>; head=<sha>; worktree=<stable fingerprint of status --short>; branch=<name or detached>
+Source checkpoints:
+- <registered source item id from Workstreams>; fingerprint=<etag/sha/checksum/head>; state=<ledger state>
+Required gates:
+- <source/workstream>; <gate>=<status>; evidence=<path/ref/hash or pending>
+Proof index:
+- <proof id>; <path/url/commit>; fingerprint=<sha/checksum>; result=<pass|fail|blocked>
+Blockers:
+- <source>; <blocker>; minimum-next-action=<action> or none
+References to load next:
+- <ledger section/source/reference path and reason>
+
+This packet is a disposable compact index, not authority. Keep refs and
+fingerprints here; load `runtime-efficiency.md` before resume or recovery.
 
 ## Worker And Delivery References
 
@@ -317,6 +349,15 @@ actual worker surface differ. Include the requested surface, owner consent when
 required, actual surface, tool or session id when one exists, fallback reason,
 and whether execution was parallel, sequential, root-owned, or simulated.
 
+## Runtime Metrics
+
+| Phase / Wave | Start Counter | End Counter | Input Delta | Cached Input Delta | Output Delta | Total Delta | Status / Evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| <phase/wave or interval> | <exact or n/a> | <exact or n/a> | <exact or n/a> | <exact or n/a> | <exact or n/a> | <exact or n/a> | exact-phase; <scoped counter> or exact-interval/unavailable |
+
+Load `runtime-efficiency.md` before multi-wave delta transport, recovery, or
+exact metric capture. One `unavailable` row is sufficient when counters are absent.
+
 ## Notes
 
 - <dated orchestration notes and durable context>
@@ -406,6 +447,12 @@ Before marking a ledger `complete`, verify:
 - Generated ignored artifacts and helper worktrees are either removed, retained
   for inspection with a reason, left only inside a helper worktree with an
   explicit lifecycle decision, or explicitly handed off.
+- The recovery packet reflects the last source mutation and final current-state
+  projection, or is explicitly `unavailable`; stale packets cannot support
+  closeout.
+- Runtime metrics contain root-scoped uncontaminated phase deltas,
+  explicitly labeled interval deltas, or one `unavailable` row. Missing metrics
+  never override otherwise valid closeout proof.
 - `ignored-or-suppressed` items have source id, source fingerprint, reason,
   owner, and date, and they are not rediscovered unless that fingerprint or
   owner direction changes.
@@ -438,6 +485,10 @@ one dated note and record this compact result:
 | Checked At | Sources Re-read | Current Projection Updated | Stale Values Removed | Remaining Actionable | Result |
 | --- | --- | --- | --- | --- | --- |
 | <time> | <source ids/URLs> | <sections/rows> | <values or none> | <count and refs> | pass|blocked |
+
+After recording the result, refresh the recovery packet from the reconciled
+projection and record only its changed sections and new fingerprint in normal
+progress output.
 
 Before setting the ledger `complete` or releasing the active root, run the
 reconciliation after the last source mutation and verify these invariants:

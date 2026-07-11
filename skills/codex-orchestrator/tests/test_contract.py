@@ -100,6 +100,68 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("Reconciliation updates the current projection", ledger)
         self.assertIn("Stale Values Removed", ledger)
 
+    def test_recovery_packet_is_compact_derived_and_freshness_gated(self) -> None:
+        skill = self.read("SKILL.md")
+        ledger = self.read("references/ledger.md")
+        efficiency = self.read("references/runtime-efficiency.md")
+
+        self.assertIn("## Recovery Packet", ledger)
+        self.assertIn("Projection fingerprint", ledger)
+        self.assertIn("Content fingerprint", ledger)
+        self.assertIn("Recovery packet content fingerprint", ledger)
+        self.assertIn("References to load next", ledger)
+        self.assertIn("compact derived projection, never\n  as authority", skill)
+        self.assertIn("Read only the ledger `## Recovery Packet`", efficiency)
+        self.assertIn("Recompute the packet's Projection fingerprint", efficiency)
+        self.assertIn("Recompute the packet Content fingerprint", efficiency)
+        self.assertIn("match both the packet value", efficiency)
+        self.assertIn("stored under authoritative\n   `## Active Root`", efficiency)
+        self.assertIn("require an exact match", efficiency)
+        self.assertIn("shasum -a 256", efficiency)
+        self.assertIn("checkpoint IDs to equal the complete current set", efficiency)
+        self.assertIn("in-scope registered source item IDs", efficiency)
+        self.assertIn("every current\n   `## Workstreams` status bucket", efficiency)
+        self.assertIn("reject missing or extra checkpoints", efficiency)
+        self.assertIn("repo checkpoint realpaths to equal the complete canonical", efficiency)
+        self.assertIn("from `## Scope` and `## Active Root`", efficiency)
+        self.assertIn("reject\n   missing or extra repos", efficiency)
+        self.assertIn("Projection fingerprint, which now binds that content fingerprint", efficiency)
+        self.assertIn("If any check differs, mark it `stale` or `invalid`", efficiency)
+        self.assertIn("do not mutate or dispatch\n   from it", efficiency)
+        self.assertIn("never bypasses claims,\ncapabilities, authority", efficiency)
+
+    def test_runtime_evidence_is_delta_based_and_metrics_are_exact_or_unavailable(self) -> None:
+        skill = self.read("SKILL.md")
+        ledger = self.read("references/ledger.md")
+        efficiency = self.read("references/runtime-efficiency.md")
+
+        self.assertIn("Do not re-emit\n  complete unchanged ledgers or diffs", skill)
+        for command in (
+            "git status --short",
+            "git diff --stat",
+            "git diff --name-only",
+            "git diff --check",
+        ):
+            self.assertIn(command, efficiency)
+        self.assertIn("before `$autoreview`, commit/publication", efficiency)
+        self.assertIn("## Runtime Metrics", ledger)
+        self.assertIn("claim-register-route", efficiency)
+        self.assertIn("dispatch-integrate:<wave>", efficiency)
+        self.assertIn("gate-reconcile:<wave>", efficiency)
+        self.assertIn("recovery:<packet-version>", efficiency)
+        self.assertIn("counters are scoped to this root", efficiency)
+        self.assertIn("no concurrent worker, tool, or other-phase", efficiency)
+        self.assertIn("label it `exact-interval`", efficiency)
+        self.assertIn("Never infer usage", efficiency)
+        self.assertIn("metrics are diagnostic, not gate or closeout proof", efficiency)
+
+    def test_runtime_efficiency_reference_is_conditionally_loaded(self) -> None:
+        skill = self.read("SKILL.md")
+
+        self.assertIn("references/runtime-efficiency.md", skill)
+        self.assertIn("before resuming from a packet, entering\na second wave", skill)
+        self.assertIn("a simple first wave need not load it", skill)
+
     def test_pull_request_defaults_to_merge_ready_closeout(self) -> None:
         skill = self.read("SKILL.md")
         gates = self.read("references/gates.md")

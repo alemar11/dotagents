@@ -106,6 +106,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertNotIn(LEGACY_WORKER_AUTH_KEY, fixture)
         self.assertIn("project memory, plan-feature output, tracker defaults", fixture)
         self.assertIn("authorization fields or worker capability modes", fixture)
+        self.assertIn("## Expected Runtime Efficiency Evidence", fixture)
+        self.assertIn("each `issue-hardening:<id>`", fixture)
+        self.assertIn("one `tokens=unavailable` result without estimation", fixture)
+        self.assertIn("repeatedly emitted between phases", fixture)
 
     def test_shared_contract_documents_draft_publish_handoff(self) -> None:
         contract = read("project-memory/references/tracker-publishing.md")
@@ -300,6 +304,49 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "return only the structured issue-hardening result", plan_harder
         )
         self.assertIn("instead of starting a separate user-facing question loop", plan_harder)
+
+    def test_lean_profiles_reduce_discovery_without_skipping_gates(self) -> None:
+        plan_feature = read("plan-feature/SKILL.md")
+        prd_phase = read("plan-feature/references/prd-phase.md")
+        issue_phase = read("plan-feature/references/issue-phase.md")
+
+        self.assertIn("## Execution Profiles", plan_feature)
+        self.assertIn("`lean-prd`", plan_feature)
+        self.assertIn("`lean-issues`", plan_feature)
+        self.assertIn("Lean profiles reduce discovery and repeated output only", plan_feature)
+        for required_gate in (
+            "`$plan-harder`",
+            "verticality",
+            "graph",
+            "publication",
+            "domain-closeout",
+        ):
+            self.assertIn(required_gate, plan_feature)
+
+        self.assertIn("For `lean-prd`, begin with only", prd_phase)
+        self.assertIn("project-memory/agents/domain.md", prd_phase)
+        self.assertIn("`CONTEXT-MAP.md` when either exists", prd_phase)
+        self.assertIn("Widen to\n`standard`", prd_phase)
+        self.assertIn("For `lean-issues`, read the durable PRD once", issue_phase)
+        self.assertIn("The lean profile does not weaken any hardening or output gate", issue_phase)
+        self.assertIn("at most two candidate vertical", plan_feature)
+
+    def test_planning_uses_delta_evidence_and_exact_optional_metrics(self) -> None:
+        plan_feature = read("plan-feature/SKILL.md")
+        prd_phase = read("plan-feature/references/prd-phase.md")
+        issue_phase = read("plan-feature/references/issue-phase.md")
+
+        self.assertIn("Snapshot each source or artifact in full at most once", plan_feature)
+        self.assertIn("Label\n  interleaved cumulative deltas `exact-interval`", plan_feature)
+        self.assertIn("Never estimate or make metrics a completion gate", plan_feature)
+        self.assertIn("## Evidence And Phase Metrics", prd_phase)
+        self.assertIn("phase=prd", prd_phase)
+        self.assertIn("completion output should identify the\nPRD and its fingerprint", prd_phase)
+        self.assertIn("## Evidence And Phase Metrics", issue_phase)
+        self.assertIn("phase=issue-hardening:<issue-id>", issue_phase)
+        self.assertIn("Do not repeat unchanged\nPRD or issue bodies", issue_phase)
+        self.assertIn("never estimate, reread session\narchives", issue_phase)
+        self.assertIn("do not attribute it to an\nissue phase", issue_phase)
 
     def test_project_memory_triage_and_learn_keep_narrow_authority(self) -> None:
         project_memory = read("project-memory/SKILL.md")
