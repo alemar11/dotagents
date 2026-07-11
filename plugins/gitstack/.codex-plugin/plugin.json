@@ -1,0 +1,33 @@
+{
+  "name": "gitstack",
+  "version": "1.0.0",
+  "description": "Safe local Git and connector-first GitHub workflows for commits, issues, reviews, CI, releases, and pull-request delivery.",
+  "author": {
+    "name": "alemar11",
+    "email": "",
+    "url": "https://github.com/alemar11"
+  },
+  "homepage": "https://github.com/alemar11/dotagents",
+  "repository": "https://github.com/alemar11/dotagents",
+  "license": "MIT",
+  "keywords": ["git", "github", "workflow", "codex"],
+  "skills": "./skills/",
+  "apps": "./.app.json",
+  "interface": {
+    "displayName": "GitStack",
+    "shortDescription": "Safe Git and GitHub workflows.",
+    "longDescription": "GitStack combines careful local Git authoring with connector-first GitHub issues, pull requests, review feedback, Actions diagnostics, releases, stars, portfolio triage, and draft-PR publication. It uses direct git for local state, the GitHub connector for supported remote work, and gh for connector gaps.",
+    "developerName": "alemar11",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/alemar11/dotagents",
+    "defaultPrompt": [
+      "Triage this repository's open issues and pull requests.",
+      "Diagnose and fix the failing GitHub Actions checks.",
+      "Publish these local changes as a safe draft pull request."
+    ],
+    "brandColor": "#DE4C36",
+    "composerIcon": "./assets/git-small.svg",
+    "logo": "./assets/git-small.svg"
+  }
+}

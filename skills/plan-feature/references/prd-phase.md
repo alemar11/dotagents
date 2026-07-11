@@ -218,7 +218,7 @@ Also read `$project-memory`'s `references/tracker-publishing.md` for the
 shared effective-target and `source_prd_ref` contract.
 
 - `Tracker backend: github`: publish through
-  `$github-issues`, using the title format `PRD: <Feature Name>` and the
+  `$gitstack:github-issues`, using the title format `PRD: <Feature Name>` and the
   mapped `feature` issue type when available. Do not write
   `.scratch/<feature-slug>/PRD.md` or `project-memory/features/...` as part of
   GitHub publishing unless explicitly asked for a local mirror.
@@ -238,7 +238,7 @@ shared effective-target and `source_prd_ref` contract.
   Record the accepted source in each support doc or in the completion report so
   the source boundary is auditable.
 - GitHub workspace PRDs: publish the relevant PRD issue or linked partial PRD
-  issues through `$github-issues`. Derive or ask for `<project-slug>`,
+  issues through `$gitstack:github-issues`. Derive or ask for `<project-slug>`,
   `<feature-slug>`, and the affected repo list. Related PRDs and implementation
   issues must link to each other. Do not create local `projects/...` feature
   artifacts or `.scratch/` mirrors unless the effective target is local or the
@@ -279,10 +279,10 @@ Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
 When GitHub issue types are available, create or update the PRD issue with that
 mapped type, usually `Feature`. If issue types are disabled or unsupported,
 publish the PRD without a type and keep the PRD title/body convention intact.
-Use `$github-issues` for GitHub create, type, label, and dry-run command
+Use `$gitstack:github-issues` for GitHub create, type, label, and dry-run command
 mechanics. In mutating GitHub runs, pass the sanitized PRD title, body, target
-repo, type, and labels to `$github-issues`; do not assemble a direct `gh issue
-create` shell command with generated Markdown in this phase. `$github-issues`
+repo, type, and labels to `$gitstack:github-issues`; do not assemble a direct `gh issue
+create` shell command with generated Markdown in this phase. `$gitstack:github-issues`
 owns safe temporary body-file creation, non-interpolating body writes, cleanup,
 state verification, and partial-failure recovery.
 
@@ -294,13 +294,13 @@ tracker mutation in this phase is limited to PRD planning-artifact publication
 and metadata; implementation lifecycle comments, labels, direct closure, and
 closeout mutations after scheduling starts belong to `$codex-orchestrator`.
 
-Immediately before handing content to `$github-issues`, re-scan the final PRD
+Immediately before handing content to `$gitstack:github-issues`, re-scan the final PRD
 body for machine-local absolute paths and replace them with sanitized evidence
 references. Treat any remaining unsanitized developer path as a blocker for
 hosted publication.
 
 If the configured target is GitHub but the current run explicitly requested
-no-mutation output, do not mutate GitHub. Ask `$github-issues` for the exact
+no-mutation output, do not mutate GitHub. Ask `$gitstack:github-issues` for the exact
 draft publish command and return it with the PRD body and stable
 `source_prd_ref`, or use the configured local dry-run target when one is
 recorded. For `draft-publish-commands`, also return the PRD title,

@@ -1,0 +1,63 @@
+---
+name: github-review-threads
+description: Inspect PR review feedback, implement selected fixes, validate them, and manage replies or resolution.
+---
+
+# GitHub Review Threads
+
+## Role
+
+Own the feedback-to-code workflow for pull-request reviews: preserve thread
+context, identify actionable feedback, implement only selected fixes, validate
+them, and draft or publish dispositions with explicit authority.
+
+## Transport and CLI
+
+Prefer the GitHub connector for thread-aware listing, replies, comment edits,
+reviews, and resolution state. Use `gh` for gaps. An authorized write may fall
+back automatically only for the same operation, repository, PR, and comment or
+thread after `gh` authentication and access verification; report the fallback.
+
+Resolve `<plugin-root>` as two directories above the directory containing this
+`SKILL.md`:
+
+```bash
+<plugin-root>/scripts/gitstack --help
+<plugin-root>/scripts/gitstack --version
+<plugin-root>/scripts/gitstack --json doctor
+<plugin-root>/scripts/gitstack --json reviews address --repo <owner/repo> --pr <number>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
+```
+
+The CLI uses `gh`, emits stable JSON envelopes, and writes no implicit config.
+It cannot invoke connector tools.
+
+## Workflow
+
+1. Resolve the base repository and PR, then list review threads with resolution
+   state and enough surrounding diff context to understand each comment.
+2. Group duplicates and classify feedback as actionable, already addressed,
+   informational, obsolete, or requiring a user decision.
+3. Present or honor the selected actionable set. Do not silently implement
+   every comment when the request selects only some.
+4. Inspect adjacent code and tests, implement the selected changes locally, and
+   validate the affected behavior.
+5. Draft a disposition per selected thread that names the change and proof.
+   Keep replies in UTF-8 files outside the repository.
+6. Post replies, edit comments, submit reviews, or resolve threads only when the
+   user explicitly authorizes publication or a calling workflow supplies exact
+   PR/action authority. Never infer it from an inspect or review request.
+7. Resolve a thread only after its requested change is implemented and
+   validated, or when an authorized disposition clearly explains why no change
+   is appropriate. Never substitute a top-level PR comment for a thread reply
+   silently.
+
+For `$codex-orchestrator`, resolved
+`publication_authority=prd-backed-merge-ready-pr` or
+`publication_authority=explicit-owner-authorization` is sufficient only for
+the exact review actions assigned to that PR.
+
+## References
+
+- `references/workflows.md`: feedback, reply, resolution, and fallback flows.
+- `references/script-summary.md`: shared `gitstack reviews` contract.

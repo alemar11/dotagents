@@ -388,7 +388,7 @@ and triage states to the repo's tracker values.
   proceed.
 
 Canonical values are decision inputs, not necessarily tracker values. Before
-writing an issue file or calling `$github-issues`, resolve the mapped tracker
+writing an issue file or calling `$gitstack:github-issues`, resolve the mapped tracker
 value from `project-memory/agents/triage-labels.md`. In default GitHub mode,
 `ready-for-agent` maps to the same lowercase label. In custom tracker setups,
 do not assume the canonical string is the label; read the mapping first.
@@ -399,16 +399,16 @@ Use `project-memory/agents/issue-tracker.md` for the target, and read
 `$project-memory`'s `references/tracker-publishing.md` for shared
 effective-target, temporary body-file, and `source_prd_ref` rules:
 
-- `Tracker backend: github`: create issues through `$github-issues`, attach them
+- `Tracker backend: github`: create issues through `$gitstack:github-issues`, attach them
   to the PRD parent when the PRD source is a GitHub issue, set the mapped
   `task` issue type when available, then apply mapped labels such as
   `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
   `.scratch/` mirror unless the user explicitly requested one. Pass sanitized
   issue titles, bodies, target repo, labels, types, and parent/sub-issue intent
-  to `$github-issues`; do not assemble direct mutating `gh issue create` shell
+  to `$gitstack:github-issues`; do not assemble direct mutating `gh issue create` shell
   commands with generated Markdown in this phase.
 - GitHub workspace issues: create linked repo or partial issues through
-  `$github-issues`, using PRD parent/sub-issue relationships where available.
+  `$gitstack:github-issues`, using PRD parent/sub-issue relationships where available.
   Derive `<project-slug>` and affected repos from the PRD/project context or ask
   for them. Repo-local implementation PRs or child issues link back to the
   relevant PRD or partial issue. Do not create local orchestrator feature
@@ -430,7 +430,7 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   broader orchestrator artifact update.
 For GitHub PRDs, every generated implementation or vertical feature issue must
 be attached to the PRD issue as a sub-issue when the tracker supports it. If an
-issue is created before the parent relationship is set, use `$github-issues` to
+issue is created before the parent relationship is set, use `$gitstack:github-issues` to
 attach it afterward. Keep `Source PRD: #<prd-number>` in the issue body as well.
 For multi-repo work, related partial PRDs and repo issues must link to each
 other by URL or issue number.
@@ -542,20 +542,20 @@ unless this phase finds a new blocker or unresolved question. When the effective
 target is the configured tracker, create the GitHub issues or write the local
 issue files. In hosted tracker modes, local file writes apply only to explicit
 local mirrors or dry-run targets; hosted body-file inputs are transient files
-outside the repo and are owned by `$github-issues`. Hosted tracker mutation in
+outside the repo and are owned by `$gitstack:github-issues`. Hosted tracker mutation in
 this phase is limited to generated planning issue publication, parent/sub-issue
 links, issue type metadata, and initial workflow-state labels. After
 implementation scheduling starts, issue lifecycle comments, label changes,
 direct closure, and closeout mutations belong to `$codex-orchestrator`.
 
 Immediately before returning issue bodies, writing local issue files, handing
-content to `$github-issues`, or generating draft publish commands, re-scan every
+content to `$gitstack:github-issues`, or generating draft publish commands, re-scan every
 final issue body for machine-local absolute paths and replace them with
 sanitized evidence references. Treat any remaining unsanitized developer path as
 a blocker for hosted publication or shared draft command output.
 
 If the configured target is GitHub but the current run explicitly requested
-no-mutation output, do not mutate GitHub. Ask `$github-issues` for exact draft
+no-mutation output, do not mutate GitHub. Ask `$gitstack:github-issues` for exact draft
 commands, or use the configured local dry-run target when one is recorded. In
 `draft-publish-commands` mode, generated issue bodies may use
 `Source PRD: draft-prd:<...>` only in returned draft output; the publish plan

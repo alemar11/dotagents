@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Deep Review"
+  short_description: "Trace root cause, provenance, proof, and fix quality for GitHub issues, PRs, and fixes."
+  brand_color: "#005F73"
+  default_prompt: "Use $gitstack:github-deep-review when a GitHub issue, PR, bug report, or proposed fix needs evidence-first technical judgment: read the issue or PR with gh, inspect adjacent local code and tests, trace root cause and provenance when feasible, judge fix quality and refactor tradeoffs, and report proof plus residual risk. Route issue lifecycle mutations to $gitstack:github-issues, review-thread replies to $gitstack:github-review-threads, queue summaries to $gitstack:github-triage, and Actions failures to $gitstack:github-ci."

@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Review Threads"
+  short_description: "Address PR feedback from thread to fix."
+  brand_color: "#9333EA"
+  default_prompt: "Use $gitstack:github-review-threads to inspect thread-aware PR feedback, implement and validate selected fixes, then draft or publish exact replies and resolutions only with explicit authority. Prefer the GitHub connector and use GitStack or gh for gaps."

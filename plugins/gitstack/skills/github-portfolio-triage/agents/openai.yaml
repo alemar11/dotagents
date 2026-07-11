@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Portfolio Triage"
+  short_description: "Scan multiple GitHub repos read-only for queue and next-action summaries."
+  brand_color: "#15803D"
+  default_prompt: "Use $gitstack:github-portfolio-triage to scan explicit GitHub repositories by resolving the installed plugin root from SKILL.md, running <plugin-root>/scripts/gitstack portfolio scan, and returning a URL-first read-only queue report."

@@ -232,7 +232,7 @@ the PR ready for review.
    recorded CI blocker.
 2. If the PR is still draft, mark it ready for review with `gh pr ready <pr>`
    or an equivalent authorized GitHub action, then record the non-draft state.
-3. Use `$github-review-threads` to post a top-level PR comment requesting Codex
+3. Use `$gitstack:github-review-threads` to post a top-level PR comment requesting Codex
    review. The current official Codex GitHub trigger is exactly
    `@codex review`; add a short focus after that phrase only when useful.
 4. Wait or poll until Codex reacts and posts a completed GitHub review for the

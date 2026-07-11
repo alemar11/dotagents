@@ -1,0 +1,5 @@
+interface:
+  display_name: "GitHub Issues"
+  short_description: "Create, update, label, type, comment, close, and relate GitHub issues."
+  brand_color: "#1D4ED8"
+  default_prompt: "Use $gitstack:github-issues for GitHub issue lifecycle work: create, list, view, edit, comment, close, type, label, parent/sub-issue, explicit repo targeting, and dry-runs. Prefer connector tools and use gh for issue types, relationships, and other gaps."

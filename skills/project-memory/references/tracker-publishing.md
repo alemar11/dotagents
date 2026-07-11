@@ -10,7 +10,7 @@ source of truth; this file defines the shared mechanics.
 Use `tracker_backend` to choose the durable artifact target:
 
 - `github`: write PRDs and implementation issues as GitHub issues through
-  `$github-issues`, or return exact draft `gh` commands when the current run is
+  `$gitstack:github-issues`, or return exact draft `gh` commands when the current run is
   non-mutating.
 - `local`: write PRDs and implementation issues as Markdown files in the
   configured local conventions, or return draft paths and bodies when the
@@ -34,7 +34,7 @@ For legacy tracker configs, map old fields before acting:
 
 Hosted body-file inputs are temporary transport files. They must live outside
 the repo and be removed after mutation unless the user explicitly requests a
-local mirror. For GitHub tracker runs, `$github-issues` owns this transport:
+local mirror. For GitHub tracker runs, `$gitstack:github-issues` owns this transport:
 create transient body files with non-interpolating writes, run `gh --body-file`,
 verify tracker state after mutation, clean up temp files, and recover partial
 publication by inspecting GitHub before retrying missing operations.

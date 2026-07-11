@@ -192,32 +192,30 @@ make merge-ready does not authorize merge.
 
 ## Companion Routing
 
-Use the smallest matching standalone skill:
+Use the smallest matching GitStack bundled skill:
 
 | Workstream | Skill |
 | --- | --- |
-| Multi-repo read-only queue scan | `$github-portfolio-triage` |
-| Current-repo issue/PR queue triage | `$github-triage` |
-| Issue creation or lifecycle mutation | `$github-issues` |
-| Evidence-first issue, PR, bug, or fix-quality review | `$github-deep-review` |
-| GitHub Actions checks and logs | `$github-ci` |
-| PR review threads, Codex review requests, or replies | `$github-review-threads` |
-| Release readiness, tags, notes, assets, or packages | `$github-releases` |
-| Local commit and optional push without PR publication | `$git-commit` |
-| Branch publication plus draft PR creation/update | `$yeet` |
+| Multi-repo read-only queue scan | `$gitstack:github-portfolio-triage` |
+| Current-repo issue/PR queue triage | `$gitstack:github-triage` |
+| Issue creation or lifecycle mutation | `$gitstack:github-issues` |
+| Evidence-first issue, PR, bug, or fix-quality review | `$gitstack:github-deep-review` |
+| GitHub Actions checks and logs | `$gitstack:github-ci` |
+| PR review threads, Codex review requests, or replies | `$gitstack:github-review-threads` |
+| Release readiness, tags, notes, assets, or packages | `$gitstack:github-releases` |
+| Local commit and optional push without PR publication | `$gitstack:git-commit` |
+| Branch publication plus draft PR creation/update | `$gitstack:yeet` |
 
 Portfolio triage is read-only. Follow-up mutations require the matching skill
-and the authority described above. Do not depend on repo-local plugin bundles
-or plugin-cache artifacts for these flows.
+and the authority described above.
 
-Standalone companion skills are always the primary Git/GitHub route. A GitHub
-plugin may be used only as an automatic, logged fallback when the selected
-standalone skill or its direct `git`, `gh`, or shipped helper surface is
-unavailable, lacks the required supported capability, or fails at the
-transport/authentication layer. Do not fall back for missing owner authority,
-failed gates, unsafe or contradictory source contracts, actionable review
-findings, or correctable command input. Never run primary and fallback
-mutations in parallel. The fallback inherits the exact existing scope and
+GitStack companion skills are the primary Git/GitHub route. Within GitStack,
+prefer the official GitHub connector for supported remote operations and use
+authenticated `gh` only for connector gaps or transport/authentication
+failures. Do not fall back for missing owner authority, failed gates, unsafe or
+contradictory source contracts, actionable review findings, or correctable
+command input. Never run primary and fallback mutations in parallel. The
+fallback inherits the exact existing scope and
 mutation authority; it cannot broaden either. Record the primary skill,
 attempted operation, failure category and evidence, fallback operation,
 authority check, and result in the ledger.

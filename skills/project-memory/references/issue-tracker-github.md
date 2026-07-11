@@ -1,7 +1,7 @@
 # Issue Tracker: GitHub
 
 PRDs and implementation issues for this repo live as GitHub issues. Use
-`$github-issues` for GitHub issue lifecycle operations.
+`$gitstack:github-issues` for GitHub issue lifecycle operations.
 
 ## Configuration
 
@@ -26,7 +26,7 @@ current request explicitly asks for dry-run or no-mutation output.
 If this setup is being used for a temp exercise, validation pass, rehearsal,
 dry run, or any workflow where tracker writes are explicitly disabled, do not
 mutate GitHub. Use local markdown only when a local dry-run target is configured
-or explicitly chosen for that run, or ask `$github-issues` to return draft issue
+or explicitly chosen for that run, or ask `$gitstack:github-issues` to return draft issue
 bodies and exact `gh` commands without executing them.
 When returning draft commands before the PRD issue exists, use
 `source_prd_ref=draft-prd:<feature-slug>` and publish the PRD first; generated
@@ -38,7 +38,7 @@ durable issue-tracker configuration row.
 ## Conventions
 
 Infer the repo from `git remote -v` unless this file records a specific target.
-Use `$github-issues` to create, read, edit, comment on, label, type, attach, or
+Use `$gitstack:github-issues` to create, read, edit, comment on, label, type, attach, or
 close GitHub issues.
 
 Use `project-memory/agents/triage-labels.md` for type and label mappings. The
@@ -95,7 +95,7 @@ outside the PRD sub-issue view.
 
 ## When a skill says "publish to the issue tracker"
 
-Use `$github-issues` to create a GitHub issue.
+Use `$gitstack:github-issues` to create a GitHub issue.
 
 For feature planning:
 
@@ -137,4 +137,4 @@ maintainer explicitly says the whole PRD is complete.
 
 ## When a skill says "fetch the relevant issue"
 
-Use `$github-issues` to view the issue and recent comments.
+Use `$gitstack:github-issues` to view the issue and recent comments.

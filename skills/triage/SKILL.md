@@ -124,7 +124,7 @@ queue:
   note, so they can be re-evaluated as `needs-triage`,
 - issues that look ready but lack an agent brief.
 
-For GitHub, use `$github-issues` to list or view issues and recent comments.
+For GitHub, use `$gitstack:github-issues` to list or view issues and recent comments.
 Request type and relationship fields when useful, but if the installed `gh`
 version rejects them, use the configured fallback from `triage-labels.md`.
 
@@ -199,9 +199,9 @@ asked to apply, write, publish, or update triage.
 
 For GitHub:
 
-- Use `$github-issues` to set the issue type when GitHub issue types are
+- Use `$gitstack:github-issues` to set the issue type when GitHub issue types are
   configured and available.
-- Use `$github-issues` to apply the mapped state label.
+- Use `$gitstack:github-issues` to apply the mapped state label.
 - Remove conflicting old state labels when the mapping file identifies them.
 - Add a concise comment for `needs-info`, `ready-for-human`, `wontfix`, or
   `ready-for-agent` handoff notes.

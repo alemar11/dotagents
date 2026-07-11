@@ -21,7 +21,21 @@ Project-only maintainer workflows live under `.agents/skills/`, optional repo-lo
 
 ## Repo-Local Plugins
 
-There are currently no repo-local plugins registered in `.agents/plugins/marketplace.json`.
+GitStack is the repo-local Git and GitHub workflow plugin. It uses the official GitHub connector for supported remote operations, authenticated `gh` for connector gaps, and direct `git` for local repository work. It bundles:
+
+| Skill | Purpose |
+| --- | --- |
+| `gitstack:github` | Route mixed GitHub requests to the smallest focused GitStack workflow. |
+| `gitstack:git-commit` | Create intentional local commits and optionally push without publishing a PR. |
+| `gitstack:github-triage` | Inspect current-repository issue and PR queues read-only. |
+| `gitstack:github-issues` | Manage GitHub issue lifecycle, metadata, relationships, and dry-runs. |
+| `gitstack:github-deep-review` | Trace root cause, provenance, proof, and fix quality for issues and PRs. |
+| `gitstack:github-ci` | Inspect or explicitly fix GitHub Actions failures. |
+| `gitstack:github-review-threads` | Inspect, address, reply to, and resolve PR feedback. |
+| `gitstack:github-portfolio-triage` | Aggregate read-only GitHub state across repositories. |
+| `gitstack:github-releases` | Plan, publish, and validate releases, tags, assets, and packages. |
+| `gitstack:github-stars` | Manage stars and star lists. |
+| `gitstack:yeet` | Validate, commit, push, and open or update a draft PR. |
 
 ## Reusable Skills
 
@@ -31,15 +45,6 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs. |
 | `domain-modeling` | Build and maintain project domain language and durable decisions while work is being clarified. |
-| `git-commit` | Handle commit and push-only requests with direct `git` commands and explicit staging. |
-| `github-ci` | Inspect GitHub Actions checks and failing PR logs with direct `gh` reads or the focused `ci-inspect` CLI. |
-| `github-deep-review` | Review GitHub issues, PRs, and fixes by tracing root cause, provenance, proof, and fix quality. |
-| `github-issues` | Manage GitHub issues with direct `gh` commands for creation, edits, labels, types, comments, closure, relationships, and dry-runs. |
-| `github-portfolio-triage` | Scan multiple GitHub repos read-only for queue, PR, issue, CI, release, blocker, and next-action summaries. |
-| `github-releases` | Check, plan, draft, publish, and validate GitHub releases, tags, release notes, and packages. |
-| `github-review-threads` | Inspect PR review threads, draft or post replies, and manage conversation comments. |
-| `github-stars` | Manage authenticated-user GitHub stars and star lists with a focused `stars` CLI. |
-| `github-triage` | Inspect current-repo GitHub issue and PR queues read-only; route mutations to `github-issues`. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `triage` | Triage GitHub or local markdown issues into typed workflow states and agent-ready queues. |
 | `grill-me-with-context` | Stress-test repo-backed plans and capture or hand off durable decisions. |
@@ -58,7 +63,6 @@ There are currently no repo-local plugins registered in `.agents/plugins/marketp
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
 | `swift-docc` | Write, structure, review, and publish Swift-DocC docs using local summaries and bundled DocC sources. |
-| `yeet` | Publish local work as a branch and draft PR by composing standalone git and GitHub skills. |
 
 ### TanStack References
 
@@ -74,13 +78,12 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
-- `codex-orchestrator` requires `$autoreview` and the relevant standalone Git/GitHub skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work: `$github-triage`, `$github-issues`, `$github-portfolio-triage`, `$github-ci`, `$github-deep-review`, `$github-review-threads`, `$github-releases`, `$git-commit`, and `$yeet`. It routes rough new feature intent and existing PRDs without generated implementation issues through `$plan-feature` before scheduling implementation work.
+- `codex-orchestrator` requires `$autoreview` and the relevant GitStack bundled skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work. It routes rough new feature intent and existing PRDs without generated implementation issues through `$plan-feature` before scheduling implementation work.
 - `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop, update project context docs or ADRs inline for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, PRD writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
+- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, PRD writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$gitstack:github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
 - `project-memory` requires `$domain-modeling` when seeding or enriching `CONTEXT.md` or ADRs from repo, workspace, session evidence, or project context moved out of `AGENTS.md`.
-- `triage` requires `$project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$github-issues` for GitHub issue mutations.
-- `yeet` requires `$git-commit`; it may route to `$github-triage`, `$github-issues`, `$github-deep-review`, `$github-ci`, or `$github-review-threads` for focused GitHub follow-up work.
+- `triage` requires `$project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$gitstack:github-issues` for GitHub issue mutations.
 
 ## Project-Local Skills
 
@@ -96,7 +99,43 @@ Project-local skills are repository-specific and are not included in reusable in
 
 Repo-local plugins are exposed through `.agents/plugins/marketplace.json`; they are not installed by `skills-link.sh`.
 
-No repo-local plugins are currently registered. Use the standalone reusable git and GitHub skills for git authoring, GitHub triage, CI, reviews, releases, and publishing.
+Register the `alemar11` marketplace from GitHub, then install GitStack:
+
+```sh
+codex plugin marketplace add alemar11/dotagents --ref main
+codex plugin add gitstack@alemar11
+```
+
+If the `alemar11` marketplace is already registered, install GitStack directly:
+
+```sh
+codex plugin add gitstack@alemar11
+```
+
+For local development from a dotagents checkout, register the checkout instead
+of the GitHub source, then install the same plugin:
+
+```sh
+codex plugin marketplace add /path/to/dotagents
+codex plugin add gitstack@alemar11
+```
+
+During local development, rebuild, test, and reinstall after each versioned
+change with the explicit maintenance helper:
+
+```sh
+plugins/gitstack/projects/gitstack/scripts/reinstall-local
+```
+
+For a Git-backed marketplace checkout, refresh the marketplace before reinstalling:
+
+```sh
+codex plugin marketplace upgrade alemar11
+codex plugin remove gitstack@alemar11
+codex plugin add gitstack@alemar11
+```
+
+Restart Codex or open a fresh task after installation so the bundled skills and GitHub connector are discovered. Do not edit installed cache copies under `~/.codex/plugins/cache/`.
 
 ### Link Reusable Skills For Local Development
 
@@ -113,7 +152,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/git-commit skills/github-ci skills/github-deep-review skills/github-issues skills/github-portfolio-triage skills/github-releases skills/github-review-threads skills/github-stars skills/github-triage skills/okf skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc skills/yeet
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/domain-modeling skills/okf skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -142,15 +181,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill code-wiki \
   --skill crusty \
   --skill domain-modeling \
-  --skill git-commit \
-  --skill github-ci \
-  --skill github-deep-review \
-  --skill github-issues \
-  --skill github-portfolio-triage \
-  --skill github-releases \
-  --skill github-review-threads \
-  --skill github-stars \
-  --skill github-triage \
   --skill okf \
   --skill triage \
   --skill grill-me-with-context \
@@ -168,8 +198,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \
-  --skill swift-docc \
-  --skill yeet
+  --skill swift-docc
 ```
 
 Install one reusable skill globally for Codex:

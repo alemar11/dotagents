@@ -27,7 +27,7 @@ The table above uses the default GitHub type names. Rewrite the right-hand
 `Tracker value` cells only when the actual tracker uses different values. For
 local tracking, prefer canonical values such as `bug`, `feature`, and `task`.
 
-In GitHub issue-tracker mode, use `$github-issues` to apply native GitHub
+In GitHub issue-tracker mode, use `$gitstack:github-issues` to apply native GitHub
 Issue Type values when available.
 
 In local markdown mode, record the mapped value as a `Type:` line near the top

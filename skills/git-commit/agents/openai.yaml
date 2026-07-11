@@ -1,5 +1,0 @@
-interface:
-  display_name: "Git Commit"
-  short_description: "Handle commit and push-only requests with direct git."
-  brand_color: "#64748B"
-  default_prompt: "Use $git-commit when the user asks to commit, commit and push, or stage explicit paths. Inspect the worktree, stage only intended files, write a clear commit message, commit with direct git commands, optionally push without opening a PR, and use issue-closing trailers only for fully satisfied issues. Route issue-only GitHub comments, labels, type changes, follow-up creation, or manual closure to $github-issues."

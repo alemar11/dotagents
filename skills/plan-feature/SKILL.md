@@ -73,7 +73,7 @@ issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
   returned or published as `needs-info` or `ready-for-human`, never as
   `ready-for-agent`, and only after their target and metadata are resolved.
 - Treat the configured `tracker_backend` as planning-artifact write authority:
-  `github` publishes PRDs and generated issues through `$github-issues`, while
+  `github` publishes PRDs and generated issues through `$gitstack:github-issues`, while
   `local` writes the configured Markdown files.
 - Use draft output only when the current run explicitly asks for a dry run,
   temp/rehearsal/validation pass, disabled writes, or another no-mutation
@@ -128,12 +128,12 @@ This skill may call:
   Consume its structured `domain_knowledge_delta`; do not allow it to edit
   repository docs during Plan Feature.
 - `$plan-harder` once per generated implementation issue.
-- `$github-issues` only for GitHub issue publishing, issue type/label handling,
+- `$gitstack:github-issues` only for GitHub issue publishing, issue type/label handling,
   parent/sub-issue relationships, and dry-run command mechanics for PRDs and
   generated implementation issues. After implementation scheduling starts,
   issue lifecycle comments, labels, direct closure, and closeout mutation belong
-  to `$codex-orchestrator` using `$github-issues`.
-- In GitHub tracker mode, `$github-issues` owns safe `gh --body-file`
+  to `$codex-orchestrator` using `$gitstack:github-issues`.
+- In GitHub tracker mode, `$gitstack:github-issues` owns safe `gh --body-file`
   transport, transient body-file cleanup, partial-publication recovery, and
   dry-run command mechanics. `plan-feature` supplies sanitized titles, bodies,
   metadata, target repo, and parent relationships; it must not embed generated
@@ -180,7 +180,7 @@ publish commands.
 
 When `tracker_backend` is `github` and no no-mutation override is active, the
 hosted tracker is authoritative and the PRD/issues should be published there.
-`$github-issues` owns the transient `gh --body-file` transport, including
+`$gitstack:github-issues` owns the transient `gh --body-file` transport, including
 creating body files outside the repo, using non-interpolating writes, verifying
 tracker state, and cleaning up. Do not use `.scratch/` as a staging area in
 hosted tracker mode unless the user explicitly asks to keep a local mirror.

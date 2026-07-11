@@ -150,10 +150,10 @@ closeout, records `publication_authority=prd-backed-merge-ready-pr`, or records
 until the owner changes that decision.
 
 This PRD-backed publication authority is sufficient for the root orchestrator
-to use `$git-commit` for commit/push-only delivery, or `$yeet` when the resolved
+to use `$gitstack:git-commit` for commit/push-only delivery, or `$gitstack:yeet` when the resolved
 delivery path requires draft PR creation or updating an existing PR.
 Merge-ready publication authority is additionally sufficient to use
-`$github-review-threads` for the `@codex review` request and the required PR
+`$gitstack:github-review-threads` for the `@codex review` request and the required PR
 discussion update or no-update-needed disposition after the Codex review
 completes. Neither authority is sufficient for merge, release, production
 deploy, final issue closure by direct mutation, broad GitHub cleanup, or

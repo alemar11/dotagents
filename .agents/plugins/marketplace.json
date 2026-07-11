@@ -3,5 +3,18 @@
   "interface": {
     "displayName": "Alemar11 Plugins"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "gitstack",
+      "source": {
+        "source": "local",
+        "path": "./plugins/gitstack"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
 }

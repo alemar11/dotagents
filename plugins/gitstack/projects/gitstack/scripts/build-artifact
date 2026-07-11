@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import tempfile
+import zipapp
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+PLUGIN = ROOT.parents[1]
+SOURCE = ROOT / "src"
+TARGET = PLUGIN / "scripts" / "gitstack"
+
+manifest = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+match = re.search(r'^version = "([0-9]+\.[0-9]+\.[0-9]+)"$', manifest, re.MULTILINE)
+if not match:
+    raise SystemExit("pyproject.toml must declare a semver project version")
+version = match.group(1)
+init = (SOURCE / "gitstack" / "__init__.py").read_text(encoding="utf-8")
+if f'__version__ = "{version}"' not in init:
+    raise SystemExit("gitstack.__version__ does not match pyproject.toml")
+
+TARGET.parent.mkdir(parents=True, exist_ok=True)
+with tempfile.TemporaryDirectory(prefix="gitstack-build-") as temp:
+    app = Path(temp) / "app"
+    shutil.copytree(SOURCE, app)
+    zipapp.create_archive(app, target=TARGET, interpreter="/usr/bin/env python3", main="gitstack.cli:main", compressed=True)
+os.chmod(TARGET, 0o755)
+print(f"built {TARGET} ({version})")
