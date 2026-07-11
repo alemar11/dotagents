@@ -34,14 +34,14 @@ class StarsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = self.stars.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "1.1.0")
+        self.assertEqual(stdout.getvalue().strip(), "1.1.1")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             self.stars.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertIn("gh", payload["checks"])
 
     def test_invalid_command_json(self) -> None:

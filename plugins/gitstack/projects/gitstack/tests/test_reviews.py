@@ -34,14 +34,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "1.1.0")
+        self.assertEqual(stdout.getvalue().strip(), "1.1.1")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -75,7 +75,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -140,7 +140,7 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.0")
+        self.assertEqual(payload["version"], "1.1.1")
         self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
 
     def test_review_reply_uses_pr_scoped_endpoint(self) -> None:
@@ -212,7 +212,7 @@ class ReviewsContractTests(unittest.TestCase):
         head = "a" * 40
         review = {"id": 7, "user": {"login": "chatgpt-codex-connector[bot]"}, "commit_id": head, "submitted_at": "2026-07-11T12:02:00Z"}
         finding = {"id": 8, "user": {"login": "chatgpt-codex-connector[bot]"}, "commit_id": head}
-        with mock.patch.object(cli, "gh_json", side_effect=[{"head": {"sha": head}}, {"commit": {"committer": {"date": "2026-07-11T12:00:00Z"}}}]), mock.patch.object(
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
             cli,
             "gh_api_paginated_list",
             side_effect=self.automated_review_api(reviews=[review], inline=[finding]),
@@ -226,7 +226,7 @@ class ReviewsContractTests(unittest.TestCase):
         head = "b" * 40
         request = {"id": 99, "body": f"@codex review {head[:8]}", "created_at": "2026-07-11T12:01:00Z"}
         eyes = [{"content": "eyes", "user": {"login": "chatgpt-codex-connector[bot]"}}]
-        with mock.patch.object(cli, "gh_json", side_effect=[{"head": {"sha": head}}, {"commit": {"committer": {"date": "2026-07-11T12:00:00Z"}}}]), mock.patch.object(
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
             cli,
             "gh_api_paginated_list",
             side_effect=self.automated_review_api(comments=[request], reactions=eyes),
@@ -240,7 +240,7 @@ class ReviewsContractTests(unittest.TestCase):
         head = "c" * 40
         old_head = "d" * 40
         old_review = {"id": 7, "user": {"login": "chatgpt-codex-connector[bot]"}, "commit_id": old_head}
-        with mock.patch.object(cli, "gh_json", side_effect=[{"head": {"sha": head}}, {"commit": {"committer": {"date": "2026-07-11T12:00:00Z"}}}]), mock.patch.object(
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
             cli,
             "gh_api_paginated_list",
             side_effect=self.automated_review_api(reviews=[old_review]),
@@ -253,7 +253,7 @@ class ReviewsContractTests(unittest.TestCase):
         current_head = "e" * 40
         expected_head = "f" * 40
         old_review = {"id": 7, "user": {"login": "chatgpt-codex-connector[bot]"}, "commit_id": expected_head}
-        with mock.patch.object(cli, "gh_json", side_effect=[{"head": {"sha": current_head}}, {"commit": {"committer": {"date": "2026-07-11T12:00:00Z"}}}]), mock.patch.object(
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": current_head}}), mock.patch.object(
             cli,
             "gh_api_paginated_list",
             side_effect=self.automated_review_api(reviews=[old_review]),
@@ -262,6 +262,38 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(payload["status"], "stale")
         self.assertFalse(payload["head_is_current"])
+
+    def test_check_rejects_ambiguous_head_prefix(self) -> None:
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": "a" * 40}}):
+            with self.assertRaises(cli.ReviewError) as raised:
+                cli.check_automated_review("owner/repo", 12, "codex", "a")
+
+        self.assertEqual(raised.exception.code, "invalid_arguments")
+
+    def test_plain_review_request_is_not_bound_to_a_head(self) -> None:
+        head = "b" * 40
+        request = {"id": 99, "body": "@codex review", "created_at": "2026-07-11T12:01:00Z"}
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[request]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["status"], "stale")
+
+    def test_review_request_rejects_different_sha_with_same_prefix(self) -> None:
+        head = "abcdef0" + "1" * 33
+        other_head = "abcdef0" + "2" * 33
+        request = {"body": f"@codex review {other_head}"}
+
+        self.assertFalse(cli.review_request_matches(request, "codex", head))
+
+    def test_review_request_accepts_bounded_sha_prefix_after_command(self) -> None:
+        head = "abcdef0" + "1" * 33
+        request = {"body": "@codex review\nPlease check updated head abcdef01."}
+
+        self.assertTrue(cli.review_request_matches(request, "codex", head))
 
     def test_wait_times_out_pending_review(self) -> None:
         pending = {"status": "pending", "repo": "owner/repo", "pr": 12}

@@ -154,18 +154,30 @@ def authored_by(item: dict[str, Any], provider: str) -> bool:
 
 
 def sha_matches(actual: object, expected: str) -> bool:
-    value = str(actual or "")
-    return bool(value and expected and (value.startswith(expected) or expected.startswith(value)))
+    value = str(actual or "").lower()
+    target = expected.lower()
+    return bool(value and target and (value.startswith(target) or target.startswith(value)))
 
 
-def review_request_matches(comment: dict[str, Any], provider: str, head: str, committed_at: str) -> bool:
+def validate_head(raw: str) -> str:
+    value = raw.strip().lower()
+    if not re.fullmatch(r"[0-9a-f]{7,40}", value):
+        raise ReviewError(
+            f"Invalid --head value '{raw}'. Use a hexadecimal commit SHA or unambiguous 7-40 character prefix.",
+            code="invalid_arguments",
+            exit_code=64,
+        )
+    return value
+
+
+def review_request_matches(comment: dict[str, Any], provider: str, head: str) -> bool:
     body = str(comment.get("body") or "")
-    if provider == "codex" and not re.search(r"(?i)@codex\s+review\b", body):
+    command = re.search(r"(?is)@codex\s+review\b(?P<tail>.*)", body) if provider == "codex" else None
+    if provider == "codex" and not command:
         return False
-    if head[:7].lower() in body.lower() or head.lower() in body.lower():
-        return True
-    created_at = str(comment.get("created_at") or "")
-    return bool(committed_at and created_at and created_at >= committed_at)
+    evidence = command.group("tail") if command else body
+    tokens = re.findall(r"(?i)(?<![0-9a-f])([0-9a-f]{7,40})(?![0-9a-f])", evidence)
+    return any(sha_matches(token, head) for token in tokens)
 
 
 def provider_reactions(repo: str, comment_id: int, provider: str) -> set[str]:
@@ -186,12 +198,9 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
     current_head = str(((pull.get("head") or {}).get("sha")) or "")
     if not current_head:
         raise ReviewError("Pull request response did not include a head SHA.", code="api_error", exit_code=4)
-    head = expected_head or current_head
-
-    commit = gh_json(["api", f"repos/{repo}/commits/{head}", "-H", "Accept: application/vnd.github+json"])
-    committed_at = ""
-    if isinstance(commit, dict):
-        committed_at = str((((commit.get("commit") or {}).get("committer") or {}).get("date")) or "")
+    current_head = validate_head(current_head)
+    requested_head = validate_head(expected_head) if expected_head else current_head
+    head = current_head if sha_matches(current_head, requested_head) else requested_head
 
     reviews = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/reviews")
     inline_comments = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
@@ -206,7 +215,7 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
     requests = [
         item
         for item in conversation
-        if review_request_matches(item, provider, head, committed_at)
+        if review_request_matches(item, provider, head)
     ]
     latest_request = max(requests, key=lambda item: str(item.get("created_at") or ""), default=None)
     reactions: set[str] = set()

@@ -58,6 +58,9 @@ API or configuration failure, `64` for invalid arguments, and `124` when
 
 `wait` accepts `--timeout`, `--interval`, and `--max-interval` durations using
 seconds, minutes, or hours, such as `30s`, `15m`, or `1h`.
+`--head` accepts a full hexadecimal commit SHA or an unambiguous prefix of at
+least seven characters. Review-request comments must include that SHA or prefix
+for acknowledgement and reaction evidence to count toward the target head.
 
 ## Discussion Comments
 

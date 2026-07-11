@@ -17,7 +17,10 @@ acknowledgements, clean reactions, and review formats belong to the CLI rather
 than this workflow.
 
 After fixing and pushing findings, post a fresh review request and run the
-check or wait against the new SHA. A timed-out wait returns exit code `124` and
+check or wait against the new SHA. Include at least the first seven characters
+of that SHA in the review-request comment so the CLI can bind acknowledgement
+or clean-reaction evidence to the intended head; a plain request without a SHA
+is reported as stale until a submitted review supplies commit evidence. A timed-out wait returns exit code `124` and
 the last observed state; a calling orchestrator decides whether to schedule a
 later heartbeat.
 
