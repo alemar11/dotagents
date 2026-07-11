@@ -105,9 +105,10 @@ issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
   existing terminal integration task is reused, make it depend on every other
   terminal issue. The final task must prove the integrated feature and must not
   be a docs-only horizontal ticket. Require its implementor to invoke
-  `$project-memory` with the `domain-memory` slice, which loads
-  `$domain-modeling` before updating the named durable surfaces. In `prd-only`,
-  preserve a required delta in the PRD handoff and do not generate an issue.
+  `$project-memory` with the `domain-memory` slice, which runs its internal
+  domain-modeling workflow before updating the named durable surfaces. In
+  `prd-only`, preserve a required delta in the PRD handoff and do not generate
+  an issue.
 - Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
   the issue phase. In `draft-publish-commands` runs, use the stable draft ref
   from `$project-memory` `references/tracker-publishing.md` until a
@@ -310,9 +311,9 @@ existing terminal integration task and add direct dependencies on every other
 terminal issue. Otherwise append a final integration and domain-knowledge
 closeout task that depends on every terminal issue, runs the feature-level
 proof, invokes `$project-memory` with the `domain-memory` slice, updates the
-named context/docs/ADR surfaces through `$domain-modeling` to match the
-implemented behavior, and verifies the diff. Harden and validate that task like
-every other generated issue.
+named context/docs/ADR surfaces through its internal domain-modeling workflow
+to match the implemented behavior, and verifies the diff. Harden and validate
+that task like every other generated issue.
 
 If the issue phase discovers a product, domain, dependency, or
 acceptance-criteria blocker, pause issue writing and route the blocker back

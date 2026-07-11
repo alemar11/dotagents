@@ -113,7 +113,7 @@ hypothesis, or test name, use the term as defined in the relevant `CONTEXT.md`.
 Do not drift to synonyms the glossary explicitly avoids.
 
 If a needed concept is not in the glossary, either reconsider the invented term
-or note it as a candidate for the domain-modeling workflow.
+or note it as a candidate for the `domain-memory` modeling workflow.
 
 ## Flag ADR conflicts
 
@@ -129,7 +129,7 @@ sheets for repo path, role, tracker, validation, and linked work only.
 ## Existing-project bootstrap
 
 When setup seeds domain memory for an already-used project, load and follow
-`$domain-modeling` before writing `CONTEXT.md` or ADRs.
+`references/domain-modeling.md` before writing `CONTEXT.md` or ADRs.
 
 Use repo vocabulary first:
 
@@ -142,10 +142,11 @@ Use repo vocabulary first:
 
 When a final implementation or integration task carries accepted durable
 decisions, invoke `$project-memory domain-memory`. Load and follow
-`$domain-modeling`, reconcile the carried decisions against the behavior and
-validation that actually landed, update only the named context/docs/ADR
-surfaces, and verify the documentation diff. Reading this domain-layout file or
-editing a target directly does not satisfy the closeout workflow.
+`references/domain-modeling.md`, reconcile the carried decisions against the
+behavior and validation that actually landed, update only the named
+context/docs/ADR surfaces, and verify the documentation diff. Reading this
+domain-layout file or editing a target directly does not satisfy the closeout
+workflow.
 
 Do not record tentative proposals, rejected ideas, secrets, raw session logs, or
 generic architecture advice as project memory.

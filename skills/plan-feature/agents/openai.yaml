@@ -2,6 +2,6 @@ interface:
   display_name: "Plan Feature"
   short_description: "Manual feature planning into Product Requirements Documents (PRDs) and agent-ready issues."
   brand_color: "#10B981"
-  default_prompt: "Use $plan-feature in full-flow mode by default for new feature intent: resolve only the required project-memory routing, defer repo-backed domain capture into a structured knowledge delta, write or publish the Product Requirements Document (PRD) with merge-ready PR closeout by default and draft-only only when explicitly requested, then split it into hardened vertical issues. When durable knowledge changed, assign $project-memory domain-memory plus $domain-modeling usage to the final implementation/integration task; do not capture it during planning. Use prd-only or issues-from-existing-prd only when explicitly requested."
+  default_prompt: "Use $plan-feature in full-flow mode by default for new feature intent: resolve only the required project-memory routing, defer repo-backed domain capture into a structured knowledge delta, write or publish the Product Requirements Document (PRD) with merge-ready PR closeout by default and draft-only only when explicitly requested, then split it into hardened vertical issues. When durable knowledge changed, assign $project-memory domain-memory to the final implementation/integration task; do not capture it during planning. Use prd-only or issues-from-existing-prd only when explicitly requested."
 policy:
   allow_implicit_invocation: false

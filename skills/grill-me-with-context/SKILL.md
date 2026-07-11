@@ -8,16 +8,18 @@ description: Stress-test repo-backed plans through project context and either ca
 ## Goal
 
 Run the `$grill-me` questioning loop for a project-backed plan. Capture durable
-terminology, rules, and accepted decisions through `$domain-modeling` in inline
-mode, or return them as a structured handoff in deferred mode.
+terminology, rules, and accepted decisions through
+`$project-memory domain-memory` in inline mode, or return them as a structured
+handoff in deferred mode.
 
 Use this when the plan lives in a codebase or project workspace and the output
 should improve future agent context, not just the current conversation.
 
 ## Capture Modes
 
-- `inline` is the default for direct invocation. Use `$domain-modeling` to
-  update the appropriate context docs or ADRs as accepted decisions land.
+- `inline` is the default for direct invocation. Use `$project-memory` with the
+  `domain-memory` slice and `inline-update` operation to update the appropriate
+  context docs or ADRs as accepted decisions land.
 - `defer-to-caller` is available when an explicit parent workflow requests it
   or the user directly requests a non-writing or deferred result. Inspect the
   same project context and resolve the same decisions, but do not edit
@@ -62,8 +64,8 @@ invocation preserves the original inline capture behavior.
   `project-memory/adr/` before asking questions.
 - Load and follow `$grill-me` for the one-question-at-a-time interrogation
   loop.
-- In `inline` mode, load and follow `$domain-modeling` for documentation
-  updates.
+- In `inline` mode, load and follow `$project-memory domain-memory` with the
+  `inline-update` operation for documentation updates.
 - In `defer-to-caller` mode, use the domain routing evidence to identify target
   surfaces, but do not invoke documentation writes.
 - Do not ask questions whose answers are already present in code or docs.
@@ -84,7 +86,7 @@ Recommended answer: [default and why, in one short sentence]
 ### 3. Capture or structure durable decisions
 
 In `inline` mode, after an answer resolves a durable point, use
-`$domain-modeling` inline:
+`$project-memory domain-memory` with `operation: inline-update`:
 
 - add or revise glossary terms in `CONTEXT.md`,
 - record business rules, lifecycle states, actors, permissions, or invariants,

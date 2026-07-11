@@ -52,8 +52,8 @@ domain_knowledge_delta:
    assigned to the last integration task, which depends on every terminal
    implementation issue and includes `## Domain Knowledge Closeout`. That task
    requires its later implementor to invoke `$project-memory domain-memory`,
-   which loads `$domain-modeling`; Plan Feature does not run that capture during
-   planning.
+   which runs Project Memory's internal domain-modeling workflow; Plan Feature
+   does not run that capture during planning.
    For example, if `02 depends-on 01` while `03` is independent, the
    pre-closeout terminals are `02` and `03`; appended final task `04` depends
    directly on both. Hosted issue numbers are tracked separately and do not
@@ -100,5 +100,5 @@ domain_knowledge_delta:
 - A required `domain_knowledge_delta` is omitted, captured during planning, or
   placed in a docs-only task instead of the last integration task.
 - The final integration task permits direct edits to `CONTEXT.md`, domain docs,
-  or ADRs without invoking `$project-memory domain-memory` and loading
-  `$domain-modeling`.
+  or ADRs without invoking `$project-memory domain-memory` and running its
+  internal domain-modeling workflow.

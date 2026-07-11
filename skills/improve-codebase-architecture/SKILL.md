@@ -76,7 +76,10 @@ to explore.
 
 ### 4. Grill the selected candidate
 
-After the user chooses a candidate, load and follow `$grill-me-with-context`.
+After the user chooses a candidate, load and follow `$grill-me-with-context`
+with `capture_mode: inline`. Its inline path must use
+`$project-memory domain-memory` with `operation: inline-update` for accepted
+durable decisions.
 
 Use it to resolve:
 

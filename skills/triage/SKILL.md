@@ -63,8 +63,11 @@ the actual tracker issue types, labels, or markdown status values.
 - Before marking an issue `ready-for-agent`, load and run `$plan-harder` in
   issue-hardening mode on its caller surface and embed or post the resulting
   agent brief.
-- If the issue is underspecified, load and run `$grill-me-with-context` to resolve
-  the smallest blocking question set before writing an agent-ready brief.
+- If the issue is underspecified, load and run `$grill-me-with-context` with
+  `capture_mode: inline` to resolve the smallest blocking question set before
+  writing an agent-ready brief. Its inline path uses
+  `$project-memory domain-memory` with `operation: inline-update` for accepted
+  durable decisions.
 - Do not run `$plan-harder` or post an agent brief for `needs-info`; preserve
   established facts and ask concrete questions instead.
 - Do not implement the issue.
@@ -179,9 +182,10 @@ If the issue cannot be classified confidently, ask one blocking question or
 leave a `needs-info` note with the smallest useful question set.
 
 If the issue is almost agent-ready but still under-specified, use
-`$grill-me-with-context` to clarify the missing product/domain decisions. Let
-`$grill-me-with-context` and `$domain-modeling` own any durable updates to
-`CONTEXT.md` or ADRs.
+`$grill-me-with-context` with `capture_mode: inline` to clarify the missing
+product/domain decisions. Let `$grill-me-with-context` and
+`$project-memory domain-memory` with `operation: inline-update` own any durable
+updates to `CONTEXT.md` or ADRs.
 
 If blocker resolution still depends on the reporter or requester, stop at
 `needs-info`. Do not harden the issue with `$plan-harder`, do not post an agent

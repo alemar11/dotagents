@@ -51,7 +51,8 @@ Reject weak signals:
 
 ## Writing from session evidence
 
-Use `$domain-modeling` for the actual `CONTEXT.md` and ADR shape.
+Use `references/domain-modeling.md` for the actual `CONTEXT.md`, domain-doc,
+and ADR content.
 
 - Put stable terminology, boundaries, workflows, rules, and open questions in
   `CONTEXT.md`.

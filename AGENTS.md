@@ -57,10 +57,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its core challenge workflow can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
-- Treat `domain-modeling` as portable because it uses local repo evidence and project memory such as `CONTEXT.md`, `CONTEXT-MAP.md`, and `project-memory/adr/`, with no Codex-only runtime tools required.
-- Treat `grill-me-with-context` as portable and skill-composed because it requires `$grill-me` and `$domain-modeling`, both portable, and otherwise relies on local repo/docs inspection.
+- Treat `grill-me-with-context` as portable and skill-composed because it requires `$grill-me` and `$project-memory`, both portable, and otherwise relies on local repo/docs inspection.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-me-with-context` is the fallback path.
-- Treat `project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/project-memory/references/session-history.md`, while its core setup flow falls back to repo/workspace evidence plus `$domain-modeling` and optional localization evidence.
+- Treat `project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/project-memory/references/session-history.md`, while its core setup and internal domain-modeling flow fall back to repo/workspace evidence plus optional localization evidence.
 - Treat `plan-feature` as portable and skill-composed because its core and local-tracker workflows require `$project-memory`, `$grill-me-with-context`, and `$plan-harder`; its GitHub tracker backend additionally requires `$gitstack:github-issues`.
 - Treat `triage` as portable and skill-composed because its core and local-tracker workflows rely on project-memory mappings, `$grill-me-with-context`, and `$plan-harder`; its GitHub tracker backend additionally requires `$gitstack:github-issues`.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
@@ -114,21 +113,20 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
   invoking workflow. It must not create `plans/`, write Markdown plan files, or
   edit repo files as part of its own runtime workflow.
 
-### Grill and Domain Modeling skills
+### Grill and Project Memory composition
 - Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-me-with-context`.
-- Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs under `project-memory/adr/`; treat it as the semantic engine behind `$project-memory domain-memory` and other explicit composed callers, not as repo-maintenance metadata sync.
-- Keep `grill-me-with-context` as the thin composition layer over `grill-me` and `domain-modeling`, not a duplicate questioning loop.
+- Keep `grill-me-with-context` as the thin composition layer over `grill-me` and `$project-memory domain-memory`, not a duplicate questioning or domain-capture loop.
 - Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-me-with-context` before implementation rather than duplicating the documentation loop.
 - Use `project-memory/` as the visible root for durable project memory owned by these runtime skills: `project-memory/agents/` for repo-specific agent operating config and `project-memory/adr/` for durable decision records. Keep `CONTEXT.md` and optional `CONTEXT-MAP.md` at the project root for fast discovery.
 
 ### Project Memory skill
 - Keep `project-memory` as the normal public lifecycle surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, `project-memory/agents/domain.md`, root or context-specific `CONTEXT.md`, optional `TRANSLATION.md`, and ADR routing or content in code repos, monorepos, and orchestrator workspaces.
-- For implementation closeout that carries accepted durable decisions, require the implementor to invoke `$project-memory domain-memory`; `$project-memory` must load `$domain-modeling`, reconcile the carried delta against behavior that actually landed, update only the named durable surfaces, and verify the documentation diff. `$plan-feature` assigns this work but must not perform it during planning. (Codex learning)
+- For implementation closeout that carries accepted durable decisions, require the implementor to invoke `$project-memory domain-memory`; Project Memory must run its internal domain-modeling workflow, reconcile the carried delta against behavior that actually landed, update only the named durable surfaces, and verify the documentation diff. `$plan-feature` assigns this work but must not perform it during planning. (Codex learning)
 - `project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
 - Keep `project-memory` pointer-first for `AGENTS.md`: agent operating rules and short project-memory links stay there, while domain context, tracker detail, planning history, and accepted decisions move to `CONTEXT.md`, `project-memory/agents/*`, or ADRs after confirmation.
 - Keep `project-memory` issue-tracker setup limited to the durable `tracker_backend` values `github` and `local`; workspace, repo, path, and cross-repo linking details belong in conventions, PRDs, generated issues, or prose, not as extra backend enum values.
 - Keep `project-memory/agents/triage-labels.md` responsible for both issue type/category mapping (`bug`, `feature`, `task`) and workflow state mapping (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).
-- For already-used projects, `project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo session history, using `$domain-modeling` for the context and ADR shape.
+- For already-used projects, `project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo session history, using its internal domain-modeling workflow for context and ADR content.
 - Keep `TRANSLATION.md` optional and evidence-backed: create it only when localization support or durable translation rules are clear from repo evidence or explicit user confirmation, and add an `AGENTS.md` localization pointer only when the file exists or is confirmed.
 - Keep `CONTEXT.md` to `TRANSLATION.md` links optional: add a one-line pointer only when localization affects audience, domain terms, product naming, or user-facing copy, and never create broken pointers.
 - Do not add schema versions to `project-memory` generated Markdown files or templates unless a concrete parser or migration workflow requires versioning.

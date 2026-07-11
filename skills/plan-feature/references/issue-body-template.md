@@ -97,9 +97,9 @@ behavior; never use this section to justify a docs-only issue.]
 
 - Required workflow:
   - Invoke `$project-memory` with the `domain-memory` slice after the integrated
-    behavior is proven. `$project-memory` must load `$domain-modeling`; reading
-    `project-memory/agents/domain.md` or editing the targets directly is not a
-    substitute.
+    behavior is proven. Project Memory must run its internal domain-modeling
+    workflow; reading `project-memory/agents/domain.md` or editing the targets
+    directly is not a substitute.
 
 - Decisions:
   - [Accepted durable term, rule, boundary, or decision carried from the PRD.]
@@ -111,7 +111,8 @@ behavior; never use this section to justify a docs-only issue.]
     implementation evidence.]
 - Closeout proof:
   - [Integration validation, `$project-memory domain-memory` completion,
-    `$domain-modeling` usage, and documentation diff/consistency verification.]
+    internal domain-modeling workflow completion, and documentation
+    diff/consistency verification.]
 
 ## Requirements
 

@@ -29,7 +29,8 @@ triage details to `project-memory/agents/*` instead of copying them into
 
 ## Seed shape
 
-Load and follow `$domain-modeling` before writing. Keep the initial seed short
+Load and follow `references/domain-modeling.md` before writing. Keep the initial
+seed short
 and useful. Include only sections that have evidence:
 
 ```markdown

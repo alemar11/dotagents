@@ -26,11 +26,11 @@ domain work does not require tracker setup. Re-run only the affected slice when
 routing, mappings, domain knowledge, localization policy, or `AGENTS.md`
 pointers change.
 
-`$project-memory` is the normal public invocation for durable memory changes.
-For the `domain-memory` slice, it must load and follow `$domain-modeling` as the
-semantic engine for `CONTEXT.md`, relevant domain docs, and ADR updates. Callers
-that already compose `$domain-modeling`, such as `$grill-me-with-context`, may
-continue to use that specialist directly.
+`$project-memory` is the single public invocation for durable memory changes.
+For the `domain-memory` slice, load and follow
+`references/domain-modeling.md` as the internal semantic workflow for
+`CONTEXT.md`, relevant domain docs, and ADR updates. Composed callers such as
+`$grill-me-with-context` invoke this slice instead of a separate modeling skill.
 
 ## Boundaries
 
@@ -40,9 +40,9 @@ continue to use that specialist directly.
   home for project knowledge. Operating rules stay there; domain context,
   tracker detail, planning history, localization rules, and accepted decisions
   move to project memory.
-- Load and follow `$domain-modeling` before creating or updating `CONTEXT.md`
-  or ADRs. Reading `project-memory/agents/domain.md` alone does not satisfy this
-  requirement.
+- Load and follow `references/domain-modeling.md` before creating or updating
+  `CONTEXT.md`, relevant domain docs, or ADRs. Reading
+  `project-memory/agents/domain.md` alone does not satisfy this requirement.
 - Seed `CONTEXT.md`, `TRANSLATION.md`, or ADRs only from strong repo evidence,
   final session summaries, committed behavior, or explicit user acceptance.
 - Do not use a PR, issue, PRD, tracker comment, or session summary as the sole
@@ -60,8 +60,12 @@ continue to use that specialist directly.
   refresh project memory as write authority for the requested slice. A
   ready-for-execution implementation task that explicitly requires
   `$project-memory domain-memory` and names its durable decisions, evidence, and
-  target surfaces is also write authority for that closeout. Show the intended
-  files and meaningful values, but do not ask for redundant confirmation.
+  target surfaces is also write authority for that closeout. An explicitly
+  invoked composed workflow whose contract selects `domain-memory` with
+  `operation: inline-update`, such as direct `$grill-me-with-context`, carries
+  the same write authority unless the user requested no documentation writes or
+  deferred capture. Show the intended files and meaningful values, but do not
+  ask for redundant confirmation.
 - A view, inspect, review-only, recommendation, dry-run, or indirect suggestion
   is not write authority. In those cases, show the proposal and wait for
   confirmation before writing.
@@ -138,6 +142,11 @@ below.
   target surfaces against behavior that actually landed, using current source,
   tests, validation, and accepted tracker decisions as evidence. Do not rerun
   unrelated setup or mine session history by default.
+- Use `inline-update` when a composed workflow such as
+  `$grill-me-with-context` captures accepted durable decisions during the
+  current interaction.
+- Use `periodic-review` for automation or batch context review; default to a
+  report or proposed patch when acceptance is unclear.
 - Use `orchestrator-workspace` only for a parent coordination workspace that
   plans across independent repos. Do not treat it as a monorepo, and do not
   require a global PRD when linked partial PRDs describe the workspace feature.
@@ -207,7 +216,8 @@ Load only references needed by the selected slice:
 - tracker routing: `issue-tracker-github.md` or `issue-tracker-local.md`, plus
   `tracker-publishing.md` and `triage-labels.md`;
 - domain memory: `domain.md`, `context-seed.md`, and `session-history.md` only
-  for an existing-project bootstrap;
+  for an existing-project bootstrap, plus `domain-modeling.md` whenever the
+  slice may create, update, review, or reconcile domain memory;
 - translation memory: `translation.md`;
 - settings and pointers: `setup-workflow.md`.
 
@@ -220,14 +230,17 @@ workflow still reduces to local or GitHub artifacts.
 
 After an explicit setup, configure, initialize, update, or refresh request, a
 separate affirmative confirmation, or an authorized `implementation-closeout`
-task:
+task, or an authorized `inline-update` from an explicitly invoked composed
+workflow:
 
 - Create or update only the authorized project-memory files.
 - Preserve unrelated custom prose, mappings, comments, overrides, docs, ADRs,
   and `TRANSLATION.md` content.
 - Keep `AGENTS.md` concise and pointer-only for project memory.
-- Use `$domain-modeling` for `CONTEXT.md` and ADR shape.
-- For `implementation-closeout`, require `$domain-modeling` to reconcile the
+- Use `references/domain-modeling.md` for `CONTEXT.md`, relevant domain docs,
+  and ADR content. Load `references/documentation-shapes.md` only when the
+  project does not already have a stronger local format.
+- For `implementation-closeout`, use that internal workflow to reconcile the
   carried decisions with implemented behavior before writing. Omit provisional
   planning language that the implementation did not prove, update only the
   named durable surfaces, and verify their diff alongside the feature-level
@@ -258,8 +271,8 @@ decision, evidence checked, durable decisions captured or rejected, target
 surfaces updated, and documentation-diff verification.
 
 If session history is unavailable or weak, say so plainly. Future
-`$domain-modeling`, `$grill-me-with-context`, and planning workflows can keep
-filling project memory incrementally.
+`$project-memory domain-memory`, `$grill-me-with-context`, and planning
+workflows can keep filling project memory incrementally.
 
 ## Reference Responsibilities
 
@@ -270,6 +283,10 @@ filling project memory incrementally.
 - `triage-labels.md`: canonical issue type and workflow-state mappings.
 - `domain.md`: context, translation, ADR layout, orchestrator boundaries, and
   domain-memory consumption.
+- `domain-modeling.md`: internal semantic workflow for domain-memory setup,
+  inline updates, implementation closeout, and periodic review.
+- `documentation-shapes.md`: fallback `CONTEXT.md` and ADR shapes when the
+  project has no stronger local format.
 - `context-seed.md`: minimal initial `CONTEXT.md` evidence threshold and shape.
 - `translation.md`: optional `TRANSLATION.md` evidence threshold, location,
   shape, and pointer rule.

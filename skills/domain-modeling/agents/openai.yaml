@@ -1,5 +1,0 @@
-interface:
-  display_name: "Domain Modeling"
-  short_description: "Shape domain language and durable decisions for project-memory workflows."
-  brand_color: "#0E7490"
-  default_prompt: "Use $domain-modeling as the semantic engine for an explicit domain-modeling workflow or a caller such as $project-memory or $grill-me-with-context. Inspect existing context, sharpen terms and boundaries against evidence, and update only authorized CONTEXT.md, domain-doc, or ADR surfaces for durable accepted knowledge."

@@ -139,8 +139,8 @@ After direct write authority or separate affirmative confirmation:
   configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only authorized
   minimization.
-- Create or update `CONTEXT.md` with `$domain-modeling` when seed/bootstrap is
-  accepted.
+- Create or update `CONTEXT.md` through `references/domain-modeling.md` when
+  seed/bootstrap is accepted.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
