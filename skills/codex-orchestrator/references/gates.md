@@ -72,16 +72,18 @@ For worker assignments, `commit`, `push`, and `pr` are separate capability
 flags. Do not allow PR creation to imply commit or push, and do not allow push
 to imply local commit creation.
 
-For PRD-backed workflows, branch plus draft PR delivery in the PRD or generated
-issue can satisfy authorization for commit, push, and draft PR creation after
-tests, integration checks, and `$autoreview` pass, unless the owner restricted
-the request to local-only, inspect-only, no-push, no-PR, or equivalent work.
-Ready-for-review transition and a Codex PR review request require separate
-merge-ready closeout authority from the source or current owner request, such
-as `publication_authority=prd-backed-merge-ready-pr` or
-`publication_authority=explicit-owner-authorization` with those actions named.
-`stay-draft` or equivalent wording blocks the transition until the owner
-changes that decision. Record the resolved publication authority in the ledger.
+For PRD-backed `pull-request` workflows,
+`publication_authority=prd-backed-pull-request` satisfies authorization for
+commit, push, initial draft PR creation, ready-for-review transition, Codex
+review, and required discussion disposition after tests, integration checks,
+and `$autoreview` pass, unless the owner restricted the request to local-only,
+inspect-only, no-push, no-PR, or equivalent work. Default
+`pr_closeout=merge-ready`. Set `pr_closeout=draft-only` only from an explicit
+current-user instruction about the PR lifecycle or structured PRD field;
+PR-shape prose, `do not merge`, and `draft-only output` do not select it.
+Draft-only makes downstream ready/review/merge-ready
+gates `not-applicable` until the user removes the restriction. Record both
+publication authority and PR closeout in the ledger.
 This does not authorize merge, release, direct issue mutation, production
 deploy, or unrelated GitHub cleanup.
 
@@ -126,6 +128,13 @@ PR diff is empty, the publication checkout is not on the expected branch, or
 the target is the default/protected branch without explicit authorization, stop
 and record `blocked`.
 
+In a Codex App session, `worker-worktree` or `integration-worktree` passes this
+gate for a newly created checkout only when the ledger records its owning App
+thread id. A newly created or allocated raw Git worktree requires recorded
+App-surface failure or unsuitability plus explicit owner fallback authority;
+otherwise set `publication_checkout_guard=blocked`. This additional guard does
+not apply in CLI-only sessions or to an existing owner-supplied checkout.
+
 ### Live Proof Gate
 
 For user-facing behavior, require proof from the real app, CLI, API, service,
@@ -157,19 +166,22 @@ explicit final-commit closeout path. For local markdown sources, completion is
 the configured move to `issues/done/` after validation and proof; do not treat a
 commit alone as local issue closure.
 
-For PRD-backed workflows with authorized branch plus draft PR delivery, do not
+For PRD-backed workflows with authorized pull-request delivery, do not
 declare the workstream `completed` while the expected PR remains uncreated.
-When merge-ready closeout authority exists, also do not declare completion while
+When `pr_closeout=merge-ready`, also do not declare completion while
 the PR is still draft after local gates pass or missing a satisfied
 `codex-pr-review` gate. Either record the PR URL, ready-for-review state, Codex
 review evidence when required, and PR-body closeout path, or record the blocker
 and move the publication or review action to `needs-owner`, `blocked`, or
-`deferred`. Treat direct issue comments, labels, manual issue closure, parent
+`deferred`. When `pr_closeout=draft-only`, require validation and the expected
+draft PR, record the explicit restriction, and mark ready/review/merge-ready
+gates `not-applicable`; the requested terminal state is not itself a blocker.
+Treat direct issue comments, labels, manual issue closure, parent
 PRD closure, merge, and release as separate mutations that require explicit
 authority.
 
-For local markdown sources using `pull-request` delivery with merge-ready
-closeout authority or a merge-ready closeout target, do not move the issue to
+For local markdown sources using `pull-request` delivery with
+`pr_closeout=merge-ready`, do not move the issue to
 `issues/done/` until local validation, real PR proof, required CI or integration
 proof, and Codex review evidence plus disposition are recorded. If any proof is
 missing, keep the local issue open and record the remaining action as
@@ -220,12 +232,13 @@ owner-ready next action.
 
 ### Codex PR Review Gate
 
-For `pull-request` delivery with merge-ready closeout authority or a merge-ready
-closeout target, require a Codex GitHub review before declaring the PR
+For `pull-request` delivery with `pr_closeout=merge-ready`, require a Codex
+GitHub review before declaring the PR
 merge-ready or the workstream complete. This is distinct from local
-`$autoreview` and from Codex sandbox auto-review. If merge-ready closeout is
-expected but not authorized, stop as `needs-owner` or `blocked` before marking
-the PR ready for review.
+`$autoreview` and from Codex sandbox auto-review. For
+`pr_closeout=draft-only`, record this gate as `not-applicable` with the explicit
+user instruction or structured PRD field. If that restriction is removed,
+resume this sequence at ready-for-review.
 
 1. Verify the PR exists, targets the expected branch/base, contains the latest
    intended commit, and has passed required local gates plus current CI or a

@@ -223,10 +223,17 @@ Use one compact block per active workstream:
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
-| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr-closeout=<merge-ready|draft-only|not-applicable>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
 | GitHub routing | primary=standalone; primary-skill=<skill>; operation=<operation>; fallback=<unused|github-plugin>; fallback-reason=<none|standalone-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
+
+When reading legacy ledger rows, migrate
+`prd-backed-merge-ready-pr` to `publication=prd-backed-pull-request` plus
+`pr-closeout=merge-ready`. Migrate `prd-backed-branch-plus-draft-pr` to
+`publication=prd-backed-pull-request` and resolve `pr-closeout` from an explicit
+current-user instruction or structured PRD field, defaulting to `merge-ready`.
+Rewrite the legacy value whenever the row is touched.
 
 ### autonomous
 
@@ -276,11 +283,14 @@ Use one compact block per active workstream:
 Record the startup delegation baseline before dispatch. Include that CLI
 subagents are authorized by invoking `$codex-orchestrator` unless the owner
 disabled delegation, visible Codex App worker thread consent when that surface
-is available, and any visible-thread max concurrent worker limit. Record each
-non-blocking execution report with its source items, selected worker surface,
-orchestrator-chosen split for the current wave, authorization modes, delivery
-path, stop conditions, and any owner edits to surface, authorization, or
-delivery path.
+is available, and any visible-thread max concurrent worker limit. In a Codex
+App session, also record the App thread id/title for every newly created worker,
+integration, or publication worktree; an owner statement such as `you can use
+Codex threads if needed` records consent with a default maximum of one. Record
+each non-blocking execution report with its source items, selected worker
+surface, orchestrator-chosen split for the current wave, authorization modes,
+delivery path, stop conditions, and any owner edits to surface, authorization,
+or delivery path.
 
 The execution report is not an approval prompt. Continue later waves while they
 stay inside the recorded source items, CLI subagent default, visible-thread
@@ -289,6 +299,11 @@ visible-thread consent is missing, delegation was disabled, or a wave would
 exceed consented visible-thread limits, planned work may remain in the ledger,
 but unauthorized visible workers or disabled delegation must not start until
 the owner gives the missing consent.
+
+Do not record a newly created raw Git worktree as the publication checkout in a
+Codex App session unless App thread/worktree creation was reported as missing,
+failed, or unsuitable and the owner explicitly authorized that fallback. This
+restriction does not apply in CLI-only sessions.
 
 | Wave | Started | Finished | Sources Scanned | Items Processed | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -327,7 +342,7 @@ claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed commit, push, and draft PR creation are authorized after gates when branch plus draft PR delivery exists and publication was not restricted. Ready-for-review transition and Codex review request require merge-ready closeout authority, such as `publication_authority=prd-backed-merge-ready-pr` or `publication_authority=explicit-owner-authorization` with those actions named. |
+| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready`, so ready-for-review transition and Codex review remain actionable after local gates. `pr_closeout=draft-only` is valid only from an explicit current-user instruction about the PR lifecycle or structured PRD field and makes those downstream actions `not-applicable` rather than blocked. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
 | `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked required publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
@@ -354,14 +369,19 @@ Before marking a ledger `complete`, verify:
 - `ready-next` is empty, or every remaining action was reclassified as
   `needs-owner`, `blocked`, or `deferred` with the missing authorization,
   decision, or follow-up.
-- PRD-backed work with authorized branch plus draft PR delivery either records
+- PRD-backed work with authorized pull-request delivery either records
   the published PR URL or records the exact blocker that prevents publication;
   do not mark it complete while authorized commit, push, or draft PR creation
-  remains in `ready-next`. When merge-ready closeout authority exists, also
+  remains in `ready-next`. When `pr_closeout=merge-ready`, also
   record non-draft state, Codex review proof, and discussion disposition, and do
   not mark it complete while ready-for-review transition, Codex review request,
   completed-review wait, review-triggered fix, post-fix validation, fresh-review
   wait, or PR-thread disposition remains in `ready-next`.
+- When `pr_closeout=draft-only`, require validated draft publication and the
+  explicit current-user instruction about the PR lifecycle or structured PRD
+  field, record downstream ready/review/merge-ready gates as `not-applicable`,
+  and allow completion at that requested state. If the user removes the
+  restriction, change the value to `merge-ready` and resume at ready-for-review.
 - For merge-ready closeout, verify the publication checkout is clean, accepted
   review fixes are committed and pushed to the PR branch, current CI belongs to
   the pushed head, the latest Codex review covers that same head, and unresolved

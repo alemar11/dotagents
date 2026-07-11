@@ -48,6 +48,12 @@ Integration fields:
 | `caller_checkout_policy` | `preserve-current-branch`, `caller-checkout-approved`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
 | `publication_checkout` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, draft PR publication, and ready-for-review transition will run. |
 
+In a Codex App session, `worker-worktree` and `integration-worktree` mean a
+worktree owned by a visible App thread whenever the root creates or allocates a
+new dedicated checkout. Record the App thread id with the checkout. This
+binding does not apply in CLI-only sessions or to an existing owner-supplied
+checkout.
+
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
 `commit`, `push`, and `pr`, then rewrite touched values to the exact authorized
@@ -100,6 +106,15 @@ unless the owner disabled delegation. It may create visible Codex App worker
 threads only up to the current session's consented maximum. The root may still
 keep work in the root thread or stop for owner input when source, repo,
 dependency, gate, or tool state makes dispatch unsafe.
+
+When the current runtime is the Codex App and the root chooses a new dedicated
+worker, integration, or publication worktree, select `codex-app-thread` and
+create the thread with a worktree target before implementation. Do not run the
+implementation through CLI subagents in the caller checkout and move the
+integrated diff into a manually created worktree only for publication. If the
+App operation is missing, fails, or cannot represent the required starting
+state, report that evidence and ask for explicit authority before falling back
+to a raw Git worktree. CLI-only sessions may use raw Git worktrees directly.
 
 ## Surface Wording Rules
 
@@ -155,6 +170,11 @@ the work in the root thread.
   explicitly authorizes `caller-checkout-approved`, or when no
   helper/integration checkout is available and the owner explicitly authorizes
   that fallback.
+- In the Codex App, if the root decides a new dedicated worktree is needed for
+  implementation, integration, or publication, create a visible App thread
+  with a worktree environment and bind the checkout to that thread in the
+  ledger. Do not create an unowned raw Git worktree merely to preserve the
+  caller checkout. This requirement does not apply in CLI-only sessions.
 
 ## Startup Consent
 
@@ -204,6 +224,12 @@ answer. A bare `yes` is not enough to authorize unbounded visible threads; if
 the owner says only `yes` for visible threads, treat it as `max 1` unless the
 task clearly needs more and ask for the max before creating more than one
 visible thread.
+
+Owner wording such as `you can use Codex threads if needed` is explicit
+session-scoped consent with a default maximum of one concurrent visible worker.
+Do not interpret the missing maximum as a reason to avoid App threads or to use
+an unmanaged worktree. Ask for a higher maximum only before creating a second
+concurrent visible worker.
 
 While waiting for startup consent, do only root-owned discovery, planning,
 source registration, and wave shaping that does not create visible App threads,
@@ -283,6 +309,13 @@ contract. Otherwise pass the PRD-backed mode plus whether it is inherited from
 `Source PRD` or an issue-level override. `prd-backed-delivery.md` owns the full
 delivery/publication/issue-mutation authority model; workers only enforce the
 assignment they receive.
+
+For `pull-request`, the root also passes `pr_closeout`. Default it to
+`merge-ready`; use `draft-only` only from an explicit current-user instruction
+about the PR lifecycle or structured PRD field. `Draft PR`, `open a draft PR`,
+`do not merge`, and `draft-only output` do not select draft-only. A draft-only worker receives no `review-ready`
+authorization. If the restriction is later removed, the root may assign the
+ready-for-review sequence from the existing draft PR.
 
 For generated implementation issues, the root also passes the validated
 `## Orchestrator Handoff` projection. Workers may use the handoff for scope,
@@ -413,6 +446,14 @@ status and diffs explicitly.
 
 ## Helper Worktrees
 
+In a Codex App session, a newly created helper worktree must be owned by a
+visible App worker thread. Create the thread through the App worktree target,
+record its id/title/path, and use that managed checkout for the assigned work.
+If the App cannot create the required worktree, stop before `git worktree add`,
+report the exact limitation, and request explicit fallback authority. This rule
+does not apply in CLI-only sessions and does not require wrapping an existing
+owner-supplied checkout in a new thread.
+
 Treat Codex App worker worktrees and other worker checkouts as temporary helper
 surfaces by default, but not as disposable until closeout. A helper worktree may
 contain tracked changes, generated artifacts, logs, screenshots, test evidence,
@@ -529,8 +570,9 @@ Scope:
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Runtime delivery: <local-only|pull-request|direct-commit> (<ad-hoc default|feature-level inherited from Source PRD|issue-level override with authorization>)
 - Delivery source: <ad-hoc or legacy source, Source PRD path/issue, explicit owner request, or issue-level override reason>
-- Orchestrator handoff: <source PRD; feature slug; affected repos/product scope; scope; start rule; validation; closeout, or none for ad hoc work>
-- Publication authority: <none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked, with reason>
+- Orchestrator handoff: <source PRD; feature slug; delivery mode; PR closeout when applicable; affected repos/product scope; scope; start rule; validation; closeout, or none for ad hoc work>
+- Publication authority: <none|explicit-owner-authorization|prd-backed-pull-request|blocked, with reason>
+- PR closeout: <merge-ready|draft-only|not-applicable, with explicit draft-only evidence when selected>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
 - Codex PR review: <not-applicable|not-requested|requested|received|passed|blocked>
 - Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>

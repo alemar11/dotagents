@@ -28,11 +28,21 @@ implementation, validation, and report assigned by the root.
   branch or PR strategy, or decide closeout.
 - Worker authorization is resolved only by the root orchestrator per workstream
   and session.
-- Keep overlapping contracts, shared integration, gate decisions, and final
-  publication in the root thread.
+- Keep overlapping contracts, shared integration ownership, gate decisions,
+  final publication decisions, and closeout in the root thread. The root may
+  assign exact authorized integration or publication operations to a visible
+  App worker that owns the managed worktree; the worker does not acquire those
+  decisions or broader authority.
 - Treat worker status as evidence, not a final lifecycle decision.
 - Preserve user-owned dirty worktrees and the caller checkout unless the
   resolved source contract or owner explicitly authorizes a different action.
+- In a Codex App session, creating or allocating a new dedicated worker,
+  integration, or publication worktree requires a visible App worker thread
+  targeted to that worktree. Do not implement through CLI subagents in the
+  caller checkout and later relocate the result into an unmanaged worktree.
+  This rule does not apply in CLI-only sessions. If App thread/worktree
+  creation is unavailable, record the limitation and obtain explicit fallback
+  authority before creating a raw Git worktree.
 - Do not turn read-only discovery into GitHub, release, automation, or other
   external writes without the authority required by the source contract and
   matching companion skill.
@@ -54,10 +64,12 @@ acceptance and closure authority unless the owner explicitly migrates it.
 | PR, review thread, CI failure, bug, local checklist, implementation plan, TODO, explicit implementation request, or legacy issue without a PRD delivery contract | Register directly. Default implementation to local code/docs edits plus validation; do not require delivery-mode, branch, PR, parallelization, or source-closeout metadata. Record runtime delivery as `local-only`, publication as `none`, issue mutation as `none`, and closeout as local acceptance criteria plus validation. |
 
 For ad-hoc and legacy sources, missing publication metadata is not a blocker.
-Commit, push, PR creation or transition, Codex review request, issue mutation,
-merge, release, and deployment remain unavailable until the owner explicitly
-authorizes the specific action. A contradictory or unsafe source contract is
-still a real blocker; absence of a PRD contract is not.
+Commit, push, PR delivery, issue mutation, merge, release, and deployment remain
+unavailable until the owner explicitly authorizes the action or delivery path.
+When the owner authorizes `pull-request` delivery, default
+`pr_closeout=merge-ready`; this includes ready-for-review transition and Codex
+review but not merge. A contradictory or unsafe source contract is still a real
+blocker; absence of a PRD contract is not.
 
 `$plan-feature` owns PRD and generated-issue publication before implementation
 scheduling. After the root registers a generated issue, the root owns its
@@ -139,6 +151,17 @@ subagent. Ask only when runtime policy requires it, when visible App threads are
 requested or useful, or when a requested worker surface needs an explicit
 fallback decision.
 
+In a Codex App session, the root's decision to use a new dedicated worker,
+integration, or publication worktree makes a visible App thread required, not
+an optional presentation choice. Owner wording such as `you can use Codex
+threads if needed` supplies session consent; when it omits a maximum, cap the
+surface at one concurrent visible worker. Create the App thread with a worktree
+environment before implementation begins and keep implementation, validation,
+commit, and publication execution in that managed surface when authorized by
+the root. Integration ownership, publication decisions, gates, and closeout
+remain in the root thread. In CLI-only sessions, CLI subagents and raw Git
+worktrees remain valid.
+
 Load `references/worker.md` before delegation. It owns worker surfaces, startup
 consent wording, authorization modes, no-subdelegation, prompts, execution
 reports, lifecycle, resync, integration, artifacts, and worker evidence. Do not
@@ -170,12 +193,19 @@ later authorizes publication, record the new authority and route it through the
 matching companion skill before acting.
 
 Apply `references/gates.md` before owner-ready, issue-closed, merge-ready,
-release-ready, or final status. For pull-request delivery with authorized
-merge-ready closeout, do not declare merge-ready until the PR is out of draft,
+release-ready, or final status. For `pull-request`, default
+`pr_closeout=merge-ready`; opening the PR as draft is only the initial state.
+Do not declare merge-ready until the PR is out of draft,
 `@codex review` was requested, a completed Codex GitHub review covers the latest
 PR state, actionable feedback is resolved or explicitly dispositioned, fixes
-are validated and published, and the publication checkout is clean. Draft-only
-authority stops at a recorded draft PR.
+are validated and published, and the publication checkout is clean. Use
+`pr_closeout=draft-only` only for an explicit current-user instruction about
+the PR lifecycle or a structured PRD `PR closeout: draft-only` value. Draft-only completes after
+validation and draft publication, marks downstream ready/review/merge-ready
+gates `not-applicable`, and resumes at ready-for-review if the user removes the
+restriction. `Draft PR`, `open a draft PR`, and `do not merge automatically`
+do not select draft-only. Neither does Plan Feature's separate `draft-only
+output` no-mutation instruction.
 
 Update target-repo `AGENTS.md` only with explicit documentation/write authority
 from the owner or source contract; otherwise report the proposed change. Source
