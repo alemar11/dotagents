@@ -525,7 +525,16 @@ it may only open a PR from an already-pushed branch, record `pr` only.
 - `review-ready`: umbrella capability for exact root-listed PR-review
   sub-actions: `mark-ready`, `request-codex-review`, `poll-codex-review`, and
   `post-root-supplied-disposition`. A worker may perform only the listed
-  sub-actions for the assigned PR. Posting a disposition requires
+  sub-actions for the assigned PR. Before `request-codex-review`, run the
+  GitStack status check for the assigned head. If the result shows the assigned
+  head is stale, the root must refresh the assignment to the PR's current SHA
+  and the worker must rerun `reviews check` for that refreshed SHA. Request only
+  when that same-SHA check returns `not_requested` or `stale` with
+  `head_is_current=true`. Immediately before requesting, re-read the PR head and
+  stop if it changed or the ledger already records a request for that SHA. Root
+  retry or fresh-review wording cannot bypass the refreshed check or authorize
+  a second request for an unchanged head. Reuse `clean`/`findings` and poll
+  `acknowledged`/`pending`. Posting a disposition requires
   root-supplied text and supporting evidence; evaluating Codex feedback,
   deciding whether fixes are needed, and accepting residual risk remain
   root-owned unless the root also explicitly lists the needed `implement`,
@@ -575,6 +584,7 @@ Scope:
 - PR closeout: <merge-ready|draft-only|not-applicable, with explicit draft-only evidence when selected>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
 - Codex PR review: <not-applicable|not-requested|requested|received|passed|blocked>
+- Codex review evidence: <request-head/object; GitStack checker status; result-head/kind/object; verified provider; terminal status; disposition>
 - Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>
 - Dependencies: <completed source/workstream proof, pending dependency, or none>
 - Branch expectation: <feature-branch|repo-feature-branch|direct-commit-target|none>
@@ -588,7 +598,8 @@ Scope:
 - Forbidden actions: no subdelegation, no ledger edits, no unrelated cleanup,
   no worker/thread/chat management, no commit/push/PR/Codex-review
   request/release unless this mode explicitly permits it; no merge or direct
-  source closeout under any worker mode.
+  source closeout under any worker mode; no duplicate Codex-review request when
+  GitStack reports a terminal result or active request for the assigned head.
 
 Context:
 - Owner request: <summary>

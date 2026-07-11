@@ -91,8 +91,9 @@ Use these PRD-backed authority values in the ledger and worker prompts:
   publication actions in the current run, `prd-backed-pull-request` means the
   PRD delivery contract authorizes commit, push, initial draft PR publication,
   ready-for-review transition, `@codex review`, polling, and required
-  discussion disposition after gates, and `blocked` means publication is
-  expected but blocked by a gate or access issue.
+  discussion disposition after gates. Review-request authority remains subject
+  to the current-head GitStack preflight and cannot justify a duplicate request.
+  `blocked` means publication is expected but blocked by a gate or access issue.
 - `pr_closeout`: `merge-ready` is the default for `pull-request` and requires
   the full review lifecycle; `draft-only` intentionally stops after validated
   draft publication and is valid only from an explicit current-user instruction
@@ -262,12 +263,14 @@ For PRD-backed implementation, local code completion is not enough for
 - the expected branch and PR exist when PRD-backed publication is authorized;
 - if `pr_closeout=merge-ready`, the PR is marked ready for review when local
   gates pass;
-- if `pr_closeout=merge-ready`, `@codex review` was requested, a
-  completed Codex GitHub review exists for the latest PR state, and accepted
-  actionable feedback was fixed or explicitly dispositioned; and
+- if `pr_closeout=merge-ready`, GitStack review-status preflight ran for the
+  current head, an existing request/result was reused or exactly one request was
+  posted when needed, a verified terminal Codex result exists for that head,
+  and accepted actionable feedback was fixed or explicitly dispositioned; and
 - the ledger records the PR URL, publication checkout, caller checkout
-  disposition, and, when `pr_closeout=merge-ready`, Codex review
-  evidence plus discussion update or no-update-needed disposition; otherwise it
+  disposition, and, when `pr_closeout=merge-ready`, Codex result evidence
+  including request/result head and object id plus discussion update or
+  no-update-needed disposition; otherwise it
   records why publication/review is blocked and moves the remaining action to
   `needs-owner`, `blocked`, or `deferred`.
 
@@ -275,7 +278,7 @@ If PRD-backed publication is authorized and the only remaining action is
 commit, push, or initial draft PR creation, keep that action in `ready-next` and
 execute it before stopping when runtime access allows. If
 `pr_closeout=merge-ready` and the only remaining action is ready-for-review transition,
-Codex review request, waiting for Codex's response, review-triggered fixes, or
+Codex review preflight/request, waiting on the existing request, review-triggered fixes, or
 PR discussion update or disposition, keep that action in `ready-next` and
 execute or poll it before stopping when runtime access allows. For
 `pr_closeout=draft-only`, record downstream ready/review/merge-ready gates as

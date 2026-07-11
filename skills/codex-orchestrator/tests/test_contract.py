@@ -191,6 +191,125 @@ class OrchestratorContractTests(unittest.TestCase):
             (ROOT / "skills/plan-feature/SKILL.md").read_text(encoding="utf-8"),
         )
 
+    def test_codex_review_requests_are_idempotent_per_current_head(self) -> None:
+        gates = self.read("references/gates.md")
+        ledger = self.read("references/ledger.md")
+        worker = self.read("references/worker.md")
+        rows = self.table_rows(
+            "references/gates.md",
+            "#### Codex Review Request Matrix",
+        )
+
+        expected_rows = [
+            [
+                "GitStack `clean`",
+                "`head_is_current=true`",
+                "Reuse the result and pass the review-result portion of the gate.",
+                "No.",
+                "Record the terminal result and object for this head.",
+            ],
+            [
+                "GitStack `findings`",
+                "`head_is_current=true`",
+                "Evaluate and disposition findings; fix accepted findings before closeout.",
+                "No for this head.",
+                "Record findings and disposition; a fix may create a new head with a new preflight.",
+            ],
+            [
+                "GitStack `acknowledged` or `pending`",
+                "`head_is_current=true`",
+                "Run bounded `reviews wait` for the same head and preserve the existing request.",
+                "No.",
+                "Keep the existing request object and next poll.",
+            ],
+            [
+                "GitStack `stale`",
+                "Refresh the assigned SHA, rerun `reviews check`, require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA.",
+                "Post one request naming the proven current head.",
+                "Yes, exactly once for that SHA.",
+                "Record the request before polling.",
+            ],
+            [
+                "GitStack `not_requested`",
+                "Require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA.",
+                "Post one request naming the proven current head.",
+                "Yes, exactly once for that SHA.",
+                "Record the request before polling.",
+            ],
+            [
+                "GitStack API, authentication, or configuration error",
+                "Current head or request state is unproven.",
+                "Record the blocker and use the documented read-only fallback.",
+                "No.",
+                "Preserve any known request evidence; do not mutate from uncertainty.",
+            ],
+            [
+                "Verified terminal clean provider-authored comment not represented by GitStack",
+                "Authenticated provider plus unambiguous current-head SHA or prefix.",
+                "Record supplemental evidence and pass the review-result portion of the gate.",
+                "No.",
+                "Record the result kind, object, provider, and head.",
+            ],
+            [
+                "Verified terminal findings in a provider-authored comment not represented by GitStack",
+                "Authenticated provider plus unambiguous current-head SHA or prefix.",
+                "Record supplemental evidence and disposition findings.",
+                "No for this head.",
+                "Record findings and disposition.",
+            ],
+            [
+                "Terminal provider error for the current-head request",
+                "Existing request object and current head are recorded.",
+                "Record the error and follow recovery without another request for the unchanged head.",
+                "No.",
+                "Block or wait until a new head or external recovery exists.",
+            ],
+            [
+                "Unverified or human-authored comment claiming success",
+                "No verified result; use the GitStack status for the proven current head.",
+                "Ignore the comment and follow the matching GitStack row.",
+                "Only through a proven `stale` or `not_requested` row.",
+                "Record that the comment was rejected as evidence.",
+            ],
+        ]
+        self.assertEqual(rows, expected_rows)
+
+        self.assertIn(
+            "reviews check --provider codex --repo <owner/repo>\n"
+            "--pr <number> --head <current-sha>",
+            gates,
+        )
+        self.assertIn("request-head=<sha|none>", ledger)
+        self.assertIn("result-kind=<formal-review|provider-comment|clean-reaction|none>", ledger)
+        self.assertIn(
+            "authenticated Codex clean reaction that GitStack binds",
+            gates,
+        )
+        self.assertIn("reports as `clean` with\n  `head_is_current=true`", gates)
+        self.assertIn("worker must rerun `reviews check`", worker)
+        self.assertIn("for that refreshed SHA", worker)
+        self.assertIn(
+            "same-SHA check returns `not_requested` or `stale` with\n"
+            "  `head_is_current=true`",
+            worker,
+        )
+        self.assertIn("cannot bypass the refreshed check", worker)
+        self.assertIn("re-read the PR head and\n  stop if it changed", worker)
+        self.assertIn(
+            "Reuse `clean`/`findings` and poll\n"
+            "  `acknowledged`/`pending`",
+            worker,
+        )
+        self.assertIn(
+            "immediately re-read the PR head and verify\n"
+            "   it still equals the checked SHA",
+            gates,
+        )
+        self.assertIn(
+            "Reuse the request across `acknowledged`, `pending`, and timeouts",
+            gates,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

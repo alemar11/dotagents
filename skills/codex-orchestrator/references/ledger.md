@@ -224,6 +224,7 @@ Use one compact block per active workstream:
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
 | Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr-closeout=<merge-ready|draft-only|not-applicable>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| Codex review evidence | request-head=<sha|none>; request-object=<id/url|none>; checker-status=<not-requested|acknowledged|pending|clean|findings|stale|error>; result-head=<sha|none>; result-kind=<formal-review|provider-comment|clean-reaction|none>; result-object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | primary=standalone; primary-skill=<skill>; operation=<operation>; fallback=<unused|github-plugin>; fallback-reason=<none|standalone-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
@@ -374,9 +375,11 @@ Before marking a ledger `complete`, verify:
   do not mark it complete while authorized commit, push, or draft PR creation
   remains in `ready-next`. When `pr_closeout=merge-ready`, also
   record non-draft state, Codex review proof, and discussion disposition, and do
-  not mark it complete while ready-for-review transition, Codex review request,
-  completed-review wait, review-triggered fix, post-fix validation, fresh-review
-  wait, or PR-thread disposition remains in `ready-next`.
+  not mark it complete while ready-for-review transition, current-head review
+  preflight, permitted Codex review request, existing-request wait,
+  review-triggered fix, post-fix validation, fresh-result wait, or PR-thread
+  disposition remains in `ready-next`. Never keep a duplicate review request in
+  `ready-next` when a terminal result or active request exists for that head.
 - When `pr_closeout=draft-only`, require validated draft publication and the
   explicit current-user instruction about the PR lifecycle or structured PRD
   field, record downstream ready/review/merge-ready gates as `not-applicable`,
@@ -384,10 +387,12 @@ Before marking a ledger `complete`, verify:
   restriction, change the value to `merge-ready` and resume at ready-for-review.
 - For merge-ready closeout, verify the publication checkout is clean, accepted
   review fixes are committed and pushed to the PR branch, current CI belongs to
-  the pushed head, the latest Codex review covers that same head, and unresolved
-  review threads are either fixed, explicitly dispositioned, or recorded as a
-  blocker. If any check fails, keep the ledger active, `ready-next`, or blocked
-  instead of `complete`.
+  the pushed head, GitStack reports or authenticated supplemental evidence proves
+  a terminal Codex result for that same head, and unresolved review threads are
+  either fixed, explicitly dispositioned, or recorded as a blocker. Record the
+  request/result ids so reconciliation reuses them instead of retriggering. If
+  any check fails, keep the ledger active, `ready-next`, or blocked instead of
+  `complete`.
 - `needs-owner` and `blocked` entries are explicitly non-Codex-actionable and
   include decision briefs, blockers, evidence, and minimum next actions.
 - `deferred` contains only residual work with a linked or proposed

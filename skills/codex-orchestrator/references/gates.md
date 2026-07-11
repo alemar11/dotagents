@@ -232,33 +232,87 @@ owner-ready next action.
 
 ### Codex PR Review Gate
 
-For `pull-request` delivery with `pr_closeout=merge-ready`, require a Codex
-GitHub review before declaring the PR
-merge-ready or the workstream complete. This is distinct from local
-`$autoreview` and from Codex sandbox auto-review. For
-`pr_closeout=draft-only`, record this gate as `not-applicable` with the explicit
-user instruction or structured PRD field. If that restriction is removed,
-resume this sequence at ready-for-review.
+For `pull-request` delivery with `pr_closeout=merge-ready`, require a verified
+terminal Codex result before declaring the PR merge-ready or the workstream
+complete. This is distinct from local `$autoreview` and from Codex sandbox
+auto-review. For `pr_closeout=draft-only`, record this gate as `not-applicable`
+with the explicit user instruction or structured PRD field. If that restriction
+is removed, resume this sequence at ready-for-review.
+
+Review completion is evidence-based, not GitHub-object-type-based. A verified
+terminal Codex result may be either:
+
+- a formal GitHub review whose reviewed commit matches the current PR head; or
+- a Codex-provider-authored PR comment posted after the request that names an
+  unambiguous matching current-head SHA or prefix and gives a terminal result
+  such as clean/no findings or concrete findings; or
+- an authenticated Codex clean reaction that GitStack binds to a review request
+  naming the current PR head and reports as `clean` with
+  `head_is_current=true`.
+
+Use `$gitstack:github-review-threads` automated-review status as the primary
+state source. Run its JSON `reviews check --provider codex --repo <owner/repo>
+--pr <number> --head <current-sha>` command before any review request and its
+bounded `reviews wait` command after a request. The checker owns provider bot
+identities, review objects, acknowledgements, reactions, head matching, and
+stable state/exit-code mapping. Use an authenticated GitHub connector read only
+as supplemental evidence when Codex posted a terminal current-head comment that
+the checker does not represent; never trust display text alone.
+
+Human comments, unverified authors, acknowledgements, pending or status
+messages, cloud task replies without a terminal review result, and provider
+errors are not completion evidence. Record request head, result head, checker
+status, evidence kind, provider identity, object id or URL, terminal status, and
+disposition.
+
+#### Codex Review Request Matrix
+
+Run this preflight before every `@codex review` mutation:
+
+| Status or evidence | Required freshness | Required action | May post another request? | Ledger consequence |
+| --- | --- | --- | --- | --- |
+| GitStack `clean` | `head_is_current=true` | Reuse the result and pass the review-result portion of the gate. | No. | Record the terminal result and object for this head. |
+| GitStack `findings` | `head_is_current=true` | Evaluate and disposition findings; fix accepted findings before closeout. | No for this head. | Record findings and disposition; a fix may create a new head with a new preflight. |
+| GitStack `acknowledged` or `pending` | `head_is_current=true` | Run bounded `reviews wait` for the same head and preserve the existing request. | No. | Keep the existing request object and next poll. |
+| GitStack `stale` | Refresh the assigned SHA, rerun `reviews check`, require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA. | Post one request naming the proven current head. | Yes, exactly once for that SHA. | Record the request before polling. |
+| GitStack `not_requested` | Require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA. | Post one request naming the proven current head. | Yes, exactly once for that SHA. | Record the request before polling. |
+| GitStack API, authentication, or configuration error | Current head or request state is unproven. | Record the blocker and use the documented read-only fallback. | No. | Preserve any known request evidence; do not mutate from uncertainty. |
+| Verified terminal clean provider-authored comment not represented by GitStack | Authenticated provider plus unambiguous current-head SHA or prefix. | Record supplemental evidence and pass the review-result portion of the gate. | No. | Record the result kind, object, provider, and head. |
+| Verified terminal findings in a provider-authored comment not represented by GitStack | Authenticated provider plus unambiguous current-head SHA or prefix. | Record supplemental evidence and disposition findings. | No for this head. | Record findings and disposition. |
+| Terminal provider error for the current-head request | Existing request object and current head are recorded. | Record the error and follow recovery without another request for the unchanged head. | No. | Block or wait until a new head or external recovery exists. |
+| Unverified or human-authored comment claiming success | No verified result; use the GitStack status for the proven current head. | Ignore the comment and follow the matching GitStack row. | Only through a proven `stale` or `not_requested` row. | Record that the comment was rejected as evidence. |
+
+`request-codex-review` is idempotent per PR head. Do not post when a valid
+terminal result or an active request already exists for the current head. A new
+commit that changes the PR head invalidates the old result and permits exactly
+one new request. GitHub storing a valid Codex result as a comment rather than a
+formal review never permits a duplicate request by itself. Owner wording and
+retry instructions cannot override unchanged-head idempotency.
 
 1. Verify the PR exists, targets the expected branch/base, contains the latest
    intended commit, and has passed required local gates plus current CI or a
    recorded CI blocker.
 2. If the PR is still draft, mark it ready for review with `gh pr ready <pr>`
    or an equivalent authorized GitHub action, then record the non-draft state.
-3. Use `$gitstack:github-review-threads` to post a top-level PR comment requesting Codex
-   review. The current official Codex GitHub trigger is exactly
-   `@codex review`; add a short focus after that phrase only when useful.
-4. Wait or poll until Codex reacts and posts a completed GitHub review for the
-   latest PR state. Do not treat a non-review PR comment, status update, cloud
-   task reply, or error response as review completion. If Codex does not post a
-   review, record the blocker and troubleshooting evidence: Code review enabled
-   for the repository, Codex cloud configured for the repository, and exact
-   `@codex review` trigger used.
-5. Evaluate Codex feedback. Fix accepted actionable findings, rerun the relevant
+3. Run GitStack `reviews check --provider codex` with the exact current head.
+   Apply the returned status and the matrix before posting anything. Use an
+   authenticated connector read only for supplemental terminal-comment evidence
+   or the documented checker fallback.
+4. Only when the matrix permits it, immediately re-read the PR head and verify
+   it still equals the checked SHA and the ledger has no request object for that
+   SHA. Then post exactly one top-level PR comment. The official trigger is
+   exactly `@codex review`; name the current head and add a short focus only when
+   useful. Record the request object and head before any other action.
+5. Run bounded GitStack `reviews wait --provider codex` against the same head.
+   Reuse the request across `acknowledged`, `pending`, and timeouts; never post
+   another request merely because the wait returned without a terminal result.
+   If no terminal result appears, record the blocker and troubleshooting
+   evidence: Code review enabled for the repository, Codex cloud configured for
+   the repository, exact trigger used, request object, and current head.
+6. Evaluate Codex feedback. Fix accepted actionable findings, rerun the relevant
    tests, `$autoreview`, CI, and review-thread checks, then push the update and
-   request or verify a fresh completed Codex review when the diff materially
-   changed.
-6. For findings judged non-actionable, not applicable, or intentionally
+   run the request matrix for the new head when the diff materially changed.
+7. For findings judged non-actionable, not applicable, or intentionally
    deferred, post a PR discussion update with the disposition, evidence, and
    validation so the discussion is not left silent. If Codex reports no
    findings, or every finding is fully addressed by commits plus validation,
@@ -269,24 +323,25 @@ Use this closeout state order for merge-ready PR work:
 
 1. `draft-pr-published`
 2. `ready-for-review`
-3. `codex-review-requested`
-4. `latest-head-review-received`
-5. `feedback-dispositioned`
-6. `fixes-validated-and-pushed`
-7. `post-fix-ci-current`
-8. `fresh-latest-head-review-current`
-9. `merge-ready-report`
+3. `current-head-review-preflight`
+4. `codex-review-requested-or-reused`
+5. `current-head-terminal-result-received`
+6. `feedback-dispositioned`
+7. `fixes-validated-and-pushed`
+8. `post-fix-ci-current`
+9. `fresh-current-head-result-current`
+10. `merge-ready-report`
 
 Do not final-answer from an intermediate state as complete, released, or
-merge-ready. In particular, keep the ledger active, `ready-next`, or blocked
-while review is only requested, accepted findings are unresolved, a review fix is
-dirty in any publication checkout, a fix is committed but unpushed, checks are
-pending for the pushed fix, a fresh latest-head Codex review is pending after a
-material diff change, or PR review threads remain unresolved without an explicit
-disposition.
+merge-ready. Keep the ledger active, `ready-next`, or blocked while review is
+only requested, accepted findings are unresolved, a review fix is dirty in any
+publication checkout, a fix is committed but unpushed, checks are pending for
+the pushed fix, a fresh current-head Codex result is pending after a material
+diff change, or PR review threads remain unresolved without an explicit
+disposition. Poll an existing current-head request instead of posting again.
 
-This gate passes only when the PR is non-draft, a completed Codex GitHub review
-exists for the current PR state, actionable feedback is fixed or explicitly
+This gate passes only when the PR is non-draft, a verified terminal Codex result
+exists for the current PR head, actionable feedback is fixed or explicitly
 dispositioned, the PR discussion was updated or explicitly marked
 `no-update-needed`, and no required check blocks human merge. It does not
 authorize merging the PR.

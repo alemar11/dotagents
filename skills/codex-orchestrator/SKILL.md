@@ -196,9 +196,12 @@ Apply `references/gates.md` before owner-ready, issue-closed, merge-ready,
 release-ready, or final status. For `pull-request`, default
 `pr_closeout=merge-ready`; opening the PR as draft is only the initial state.
 Do not declare merge-ready until the PR is out of draft,
-`@codex review` was requested, a completed Codex GitHub review covers the latest
-PR state, actionable feedback is resolved or explicitly dispositioned, fixes
-are validated and published, and the publication checkout is clean. Use
+GitStack review-status preflight has reused or requested exactly one review for
+the current head, a verified terminal Codex result covers that head, actionable
+feedback is resolved or explicitly dispositioned, fixes are validated and
+published, and the publication checkout is clean. A terminal current-head
+result may be a formal review or verified provider-authored result comment; its
+GitHub object type alone never justifies another `@codex review` request. Use
 `pr_closeout=draft-only` only for an explicit current-user instruction about
 the PR lifecycle or a structured PRD `PR closeout: draft-only` value. Draft-only completes after
 validation and draft publication, marks downstream ready/review/merge-ready
