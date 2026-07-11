@@ -53,6 +53,9 @@ single-repo issues, `current repository`; for workspace issues, use
   <issue-id>[, <issue-id>] | root-integrated]
 - Dependencies: [generated issue IDs and reason, or `None`.]
 - Validation: [commands, checks, or proof required for this issue.]
+- Domain closeout: [not-applicable | implementation-closeout with the exact
+  decisions, target surfaces, evidence, and `$project-memory domain-memory`
+  operation required by `## Domain Knowledge Closeout` below]
 - Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
   direct-commit-closes-issue | local-done-move-after-proof; use
   local-done-move-after-proof for local markdown even with direct-commit

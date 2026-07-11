@@ -1,5 +1,5 @@
 interface:
   display_name: "Project Memory"
-  short_description: "Create and maintain tracker, context, decision, and localization memory."
+  short_description: "Maintain tracker routing, domain language, ADRs, context, and localization memory."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $project-memory as the single public entry point to create or maintain only the requested tracker, delivery, domain, localization, or AGENTS.md-pointer slice. For domain-memory updates, load the internal domain-modeling reference, reconcile accepted decisions against implemented or repository evidence, and update only the authorized durable surfaces."
+  default_prompt: "Use $project-memory for the smallest requested tracker, domain-memory, localization, or AGENTS-pointer slice. For domain-memory, choose setup-bootstrap, inline-update, implementation-closeout, or periodic-review; load only the operation-specific references and update authorized durable surfaces from accepted evidence."

@@ -1,415 +1,185 @@
 ---
 name: plan-feature
-description: Manual feature planning into Product Requirements Documents (PRDs) and agent-ready issues, including prd-only and issues-from-existing-prd modes.
+description: Manually plan features into PRDs and agent-ready issues through full-flow, prd-only, or issues-from-existing-prd modes.
 ---
 
 # Plan Feature
 
-## Goal
+## Purpose And Invocation
 
-Run feature planning from one public invocation. This skill owns the planning
-pipeline and its internal Product Requirements Document (PRD) and issue phases:
+Use this planning-only skill to turn feature intent into a durable Product
+Requirements Document (PRD) and, when requested by the selected mode, hardened
+vertical implementation issues. The public pipeline is:
 
-`$project-memory` if needed -> `$grill-me-with-context` when scope needs
-clarification -> PRD phase -> issue phase with `$plan-harder` per generated
-issue -> final integration and domain-knowledge closeout task when issues are
-generated and durable knowledge changed. The later implementor executing that
-task invokes `$project-memory domain-memory`; Plan Feature only carries and
-assigns the deferred knowledge delta.
+`project-memory routing if needed -> repo-backed clarification if needed -> PRD phase -> issue phase -> deferred domain-memory closeout`
 
-Use this skill to turn rough feature intent into a written PRD and agent-ready
-vertical issues. In orchestrator workspaces, those issues may be cross-repo
-vertical outcomes. Do not implement the feature.
-
-A feature is the capability or outcome being planned; the PRD is the durable
-planning artifact that describes that feature's scope, requirements, acceptance
-criteria, and delivery mode.
-
-## Invocation Boundary
-
-- Use only when the user explicitly invokes `$plan-feature`, explicitly asks to
-  run the Plan Feature skill, or a manually invoked parent workflow explicitly
-  routes to `$plan-feature`.
-- Do not auto-select this skill for ordinary feature, planning, PRD, issue
-  splitting, implementation, or triage requests.
-- If feature planning would help but the user did not invoke this skill, answer
-  or plan normally and ask before switching into the Plan Feature workflow.
+Use it only when the user invokes `$plan-feature`, asks to run Plan Feature, or
+a manually invoked parent workflow routes here. Do not auto-select it for
+ordinary planning, PRD, implementation, issue-splitting, or triage requests.
+Do not implement the planned feature.
 
 ## Modes
 
 Choose the smallest mode that satisfies the request:
 
-- `full-flow`: default for rough new feature intent. Resolve setup, grill with
-  context, produce or publish the PRD, then split it into hardened issues.
-- `prd-only`: for clarified intent that should become a PRD but should not be
-  split into issues yet.
-- `issues-from-existing-prd`: for an existing durable PRD that needs generated
-  implementation issues. Do not rewrite the PRD unless the user explicitly asks.
+| Mode | Use when | Stop point |
+| --- | --- | --- |
+| `full-flow` | New feature intent needs a PRD and implementation graph. This is the default for new intent unless the user asks to stop at the PRD. | PRD plus hardened issues. |
+| `prd-only` | The user explicitly wants a PRD without generated issues. | PRD phase report. |
+| `issues-from-existing-prd` | A durable PRD already exists and needs implementation issues. Do not rewrite it unless asked. | Hardened issues. |
 
-For `prd-only` mode, stop after the PRD phase report. For
-`issues-from-existing-prd` mode, skip feature grilling unless the PRD has
-unresolved blockers that affect scope, acceptance criteria, dependencies,
-validation, publication target, permissions, or cross-repo contracts.
-If the user supplies new feature intent without naming a mode or asking to stop
-at the PRD, use `full-flow`; issue splitting is part of that default. Use
-`prd-only` only when the user explicitly requests a PRD without generated
-issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
+In `issues-from-existing-prd`, skip clarification unless unresolved PRD
+questions affect scope, acceptance criteria, dependencies, validation,
+publication, permissions, or cross-repo contracts.
 
-## Hard Requirements
+## Non-Negotiable Invariants
 
-- Keep PRD writing and issue splitting as internal phases, not separate public
-  skill invocations.
-- Load `references/prd-phase.md` before drafting, writing, or publishing a PRD.
-- Load `references/issue-phase.md` before splitting a PRD into issues.
-- Load `references/prd-template.md`, `references/issue-body-template.md`, and
-  `references/vertical-slices.md` when the relevant phase requires them.
-- Load and follow `$plan-harder` once for every generated implementation issue,
-  using issue-hardening mode on its caller surface.
-- Before writing, returning, or publishing generated implementation issues, run
-  the issue phase verticality gate from `references/vertical-slices.md`; repair,
-  merge, split, re-harden, or withhold any issue that is horizontal,
-  chore-only, or otherwise not a justified vertical/enabling slice.
-- Write or publish `ready-for-agent` artifacts only after the required tracker
-  routing is available and no planning blockers remain. An explicit request for
-  partial non-agent-ready output is the only exception: unresolved items may be
-  returned or published as `needs-info` or `ready-for-human`, never as
-  `ready-for-agent`, and only after their target and metadata are resolved.
-- Treat the configured `tracker_backend` as planning-artifact write authority:
-  `github` publishes PRDs and generated issues through `$gitstack:github-issues`, while
-  `local` writes the configured Markdown files.
-- Use draft output only when the current run explicitly asks for a dry run,
-  temp/rehearsal/validation pass, disabled writes, or another no-mutation
-  override.
-- Treat persistent local planning artifacts separately from temporary hosted
-  issue body files. In hosted tracker mode, do not keep
-  repo-local PRD, issue, `.scratch/`, or `project-memory/features/` mirrors
-  unless the configured target or current run explicitly asks for a local
-  artifact target.
-- Carry accepted planning identity through every phase: selected context,
-  product or project slug, workspace path when applicable, and authoritative
-  feature slug.
-- Carry accepted delivery mode and PR closeout through every phase using
-  structured values: `pull-request` or `direct-commit`, plus `merge-ready` or
-  `draft-only` when delivery is `pull-request`.
-- When calling `$grill-me-with-context`, always pass
-  `capture_mode: defer-to-caller`. Planning may read project context but must
-  not edit `CONTEXT.md`, project docs, ADRs, or other durable domain surfaces.
-- Initialize every run with a canonical `domain_knowledge_delta` using
-  `status: none` and empty `decisions`, `target_surfaces`, `evidence`, and
-  `unresolved` lists. Replace it with the deferred clarification result or
-  planning-derived durable decisions when required, then carry it through the
-  PRD and issue phases. In issue-generating modes, when its status is
-  `required`, assign its capture and verification to the final generated
-  integration task. If the issue graph has no suitable final integration task,
-  append one that depends on every terminal implementation issue. If an
-  existing terminal integration task is reused, make it depend on every other
-  terminal issue. The final task must prove the integrated feature and must not
-  be a docs-only horizontal ticket. Require its implementor to invoke
-  `$project-memory` with the `domain-memory` slice, which runs its internal
-  domain-modeling workflow before updating the named durable surfaces. In
-  `prd-only`, preserve a required delta in the PRD handoff and do not generate
-  an issue.
-- Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
-  the issue phase. In `draft-publish-commands` runs, use the stable draft ref
-  from `$project-memory` `references/tracker-publishing.md` until a
-  hosted PRD issue number or local PRD path exists, and carry the PRD title,
-  feature slug, project slug when applicable, and PRD body fingerprint with the
-  draft handoff.
-- Use structured values from setup, the PRD phase, and the issue phase. Keep
-  prose values only for explanations, reasons, and free-form notes.
-- Treat `$codex-orchestrator` worker choices and runtime authorization as
-  session-only decisions. Do not include worker authorization defaults or copy
-  session worker choices into PRDs, generated issues, `## Orchestrator Handoff`,
-  local issue files, hosted issue bodies, or draft publish commands.
+- Keep PRD writing and issue splitting as internal phases. Load
+  `references/prd-phase.md` before PRD work and `references/issue-phase.md`
+  before issue work; load their templates and `vertical-slices.md` only for the
+  phase that needs them.
+- Treat `tracker_backend` as planning-artifact write authority. `github`
+  publishes through `$gitstack:github-issues`; `local` writes the configured
+  Markdown paths. A current-run no-mutation override returns local dry-run
+  output or draft publish commands instead.
+- In hosted tracker mode, keep body files transient and outside the repo. Do
+  not create `.scratch/`, `project-memory/features/`, or other local mirrors
+  unless the configured target or user explicitly requires one.
+- Resolve and carry one planning identity: `feature_slug`, selected
+  product/workspace/context when applicable, and `project_slug` for
+  orchestrator workspaces.
+- Default `delivery_mode` to `pull-request`; use `direct-commit` only with
+  explicit authorization. For pull requests, default `pr_closeout` to
+  `merge-ready`; use `draft-only` only from an explicit current-user PR
+  lifecycle instruction or structured PRD value. `draft PR`, `do not merge`,
+  and the planning no-mutation value `draft-output` do not select it.
+- Initialize every run with a structured `domain_knowledge_delta`: `status`
+  (`none` or `required`) plus `decisions`, `target_surfaces`, `evidence`, and
+  `unresolved` lists. Empty all lists when status is `none`.
+- Call `$grill-me-with-context` only with `capture_mode: defer-to-caller`.
+  Planning may read durable context but must not update `CONTEXT.md`, domain
+  docs, ADRs, or other domain-memory surfaces.
+- When a required domain delta exists, preserve it in the PRD handoff and make
+  exactly one final implementation/integration issue own feature-level proof
+  plus `$project-memory domain-memory` with `operation:
+  implementation-closeout`. That issue depends on every other terminal issue
+  and is never docs-only.
+- Run `$plan-harder` once per generated issue in issue-hardening caller mode.
+  Then run the final verticality and graph gates; repair and re-harden changed
+  issues before output.
+- Never label unresolved planning work `ready-for-agent`. Withhold it by
+  default. Only an explicit request for partial non-agent-ready output permits
+  `needs-info` or `ready-for-human` artifacts.
+- Carry a durable `source_prd_ref` into every generated issue. A
+  `draft-prd:<...>` ref is inspection-only until replaced by a hosted PRD
+  number or durable local path.
+- Keep worker surfaces, worker counts, publication authority, issue mutation
+  authority, and other `$codex-orchestrator` session choices out of PRDs,
+  generated issues, handoffs, local tracker files, and draft commands.
 
-## External Skill Calls
+## Composed Skills
 
-This skill may call:
+| Skill | Load when | Boundary |
+| --- | --- | --- |
+| `$project-memory` | Tracker routing is missing, incomplete, or stale. | Use only `tracker-routing`; Plan Feature never invokes `domain-memory`. |
+| `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always `capture_mode: defer-to-caller`; consume its structured delta. |
+| `$plan-harder` | For every generated implementation issue. | One issue per issue-hardening call; the issue phase owns writes. |
+| `$gitstack:github-issues` | Publishing GitHub PRDs/issues or producing hosted dry-run commands. | It owns safe body transport, metadata, parent/sub-issues, verification, cleanup, and partial recovery. |
 
-- `$project-memory`'s `tracker-routing` slice when required tracker setup is
-  missing or needs review; broader setup remains out of scope unless separately
-  requested.
-- `$grill-me-with-context` in `capture_mode: defer-to-caller` when feature
-  scope, terms, decisions, or planning blockers need repo-backed clarification.
-  Consume its structured `domain_knowledge_delta`; do not allow it to edit
-  repository docs during Plan Feature.
-- `$plan-harder` once per generated implementation issue.
-- `$gitstack:github-issues` only for GitHub issue publishing, issue type/label handling,
-  parent/sub-issue relationships, and dry-run command mechanics for PRDs and
-  generated implementation issues. After implementation scheduling starts,
-  issue lifecycle comments, labels, direct closure, and closeout mutation belong
-  to `$codex-orchestrator` using `$gitstack:github-issues`.
-- In GitHub tracker mode, `$gitstack:github-issues` owns safe `gh --body-file`
-  transport, transient body-file cleanup, partial-publication recovery, and
-  dry-run command mechanics. `plan-feature` supplies sanitized titles, bodies,
-  metadata, target repo, and parent relationships; it must not embed generated
-  Markdown bodies in ad hoc shell commands.
-
-Plan Feature does not call `$project-memory domain-memory`. It assigns that
-invocation to the final implementation/integration task so durable docs are
-reconciled against behavior that actually landed rather than provisional
-planning language.
+After implementation scheduling begins, issue lifecycle mutations belong to
+`$codex-orchestrator`, not Plan Feature.
 
 ## Workflow
 
-### 1. Resolve Mode And Setup
+### 1. Resolve Setup, Target, And Identity
 
-Inspect the user request and source material to choose `full-flow`, `prd-only`,
-or `issues-from-existing-prd`.
+Read `project-memory/agents/issue-tracker.md` and
+`project-memory/agents/triage-labels.md`. Read `project-memory/agents/domain.md`,
+`CONTEXT.md`, or `CONTEXT-MAP.md` only when context selection is material.
 
-Inspect the repo for the setup required by the selected mode:
+If tracker routing or mappings are missing or inconsistent with the requested
+target, run only `$project-memory tracker-routing`. Do not bootstrap unrelated
+domain, localization, ADR, or `AGENTS.md` content. Orchestrator-workspace setup
+is config-only and does not create project or feature artifacts.
 
-- `project-memory/agents/issue-tracker.md`,
-- `project-memory/agents/triage-labels.md`.
+Resolve:
 
-Read `project-memory/agents/domain.md`, `CONTEXT.md`, or `CONTEXT-MAP.md` when
-they exist or when context selection is material. Missing domain or localization
-memory alone does not require broad setup before planning.
+- effective target: `configured-tracker`, `local-dry-run`, or
+  `draft-publish-commands`;
+- no-mutation override: `none`, `dry-run`, `temp`, `rehearsal`, `validation`,
+  `disabled-writes`, or `draft-output`;
+- `feature_slug` and, when applicable, `product_slug`, `workspace_path`,
+  `context_file`, and `project_slug`;
+- `delivery_mode` and `pr_closeout` using the defaults above.
 
-If tracker routing or issue mappings are missing, incomplete, stale, or
-inconsistent with the current planning target, load `$project-memory`'s
-`tracker-routing` slice, scoped to only the missing values. Use the user's
-planning goal as context; do not bootstrap unrelated domain, localization, ADR,
-or `AGENTS.md` content. In orchestrator workspace mode, setup is config-only
-and must not create project or feature folders.
+Use `$project-memory`'s `references/tracker-publishing.md` for effective-target,
+temporary-body-file, and draft `source_prd_ref` mechanics. Stop before writing
+when repo/context identity or cross-repo delivery is materially ambiguous.
 
-Before writing or publishing, resolve the effective target for the current run:
+### 2. Clarify Only Material Unknowns
 
-- configured tracker backend from `project-memory/agents/issue-tracker.md`,
-- any explicit no-mutation override such as dry run, temp, rehearsal,
-  validation pass, disabled writes, or draft-only output,
-- any local dry-run target or explicit local mirror request.
+In `full-flow` and `prd-only`, run `$grill-me-with-context` only when the
+provided intent and repository evidence are not sufficient for the PRD and
+issue graph. Resolve one blocking question at a time.
 
-For tracker publishing mechanics, use `$project-memory`'s `references/tracker-publishing.md`;
-this includes `source_prd_ref` handling for `draft-publish-commands`.
+Build or consume the canonical `domain_knowledge_delta`. Durable accepted
+terms, rules, boundaries, and decisions use repo-relative or repo-qualified
+targets and evidence. Planning blockers must be resolved or explicitly proven
+non-blocking before agent-ready output.
 
-If the user asked for a rehearsal, temp run, dry run, validation pass, or other
-non-mutating run, do not write local tracker files or mutate a hosted tracker
-even when persisted setup points at a writable target. Use the configured local
-dry-run target when one exists; otherwise ask for a local target or return draft
-publish commands.
-
-When `tracker_backend` is `github` and no no-mutation override is active, the
-hosted tracker is authoritative and the PRD/issues should be published there.
-`$gitstack:github-issues` owns the transient `gh --body-file` transport, including
-creating body files outside the repo, using non-interpolating writes, verifying
-tracker state, and cleaning up. Do not use `.scratch/` as a staging area in
-hosted tracker mode unless the user explicitly asks to keep a local mirror.
-
-When `tracker_backend` is `local` and no no-mutation override is active, write
-the PRD and generated implementation issues to the configured Markdown paths.
-
-Resolve the planning identity before writing:
-
-- `feature_slug`: accepted lowercase kebab-case slug for this feature.
-- For multi-context repos or monorepos: accepted `product_slug`,
-  `workspace_path`, and `context_file` selected from `CONTEXT-MAP.md` or
-  project memory.
-- For orchestrator workspaces: accepted `project_slug` and `feature_slug`.
-- `delivery_mode`: `pull-request` by default. For a single repo or monorepo, use
-  one feature branch and PR. For true multi-repo work, every involved repo uses
-  the same branch name and opens its own PR. Use `direct-commit` only when
-  explicitly authorized.
-- `pr_closeout`: `merge-ready` by default for `pull-request`. Use `draft-only`
-  only when the current user explicitly asks to keep or leave the PR in draft,
-  or when preserving an existing structured PRD `PR closeout: draft-only`
-  decision. Wording such as `draft PR`, `open a draft PR`, or `do not merge`
-  describes an initial state or merge authority and does not select
-  `draft-only`.
-
-If a multi-context local Markdown repo has no accepted product/context or the
-feature slug is not product/workspace namespaced according to tracker
-conventions, stop before PRD writing or issue writing and resolve that identity
-first. If the delivery mode is ambiguous because the feature might cross
-multiple git repositories, stop before writing and resolve that delivery mode
-first.
-
-### 2. Clarify Scope When Needed
-
-For `full-flow`, load and run `$grill-me-with-context` on the feature intent
-unless the supplied source is already clear enough to produce a PRD and issues.
-For `prd-only`, use the same clarification path when the intent is not already
-clear enough to produce a PRD, then stop after the PRD phase.
-
-Use it to resolve:
-
-- feature goal and non-goals,
-- users, workflows, and success criteria,
-- domain terms, rules, and accepted decisions,
-- open planning blockers that would change the PRD or issue split.
-
-If this clarification resolves durable terms, rules, boundaries, or accepted
-decisions, require `$grill-me-with-context` to return them in
-`domain_knowledge_delta` with intended repo-relative target surfaces and
-evidence, qualified by repository slug for multi-repo work. Do not capture them
-in repository docs during planning. If the source
-is already clear enough to skip grilling but planning still resolves new
-durable knowledge, build the same delta directly from accepted source material
-and user decisions. If grilling is skipped and planning introduces no durable
-change, preserve the initialized `status: none` delta with all lists empty.
-
-If planning blockers emerge, continue the grill-style one-question flow until
-they are resolved or explicitly deferred as non-blocking. Do not write or
-publish agent-ready artifacts while a planning blocker remains unresolved or
-deferred in a way that can affect scope, acceptance criteria, dependencies,
-validation, publication target, permissions, or cross-repo contracts. If the
-user explicitly requested partial non-agent-ready output, carry the blocker
-into that output and apply the exception defined in the issue phase.
-
-For `issues-from-existing-prd`, inspect the PRD's open questions first. Use
-`$grill-me-with-context` only if the PRD has blockers that materially affect
-issue splitting.
+For `issues-from-existing-prd`, inspect open questions first and clarify only
+those that block a safe split.
 
 ### 3. Run The PRD Phase
 
-Skip this step only in `issues-from-existing-prd` mode when the PRD is already
-durable and the user did not request a PRD update.
+Skip only when `issues-from-existing-prd` uses an unchanged durable PRD.
+Otherwise load `references/prd-phase.md` and its required template, then pass
+the resolved mode, target, no-mutation override, planning identity, delivery
+values, source-ref state, and domain delta.
 
-Load `references/prd-phase.md` and pass the phase handoff fields defined there,
-including mode, effective target, no-mutation override, source PRD ref state,
-planning identity, delivery mode, and `domain_knowledge_delta`.
-
-Require the PRD phase to return `source_prd_ref`. In `draft-publish-commands`
-mode, this is a deterministic `draft-prd:<feature-slug>` or
-`draft-prd:<project-slug>/<feature-slug>` value plus a publish-order note that
-the PRD must be created first and issue bodies must replace the draft ref with
-the hosted PRD number before mutation.
-
-If the PRD phase discovers a new blocker, route the blocker back through
-`$grill-me-with-context` using the same one-question loop, then continue only
-after the blocker is resolved or explicitly deferred as non-blocking.
-
-Stop here in `prd-only` mode and return the PRD phase report.
+Require a durable local/hosted `source_prd_ref`, or a deterministic
+`draft-prd:<feature-slug>` / `draft-prd:<project-slug>/<feature-slug>` plus
+body fingerprint and publish-order note for draft commands. Route any new
+material blocker back through clarification. Stop here for `prd-only`.
 
 ### 4. Run The Issue Phase
 
-After the PRD is written, published, supplied as an existing durable PRD, or
-returned as a `draft-publish-commands` dry-run with a deterministic
-`source_prd_ref`, load `references/issue-phase.md`. In
-`draft-publish-commands` mode, the issue phase may only generate draft issue
-commands or bodies for inspection. Draft commands may show the intended future
-mapped labels, but they are not executable agent-ready issues until the draft
-`Source PRD` ref is replaced with the hosted PRD number or durable local PRD
-path.
+Load `references/issue-phase.md`, `references/issue-body-template.md`, and
+`references/vertical-slices.md`. Pass the same identity, delivery, source-ref,
+target, and domain-delta fields.
 
-Pass the same phase handoff fields defined in `references/issue-phase.md`, with
-`source_prd_ref` resolved or carried from the draft handoff and
-`domain_knowledge_delta` preserved from clarification or the PRD's
-`## Domain Knowledge Handoff` section.
+The issue phase owns vertical splitting, one `$plan-harder` pass per issue,
+mapped metadata, dependency/acyclicity validation, PRD parent/sub-issue links,
+the canonical `## Orchestrator Handoff`, publication or local writes, and final
+reporting. In draft-command runs, output remains non-executable until the draft
+PRD ref is replaced by a durable source.
 
-Require the issue phase to use the configured issue target, mapped issue
-metadata, PRD parent/sub-issue relationships, related issue links, `$plan-harder`
-in issue-hardening caller mode per issue, the verticality gate, graph
-validation, copied delivery mode, and the `## Orchestrator Handoff` shape from
-`references/issue-body-template.md`.
-`references/issue-phase.md` owns the detailed issue body, workspace,
-publication, draft-output, and placeholder rules.
-
-When `domain_knowledge_delta.status` is `required`, require the issue phase to
-make domain capture part of the final integration task. Prefer enriching an
-existing terminal integration task and add direct dependencies on every other
-terminal issue. Otherwise append a final integration and domain-knowledge
-closeout task that depends on every terminal issue, runs the feature-level
-proof, invokes `$project-memory` with the `domain-memory` slice, updates the
-named context/docs/ADR surfaces through its internal domain-modeling workflow
-to match the implemented behavior, and verifies the diff. Harden and validate
-that task like every other generated issue.
-
-If the issue phase discovers a product, domain, dependency, or
-acceptance-criteria blocker, pause issue writing and route the blocker back
-through `$grill-me-with-context`. Do not publish `needs-info` implementation
-issues from the normal `plan-feature` flow. Publish partial `needs-info` or
-`ready-for-human` issues only when the user explicitly asks for partial output
-instead of a fully agent-ready issue set. If the PRD still has open questions
-that affect scope, acceptance criteria, dependencies, validation, publication
-target, permissions, or cross-repo contracts, treat them as issue-splitting
-blockers and do not produce `ready-for-agent` issues.
+If a required domain delta exists, make its exact decisions, targets, evidence,
+and `implementation-closeout` operation part of the final integration issue and
+its Orchestrator Handoff. Reuse a suitable terminal integration issue or append
+one that depends directly on every terminal issue, then harden and validate it
+like every other issue.
 
 ### 5. Report Completion
 
-Every completion report, including `prd-only`, must include exactly one
-`Domain knowledge` outcome:
+Return the phase locations/counts and the effective target, planning identity,
+delivery values, verticality repairs/exceptions, graph validation, blockers,
+and applied tracker metadata. Include exactly one domain outcome:
 
-- `Domain knowledge: deferred to <final task ref> because Plan Feature assigns
-  durable capture to implementation closeout` when a required delta was placed
-  in the final generated task.
-- In `prd-only` when `domain_knowledge_delta.status` is `required`, use
-  `Domain knowledge: deferred to the final implementation task generated from
-  <source_prd_ref> because prd-only stops before issue creation` and preserve
-  the delta in the PRD's `## Domain Knowledge Handoff` section.
-- `Domain knowledge: no durable change` when planning introduced no new durable
-  project knowledge, including `prd-only` runs whose delta remains
-  `status: none`.
+- `Domain knowledge: deferred to <final task ref> because Plan Feature assigns durable capture to implementation closeout`;
+- for required `prd-only` deltas: `Domain knowledge: deferred to the final implementation task generated from <source_prd_ref> because prd-only stops before issue creation`; or
+- `Domain knowledge: no durable change`.
 
-Publishing a GitHub PRD or implementation issues does not by itself count as
-domain-knowledge capture. Plan Feature does not report `captured` because it
-does not modify durable domain surfaces during planning.
-
-Summarize:
-
-- selected mode,
-- setup status,
-- PRD location or draft publish command status,
-- number of issues written, published, or returned,
-- GitHub PRD parent/sub-issue relationship, when applicable,
-- orchestrator project/feature path and affected repos, when applicable,
-- issue types and labels/statuses applied,
-- completion instructions included,
-- effective target used, including whether configured tracker artifacts were
-  written/published or draft-only output was returned,
-- planning identity used, including feature slug and product/context/project
-  scope when applicable,
-- delivery mode used,
-- PR closeout used for pull-request delivery,
-- verticality gate result, including repairs, merges, splits, justified
-  enabling-slice exceptions, or withheld anomalies,
-- issue graph validation summary, including dependency and acyclicity checks,
-- planning blockers resolved or deferred,
-- the mandatory `Domain knowledge` outcome,
-- the final task that owns domain capture in issue-generating modes, or the PRD
-  handoff that preserves it in `prd-only`, when a knowledge delta is required,
-- any issue still blocked and why.
-
-## Guardrails
-
-- Do not implement the feature.
-- Do not write durable domain docs directly or indirectly during Plan Feature.
-  Always call `$grill-me-with-context` in `defer-to-caller` mode and carry its
-  delta into planning artifacts.
-- Do not invoke `$project-memory domain-memory` during planning. Put that exact
-  invocation and its carried decisions, evidence, and target surfaces in the
-  final implementation/integration task.
-- Do not let durable terms, rules, or accepted decisions stop only in the PRD,
-  ordinary implementation issues, or chat. Put the exact delta and target
-  surfaces in the final integration task, or in the PRD handoff until issue
-  generation occurs.
-- Do not create a docs-only domain-capture issue. The final owner must also run
-  the integrated feature proof and verify that durable docs describe the
-  behavior that actually landed.
-- Do not create PRDs or issues in locations not configured by
-  `project-memory/agents/issue-tracker.md`.
-- Do not keep repo-local `.scratch/` or `project-memory/features/` copies for
-  hosted tracker runs unless the user explicitly asked for a local
-  mirror or the effective target is a local dry-run override.
-- Do not treat `needs-info` issues as agent-ready output; they are waiting for
-  human/reporter input and must be re-triaged before implementation.
-- If required tracker setup cannot be completed, stop with the current state
-  and next question instead of writing tracker artifacts.
-- If a planning blocker remains unresolved, withhold agent-ready artifacts and
-  return the blocker. Only an explicit request for partial non-agent-ready
-  output permits a `needs-info` or `ready-for-human` artifact; keep its blocker
-  visible and do not describe it as executable.
+Plan Feature never reports domain knowledge as captured.
 
 ## References
 
-- `references/prd-phase.md`: internal PRD drafting, writing, publishing, path
-  sanitization, and `source_prd_ref` rules.
-- `references/issue-phase.md`: internal issue splitting, hardening, graph
-  validation, publishing, and completion rules.
+- `references/prd-phase.md`: PRD handoff, drafting, publication, sanitization,
+  and `source_prd_ref` rules.
+- `references/issue-phase.md`: issue splitting, hardening, graph validation,
+  publication, and completion.
 - `references/prd-template.md`: default PRD shape.
-- `references/issue-body-template.md`: generated implementation issue body
-  template.
-- `references/vertical-slices.md`: issue splitting rules.
-- `references/full-flow-dry-run.md`: validation fixture for the
-  `plan-feature` -> PRD phase -> issue phase -> `$codex-orchestrator`
-  planning and orchestration handoff.
+- `references/issue-body-template.md`: generated issue and Orchestrator
+  Handoff shape.
+- `references/vertical-slices.md`: slicing, verticality, and readiness gates.
+- `references/full-flow-dry-run.md`: no-mutation forward fixture.

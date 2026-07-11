@@ -33,11 +33,45 @@ class OrchestratorContractTests(unittest.TestCase):
         skill = self.read("SKILL.md")
         ledger = self.read("references/ledger.md")
 
-        self.assertIn(
-            "GitStack companion skills are the primary Git/GitHub route",
-            skill,
-        )
+        self.assertIn("Within GitStack, use the official GitHub\nconnector first", skill)
+        self.assertIn("GitHub workflow skill", ledger)
+        self.assertIn("GitHub primary transport: connector", ledger)
+        self.assertNotIn("primary=standalone", ledger)
+        self.assertNotIn("github-plugin", ledger)
         self.assertIn("authority-reused=<authority", ledger)
+
+    def test_worker_capabilities_cannot_be_bypassed_by_allowed_surfaces(self) -> None:
+        worker = self.read("references/worker.md")
+
+        inspect_mode = next(
+            line for line in worker.splitlines() if line.startswith("- `inspect`:")
+        )
+        implement_mode = next(
+            line for line in worker.splitlines() if line.startswith("- `implement`:")
+        )
+        self.assertIn("read-only", inspect_mode)
+        self.assertIn("never permits", worker)
+        self.assertIn("cannot grant another capability mode", worker)
+        self.assertNotIn("unless explicitly listed in allowed surfaces", inspect_mode)
+        self.assertNotIn("unless explicitly listed in allowed surfaces", implement_mode)
+
+    def test_gate_selection_includes_follow_up_risk_and_access(self) -> None:
+        gates = self.read("references/gates.md")
+        universal = gates.split("## Gate Lenses", 1)[0]
+
+        for gate in ("`follow-up`", "`risk-follow-up`", "`credential-and-access`"):
+            self.assertIn(gate, universal)
+
+    def test_domain_closeout_survives_issue_to_worker_handoff(self) -> None:
+        issue_template = (
+            ROOT / "skills/plan-feature/references/issue-body-template.md"
+        ).read_text(encoding="utf-8")
+        delivery = self.read("references/prd-backed-delivery.md")
+        worker = self.read("references/worker.md")
+
+        for text in (issue_template, delivery, worker):
+            self.assertIn("Domain closeout", text)
+            self.assertIn("implementation-closeout", text)
 
     def test_merge_is_root_owned_and_explicit(self) -> None:
         worker = self.read("references/worker.md")
@@ -74,7 +108,7 @@ class OrchestratorContractTests(unittest.TestCase):
             "## PR Closeout Resolution Matrix",
         )
 
-        self.assertIn("default\n`pr_closeout=merge-ready`", skill)
+        self.assertIn("Pull-request delivery defaults to\n`merge-ready`", skill)
         self.assertIn(
             "`publication_authority=prd-backed-pull-request` satisfies authorization",
             gates,
@@ -108,7 +142,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertEqual(structured_draft_only[2], "`draft-only`")
         self.assertIn("Preserve the structured decision", structured_draft_only[4])
 
-        no_mutation = self.row_containing(rows, "`draft-only output`")
+        no_mutation = self.row_containing(rows, "`draft-output`")
         self.assertEqual(no_mutation[1], "`none` for the planning run")
         self.assertIn("`merge-ready`", no_mutation[2])
         self.assertIn("without persisting", no_mutation[4])
@@ -185,11 +219,11 @@ class OrchestratorContractTests(unittest.TestCase):
                 encoding="utf-8"
             ),
         )
-        self.assertIn(
-            "preserving an existing structured PRD `PR closeout: draft-only`\n"
-            "  decision",
-            (ROOT / "skills/plan-feature/SKILL.md").read_text(encoding="utf-8"),
+        plan_skill = (ROOT / "skills/plan-feature/SKILL.md").read_text(
+            encoding="utf-8"
         )
+        self.assertIn("structured PRD value", plan_skill)
+        self.assertIn("`draft-output` do not select it", plan_skill)
 
     def test_codex_review_requests_are_idempotent_per_current_head(self) -> None:
         gates = self.read("references/gates.md")

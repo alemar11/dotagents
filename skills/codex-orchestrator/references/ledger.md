@@ -90,8 +90,9 @@ Use these ledger-owned values:
 - `merge_policy`: `owner-approval` by default or
   `automatic-after-gates` when the explicit merge instruction waives another
   checkpoint after gates pass.
-- `github_primary_surface`: `standalone`; plugin-first is not valid.
-- `github_fallback_reason`: `none`, `standalone-unavailable`,
+- `github_workflow_skill`: the selected `$gitstack:*` workflow skill.
+- `github_primary_transport`: `connector`; authenticated `gh` is fallback only.
+- `github_fallback_reason`: `none`, `connector-unavailable`,
   `capability-unsupported`, or `transport-failure`.
 
 Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
@@ -168,8 +169,9 @@ Workers edit ledger: false
 Root owns worker lifecycle: true
 Visible worker title format: <Project>: <short current task>
 Root capability snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh-auth=<available|unavailable|not-required>; codex-cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked-at=<time/evidence>
-GitHub primary surface: standalone
-GitHub fallback: used=<true|false>; reason=<none|standalone-unavailable|capability-unsupported|transport-failure>; primary-skill=<skill or none>; operation=<operation or none>; evidence=<failure or none>; plugin-operation=<operation or none>; authority-reused=<authority or none>; result=<result or none>
+GitHub workflow skill: <gitstack skill or none>
+GitHub primary transport: connector
+GitHub fallback: used=<true|false>; transport=<none|gh>; reason=<none|connector-unavailable|capability-unsupported|transport-failure>; operation=<operation or none>; evidence=<failure or none>; authority-reused=<authority or none>; result=<result or none>
 
 Worker fields follow `worker.md`. Delivery, publication, and issue-mutation
 authority follow `prd-backed-delivery.md`. Gates follow `gates.md`. Keep only
@@ -225,7 +227,7 @@ Use one compact block per active workstream:
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
 | Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr-closeout=<merge-ready|draft-only|not-applicable>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
 | Codex review evidence | request-head=<sha|none>; request-object=<id/url|none>; checker-status=<not-requested|acknowledged|pending|clean|findings|stale|error>; result-head=<sha|none>; result-kind=<formal-review|provider-comment|clean-reaction|none>; result-object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
-| GitHub routing | primary=standalone; primary-skill=<skill>; operation=<operation>; fallback=<unused|github-plugin>; fallback-reason=<none|standalone-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
+| GitHub routing | workflow-skill=<gitstack skill>; primary-transport=connector; operation=<operation>; fallback=<unused|gh>; fallback-reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
@@ -443,7 +445,8 @@ reconciliation after the last source mutation and verify these invariants:
 - no closed source is described as open or pending in a current-state field;
 - no merged PR is described as draft, open, or merge-ready-only;
 - no archived, integrated, abandoned, or handed-off worker remains active;
-- every fallback records its primary standalone attempt and authority reuse;
+- every fallback records its GitStack workflow, primary connector attempt,
+  authenticated `gh` fallback, and authority reuse;
 - merge proof exists only when explicit merge authority exists;
 - the current gate matrix, workstream rows, bucket membership, wave report,
   root status, and final note agree.

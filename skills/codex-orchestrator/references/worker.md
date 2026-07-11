@@ -27,8 +27,8 @@ Session fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces available for the current orchestrator session. `cli-subagent` is authorized by invoking `$codex-orchestrator` unless the owner disables delegation. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner consented to that surface. |
-| `actual_workstream_surface` | `root-thread`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-thread` owner-facing as `root thread (no-delegation)`. Do not present hidden subagents as visible App threads. |
+| `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces available for the current session. `cli-subagent` is the compatibility ledger value for an internal Codex subagent exposed through the active App/CLI/IDE runtime and is authorized by invoking `$codex-orchestrator` unless the owner disables delegation. `codex-app-thread` is a separately created top-level App task and requires owner consent. |
+| `actual_workstream_surface` | `root-thread`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-thread` owner-facing as `root thread (no-delegation)`. Do not present internal subagents as separately created App tasks. |
 | `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `review-ready`, `ci-rerun-fix`, `release` | Capability flags; list every allowed action explicitly. `review-ready` also requires exact root-listed sub-actions. Merge and source closeout remain root-owned. |
 
 Worker report fields:
@@ -53,6 +53,22 @@ worktree owned by a visible App thread whenever the root creates or allocates a
 new dedicated checkout. Record the App thread id with the checkout. This
 binding does not apply in CLI-only sessions or to an existing owner-supplied
 checkout.
+
+## Runtime Tool Mapping
+
+Search the current tool registry before dispatch or lifecycle operations; tool
+names are runtime-dependent. In the current surface, internal subagent
+operations map to `spawn_agent`, `list_agents`, `send_message`,
+`followup_task`, `interrupt_agent`, and `wait_agent`. Separately created App
+tasks map to `list_projects`, `create_thread`, `list_threads`, `read_thread`,
+`send_message_to_thread`, title/archive/pin, fork, and handoff/status tools.
+
+Do not claim a resume or close operation when the runtime exposes only
+follow-up, interrupt, or archive. Read current state first, use the narrowest
+available lifecycle operation, and record the actual tool and result. For App
+worktree creation, starting state may be the project default, an existing named
+branch, or the current working tree when supported; a branch start argument
+selects an existing ref and does not name a new branch.
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
@@ -125,7 +141,7 @@ and `actual_workstream_surface` to `codex-app-thread`. Do not spawn a
 `cli-subagent` for a request that says `thread` unless the owner explicitly
 authorizes that fallback after the missing or changed surface is stated.
 
-Use `cli-subagent` for hidden CLI subagent workers selected by the root after
+Use `cli-subagent` for internal Codex subagents selected by the root after
 `$codex-orchestrator` is invoked, unless the owner says `root only`,
 `no delegation`, `no subagents`, or equivalent. Owner wording such as
 `subagent`, `/agent`, `CLI worker`, or similar non-thread worker language
@@ -313,7 +329,7 @@ assignment they receive.
 For `pull-request`, the root also passes `pr_closeout`. Default it to
 `merge-ready`; use `draft-only` only from an explicit current-user instruction
 about the PR lifecycle or structured PRD field. `Draft PR`, `open a draft PR`,
-`do not merge`, and `draft-only output` do not select draft-only. A draft-only worker receives no `review-ready`
+`do not merge`, and `draft-output` do not select draft-only. A draft-only worker receives no `review-ready`
 authorization. If the restriction is later removed, the root may assign the
 ready-for-review sequence from the existing draft PR.
 
@@ -499,10 +515,11 @@ review-ready` plus the `mark-ready` and `request-codex-review` sub-actions. If
 it may only open a PR from an already-pushed branch, record `pr` only.
 
 - `inspect`: read-only investigation, issue/PR/CI inspection, repo scan, or
-  design review. No file edits unless explicitly listed in allowed surfaces.
+  design review. It never permits file edits, staging, publication, or external
+  mutation; allowed paths and surfaces only bound where inspection may occur.
 - `implement`: local code/docs changes plus focused validation, but no staging,
-  commit, push, PR, merge, release, or external mutation unless explicitly
-  listed in allowed surfaces.
+  commit, push, PR, merge, release, or external mutation. Allowed paths and
+  surfaces bound the edits but cannot grant another capability mode.
 - `commit`: may stage and create local commits for the assigned paths in the
   exact repository and branch/worktree named by the root. It assumes edits are
   separately allowed by `implement` or by explicit assignment text. It does not
@@ -579,7 +596,8 @@ Scope:
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Runtime delivery: <local-only|pull-request|direct-commit> (<ad-hoc default|feature-level inherited from Source PRD|issue-level override with authorization>)
 - Delivery source: <ad-hoc or legacy source, Source PRD path/issue, explicit owner request, or issue-level override reason>
-- Orchestrator handoff: <source PRD; feature slug; delivery mode; PR closeout when applicable; affected repos/product scope; scope; start rule; validation; closeout, or none for ad hoc work>
+- Orchestrator handoff: <source PRD; feature slug; delivery mode; PR closeout when applicable; affected repos/product scope; scope; start rule; validation; domain closeout; closeout, or none for ad hoc work>
+- Domain closeout: <not-applicable|implementation-closeout with exact decisions, target surfaces, evidence, and `$project-memory domain-memory` operation>
 - Publication authority: <none|explicit-owner-authorization|prd-backed-pull-request|blocked, with reason>
 - PR closeout: <merge-ready|draft-only|not-applicable, with explicit draft-only evidence when selected>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>

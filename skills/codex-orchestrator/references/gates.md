@@ -12,6 +12,10 @@ non-trivial code edits, `ci` for merge or release readiness,
 `codex-pr-review` before declaring pull-request delivery merge-ready,
 `merge-authorization` only before an actual merge,
 `owner-decision` when progress depends on approval or risk acceptance,
+`follow-up` before closing partially satisfied work, `risk-follow-up` when a
+worker or validation reports residual risk, `credential-and-access` when proof
+or execution depends on credentials, service access, hardware, or protected
+environments,
 `release` only for tag, package, deploy, or promotion work,
 `public-model-identifier` only when public names or API fields are changed or
 exposed, `cross-repo-integration` only when multiple repositories or packages
@@ -80,7 +84,7 @@ and `$autoreview` pass, unless the owner restricted the request to local-only,
 inspect-only, no-push, no-PR, or equivalent work. Default
 `pr_closeout=merge-ready`. Set `pr_closeout=draft-only` only from an explicit
 current-user instruction about the PR lifecycle or structured PRD field;
-PR-shape prose, `do not merge`, and `draft-only output` do not select it.
+PR-shape prose, `do not merge`, and `draft-output` do not select it.
 Draft-only makes downstream ready/review/merge-ready
 gates `not-applicable` until the user removes the restriction. Record both
 publication authority and PR closeout in the ledger.
@@ -370,8 +374,8 @@ declaring a workstream complete.
 ### Release Gate
 
 Before release-ready status, verify version, changelog or release notes, tags,
-package artifacts, migration notes, rollback path, and CI. Use the standalone
-GitHub Releases skill for GitHub-backed releases.
+package artifacts, migration notes, rollback path, and CI. Use
+`$gitstack:github-releases` for GitHub-backed releases.
 
 ### Public Model Identifier Gate
 

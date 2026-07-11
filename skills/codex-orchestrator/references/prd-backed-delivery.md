@@ -36,7 +36,11 @@ authority.
 For generated implementation issues, `## Orchestrator Handoff` is the
 canonical issue-level dispatch contract. It must restate the source PRD,
 feature slug, delivery mode, PR closeout when applicable, affected repos or
-product scope, scope, start rule, dependencies, validation, and closeout path. The handoff is not an
+product scope, scope, start rule, dependencies, validation, domain closeout,
+and closeout path. `Domain closeout` is `not-applicable` unless the issue has a
+`## Domain Knowledge Closeout` section; when it does, preserve the exact
+`implementation-closeout` operation, decisions, target surfaces, and evidence.
+The handoff is not an
 authorization grant: worker authorization, publication authority, and issue
 mutation authority are still resolved by the root orchestrator from the owner
 request, linked PRD, issue body, gate state, and current session authority.
@@ -53,7 +57,7 @@ proof before marking the feature graph complete.
 
 ## Authority Model
 
-Record these four authorities separately in the ledger:
+Record these five authority and lifecycle concerns separately in the ledger:
 
 - **Delivery authority**: where the branch, PR shape, dependency graph, and
   closeout path come from. For generated issues this is usually the linked
@@ -129,7 +133,7 @@ Treat legacy authority values as read aliases, not current output values:
 
 Rewrite either legacy value when its ledger or prompt projection is touched.
 Never infer `draft-only` from `draft PR`, `open a draft PR`, `one draft PR`,
-`do not merge automatically`, or Plan Feature's `draft-only output`
+`do not merge automatically`, or Plan Feature's `draft-output`
 no-mutation instruction.
 
 ## PR Closeout Resolution Matrix
@@ -141,7 +145,7 @@ Resolve intent before publication and record the evidence:
 | `pull-request`, `draft PR`, `one draft PR`, or `open a draft PR` | resolved pull-request authority | `merge-ready` | unchanged; default `none` | Open draft initially, then validate and continue through Codex review. |
 | `do not merge` or `do not merge automatically` | unchanged | `merge-ready` | `none` | Continue through Codex review and stop merge-ready. |
 | Current user says `keep the PR in draft`, `leave the PR in draft`, or `PR closeout: draft-only` | unchanged | `draft-only` | `none` unless separately authorized | Validate and publish the draft; do not mark ready or request Codex review. |
-| Plan Feature `draft-only output` or another no-mutation planning instruction | `none` for the planning run | `merge-ready` unless separately set by PR-lifecycle evidence | `none` | Return draft planning artifacts without persisting a draft-only PR closeout decision. |
+| Plan Feature `draft-output` or another no-mutation planning instruction | `none` for the planning run | `merge-ready` unless separately set by PR-lifecycle evidence | `none` | Return draft planning artifacts without persisting a draft-only PR closeout decision. |
 | Structured PRD field `PR closeout: draft-only` | `prd-backed-pull-request` | `draft-only` | unchanged; default `none` | Preserve the structured decision, validate, and publish the draft without Codex review. |
 | Legacy handoff missing `PR closeout` without contradictory evidence | `prd-backed-pull-request` | `merge-ready` | unchanged; default `none` | Rewrite the touched handoff projection and continue through Codex review. |
 | Existing draft PR without explicit draft-only evidence | unchanged | `merge-ready` | unchanged | Resume at ready-for-review after required local gates. |
@@ -182,7 +186,7 @@ required tests, integration checks, and `$autoreview` pass, unless the owner sai
 Set `pr_closeout=draft-only` only from an explicit current-user instruction such
 as `keep the PR in draft`, `leave the PR in draft`, or `PR closeout:
 draft-only`, or from a structured PRD `PR closeout: draft-only` field. PR-shape
-prose, merge restrictions, and `draft-only output` planning instructions do not
+prose, merge restrictions, and `draft-output` planning instructions do not
 select it. Draft-only blocks ready-for-review transition,
 Codex review, and merge-ready reporting until the current user changes the
 decision; validation and draft publication still complete normally.
@@ -228,7 +232,10 @@ Before scheduling or publishing PRD-backed work:
 2. For generated issues, read `## Orchestrator Handoff` and verify it contains
    source PRD, feature slug, delivery mode, PR closeout when applicable,
    affected repos or product scope, scope, start rule, dependencies, validation,
-   and closeout. For a legacy pull-request handoff missing only PR closeout,
+   domain closeout, and closeout. Require `Domain closeout:
+   implementation-closeout` with exact decisions, targets, and evidence when
+   the issue contains `## Domain Knowledge Closeout`; otherwise require
+   `not-applicable`. For a legacy pull-request handoff missing only PR closeout,
    default it to `merge-ready` and rewrite the touched projection. If another
    required field is missing or the handoff contradicts the issue body, stop as
    `needs-owner` or route back through `$plan-feature` issue generation instead

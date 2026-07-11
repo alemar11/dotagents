@@ -493,6 +493,10 @@ metadata without duplicating the full PRD branch and PR details:
   `root-integrated`.
 - `Dependencies`: required. Use `None` or direct generated issue IDs with the
   dependency reason.
+- `Domain closeout`: required. Use `not-applicable` unless the issue owns
+  `## Domain Knowledge Closeout`; for that final owner, copy
+  `implementation-closeout` plus the exact decisions, target surfaces,
+  evidence, and `$project-memory domain-memory` operation.
 - `Closeout`: required. State the concrete completion path, such as
   `feature-pr-closes-issue`, `repo-pr-closes-issue`,
   `direct-commit-closes-issue`, or `local-done-move-after-proof`.

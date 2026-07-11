@@ -1,7 +1,7 @@
 interface:
   display_name: "Codex Orchestrator"
-  short_description: "Coordinate PRD-backed or queue-driven work with Goal mode, gates, workers, ledgers, Codex PR review, and authorized merge-ready closeout."
+  short_description: "Explicitly coordinate source graphs, workers, gates, ledgers, and merge-ready closeout."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $codex-orchestrator for explicit orchestration sessions: reconcile sources, set a Codex goal when Goal mode is available, route planning through $plan-feature when needed, use CLI subagents by default unless I say root only or no subagents, ask before creating bounded visible Codex App worker threads, bind newly created dedicated App worktrees to visible worker threads, maintain the ledger, apply gates, keep going until completion or a real gate/blocker, treat draft as the initial pull-request state unless I explicitly request draft-only, query GitStack review status for the exact head and reuse terminal or pending evidence instead of posting duplicate Codex review requests, and drive pull-request delivery through Codex review before merge-ready closeout without merging unless separately authorized."
+  default_prompt: "Use $codex-orchestrator only for explicit orchestration. Claim and reconcile the ledger, establish Goal mode or its fallback, route sources, dispatch bounded workers with exact capabilities, apply root-owned gates, and continue until completion or a real blocker. Pull-request delivery defaults to merge-ready with one verified Codex review per head; never merge without separate authority."
 policy:
   allow_implicit_invocation: false

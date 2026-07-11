@@ -1,296 +1,182 @@
 ---
 name: project-memory
-description: Create and maintain durable project memory for tracker, delivery, context, decisions, and localization.
+description: Maintain tracker routing, domain language, ADRs, context, decisions, and localization memory.
 ---
 
 # Project Memory
 
-## Goal
+## Purpose
 
-Provide the public entry point for creating and maintaining the repo memory
-that other skills consume:
+Use `$project-memory` as the single public entry point for durable repository
+memory:
 
-- `AGENTS.md` for lean operating pointers.
-- `project-memory/agents/issue-tracker.md` for PRD and issue routing.
-- `project-memory/agents/triage-labels.md` for issue type and state mappings.
-- `project-memory/agents/domain.md` for context, translation, and ADR layout.
-- `CONTEXT.md` and optional `project-memory/adr/` for domain memory.
-- `TRANSLATION.md` when localization support or translation rules are real.
+- lean project-memory pointers in `AGENTS.md`;
+- tracker and delivery routing in `project-memory/agents/issue-tracker.md`;
+- issue type/state mappings in `project-memory/agents/triage-labels.md`;
+- domain layout in `project-memory/agents/domain.md`;
+- `CONTEXT.md`, domain docs, and ADRs under `project-memory/adr/`;
+- optional `TRANSLATION.md` when localization rules are real.
 
-Use this skill both for initial setup and for later reconciliation after
-implementation, accepted decisions, tracker changes, or localization changes.
-Configure or update only the memory surfaces needed for the requested workflow.
-An explicitly requested full first-time setup may create all applicable
-surfaces, but tracker routing does not require domain or localization work, and
-domain work does not require tracker setup. Re-run only the affected slice when
-routing, mappings, domain knowledge, localization policy, or `AGENTS.md`
-pointers change.
+Use the smallest requested slice. Tracker routing does not require domain or
+localization work, and domain updates do not require tracker setup.
 
-`$project-memory` is the single public invocation for durable memory changes.
-For the `domain-memory` slice, load and follow
-`references/domain-modeling.md` as the internal semantic workflow for
-`CONTEXT.md`, relevant domain docs, and ADR updates. Composed callers such as
-`$grill-me-with-context` invoke this slice instead of a separate modeling skill.
+## Operations And Shape
 
-## Boundaries
+| Slice | Owns |
+| --- | --- |
+| `tracker-routing` | Tracker backend, delivery mode, issue-type mapping, and triage-state mapping. |
+| `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
+| `translation-memory` | Localization memory only. |
+| `agents-pointers` | Missing or stale project-memory pointers only. |
+| `full-setup` | All applicable slices, only when explicitly requested. |
 
-- Always use `AGENTS.md` for setup pointers when an agent-instruction file is
-  needed.
-- Keep `AGENTS.md` pointer-first: it is an operating index, not the durable
-  home for project knowledge. Operating rules stay there; domain context,
-  tracker detail, planning history, localization rules, and accepted decisions
-  move to project memory.
-- Load and follow `references/domain-modeling.md` before creating or updating
-  `CONTEXT.md`, relevant domain docs, or ADRs. Reading
-  `project-memory/agents/domain.md` alone does not satisfy this requirement.
-- Seed `CONTEXT.md`, `TRANSLATION.md`, or ADRs only from strong repo evidence,
-  final session summaries, committed behavior, or explicit user acceptance.
-- Do not use a PR, issue, PRD, tracker comment, or session summary as the sole
-  durable citation in `CONTEXT.md`. Tracker and session artifacts may identify
-  accepted knowledge, but capture that knowledge in a repo-owned document, ADR,
-  source file, schema, or test and cite the durable surface instead.
+For `domain-memory`, use an explicit operation from
+`references/domain-modeling.md`: `setup-bootstrap`, `inline-update`,
+`implementation-closeout`, or `periodic-review`.
+
+Execution context is orthogonal to the slice and operation:
+
+- `fresh-setup`: selected files are missing;
+- `existing-project-bootstrap`: reconcile accepted repo or recent same-repo
+  session evidence;
+- `orchestrator-workspace`: configure only root coordination memory and never
+  create project/feature artifacts during setup;
+- current-run no-mutation override: review/propose without persistent writes.
+
+## Non-Negotiable Boundaries
+
+- Use `AGENTS.md` for operating pointers only. Domain context, tracker detail,
+  planning history, localization rules, and accepted decisions live in their
+  dedicated memory surfaces.
+- Load `references/domain-modeling.md` before creating, updating, reviewing, or
+  reconciling `CONTEXT.md`, domain docs, or ADRs. Reading
+  `project-memory/agents/domain.md` is not equivalent.
+- Seed durable memory only from strong repo evidence, committed behavior,
+  accepted tracker decisions, final session evidence, or explicit user
+  acceptance. Exclude tentative/rejected ideas, secrets, raw logs, and weak
+  inferences.
 - Create `TRANSLATION.md` only when localization support or durable translation
-  rules are clear from evidence or confirmed by the user.
-- Do not record tentative proposals, rejected ideas, secrets, raw logs, broad
-  doctrine, or weak session inferences.
-- Do not create empty `project-memory/adr/` directories just to show intent.
-- In orchestrator workspace mode, configure only root setup files. Do not create
-  `projects/<project>/`, feature PRDs, or issue files during setup.
-- Treat an explicit user request to set up, configure, initialize, update, or
-  refresh project memory as write authority for the requested slice. A
-  ready-for-execution implementation task that explicitly requires
-  `$project-memory domain-memory` and names its durable decisions, evidence, and
-  target surfaces is also write authority for that closeout. An explicitly
-  invoked composed workflow whose contract selects `domain-memory` with
-  `operation: inline-update`, such as direct `$grill-me-with-context`, carries
-  the same write authority unless the user requested no documentation writes or
-  deferred capture. Show the intended files and meaningful values, but do not
-  ask for redundant confirmation.
-- A view, inspect, review-only, recommendation, dry-run, or indirect suggestion
-  is not write authority. In those cases, show the proposal and wait for
-  confirmation before writing.
-- Ask only when the target or a behavior-affecting value is materially
-  ambiguous and repo evidence plus documented defaults do not resolve it.
-  Never require choices for unrelated setup slices.
+  rules are evidenced or confirmed. Do not create empty ADR directories.
+- Explicit setup/configure/initialize/update/refresh instructions authorize
+  only the requested slice. A ready implementation-closeout task authorizes
+  only its named decisions, evidence, and target surfaces.
+- An explicitly invoked composed workflow may authorize `inline-update` only
+  when its caller has durable domain-memory write authority. Tracker mutation
+  authority alone is insufficient.
+- Inspect-only, review-only, proposal, dry-run, or indirect suggestions are not
+  write authority. Return the proposed change instead.
+- Preserve unrelated custom prose, mappings, comments, overrides, domain docs,
+  ADRs, and localization content.
+- Ask only when the target or behavior-affecting value is materially ambiguous
+  after repo evidence and documented defaults.
 
-## Structured Values
+## Structured Configuration
 
-Use human-first Markdown with typed configuration tables for behavior-affecting
-settings. `$project-memory` is the normal editor for these tables: read current
-values, resolve requested changes from repo evidence and documented defaults,
-ask only about materially ambiguous values, preserve custom prose, normalize
-known keys, and report unknown keys instead of silently deleting them.
+Behavior-affecting setup uses human-first Markdown tables with
+`lower_snake_case` keys and `lower-kebab-case` values:
 
-Use `lower_snake_case` keys and `lower-kebab-case` values for setup-owned
-structured fields. Treat older uppercase kebab-case values as legacy aliases
-when reading existing artifacts; rewrite touched values to lower-kebab-case.
+| Key | Values | Owner |
+| --- | --- | --- |
+| `tracker_backend` | `github`, `local` | `issue-tracker.md` |
+| `delivery_mode` | `pull-request`, `direct-commit` | `issue-tracker.md`, PRDs, generated issues |
 
-| Key | Type | Allowed values | Meaning | Owner |
-| --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `github`, `local` | Where durable PRDs and implementation issues are written. | `issue-tracker.md` |
-| `delivery_mode` | enum | `pull-request`, `direct-commit` | How implementation work is published after validation. | `issue-tracker.md`, PRDs, and generated issues |
+Treat uppercase kebab values as read aliases and normalize touched values.
+Do not add durable keys for workspace shape, setup flow, GitHub repo,
+coordination repo, workers, publication/issue-mutation authority, scheduled
+checks, or current-run no-mutation intent. Use prose, planning artifacts, or
+the orchestrator ledger for those concerns.
 
-Do not add durable setup keys for workspace shape, setup flow, GitHub repo,
-coordination repo, worker surfaces, worker counts, publication authority, issue
-mutation authority, scheduled checks, or dry-run/no-mutation intent. Record
-real repo targets, path conventions, and cross-repo links in prose, PRDs,
-generated issues, or the orchestrator ledger as appropriate.
+`references/setup-workflow.md` owns the settings editor, legacy-key migration,
+table normalization, draft checklist, pointer block, and completion report.
+When touching `issue-tracker.md`, require `tracker_backend` and `delivery_mode`,
+preserve useful prose, and remove runtime-only/legacy table rows unless their
+meaning is deliberately retained as prose.
 
-Legacy cleanup:
+## Reference Loading Matrix
 
-- Map old tracker and delivery fields through `references/tracker-publishing.md`
-  before acting.
-- Remove current-run or runtime-only fields from any `issue-tracker.md` file you
-  touch; `references/setup-workflow.md` owns the exact write-normalization rule.
+Load only the selected branch:
 
-When touching `project-memory/agents/issue-tracker.md`, normalize the setup
-header:
+| Work | Required references |
+| --- | --- |
+| Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
+| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only for existing-project bootstrap. |
+| Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
+| Translation | `translation.md`. |
+| Pointer/settings work | `setup-workflow.md`. |
 
-- use `lower_snake_case` keys;
-- wrap structured values in backticks;
-- keep behavior-affecting fields in a typed configuration table before prose;
-- require `tracker_backend` and `delivery_mode`;
-- remove legacy durable rows such as `tracker_mode`, `tracker_writes`,
-  `setup_mode`, `github_repo`, `coordination_repo`, `project_label_format`, and
-  path-pattern keys from the configuration table; preserve real custom targets
-  or path conventions in prose when they are still needed;
-- preserve unrelated custom prose, labels, delivery rules, and dry-run notes.
-
-Detailed meanings and generated-file shapes live in the references listed
-below.
+Do not load domain, localization, or session-history evidence for tracker-only
+work. This operation-specific loading rule is part of the token contract.
 
 ## Workflow
 
-### 1. Choose Operation And Slice
+### 1. Resolve Slice, Operation, And Write Authority
 
-- Select the smallest slice needed:
-  - `tracker-routing`: issue tracker, delivery mode, issue-type mapping, and
-    triage-state mapping;
-  - `domain-memory`: domain layout, context seed or reconciliation, relevant
-    domain-doc updates, and accepted ADR routing or capture;
-  - `translation-memory`: localization memory only;
-  - `agents-pointers`: missing or stale project-memory pointers only;
-  - `full-setup`: all applicable slices, only when explicitly requested.
-- Use `fresh-setup` when files for the selected slice are missing. For a
-  `domain-memory` or explicit `full-setup` slice in a non-empty repo, also check
-  whether evidence supports an initial `CONTEXT.md` seed.
-- Use `existing-project-bootstrap` when the selected slice reconciles existing
-  docs, partial project memory, accepted knowledge, recent same-repo session
-  history, or ADR candidates.
-- Use `implementation-closeout` for a `domain-memory` slice carried by a final
-  implementation or integration task. Reconcile only the named decisions and
-  target surfaces against behavior that actually landed, using current source,
-  tests, validation, and accepted tracker decisions as evidence. Do not rerun
-  unrelated setup or mine session history by default.
-- Use `inline-update` when a composed workflow such as
-  `$grill-me-with-context` captures accepted durable decisions during the
-  current interaction.
-- Use `periodic-review` for automation or batch context review; default to a
-  report or proposed patch when acceptance is unclear.
-- Use `orchestrator-workspace` only for a parent coordination workspace that
-  plans across independent repos. Do not treat it as a monorepo, and do not
-  require a global PRD when linked partial PRDs describe the workspace feature.
-- For temp, rehearsal, validation, or dry-run work, use a current-run
-  no-mutation override unless the user explicitly authorizes tracker writes. Do
-  not persist no-mutation intent as a durable issue-tracker config row.
+Select the smallest slice and execution context above. For
+`implementation-closeout`, carry only the named decisions, evidence, targets,
+and integrated feature proof. For temporary/rehearsal/validation work, use a
+current-run no-mutation override rather than persisting it as configuration.
 
-### 2. Inspect Evidence
+### 2. Inspect Focused Evidence
 
-Read only the evidence needed for the selected slice:
+- tracker: current setup, remotes/config, templates, tracker docs, and relevant
+  local/workspace conventions;
+- domain: current pointers, README/docs/manifests, relevant source/tests/schema,
+  context files, domain layout, and ADRs;
+- translation: translation memory, locale catalogs/config, copy guidance, and
+  market requirements;
+- pointers: `AGENTS.md` and the files it should index.
 
-- `tracker-routing`: existing tracker setup, `git remote -v`, `.git/config`,
-  issue templates, tracker docs, `.scratch/`, and workspace `projects/` signals;
-- `domain-memory`: `AGENTS.md`, README/docs/manifests, relevant source/tests or
-  schemas, existing context files, domain setup, and ADRs;
-- `translation-memory`: existing translation memory plus locale catalogs,
-  i18n/l10n config, product copy guidance, and target-market requirements;
-- `agents-pointers`: `AGENTS.md` and the project-memory files it should index.
+For existing-project domain bootstrap, use `session-history.md` only when
+recent same-repo evidence is strong enough to be durable.
 
-Do not scan domain, localization, or session-history evidence for a
-tracker-only edit.
+When `AGENTS.md` mixes concerns, keep operating rules there and route project
+purpose/vocabulary to `CONTEXT.md`, localization to `TRANSLATION.md`, tracker
+and layout settings to `project-memory/agents/*`, and accepted load-bearing
+decisions to ADRs.
 
-When `AGENTS.md` already contains setup or project context, classify content
-before writing:
+### 3. Resolve Settings Or Delta
 
-- keep agent operating rules in `AGENTS.md`;
-- move project purpose, vocabulary, boundaries, and open questions to
-  `CONTEXT.md`;
-- move localization policy to `TRANSLATION.md`;
-- move tracker, triage, delivery, and domain layout to
-  `project-memory/agents/*`;
-- move accepted load-bearing decisions to ADRs;
-- preserve or ask about stale, conflicting, or weakly evidenced content.
+For setup/review, summarize only the selected slice and use `Unknown` for
+ambiguous values. Resolve only its behavior-affecting settings. For
+implementation closeout or inline update, summarize the carried decisions,
+evidence, named targets, and write authority instead of unrelated setup.
 
-For an `existing-project-bootstrap` domain-memory slice, read
-`references/session-history.md` and use recent session evidence only when it is
-strong enough to be durable. Do not load session history for tracker-only,
-translation-only, or pointer-only setup.
+### 4. Draft And Show The Change
 
-### 3. Review Or Confirm Settings
+Before writing, show intended files and meaningful before/after values. Follow
+the loading matrix and existing local formats. In custom tracker workflows,
+preserve the described conventions while keeping the structured table limited
+to `tracker_backend` and `delivery_mode`.
 
-If relevant memory files already exist, or the user asks to
-show/review/change settings, summarize the selected slice before proposing
-edits. Include only known values; use `Unknown` when absent or ambiguous.
-Summarize all slices only for an explicit full review. For
-`implementation-closeout`, summarize the carried decisions, evidence, and named
-targets instead of unrelated setup settings.
+### 5. Write And Verify Authorized Memory
 
-Resolve only decisions in the selected setup slice:
+Update only authorized files. Keep `AGENTS.md` pointer-first. Use
+`domain-modeling.md` for domain content and reconcile implementation-closeout
+decisions against behavior that actually landed; omit provisional planning
+language and verify the docs diff alongside feature proof.
 
-- issue tracker backend;
-- delivery mode;
-- issue type and triage state mappings;
-- domain-memory layout and context seed mode;
-- localization memory state;
-- `AGENTS.md` pointer creation or minimization.
+In orchestrator-workspace setup, do not create project or feature folders. Do
+not create orchestration runtime config files. Before completing a touched
+`issue-tracker.md`, search for `tracker_mode`, `tracker_writes`,
+`effective_target`, `local_artifact_writes`, and
+`external_tracker_mutation`; remove them or explain why retained prose remains.
 
-Use `references/setup-workflow.md` for the settings editor protocol, option
-sets, write-authority rules, draft checklist, `AGENTS.md` block, and completion
-report.
+### 6. Report
 
-### 4. Draft Project Memory
-
-Before writing, show the intended files and the relevant before/after summary.
-Load only references needed by the selected slice:
-
-- tracker routing: `issue-tracker-github.md` or `issue-tracker-local.md`, plus
-  `tracker-publishing.md` and `triage-labels.md`;
-- domain memory: `domain.md`, `context-seed.md`, and `session-history.md` only
-  for an existing-project bootstrap, plus `domain-modeling.md` whenever the
-  slice may create, update, review, or reconcile domain memory;
-- translation memory: `translation.md`;
-- settings and pointers: `setup-workflow.md`.
-
-For custom tracker workflows, write `issue-tracker.md` from the user's described
-workflow instead of forcing a hosted-tracker template, but keep the durable
-configuration table focused on `tracker_backend` and `delivery_mode` when the
-workflow still reduces to local or GitHub artifacts.
-
-### 5. Write Authorized Project Memory
-
-After an explicit setup, configure, initialize, update, or refresh request, a
-separate affirmative confirmation, or an authorized `implementation-closeout`
-task, or an authorized `inline-update` from an explicitly invoked composed
-workflow:
-
-- Create or update only the authorized project-memory files.
-- Preserve unrelated custom prose, mappings, comments, overrides, docs, ADRs,
-  and `TRANSLATION.md` content.
-- Keep `AGENTS.md` concise and pointer-only for project memory.
-- Use `references/domain-modeling.md` for `CONTEXT.md`, relevant domain docs,
-  and ADR content. Load `references/documentation-shapes.md` only when the
-  project does not already have a stronger local format.
-- For `implementation-closeout`, use that internal workflow to reconcile the
-  carried decisions with implemented behavior before writing. Omit provisional
-  planning language that the implementation did not prove, update only the
-  named durable surfaces, and verify their diff alongside the feature-level
-  integration proof.
-- Use `references/translation.md` for `TRANSLATION.md`.
-- Optionally add a one-line `CONTEXT.md` pointer to neighboring
-  `TRANSLATION.md` only when localization affects audience, domain terms,
-  product naming, or user-facing copy. Do not require the pointer or create
-  broken links.
-- In orchestrator workspace mode, do not create project or feature folders.
-- Do not create extra orchestration setup files; session worker questions belong
-  in `$codex-orchestrator`, and runtime worker state belongs in the orchestrator
-  checkpoint and ledger.
-- Before reporting completion, grep any touched `issue-tracker.md` for legacy
-  keys: `tracker_mode`, `tracker_writes`, `effective_target`,
-  `local_artifact_writes`, and `external_tracker_mutation`. Remove them or
-  report why they must remain.
-
-### 6. Report Completion
-
-Report the operation, slice, files written, and only the settings or memory
-surfaces reviewed or changed. Include tracker, domain, localization,
-`AGENTS.md`, context/translation/ADR, and session-history details only when they
-were part of this run, plus the workflows that can now consume the setup.
-
-For `implementation-closeout`, also report the implementation task or source
-decision, evidence checked, durable decisions captured or rejected, target
-surfaces updated, and documentation-diff verification.
-
-If session history is unavailable or weak, say so plainly. Future
-`$project-memory domain-memory`, `$grill-me-with-context`, and planning
-workflows can keep filling project memory incrementally.
+Report the operation, slice, files changed, reviewed settings/surfaces, evidence,
+and consuming workflows. For implementation closeout, also report the source
+task/decision, durable decisions accepted or rejected, named targets updated,
+feature proof, and documentation-diff verification. Mention unavailable or weak
+session evidence plainly.
 
 ## Reference Responsibilities
 
-- `issue-tracker-*.md`: tracker-specific artifact locations, publication rules,
-  delivery defaults, runtime boundaries, title formats, and completion.
-- `tracker-publishing.md`: shared effective target, draft publish, temporary
-  body-file, and `source_prd_ref` contract.
-- `triage-labels.md`: canonical issue type and workflow-state mappings.
-- `domain.md`: context, translation, ADR layout, orchestrator boundaries, and
-  domain-memory consumption.
-- `domain-modeling.md`: internal semantic workflow for domain-memory setup,
-  inline updates, implementation closeout, and periodic review.
-- `documentation-shapes.md`: fallback `CONTEXT.md` and ADR shapes when the
-  project has no stronger local format.
-- `context-seed.md`: minimal initial `CONTEXT.md` evidence threshold and shape.
-- `translation.md`: optional `TRANSLATION.md` evidence threshold, location,
-  shape, and pointer rule.
-- `session-history.md`: same-repo session evidence lookup for existing-project
-  bootstrap.
-- `setup-workflow.md`: setup editor details, draft/write checklist,
-  `AGENTS.md` pointer block, and completion report fields.
+- `setup-workflow.md`: settings editor, normalization, pointers, and report.
+- `issue-tracker-*.md`, `tracker-publishing.md`, `triage-labels.md`: tracker,
+  artifact, type/state, source-ref, and completion contracts.
+- `domain.md`: domain-memory layout and ownership.
+- `domain-modeling.md`: domain setup, inline update, implementation closeout,
+  and periodic review semantics.
+- `documentation-shapes.md`: fallback context and ADR shapes.
+- `context-seed.md`, `session-history.md`: initial and session-backed bootstrap.
+- `translation.md`: optional localization memory.

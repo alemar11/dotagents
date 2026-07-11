@@ -63,11 +63,12 @@ the actual tracker issue types, labels, or markdown status values.
 - Before marking an issue `ready-for-agent`, load and run `$plan-harder` in
   issue-hardening mode on its caller surface and embed or post the resulting
   agent brief.
-- If the issue is underspecified, load and run `$grill-me-with-context` with
-  `capture_mode: inline` to resolve the smallest blocking question set before
-  writing an agent-ready brief. Its inline path uses
-  `$project-memory domain-memory` with `operation: inline-update` for accepted
-  durable decisions.
+- If the issue is underspecified, load and run `$grill-me-with-context` to
+  resolve the smallest blocking question set before writing an agent-ready
+  brief. Use `capture_mode: inline` only when the current request explicitly
+  authorizes durable domain-memory writes; otherwise use `defer-to-caller` and
+  return the proposed delta without editing domain docs. Tracker mutation
+  authority alone does not authorize domain-memory writes.
 - Do not run `$plan-harder` or post an agent brief for `needs-info`; preserve
   established facts and ask concrete questions instead.
 - Do not implement the issue.
@@ -182,10 +183,12 @@ If the issue cannot be classified confidently, ask one blocking question or
 leave a `needs-info` note with the smallest useful question set.
 
 If the issue is almost agent-ready but still under-specified, use
-`$grill-me-with-context` with `capture_mode: inline` to clarify the missing
-product/domain decisions. Let `$grill-me-with-context` and
-`$project-memory domain-memory` with `operation: inline-update` own any durable
-updates to `CONTEXT.md` or ADRs.
+`$grill-me-with-context` to clarify the missing product/domain decisions. Use
+`capture_mode: inline` and `$project-memory domain-memory` with `operation:
+inline-update` only when durable domain-memory writes are explicitly authorized.
+For inspect-only, review-only, proposal, dry-run, or tracker-only mutation
+requests, use `capture_mode: defer-to-caller`; keep the structured delta in the
+triage result and do not edit `CONTEXT.md`, domain docs, or ADRs.
 
 If blocker resolution still depends on the reporter or requester, stop at
 `needs-info`. Do not harden the issue with `$plan-harder`, do not post an agent

@@ -45,7 +45,7 @@ Publishing target:
 - Effective target for this run:
   <configured-tracker|local-dry-run|draft-publish-commands>.
 - No-mutation override:
-  <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-only>.
+  <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-output>.
 - Local mirror:
   <not-requested|requested>.
 - Source PRD ref:
