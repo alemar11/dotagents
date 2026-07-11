@@ -26,6 +26,8 @@ single-repo issues, `current repository`; for workspace issues, use
 
 - Delivery mode: [pull-request | direct-commit] ([feature-level, inherited from
   Source PRD] or [issue-level override with authorization reason])
+- PR closeout: [merge-ready | draft-only] (feature-level, inherited from Source
+  PRD; omit only for direct-commit)
 - Parallelization: [independent | depends-on <issue-id>[, <issue-id>] | blocks
   <issue-id>[, <issue-id>] | root-integrated]
 - Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
@@ -41,6 +43,8 @@ single-repo issues, `current repository`; for workspace issues, use
 - Feature slug: [authoritative lowercase feature slug]
 - Delivery mode: [same effective delivery mode and inheritance or override
   source as `## Delivery`]
+- PR closeout: [same effective PR closeout as `## Delivery`, or not-applicable
+  for direct-commit]
 - Affected repos or product scope: [repo slugs, workspace path, or current
   repository]
 - Scope:

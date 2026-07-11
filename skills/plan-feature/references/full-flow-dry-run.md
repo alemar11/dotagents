@@ -19,6 +19,7 @@ effective_target: draft-publish-commands
 no_mutation_override: dry-run
 feature_slug: account-settings-export
 delivery_mode: pull-request
+pr_closeout: merge-ready
 source_prd_ref: draft-prd:account-settings-export
 prd_body_fingerprint: sha256:7f4a9c21d003
 capture_mode: defer-to-caller

@@ -26,8 +26,8 @@ question set or route back through `$grill-me-with-context`.
   or `.scratch/` staging copies unless the tracker config, current-run override,
   or user explicitly asks for a local mirror.
 - Use structured values for multi-choice fields. Read tracker and type mappings
-  from project memory, and use the `delivery_mode` values documented in
-  `references/prd-template.md`.
+  from project memory, and use the `delivery_mode` and `pr_closeout` values
+  documented in `references/prd-template.md`.
 - For publication mechanics, effective targets, and stable `source_prd_ref`
   behavior in draft command runs, use `$project-memory`'s `references/tracker-publishing.md`.
 
@@ -58,6 +58,7 @@ Planning identity:
 - context_file: <selected CONTEXT.md, for monorepos/multi-context repos>
 - project_slug: <accepted orchestrator project slug, for orchestrator modes>
 - delivery_mode: <pull-request|direct-commit>
+- pr_closeout: <merge-ready|draft-only|not-applicable>
 
 Domain knowledge:
 - capture_mode: defer-to-caller
@@ -102,6 +103,7 @@ before writing:
 - `context_file`
 - `feature_slug`
 - `delivery_mode`
+- `pr_closeout`
 
 Use values passed by `plan-feature` when present. Otherwise derive them from
 project memory and repo evidence, asking only when multiple contexts could
@@ -115,6 +117,15 @@ Resolve the PRD `delivery_mode` before drafting:
   its own PR.
 - `direct-commit`: exception only when the maintainer explicitly authorizes a
   direct commit path for this feature.
+
+For `pull-request`, resolve `pr_closeout` separately:
+
+- `merge-ready`: default. Open the PR as draft initially, then validate, mark
+  it ready, request Codex review, address feedback, and stop merge-ready.
+- `draft-only`: use only when the current user explicitly asks to keep or leave
+  the PR in draft, or when preserving an existing structured PRD
+  `PR closeout: draft-only` decision. `Draft PR`, `open a draft PR`, and `do
+  not merge` do not select this value.
 
 If the repo shape makes the affected repo set ambiguous, ask before writing the
 PRD.
@@ -259,8 +270,9 @@ workspace path, context file, and explicitly out-of-scope sibling workspaces
 when relevant.
 
 Include a `## Delivery Mode` section in every PRD. For `pull-request`, record
-branch naming such as `feature/<feature-slug>`, the expected PR shape, and the
-validation required before implementation issues close. In multi-repo work,
+branch naming such as `feature/<feature-slug>`, `PR closeout`, the expected PR
+shape, and the validation required before implementation issues close. In
+multi-repo work,
 record the same branch name for each affected repo, expected repo PR slots or
 pre-implementation placeholders, and the cross-repo proof needed before issues
 close. Use `direct-commit` only when explicitly authorized and record the
@@ -268,12 +280,13 @@ authorization reason. Placeholders in the PRD are delivery expectations, not
 completion proof; `$codex-orchestrator` records real PR links or equivalent
 integration proof during closeout.
 
-Treat the PRD as the canonical source for delivery mode and branch/PR details.
+Treat the PRD as the canonical source for delivery mode, PR closeout, and
+branch/PR details.
 The issue phase owns issue splitting and validates the generated issue graph
-before publication. Generated issues copy only the effective `Delivery mode`
-label as feature-level metadata inherited from `Source PRD`, plus issue-level
-dependencies, parallelization, closeout, and any explicit issue-level exception
-or cross-repo closeout rule.
+before publication. Generated issues copy the effective `Delivery mode` and
+`PR closeout` labels as feature-level metadata inherited from `Source PRD`, plus
+issue-level dependencies, parallelization, closeout, and any explicit
+issue-level exception or cross-repo closeout rule.
 
 Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
 When GitHub issue types are available, create or update the PRD issue with that

@@ -12,6 +12,17 @@ Use these `delivery_mode` values in every PRD:
 - `direct-commit`: direct commit path, only with explicit maintainer
   authorization.
 
+For `pull-request`, use these `pr_closeout` values:
+
+- `merge-ready`: default. The PR opens as draft initially and progresses
+  through validation, ready-for-review transition, Codex review, and
+  merge-ready closeout without authorizing merge.
+- `draft-only`: terminal draft state, only when the current user explicitly
+  asks to keep or leave the PR in draft.
+
+Do not infer `draft-only` from prose such as `draft PR`, `open a draft PR`, or
+`do not merge automatically`.
+
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
@@ -70,16 +81,19 @@ What user or system problem this solves.
 
 - Delivery mode: `pull-request` by default, or `direct-commit` only with
   explicit authorization.
+- PR closeout: `merge-ready` by default for `pull-request`; use `draft-only`
+  only after an explicit current-user request or when preserving an existing
+  structured `PR closeout: draft-only` decision.
 - Branch naming: default to `feature/<feature-slug>`; for multi-repo work, use
   that same branch name in each affected repo unless repo policy differs.
-- PR shape: one draft PR for the feature in a single repo or monorepo; one draft
-  PR per affected repo in multi-repo work; no PR only for an authorized direct
-  commit.
+- PR shape: one PR opened as draft initially for the feature in a single repo
+  or monorepo; one PR per affected repo opened as draft initially in multi-repo
+  work; no PR only for an authorized direct commit.
 - Integration proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
 - Issue inheritance: generated issues link this PRD with `Source PRD`, copy the
-  effective `Delivery mode` label as feature-level scheduling metadata, and
-  carry issue-level ordering, dependencies, parallelization, closeout, and
+  effective `Delivery mode` and `PR closeout` labels as feature-level metadata,
+  and carry issue-level ordering, dependencies, parallelization, closeout, and
   exceptions. The issue phase validates the generated issue graph before
   publication.
 

@@ -86,8 +86,9 @@ issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
 - Carry accepted planning identity through every phase: selected context,
   product or project slug, workspace path when applicable, and authoritative
   feature slug.
-- Carry accepted delivery mode through every phase using structured values:
-  `pull-request` or `direct-commit`.
+- Carry accepted delivery mode and PR closeout through every phase using
+  structured values: `pull-request` or `direct-commit`, plus `merge-ready` or
+  `draft-only` when delivery is `pull-request`.
 - When calling `$grill-me-with-context`, always pass
   `capture_mode: defer-to-caller`. Planning may read project context but must
   not edit `CONTEXT.md`, project docs, ADRs, or other durable domain surfaces.
@@ -199,6 +200,12 @@ Resolve the planning identity before writing:
   one feature branch and PR. For true multi-repo work, every involved repo uses
   the same branch name and opens its own PR. Use `direct-commit` only when
   explicitly authorized.
+- `pr_closeout`: `merge-ready` by default for `pull-request`. Use `draft-only`
+  only when the current user explicitly asks to keep or leave the PR in draft,
+  or when preserving an existing structured PRD `PR closeout: draft-only`
+  decision. Wording such as `draft PR`, `open a draft PR`, or `do not merge`
+  describes an initial state or merge authority and does not select
+  `draft-only`.
 
 If a multi-context local Markdown repo has no accepted product/context or the
 feature slug is not product/workspace namespaced according to tracker
@@ -342,6 +349,7 @@ Summarize:
 - planning identity used, including feature slug and product/context/project
   scope when applicable,
 - delivery mode used,
+- PR closeout used for pull-request delivery,
 - verticality gate result, including repairs, merges, splits, justified
   enabling-slice exceptions, or withheld anomalies,
 - issue graph validation summary, including dependency and acyclicity checks,

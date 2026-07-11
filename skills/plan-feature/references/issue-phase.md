@@ -64,8 +64,8 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   bodies or commands only for explicit no-mutation overrides.
 - Use structured values for multi-choice issue body fields. This phase owns the
   `parallelization`, `closeout_mode`, and `integration_mode` values documented
-  below; `delivery_mode` comes from the PRD, and `issue_type` / `triage_state`
-  come from project memory mappings.
+  below; `delivery_mode` and `pr_closeout` come from the PRD, and `issue_type` /
+  `triage_state` come from project memory mappings.
 - Do not add worker authorization defaults, worker capability modes, or worker
   surface choices to PRDs, generated issues, issue files, hosted issue bodies,
   or draft publish commands. `$codex-orchestrator` resolves those per
@@ -123,11 +123,12 @@ Use these values in generated issue bodies:
 - `integration_mode`: `single-repo-pr`, `repo-pr`, `direct-commit`, or
   `omitted` records how issue output lands when it is not obvious from the PRD.
 
-`delivery_mode` is copied from the PRD. `issue_type` and `triage_state` are
-mapped through `project-memory/agents/triage-labels.md`. Lower-kebab-case
-values are canonical. Treat older uppercase kebab-case values as legacy aliases
-when reading existing artifacts. When updating an artifact that contains legacy
-aliases, rewrite touched structured values to lower-kebab-case.
+`delivery_mode` and `pr_closeout` are copied from the PRD. `issue_type` and
+`triage_state` are mapped through `project-memory/agents/triage-labels.md`.
+Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
+as legacy aliases when reading existing artifacts. When updating an artifact
+that contains legacy aliases, rewrite touched structured values to
+lower-kebab-case.
 
 ## Workflow
 
@@ -174,6 +175,10 @@ Resolve and carry the planning identity before splitting:
 - `delivery_mode`: inherit from the PRD `## Delivery Mode` section. If the PRD
   lacks it, infer `pull-request` when repo shape and affected repo set are
   unambiguous; otherwise stop and require the PRD delivery mode to be resolved.
+- `pr_closeout`: for `pull-request`, inherit the structured `PR closeout` value.
+  Default missing legacy values to `merge-ready`. Use `draft-only` only when the
+  PRD has the explicit structured value; prose such as `draft PR`, `open a draft
+  PR`, or `do not merge` is not a draft-only signal.
 - `source_prd_ref`: use the durable PRD issue number, local PRD path, or stable
   draft ref passed by the PRD phase or existing durable PRD source. In
   `draft-publish-commands` mode, keep the draft ref in returned bodies but
@@ -199,6 +204,8 @@ Before hardening, validate the generated issue graph from the proposed issue
 list:
 
 - `delivery_mode`: inherited from the PRD and copied in each issue.
+- `pr_closeout`: inherited from the PRD for `pull-request` and copied in each
+  issue.
 - ordered issue map with `<NN>` and short intent.
 - dependency graph plus `blocks` / `depends-on` intent.
 - dependency edge validity check: every `depends-on` / `blocks` reference must
@@ -472,6 +479,9 @@ metadata without duplicating the full PRD branch and PR details:
   not only this generated issue. For an exception, record the issue-level
   override and authorization reason, such as `direct-commit (issue-level
   override, authorized by <owner/date>)`.
+- `PR closeout`: required for `pull-request`. Copy `merge-ready` or `draft-only`
+  from the PRD as feature-level metadata. Default a missing legacy value to
+  `merge-ready`; do not infer `draft-only` from PR-shape prose.
 - `Parallelization`: required. Use `independent`,
   `depends-on <issue-id>[, <issue-id>]`, `blocks <issue-id>[, <issue-id>]`, or
   `root-integrated`.
@@ -506,6 +516,7 @@ For ordinary single-repo or monorepo `pull-request` issues, the
 ## Delivery
 
 - Delivery mode: pull-request (feature-level, inherited from Source PRD)
+- PR closeout: merge-ready (feature-level, inherited from Source PRD)
 - Parallelization: independent
 - Closeout: feature-pr-closes-issue
 ```
