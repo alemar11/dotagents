@@ -13,7 +13,9 @@ pipeline and its internal Product Requirements Document (PRD) and issue phases:
 `$project-memory` if needed -> `$grill-me-with-context` when scope needs
 clarification -> PRD phase -> issue phase with `$plan-harder` per generated
 issue -> final integration and domain-knowledge closeout task when issues are
-generated and durable knowledge changed.
+generated and durable knowledge changed. The later implementor executing that
+task invokes `$project-memory domain-memory`; Plan Feature only carries and
+assigns the deferred knowledge delta.
 
 Use this skill to turn rough feature intent into a written PRD and agent-ready
 vertical issues. In orchestrator workspaces, those issues may be cross-repo
@@ -102,8 +104,10 @@ issues, and use `issues-from-existing-prd` only when a durable PRD is supplied.
   append one that depends on every terminal implementation issue. If an
   existing terminal integration task is reused, make it depend on every other
   terminal issue. The final task must prove the integrated feature and must not
-  be a docs-only horizontal ticket. In `prd-only`, preserve a required delta in
-  the PRD handoff and do not generate an issue.
+  be a docs-only horizontal ticket. Require its implementor to invoke
+  `$project-memory` with the `domain-memory` slice, which loads
+  `$domain-modeling` before updating the named durable surfaces. In `prd-only`,
+  preserve a required delta in the PRD handoff and do not generate an issue.
 - Carry `source_prd_ref` from the PRD phase or existing durable PRD source into
   the issue phase. In `draft-publish-commands` runs, use the stable draft ref
   from `$project-memory` `references/tracker-publishing.md` until a
@@ -139,6 +143,11 @@ This skill may call:
   dry-run command mechanics. `plan-feature` supplies sanitized titles, bodies,
   metadata, target repo, and parent relationships; it must not embed generated
   Markdown bodies in ad hoc shell commands.
+
+Plan Feature does not call `$project-memory domain-memory`. It assigns that
+invocation to the final implementation/integration task so durable docs are
+reconciled against behavior that actually landed rather than provisional
+planning language.
 
 ## Workflow
 
@@ -300,9 +309,10 @@ make domain capture part of the final integration task. Prefer enriching an
 existing terminal integration task and add direct dependencies on every other
 terminal issue. Otherwise append a final integration and domain-knowledge
 closeout task that depends on every terminal issue, runs the feature-level
-proof, updates the named context/docs/ADR surfaces to match the implemented
-behavior, and verifies the diff. Harden and validate that task like every other
-generated issue.
+proof, invokes `$project-memory` with the `domain-memory` slice, updates the
+named context/docs/ADR surfaces through `$domain-modeling` to match the
+implemented behavior, and verifies the diff. Harden and validate that task like
+every other generated issue.
 
 If the issue phase discovers a product, domain, dependency, or
 acceptance-criteria blocker, pause issue writing and route the blocker back
@@ -365,6 +375,9 @@ Summarize:
 - Do not write durable domain docs directly or indirectly during Plan Feature.
   Always call `$grill-me-with-context` in `defer-to-caller` mode and carry its
   delta into planning artifacts.
+- Do not invoke `$project-memory domain-memory` during planning. Put that exact
+  invocation and its carried decisions, evidence, and target surfaces in the
+  final implementation/integration task.
 - Do not let durable terms, rules, or accepted decisions stop only in the PRD,
   ordinary implementation issues, or chat. Put the exact delta and target
   surfaces in the final integration task, or in the PRD handoff until issue

@@ -99,6 +99,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Domain Knowledge Handoff", fixture)
         self.assertIn("## Domain Knowledge Closeout", fixture)
         self.assertIn("last integration task", fixture)
+        self.assertIn("$project-memory domain-memory", fixture)
+        self.assertIn("loads `$domain-modeling`", fixture)
         self.assertIn("Replace every issue body line", fixture)
         self.assertIn("must not dispatch implementation workers", fixture)
         self.assertNotIn(LEGACY_WORKER_AUTH_KEY, fixture)
@@ -230,6 +232,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         grill_with_context = read("grill-me-with-context/SKILL.md")
         prd_phase = read("plan-feature/references/prd-phase.md")
         issue_phase = read("plan-feature/references/issue-phase.md")
+        issue_template = read("plan-feature/references/issue-body-template.md")
         fixture = read("plan-feature/references/full-flow-dry-run.md")
 
         self.assertIn("capture_mode: defer-to-caller", plan_feature)
@@ -241,7 +244,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("final integration and domain-knowledge closeout task", plan_feature)
         self.assertIn("docs-only horizontal ticket", plan_feature)
         self.assertIn("In issue-generating modes", plan_feature)
-        self.assertIn("In `prd-only`, preserve a required delta", plan_feature)
+        self.assertIn("In `prd-only`,\n  preserve a required delta", plan_feature)
+        self.assertIn("Plan Feature does not call `$project-memory domain-memory`", plan_feature)
 
         self.assertIn("## Capture Modes", grill_with_context)
         self.assertIn("`inline` is the default for direct invocation", grill_with_context)
@@ -270,12 +274,16 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("Normalize each dependency edge from prerequisite", issue_phase)
         self.assertIn("pre-closeout nodes with no\n  downstream consumers", issue_phase)
         self.assertIn("exclude it from the terminal prerequisites", issue_phase)
+        self.assertIn("explicit `$project-memory domain-memory` implementation step", issue_phase)
+        self.assertIn("editing the targets directly is not a", issue_template)
+        self.assertIn("`$domain-modeling` usage", issue_template)
 
         self.assertIn("performs no documentation", fixture)
         self.assertIn("last integration task", fixture)
         self.assertIn("placed in a docs-only task", fixture)
         self.assertIn("pre-closeout terminals are `02` and `03`", fixture)
         self.assertIn("do not\n   replace these generated dependency IDs", fixture)
+        self.assertIn("Plan Feature does not run that capture", fixture)
 
     def test_planning_entrypoints_have_unambiguous_output_contracts(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
@@ -298,12 +306,18 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
     def test_project_memory_triage_and_learn_keep_narrow_authority(self) -> None:
         project_memory = read("project-memory/SKILL.md")
+        domain_modeling = read("domain-modeling/SKILL.md")
         setup_workflow = read("project-memory/references/setup-workflow.md")
         triage = read("triage/SKILL.md")
         learn = read("learn/SKILL.md")
 
-        self.assertIn("Select the smallest setup slice needed", project_memory)
-        self.assertIn("write authority for the requested setup slice", project_memory)
+        self.assertIn("Select the smallest slice needed", project_memory)
+        self.assertIn("write authority for the requested slice", project_memory)
+        self.assertIn("normal public invocation for durable memory changes", project_memory)
+        self.assertIn("`implementation-closeout`", project_memory)
+        self.assertIn("ready-for-execution implementation task", project_memory)
+        self.assertIn("semantic engine for domain documentation", domain_modeling)
+        self.assertIn("`$project-memory domain-memory` is the normal public", domain_modeling)
         self.assertIn("Ask only when the target or a behavior-affecting value is materially", project_memory)
         self.assertIn("proceed without a second confirmation", setup_workflow)
         self.assertIn("## One-Issue Best-Effort Fallback", triage)

@@ -1,13 +1,14 @@
 ---
 name: project-memory
-description: Configure project-memory for tracker, delivery, context, and localization setup.
+description: Create and maintain durable project memory for tracker, delivery, context, decisions, and localization.
 ---
 
 # Project Memory
 
 ## Goal
 
-Configure the repo memory that other skills consume:
+Provide the public entry point for creating and maintaining the repo memory
+that other skills consume:
 
 - `AGENTS.md` for lean operating pointers.
 - `project-memory/agents/issue-tracker.md` for PRD and issue routing.
@@ -16,12 +17,20 @@ Configure the repo memory that other skills consume:
 - `CONTEXT.md` and optional `project-memory/adr/` for domain memory.
 - `TRANSLATION.md` when localization support or translation rules are real.
 
-Configure only the memory surfaces needed for the requested workflow. An
-explicitly requested full first-time setup may create all applicable surfaces,
-but tracker routing does not require domain or localization bootstrap, and
-domain work does not require tracker setup. Re-run only the affected setup slice
-when routing, mappings, domain layout, localization policy, or `AGENTS.md`
+Use this skill both for initial setup and for later reconciliation after
+implementation, accepted decisions, tracker changes, or localization changes.
+Configure or update only the memory surfaces needed for the requested workflow.
+An explicitly requested full first-time setup may create all applicable
+surfaces, but tracker routing does not require domain or localization work, and
+domain work does not require tracker setup. Re-run only the affected slice when
+routing, mappings, domain knowledge, localization policy, or `AGENTS.md`
 pointers change.
+
+`$project-memory` is the normal public invocation for durable memory changes.
+For the `domain-memory` slice, it must load and follow `$domain-modeling` as the
+semantic engine for `CONTEXT.md`, relevant domain docs, and ADR updates. Callers
+that already compose `$domain-modeling`, such as `$grill-me-with-context`, may
+continue to use that specialist directly.
 
 ## Boundaries
 
@@ -32,7 +41,8 @@ pointers change.
   tracker detail, planning history, localization rules, and accepted decisions
   move to project memory.
 - Load and follow `$domain-modeling` before creating or updating `CONTEXT.md`
-  or ADRs.
+  or ADRs. Reading `project-memory/agents/domain.md` alone does not satisfy this
+  requirement.
 - Seed `CONTEXT.md`, `TRANSLATION.md`, or ADRs only from strong repo evidence,
   final session summaries, committed behavior, or explicit user acceptance.
 - Create `TRANSLATION.md` only when localization support or durable translation
@@ -43,9 +53,11 @@ pointers change.
 - In orchestrator workspace mode, configure only root setup files. Do not create
   `projects/<project>/`, feature PRDs, or issue files during setup.
 - Treat an explicit user request to set up, configure, initialize, update, or
-  refresh project memory as write authority for the requested setup slice. Show
-  the intended files and meaningful values, but do not ask for redundant
-  confirmation.
+  refresh project memory as write authority for the requested slice. A
+  ready-for-execution implementation task that explicitly requires
+  `$project-memory domain-memory` and names its durable decisions, evidence, and
+  target surfaces is also write authority for that closeout. Show the intended
+  files and meaningful values, but do not ask for redundant confirmation.
 - A view, inspect, review-only, recommendation, dry-run, or indirect suggestion
   is not write authority. In those cases, show the proposal and wait for
   confirmation before writing.
@@ -101,12 +113,13 @@ below.
 
 ## Workflow
 
-### 1. Choose Setup Flow
+### 1. Choose Operation And Slice
 
-- Select the smallest setup slice needed:
+- Select the smallest slice needed:
   - `tracker-routing`: issue tracker, delivery mode, issue-type mapping, and
     triage-state mapping;
-  - `domain-memory`: domain layout, context seed, and accepted ADR routing;
+  - `domain-memory`: domain layout, context seed or reconciliation, relevant
+    domain-doc updates, and accepted ADR routing or capture;
   - `translation-memory`: localization memory only;
   - `agents-pointers`: missing or stale project-memory pointers only;
   - `full-setup`: all applicable slices, only when explicitly requested.
@@ -116,6 +129,11 @@ below.
 - Use `existing-project-bootstrap` when the selected slice reconciles existing
   docs, partial project memory, accepted knowledge, recent same-repo session
   history, or ADR candidates.
+- Use `implementation-closeout` for a `domain-memory` slice carried by a final
+  implementation or integration task. Reconcile only the named decisions and
+  target surfaces against behavior that actually landed, using current source,
+  tests, validation, and accepted tracker decisions as evidence. Do not rerun
+  unrelated setup or mine session history by default.
 - Use `orchestrator-workspace` only for a parent coordination workspace that
   plans across independent repos. Do not treat it as a monorepo, and do not
   require a global PRD when linked partial PRDs describe the workspace feature.
@@ -157,10 +175,12 @@ translation-only, or pointer-only setup.
 
 ### 3. Review Or Confirm Settings
 
-If setup files already exist, or the user asks to show/review/change settings,
-summarize the selected slice before proposing edits. Include only known values;
-use `Unknown` when absent or ambiguous. Summarize all slices only for an
-explicit full review.
+If relevant memory files already exist, or the user asks to
+show/review/change settings, summarize the selected slice before proposing
+edits. Include only known values; use `Unknown` when absent or ambiguous.
+Summarize all slices only for an explicit full review. For
+`implementation-closeout`, summarize the carried decisions, evidence, and named
+targets instead of unrelated setup settings.
 
 Resolve only decisions in the selected setup slice:
 
@@ -192,16 +212,22 @@ workflow instead of forcing a hosted-tracker template, but keep the durable
 configuration table focused on `tracker_backend` and `delivery_mode` when the
 workflow still reduces to local or GitHub artifacts.
 
-### 5. Write Authorized Setup
+### 5. Write Authorized Project Memory
 
-After an explicit setup, configure, initialize, update, or refresh request, or
-a separate affirmative confirmation:
+After an explicit setup, configure, initialize, update, or refresh request, a
+separate affirmative confirmation, or an authorized `implementation-closeout`
+task:
 
-- Create or update only the authorized setup files.
+- Create or update only the authorized project-memory files.
 - Preserve unrelated custom prose, mappings, comments, overrides, docs, ADRs,
   and `TRANSLATION.md` content.
 - Keep `AGENTS.md` concise and pointer-only for project memory.
 - Use `$domain-modeling` for `CONTEXT.md` and ADR shape.
+- For `implementation-closeout`, require `$domain-modeling` to reconcile the
+  carried decisions with implemented behavior before writing. Omit provisional
+  planning language that the implementation did not prove, update only the
+  named durable surfaces, and verify their diff alongside the feature-level
+  integration proof.
 - Use `references/translation.md` for `TRANSLATION.md`.
 - Optionally add a one-line `CONTEXT.md` pointer to neighboring
   `TRANSLATION.md` only when localization affects audience, domain terms,
@@ -218,10 +244,14 @@ a separate affirmative confirmation:
 
 ### 6. Report Completion
 
-Report the setup flow and slice, files written, and only the settings or memory
+Report the operation, slice, files written, and only the settings or memory
 surfaces reviewed or changed. Include tracker, domain, localization,
 `AGENTS.md`, context/translation/ADR, and session-history details only when they
 were part of this run, plus the workflows that can now consume the setup.
+
+For `implementation-closeout`, also report the implementation task or source
+decision, evidence checked, durable decisions captured or rejected, target
+surfaces updated, and documentation-diff verification.
 
 If session history is unavailable or weak, say so plainly. Future
 `$domain-modeling`, `$grill-me-with-context`, and planning workflows can keep

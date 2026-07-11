@@ -138,6 +138,15 @@ Use repo vocabulary first:
 - accepted decisions from commits, final session summaries, or explicit user
   acceptance
 
+## Implementation closeout
+
+When a final implementation or integration task carries accepted durable
+decisions, invoke `$project-memory domain-memory`. Load and follow
+`$domain-modeling`, reconcile the carried decisions against the behavior and
+validation that actually landed, update only the named context/docs/ADR
+surfaces, and verify the documentation diff. Reading this domain-layout file or
+editing a target directly does not satisfy the closeout workflow.
+
 Do not record tentative proposals, rejected ideas, secrets, raw session logs, or
 generic architecture advice as project memory.
 

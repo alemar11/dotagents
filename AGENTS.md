@@ -116,13 +116,14 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Grill and Domain Modeling skills
 - Keep `grill-me` as the generic stateless pressure-testing loop; repo-backed documentation capture belongs in `grill-me-with-context`.
-- Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs under `project-memory/adr/`; do not use it for repo-maintenance metadata sync.
+- Keep `domain-modeling` focused on runtime project-language and decision capture in `CONTEXT.md`, relevant docs, and ADRs under `project-memory/adr/`; treat it as the semantic engine behind `$project-memory domain-memory` and other explicit composed callers, not as repo-maintenance metadata sync.
 - Keep `grill-me-with-context` as the thin composition layer over `grill-me` and `domain-modeling`, not a duplicate questioning loop.
 - Keep `improve-codebase-architecture` as architecture discovery and candidate selection first; it should hand the selected candidate to `grill-me-with-context` before implementation rather than duplicating the documentation loop.
 - Use `project-memory/` as the visible root for durable project memory owned by these runtime skills: `project-memory/agents/` for repo-specific agent operating config and `project-memory/adr/` for durable decision records. Keep `CONTEXT.md` and optional `CONTEXT-MAP.md` at the project root for fast discovery.
 
 ### Project Memory skill
-- Keep `project-memory` as the reusable setup surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, `project-memory/agents/domain.md`, root or context-specific `CONTEXT.md`, optional `TRANSLATION.md`, and ADR routing in code repos, monorepos, and orchestrator workspaces.
+- Keep `project-memory` as the normal public lifecycle surface for creating or refreshing `AGENTS.md` pointers plus `project-memory/agents/issue-tracker.md`, `project-memory/agents/triage-labels.md`, `project-memory/agents/domain.md`, root or context-specific `CONTEXT.md`, optional `TRANSLATION.md`, and ADR routing or content in code repos, monorepos, and orchestrator workspaces.
+- For implementation closeout that carries accepted durable decisions, require the implementor to invoke `$project-memory domain-memory`; `$project-memory` must load `$domain-modeling`, reconcile the carried delta against behavior that actually landed, update only the named durable surfaces, and verify the documentation diff. `$plan-feature` assigns this work but must not perform it during planning. (Codex learning)
 - `project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
 - Keep `project-memory` pointer-first for `AGENTS.md`: agent operating rules and short project-memory links stay there, while domain context, tracker detail, planning history, and accepted decisions move to `CONTEXT.md`, `project-memory/agents/*`, or ADRs after confirmation.
 - Keep `project-memory` issue-tracker setup limited to the durable `tracker_backend` values `github` and `local`; workspace, repo, path, and cross-repo linking details belong in conventions, PRDs, generated issues, or prose, not as extra backend enum values.

@@ -57,7 +57,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   task that already owns feature-level integration proof. Otherwise append one
   final integration and domain-knowledge closeout task that depends on every
   terminal implementation issue. This final task must be system-verifiable and
-  must not be a docs-only horizontal ticket.
+  must not be a docs-only horizontal ticket. It must require its implementor to
+  invoke `$project-memory` with the `domain-memory` slice; `$project-memory`
+  then loads `$domain-modeling` for the durable content update.
 - Treat `tracker_backend` as planning-artifact write authority. When the
   effective target is the configured tracker, publish GitHub issues for
   `github` backends and write Markdown files for `local` backends. Return draft
@@ -232,9 +234,10 @@ that pre-closeout terminal snapshot after the initial graph is formed:
    land.
 2. Otherwise append the last generated issue as a final integration and
    domain-knowledge closeout task. It depends directly on every terminal issue,
-   reruns the feature-level integration proof, updates the named context/docs/ADR
-   targets through the feature delivery path, and verifies the resulting docs
-   against the implemented behavior.
+   reruns the feature-level integration proof, invokes `$project-memory` with
+   the `domain-memory` slice, updates the named context/docs/ADR targets through
+   `$domain-modeling` and the feature delivery path, and verifies the resulting
+   docs against the implemented behavior.
 3. Add the exact decisions, target surfaces, and evidence under
    `## Domain Knowledge Closeout`; merge corresponding work into Requirements,
    Acceptance Criteria, Validation, Completion, and Orchestrator Handoff.
@@ -332,7 +335,10 @@ For each issue, verify that it:
 For the final domain owner, also verify that `## Domain Knowledge Closeout`
 contains the carried decisions, target surfaces, and evidence, and that its goal
 and acceptance criteria prove integrated behavior in addition to documentation.
-Reject ambiguous bare target or repo-local evidence paths in multi-repo work.
+Require an explicit `$project-memory domain-memory` implementation step and
+proof that it loaded `$domain-modeling`; reject a direct ad hoc edit presented
+as equivalent. Reject ambiguous bare target or repo-local evidence paths in
+multi-repo work.
 
 Allow a separate enabling issue only when it satisfies all exception rules from
 `references/vertical-slices.md`: no useful vertical slice can be implemented

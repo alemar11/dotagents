@@ -95,6 +95,12 @@ completion.]
 required domain-knowledge handoff. This task must also prove integrated feature
 behavior; never use this section to justify a docs-only issue.]
 
+- Required workflow:
+  - Invoke `$project-memory` with the `domain-memory` slice after the integrated
+    behavior is proven. `$project-memory` must load `$domain-modeling`; reading
+    `project-memory/agents/domain.md` or editing the targets directly is not a
+    substitute.
+
 - Decisions:
   - [Accepted durable term, rule, boundary, or decision carried from the PRD.]
 - Target surfaces:
@@ -104,7 +110,8 @@ behavior; never use this section to justify a docs-only issue.]
   - [Portable current-repository, repo-slug-qualified, hosted, or accepted
     implementation evidence.]
 - Closeout proof:
-  - [Integration validation plus documentation diff/consistency verification.]
+  - [Integration validation, `$project-memory domain-memory` completion,
+    `$domain-modeling` usage, and documentation diff/consistency verification.]
 
 ## Requirements
 

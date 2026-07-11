@@ -44,7 +44,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `autoreview` | Run Codex-only structured closeout review before final, commit, PR, or ship. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs. |
-| `domain-modeling` | Build and maintain project domain language and durable decisions while work is being clarified. |
+| `domain-modeling` | Shape domain language and durable decisions as the semantic engine behind project-memory and other composed workflows. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `triage` | Triage GitHub or local markdown issues into typed workflow states and agent-ready queues. |
 | `grill-me-with-context` | Stress-test repo-backed plans and capture or hand off durable decisions. |
@@ -57,7 +57,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `plan-feature` | Manual feature planning into Product Requirements Documents (PRDs) and agent-ready issues, including prd-only and issues-from-existing-prd modes. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
-| `project-memory` | Configure tracker, delivery, context, and localization memory. |
+| `project-memory` | Create and maintain tracker, delivery, context, decision, and localization memory. |
 | `codex-orchestrator` | Coordinate PRD-backed or queue-driven work with Goal mode, gates, workers, ledgers, Codex PR review, and authorized merge-ready closeout. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
@@ -82,7 +82,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `grill-me-with-context` requires `$grill-me` and `$domain-modeling` so it can run the questioning loop, update project context docs or ADRs inline for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, PRD writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$gitstack:github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
-- `project-memory` requires `$domain-modeling` when seeding or enriching `CONTEXT.md` or ADRs from repo, workspace, session evidence, or project context moved out of `AGENTS.md`.
+- `project-memory` is the normal public entry point for durable memory changes and requires `$domain-modeling` as its semantic engine whenever the `domain-memory` slice creates or updates `CONTEXT.md`, relevant domain docs, or ADRs.
 - `triage` requires `$project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$gitstack:github-issues` for GitHub issue mutations.
 
 ## Project-Local Skills

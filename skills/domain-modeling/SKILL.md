@@ -12,9 +12,14 @@ being discussed. Turn clarified terminology, boundaries, rules, and decisions
 into lightweight project documentation that future agents and maintainers can
 reuse.
 
-This is an inline documentation skill, not a standalone brainstorming session.
-Update docs only when the conversation or repo evidence resolves something
-durable.
+This is the semantic engine for domain documentation, not a standalone
+brainstorming session. `$project-memory domain-memory` is the normal public
+entry point when the goal is to create or update durable memory surfaces; it
+loads this skill to shape `CONTEXT.md`, relevant domain docs, and ADR changes.
+Direct callers that already own a domain workflow, such as
+`$grill-me-with-context`, may compose this skill without routing through
+`$project-memory`. Update docs only when the conversation or repo evidence
+resolves something durable.
 
 ## Trigger Rules
 
@@ -22,6 +27,9 @@ durable.
   record architectural or product decisions, or update project context docs.
 - Use when another skill is clarifying a codebase-backed plan and domain terms,
   business concepts, workflows, or durable decisions become clear.
+- Use when `$project-memory` delegates a `domain-memory` setup, refresh, or
+  implementation-closeout slice. Stay within the caller's authorized targets
+  and return the semantic capture result to `$project-memory` for closeout.
 - Use for a periodic project context review when the caller provides recent
   project conversations, session notes, or equivalent work history to mine for
   durable terminology, rules, open questions, or accepted decisions.
@@ -73,6 +81,12 @@ Write the smallest durable update that preserves the resolved meaning:
 - Add an ADR under `project-memory/adr/` only for load-bearing decisions that
   future agents or maintainers would otherwise reopen.
 - Leave open questions clearly marked instead of smoothing over uncertainty.
+
+When invoked by `$project-memory`, treat its selected context, authorized target
+surfaces, evidence boundary, and operation (`fresh-setup`,
+`existing-project-bootstrap`, or `implementation-closeout`) as the write
+boundary. Do not expand into tracker, localization, pointer, or unrelated domain
+surfaces.
 
 Keep docs practical:
 

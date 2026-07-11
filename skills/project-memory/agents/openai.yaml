@@ -1,5 +1,5 @@
 interface:
   display_name: "Project Memory"
-  short_description: "Configure tracker, delivery, context, and localization memory."
+  short_description: "Create and maintain tracker, context, decision, and localization memory."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $project-memory to configure only the requested tracker, delivery, domain, localization, or AGENTS.md-pointer slice. Treat an explicit setup or configure request as write authority, infer safe defaults from repo evidence, and ask only for materially ambiguous target or behavior values."
+  default_prompt: "Use $project-memory as the public entry point to create or maintain only the requested tracker, delivery, domain, localization, or AGENTS.md-pointer slice. For domain-memory updates, load $domain-modeling, reconcile accepted decisions against implemented or repository evidence, and update only the authorized durable surfaces."
