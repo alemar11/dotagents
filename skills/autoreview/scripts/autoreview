@@ -11,7 +11,7 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 PRIORITIES = {"P0", "P1", "P2", "P3"}
 CATEGORIES = {"bug", "security", "regression", "test_gap", "maintainability"}
@@ -66,7 +66,129 @@ SCHEMA: dict[str, Any] = {
 
 
 class AutoreviewError(RuntimeError):
-    pass
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "autoreview-failed",
+        recovery: str = "inspect-error",
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.recovery = recovery
+
+
+def writable_path_status(path: Path) -> dict[str, Any]:
+    expanded = path.expanduser()
+    exists = expanded.exists()
+    is_directory = expanded.is_dir() if exists else None
+    status: dict[str, Any] = {
+        "path": str(expanded),
+        "exists": exists,
+        "is_directory": is_directory,
+        "writable": None if not exists else False,
+        "probe": "not-run",
+        "error": None,
+    }
+    if not exists:
+        status["probe"] = "unverified-missing-directory"
+        return status
+    if not is_directory:
+        status["probe"] = "blocked-not-directory"
+        return status
+
+    probe_path: Path | None = None
+    primary_error: OSError | None = None
+    cleanup_errors: list[str] = []
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            prefix=".autoreview-write-probe-",
+            dir=expanded,
+            delete=False,
+        ) as handle:
+            probe_path = Path(handle.name)
+    except OSError as exc:
+        primary_error = exc
+    finally:
+        if probe_path is not None:
+            try:
+                probe_path.unlink(missing_ok=True)
+            except OSError as exc:
+                cleanup_errors.append(
+                    f"{probe_path}: {type(exc).__name__}: {exc}"
+                )
+
+    if primary_error is not None:
+        status["probe"] = "blocked"
+        status["error"] = f"{type(primary_error).__name__}: {primary_error}"
+        if cleanup_errors:
+            status["probe"] = "blocked-cleanup-failed"
+            status["error"] += "; cleanup " + "; ".join(cleanup_errors)
+        return status
+    if cleanup_errors:
+        status["probe"] = "blocked-cleanup-failed"
+        status["error"] = "; ".join(cleanup_errors)
+        return status
+
+    status["writable"] = True
+    status["probe"] = "create-delete-verified"
+    return status
+
+
+def environment_status() -> dict[str, Any]:
+    codex_home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    temp_root = Path(tempfile.gettempdir())
+    return {
+        "codex_home": writable_path_status(codex_home),
+        "temp": writable_path_status(temp_root),
+        "network": {
+            "required": True,
+            "status": "not-probed",
+            "note": "Codex engine connectivity is classified from codex exec failures.",
+        },
+    }
+
+
+def ensure_review_environment() -> None:
+    status = environment_status()
+    if status["codex_home"]["writable"] is False:
+        raise AutoreviewError(
+            f"CODEX_HOME is not writable: {status['codex_home']['path']}",
+            code="codex-home-unwritable",
+            recovery="reroute-to-capable-root",
+        )
+    if status["temp"]["writable"] is False:
+        raise AutoreviewError(
+            f"Temporary directory is not writable: {status['temp']['path']}",
+            code="temp-unwritable",
+            recovery="reroute-to-capable-root",
+        )
+
+
+def classify_codex_failure(detail: str) -> tuple[str, str]:
+    lower = detail.lower()
+    state_markers = ("state db", "state database", "sqlite", ".codex")
+    permission_markers = ("permission denied", "operation not permitted", "read-only file system")
+    network_markers = (
+        "network is unreachable",
+        "failed to connect",
+        "connection refused",
+        "connection reset",
+        "connection error",
+        "connect error",
+        "error sending request",
+        "dns error",
+        "name or service not known",
+        "temporary failure in name resolution",
+    )
+    if any(marker in lower for marker in state_markers) and any(
+        marker in lower for marker in permission_markers
+    ):
+        return "codex-home-unwritable", "reroute-to-capable-root"
+    if any(marker in lower for marker in network_markers):
+        return "codex-network-unavailable", "reroute-to-capable-root"
+    return "codex-engine-failed", "inspect-error"
 
 
 def run(
@@ -411,15 +533,32 @@ def configured_codex_model() -> str | None:
 
 def write_json_temp(data: dict[str, Any]) -> Path:
     handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
-    with handle:
-        json.dump(data, handle)
-    return Path(handle.name)
+    path = Path(handle.name)
+    try:
+        with handle:
+            json.dump(data, handle)
+    except BaseException as exc:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError as cleanup_exc:
+            detail = (
+                f"schema temporary file cleanup failed for {path}: "
+                f"{type(cleanup_exc).__name__}: {cleanup_exc}"
+            )
+            if isinstance(exc, Exception):
+                raise AutoreviewError(
+                    f"schema temporary file write failed: {type(exc).__name__}: {exc}\n{detail}",
+                    code="temp-cleanup-failed",
+                    recovery="inspect-error",
+                ) from exc
+            exc.add_note(detail)
+        raise
+    return path
 
 
 def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
+    ensure_review_environment()
     codex_bin = resolve_command(args.codex_bin, repo)
-    schema_path = write_json_temp(SCHEMA)
-    output_path = Path(tempfile.NamedTemporaryFile("w", suffix=".json", delete=False).name)
     model = args.model or configured_codex_model()
     cmd = [codex_bin, "--ask-for-approval", "never"]
     if args.web_search:
@@ -436,27 +575,92 @@ def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
             str(repo),
             "--ignore-user-config",
             "--ignore-rules",
+        ]
+    )
+    schema_path: Path | None = None
+    output_path: Path | None = None
+    result: subprocess.CompletedProcess[str] | None = None
+    output = ""
+    primary_error: AutoreviewError | None = None
+    pending_base_exception: BaseException | None = None
+    cleanup_errors: list[str] = []
+    try:
+        schema_path = write_json_temp(SCHEMA)
+        output_handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
+        with output_handle:
+            output_path = Path(output_handle.name)
+        run_cmd = [
+            *cmd,
             "--output-schema",
             str(schema_path),
             "--output-last-message",
             str(output_path),
             "-",
         ]
-    )
-    result = run_with_heartbeat(
-        cmd,
-        repo,
-        input_text=prompt,
-        label="codex",
-        heartbeat_seconds=args.heartbeat_seconds,
-    )
-    try:
-        output = output_path.read_text()
+        result = run_with_heartbeat(
+            run_cmd,
+            repo,
+            input_text=prompt,
+            label="codex",
+            heartbeat_seconds=args.heartbeat_seconds,
+        )
+        if result.returncode != 0:
+            detail = result.stderr or result.stdout or "codex exec failed without output"
+            code, recovery = classify_codex_failure(detail)
+            primary_error = AutoreviewError(
+                f"codex engine failed ({result.returncode})\n{detail}",
+                code=code,
+                recovery=recovery,
+            )
+        else:
+            output = output_path.read_text()
+    except AutoreviewError as exc:
+        primary_error = exc
+    except Exception as exc:
+        primary_error = AutoreviewError(
+            f"codex execution failed: {type(exc).__name__}: {exc}",
+            code="codex-engine-failed",
+            recovery="inspect-error",
+        )
+    except BaseException as exc:
+        pending_base_exception = exc
     finally:
-        schema_path.unlink(missing_ok=True)
-        output_path.unlink(missing_ok=True)
-    if result.returncode != 0:
-        raise AutoreviewError(f"codex engine failed ({result.returncode})\n{result.stderr or result.stdout}")
+        for temp_path in (schema_path, output_path):
+            if temp_path is None:
+                continue
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError as exc:
+                cleanup_errors.append(f"{temp_path}: {type(exc).__name__}: {exc}")
+
+    if pending_base_exception is not None:
+        if cleanup_errors:
+            pending_base_exception.add_note(
+                "temporary cleanup failed: " + "; ".join(cleanup_errors)
+            )
+        raise pending_base_exception
+
+    if primary_error is not None:
+        detail = str(primary_error)
+        if cleanup_errors:
+            detail += "\ntemporary cleanup failed: " + "; ".join(cleanup_errors)
+        raise AutoreviewError(
+            detail,
+            code=primary_error.code,
+            recovery=primary_error.recovery,
+        )
+    if cleanup_errors:
+        raise AutoreviewError(
+            "temporary cleanup failed: " + "; ".join(cleanup_errors),
+            code="temp-cleanup-failed",
+            recovery="inspect-error",
+        )
+    if result is None:
+        raise AutoreviewError(
+            "codex execution ended without a process result",
+            code="codex-engine-failed",
+            recovery="inspect-error",
+        )
     return output or result.stdout
 
 
@@ -600,6 +804,12 @@ def doctor(args: argparse.Namespace) -> int:
         if not structured_flags:
             missing.append("codex structured output flags")
 
+    environment = environment_status()
+    if environment["codex_home"]["writable"] is False:
+        missing.append("writable CODEX_HOME")
+    if environment["temp"]["writable"] is False:
+        missing.append("writable temporary directory")
+
     payload = {
         "ok": not missing,
         "version": VERSION,
@@ -608,6 +818,13 @@ def doctor(args: argparse.Namespace) -> int:
         "gh": {**gh_info, "optional": True, "purpose": "PR base detection"},
         "codex": codex_info,
         "configured_model": configured_codex_model(),
+        "environment": environment,
+        "recovery": (
+            "reroute-to-capable-root"
+            if environment["codex_home"]["writable"] is False
+            or environment["temp"]["writable"] is False
+            else "none"
+        ),
         "supports": {
             "codex_exec": codex_exec,
             "structured_output_flags": structured_flags,
@@ -747,7 +964,19 @@ def main(argv: list[str] | None = None) -> int:
         return run_review(args)
     except AutoreviewError as exc:
         if args.json:
-            print(json.dumps({"ok": False, "error": str(exc)}, indent=2, sort_keys=True), file=sys.stderr)
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "error": str(exc),
+                        "error_code": exc.code,
+                        "recovery": exc.recovery,
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+                file=sys.stderr,
+            )
         else:
             print(f"autoreview: {exc}", file=sys.stderr)
         return 2

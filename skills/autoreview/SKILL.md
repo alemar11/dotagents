@@ -52,7 +52,17 @@ Do not use this skill for:
 - If invoking from another repo, resolve the installed skill root first and run
   `<autoreview-skill-root>/scripts/autoreview ...`.
 - This skill is Codex-dependent. The helper requires local `git`, the Codex CLI
-  `exec` command, structured output flags, and read-only review execution.
+  `exec` command, structured output flags, a writable `CODEX_HOME` state
+  surface, Codex engine network access, and read-only review execution.
+- Run `scripts/autoreview --json doctor` before delegating review to a worker
+  with an uncertain permission profile. If it returns
+  `recovery=reroute-to-capable-root`, reroute the review instead of copying
+  credentials or repeatedly retrying the worker.
+- The doctor verifies `CODEX_HOME` and temporary-directory writability with
+  file create/delete probes when those directories exist; permission bits alone
+  are not capability proof. A missing `CODEX_HOME` is reported as unverified
+  without creating configuration directories, then `codex exec` provides the
+  authoritative success or structured failure.
 
 ## Closeout Entry Modes
 
@@ -111,6 +121,11 @@ remain, when the structured report is invalid, or when the review target cannot
 be resolved.
 Long Codex reviews emit `review still running: codex elapsed=<seconds>s
 pid=<pid>` to stderr while the review subprocess is still active.
+
+Under `--json`, environment failures preserve the human `error` and add stable
+`error_code` plus `recovery` fields. `codex-home-unwritable` and
+`codex-network-unavailable` require `reroute-to-capable-root`; generic
+`codex-engine-failed` requires inspection before rerouting.
 
 ## Final Report
 
