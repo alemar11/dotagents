@@ -27,14 +27,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "1.1.1")
+        self.assertEqual(stdout.getvalue().strip(), "1.1.2")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], "1.1.2")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -62,7 +62,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], "1.1.2")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -127,8 +127,39 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], "1.1.2")
         self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
+
+    def test_review_reply_uses_pr_scoped_endpoint(self) -> None:
+        entry = {"type": "review_comment", "comment_id": 123456}
+        result = mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(cli, "run_gh", return_value=result) as run_gh:
+            actions = cli.post_replies("owner/repo", 12, [entry], "Fixed.", False)
+
+        run_gh.assert_called_once_with(
+            [
+                "api",
+                "-X",
+                "POST",
+                "repos/owner/repo/pulls/12/comments/123456/replies",
+                "-H",
+                "Accept: application/vnd.github+json",
+                "-f",
+                "body=Fixed.",
+            ]
+        )
+        self.assertEqual(actions[0]["status"], "replied")
+
+    def test_review_reply_preserves_api_failure(self) -> None:
+        entry = {"type": "review_comment", "comment_id": 123456}
+        result = mock.Mock(returncode=1, stdout="", stderr="HTTP 404")
+
+        with mock.patch.object(cli, "run_gh", return_value=result):
+            actions = cli.post_replies("owner/repo", 12, [entry], "Fixed.", False)
+
+        self.assertEqual(actions[0]["status"], "error")
+        self.assertEqual(actions[0]["message"], "HTTP 404")
 
     def test_address_rejects_inline_and_file_reply_bodies_together(self) -> None:
         entry = {

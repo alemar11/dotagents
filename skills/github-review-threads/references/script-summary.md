@@ -23,7 +23,7 @@ Success envelopes:
 ```json
 {
   "ok": true,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "command": ["address"],
   "data": {}
 }
@@ -34,7 +34,7 @@ Error envelopes:
 ```json
 {
   "ok": false,
-  "version": "1.1.1",
+  "version": "1.1.2",
   "command": ["address"],
   "error": {"code": "invalid_arguments", "message": "..."}
 }
