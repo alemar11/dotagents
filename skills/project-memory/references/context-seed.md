@@ -11,7 +11,13 @@ content:
 - README, vision docs, architecture docs, product docs, or component docs
 - AGENTS.md rules that describe accepted repo behavior
 - package manifests, schemas, tests, source directories, or public APIs
-- accepted user decisions, commits, issues, or final session summaries
+- accepted user decisions and committed repo behavior
+
+Issues, PRs, PRDs, tracker discussions, and final session summaries may help
+discover candidate knowledge, but they are not durable repo authority by
+themselves. Before citing a candidate in `CONTEXT.md`, capture or verify it in a
+repo-owned document, ADR, source file, schema, or test. Tracker links may remain
+as optional provenance in that durable source.
 
 Do not seed from guesses, tentative plans, rejected options, secrets, raw logs,
 or generic architecture advice.

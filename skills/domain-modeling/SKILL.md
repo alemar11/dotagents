@@ -91,7 +91,13 @@ surfaces.
 Keep docs practical:
 
 - Use project vocabulary from the repo and user.
-- Link to relevant source files, issues, or ADRs when they are available.
+- Cite durable repo sources such as source files, tests, project docs, or ADRs
+  when they are available.
+- Treat issues, PRs, tracker discussions, and session history as discovery
+  evidence or optional provenance, not as the sole authority for a durable
+  `CONTEXT.md` term, rule, boundary, or decision. First restate the accepted
+  meaning in a repo-owned source; keep tracker links in that source's
+  background or provenance when useful.
 - Avoid generic domain-driven-design exposition.
 - Do not rewrite broad docs just to add one clarified term.
 - If the right destination is missing, return the smallest explicit deferral:

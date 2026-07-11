@@ -45,6 +45,10 @@ continue to use that specialist directly.
   requirement.
 - Seed `CONTEXT.md`, `TRANSLATION.md`, or ADRs only from strong repo evidence,
   final session summaries, committed behavior, or explicit user acceptance.
+- Do not use a PR, issue, PRD, tracker comment, or session summary as the sole
+  durable citation in `CONTEXT.md`. Tracker and session artifacts may identify
+  accepted knowledge, but capture that knowledge in a repo-owned document, ADR,
+  source file, schema, or test and cite the durable surface instead.
 - Create `TRANSLATION.md` only when localization support or durable translation
   rules are clear from evidence or confirmed by the user.
 - Do not record tentative proposals, rejected ideas, secrets, raw logs, broad

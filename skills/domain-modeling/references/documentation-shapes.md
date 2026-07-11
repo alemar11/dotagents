@@ -16,7 +16,7 @@ Short project-specific definition.
 
 - Also called: optional alias
 - Not: nearby concept it should not be confused with
-- Source: optional issue, file, or ADR link
+- Source: optional durable repo file or ADR link
 
 ## Rules
 
