@@ -82,13 +82,16 @@ Run this deterministic loop:
    `references/worker.md` before any delegation and record the execution report
    it defines.
 5. **INTEGRATE** — monitor workers from current ledger state, read before
-   steering or lifecycle changes, integrate accepted output, and record proof,
-   blockers, artifacts, and next actions.
+   steering or lifecycle changes, revalidate worker capabilities after create,
+   resume, or fork, integrate accepted output, and record proof, blockers,
+   artifacts, and next actions.
 6. **GATE** — apply `references/gates.md`, run focused validation and
    `$autoreview` for non-trivial edits, perform only authorized publication and
    source mutations, and re-run affected gates after fixes.
-7. **RECONCILE** — update the ledger and authorized source state, rescan due
-   sources, then return to **REGISTER** while actionable work remains.
+7. **RECONCILE** — rescan every due source, replace stale current-state
+   projections, update the ledger and authorized source state, and record a
+   reconciliation result before returning to **REGISTER** while actionable work
+   remains. Run the same reconciliation immediately before final closeout.
 
 Each wave must create a ledger transition, new proof, an authorized source
 update, an owner decision brief, or an explicit no-progress record. Never loop
@@ -146,6 +149,13 @@ If a required Codex tool is not visible, search the available tool registry by
 operation before declaring it unavailable. Continue with safe root-owned work
 when possible and record the exact missing surface or fallback.
 
+At worker creation, resume, fork, and before any network, publication, or
+external-mutation action, capture the capability snapshot required by
+`references/worker.md`. A fork does not imply a broader permission profile. If
+a worker loses a required capability, stop retrying that operation in the
+worker and route it to a capable root surface when the existing authority and
+gates permit it.
+
 ## Delivery, Gates, And Closeout
 
 For PRD-backed sources, load `references/prd-backed-delivery.md` before
@@ -172,6 +182,14 @@ from the owner or source contract; otherwise report the proposed change. Source
 comments, labels, direct closure, merge, release, and deployment likewise
 require their own authority.
 
+Merge is root-owned and unavailable by default. Record
+`merge_authority=explicit-owner-authorization` only when the owner explicitly
+directs the orchestrator to merge or land the named PR or PR set. Record
+`merge_policy=automatic-after-gates` only when that instruction also authorizes
+the root to proceed after gates without another owner checkpoint; otherwise use
+`merge_policy=owner-approval`. Wording such as finish, complete, deliver, or
+make merge-ready does not authorize merge.
+
 ## Companion Routing
 
 Use the smallest matching standalone skill:
@@ -191,6 +209,18 @@ Use the smallest matching standalone skill:
 Portfolio triage is read-only. Follow-up mutations require the matching skill
 and the authority described above. Do not depend on repo-local plugin bundles
 or plugin-cache artifacts for these flows.
+
+Standalone companion skills are always the primary Git/GitHub route. A GitHub
+plugin may be used only as an automatic, logged fallback when the selected
+standalone skill or its direct `git`, `gh`, or shipped helper surface is
+unavailable, lacks the required supported capability, or fails at the
+transport/authentication layer. Do not fall back for missing owner authority,
+failed gates, unsafe or contradictory source contracts, actionable review
+findings, or correctable command input. Never run primary and fallback
+mutations in parallel. The fallback inherits the exact existing scope and
+mutation authority; it cannot broaden either. Record the primary skill,
+attempted operation, failure category and evidence, fallback operation,
+authority check, and result in the ledger.
 
 ## Final Report
 

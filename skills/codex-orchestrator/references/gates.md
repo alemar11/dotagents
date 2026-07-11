@@ -10,6 +10,7 @@ Gate selection is per workstream. Always evaluate `authorization` and
 `closure`. Add `live-proof` for user-facing behavior, `autoreview` for
 non-trivial code edits, `ci` for merge or release readiness,
 `codex-pr-review` before declaring pull-request delivery merge-ready,
+`merge-authorization` only before an actual merge,
 `owner-decision` when progress depends on approval or risk acceptance,
 `release` only for tag, package, deploy, or promotion work,
 `public-model-identifier` only when public names or API fields are changed or
@@ -83,6 +84,22 @@ as `publication_authority=prd-backed-merge-ready-pr` or
 changes that decision. Record the resolved publication authority in the ledger.
 This does not authorize merge, release, direct issue mutation, production
 deploy, or unrelated GitHub cleanup.
+
+### Merge Authorization Gate
+
+Before an actual merge, require `merge_authority=explicit-owner-authorization`
+for the named PR or PR set. `merge_policy=owner-approval` requires a current
+owner checkpoint after every other merge gate passes;
+`merge_policy=automatic-after-gates` permits the root to merge without another
+checkpoint only when the authorizing instruction explicitly says to merge or
+land after gates. Finish, complete, deliver, ship, close out, and make
+merge-ready do not satisfy this gate.
+
+Merge is root-owned. Workers cannot receive merge authority. Record the owner
+instruction and timestamp, exact PR/head, mergeability, current CI, latest-head
+review proof, unresolved-thread count, and merge result. When authority is
+missing or ambiguous, stop at merge-ready under `needs-owner`; do not infer it
+from publication or issue-mutation authority.
 
 ### Publication Safety Gate
 

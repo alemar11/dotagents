@@ -85,6 +85,14 @@ Use these ledger-owned values:
 - `active_root_takeover_policy`: `owner-approval` requires an explicit owner
   decision, while `stale-ledger-check` permits takeover only after the recorded
   stale-read note and takeover note are present.
+- `merge_authority`: `none` by default or
+  `explicit-owner-authorization` for the named PR or PR set.
+- `merge_policy`: `owner-approval` by default or
+  `automatic-after-gates` when the explicit merge instruction waives another
+  checkpoint after gates pass.
+- `github_primary_surface`: `standalone`; plugin-first is not valid.
+- `github_fallback_reason`: `none`, `standalone-unavailable`,
+  `capability-unsupported`, or `transport-failure`.
 
 Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
 and gate values are owned by `worker.md`, `prd-backed-delivery.md`, and
@@ -132,6 +140,9 @@ Started: <YYYY-MM-DD HH:MM TZ>
 Last Progress Read: <YYYY-MM-DD HH:MM TZ>
 Next Root Check: <YYYY-MM-DD HH:MM TZ or none>
 Takeover policy: owner-approval|stale-ledger-check
+Merge authority: none|explicit-owner-authorization
+Merge policy: owner-approval|automatic-after-gates
+Merge authorization evidence: <owner instruction and timestamp or none>
 Claimed repo realpaths:
 - <absolute realpath or unknown>; source=<scope evidence>
 Claimed source ids:
@@ -149,13 +160,16 @@ remaining.
 ## Worker And Delivery References
 
 Authorization resolution: per-workstream
-Assignable authorization modes: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|merge-close|release
+Assignable authorization modes: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release
 Session CLI subagents consented: authorized-by-invocation|disabled|limited; max=<n|unbounded>
 Session Codex App threads consented: true|false; max=<n|unspecified>
 No subdelegation: true
 Workers edit ledger: false
 Root owns worker lifecycle: true
 Visible worker title format: <Project>: <short current task>
+Root capability snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh-auth=<available|unavailable|not-required>; codex-cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked-at=<time/evidence>
+GitHub primary surface: standalone
+GitHub fallback: used=<true|false>; reason=<none|standalone-unavailable|capability-unsupported|transport-failure>; primary-skill=<skill or none>; operation=<operation or none>; evidence=<failure or none>; plugin-operation=<operation or none>; authority-reused=<authority or none>; result=<result or none>
 
 Worker fields follow `worker.md`. Delivery, publication, and issue-mutation
 authority follow `prd-backed-delivery.md`. Gates follow `gates.md`. Keep only
@@ -179,6 +193,7 @@ Available gates:
 - cross-repo-integration
 - credential-and-access
 - publication-safety
+- merge-authorization
 
 Portfolio overrides:
 - <gate>: <stricter requirement or owner-approved exception>
@@ -204,11 +219,12 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; authorized_or_consented=<true|false>; actual=<root-thread|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated> |
+| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; authorized_or_consented=<true|false>; actual=<root-thread|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability-snapshot=<filesystem/network/gh-auth/codex-cli/autoreview/time evidence> |
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
-| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-branch-plus-draft-pr|prd-backed-merge-ready-pr|blocked>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| GitHub routing | primary=standalone; primary-skill=<skill>; operation=<operation>; fallback=<unused|github-plugin>; fallback-reason=<none|standalone-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
@@ -385,3 +401,28 @@ snapshot against the ledger:
 - newly surfaced source items are added to `autonomous`, `active`,
   `needs-owner`, `blocked`, `deferred`, or `ignored-or-suppressed` before
   stopping.
+
+Reconciliation updates the current projection instead of appending a new claim
+that contradicts stale current fields. Preserve historical `## Notes`, but
+replace outdated source snapshots, gate rows, workstream delivery values,
+active-worker lists, and current next actions. For every reconciliation, append
+one dated note and record this compact result:
+
+| Checked At | Sources Re-read | Current Projection Updated | Stale Values Removed | Remaining Actionable | Result |
+| --- | --- | --- | --- | --- | --- |
+| <time> | <source ids/URLs> | <sections/rows> | <values or none> | <count and refs> | pass|blocked |
+
+Before setting the ledger `complete` or releasing the active root, run the
+reconciliation after the last source mutation and verify these invariants:
+
+- no closed source is described as open or pending in a current-state field;
+- no merged PR is described as draft, open, or merge-ready-only;
+- no archived, integrated, abandoned, or handed-off worker remains active;
+- every fallback records its primary standalone attempt and authority reuse;
+- merge proof exists only when explicit merge authority exists;
+- the current gate matrix, workstream rows, bucket membership, wave report,
+  root status, and final note agree.
+
+If any invariant fails, keep the ledger active or blocked and repair the
+current projection before final status. Historical notes are evidence, not a
+substitute for current-state reconciliation.

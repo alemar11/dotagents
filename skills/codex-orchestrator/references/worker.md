@@ -29,7 +29,7 @@ Session fields:
 | --- | --- | --- |
 | `delegated_worker_surface` | `codex-app-thread`, `cli-subagent`, `none` | Worker surfaces available for the current orchestrator session. `cli-subagent` is authorized by invoking `$codex-orchestrator` unless the owner disables delegation. `codex-app-thread` allows visible App threads only when the current runtime exposes thread tools and the owner consented to that surface. |
 | `actual_workstream_surface` | `root-thread`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-thread` owner-facing as `root thread (no-delegation)`. Do not present hidden subagents as visible App threads. |
-| `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `review-ready`, `ci-rerun-fix`, `merge-close`, `release` | Capability flags; list every allowed action explicitly. `review-ready` also requires exact root-listed sub-actions. |
+| `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `review-ready`, `ci-rerun-fix`, `release` | Capability flags; list every allowed action explicitly. `review-ready` also requires exact root-listed sub-actions. Merge and source closeout remain root-owned. |
 
 Worker report fields:
 
@@ -57,6 +57,30 @@ The canonical execution values are the worker-surface fields above. In the
 owner-facing execution report, `Execution mode` is only a display summary
 inferred from the selected surfaces and worker split; do not treat it as a
 separate enum or source of truth.
+
+## Capability Snapshots
+
+The root records a capability snapshot when a worker is created, resumed, or
+forked, and refreshes it before the worker performs a network, publication, or
+external-mutation action. Record:
+
+- `filesystem`: the reported permission profile and whether the assigned
+  checkout is readable/writable as required;
+- `network`: available, restricted, or unknown, with read-only probe evidence
+  when the action needs network access;
+- `gh-auth`: available, unavailable, or not-required;
+- `codex-cli`: available, unavailable, or not-required;
+- `autoreview`: available, unavailable, or reroute-to-root, using
+  `autoreview doctor --json` when applicable;
+- `checked-at`: timestamp plus the tool, thread metadata, or command that
+  produced the evidence.
+
+Do not assume a fork inherits broader permissions than its parent. If a
+snapshot changes or an operation fails with permission, network,
+authentication, or state-storage evidence, refresh the snapshot once and stop
+retrying that operation in the worker. Route it to a capable root when current
+scope, authority, and gates permit; otherwise record the blocker. Never copy
+credentials into a worker to manufacture capability.
 
 Automation creation, updates, and scheduling are explicit-only and
 runtime-tool-dependent. Project memory does not store scheduled check timing and
@@ -471,10 +495,13 @@ it may only open a PR from an already-pushed branch, record `pr` only.
   PR or branch when the root assignment names the failing checks. Any edits,
   commits, or pushes for CI repair also require the corresponding `implement`,
   `commit`, and `push` modes plus publication-safety gates.
-- `merge-close`: merge, close, label, comment, or otherwise mutate GitHub state
-  only with explicit owner approval.
 - `release`: tag, release, publish, or package promotion only with explicit
   owner approval and the release gate satisfied.
+
+Merge, direct issue closeout, labels, and root-authored discussion mutations
+are not worker modes. They remain root-owned actions with their own recorded
+authority. A legacy worker assignment containing `merge-close` is invalid;
+stop as `needs-owner` instead of executing or silently translating it.
 
 ## Prompt Template
 
@@ -496,8 +523,9 @@ Scope:
 - Source ref: <URL, path:line, heading, run id, or ledger item>
 - Acceptance criteria: <source-owned completion criteria>
 - Closeout target: <local acceptance criteria plus validation, issue close, PR reply, file checkbox/patch, CI rerun, or ledger status>
-- Authorization modes: <one or more of inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|merge-close|release>
+- Authorization modes: <one or more of inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release>
 - Review-ready sub-actions: <mark-ready|request-codex-review|poll-codex-review|post-root-supplied-disposition or not-applicable>
+- Capability snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh-auth=<available|unavailable|not-required>; codex-cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked-at=<time/evidence>
 - Allowed paths or surfaces: <paths, branches, PRs, issues, or commands>
 - Runtime delivery: <local-only|pull-request|direct-commit> (<ad-hoc default|feature-level inherited from Source PRD|issue-level override with authorization>)
 - Delivery source: <ad-hoc or legacy source, Source PRD path/issue, explicit owner request, or issue-level override reason>
@@ -517,7 +545,8 @@ Scope:
 - Next ledger check: <time/action or none>
 - Forbidden actions: no subdelegation, no ledger edits, no unrelated cleanup,
   no worker/thread/chat management, no commit/push/PR/Codex-review
-  request/merge/release unless this mode explicitly permits it.
+  request/release unless this mode explicitly permits it; no merge or direct
+  source closeout under any worker mode.
 
 Context:
 - Owner request: <summary>

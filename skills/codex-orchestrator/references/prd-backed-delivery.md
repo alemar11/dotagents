@@ -50,7 +50,7 @@ proof before marking the feature graph complete.
 
 ## Authority Model
 
-Record these three authorities separately in the ledger:
+Record these four authorities separately in the ledger:
 
 - **Delivery authority**: where the branch, PR shape, dependency graph, and
   closeout path come from. For generated issues this is usually the linked
@@ -62,6 +62,8 @@ Record these three authorities separately in the ledger:
   no-update-needed dispositions after gates pass.
 - **Issue mutation authority**: whether the root may directly comment, label,
   close, or otherwise mutate GitHub issues outside the PR body closeout path.
+- **Merge authority**: whether the root may merge the named PR or PR set after
+  every required gate passes, and whether another owner checkpoint is required.
 
 Do not collapse these into one boolean. A PRD can authorize a draft PR delivery
 path without authorizing ready-for-review transition, Codex review request,
@@ -94,6 +96,17 @@ Use these PRD-backed authority values in the ledger and worker prompts:
   `pr-body-closeout-only` means closure only through the relevant PR body, and
   `explicit-direct-mutation` means direct issue comments, labels, or closure are
   authorized.
+- `merge_authority`: `none` is the default and means stop at merge-ready;
+  `explicit-owner-authorization` means the current owner request explicitly
+  directs the root to merge or land the named PR or PR set.
+- `merge_policy`: `owner-approval` is the default and requires a final owner
+  checkpoint; `automatic-after-gates` is allowed only when the same explicit
+  instruction authorizes merging after gates without another checkpoint.
+
+The words `merge` or `land` must unambiguously apply to the named PR or PR set.
+Finish, complete, deliver, ship, close out, and make merge-ready do not grant
+merge authority. When intent remains ambiguous, keep `merge_authority=none` and
+move the decision to `needs-owner`.
 
 `prd-backed-branch-plus-draft-pr` is a legacy-compatible draft-only value. Do
 not reinterpret it as ready-for-review or Codex-review authority. Use
@@ -185,9 +198,10 @@ Before scheduling or publishing PRD-backed work:
 4. Resolve the effective delivery mode from the PRD first, then apply only
    issue-level overrides that are explicit and authorized.
 5. Record delivery authority, publication authority, merge-ready closeout
-   authority when any, issue mutation authority, closeout vehicle, branch
-   expectation, PR expectation, publication checkout, caller checkout policy,
-   integration proof target, and handoff projection in the ledger.
+   authority when any, issue mutation authority, merge authority, merge policy,
+   authorizing owner instruction when any, closeout vehicle, branch expectation,
+   PR expectation, publication checkout, caller checkout policy, integration
+   proof target, and handoff projection in the ledger.
 6. Build the wave graph from the generated issues' handoff start rules,
    dependency fields, and parallelization fields. Queue-ready does not mean
    start-ready when an issue depends on another incomplete issue.
@@ -269,8 +283,9 @@ For ad hoc requests, PR reviews, CI diagnosis, local TODOs, or legacy issues
 without a linked PRD delivery contract, `implement` means local code/docs
 changes plus validation only. Commit, push, draft PR, ready-for-review
 transition, Codex review request, issue mutation, merge, and release require
-explicit owner authorization or a later `commit`, `push`, `pr`, `review-ready`,
-`merge-close`, or `release` mode.
+explicit owner authorization. Worker modes may grant `commit`, `push`, `pr`,
+`review-ready`, or `release` within their scoped contracts, but merge remains a
+root-owned action governed by `merge_authority` and `merge_policy`.
 
 Do not block ad hoc or legacy implementation merely because PRD fields are
 absent. In the ledger, use runtime delivery `local-only`, publication `none`,

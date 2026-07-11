@@ -208,6 +208,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Standalone Git and GitHub skills
 - Keep reusable git and GitHub runtime workflows under standalone `skills/*` as the preferred reusable install surface for `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, `github-ci`, `github-review-threads`, `github-portfolio-triage`, `github-stars`, and `yeet`.
 - Keep standalone skills independent from repo-local plugin files, plugin shared scripts, and installed plugin cache copies; standalone runtime docs and code must use direct `git`, direct `gh`, or their own `scripts/<tool>` artifacts.
+- Prefer standalone Git/GitHub skills for every supported operation. A GitHub plugin is fallback-only after the standalone skill is unavailable, lacks the required supported capability, or fails at the transport/authentication layer; reuse the existing authority, record the reason, and never run primary and fallback mutations in parallel. (Codex learning)
 - Keep standalone `github-*` skills provider-primitive and workflow-agnostic: they may expose GitHub mechanics and route to sibling GitHub skills, but caller-specific policy such as planning, orchestration, project-memory, queue state, issue body schema, or label taxonomy belongs in the composing skill that invokes them.
 - Keep `git-commit`, `github-deep-review`, `github-issues`, `github-triage`, `github-releases`, and `yeet` scriptless unless a concrete repeated workflow needs a real shipped script.
 - Keep GitHub issue lifecycle mechanics in standalone `github-issues`, not in queue triage, PR review-thread, publish, commit, or project-memory skills.
@@ -219,6 +220,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `codex-orchestrator` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary implementation, planning, triage, GitHub, commit, PR, or multi-repo requests must not auto-select it. (Codex learning)
 - Treat one active `codex-orchestrator` root as the owner for a project or portfolio source graph. Parallel implementation should run as scoped workers under that root, not as multiple independent orchestrator roots in the same repo or overlapping source graph.
 - Keep runtime orchestration, worker, gate, active-root, target-repo `AGENTS.md`, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.
+- Keep merge root-owned and unavailable by default: publication and merge-ready authority do not imply merge, and only an explicit owner instruction may select owner-approved or automatic-after-gates merge behavior. (Codex learning)
 - Persist portfolio ledgers under `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, with one ledger per named portfolio by default.
 - When an owner intentionally splits orchestration across separate roots, require explicit non-overlapping repo/source boundaries or an explicit takeover/handoff decision.
 
