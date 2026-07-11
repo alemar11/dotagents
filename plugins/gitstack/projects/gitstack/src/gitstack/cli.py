@@ -36,7 +36,7 @@ def parser() -> Parser:
     ci_parser.add_argument("args", nargs=argparse.REMAINDER)
     portfolio_parser = commands.add_parser("portfolio", help="Scan multiple repositories read-only.")
     portfolio_parser.add_argument("args", nargs=argparse.REMAINDER)
-    reviews_parser = commands.add_parser("reviews", help="Inspect, reply to, or comment on PR reviews.")
+    reviews_parser = commands.add_parser("reviews", help="Inspect, check, wait for, or respond to PR reviews.")
     reviews_parser.add_argument("args", nargs=argparse.REMAINDER)
     stars_parser = commands.add_parser("stars", help="Manage stars and authenticated-user star lists.")
     stars_parser.add_argument("args", nargs=argparse.REMAINDER)

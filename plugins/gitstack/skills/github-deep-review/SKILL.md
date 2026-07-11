@@ -35,6 +35,9 @@ threads.
 
 ## Start
 
+Resolve `<plugin-root>` as two directories above the directory containing this
+`SKILL.md` before invoking the shared CLI.
+
 Prefer connector-backed PR or issue context plus local repo evidence over web
 browsing. Use `gh` for connector gaps and local branch discovery:
 
@@ -46,6 +49,16 @@ git status --short --branch
 git fetch origin
 git log --oneline --decorate -20
 ```
+
+When automated-review freshness is relevant, use the one-shot provider-neutral
+check as evidence and keep analysis read-only:
+
+```bash
+<plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
+```
+
+Route waiting, findings disposition, replies, and re-review loops to
+`$gitstack:github-review-threads`.
 
 Read local instructions, issue workflows, test guidance, and maintainer runbooks
 before deciding. If the repository is not checked out locally, clone or fetch it

@@ -1,5 +1,26 @@
 # GitHub Review Workflows
 
+## Check Or Wait For Automated Review
+
+Use the same provider-neutral state contract for a one-shot read or a bounded
+wait. Always pass the intended PR head SHA when freshness matters:
+
+```bash
+<plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
+<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout 15m
+```
+
+`check` reads once. `wait` polls with bounded backoff until it sees `clean` or
+`findings`, detects `not_requested` or `stale`, or reaches its timeout. The
+current provider adapter is `codex`; provider-specific bot identities,
+acknowledgements, clean reactions, and review formats belong to the CLI rather
+than this workflow.
+
+After fixing and pushing findings, post a fresh review request and run the
+check or wait against the new SHA. A timed-out wait returns exit code `124` and
+the last observed state; a calling orchestrator decides whether to schedule a
+later heartbeat.
+
 ## List Review Context
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning

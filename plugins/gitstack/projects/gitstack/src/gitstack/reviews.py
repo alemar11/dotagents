@@ -5,6 +5,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import which
@@ -13,6 +14,15 @@ from typing import Any
 
 from . import __version__ as VERSION
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
+CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
+REVIEW_EXIT_CODES = {
+    "clean": 0,
+    "findings": 1,
+    "not_requested": 2,
+    "acknowledged": 2,
+    "pending": 2,
+    "stale": 3,
+}
 
 
 @dataclass(frozen=True)
@@ -115,6 +125,160 @@ def positive_int(raw: str | None, name: str) -> int:
     if not raw or not re.fullmatch(r"[1-9][0-9]*", raw):
         raise ReviewError(f"Invalid --{name} value '{raw or ''}'. Use a positive integer.", code="invalid_arguments", exit_code=64)
     return int(raw)
+
+
+def duration_seconds(raw: str, name: str) -> float:
+    match = re.fullmatch(r"([1-9][0-9]*)([smh]?)", raw.strip().lower())
+    if not match:
+        raise ReviewError(
+            f"Invalid --{name} value '{raw}'. Use a positive duration such as 30s, 15m, or 1h.",
+            code="invalid_arguments",
+            exit_code=64,
+        )
+    multipliers = {"": 1, "s": 1, "m": 60, "h": 3600}
+    return int(match.group(1)) * multipliers[match.group(2)]
+
+
+def is_provider_author(provider: str, login: str) -> bool:
+    if provider != "codex":
+        raise ReviewError(
+            f"Unsupported review provider '{provider}'. Supported providers: codex.",
+            code="unsupported_provider",
+            exit_code=64,
+        )
+    return login.lower() in CODEX_LOGINS
+
+
+def authored_by(item: dict[str, Any], provider: str) -> bool:
+    return is_provider_author(provider, str((item.get("user") or {}).get("login") or ""))
+
+
+def sha_matches(actual: object, expected: str) -> bool:
+    value = str(actual or "")
+    return bool(value and expected and (value.startswith(expected) or expected.startswith(value)))
+
+
+def review_request_matches(comment: dict[str, Any], provider: str, head: str, committed_at: str) -> bool:
+    body = str(comment.get("body") or "")
+    if provider == "codex" and not re.search(r"(?i)@codex\s+review\b", body):
+        return False
+    if head[:7].lower() in body.lower() or head.lower() in body.lower():
+        return True
+    created_at = str(comment.get("created_at") or "")
+    return bool(committed_at and created_at and created_at >= committed_at)
+
+
+def provider_reactions(repo: str, comment_id: int, provider: str) -> set[str]:
+    reactions = gh_api_paginated_list(f"repos/{repo}/issues/comments/{comment_id}/reactions")
+    return {
+        str(reaction.get("content") or "")
+        for reaction in reactions
+        if authored_by(reaction, provider)
+    }
+
+
+def check_automated_review(repo: str, pr: int, provider: str, expected_head: str | None) -> dict[str, Any]:
+    # Validate before any network reads so unsupported providers fail predictably.
+    is_provider_author(provider, "")
+    pull = gh_json(["api", f"repos/{repo}/pulls/{pr}", "-H", "Accept: application/vnd.github+json"])
+    if not isinstance(pull, dict):
+        raise ReviewError("Unexpected pull request response shape.", code="api_error", exit_code=4)
+    current_head = str(((pull.get("head") or {}).get("sha")) or "")
+    if not current_head:
+        raise ReviewError("Pull request response did not include a head SHA.", code="api_error", exit_code=4)
+    head = expected_head or current_head
+
+    commit = gh_json(["api", f"repos/{repo}/commits/{head}", "-H", "Accept: application/vnd.github+json"])
+    committed_at = ""
+    if isinstance(commit, dict):
+        committed_at = str((((commit.get("commit") or {}).get("committer") or {}).get("date")) or "")
+
+    reviews = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/reviews")
+    inline_comments = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
+    conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
+    provider_reviews = [item for item in reviews if authored_by(item, provider)]
+    head_reviews = [item for item in provider_reviews if sha_matches(item.get("commit_id"), head)]
+    head_findings = [
+        item
+        for item in inline_comments
+        if authored_by(item, provider) and sha_matches(item.get("commit_id"), head)
+    ]
+    requests = [
+        item
+        for item in conversation
+        if review_request_matches(item, provider, head, committed_at)
+    ]
+    latest_request = max(requests, key=lambda item: str(item.get("created_at") or ""), default=None)
+    reactions: set[str] = set()
+    if latest_request and latest_request.get("id"):
+        reactions = provider_reactions(repo, int(latest_request["id"]), provider)
+
+    head_is_current = sha_matches(current_head, head)
+    if not head_is_current:
+        status = "stale"
+    elif head_reviews:
+        status = "findings" if head_findings else "clean"
+    elif "+1" in reactions:
+        status = "clean"
+    elif latest_request:
+        status = "acknowledged" if "eyes" in reactions else "pending"
+    elif provider_reviews or any(
+        provider == "codex" and re.search(r"(?i)@codex\s+review\b", str(item.get("body") or ""))
+        for item in conversation
+    ):
+        status = "stale"
+    else:
+        status = "not_requested"
+
+    return {
+        "repo": repo,
+        "pr": pr,
+        "provider": provider,
+        "status": status,
+        "head": head,
+        "current_head": current_head,
+        "head_is_current": head_is_current,
+        "review": {
+            "count": len(head_reviews),
+            "latest_id": head_reviews[-1].get("id") if head_reviews else None,
+            "submitted_at": head_reviews[-1].get("submitted_at") if head_reviews else None,
+            "findings": len(head_findings),
+        },
+        "request": {
+            "comment_id": latest_request.get("id") if latest_request else None,
+            "created_at": latest_request.get("created_at") if latest_request else None,
+            "acknowledged": "eyes" in reactions,
+            "clean_reaction": "+1" in reactions,
+        },
+    }
+
+
+def wait_for_automated_review(
+    repo: str,
+    pr: int,
+    provider: str,
+    expected_head: str | None,
+    timeout: float,
+    initial_interval: float,
+    max_interval: float,
+) -> tuple[dict[str, Any], int]:
+    started = time.monotonic()
+    interval = initial_interval
+    attempts = 0
+    while True:
+        attempts += 1
+        payload = check_automated_review(repo, pr, provider, expected_head)
+        payload["attempts"] = attempts
+        payload["elapsed_seconds"] = round(time.monotonic() - started, 3)
+        status = str(payload["status"])
+        if status in {"clean", "findings", "not_requested", "stale"}:
+            return payload, REVIEW_EXIT_CODES[status]
+        remaining = timeout - (time.monotonic() - started)
+        if remaining <= 0:
+            payload["timed_out"] = True
+            return payload, 124
+        time.sleep(min(interval, remaining))
+        interval = min(max_interval, interval * 1.5)
 
 
 def snippet(text: str, limit: int = 220) -> str:
@@ -327,6 +491,14 @@ def post_replies(repo: str, pr: int, entries: list[dict[str, Any]], body: str, d
 
 
 def render_text(payload: dict[str, Any]) -> str:
+    if "status" in payload:
+        lines = [
+            f"{payload['provider']} review for {payload['repo']}#{payload['pr']}: {payload['status']}",
+            f"head={payload['head']} current={payload['current_head']}",
+        ]
+        if payload.get("timed_out"):
+            lines.append("wait timed out")
+        return "\n".join(lines) + "\n"
     lines: list[str] = []
     for entry in payload["entries"]:
         lines.append(f"[{entry['index']:>3}] {entry['type']} id={entry['comment_id']} author={entry['author'] or 'unknown'} updated={entry['updated']}")
@@ -362,7 +534,10 @@ def doctor_payload() -> dict[str, object]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Inspect PR review comments and route PR discussion comments or replies.")
+    parser = argparse.ArgumentParser(
+        prog="gitstack reviews",
+        description="Inspect, check, wait for, or respond to pull-request reviews.",
+    )
     parser.add_argument("--json", action="store_true", help="Emit a stable JSON envelope.")
     parser.add_argument("--version", action="store_true", help="Print version and exit.")
     subparsers = parser.add_subparsers(dest="command")
@@ -384,6 +559,20 @@ def build_parser() -> argparse.ArgumentParser:
     comment.add_argument("--body-file", help="Read the comment body from a UTF-8 file.")
     comment.add_argument("--dry-run", action="store_true", help="Preview the comment action without posting.")
     comment.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
+    for command, help_text in (
+        ("check", "Inspect automated review state once and exit."),
+        ("wait", "Wait for an automated review to complete or time out."),
+    ):
+        review = subparsers.add_parser(command, help=help_text)
+        review.add_argument("--provider", required=True, help="Automated review provider. Currently: codex.")
+        review.add_argument("--pr", required=True, help="Pull request number.")
+        review.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
+        review.add_argument("--head", help="Expected reviewed head SHA. Defaults to the current PR head.")
+        review.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
+        if command == "wait":
+            review.add_argument("--timeout", default="15m", help="Maximum wait, for example 30s, 15m, or 1h.")
+            review.add_argument("--interval", default="10s", help="Initial polling interval. Default: 10s.")
+            review.add_argument("--max-interval", default="30s", help="Maximum polling interval. Default: 30s.")
     return parser
 
 
@@ -410,12 +599,34 @@ def main(argv: list[str] | None = None) -> int:
             print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
             print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
         return 0 if payload["ok"] else 1
-    if args.command not in {"address", "comment"}:
+    if args.command not in {"address", "comment", "check", "wait"}:
         parser.print_help()
         return 0
     try:
         pr = positive_int(args.pr, "pr")
         repo = resolve_repo(args.repo, allow_non_project=args.allow_non_project)
+        if args.command in {"check", "wait"}:
+            if args.command == "check":
+                payload = check_automated_review(repo, pr, args.provider, args.head)
+                exit_code = REVIEW_EXIT_CODES[str(payload["status"])]
+            else:
+                timeout = duration_seconds(args.timeout, "timeout")
+                interval = duration_seconds(args.interval, "interval")
+                max_interval = duration_seconds(args.max_interval, "max-interval")
+                if interval > max_interval:
+                    raise ReviewError(
+                        "--interval cannot be greater than --max-interval.",
+                        code="invalid_arguments",
+                        exit_code=64,
+                    )
+                payload, exit_code = wait_for_automated_review(
+                    repo, pr, args.provider, args.head, timeout, interval, max_interval
+                )
+            if args.json:
+                emit_success(payload, [args.command])
+            else:
+                print(render_text(payload), end="")
+            return exit_code
         if args.command == "comment":
             body = read_body(args.body, args.body_file)
             payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run)}
@@ -442,6 +653,8 @@ def main(argv: list[str] | None = None) -> int:
             print(render_text(payload), end="")
         return 0
     except ReviewError as exc:
+        if args.command in {"check", "wait"} and exc.code == "command_failed":
+            exc = ReviewError(exc.message, code="api_error", exit_code=4)
         if args.json:
             emit_error(exc, [args.command or ""])
         else:

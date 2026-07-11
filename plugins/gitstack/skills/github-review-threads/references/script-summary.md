@@ -10,6 +10,8 @@
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number> --comment-ids <ids> --reply-body-file <message-file>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file>
+<plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
+<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout 15m
 ```
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning
@@ -41,6 +43,21 @@ Error envelopes:
 ```
 
 The script does not write configuration files.
+
+## Automated Review State
+
+Both `check` and `wait` return `data.provider`, `data.status`, `data.head`,
+`data.current_head`, `data.head_is_current`, plus review and request evidence.
+States are `not_requested`, `acknowledged`, `pending`, `clean`, `findings`, and
+`stale`.
+
+Exit codes are stable: `0` for clean, `1` for findings, `2` for
+not-requested/acknowledged/pending, `3` for stale review evidence, `4` for an
+API or configuration failure, `64` for invalid arguments, and `124` when
+`wait` times out. JSON envelopes remain valid for nonzero review-state exits.
+
+`wait` accepts `--timeout`, `--interval`, and `--max-interval` durations using
+seconds, minutes, or hours, such as `30s`, `15m`, or `1h`.
 
 ## Discussion Comments
 

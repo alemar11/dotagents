@@ -35,7 +35,7 @@ Resolve `<plugin-root>` as two directories above this `SKILL.md`.
 | GitHub issue lifecycle and relationships | `$gitstack:github-issues` |
 | Root-cause and fix-quality review | `$gitstack:github-deep-review` |
 | Actions inspection or explicit CI repair | `$gitstack:github-ci` |
-| Review feedback, implementation, replies, resolution | `$gitstack:github-review-threads` |
+| Automated review check/wait, review feedback, implementation, replies, resolution | `$gitstack:github-review-threads` |
 | Multi-repository queue scan | `$gitstack:github-portfolio-triage` |
 | Tags, releases, notes, assets, packages | `$gitstack:github-releases` |
 | Stars and star lists | `$gitstack:github-stars` |

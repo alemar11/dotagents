@@ -54,6 +54,10 @@ Prefer the shortest publish path that matches the state in front of you:
    look up the PR again before retrying so a successful first request cannot
    create a duplicate.
 6. Return branch, PR URL, commit hash, and verification performed.
+7. When the calling workflow requires an automated-review publication gate,
+   hand it to `$gitstack:github-review-threads` with the configured provider
+   and exact published head SHA. Do not duplicate provider detection or polling
+   inside Yeet.
 
 ## References
 
