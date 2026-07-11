@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 SKILL_INJECTION_RE = re.compile(r"<skill>\s*<name>([^<]+)</name>", re.S)
 
 
@@ -33,6 +33,9 @@ class SessionMeta:
     timestamp: str | None = None
     cwd: str | None = None
     path: str | None = None
+    thread_source: str | None = None
+    forked_from_id: str | None = None
+    parent_thread_id: str | None = None
 
 
 @dataclass
@@ -45,6 +48,10 @@ class Evidence:
     path: str | None
     prompt: str = ""
     detail: str = ""
+    transport: str = ""
+    thread_source: str | None = None
+    forked_from_id: str | None = None
+    parent_thread_id: str | None = None
 
 
 def default_roots() -> list[Path]:
@@ -64,6 +71,33 @@ def read_message_text(payload: dict[str, Any]) -> str:
             if isinstance(text, str):
                 parts.append(text)
     return "\n".join(parts)
+
+
+def resolve_parent_thread_id(payload: dict[str, Any]) -> str | None:
+    direct = payload.get("parent_thread_id") or payload.get("forked_from_id")
+    if isinstance(direct, str) and direct:
+        return direct
+    source = payload.get("source")
+    if not isinstance(source, dict):
+        return None
+    subagent = source.get("subagent")
+    if not isinstance(subagent, dict):
+        return None
+    thread_spawn = subagent.get("thread_spawn")
+    if not isinstance(thread_spawn, dict):
+        return None
+    parent = thread_spawn.get("parent_thread_id")
+    return parent if isinstance(parent, str) and parent else None
+
+
+def resolve_thread_source(payload: dict[str, Any]) -> str | None:
+    direct = payload.get("thread_source")
+    if isinstance(direct, str) and direct:
+        return direct
+    source = payload.get("source")
+    if isinstance(source, dict) and isinstance(source.get("subagent"), dict):
+        return "subagent"
+    return None
 
 
 def parse_targets(
@@ -214,11 +248,15 @@ def scan_file(
             payload = item.get("payload") or {}
 
             if item_type == "session_meta":
-                meta.session_id = payload.get("id")
-                meta.timestamp = payload.get("timestamp") or item.get("timestamp")
-                meta.cwd = payload.get("cwd")
-                if session_is_before(meta, since):
-                    should_skip = True
+                if meta.session_id is None:
+                    meta.session_id = payload.get("id") or payload.get("session_id")
+                    meta.timestamp = payload.get("timestamp") or item.get("timestamp")
+                    meta.cwd = payload.get("cwd")
+                    meta.thread_source = resolve_thread_source(payload)
+                    meta.forked_from_id = payload.get("forked_from_id")
+                    meta.parent_thread_id = resolve_parent_thread_id(payload)
+                    if session_is_before(meta, since):
+                        should_skip = True
                 continue
 
             if should_skip:
@@ -233,11 +271,15 @@ def scan_file(
                             Evidence(
                                 target=target.name,
                                 source="explicit-user",
-                                timestamp=meta.timestamp or item.get("timestamp"),
+                                timestamp=item.get("timestamp") or meta.timestamp,
                                 session_id=meta.session_id,
                                 cwd=meta.cwd,
                                 path=meta.path,
                                 prompt=normalize_text(prompt),
+                                transport="user-message",
+                                thread_source=meta.thread_source,
+                                forked_from_id=meta.forked_from_id,
+                                parent_thread_id=meta.parent_thread_id,
                             )
                         )
                 continue
@@ -254,31 +296,49 @@ def scan_file(
                             Evidence(
                                 target=target.name,
                                 source="skill-injection",
-                                timestamp=meta.timestamp or item.get("timestamp"),
+                                timestamp=item.get("timestamp") or meta.timestamp,
                                 session_id=meta.session_id,
                                 cwd=meta.cwd,
                                 path=meta.path,
                                 prompt=normalize_text(last_user_prompt),
+                                transport="skill-injection",
+                                thread_source=meta.thread_source,
+                                forked_from_id=meta.forked_from_id,
+                                parent_thread_id=meta.parent_thread_id,
                             )
                         )
                 continue
 
-            if response_type != "function_call":
+            if response_type not in {"function_call", "custom_tool_call"}:
                 continue
 
-            detail = f"{payload.get('name') or ''} {payload.get('arguments') or ''}"
+            if response_type == "custom_tool_call":
+                raw_detail = payload.get("input") or payload.get("arguments") or ""
+                transport = (
+                    "code-mode-custom-tool"
+                    if payload.get("name") == "exec"
+                    else "custom-tool-call"
+                )
+            else:
+                raw_detail = payload.get("arguments") or ""
+                transport = "function-call"
+            detail = f"{payload.get('name') or ''} {raw_detail}"
             for target in targets:
                 if opened_skill_doc(detail, target):
                     evidence.append(
                         Evidence(
                             target=target.name,
                             source="opened-skill-doc",
-                            timestamp=meta.timestamp or item.get("timestamp"),
+                            timestamp=item.get("timestamp") or meta.timestamp,
                             session_id=meta.session_id,
                             cwd=meta.cwd,
                             path=meta.path,
                             prompt=normalize_text(last_user_prompt),
                             detail=normalize_text(detail),
+                            transport=transport,
+                            thread_source=meta.thread_source,
+                            forked_from_id=meta.forked_from_id,
+                            parent_thread_id=meta.parent_thread_id,
                         )
                     )
                 if runtime_matches(detail, target):
@@ -286,12 +346,16 @@ def scan_file(
                         Evidence(
                             target=target.name,
                             source="runtime-command",
-                            timestamp=meta.timestamp or item.get("timestamp"),
+                            timestamp=item.get("timestamp") or meta.timestamp,
                             session_id=meta.session_id,
                             cwd=meta.cwd,
                             path=meta.path,
                             prompt=normalize_text(last_user_prompt),
                             detail=normalize_text(detail),
+                            transport=transport,
+                            thread_source=meta.thread_source,
+                            forked_from_id=meta.forked_from_id,
+                            parent_thread_id=meta.parent_thread_id,
                         )
                     )
 
@@ -350,6 +414,12 @@ def summarize(
             "first": timestamps[0] if timestamps else None,
             "last": timestamps[-1] if timestamps else None,
             "sources": dict(Counter(item.source for item in items).most_common()),
+            "transports": dict(
+                Counter(item.transport or "unknown" for item in items).most_common()
+            ),
+            "thread_sources": dict(
+                Counter(item.thread_source or "unknown" for item in items).most_common()
+            ),
             "cwd": dict(Counter(item.cwd or "" for item in items).most_common(8)),
             "examples": [
                 {
@@ -360,6 +430,10 @@ def summarize(
                     "path": item.path,
                     "prompt": item.prompt[:500],
                     "detail": item.detail[:500] if item.detail else "",
+                    "transport": item.transport,
+                    "thread_source": item.thread_source,
+                    "forked_from_id": item.forked_from_id,
+                    "parent_thread_id": item.parent_thread_id,
                 }
                 for item in sorted(items, key=lambda value: value.timestamp or "")[-limit:]
             ],
@@ -378,6 +452,14 @@ def print_text(summary: dict[str, Any]) -> None:
         )
         sources = ", ".join(f"{name}={count}" for name, count in data["sources"].items())
         print(f"sources: {sources or 'none'}")
+        transports = ", ".join(
+            f"{name}={count}" for name, count in data["transports"].items()
+        )
+        print(f"transports: {transports or 'none'}")
+        thread_sources = ", ".join(
+            f"{name}={count}" for name, count in data["thread_sources"].items()
+        )
+        print(f"thread sources: {thread_sources or 'none'}")
         cwds = ", ".join(
             f"{cwd or '<unknown>'} ({count})" for cwd, count in data["cwd"].items()
         )
