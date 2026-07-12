@@ -17,7 +17,7 @@ Run this checklist before finalizing maintainer updates.
 ## Command Set (Typical)
 - `find . -type f -name 'SKILL.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
 - `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
-- `rg -n "\\.agents/skills/Maintainer|agents/openai.yaml|SKILL.md" -S`
+- `rg -n "\\.agents/skills/maintainer|agents/openai.yaml|SKILL.md" -S`
 - `rg -n "request_user_input|subagent|\\$CODEX_HOME|~/.codex|Codex CLI|Codex App|MEMORY.md|memory_summary.md" -S`
 - `git diff --stat`
 - `git diff`

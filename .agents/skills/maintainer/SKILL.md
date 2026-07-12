@@ -1,5 +1,5 @@
 ---
-name: Maintainer
+name: maintainer
 description: Maintain repo skills and plugins through metadata, description, consistency, and refresh workflows.
 ---
 
@@ -8,7 +8,7 @@ description: Maintain repo skills and plugins through metadata, description, con
 ## Goal
 Use this project-maintainer skill to maintain existing skills and plugins in this repository. Its primary job is to inspect one or more local packages, apply concrete docs, metadata, and workflow improvements, and keep repo-level maintainer docs aligned.
 Treat maintenance as one unified task:
-- repo-wide pass when the user invokes `$Maintainer` generically with a bare imperative such as `run` or `run your tasks`
+- repo-wide pass when the user invokes `$maintainer` generically with a bare imperative such as `run` or `run your tasks`
 - targeted maintenance when the user names one or more existing skills or plugins
 - metadata-only maintenance when the user explicitly asks to align or sync docs/metadata
 
@@ -28,7 +28,7 @@ For the exact user-facing task menu, open `references/task-menu.md`.
 
 ## Trigger Rules
 Use this skill when users ask to:
-- Invoke `$Maintainer` generically to maintain existing skills or plugins in this repository
+- Invoke `$maintainer` generically to maintain existing skills or plugins in this repository
 - Maintain, upgrade, sync, tighten, or clean up one or more existing skills or plugins
 - Maintain, upgrade, sync, tighten, or clean up repo-local plugins or shared repo structure around skills and plugins
 - Optimize skill docs, metadata, workflow clarity, or maintainability

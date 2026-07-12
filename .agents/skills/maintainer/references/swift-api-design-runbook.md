@@ -20,7 +20,7 @@ from within the `Maintainer` project skill.
 - Review and update `skills/swift-api-design/references/*.md` only when local routing
   or link integrity has materially drifted.
 - Keep the procedure and maintainer tooling under
-  `.agents/skills/Maintainer/`.
+  `.agents/skills/maintainer/`.
 
 ## Source-Of-Truth Rule
 
@@ -45,9 +45,9 @@ from within the `Maintainer` project skill.
 ## Tooling
 
 - Refresh script:
-  `./.agents/skills/Maintainer/scripts/swift_api_design_refresh.py`
+  `./.agents/skills/maintainer/scripts/swift_api_design_refresh.py`
 - Check script:
-  `./.agents/skills/Maintainer/scripts/swift_api_design_check.py`
+  `./.agents/skills/maintainer/scripts/swift_api_design_check.py`
 
 ## Prerequisites
 
@@ -58,11 +58,11 @@ from within the `Maintainer` project skill.
 ## Refresh Flow
 
 1. Check bundled asset freshness:
-   - `python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py --check-stale`
+   - `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py --check-stale`
 2. If stale, refresh the bundle:
-   - `python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py`
+   - `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py`
 3. Validate the runtime package shape and link integrity:
-   - `python3 .agents/skills/Maintainer/scripts/swift_api_design_check.py`
+   - `python3 .agents/skills/maintainer/scripts/swift_api_design_check.py`
 4. Review fast-path coverage manually:
    - `skills/swift-api-design/references/README.md`
    - `skills/swift-api-design/references/official-guidelines.md`
@@ -71,8 +71,8 @@ from within the `Maintainer` project skill.
    - `skills/swift-api-design/references/common-api-shaping-patterns.md`
    - `skills/swift-api-design/references/review-checklist.md`
 5. If curated-reference edits are needed, update those markdown files and rerun:
-   - `python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py`
-   - `python3 .agents/skills/Maintainer/scripts/swift_api_design_check.py`
+   - `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py`
+   - `python3 .agents/skills/maintainer/scripts/swift_api_design_check.py`
 6. Ensure runtime docs stay clean:
    - no `skills/swift-api-design/scripts/` directory
    - no maintainer-routing references in `skills/swift-api-design/SKILL.md`
@@ -80,9 +80,9 @@ from within the `Maintainer` project skill.
 
 ## Validation
 
-- `python3 -m py_compile .agents/skills/Maintainer/scripts/swift_api_design_refresh.py .agents/skills/Maintainer/scripts/swift_api_design_check.py`
-- `python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py --check-stale`
-- `python3 .agents/skills/Maintainer/scripts/swift_api_design_check.py`
+- `python3 -m py_compile .agents/skills/maintainer/scripts/swift_api_design_refresh.py .agents/skills/maintainer/scripts/swift_api_design_check.py`
+- `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py --check-stale`
+- `python3 .agents/skills/maintainer/scripts/swift_api_design_check.py`
 - `git diff --check`
 
 ## Notes

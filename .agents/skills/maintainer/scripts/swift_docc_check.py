@@ -239,7 +239,7 @@ def main() -> int:
                 errors.append(f"Broken local link in summary file {path.name}: {link}")
 
     forbidden_runtime_markers = [
-        ".agents/skills/Maintainer",
+        ".agents/skills/maintainer",
         "python3 scripts/",
         "scripts/refresh_references.py",
         "scripts/check_references.py",

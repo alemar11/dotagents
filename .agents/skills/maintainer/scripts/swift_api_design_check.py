@@ -81,9 +81,9 @@ def main() -> int:
                 errors.append(f"Broken local link in summary file {path.name}: {link}")
 
     forbidden_runtime_markers = [
-        ".agents/skills/Maintainer",
-        "python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py",
-        "python3 .agents/skills/Maintainer/scripts/swift_api_design_check.py",
+        ".agents/skills/maintainer",
+        "python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py",
+        "python3 .agents/skills/maintainer/scripts/swift_api_design_check.py",
     ]
     for path in [SKILL_PATH, REFERENCES_DIR / "README.md"]:
         content = path.read_text(encoding="utf-8")

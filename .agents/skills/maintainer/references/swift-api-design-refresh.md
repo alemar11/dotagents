@@ -17,15 +17,15 @@ review the `swift-api-design` manifest and local fast-path layer.
 1. `syntax-check`: run `python3 -m py_compile` on both Swift API Design
    maintainer scripts.
 2. `staleness-check`: run
-   `python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py --check-stale`.
+   `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py --check-stale`.
 3. `refresh-if-needed`: if the manifest or bundled source file is stale, run
-   `python3 .agents/skills/Maintainer/scripts/swift_api_design_refresh.py`.
+   `python3 .agents/skills/maintainer/scripts/swift_api_design_refresh.py`.
 4. `review-fast-paths`: inspect `skills/swift-api-design/references/*.md`,
    especially `README.md`, `official-guidelines.md`, and the curated summary
    pages such as `common-api-shaping-patterns.md`, for stale local links or
    routing gaps.
 5. `integrity-check`: run
-   `python3 .agents/skills/Maintainer/scripts/swift_api_design_check.py`.
+   `python3 .agents/skills/maintainer/scripts/swift_api_design_check.py`.
 6. `final-report`: use the release checklist schema and return `PASS (NOOP)` if
    the bundle was already current and no persistent reference edits were needed.
 
@@ -42,7 +42,7 @@ When a read-only verification is requested:
 ## Guardrails
 
 - Do not add a runtime `skills/swift-api-design/scripts/` directory.
-- Do not add `.agents/skills/Maintainer` routing or commands to runtime
+- Do not add `.agents/skills/maintainer` routing or commands to runtime
   `swift-api-design` docs.
 - Treat `skills/swift-api-design/assets/api-design-guidelines.md` as the bundled source
   of truth and keep `references/*.md` thin, task-oriented routing layers.

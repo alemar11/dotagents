@@ -11,10 +11,10 @@ the `swift-docc` manifest and local fast-path layer.
 
 ## Execution Flow (Mandatory Order)
 1. `syntax-check`: run `python3 -m py_compile` on both Swift-DocC maintainer scripts.
-2. `staleness-check`: run `python3 .agents/skills/Maintainer/scripts/swift_docc_refresh.py --check-stale`.
-3. `refresh-if-needed`: if the manifest or bundled asset tree is stale, run `python3 .agents/skills/Maintainer/scripts/swift_docc_refresh.py`.
+2. `staleness-check`: run `python3 .agents/skills/maintainer/scripts/swift_docc_refresh.py --check-stale`.
+3. `refresh-if-needed`: if the manifest or bundled asset tree is stale, run `python3 .agents/skills/maintainer/scripts/swift_docc_refresh.py`.
 4. `review-fast-paths`: inspect `skills/swift-docc/references/*.md`, especially the workflow pages, async/stateful API routing, local preview guidance, and `source-map.md`, for missing high-frequency layers or stale local links.
-5. `integrity-check`: run `python3 .agents/skills/Maintainer/scripts/swift_docc_check.py`.
+5. `integrity-check`: run `python3 .agents/skills/maintainer/scripts/swift_docc_check.py`.
 6. `final-report`: use the release checklist schema and return `PASS (NOOP)` if the bundle was already current and no persistent reference edits were needed.
 
 ## Read-only Evaluation Mode
@@ -26,7 +26,7 @@ When a read-only verification is requested:
 
 ## Guardrails
 - Do not reintroduce `skills/swift-docc/scripts/` in the runtime skill.
-- Do not add `.agents/skills/Maintainer` routing or commands to runtime `swift-docc` docs.
+- Do not add `.agents/skills/maintainer` routing or commands to runtime `swift-docc` docs.
 - Treat `assets/DocCDocumentation.docc` as the source of truth and keep `references/*.md` thin, task-oriented routing layers.
 - Update fast-path markdown only when there is a meaningful gap, stale local link, or upstream drift that changes routing.
 

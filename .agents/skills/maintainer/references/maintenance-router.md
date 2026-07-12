@@ -13,7 +13,7 @@ Use this file first to route maintenance requests to the right playbook.
 - `okf-spec`: refresh the bundled official OKF spec copy and validate the runtime OKF skill
 
 ## Decision Tree
-1. If the user invokes `$Maintainer` generically with a bare imperative such as `run`, `run your tasks`, or `do a maintenance pass` and does not name a task, classify as `maintain` and use `run-maintenance.md`.
+1. If the user invokes `$maintainer` generically with a bare imperative such as `run`, `run your tasks`, or `do a maintenance pass` and does not name a task, classify as `maintain` and use `run-maintenance.md`.
    - Deterministic default flow:
      - inspect local skills and plugins
      - shortlist clear actionable drift
@@ -24,7 +24,7 @@ Use this file first to route maintenance requests to the right playbook.
    - Do not infer `refresh` or new-skill creation.
 2. If the user asks to maintain, upgrade, modernize, tighten, or improve one or more named existing skills or plugins, classify as `maintain` and use `skill-upgrade.md`.
    - If the named target is `okf`, run
-     `python3 .agents/skills/Maintainer/scripts/okf_spec_refresh.py --check-stale`
+     `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py --check-stale`
      as part of inspection and report whether the official spec changed.
    - Do not refresh the bundled OKF spec during targeted `maintain okf`
      unless the user explicitly asked for refresh or approved the update.

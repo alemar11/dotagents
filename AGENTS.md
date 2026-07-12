@@ -41,9 +41,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - If `brand_color` isn’t provided, pick a random hex color not already used by other skills in this repo and set it in `agents/openai.yaml`.
 - Plugin manifests must keep asset and bundled-skill paths repo-relative and valid from the plugin root; update them together with any plugin layout move. (Codex learning)
 - Bundled plugin skills must follow the same runtime/maintenance split as reusable skills under `skills/`: runtime guidance stays in their `SKILL.md`, while repo-maintenance routing stays in repo-level maintainer docs. (Codex learning)
-- Runtime skills must stay unaware of `.agents/skills/Maintainer`: do not reference it, its runbooks, or maintainer-routing instructions from runtime `SKILL.md` files or runtime usage references. Keep that routing only in repo-level maintainer docs such as this `AGENTS.md`.
+- Runtime skills must stay unaware of `.agents/skills/maintainer`: do not reference it, its runbooks, or maintainer-routing instructions from runtime `SKILL.md` files or runtime usage references. Keep that routing only in repo-level maintainer docs such as this `AGENTS.md`.
 - Runtime skills may surface runtime learnings or durable guidance candidates, but they must not perform self-upgrade, metadata-sync, reference-refresh, or other repo-maintenance workflows from their own runtime instructions.
-- Route skill-maintenance and repo-maintenance work through `.agents/skills/Maintainer` from repo-level maintainer docs, not from runtime `SKILL.md` files.
+- Route skill-maintenance and repo-maintenance work through `.agents/skills/maintainer` from repo-level maintainer docs, not from runtime `SKILL.md` files.
 - Keep the repo-level source of truth for skill portability in this `AGENTS.md`: record which skills are Codex-dependent vs portable when that boundary matters for maintenance or runtime behavior.
 - Codex-dependent skills must explicitly name the Codex runtime tools, artifacts, or filesystem contracts they require in `SKILL.md`; skills intended to stay portable may mention Codex-only helpers only as optional accelerators with a generic fallback.
 - Scope per-user cache files under `~/.cache/dotagents/` by owner: reusable skills use `~/.cache/dotagents/skills/<skill-name>/...`, plugin-shared caches use `~/.cache/dotagents/plugins/<plugin-name>/...`, and plugin-bundled skill caches use `~/.cache/dotagents/plugins/<plugin-name>/skills/<skill-name>/...`. (Codex learning)
@@ -66,7 +66,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat GitStack as Codex-dependent because its bundled workflows require the official GitHub connector. Its shared CLI fallback remains runtime-dependent on Python 3.11+, local `git`, and authenticated `gh`.
 - Treat `okf` as portable runtime-dependent because it requires `python3` for its shipped `scripts/okf` CLI, uses optional `PyYAML` when available for exact YAML parsing, and otherwise relies on local markdown/spec assets without Codex-only runtime tools.
 - Treat `tanstack` as portable because it is guidance-only, relies on local repo/package inspection plus current TanStack-owned docs when exact APIs matter, and does not require Codex-only runtime tools.
-- Treat `.agents/skills/Maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
+- Treat `.agents/skills/maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
 - When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
 - Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.
@@ -93,15 +93,15 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### OKF skill
 - Keep OKF runtime guidance in `skills/okf/SKILL.md`, `skills/okf/references/*`, and the shipped `skills/okf/scripts/okf` CLI.
-- Keep official OKF spec refresh mechanics in `.agents/skills/Maintainer`, using `.agents/skills/Maintainer/references/okf-spec-runbook.md` as the canonical procedure.
-- Runtime OKF docs must not reference `.agents/skills/Maintainer`, maintainer scripts, or maintainer-only routing.
+- Keep official OKF spec refresh mechanics in `.agents/skills/maintainer`, using `.agents/skills/maintainer/references/okf-spec-runbook.md` as the canonical procedure.
+- Runtime OKF docs must not reference `.agents/skills/maintainer`, maintainer scripts, or maintainer-only routing.
 
 ### Swift-DocC skill
-- Keep Swift-DocC bundled-asset refresh and reference integrity checks in `.agents/skills/Maintainer`, and use `.agents/skills/Maintainer/references/swift-docc-runbook.md` as the canonical procedure.
+- Keep Swift-DocC bundled-asset refresh and reference integrity checks in `.agents/skills/maintainer`, and use `.agents/skills/maintainer/references/swift-docc-runbook.md` as the canonical procedure.
 - Keep runtime Swift-DocC docs and fast-path reference design in `skills/swift-docc/`; keep maintainer-only refresh routing here. (Codex learning)
 
 ### Swift API Design skill
-- Keep Swift API Design bundled-asset refresh and reference integrity checks in `.agents/skills/Maintainer`, and use `.agents/skills/Maintainer/references/swift-api-design-runbook.md` as the canonical procedure.
+- Keep Swift API Design bundled-asset refresh and reference integrity checks in `.agents/skills/maintainer`, and use `.agents/skills/maintainer/references/swift-api-design-runbook.md` as the canonical procedure.
 - Keep runtime Swift API Design docs and bundled-source usage details in `skills/swift-api-design/`; keep maintainer-only refresh routing here.
 - Refresh `swift-api-design` from `swiftlang/swift-org-website/documentation/api-design-guidelines/index.md` until the live Swift.org page demonstrably migrates to a different substantive source. (Codex learning)
 
@@ -177,13 +177,13 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Before marking an existing issue `ready-for-agent`, `triage` must harden that single issue through `$plan-harder` and preserve the resulting agent brief in the tracker.
 
 ### Maintainer skill
-- The `.agents/skills/Maintainer` skill is the default maintainer for improving existing skills and plugins in this repository through shared upgrade tasks and skill-specific refresh workflows.
-- `Maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills and plugins in this repository.
-- Keep `Maintainer` self-contained: workflow markdown guidance must live under `.agents/skills/Maintainer/references/`.
-- Keep the dependency direction one-way: runtime skills must not depend on, reference, or route users to `.agents/skills/Maintainer`; only repo-level maintainer docs may route work to `Maintainer`.
-- When updating skill or plugin metadata/docs across the repo, route through the `Maintainer` playbooks and keep README/openai metadata text aligned.
+- The `.agents/skills/maintainer` skill is the default maintainer for improving existing skills and plugins in this repository through shared upgrade tasks and skill-specific refresh workflows.
+- `maintainer` is the only maintainer skill that should orchestrate upgrades, metadata sync, reference refresh, and other repository maintenance for existing skills and plugins in this repository.
+- Keep `maintainer` self-contained: workflow markdown guidance must live under `.agents/skills/maintainer/references/`.
+- Keep the dependency direction one-way: runtime skills must not depend on, reference, or route users to `.agents/skills/maintainer`; only repo-level maintainer docs may route work to `$maintainer`.
+- When updating skill or plugin metadata/docs across the repo, route through the `maintainer` playbooks and keep README/openai metadata text aligned.
 - Keep instruction-density reviews proposal-first: identify lower-instruction equivalents, then wait for explicit approval before compaction refactors.
-- For brand-new skill creation, use `$skill-creator` first; use `Maintainer` afterward only for repo integration or follow-up maintenance. (Codex learning)
+- For brand-new skill creation, use `$skill-creator` first; use `$maintainer` afterward only for repo integration or follow-up maintenance. (Codex learning)
 - Keep Codex-dependency audits and TanStack Intent coverage refresh as explicit maintainer-owned maintenance tracks; do not spread those maintenance workflows into runtime skills. (Codex learning)
 - Keep TanStack skills coverage alignment against `tanstack-skills/tanstack-skills/plugins` as an explicit maintainer-owned maintenance track; map upstream product plugins into the single reusable `skills/tanstack/` skill and verify product guidance against TanStack-owned docs. (Codex learning)
 - During Codex dependency audits, require Codex-dependent skills to name their required Codex tools or runtime contracts precisely, and require portable skills to keep Codex-only helpers optional with a generic fallback.

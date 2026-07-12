@@ -10,7 +10,7 @@ asset and validating the runtime OKF skill from within `Maintainer`.
 - Refresh `skills/okf/assets/manifest.json`.
 - Review and update `skills/okf/references/*.md` only when local routing or
   guidance materially drifts from the official spec.
-- Keep refresh tooling under `.agents/skills/Maintainer/`.
+- Keep refresh tooling under `.agents/skills/maintainer/`.
 
 ## Source Of Truth
 
@@ -24,18 +24,18 @@ Do not switch source repositories unless the official OKF project moves.
 ## Tooling
 
 - Refresh script:
-  `./.agents/skills/Maintainer/scripts/okf_spec_refresh.py`
+  `./.agents/skills/maintainer/scripts/okf_spec_refresh.py`
 - Check script:
-  `./.agents/skills/Maintainer/scripts/okf_spec_check.py`
+  `./.agents/skills/maintainer/scripts/okf_spec_check.py`
 
 ## Refresh Flow
 
 1. Check freshness:
-   - `python3 .agents/skills/Maintainer/scripts/okf_spec_refresh.py --check-stale`
+   - `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py --check-stale`
 2. If stale, refresh:
-   - `python3 .agents/skills/Maintainer/scripts/okf_spec_refresh.py`
+   - `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py`
 3. Validate runtime package shape:
-   - `python3 .agents/skills/Maintainer/scripts/okf_spec_check.py`
+   - `python3 .agents/skills/maintainer/scripts/okf_spec_check.py`
 4. Run runtime CLI tests:
    - `python3 -m unittest discover -s skills/okf/tests`
 5. Review fast-path references only if the spec changed:
@@ -46,8 +46,8 @@ Do not switch source repositories unless the official OKF project moves.
 
 ## Validation
 
-- `python3 -m py_compile .agents/skills/Maintainer/scripts/okf_spec_refresh.py .agents/skills/Maintainer/scripts/okf_spec_check.py`
-- `python3 .agents/skills/Maintainer/scripts/okf_spec_refresh.py --check-stale`
-- `python3 .agents/skills/Maintainer/scripts/okf_spec_check.py`
+- `python3 -m py_compile .agents/skills/maintainer/scripts/okf_spec_refresh.py .agents/skills/maintainer/scripts/okf_spec_check.py`
+- `python3 .agents/skills/maintainer/scripts/okf_spec_refresh.py --check-stale`
+- `python3 .agents/skills/maintainer/scripts/okf_spec_check.py`
 - `python3 -m unittest discover -s skills/okf/tests`
 - `git diff --check`

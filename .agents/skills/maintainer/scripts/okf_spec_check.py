@@ -108,7 +108,7 @@ def main() -> int:
 
     runtime_docs = [SKILL_PATH] + [REFERENCES_DIR / name for name in REQUIRED_REFERENCE_FILES]
     forbidden = [
-        ".agents/skills/Maintainer",
+        ".agents/skills/maintainer",
         "okf_spec_refresh.py",
         "okf_spec_check.py",
         "refresh okf spec",
