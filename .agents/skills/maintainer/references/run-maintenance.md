@@ -20,6 +20,7 @@ or other default maintenance requests.
   - Codex-dependency labeling and optional-tool fallback clarity
   - directly coupled `README.md` or `AGENTS.md` wording drift
 - Do not infer domain `refresh` or brand-new skill creation from bare `run`.
+- Do not infer workflow-family hardening, package migration/retirement, or substantial reshapes from bare `run`.
 - If a candidate change is strategic, high-ambiguity, or likely to alter intent, report it as follow-up instead of auto-applying it here.
 
 ## Workflow

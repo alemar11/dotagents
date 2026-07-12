@@ -22,6 +22,7 @@ or more existing skills or plugins.
   - `.agents/plugins/marketplace.json`
   - directly coupled mentions in `README.md` or `AGENTS.md`
 - Do not refresh domain best-practices content unless the user explicitly asks for `refresh`.
+- If the requested change merges/removes public packages, changes public invocation, redistributes major responsibilities, moves standalone skills into a plugin, or breaks a handoff schema, stop this playbook and route through `$skill-creator` or `$plugin-creator` first. Resume with `package-lifecycle.md` for integration and cleanup.
 
 ## Workflow
 1. Identify the target skill, plugin, or mixed target set and inspect each current package:
@@ -43,7 +44,7 @@ or more existing skills or plugins.
    - referenced scripts/docs exist
    - no contradictory instructions were introduced
    - `references/` markdown naming still follows repo policy
-6. Finish with `references/release-checklist.md` and report `PASS`, `PASS (NOOP)`, or `FAIL`.
+6. Select the applicable lanes from `references/validation-matrix.md`, finish with `references/release-checklist.md`, and report `PASS`, `PASS (NOOP)`, or `FAIL`.
 
 ## Parallel Subagent Pattern
 - Use internal subagents when the active runtime policy permits and the split materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.

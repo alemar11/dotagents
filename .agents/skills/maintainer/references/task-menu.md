@@ -1,6 +1,6 @@
 # Maintainer Task Menu
 
-Use this file when the user asks what the `Maintainer` skill can do or when a
+Use this file when the user asks what the `$maintainer` skill can do or when a
 maintenance request needs to be routed to a concrete task.
 
 ## Tasks
@@ -19,17 +19,28 @@ maintenance request needs to be routed to a concrete task.
      checks.
    - Finish with audit and release-style reporting when the scope is broader
      than metadata-only alignment.
-2. `audit consistency`
+2. `harden workflow family`
+   - Use representative sessions, logs, tests, or live failures to repair a
+     connected skill/plugin workflow.
+   - Confirm ownership, authority, handoffs, sources of truth, validation, and
+     closeout before changing contracts.
+   - Require regression coverage for accepted behavior defects.
+3. `migrate or retire package`
+   - Merge, rename, move, bundle, replace, or retire existing skills/plugins.
+   - Use `$skill-creator` or `$plugin-creator` first for substantial reshapes,
+     then return here for repo integration, stale-surface cleanup, validation,
+     versioning, install/cache checks, and release reporting.
+4. `audit consistency`
    - Run structure, rules, and reference checks across the repo or the touched
      skills.
-3. `review instruction density`
+5. `review instruction density`
    - Inspect one or more existing skills or plugins and identify where the same
      runtime behavior can be achieved with fewer instructions.
    - Classify each proposal as `safe trim`, `move to reference`,
      `behavior-risk`, or `leave as-is`.
    - Return a read-only proposal first; do not refactor, edit, or commit
      compaction changes until the user explicitly approves that refactor.
-4. `review skill descriptions`
+6. `review skill descriptions`
    - Inspect `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short
      descriptions, and README one-liners for length, clarity, selection value,
      and alignment.
@@ -39,19 +50,19 @@ maintenance request needs to be routed to a concrete task.
    - Return proposed wording first when behavior or invocation boundaries could
      change; apply safe metadata trims directly during approved maintenance
      passes.
-5. `audit codex dependencies`
+7. `audit codex dependencies`
    - Verify which skills are Codex-dependent versus portable, keep the repo
      inventory current, and ensure Codex-specific tools or filesystem contracts
      are named precisely.
-6. `refresh swift-docc references`
+8. `refresh swift-docc references`
    - Check the bundled Swift-DocC manifest, refresh the local
      `DocCDocumentation.docc` asset tree when stale, and validate or tighten the
      local `references/*.md` fast paths.
-7. `refresh swift-api-design references`
+9. `refresh swift-api-design references`
    - Check the bundled Swift API Design manifest, refresh the local guideline
      source file when stale, and validate the local `references/*.md` routing
      layer.
-8. `refresh tanstack intent coverage`
+10. `refresh tanstack intent coverage`
    - Review the current TanStack Intent registry and relevant TanStack package
      skill pages for `skills/tanstack/`.
    - Update local skill metadata, `$tanstack` routing, `references/*.md` fast
@@ -61,7 +72,7 @@ maintenance request needs to be routed to a concrete task.
      entrypoint, with dense product and domain slices living under `references/`
      instead of separate narrow skill directories.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-9. `refresh tanstack skills coverage`
+11. `refresh tanstack skills coverage`
    - Compare local `skills/tanstack/` product-level references against the
      upstream `tanstack-skills/tanstack-skills` plugin tree.
    - Ignore upstream bundle aliases such as `tanstack-all`, `tanstack-core`,
@@ -70,7 +81,7 @@ maintenance request needs to be routed to a concrete task.
    - Verify product-specific API and best-practice details against
      TanStack-owned docs before updating local runtime guidance.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-10. `refresh codex tool surface`
+12. `refresh codex tool surface`
    - Inspect the currently exposed Codex subagent and Codex App thread tools,
      including spawn, wait, send/resume/close, create-thread,
      read/rename/archive/handoff, and related lifecycle operations.
@@ -80,7 +91,7 @@ maintenance request needs to be routed to a concrete task.
      behavior, lifecycle capabilities, or authorization boundaries have
      materially changed.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
-11. `refresh okf spec`
+13. `refresh okf spec`
    - Check `skills/okf/assets/manifest.json` and the bundled official spec copy
      against `GoogleCloudPlatform/knowledge-catalog/okf/SPEC.md`.
    - Refresh `skills/okf/assets/spec.md` and the manifest when stale.

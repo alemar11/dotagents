@@ -1,5 +1,5 @@
 interface:
   display_name: "Maintainer"
-  short_description: "Maintain repo skills and plugins through metadata, consistency, and refresh workflows."
+  short_description: "Maintain and re-engineer repo skills and plugins through evidence, lifecycle, validation, and refresh workflows."
   brand_color: "#B85C00"
-  default_prompt: "Run the requested maintenance workflow for one or more skills or plugins in this repository. Treat maintenance as one unified task: if the user gives no targets, do a repo-wide pass; if the user names skills or plugins, do targeted maintenance; if the user asks for metadata, docs, or description alignment, stay in metadata-only mode. For instruction-density reviews, propose lower-instruction equivalents first and do not refactor until approved."
+  default_prompt: "Run the requested maintenance workflow for existing skills or plugins in this repository. Route bare requests to conservative maintenance, named targets to scoped upgrades, runtime failures to workflow-family hardening, and package moves or removals to lifecycle maintenance. Use creator-first routing for substantial reshapes, select validation by change type, and keep instruction-density reviews proposal-first."

@@ -77,6 +77,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 ## Skill Dependencies
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
+- `maintainer` uses `$skill-audit` when workflow hardening needs portfolio or session evidence, requires `$skill-creator` or `$plugin-creator` for substantial package reshapes, and requires `$autoreview` for non-trivial implementation closeout.
 - `codex-orchestrator` requires `$autoreview` and the relevant GitStack bundled skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work. It routes rough new feature intent and existing PRDs without generated implementation issues through `$plan-feature` before scheduling implementation work.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
@@ -87,7 +88,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 | Skill | Path | Purpose |
 | --- | --- | --- |
-| maintainer | `.agents/skills/maintainer/` | Maintain repo skills and plugins through metadata, description, consistency, and refresh workflows. |
+| maintainer | `.agents/skills/maintainer/` | Maintain and re-engineer repo skills and plugins through evidence, lifecycle, validation, metadata, and explicit refresh workflows. |
 
 Project-local skills are repository-specific and are not included in reusable install commands.
 

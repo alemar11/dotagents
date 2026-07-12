@@ -50,10 +50,11 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Dependency Classification
 - In this section, `portable` means "not dependent on Codex-only runtime features"; it does not necessarily mean the skill is repository-agnostic or broadly reusable unchanged.
-- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `codex-orchestrator`, and `skill-audit`.
+- Current Codex-dependent skills are `autoreview`, `codex-changelog`, `code-wiki`, `learn`, `maintainer`, `codex-orchestrator`, and `skill-audit`.
 - Treat `autoreview` as Codex-dependent because its runtime contract shells through local `git` and Codex CLI `exec` with structured output flags (`--output-schema`, `--output-last-message`) and read-only review execution.
 - Treat `code-wiki` as Codex-dependent because its runtime contract requires Codex subagents for parallel repo study when available, `$imagegen` for selected raster wiki visuals, and `~/.cache/dotagents/skills/code-wiki/` as its disposable clone/analysis cache.
 - Treat `codex-orchestrator` as Codex-dependent because its runtime contract requires Codex CLI subagent tools, Codex App thread tools for explicitly consented visible workers, Codex Goal mode when available with a ledger fallback when unavailable, Codex GitHub code review requests for authorized merge-ready pull-request closeout, ledger-driven progress monitoring, scheduled ledger checks when authorized and runtime-supported, `~/.cache/dotagents/skills/codex-orchestrator/ledgers/`, `$autoreview`, `$plan-feature` for feature planning or existing PRD issue generation before implementation scheduling, and GitStack bundled skills for Git and GitHub workflows.
+- Treat `.agents/skills/maintainer` as Codex-dependent because workflow-family hardening uses `$skill-audit` plus Codex memory/session evidence for portfolio or runtime invocation claims, substantial reshapes require `$skill-creator` or `$plugin-creator`, and non-trivial implementation closeout requires `$autoreview`.
 - Treat `crusty` as Codex-aware but portable because direct-only invocation policy and optional subagents are Codex-aware, while its core challenge workflow can run sequentially with generic web/search fallback.
 - Treat `plan-harder` as Codex-aware but portable because Codex-only helpers such as `request_user_input` or subagents are optional and have a non-Codex fallback path.
 - Treat `grill-me` as Codex-aware but portable because structured question helpers such as `request_user_input` are optional; its fallback is plain one-question-at-a-time dialogue.
@@ -66,7 +67,6 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat GitStack as Codex-dependent because its bundled workflows require the official GitHub connector. Its shared CLI fallback remains runtime-dependent on Python 3.11+, local `git`, and authenticated `gh`.
 - Treat `okf` as portable runtime-dependent because it requires `python3` for its shipped `scripts/okf` CLI, uses optional `PyYAML` when available for exact YAML parsing, and otherwise relies on local markdown/spec assets without Codex-only runtime tools.
 - Treat `tanstack` as portable because it is guidance-only, relies on local repo/package inspection plus current TanStack-owned docs when exact APIs matter, and does not require Codex-only runtime tools.
-- Treat `.agents/skills/maintainer` as a portable project-local maintainer skill because it relies on this repository layout and local shell/docs workflows, while any subagent usage remains optional.
 - Treat `xcode-changelog` as portable and runtime-dependent on macOS plus network access: it requires `python3`, `xcodebuild`, `xcode-select`, `plutil`, and outbound access to Apple’s documentation endpoints.
 - When a skill becomes Codex-dependent or stops being Codex-dependent, update this section in the same change as the skill docs.
 - Keep this list updated whenever a skill is added, removed, renamed, or its portability boundary changes.
@@ -187,6 +187,9 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep Codex-dependency audits and TanStack Intent coverage refresh as explicit maintainer-owned maintenance tracks; do not spread those maintenance workflows into runtime skills. (Codex learning)
 - Keep TanStack skills coverage alignment against `tanstack-skills/tanstack-skills/plugins` as an explicit maintainer-owned maintenance track; map upstream product plugins into the single reusable `skills/tanstack/` skill and verify product guidance against TanStack-owned docs. (Codex learning)
 - During Codex dependency audits, require Codex-dependent skills to name their required Codex tools or runtime contracts precisely, and require portable skills to keep Codex-only helpers optional with a generic fallback.
+- Route representative runtime failures and cross-skill ownership defects through `$maintainer` workflow-family hardening; keep `$skill-audit` read-only and let `$maintainer` own approved contract changes and regression coverage.
+- Route substantial skill/plugin merges, removals, public invocation changes, and standalone-to-plugin moves through `$skill-creator` or `$plugin-creator` first, then return to `$maintainer` for lifecycle cleanup, metadata, validation, and release checks.
+- Select maintainer validation by change type. Plugin and CLI maintenance must verify shipped artifacts and installed/cache state; composed-workflow changes require focused contract tests and bounded scenario proof when risk justifies it.
 
 ### Codex Changelog skill
 - Keep `codex-changelog` as a Codex-dependent reusable skill under `skills/codex-changelog/`; release-source selection and output formatting belong in its own `SKILL.md` and references, not in this `AGENTS.md`.

@@ -2,38 +2,79 @@
 
 Run this checklist before finalizing maintainer updates.
 
-## Pre-commit Validation
-1. Metadata and docs
-- Confirm skill names/descriptions are aligned across `SKILL.md`, `agents/openai.yaml`, and README entries.
-- Confirm touched descriptions are compact and do not duplicate detailed trigger, workflow, or guardrail text from the skill body.
-- Confirm no stale references to removed or renamed skills.
-- If Codex-dependency boundaries changed, confirm `AGENTS.md` and the maintainer playbooks reflect the updated classification.
+## 1. Resolve Scope And Lanes
 
-2. Structural consistency
-- Confirm required skill files exist.
-- Confirm `references/` markdown naming policy is respected.
-- Confirm Codex-dependent skills name their required Codex tools/runtime contracts explicitly, and portable skills keep Codex-only helpers optional.
+- Confirm the requested packages and directly coupled repo docs.
+- Select every applicable lane from `validation-matrix.md`.
+- Confirm substantial reshapes used `$skill-creator` or `$plugin-creator` first.
+- Confirm unrelated dirty worktree changes are preserved and excluded.
 
-## Command Set (Typical)
-- `find . -type f -name 'SKILL.md' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
-- `find . -type f -path '*/agents/openai.yaml' -not -path '*/.git/*' -not -path '*/.cache/*' | sort`
-- `rg -n "\\.agents/skills/maintainer|agents/openai.yaml|SKILL.md" -S`
-- `rg -n "request_user_input|subagent|\\$CODEX_HOME|~/.codex|Codex CLI|Codex App|MEMORY.md|memory_summary.md" -S`
+## 2. Package And Policy Consistency
+
+- Align skill names/descriptions across `SKILL.md`, `agents/openai.yaml`, README,
+  manifests, and marketplace entries in scope.
+- Verify required files, lowercase `references/*.md` names, and referenced
+  scripts/docs.
+- Scan for stale names, paths, invocations, dependencies, install prompts, and
+  retired discovery surfaces.
+- Reconcile Codex-dependency classification and runtime/maintenance boundaries.
+- For plugin changes, verify the semantic version bump, embedded CLI alignment,
+  deterministic artifact, install/cache parity, and clean reinstall.
+
+## 3. Execute Validation
+
+- Run every selected validation lane and record its commands and results.
+- Run `$autoreview` for non-trivial implementations and resolve or explicitly
+  disposition accepted findings.
+- Treat a missing required lane as `FAIL` unless the user explicitly accepts a
+  narrower result.
+
+## 4. Review Evidence Efficiently
+
+During iteration use:
+
+- `git status --short --branch`
 - `git diff --stat`
-- `git diff`
+- `git diff --name-only`
+- `git diff --check`
+- focused `git diff -- <paths>`
 
-## Parallelism Guardrail
-- Read-only manifest listing and grep-style checks may run concurrently or through explorer subagents.
-- Keep `git diff --stat`, `git diff`, final findings cleanup, and final PASS/FAIL report assembly in the main agent.
-- If the broader maintenance task also includes a commit, keep post-commit verification sequential to avoid stale state.
+Read the complete relevant diff once before final review and publication. Carry
+artifact paths/refs, fingerprints, changed sections, proof results, and failed
+gate excerpts instead of repeatedly reproducing complete unchanged artifacts.
 
-## Final Report Template
-- Scope: `<what was covered>`
-- Commands run: `<ordered list of key commands>`
-- Files changed: `<absolute or repo-relative paths>` or `none`
-- Why changed: `<meaningful-change rationale per changed file>` or `NOOP (no meaningful updates needed)`
+## 5. Commit And Publication
+
+Resolve commit, push, PR, and other publication authority independently.
+Otherwise stop after validation and report the dirty diff without staging or
+changing Git history.
+
+- With explicit commit authority, stage only explicit paths, inspect the staged
+  diff, and split multiple skills/plugins or distinct migration intents into
+  meaningful commits.
+- With push-only authority, do not stage or commit. Verify the existing commit
+  range and push only those commits.
+- With PR or other publication authority, use the matching publication workflow
+  and its own scope rules. Do not infer commit authority from a bare PR request,
+  or PR/publication authority from commit or push authority.
+- Prefer the matching GitStack workflow when installed. Direct scoped `git` is
+  the fallback for explicitly authorized commit/push operations when GitStack is
+  unavailable.
+- After an authorized commit or push, verify the exact commit range, branch
+  divergence, and that authorized paths plus the staged set are clean. Confirm
+  unrelated pre-existing changes remain unchanged; global worktree cleanliness
+  is not required. Do not claim an external mutation from a suggestion or
+  attempted command; verify resulting state.
+
+## Final Report
+
+- Scope: `<packages and workflow covered>`
+- Validation lanes: `<selected lanes>`
+- Commands run: `<key commands in order>`
+- Files changed: `<paths>` or `none`
+- Why changed: `<rationale per target>` or `NOOP`
+- Runtime evidence: `<sessions/logs/tests used>` or `not applicable`
+- Artifacts/install state: `<versions, fingerprints, cache/reinstall proof>` or `not applicable`
 - Result: `PASS`, `PASS (NOOP)`, or `FAIL`
-- Findings:
-  - `P1/P2` blocking items
-  - `WARN` cleanup items
-- Follow-ups: `<optional next actions>`
+- Findings: `<blocking and warning items>`
+- Follow-ups: `<deferred work>`

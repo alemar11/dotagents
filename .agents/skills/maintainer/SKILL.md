@@ -1,27 +1,42 @@
 ---
 name: maintainer
-description: Maintain repo skills and plugins through metadata, description, consistency, and refresh workflows.
+description: Maintain and re-engineer existing repo skills and plugins through targeted upgrades, runtime-evidence workflow hardening, package migrations, metadata alignment, validation, and explicit refresh workflows.
 ---
 
 # Maintainer
 
 ## Goal
-Use this project-maintainer skill to maintain existing skills and plugins in this repository. Its primary job is to inspect one or more local packages, apply concrete docs, metadata, and workflow improvements, and keep repo-level maintainer docs aligned.
+Use this project-maintainer skill to maintain existing skills and plugins in this repository. Its primary job is to turn repository or runtime evidence into scoped package improvements and keep implementation, metadata, validation, and repo-level maintainer docs aligned.
 Treat maintenance as one unified task:
 - repo-wide pass when the user invokes `$maintainer` generically with a bare imperative such as `run` or `run your tasks`
 - targeted maintenance when the user names one or more existing skills or plugins
 - metadata-only maintenance when the user explicitly asks to align or sync docs/metadata
+- workflow-family hardening when recent executions expose a cross-skill ownership, authority, closeout, or efficiency defect
+- package lifecycle work when an existing skill or plugin must be merged, renamed, moved, bundled, replaced, or retired
 
 For the repo-wide pass, inspect the local skills and plugins, choose the ones with clear actionable drift, apply safe scoped upgrades, then run sync, audit, and release-style checks.
 Treat domain-refresh work as explicit tasks, not default behavior. For brand-new skills, start with `$skill-creator`; this skill is for maintaining and integrating existing skill and plugin packages.
 
+## Runtime Dependencies
+
+This project-local skill is Codex-dependent for its full maintenance contract.
+Workflow-family hardening uses `$skill-audit` plus Codex memory/session evidence
+when making portfolio or runtime invocation/routing/cost claims; reproducible
+tests, supplied logs, or live failures may establish other defects directly.
+Substantial reshapes require `$skill-creator` or `$plugin-creator`, and
+non-trivial implementation closeout requires `$autoreview`. It also relies on
+the local repository filesystem plus direct shell and `git` inspection.
+
 ## User-facing Capability Summary
-If the user asks what this skill can do, answer with two capability groups:
+If the user asks what this skill can do, answer with three capability groups:
 
 1. Maintain existing skills or plugins through targeted package/docs/metadata
    updates, description and instruction-density reviews, consistency checks, and
    Codex-dependency audits.
-2. Run explicit skill-specific refresh workflows for Swift-DocC, Swift API
+2. Harden composed workflow families from representative runtime evidence, or
+   migrate and retire existing skill/plugin packages with creator-first reshape
+   routing and lifecycle validation.
+3. Run explicit skill-specific refresh workflows for Swift-DocC, Swift API
    Design, TanStack coverage, Codex worker/thread surfaces, and OKF.
 
 For the exact user-facing task menu, open `references/task-menu.md`.
@@ -45,6 +60,8 @@ Use this skill when users ask to:
 - Refresh or audit the Codex worker/thread tool surface, especially subagent spawning, subagent lifecycle, Codex App thread creation, visible worker behavior, or `codex-orchestrator` worker-surface contracts
 - Refresh the bundled OKF spec or align `skills/okf/` with the latest official Open Knowledge Format spec from `GoogleCloudPlatform/knowledge-catalog`
 - Integrate a newly scaffolded skill or plugin into repo metadata after `$skill-creator` or `$plugin-creator` has already created the package
+- Harden a connected workflow family after sessions, logs, tests, or live failures expose recurring behavioral drift
+- Merge, rename, move, bundle, replace, or retire an existing skill or plugin
 
 ## Workflow
 1) Route the request with `references/maintenance-router.md`.
@@ -52,17 +69,19 @@ Use this skill when users ask to:
    - repo-wide pass -> `references/run-maintenance.md`
    - targeted maintenance -> `references/skill-upgrade.md`
    - metadata-only alignment -> `references/metadata-sync.md`
-3) For structure and rules checks, follow `references/doc-consistency.md`.
-4) For description alignment or compaction, follow `references/metadata-sync.md`; use `references/instruction-density-review.md` first when compaction could weaken behavior.
-5) For instruction-density reviews, follow `references/instruction-density-review.md`.
-6) For Codex dependency audits and portability-boundary checks, follow `references/codex-dependency-audit.md`.
-7) For Swift-DocC bundled-reference refresh, follow `references/swift-docc-refresh.md`.
-8) For Swift API Design bundled-reference refresh, follow `references/swift-api-design-refresh.md`.
-9) For TanStack Intent coverage refresh on `skills/tanstack/`, follow `references/tanstack-intent-refresh.md`.
-10) For TanStack skills coverage refresh on `skills/tanstack/`, follow `references/tanstack-skills-alignment.md`.
-11) For Codex worker/thread tool surface refresh, follow `references/codex-tool-surface-refresh.md`.
-12) For OKF official spec refresh on `skills/okf/`, follow `references/okf-spec-refresh.md`.
-13) Before finishing, run `references/release-checklist.md` and report pass/fail with actionable findings.
+3) For runtime-evidence or composed-workflow hardening, follow `references/workflow-family-hardening.md`.
+4) For package migrations, replacements, or retirements, follow `references/package-lifecycle.md`.
+5) For structure and rules checks, follow `references/doc-consistency.md`.
+6) For description alignment or compaction, follow `references/metadata-sync.md`; use `references/instruction-density-review.md` first when compaction could weaken behavior.
+7) For instruction-density reviews, follow `references/instruction-density-review.md`.
+8) For Codex dependency audits and portability-boundary checks, follow `references/codex-dependency-audit.md`.
+9) For Swift-DocC bundled-reference refresh, follow `references/swift-docc-refresh.md`.
+10) For Swift API Design bundled-reference refresh, follow `references/swift-api-design-refresh.md`.
+11) For TanStack Intent coverage refresh on `skills/tanstack/`, follow `references/tanstack-intent-refresh.md`.
+12) For TanStack skills coverage refresh on `skills/tanstack/`, follow `references/tanstack-skills-alignment.md`.
+13) For Codex worker/thread tool surface refresh, follow `references/codex-tool-surface-refresh.md`.
+14) For OKF official spec refresh on `skills/okf/`, follow `references/okf-spec-refresh.md`.
+15) Before finishing, select the applicable lanes from `references/validation-matrix.md`, then run `references/release-checklist.md` and report pass/fail with actionable findings.
 
 ## References
 
@@ -70,6 +89,9 @@ Use this skill when users ask to:
 - `references/task-menu.md`: exact user-facing task menu and capability details.
 - `references/run-maintenance.md`: use for proactive repo maintenance across one or more existing skills or plugins.
 - `references/skill-upgrade.md`: use for scoped improvements to one or more existing skills or plugins.
+- `references/workflow-family-hardening.md`: use runtime evidence to harden ownership and handoffs across a connected workflow family.
+- `references/package-lifecycle.md`: use for existing-package merges, renames, moves, bundling, replacements, and retirement.
+- `references/validation-matrix.md`: select validation by the changed package and behavior surface.
 - `references/metadata-sync.md`: use for `SKILL.md`, `agents/openai.yaml`, and repo-doc alignment.
 - `references/skill_openai_metadata.md`: field-shape reference for maintaining `agents/openai.yaml` UI metadata.
 - `references/doc-consistency.md`: use for repository-wide structure and policy checks.
@@ -101,6 +123,7 @@ Use this skill when users ask to:
 - Prefer concrete skill-level improvements over neutral orchestration language.
 - Do not infer `refresh` or new-skill creation from generic maintenance requests.
 - Use `$skill-creator` first when the user wants to create a brand-new skill.
+- Use `$skill-creator` or `$plugin-creator` first for substantial public package reshapes; return here for repo integration, lifecycle cleanup, validation, and release checks.
 - Keep changes scoped to the selected or discovered skills.
 - Keep internal delegation within the active runtime policy and the user's scope; do not treat it as authority for external writes or broader maintenance.
 - If no meaningful updates are needed, return `PASS (NOOP)` and avoid persistent file edits.
