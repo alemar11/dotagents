@@ -60,6 +60,7 @@ scope only when it is registered as a workstream.
 | `delivery_mode` | `local-only`, `pull-request`, `direct-commit` | `local-only` for ad hoc sources | PRD-backed sources inherit their canonical value. |
 | `delivery_source` | `runtime-default`, `feature-level-inherited`, `issue-level-override`, `owner-instruction` | `runtime-default` for ad hoc sources | Source refs and authorization evidence remain separate data. |
 | `pr_closeout` | `merge-ready`, `draft-only`, `not-applicable` | `merge-ready` for `pull-request`; otherwise `not-applicable` | `draft-only` requires canonical source or owner evidence. |
+| `codex_review_policy` | `required`, `skip`, `not-applicable` | `required` for `pull-request` with `pr_closeout=merge-ready`; otherwise `not-applicable` | `skip` requires scoped owner-instruction evidence resolved to the exact workstream. |
 | `pr_shape` | `single-pr`, `per-repo-pr`, `none` | Inherited for PRD-backed work; `none` for ad hoc `local-only` | Repository refs and branch names remain separate data. |
 | `closeout_mode` | `feature-pr-closes-issue`, `repo-pr-closes-issue`, `direct-commit-closes-issue`, `local-done-move-after-proof`, `not-applicable` | Inherited for PRD-backed work; `not-applicable` for ad hoc work | Completion refs and proof remain separate data. |
 | `integration_mode` | `single-repo-pr`, `repo-pr`, `direct-commit`, `not-applicable` | Inherited for PRD-backed work; otherwise `not-applicable` | Integration refs and proof remain separate data. |
@@ -67,6 +68,10 @@ scope only when it is registered as a workstream.
 `branch_name` is required scoped data, not an enum option. Record it in the
 same six-column resolution table for every workstream scope; use
 `not-applicable` only with `delivery_mode=local-only`.
+`current_pr_ref` is parallel runtime-derived scoped data. Use canonical
+`<owner>/<repo>#<number>` after publication, `pending` before a pull-request
+vehicle exists, and `not-applicable` for non-PR delivery. Refresh it from live
+GitHub state before any review-policy action.
 `scope_transfer_ref` is also required scoped data. Use `not-applicable` when no
 generated-issue authority transfer exists; otherwise use the exact
 `issue:<NN>` scope whose current handoff supplied the preserved authority.
@@ -92,8 +97,8 @@ Record exactly one row per Session Registry field and one row each for
 `worker_limit` and `app_thread_limit` before any dispatch. Record exactly one
 row per Discovery Source Registry field for every `source:<Source ID>`. Record
 exactly one row per Per-Workstream Registry field for every
-`workstream:<id>`, plus `branch_name`, `scope_transfer_ref`, and
-`issue_mutation_transfer_ref` data rows, before dispatch or mutation in that
+`workstream:<id>`, plus `branch_name`, `current_pr_ref`, `scope_transfer_ref`,
+and `issue_mutation_transfer_ref` data rows, before dispatch or mutation in that
 workstream; use the canonical default or
 `not-applicable` value instead of omitting an inactive field:
 
@@ -103,6 +108,7 @@ workstream; use the canonical default or
 | `source:<Source ID>:source_mutation_authority` | `source:<Source ID>` | `source_mutation_authority` | `<canonical value>` | <allowed source for this field/value below> | `<instruction, source, or tool ref or none>` |
 | `<scope_id>:<field>` | `workstream:<id>` | `<Per-Workstream Registry field>` | `<canonical value>` | <allowed source for this field/value below> | `<instruction, source, or tool ref or none>` |
 | `<scope_id>:branch_name` | `workstream:<id>` | `branch_name` | `<exact branch or not-applicable>` | <allowed branch source below> | `<source or owner evidence>` |
+| `<scope_id>:current_pr_ref` | `workstream:<id>` | `current_pr_ref` | `<owner/repo#number, pending, or not-applicable>` | `runtime-derived` | `<current PR URL or none>` |
 | `<scope_id>:scope_transfer_ref` | `workstream:<id>` | `scope_transfer_ref` | `<issue:<NN> or not-applicable>` | `source-contract`, `default`, or `runtime-derived` | `<exact source handoff evidence or none>` |
 | `<scope_id>:issue_mutation_transfer_ref` | `workstream:<id>` | `issue_mutation_transfer_ref` | `<issue:<NN> or not-applicable>` | `source-contract`, `default`, or `runtime-derived` | `<exact source mutation evidence or none>` |
 
@@ -153,6 +159,7 @@ Resolution sources are field- and value-specific:
 | `delivery_mode=direct-commit` | `owner-instruction` naming the exact instruction, workstream scope, and target branch; or `source-contract` preserving that same owner evidence and branch data |
 | `branch_name=not-applicable` | `default` or `runtime-derived` |
 | Other `branch_name` data | `source-contract`, `owner-instruction`, `runtime-derived`, or `legacy-migration` |
+| `current_pr_ref` | `runtime-derived` from the current GitHub PR vehicle, or `not-applicable` for non-PR delivery |
 | `scope_transfer_ref=not-applicable` | `default` or `runtime-derived` |
 | `scope_transfer_ref=issue:<NN>` | `source-contract` with the exact current generated-issue evidence |
 | `issue_mutation_transfer_ref=not-applicable` | `default` or `runtime-derived` |
@@ -163,6 +170,9 @@ Resolution sources are field- and value-specific:
 | `pr_closeout=merge-ready` | `default`, `source-contract`, or `legacy-migration` |
 | `pr_closeout=draft-only` | `source-contract`, `owner-instruction`, or `legacy-migration` preserving owner evidence |
 | `pr_closeout=not-applicable` | `runtime-derived` from `delivery_mode`, or `legacy-migration` |
+| `codex_review_policy=required` | `default` or `legacy-migration` |
+| `codex_review_policy=skip` | `owner-instruction` preserving `owner-ref`, `scope-ref`, `target-ref`, and `pr-ref` evidence tokens; both scoped refs equal the exact workstream, while `pr-ref` is `not-applicable` for a workstream-scoped instruction or the immutable canonical PR named by a PR-scoped instruction |
+| `codex_review_policy=not-applicable` | `runtime-derived` from `delivery_mode` and `pr_closeout`, or `legacy-migration` |
 | `pr_shape`, `closeout_mode`, and `integration_mode` | `source-contract`, `runtime-derived`, or `legacy-migration` |
 
 `runtime-capability` may restrict execution or select a blocked/none value; it
@@ -235,13 +245,26 @@ unchanged.
   `merge_authority=explicit-owner-authorization` for the named PR or PR set.
 - `delivery_mode=pull-request` requires
   `pr_closeout=merge-ready` or `pr_closeout=draft-only` and requires
-  `pr_shape=single-pr` or `pr_shape=per-repo-pr`. Its `delivery_source` must be
+  `pr_shape=single-pr` or `pr_shape=per-repo-pr`, plus a `current_pr_ref` of
+  `pending` or the canonical live PR. Its `delivery_source` must be
   `feature-level-inherited`, `issue-level-override`, or `owner-instruction`.
+- `delivery_mode=pull-request` with `pr_closeout=merge-ready` requires
+  `codex_review_policy=required` or `codex_review_policy=skip`.
+  `codex_review_policy=skip` requires owner-instruction evidence scoped to the
+  exact workstream, with both `scope-ref` and `target-ref` equal to that
+  workstream. Preserve `pr-ref=not-applicable` for a workstream-scoped
+  instruction. For a PR-scoped instruction, preserve its immutable canonical
+  `<owner>/<repo>#<number>` as `pr-ref` and require it to equal the refreshed
+  `current_pr_ref`; a changed PR invalidates the row and resets the policy to
+  `required`. It never applies to another workstream by inheritance.
+- `delivery_mode=pull-request` with `pr_closeout=draft-only`, and every
+  non-`pull-request` delivery mode, requires
+  `codex_review_policy=not-applicable`.
 - `delivery_mode=local-only` requires `delivery_source=runtime-default`.
 - `delivery_mode=direct-commit` requires `delivery_source` to be
   `feature-level-inherited`, `issue-level-override`, or `owner-instruction`.
 - Other delivery modes require `pr_closeout=not-applicable` and
-  `pr_shape=none`.
+  `pr_shape=none`, plus `current_pr_ref=not-applicable`.
 - `delivery_mode=pull-request` permits `integration_mode=single-repo-pr`,
   `integration_mode=repo-pr`, or `integration_mode=not-applicable`.
 - `delivery_mode=direct-commit` permits `integration_mode=direct-commit` or

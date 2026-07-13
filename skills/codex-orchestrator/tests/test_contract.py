@@ -203,9 +203,11 @@ class OrchestratorContractTests(unittest.TestCase):
             "delivery_mode": ("pull-request", "source-contract", "issue-1"),
             "delivery_source": ("feature-level-inherited", "source-contract", "issue-1"),
             "branch_name": ("feature/example", "source-contract", "issue-1"),
+            "current_pr_ref": ("owner/repo#123", "runtime-derived", "https://github.com/owner/repo/pull/123"),
             "scope_transfer_ref": ("not-applicable", "default", "none"),
             "issue_mutation_transfer_ref": ("not-applicable", "default", "none"),
             "pr_closeout": ("merge-ready", "source-contract", "issue-1"),
+            "codex_review_policy": ("required", "default", "none"),
             "pr_shape": ("single-pr", "source-contract", "issue-1"),
             "closeout_mode": ("feature-pr-closes-issue", "source-contract", "issue-1"),
             "integration_mode": ("single-repo-pr", "source-contract", "issue-1"),
@@ -818,6 +820,127 @@ class OrchestratorContractTests(unittest.TestCase):
             )
             self.assertNotEqual(empty_evidence.returncode, 0)
 
+            required_review = row(
+                "workstream:a",
+                "codex_review_policy",
+                scoped_values["codex_review_policy"],
+            )
+            skip_evidence = (
+                "owner-ref=request-skip;scope-ref=workstream:a;"
+                "target-ref=workstream:a;pr-ref=not-applicable"
+            )
+            skipped_review = row(
+                "workstream:a",
+                "codex_review_policy",
+                ("skip", "owner-instruction", skip_evidence),
+            )
+            valid_skip = run(
+                complete_ids,
+                ledger_fixture.replace(required_review, skipped_review),
+            )
+            self.assertEqual(valid_skip.returncode, 0, valid_skip.stderr)
+
+            unscoped_skip = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    required_review,
+                    row(
+                        "workstream:a",
+                        "codex_review_policy",
+                        (
+                            "skip",
+                            "owner-instruction",
+                            skip_evidence.replace(
+                                "scope-ref=workstream:a",
+                                "scope-ref=workstream:b",
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            self.assertNotEqual(unscoped_skip.returncode, 0)
+
+            mismatched_skip_target = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    required_review,
+                    row(
+                        "workstream:a",
+                        "codex_review_policy",
+                        (
+                            "skip",
+                            "owner-instruction",
+                            skip_evidence.replace(
+                                "target-ref=workstream:a",
+                                "target-ref=workstream:b",
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            self.assertNotEqual(mismatched_skip_target.returncode, 0)
+
+            pr_scoped_skip_evidence = skip_evidence.replace(
+                "pr-ref=not-applicable",
+                "pr-ref=owner/repo#123",
+            )
+            valid_pr_scoped_skip = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    required_review,
+                    row(
+                        "workstream:a",
+                        "codex_review_policy",
+                        ("skip", "owner-instruction", pr_scoped_skip_evidence),
+                    ),
+                ),
+            )
+            self.assertEqual(
+                valid_pr_scoped_skip.returncode,
+                0,
+                valid_pr_scoped_skip.stderr,
+            )
+
+            mismatched_pr_scoped_skip = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    required_review,
+                    row(
+                        "workstream:a",
+                        "codex_review_policy",
+                        (
+                            "skip",
+                            "owner-instruction",
+                            pr_scoped_skip_evidence.replace(
+                                "pr-ref=owner/repo#123",
+                                "pr-ref=owner/repo#999",
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            self.assertNotEqual(mismatched_pr_scoped_skip.returncode, 0)
+
+            malformed_pr_scoped_skip = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    required_review,
+                    row(
+                        "workstream:a",
+                        "codex_review_policy",
+                        (
+                            "skip",
+                            "owner-instruction",
+                            pr_scoped_skip_evidence.replace(
+                                "pr-ref=owner/repo#123",
+                                "pr-ref=pr:123",
+                            ),
+                        ),
+                    ),
+                ),
+            )
+            self.assertNotEqual(malformed_pr_scoped_skip.returncode, 0)
+
             direct_evidence = (
                 "owner-ref=request-1;scope-ref=workstream:a;"
                 "target-ref=issue-1;target-branch=main"
@@ -836,7 +959,9 @@ class OrchestratorContractTests(unittest.TestCase):
                 "delivery_mode": ("direct-commit", "owner-instruction", direct_evidence),
                 "delivery_source": ("owner-instruction", "owner-instruction", direct_evidence),
                 "branch_name": ("main", "owner-instruction", direct_evidence),
+                "current_pr_ref": ("not-applicable", "runtime-derived", "none"),
                 "pr_closeout": ("not-applicable", "runtime-derived", "none"),
+                "codex_review_policy": ("not-applicable", "runtime-derived", "none"),
                 "pr_shape": ("none", "runtime-derived", "none"),
                 "closeout_mode": (
                     "direct-commit-closes-issue",
@@ -955,6 +1080,7 @@ class OrchestratorContractTests(unittest.TestCase):
                     "source-contract",
                     workstream_transfer_evidence,
                 ),
+                "current_pr_ref": ("not-applicable", "runtime-derived", "none"),
                 "scope_transfer_ref": (
                     "issue:01",
                     "source-contract",
@@ -966,6 +1092,7 @@ class OrchestratorContractTests(unittest.TestCase):
                     issue_mutation_transfer_evidence,
                 ),
                 "pr_closeout": ("not-applicable", "runtime-derived", "none"),
+                "codex_review_policy": ("not-applicable", "runtime-derived", "none"),
                 "pr_shape": ("none", "runtime-derived", "none"),
                 "closeout_mode": (
                     "direct-commit-closes-issue",
@@ -1221,15 +1348,21 @@ class OrchestratorContractTests(unittest.TestCase):
             "## Canonical PR Closeout Resolution",
         )
 
-        merge_ready = next(row for row in rows if row[:3] == [
-            "`pull-request`", "`prd-backed-pull-request`", "`merge-ready`"
+        merge_ready = next(row for row in rows if row[:4] == [
+            "`pull-request`", "`prd-backed-pull-request`", "`merge-ready`", "`required`"
         ])
-        self.assertIn("Codex review", merge_ready[4])
+        self.assertIn("Codex review", merge_ready[5])
 
-        draft_only = next(row for row in rows if row[:3] == [
-            "`pull-request`", "`prd-backed-pull-request`", "`draft-only`"
+        skip_review = next(row for row in rows if row[:4] == [
+            "`pull-request`", "`prd-backed-pull-request`", "`merge-ready`", "`skip`"
         ])
-        self.assertIn("do not mark ready", draft_only[4])
+        self.assertIn("skip Codex review request/wait", skip_review[5])
+        self.assertIn("parent closeout", skip_review[5])
+
+        draft_only = next(row for row in rows if row[:4] == [
+            "`pull-request`", "`prd-backed-pull-request`", "`draft-only`", "`not-applicable`"
+        ])
+        self.assertIn("do not mark ready", draft_only[5])
         self.assertNotIn(
             "| `delivery_mode` | `no_mutation_override` |",
             self.read("references/prd-backed-delivery.md"),
@@ -1252,6 +1385,55 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertNotIn("Session Codex App threads consented", worker)
         self.assertIn("option-resolution row", delivery)
         self.assertIn("Missing `pr_closeout` becomes `merge-ready` for", delivery)
+
+    def test_codex_review_policy_is_default_required_and_owner_scoped_skip(self) -> None:
+        options = self.read("references/options.md")
+        delivery = self.read("references/prd-backed-delivery.md")
+        gates = self.read("references/gates.md")
+        ledger = self.read("references/ledger.md")
+        worker = self.read("references/worker.md")
+
+        rows = self.table_rows(
+            "references/options.md",
+            "## Per-Workstream Authority And Delivery Registry",
+        )
+        policy = self.row_containing(rows, "`codex_review_policy`")
+        self.assertIn("`required`", policy[1])
+        self.assertIn("`skip`", policy[1])
+        self.assertIn("`not-applicable`", policy[1])
+        self.assertIn("`required` for `pull-request`", policy[2])
+        self.assertIn("scoped owner-instruction evidence", policy[3])
+
+        self.assertIn(
+            "`codex_review_policy=skip` | `owner-instruction` preserving `owner-ref`, `scope-ref`, `target-ref`, and `pr-ref`",
+            options,
+        )
+        self.assertIn("Never infer `skip` from silence", delivery)
+        self.assertIn("do not post `@codex review`", gates)
+        self.assertIn("Do not wait for pending or later feedback", gates)
+        self.assertIn("codex_review=skipped", gates)
+        self.assertIn(
+            "Merge-ready publication authority with either review policy",
+            delivery,
+        )
+        self.assertIn(
+            "authorizes disposition comments for already-known actionable feedback when\n  `codex_review_policy=skip`",
+            delivery,
+        )
+        self.assertIn(
+            "publication authority covers this disposition mutation for both `required` and `skip`",
+            " ".join(gates.split()),
+        )
+        self.assertIn("codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked>", ledger)
+        self.assertIn("codex_review_policy: <required|skip|not-applicable>", worker)
+        self.assertIn("`skip` permits `mark-ready`", worker)
+
+        plan_feature_root = ROOT / "skills" / "plan-feature" / "references"
+        for path in (
+            plan_feature_root / "issue-body-template.md",
+            plan_feature_root / "issue-phase.md",
+        ):
+            self.assertNotIn("codex_review_policy", path.read_text())
 
     def test_legacy_handoff_is_normalized_before_prd_routing(self) -> None:
         skill = self.read("SKILL.md")
@@ -1570,8 +1752,8 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertEqual(rows, expected_rows)
 
         self.assertIn(
-            "reviews check --provider codex --repo <owner/repo>\n"
-            "--pr <number> --head <current-sha>",
+            "<plugin-root>/scripts/gitstack --json reviews check --provider codex "
+            "--repo <owner/repo> --pr <number> --head <current-sha>",
             gates,
         )
         self.assertIn("request_head=<sha|none>", ledger)
@@ -1602,10 +1784,164 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn(
             "Reuse the request across `acknowledged`, `pending`, and timeouts",
-            gates,
+            " ".join(gates.split()),
         )
 
-    def test_parent_prd_closeout_follows_successful_current_head_review(self) -> None:
+    def test_codex_review_wait_budget_is_total_capped_and_pr_scoped(self) -> None:
+        gates = self.read("references/gates.md")
+        ledger = self.read("references/ledger.md")
+        options = self.read("references/options.md")
+        normalized_gates = " ".join(gates.split())
+        wait_contract = gates.split("#### Codex Review Wait Budget", 1)[1].split(
+            "\n\n1. Verify the PR exists",
+            1,
+        )[0]
+        normalized_wait_contract = " ".join(wait_contract.split())
+
+        def duration_seconds(value: str) -> float:
+            match = re.fullmatch(r"(\d+(?:\.\d+)?)([smh])", value)
+            self.assertIsNotNone(match, value)
+            assert match is not None
+            scale = {"s": 1, "m": 60, "h": 3600}[match.group(2)]
+            return float(match.group(1)) * scale
+
+        def command_option(command: str, option: str) -> str:
+            args = shlex.split(command)
+            for index, value in enumerate(args):
+                if value == option:
+                    self.assertLess(index + 1, len(args), command)
+                    return args[index + 1]
+                prefix = f"{option}="
+                if value.startswith(prefix):
+                    return value[len(prefix) :]
+            self.fail(f"{option} missing from {command}")
+
+        self.assertIn(
+            "15-minute standard or 30-minute extended total active-wait budget",
+            normalized_gates,
+        )
+        wait_code_spans = [
+            span
+            for span in re.findall(r"`([^`]*reviews wait[^`]*)`", gates)
+            if "--" in span
+        ]
+        self.assertTrue(
+            all(
+                span.startswith("<plugin-root>/scripts/gitstack --json reviews wait ")
+                for span in wait_code_spans
+            )
+        )
+        wait_commands = wait_code_spans
+        self.assertEqual(len(wait_commands), 3)
+        for command in wait_commands:
+            self.assertEqual(
+                shlex.split(command)[:4],
+                ["<plugin-root>/scripts/gitstack", "--json", "reviews", "wait"],
+            )
+            self.assertEqual(command_option(command, "--provider"), "codex")
+            self.assertEqual(command_option(command, "--repo"), "<owner/repo>")
+            self.assertEqual(command_option(command, "--pr"), "<number>")
+            self.assertEqual(command_option(command, "--head"), "<current-sha>")
+        timeout_values = [command_option(command, "--timeout") for command in wait_commands]
+        self.assertEqual(
+            [
+                duration_seconds(value)
+                for value in timeout_values
+                if value != "<remaining-seconds>s"
+            ],
+            [900, 1800],
+        )
+        self.assertEqual(timeout_values.count("<remaining-seconds>s"), 1)
+        self.assertEqual(
+            [duration_seconds(command_option(command, "--interval")) for command in wait_commands],
+            [10, 10, 10],
+        )
+        max_intervals = [
+            duration_seconds(command_option(command, "--max-interval"))
+            for command in wait_commands
+        ]
+        self.assertEqual(max_intervals, [30, 30, 30])
+        self.assertTrue(all(value <= 30 for value in max_intervals))
+        check_commands = [
+            span
+            for span in re.findall(r"`([^`]*reviews check[^`]*)`", gates)
+            if "--" in span
+        ]
+        self.assertEqual(len(check_commands), 1)
+        check_command = check_commands[0]
+        self.assertEqual(
+            shlex.split(check_command)[:4],
+            ["<plugin-root>/scripts/gitstack", "--json", "reviews", "check"],
+        )
+        self.assertEqual(command_option(check_command, "--provider"), "codex")
+        self.assertEqual(command_option(check_command, "--repo"), "<owner/repo>")
+        self.assertEqual(command_option(check_command, "--pr"), "<number>")
+        self.assertEqual(command_option(check_command, "--head"), "<current-sha>")
+        minute_values = {
+            value
+            for match in re.findall(
+                r"\b(\d+)-minute\b|\b(\d+) minutes?\b",
+                wait_contract,
+            )
+            for value in match
+            if value
+        }
+        self.assertEqual(minute_values, {"15", "30"})
+        self.assertIn("30 minutes after the original `wait_started_at`", gates)
+        self.assertIn("never start a fresh 30-minute wait", gates)
+        self.assertIn("round down to positive integer seconds", normalized_wait_contract)
+        self.assertIn("When less than one second remains, do not invoke GitStack", gates)
+        self.assertIn("same round-down rule and remaining-budget command", gates)
+        self.assertIn("subsequent heads of that same PR", gates)
+        self.assertIn("exact `wait_profile_pr`", wait_contract)
+        self.assertIn(
+            "If the live PR identity differs from `wait_profile_pr`",
+            normalized_wait_contract,
+        )
+        self.assertIn("never carry an extended profile", normalized_wait_contract)
+        self.assertIn(
+            "partial prior wait never creates a third budget tier",
+            normalized_wait_contract,
+        )
+        self.assertIn("`wait_state=monitoring-required`", gates)
+        self.assertIn("A still-pollable review is not a blocker", gates)
+        self.assertIn("preserve the request", wait_contract)
+        self.assertIn("`## Codex Review Wait Registry` is the sole timing authority", wait_contract)
+        self.assertIn("exactly one row keyed by", wait_contract)
+        self.assertIn("reuse that row's earliest", wait_contract)
+        self.assertIn("must never initialize or extend an independent window", wait_contract)
+        self.assertIn(
+            "no workstream may calculate a later replacement deadline",
+            normalized_wait_contract,
+        )
+        self.assertIn(
+            "`not-applicable`; do not start or resume a waiter",
+            normalized_wait_contract,
+        )
+        self.assertNotIn("--max-interval 45s", gates)
+        self.assertNotIn("--interval 15s", gates)
+
+        self.assertIn(
+            "wait_profile_pr=<pr-ref|none|not-applicable>; "
+            "wait_profile=<standard|extended|not-applicable>; "
+            "wait_budget_minutes=<15|30|not-applicable>",
+            ledger,
+        )
+        self.assertIn("## Codex Review Wait Registry", ledger)
+        self.assertIn("sole authority for review wait timing", ledger)
+        self.assertIn("exactly one row for", ledger)
+        self.assertIn("every one must carry\nthe same `wait_record`", ledger)
+        self.assertIn("wait_record=<pr-ref@head|none|not-applicable>", ledger)
+        self.assertIn("wait_started_at=<timestamp|none|not-applicable>", ledger)
+        self.assertIn("wait_deadline=<timestamp|none|not-applicable>", ledger)
+        self.assertIn("wait_elapsed_seconds=<number|none|not-applicable>", ledger)
+        self.assertIn(
+            "wait_state=<not-started|active|monitoring-required|terminal|not-applicable>",
+            ledger,
+        )
+        self.assertNotIn("wait_profile", options)
+
+    def test_parent_prd_closeout_follows_resolved_review_policy(self) -> None:
         skill = self.read("SKILL.md")
         delivery = self.read("references/prd-backed-delivery.md")
         gates = self.read("references/gates.md")
@@ -1633,7 +1969,7 @@ class OrchestratorContractTests(unittest.TestCase):
         ]
 
         self.assertLess(
-            states.index("fresh-current-head-result-current"),
+            states.index("closeout-head-current"),
             states.index("parent-prd-closeout-resolved"),
         )
         self.assertLess(
@@ -1648,7 +1984,7 @@ class OrchestratorContractTests(unittest.TestCase):
             states.index("parent-closeout-watch-established"),
             states.index("merge-ready-report"),
         )
-        self.assertIn("current-head Codex review gate passes", normalized_skill)
+        self.assertIn("resolved review policy", normalized_skill)
         self.assertIn("`Closes #<PRD-number>`", delivery)
         self.assertIn("`Closes owner/repo#<PRD-number>`", delivery)
         self.assertIn("all PRD closeout proof is satisfied", gates)
@@ -1677,18 +2013,19 @@ class OrchestratorContractTests(unittest.TestCase):
             " ".join(closeout_hygiene.split()),
         )
         self.assertIn(
-            "`parent_closeout_head` equal to the current reviewed SHA",
-            closeout_hygiene,
+            "`parent_closeout_head` equal to the current closeout-qualified SHA",
+            " ".join(closeout_hygiene.split()),
         )
         self.assertIn("PR-body evidence", closeout_hygiene)
         self.assertIn(
             "excluded workstreams must record `not-applicable`", closeout_hygiene
         )
         self.assertIn("A worker must not add or remove the parent PRD", worker)
-        self.assertIn("post-review mutation", worker)
+        self.assertIn("post-gate mutation", worker)
         self.assertIn("Immediately before the root updates the PR body", gates)
         self.assertIn("immediately before the merge-ready report", normalized_gates)
-        self.assertIn("set\n`parent_prd_closeout=pending-review`", gates)
+        self.assertIn("`parent_prd_closeout=pending-review`", gates)
+        self.assertIn("`parent_prd_closeout=pending-closeout`", gates)
         self.assertIn("current PR body after the body update", normalized_gates)
         self.assertIn("live body or its fingerprint", normalized_gates)
         self.assertIn(
@@ -1702,12 +2039,15 @@ class OrchestratorContractTests(unittest.TestCase):
             "record parent closeout as `not-applicable`", normalized_gates
         )
         self.assertIn(
-            "Reconcile the PR body before current-head review preflight", gates
+            "Reconcile the PR body before the policy-specific closeout gate", gates
         )
         self.assertIn(
             "must remove it or replace it with a non-closing reference", gates
         )
-        self.assertIn("A pre-existing keyword is\nnever proof", delivery)
+        self.assertIn(
+            "A pre-existing keyword is never proof",
+            " ".join(delivery.split()),
+        )
         self.assertIn("current default branch", delivery)
         self.assertIn("require the PR base to match it", gates)
         self.assertIn(
@@ -1741,7 +2081,7 @@ class OrchestratorContractTests(unittest.TestCase):
         for plan_producer in (issue_phase, issue_template):
             normalized = " ".join(plan_producer.split())
             self.assertIn("root delivery orchestrator", normalized)
-            self.assertIn("final current-head review", normalized)
+            self.assertIn("resolved review policy", normalized)
         self.assertIn("root delivery orchestrator", " ".join(tracker.split()))
 
 

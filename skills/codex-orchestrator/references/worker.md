@@ -312,6 +312,13 @@ evidence cannot alter `pr_closeout`. A draft-only worker receives no
 `merge-ready`, the root may assign the ready-for-review sequence from the
 existing draft PR.
 
+The root also passes `codex_review_policy`. Use `required` by default for
+`merge-ready`, `skip` only with exact owner-scoped option evidence, and
+`not-applicable` for every other closeout. This runtime option is not inherited
+from Plan Feature or inferred from review availability. The root also passes
+the refreshed `current_pr_ref`; PR-scoped skip evidence is valid only while its
+immutable `pr-ref` equals that value.
+
 The root also passes `pr_shape`. PRD-backed work inherits `single-pr` or
 `per-repo-pr`; ad hoc `local-only` and `direct-commit` work use `none`. Branch
 names, repository refs, and expected PR URLs remain separate data.
@@ -522,14 +529,16 @@ it may only open a PR from an already-pushed branch, record `pr` only.
   is the first mode that may place GitHub closing keywords such as `Closes #123`
   in a PR body when the generated issue's closeout path calls for PR-body
   closure. A worker must not add or remove the parent PRD closing keyword; that
-  post-review mutation and its reviewed-head revalidation are root-owned. This
+  post-gate mutation and its closeout-head revalidation are root-owned. This
   mode does not permit local commits or push unless those modes are also listed,
   and it does not authorize ready-for-review transition, Codex review request,
   merge, release, or direct issue mutation.
 - `review-ready`: umbrella capability for exact root-listed PR-review
   sub-actions: `mark-ready`, `request-codex-review`, `poll-codex-review`, and
   `post-root-supplied-disposition`. A worker may perform only the listed
-  sub-actions for the assigned PR. Before `request-codex-review`, run the
+  sub-actions for the assigned PR. The root may list request or poll only when
+  `codex_review_policy=required`; `skip` permits `mark-ready` but makes request
+  and poll actions `not-applicable`. Before `request-codex-review`, run the
   GitStack status check for the assigned head. If the result shows the assigned
   head is stale, the root must refresh the assignment to the PR's current SHA
   and the worker must rerun `reviews check` for that refreshed SHA. Request only
@@ -596,6 +605,8 @@ Scope:
 - publication_authority_evidence: <option-resolution or source-contract evidence>
 - pr_closeout: <merge-ready|draft-only|not-applicable>
 - pr_closeout_evidence: <option-resolution evidence>
+- codex_review_policy: <required|skip|not-applicable>
+- codex_review_policy_evidence: <default or scoped owner-instruction evidence>
 - pr_shape: <single-pr|per-repo-pr|none>
 - closeout_mode: <feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>
 - issue_mutation_authority: <none|pr-body-closeout-only|explicit-direct-mutation>
@@ -604,13 +615,13 @@ Scope:
 - parent_prd_closeout: <not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>
 - parent_prd_ref: <issue ref or none>
 - parent_closeout_vehicle: <PR ref, pending, or none>
-- parent_closeout_head: <reviewed SHA or none>
+- parent_closeout_head: <closeout-qualified SHA or none>
 - parent_closeout_base: <branch or none>
 - default_branch: <branch or none>
 - pr_body_evidence: <URL/fingerprint or none>
 - parent_closeout_watch: <not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>
 - parent_closeout_watch_evidence: <watch packet, automation id, or none>
-- codex_review: <not-applicable|not-requested|requested|received|passed|blocked>
+- codex_review: <not-applicable|not-requested|requested|received|passed|skipped|blocked>
 - codex_review_evidence: <request head/object; GitStack checker status; result head/kind/object; verified provider; terminal status; disposition>
 - parallelization: <independent|depends-on|blocks|root-integrated>
 - dependency_ids: <source/workstream ids or none>
@@ -655,7 +666,7 @@ Final report:
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
 - Delivery: runtime delivery, branch or PR used, closeout path, and PR links or
-  `none`; include ready-for-review state, Codex review state, publication
+  `none`; include ready-for-review state, Codex review policy/state, publication
   checkout, and caller checkout disposition
 - Worker evidence: canonical `worker_surface`, `actual_workstream_surface`, and
   `authorization_state`; worker id or session evidence; unavailable or failed

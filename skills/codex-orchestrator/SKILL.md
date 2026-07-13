@@ -179,14 +179,23 @@ later explicit authority change.
 
 Load `references/gates.md` before owner-ready, issue-closed, merge-ready,
 release-ready, or final status. Pull-request delivery defaults to
-`merge-ready`: validate, leave draft, transition ready, reuse or request exactly
-one Codex review per current head, receive a verified terminal result, resolve
-or disposition findings, publish fixes, verify current CI, and leave the
-publication checkout clean. For a GitHub-backed `merge-ready` final feature or
+`merge-ready`: validate, leave draft, transition ready, apply the resolved
+`codex_review_policy`, verify current CI, and leave the publication checkout
+clean. Review is `required` by default: reuse or request exactly one Codex
+review per current head, receive a verified terminal result, and resolve or
+disposition findings. The current user may set `codex_review_policy=skip` for
+an exact workstream or PR. Resolve a PR-scoped instruction to each current
+workstream mapped to that PR, preserve the immutable canonical PR ref, and
+reset to `required` if the live PR identity changes, then follow the normal
+required-review path for the replacement PR. While the skip remains valid, do
+not request or wait for Codex review, but still disposition already-known
+actionable Codex feedback and satisfy every other closeout gate. For a
+GitHub-backed `merge-ready` final feature or
 integration PR that completes the whole PRD and targets the current default
-branch, add the parent PRD closing keyword only after the current-head Codex
-review gate passes, revalidate that reviewed head around the root-owned PR-body
-update, and require parent closeout `armed` before reporting merge-ready. A
+branch, add the parent PRD closing keyword only after the resolved review policy
+and all other closeout gates pass, revalidate that closeout-qualified head
+around the root-owned PR-body update, and require parent closeout `armed` before
+reporting merge-ready. A
 non-default-base PR may report merge-ready with a linked later default-branch
 closeout vehicle still active; the whole PRD and ledger may not complete until
 that vehicle is armed. Because an armed PR remains mutable until merge, keep a

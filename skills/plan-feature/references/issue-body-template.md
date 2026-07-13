@@ -176,7 +176,7 @@ When all acceptance criteria pass and validation is complete:
   authorization evidence. Do not add the parent PRD closing keyword from an individual child
   issue. For a whole-PRD final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
-  only after its final current-head review and all PRD closeout gates pass.
+  only after its resolved review policy and all PRD closeout gates pass.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
   `issues/done/` on demand after validation and, for `direct-commit`, after the
   commit/proof is recorded. For orchestrator workspace issues, move it only

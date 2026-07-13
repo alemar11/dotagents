@@ -147,7 +147,8 @@ commit reaches the default branch.
 Use closing keywords only for issues actually satisfied by the change. Do not
 add the parent PRD closing keyword from an individual child issue. For a
 whole-PRD final feature or integration PR, the root delivery orchestrator may
-add that parent keyword only after its review and all PRD closeout gates pass.
+add that parent keyword only after its resolved review policy and all PRD
+closeout gates pass.
 
 ## When a skill says "fetch the relevant issue"
 

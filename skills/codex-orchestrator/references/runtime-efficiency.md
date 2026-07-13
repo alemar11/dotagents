@@ -318,7 +318,7 @@ On resume:
        split("delegation_mode worker_surface worker_limit app_thread_consent app_thread_limit raw_worktree_fallback active_root_takeover_policy", fields, " ")
        for (i in fields) expected_session[fields[i]]=1
        expected_source["source_mutation_authority"]=1
-       split("source_mutation_authority publication_authority issue_mutation_authority merge_authority merge_policy caller_checkout_policy automation_authority temporary_source_execution completion_proof_policy delivery_mode delivery_source branch_name scope_transfer_ref issue_mutation_transfer_ref pr_closeout pr_shape closeout_mode integration_mode", fields, " ")
+       split("source_mutation_authority publication_authority issue_mutation_authority merge_authority merge_policy caller_checkout_policy automation_authority temporary_source_execution completion_proof_policy delivery_mode delivery_source branch_name current_pr_ref scope_transfer_ref issue_mutation_transfer_ref pr_closeout codex_review_policy pr_shape closeout_mode integration_mode", fields, " ")
        for (i in fields) expected_workstream[fields[i]]=1
        count=split(wanted, ids, ",")
        for (i=1; i <= count; i++) {
@@ -369,6 +369,7 @@ On resume:
        if (field == "delivery_mode" && value == "direct-commit") return 1
        if (field == "delivery_source" && matches(value, "issue-level-override|owner-instruction")) return 1
        if (field == "pr_closeout" && value == "draft-only") return 1
+       if (field == "codex_review_policy" && value == "skip") return 1
        return 0
      }
      function allowed_value(field, value) {
@@ -391,9 +392,11 @@ On resume:
        if (field == "delivery_mode") return matches(value, "local-only|pull-request|direct-commit")
        if (field == "delivery_source") return matches(value, "runtime-default|feature-level-inherited|issue-level-override|owner-instruction")
        if (field == "branch_name") return value != "" && value != "none"
+       if (field == "current_pr_ref") return matches(value, "not-applicable|pending|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*")
        if (field == "scope_transfer_ref") return matches(value, "not-applicable|issue:[A-Za-z0-9:_-]+")
        if (field == "issue_mutation_transfer_ref") return matches(value, "not-applicable|issue:[A-Za-z0-9:_-]+")
        if (field == "pr_closeout") return matches(value, "merge-ready|draft-only|not-applicable")
+       if (field == "codex_review_policy") return matches(value, "required|skip|not-applicable")
        if (field == "pr_shape") return matches(value, "single-pr|per-repo-pr|none")
        if (field == "closeout_mode") return matches(value, "feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable")
        if (field == "integration_mode") return matches(value, "single-repo-pr|repo-pr|direct-commit|not-applicable")
@@ -431,11 +434,17 @@ On resume:
        if (field == "delivery_mode") return value == "local-only" ? matches(source, "default|runtime-derived") : matches(source, "source-contract|owner-instruction")
        if (field == "delivery_source") return value == "runtime-default" ? matches(source, "default|runtime-derived") : (value == "feature-level-inherited" ? source == "source-contract" : matches(source, "source-contract|owner-instruction"))
        if (field == "branch_name") return value == "not-applicable" ? matches(source, "default|runtime-derived") : matches(source, "source-contract|owner-instruction|runtime-derived|legacy-migration")
+       if (field == "current_pr_ref") return source == "runtime-derived"
        if (field == "scope_transfer_ref") return value == "not-applicable" ? matches(source, "default|runtime-derived") : source == "source-contract"
        if (field == "issue_mutation_transfer_ref") return value == "not-applicable" ? matches(source, "default|runtime-derived") : source == "source-contract"
        if (field == "pr_closeout") {
          if (value == "merge-ready") return matches(source, "default|source-contract|legacy-migration")
          if (value == "draft-only") return matches(source, "source-contract|owner-instruction|legacy-migration")
+         return matches(source, "runtime-derived|legacy-migration")
+       }
+       if (field == "codex_review_policy") {
+         if (value == "required") return matches(source, "default|legacy-migration")
+         if (value == "skip") return source == "owner-instruction"
          return matches(source, "runtime-derived|legacy-migration")
        }
        if (field == "pr_shape" || field == "closeout_mode" || field == "integration_mode") return matches(source, "source-contract|runtime-derived|legacy-migration")
@@ -520,12 +529,21 @@ On resume:
          shape=resolved[scope_id SUBSEP "pr_shape"]
          integration=resolved[scope_id SUBSEP "integration_mode"]
          branch_name=resolved[scope_id SUBSEP "branch_name"]
+         current_pr_ref=resolved[scope_id SUBSEP "current_pr_ref"]
          scope_transfer_ref=resolved[scope_id SUBSEP "scope_transfer_ref"]
          issue_mutation_transfer_ref=resolved[scope_id SUBSEP "issue_mutation_transfer_ref"]
          pr_closeout=resolved[scope_id SUBSEP "pr_closeout"]
+         codex_review_policy=resolved[scope_id SUBSEP "codex_review_policy"]
          if (resolved[scope_id SUBSEP "merge_policy"] == "automatic-after-gates" && resolved[scope_id SUBSEP "merge_authority"] != "explicit-owner-authorization") exit 48
-         if (delivery == "local-only" && (resolved[scope_id SUBSEP "delivery_source"] != "runtime-default" || branch_name != "not-applicable" || scope_transfer_ref != "not-applicable" || issue_mutation_transfer_ref != "not-applicable" || pr_closeout != "not-applicable" || shape != "none" || closeout != "not-applicable" || integration != "not-applicable")) exit 48
-         if (delivery == "pull-request" && (!matches(resolved[scope_id SUBSEP "delivery_source"], "feature-level-inherited|issue-level-override|owner-instruction") || branch_name == "not-applicable" || scope_transfer_ref != "not-applicable" || issue_mutation_transfer_ref != "not-applicable" || !matches(pr_closeout, "merge-ready|draft-only") || !matches(shape, "single-pr|per-repo-pr") || !matches(closeout, "feature-pr-closes-issue|repo-pr-closes-issue|local-done-move-after-proof") || !matches(integration, "single-repo-pr|repo-pr|not-applicable"))) exit 48
+         if (delivery == "local-only" && (resolved[scope_id SUBSEP "delivery_source"] != "runtime-default" || branch_name != "not-applicable" || current_pr_ref != "not-applicable" || scope_transfer_ref != "not-applicable" || issue_mutation_transfer_ref != "not-applicable" || pr_closeout != "not-applicable" || codex_review_policy != "not-applicable" || shape != "none" || closeout != "not-applicable" || integration != "not-applicable")) exit 48
+         if (delivery == "pull-request" && (!matches(resolved[scope_id SUBSEP "delivery_source"], "feature-level-inherited|issue-level-override|owner-instruction") || branch_name == "not-applicable" || current_pr_ref == "not-applicable" || scope_transfer_ref != "not-applicable" || issue_mutation_transfer_ref != "not-applicable" || !matches(pr_closeout, "merge-ready|draft-only") || !matches(shape, "single-pr|per-repo-pr") || !matches(closeout, "feature-pr-closes-issue|repo-pr-closes-issue|local-done-move-after-proof") || !matches(integration, "single-repo-pr|repo-pr|not-applicable"))) exit 48
+         if (delivery == "pull-request" && pr_closeout == "merge-ready" && !matches(codex_review_policy, "required|skip")) exit 48
+         if (delivery == "pull-request" && pr_closeout == "draft-only" && codex_review_policy != "not-applicable") exit 48
+         if (codex_review_policy == "skip") {
+           review_evidence=row_evidence[scope_id SUBSEP "codex_review_policy"]
+           review_pr_ref=token_value(review_evidence, "pr-ref")
+           if (row_source[scope_id SUBSEP "codex_review_policy"] != "owner-instruction" || token_value(review_evidence, "owner-ref") == "" || token_value(review_evidence, "scope-ref") != scope_id || token_value(review_evidence, "target-ref") != scope_id || review_pr_ref == "" || (review_pr_ref != "not-applicable" && review_pr_ref != current_pr_ref)) exit 48
+         }
          if (delivery == "direct-commit") {
            delivery_evidence=row_evidence[scope_id SUBSEP "delivery_mode"]
            delivery_source=resolved[scope_id SUBSEP "delivery_source"]
@@ -540,7 +558,7 @@ On resume:
            target_ref=token_value(delivery_evidence, "target-ref")
            if (!matches(delivery_source, "feature-level-inherited|issue-level-override|owner-instruction")) exit 48
            transfer_token=token_value(delivery_evidence, "scope-transfer-ref")
-           if (resolved[scope_id SUBSEP "publication_authority"] != "explicit-owner-authorization" || token_value(publication_evidence, "owner-ref") != owner_ref || token_value(publication_evidence, "scope-ref") != scope_id || token_value(publication_evidence, "target-ref") != target_ref || token_value(publication_evidence, "target-branch") != branch_name || token_value(publication_evidence, "scope-transfer-ref") != transfer_token || branch_name == "not-applicable" || !matches(row_source[scope_id SUBSEP "branch_name"], "owner-instruction|source-contract") || owner_ref == "" || branch_owner_ref != owner_ref || target_ref == "" || token_value(branch_evidence, "target-ref") != target_ref || token_value(delivery_evidence, "scope-ref") != scope_id || token_value(branch_evidence, "scope-ref") != scope_id || token_value(delivery_evidence, "target-branch") != branch_name || token_value(branch_evidence, "target-branch") != branch_name || token_value(branch_evidence, "scope-transfer-ref") != transfer_token || token_value(delivery_source_evidence, "owner-ref") != owner_ref || token_value(delivery_source_evidence, "scope-ref") != scope_id || token_value(delivery_source_evidence, "target-ref") != target_ref || token_value(delivery_source_evidence, "target-branch") != branch_name || token_value(delivery_source_evidence, "scope-transfer-ref") != transfer_token || pr_closeout != "not-applicable" || shape != "none" || !matches(closeout, "direct-commit-closes-issue|local-done-move-after-proof") || !matches(integration, "direct-commit|not-applicable")) exit 48
+           if (resolved[scope_id SUBSEP "publication_authority"] != "explicit-owner-authorization" || token_value(publication_evidence, "owner-ref") != owner_ref || token_value(publication_evidence, "scope-ref") != scope_id || token_value(publication_evidence, "target-ref") != target_ref || token_value(publication_evidence, "target-branch") != branch_name || token_value(publication_evidence, "scope-transfer-ref") != transfer_token || branch_name == "not-applicable" || current_pr_ref != "not-applicable" || !matches(row_source[scope_id SUBSEP "branch_name"], "owner-instruction|source-contract") || owner_ref == "" || branch_owner_ref != owner_ref || target_ref == "" || token_value(branch_evidence, "target-ref") != target_ref || token_value(delivery_evidence, "scope-ref") != scope_id || token_value(branch_evidence, "scope-ref") != scope_id || token_value(delivery_evidence, "target-branch") != branch_name || token_value(branch_evidence, "target-branch") != branch_name || token_value(branch_evidence, "scope-transfer-ref") != transfer_token || token_value(delivery_source_evidence, "owner-ref") != owner_ref || token_value(delivery_source_evidence, "scope-ref") != scope_id || token_value(delivery_source_evidence, "target-ref") != target_ref || token_value(delivery_source_evidence, "target-branch") != branch_name || token_value(delivery_source_evidence, "scope-transfer-ref") != transfer_token || pr_closeout != "not-applicable" || codex_review_policy != "not-applicable" || shape != "none" || !matches(closeout, "direct-commit-closes-issue|local-done-move-after-proof") || !matches(integration, "direct-commit|not-applicable")) exit 48
            issue_mutation_transfer_token=token_value(issue_mutation_evidence, "scope-transfer-ref")
            if (closeout == "direct-commit-closes-issue" && (resolved[scope_id SUBSEP "issue_mutation_authority"] != "explicit-direct-mutation" || token_value(issue_mutation_evidence, "owner-ref") == "" || token_value(issue_mutation_evidence, "scope-ref") != scope_id || token_value(issue_mutation_evidence, "target-ref") != target_ref || token_value(issue_mutation_evidence, "target-branch") != branch_name || (issue_mutation_transfer_ref == "not-applicable" ? issue_mutation_transfer_token != "" : issue_mutation_transfer_token != issue_mutation_transfer_ref))) exit 48
            if (matches(delivery_source, "feature-level-inherited|issue-level-override")) {

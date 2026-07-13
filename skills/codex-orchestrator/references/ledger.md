@@ -199,12 +199,30 @@ durable `owner-handoff` or explicitly authorized `automation-handoff` transfers
 the watch; that handoff releases the root with `ledger_status=paused`, never
 `complete`.
 
+## Codex Review Wait Registry
+
+This is the sole authority for review wait timing. Keep exactly one row for
+each active `<owner>/<repo>#<number>@<head-sha>` key; workstream wait fields are
+derived projections that reference this row and never create independent
+deadlines.
+
+| wait_record | wait_profile_pr | request_head | request_object | wait_profile | wait_budget_minutes | wait_started_at | wait_deadline | wait_elapsed_seconds | wait_state |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <owner/repo#number@head-sha> | <owner/repo#number> | <head-sha> | <id/url> | <standard|extended> | <15|30> | <timestamp> | <timestamp> | <number> | <active|monitoring-required|terminal> |
+
+When multiple workstreams map to the same PR and head, every one must carry
+the same `wait_record` and an exact projection of that row. Update the registry
+row first, then refresh all mapped projections. Retain the PR-level extended
+profile across later heads as described by the review gate, while using a new
+row and deadline for each new head.
+
 ## Parent Closeout Watch
 
 Status: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
 Parent PRD: <issue ref or none>
 Closeout PR: <PR ref or pending>
-Armed head: <reviewed SHA or none>
+Review policy: <required|skip|not-applicable>
+Armed head: <closeout-qualified SHA or none>
 Closeout base: <branch or none>
 Current default branch: <branch or none>
 PR-body evidence: <URL/fingerprint or none>
@@ -214,7 +232,7 @@ Last checked: <time or none>
 Next check: <time/event/owner action or none>
 Handoff evidence: <persisted owner-visible packet or automation id/config, or none>
 Mutation triggers: <head push, base retarget, default-branch change, PR-body edit, merge>
-Mismatch action: <remove/replace parent closer, set pending-review or deferred-to-default-branch, rerun gates>
+Mismatch action: <remove/replace parent closer, set policy-specific pending-review or pending-closeout, or deferred-to-default-branch, then rerun gates>
 Merge control: <root-authorized-merger|owner-pre-merge-check|event-driven-automation|not-applicable>
 Post-merge proof: <merged head/base/body plus parent issue closed state, or none>
 
@@ -338,8 +356,8 @@ Use one compact block per active workstream:
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | parallelization=<independent|depends-on|blocks|root-integrated>; dependency_ids=<refs|none>; blocked_issue_ids=<refs|none>; dependency_reason=<reason|none>; dependency_proof=<evidence|pending|none> |
-| Delivery | delivery_mode=<local-only|pull-request|direct-commit>; delivery_source=<runtime-default|feature-level-inherited|issue-level-override|owner-instruction>; delivery_source_evidence=<scoped-option-row/source-ref|none>; branch_name=<exact branch|not-applicable>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; temporary_source_execution=<forbidden|owner-approved>; completion_proof_policy=<live-required|synthetic-accepted>; pr_shape=<single-pr|per-repo-pr|none>; closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>; integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>; publication_authority=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr_closeout=<merge-ready|draft-only|not-applicable>; issue_mutation_authority=<none|pr-body-closeout-only|explicit-direct-mutation>; automation_authority=<none|explicit-owner-authorization>; automation_target=<source/workstream ref|none>; parent_prd_applicability=<required|deferred-vehicle|not-applicable>; parent_prd_applicability_reason=<whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent_prd_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_prd_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; merge_authority=<none|explicit-owner-authorization>; merge_policy=<owner-approval|automatic-after-gates>; codex_review=<not-applicable|not-requested|requested|received|passed|blocked> |
-| Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
+| Delivery | delivery_mode=<local-only|pull-request|direct-commit>; delivery_source=<runtime-default|feature-level-inherited|issue-level-override|owner-instruction>; delivery_source_evidence=<scoped-option-row/source-ref|none>; branch_name=<exact branch|not-applicable>; current_pr_ref=<owner/repo#number|pending|not-applicable>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; temporary_source_execution=<forbidden|owner-approved>; completion_proof_policy=<live-required|synthetic-accepted>; pr_shape=<single-pr|per-repo-pr|none>; closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>; integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>; publication_authority=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr_closeout=<merge-ready|draft-only|not-applicable>; codex_review_policy=<required|skip|not-applicable>; issue_mutation_authority=<none|pr-body-closeout-only|explicit-direct-mutation>; automation_authority=<none|explicit-owner-authorization>; automation_target=<source/workstream ref|none>; parent_prd_applicability=<required|deferred-vehicle|not-applicable>; parent_prd_applicability_reason=<whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent_prd_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_prd_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; merge_authority=<none|explicit-owner-authorization>; merge_policy=<owner-approval|automatic-after-gates>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
+| Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; wait_record=<pr-ref@head|none|not-applicable>; wait_profile_pr=<pr-ref|none|not-applicable>; wait_profile=<standard|extended|not-applicable>; wait_budget_minutes=<15|30|not-applicable>; wait_started_at=<timestamp|none|not-applicable>; wait_deadline=<timestamp|none|not-applicable>; wait_elapsed_seconds=<number|none|not-applicable>; wait_state=<not-started|active|monitoring-required|terminal|not-applicable>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | workflow_skill=<gitstack skill>; primary_transport=connector; operation=<operation>; fallback=<unused|gh>; fallback_reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority_reused=<authority> |
 | Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; publication_checkout=<checkout or not-applicable>; caller_checkout_policy=<policy> |
 | Gates / proof | <required gates and current proof target> |
@@ -350,7 +368,8 @@ and one of `pending-review`, `pending-closeout`, `armed`, or `blocked`.
 state `deferred-to-default-branch`, and a linked later default-branch
 `parent_closeout_vehicle` or `pending` vehicle-selection action in `ready-next`.
 `parent_prd_closeout=armed` is valid only when `parent_closeout_head` equals the
-current reviewed SHA, `parent_closeout_base` equals the current `default_branch`,
+current closeout-qualified SHA (reviewed for `required`, fully validated for
+`skip`), `parent_closeout_base` equals the current `default_branch`,
 and `pr_body_evidence` proves the parent closing keyword is present; none of
 those proof fields may be `none`.
 An unmerged `armed` row also requires `parent_closeout_watch=root-monitoring`,
@@ -403,7 +422,7 @@ value whenever the row is touched.
 ### completed
 
 - workstream_id=<id>; source_id=<id/ref>; <runtime delivery, branch/PR/proof, ready-for-review state, Codex
-  review proof, parent-PRD closeout state/reviewed head/PR-body evidence when
+  review policy/evidence, parent-PRD closeout state/closeout-qualified head/PR-body evidence when
   applicable, closeout-watch/post-merge proof when applicable, validation,
   source closeout target and whether it was
   updated/closed, publication checkout, caller checkout disposition>
@@ -488,7 +507,7 @@ roots in the active-root claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, root-owned parent-PRD PR-body closeout, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready`, so ready-for-review transition, Codex review, and applicable parent-PRD closeout remain actionable after local gates. `pr_closeout=draft-only` is valid only from its canonical option-resolution row and makes those downstream actions `not-applicable` rather than blocked. |
+| `ready-next` | Owner-ready work still needing review, commit, push, PR, policy-required Codex PR review, root-owned parent-PRD PR-body closeout, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready` plus `codex_review_policy=required`, so ready-for-review transition, the resolved review policy, and applicable parent-PRD closeout remain actionable after local gates. An owner-scoped `codex_review_policy=skip` makes review request/wait actions `not-applicable`, not blocked. `pr_closeout=draft-only` is valid only from its canonical option-resolution row and makes those downstream actions `not-applicable` rather than blocked. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
 | `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. A default-branch GitHub whole-PRD closeout PR may report merge-ready with `parent_prd_closeout=armed`, proof, and an active or handed-off watch, but the parent PRD source and portfolio ledger are not complete until the PR merges and the issue is verified closed. A non-default-base PR workstream may complete at merge-ready with `deferred-to-default-branch` only when the linked later vehicle remains `active` or `ready-next`; this never completes the parent PRD or ledger. Authorized `draft-only` and other excluded workstreams record `not-applicable` with a reason. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked or pending required publication, closeout, or proof remains `active`, `ready-next`, `needs-owner`, `blocked`, or `deferred`. |
@@ -525,14 +544,17 @@ Before marking a ledger `complete`, verify:
 - PRD-backed work with authorized pull-request delivery either records
   the published PR URL or records the exact blocker that prevents publication;
   do not mark it complete while authorized commit, push, or draft PR creation
-  remains in `ready-next`. When `pr_closeout=merge-ready`, also
-  record non-draft state, Codex review proof, and discussion disposition, and do
-  not mark it complete while ready-for-review transition, current-head review
-  preflight, permitted Codex review request, existing-request wait,
-  review-triggered fix, post-fix validation, fresh-result wait, or PR-thread
-  disposition remains in `ready-next`. For a default-branch GitHub whole-PRD
+  remains in `ready-next`. When `pr_closeout=merge-ready`, also record non-draft
+  state and the resolved review policy. For `codex_review_policy=required`,
+  record Codex review proof and discussion disposition, and do not mark it
+  complete while current-head review preflight, a permitted request,
+  existing-request wait, review-triggered fix, fresh-result wait, or PR-thread
+  disposition remains in `ready-next`. For `codex_review_policy=skip`, record
+  scoped owner evidence, keep review request/wait actions `not-applicable`, and
+  resolve any already-known actionable feedback. For a default-branch GitHub whole-PRD
   closeout vehicle, merge-ready reporting requires `parent_prd_closeout=armed`,
-  the parent ref, a `parent_closeout_head` equal to the current reviewed SHA, a
+  the parent ref, a `parent_closeout_head` equal to the current
+  closeout-qualified SHA, a
   `parent_closeout_base` equal to the current `default_branch`, PR-body evidence,
   current live-body fingerprint matching that evidence, and a valid closeout
   watch. With no merge authority the watch must be `owner-handoff`; use
@@ -554,13 +576,14 @@ Before marking a ledger `complete`, verify:
   that requested state. A later owner instruction changes the canonical row to
   `pr_closeout=merge-ready`; resume at ready-for-review only after that update.
 - For merge-ready closeout, verify the publication checkout is clean, accepted
-  review fixes are committed and pushed to the PR branch, current CI belongs to
-  the pushed head, GitStack reports or authenticated supplemental evidence proves
-  a terminal Codex result for that same head, and unresolved review threads are
-  either fixed, explicitly dispositioned, or recorded as a blocker. Record the
-  request/result ids so reconciliation reuses them instead of retriggering. For
-  an applicable parent PRD, also verify the armed closeout head equals that
-  current result head, the closeout PR still targets the current default branch,
+  fixes are committed and pushed to the PR branch, and current CI belongs to the
+  pushed head. With `codex_review_policy=required`, require GitStack or
+  authenticated supplemental evidence to prove a terminal Codex result for that
+  head, disposition unresolved review threads, and record request/result ids for
+  reuse. With `codex_review_policy=skip`, require scoped owner evidence, no
+  request/wait action, and disposition only already-known actionable feedback.
+  For an applicable parent PRD, also verify the armed closeout head equals the
+  current closeout-qualified head, the closeout PR still targets the current default branch,
   and the recorded PR-body evidence still contains the parent closing keyword.
   If any check fails, keep the ledger active,
   `ready-next`, or blocked instead of `complete`.
@@ -569,7 +592,7 @@ Before marking a ledger `complete`, verify:
 - `deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
 - `completed` records the final proof, source closeout state, integration
-  method, publication state, ready-for-review state, Codex review proof,
+  method, publication state, ready-for-review state, review policy and evidence,
   applicable parent-PRD closeout state/head/PR-body evidence, closeout-watch and
   post-merge proof, publication checkout, caller checkout disposition, and
   worker lifecycle decision for each completed worker-backed item.
