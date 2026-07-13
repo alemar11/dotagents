@@ -380,7 +380,7 @@ pub fn load_and_migrate_config(path: &Path) -> Result<SkillConfig> {
 /// Explicitly migrate config with a pre-migration backup and atomic canonical write.
 pub fn migrate_config_file(path: &Path) -> Result<ConfigMigrationResult> {
     let (config, loaded) = load_config_from_disk(path)?;
-    let changed = loaded.needs_option_normalization
+    let changed = loaded.needs_persisted_normalization
         || should_save_loaded_config(path, &loaded.read_path, &loaded.original, &config);
     let backup_path = if changed {
         let backup_path = next_backup_path(&loaded.read_path);
@@ -407,7 +407,7 @@ pub fn migrate_config_file(path: &Path) -> Result<ConfigMigrationResult> {
 struct LoadedConfig {
     read_path: PathBuf,
     original: SkillConfig,
-    needs_option_normalization: bool,
+    needs_persisted_normalization: bool,
 }
 
 fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
@@ -424,7 +424,7 @@ fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
 
     let raw = fs::read_to_string(&read_path)
         .with_context(|| format!("Failed to read postgres config at {}", read_path.display()))?;
-    let needs_option_normalization = has_legacy_option_encoding(&raw)?;
+    let needs_persisted_normalization = has_legacy_persisted_encoding(&raw)?;
     let mut config = parse_config(&raw)?;
     let original = config.clone();
     migrate_config_in_place(&mut config)?;
@@ -433,7 +433,7 @@ fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
         LoadedConfig {
             read_path,
             original,
-            needs_option_normalization,
+            needs_persisted_normalization,
         },
     ))
 }
@@ -489,8 +489,17 @@ fn parse_config(raw: &str) -> Result<SkillConfig> {
     }
 }
 
-fn has_legacy_option_encoding(raw: &str) -> Result<bool> {
+fn has_legacy_persisted_encoding(raw: &str) -> Result<bool> {
     let value: toml::Value = toml::from_str(raw).context("Failed to parse postgres config")?;
+    let table = value
+        .as_table()
+        .ok_or_else(|| anyhow!("Postgres config must be a TOML table."))?;
+    if !table.contains_key("tools")
+        && !table.contains_key("defaults")
+        && !table.contains_key("schema_version")
+    {
+        return Ok(true);
+    }
     let Some(postgres) = value
         .get("tools")
         .and_then(|tools| tools.get("postgres"))
@@ -1396,6 +1405,39 @@ password = "postgres"
         assert!(canonical.contains("access_mode = \"read-write\""));
         assert!(!canonical.contains("sslmode ="));
         assert!(!canonical.contains("access ="));
+    }
+
+    #[test]
+    fn explicit_migration_rewrites_legacy_layout_at_canonical_path() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        let original = r#"[configuration]
+schema_version = "1.1.0"
+
+[database.local]
+database = "app"
+user = "postgres"
+password = "postgres"
+sslmode = "disable"
+"#;
+        fs::write(&canonical_path, original).unwrap();
+
+        let first = migrate_config_file(&canonical_path).unwrap();
+        assert_eq!(first.migration_outcome, "migrated");
+        let backup_path = first.backup_path.expect("legacy-layout backup");
+        assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
+        let canonical = fs::read_to_string(&canonical_path).unwrap();
+        assert!(canonical.contains("schema_version = \"3.0.0\""));
+        assert!(canonical.contains("[tools.postgres.profiles.local]"));
+        assert!(canonical.contains("ssl_mode = \"disable\""));
+        assert!(canonical.contains("access_mode = \"read-write\""));
+        assert!(!canonical.contains("[configuration]"));
+        assert!(!canonical.contains("[database.local]"));
+
+        let second = migrate_config_file(&canonical_path).unwrap();
+        assert_eq!(second.migration_outcome, "no-change");
+        assert_eq!(second.backup_path, None);
     }
 
     #[test]

@@ -62,6 +62,9 @@ migrations_path = "db/migrations"
 ## Migration Rules
 
 - If canonical `config.toml` exists, it is always the source of truth.
+- A legacy v1 table layout found at canonical `config.toml` is still legacy
+  persisted encoding: ordinary reads normalize it in memory, while
+  `profile migrate-config` backs it up and rewrites the v3 layout.
 - Existing `2.0.0` and `2.1.0` canonical configs normalize in memory to
   `3.0.0` for ordinary runtime commands and migrate in place only when the
   operator runs `profile migrate-config` or another explicit config-writing
