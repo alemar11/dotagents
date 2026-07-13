@@ -37,6 +37,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Keep `AGENTS.md` lean: record only repo-specific rules or durable learnings that are hard to infer from the tree, and prefer linking or routing to `SKILL.md`, reference docs, or local package manifests instead of duplicating detailed doctrine, migration history, or exhaustive anti-regression lists.
 - When new durable rules are discovered while creating or updating skills, add them to this AGENTS.md under the appropriate skill section.
 - Use this section only as a fallback when no more appropriate section exists in AGENTS.md.
+- Keep behavior-affecting option contracts canonical across this repository: use `snake_case` field names and lower-kebab assigned values. Natural-language phrases may explain an option but must not be its value; normalize prose or legacy inputs once at the boundary, then emit and persist only canonical values. Keep an option value separate from associated prose, data, or references. Factual booleans and externally owned syntax are exempt. (Codex learning)
 - In `references/` folders, keep `.md` filenames lowercase except for `README.md` and `AGENTS.md`.
 - If `brand_color` isn’t provided, pick a random hex color not already used by other skills in this repo and set it in `agents/openai.yaml`.
 - Plugin manifests must keep asset and bundled-skill paths repo-relative and valid from the plugin root; update them together with any plugin layout move. (Codex learning)
@@ -140,7 +141,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Plan Feature skill
 - Keep `plan-feature` as the single public planning surface for full feature planning, prd-only drafting, and existing PRD issue generation; keep dense PRD writing and issue splitting guidance in its internal `references/` phase files.
-- Keep Plan Feature option fields in snake_case and enum values in lower-kebab form through `skills/plan-feature/references/options.md`; normalize natural-language or legacy input once as resolution evidence, and never emit prose, booleans, or combined enum-plus-data values as current choices. (Codex learning)
+- Keep `skills/plan-feature/references/options.md` as the owner of Plan Feature's concrete option registry and apply the repository-wide canonical option contract there. (Codex learning)
 - Keep `plan-feature` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary feature, planning, PRD, issue splitting, implementation, or triage requests must not auto-select it. (Codex learning)
 - `plan-feature` may run its PRD phase and issue phase only after setup exists and no blocking gates remain; when `effective_target=configured-tracker`, treat `tracker_backend` as the planning-artifact write authority: `github` publishes PRD/issues to GitHub and `local` writes local Markdown files. Other effective-target values are non-mutating. (Codex learning)
 - In monorepo or multi-context planning, carry the accepted product slug, workspace path, context file, and authoritative feature slug through `plan-feature` and its internal phases; prefer explicit or path-derived slugs over title-derived slugs. (Codex learning)
@@ -219,7 +220,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 
 ### Codex Orchestrator skill
 - Keep `codex-orchestrator` as a standalone reusable skill under `skills/codex-orchestrator/`, using namespaced GitStack bundled skills for queue, issue lifecycle, CI, review, release, commit, and publish workflows.
-- Keep Codex Orchestrator option fields in snake_case and enum values in lower-kebab form through `skills/codex-orchestrator/references/options.md`; owner/source prose is resolution evidence only, and ledgers, prompts, handoffs, recovery packets, and reports must branch on canonical values rather than phrases or booleans. (Codex learning)
+- Keep `skills/codex-orchestrator/references/options.md` as the owner of Codex Orchestrator's concrete option registry; ledgers, prompts, handoffs, recovery packets, and reports must use those canonical values. (Codex learning)
 - Keep `codex-orchestrator` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary implementation, planning, triage, GitHub, commit, PR, or multi-repo requests must not auto-select it. (Codex learning)
 - Treat one active `codex-orchestrator` root as the owner for a project or portfolio source graph. Parallel implementation should run as scoped workers under that root, not as multiple independent orchestrator roots in the same repo or overlapping source graph.
 - Keep runtime orchestration, worker, gate, active-root, target-repo `AGENTS.md`, and ledger details in `skills/codex-orchestrator/SKILL.md` and its references; keep this file limited to dependency and ownership boundaries.

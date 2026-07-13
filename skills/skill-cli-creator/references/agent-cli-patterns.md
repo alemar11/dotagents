@@ -25,6 +25,42 @@ Good top-level help should answer:
 
 Treat `--version` as part of that top-level interface, not an afterthought.
 
+## Canonical option contracts
+
+For behavior-affecting options, use `snake_case` field names and lower-kebab
+assigned values. Natural-language phrases may explain an option to a person,
+but runtime branching, JSON, config, handoffs, and persisted state must use the
+canonical value.
+
+```json
+{
+  "mutation_mode": "draft-only",
+  "review_state": "not-requested",
+  "publication_target": "pull-request",
+  "publication_ref": "https://example.test/pull/42"
+}
+```
+
+Apply these rules:
+
+- Normalize natural-language and legacy inputs once at the command boundary.
+- Emit and persist only canonical values after normalization.
+- Keep the option value separate from associated prose, data, identifiers, or
+  references; for example, use `publication_target` plus `publication_ref`
+  rather than one combined phrase.
+- Keep factual observations such as `ok: true` as booleans. Do not replace
+  externally owned syntax such as provider fields, protocol values, or standard
+  environment variables merely to match this repository convention.
+- When compatibility requires aliases, document them as input-only and test
+  that every output path returns the canonical value.
+- Treat a breaking change to machine-readable option keys or values as a major
+  CLI version change unless the owner documents a narrower compatibility
+  guarantee.
+
+When one CLI has several options or multiple consumers, keep its concrete
+registry in one owner-local reference and make consumer tests prove that their
+values belong to that registry. Do not create a repository-wide mega-registry.
+
 ## Prefer this command shape
 
 Use product nouns, then verbs:
