@@ -110,10 +110,9 @@ Use these ledger-owned values:
 Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
 and gate values are owned by `worker.md`, `prd-backed-delivery.md`, and
 `gates.md`.
-Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-as legacy aliases when reading existing artifacts. When updating an artifact
-that contains legacy aliases, rewrite touched structured values to
-lower-kebab-case.
+Option fields and values follow `options.md`: snake_case fields and lower-kebab
+enum values. Treat older uppercase values, booleans, human labels, and
+hyphenated assignment keys as read aliases only; rewrite them when touched.
 
 ## Template
 
@@ -133,13 +132,38 @@ Repositories:
 Out of scope:
 - <repos, branches, issues, or workflows intentionally ignored>
 
+## Option Resolution
+
+### Session Rows
+
+| row_id | scope_id | field | value | source | evidence |
+| --- | --- | --- | --- | --- | --- |
+| `session:<field>` | `session` | <Session Registry field from options.md> | <canonical value> | `default`, `owner-instruction`, `runtime-capability`, or `legacy-migration` | <instruction/tool ref or none> |
+| `session:worker_limit` | `session` | `worker_limit` | <positive integer or `unbounded`> | `default` only for `unbounded`; otherwise `owner-instruction` or evidence-preserving `legacy-migration` | <matching bounded-delegation owner evidence or none> |
+| `session:app_thread_limit` | `session` | `app_thread_limit` | <positive integer or `unspecified`> | `default` only for `unspecified`; otherwise `owner-instruction` or evidence-preserving `legacy-migration` | <matching App-thread-consent owner evidence or none> |
+
+### Scoped Rows
+
+| row_id | scope_id | field | value | source | evidence |
+| --- | --- | --- | --- | --- | --- |
+| `source:<Source ID>:source_mutation_authority` | `source:<Source ID>` | `source_mutation_authority` | <canonical value> | `default`, `owner-instruction`, `runtime-capability`, or `legacy-migration` | <instruction/source/tool ref or none> |
+| `<scope_id>:<field>` | `workstream:<id>` | <Per-Workstream Registry field from options.md> | <canonical value> | `default`, `owner-instruction`, `source-contract`, `runtime-capability`, `runtime-derived`, or `legacy-migration` | <instruction/source/tool ref or none> |
+
+Every applicable source row must be projected into its corresponding
+discovery-source row, and every workstream row into its workstream ledger row.
+Discovery sources carry only `source_mutation_authority`; full authority and
+delivery options begin at workstream registration. Never reuse another scope's
+authority or delivery value. Keep every `row_id` unique across both option
+tables, restrict row IDs to `[A-Za-z0-9:_-]+` with no commas, and encode a
+literal `|` in evidence data as `%7C`.
+
 ## Discovery Sources
 
-| Source ID | Kind | Path/Query/URL | Last Checked | Cursor/Fingerprint | Item Key Rule | Mutation Authority | Suppression Rule |
+| Source ID | Kind | Path/Query/URL | Last Checked | Cursor/Fingerprint | Item Key Rule | source_mutation_authority | Suppression Rule |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | ds-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | none, propose, or write | <owner/date/reason/source fingerprint> |
 
-`Mutation Authority` uses the `source_mutation_authority` option values.
+`source_mutation_authority` uses the canonical option values.
 
 ## Active Root
 
@@ -152,18 +176,17 @@ Goal fallback reason: <none or why /goal/runtime goal tool was unavailable>
 Started: <YYYY-MM-DD HH:MM TZ>
 Last Progress Read: <YYYY-MM-DD HH:MM TZ>
 Next Root Check: <YYYY-MM-DD HH:MM TZ or none>
-Takeover policy: owner-approval|stale-ledger-check
-Merge authority: none|explicit-owner-authorization
-Merge policy: owner-approval|automatic-after-gates
-Merge authorization evidence: <owner instruction and timestamp or none>
-Parent closeout watch: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
+active_root_takeover_policy: owner-approval|stale-ledger-check
+Scoped merge option refs: <exact workstream merge_authority/merge_policy row_ids or none>
+parent_closeout_watch: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
 Parent closeout watch evidence: <ledger section/fingerprint plus owner-visible handoff or automation id, or none>
 Claimed repo realpaths:
 - <absolute realpath or unknown>; source=<scope evidence>
 Claimed source ids:
 - <source id/ref>
 Active workers:
-- <worker id/title or none>
+- worker_id=<stable id>; actual_workstream_surface=<cli-subagent|codex-app-thread>; workstream_ids=<comma-separated ids>
+- none
 Recovery packet content fingerprint: <sha256 from runtime-efficiency.md or none>
 Takeover history:
 - <date, previous root id, overlap, stale/owner approval evidence, worker disposition>
@@ -214,20 +237,23 @@ Status: fresh|stale|invalid|unavailable
 Updated: <YYYY-MM-DD HH:MM TZ>
 Projection fingerprint: <sha256 of ledger content before Notes, excluding this Recovery Packet, using runtime-efficiency.md canonical extraction>
 Content fingerprint: <sha256 of packet derived fields, excluding status/timestamps/fingerprints, also recorded under Active Root>
-Root: <root id>; claim=<status>; goal=<objective ref>; active-workers=<ids or none>; parent-closeout-watch=<status/ref>
-Current wave: <wave id/status>; current-workstreams=<ids>; next-action=<one bounded action or blocker>
-Authority: source-mutation=<none|propose|write>; publication=<value>; issue-mutation=<value>; merge=<value>; worker-modes=<values>
+Root: <root id>; claim=<status>; goal=<objective ref>; active_workers=<unique comma-separated worker ids or none>; parent_closeout_watch=<status/ref>
+Current wave: <wave id/status>; current_workstreams=<ids>; next_action=<one bounded action or blocker>
+Option resolution refs: session_rows=<unique comma-separated exact row_ids>; scoped_rows=<unique comma-separated exact current source/workstream row_ids or empty>; rows_fingerprint=<sha256 of exactly the referenced row union using runtime-efficiency.md>
 Repo checkpoints:
 - <repo realpath>; head=<sha>; worktree=<stable fingerprint of status --short>; branch=<name or detached>
 Source checkpoints:
 - <registered source item id from Workstreams>; fingerprint=<etag/sha/checksum/head>; state=<ledger state>
+Workstream checkpoints:
+- <workstream id>; source=<registered source item id>; state=<ledger state>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; delivery_evidence_fingerprint=<sha256 or not-applicable>; issue_mutation_evidence_fingerprint=<sha256 or not-applicable>
 Required gates:
 - <source/workstream>; <gate>=<status>; evidence=<path/ref/hash or pending>
 Proof index:
 - <proof id>; <path/url/commit>; fingerprint=<sha/checksum>; result=<pass|fail|blocked>
 Blockers:
-- <source>; <blocker>; minimum-next-action=<action> or none
+- <source>; <blocker>; minimum_next_action=<action> or none
 References to load next:
+- `## Option Resolution`: <exact session and scoped row_ids above; required before dispatch or mutation>
 - <ledger section/source/reference path and reason>
 
 This packet is a disposable compact index, not authority. Keep refs and
@@ -235,18 +261,28 @@ fingerprints here; load `runtime-efficiency.md` before resume or recovery.
 
 ## Worker And Delivery References
 
-Authorization resolution: per-workstream
-Assignable authorization modes: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release
-Session CLI subagents consented: authorized-by-invocation|disabled|limited; max=<n|unbounded>
-Session Codex App threads consented: true|false; max=<n|unspecified>
-No subdelegation: true
-Workers edit ledger: false
-Root owns worker lifecycle: true
+authorization_resolution: per-workstream
+worker_authorization: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release
+delegation_mode: auto|disabled|bounded
+worker_surface: auto|root-thread|cli-subagent|codex-app-thread
+worker_limit: <positive integer|unbounded>
+app_thread_consent: not-requested|granted|denied
+app_thread_limit: <positive integer|unspecified>
+raw_worktree_fallback: forbidden|owner-approved
+pr_shape: single-pr|per-repo-pr|none
+branch_name: <exact branch|not-applicable>
+scope_transfer_ref: <issue:<NN>|not-applicable>
+issue_mutation_transfer_ref: <issue:<NN>|not-applicable>
+closeout_mode: feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable
+integration_mode: single-repo-pr|repo-pr|direct-commit|not-applicable
+subdelegation: forbidden
+worker_ledger_mutation: forbidden
+worker_lifecycle_owner: root
 Visible worker title format: <Project>: <short current task>
-Root capability snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh-auth=<available|unavailable|not-required>; codex-cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked-at=<time/evidence>
+Root capability snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh_auth=<available|unavailable|not-required>; codex_cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked_at=<time/evidence>
 GitHub workflow skill: <gitstack skill or none>
 GitHub primary transport: connector
-GitHub fallback: used=<true|false>; transport=<none|gh>; reason=<none|connector-unavailable|capability-unsupported|transport-failure>; operation=<operation or none>; evidence=<failure or none>; authority-reused=<authority or none>; result=<result or none>
+GitHub fallback: fallback_status=<unused|used>; transport=<none|gh>; reason=<none|connector-unavailable|capability-unsupported|transport-failure>; operation=<operation or none>; evidence=<failure or none>; authority_reused=<authority or none>; result=<result or none>
 
 Worker fields follow `worker.md`. Delivery, publication, and issue-mutation
 authority follow `prd-backed-delivery.md`. Gates follow `gates.md`. Keep only
@@ -284,7 +320,9 @@ Gate matrix:
 
 Every non-active bucket entry must preserve the source id/ref plus the relevant
 proof or evidence, owner action or next action, and closeout or follow-up target
-when those fields apply.
+when those fields apply. Start every such entry with the parseable prefix
+`- workstream_id=<stable-id>; source_id=<stable-id-or-ref>;`. Active entries use
+their `#### <workstream-id>:` heading as the authoritative ID.
 
 ### active
 
@@ -296,122 +334,122 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | requested=<none|cli-subagent|codex-app-thread>; authorized_or_consented=<true|false>; actual=<root-thread|cli-subagent|codex-app-thread>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability-snapshot=<filesystem/network/gh-auth/codex-cli/autoreview/time evidence> |
-| Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
+| Worker evidence | worker_surface=<auto|root-thread|cli-subagent|codex-app-thread>; actual_workstream_surface=<root-thread|cli-subagent|codex-app-thread>; authorization_state=<authorized-by-invocation|owner-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
+| Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
-| Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
-| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr-closeout=<merge-ready|draft-only|not-applicable>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; parent-prd-applicability=<required|deferred-vehicle|not-applicable>; parent-prd-applicability-reason=<whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent-prd-closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent-prd=<ref|none>; parent-closeout-vehicle=<pr-ref|pending|none>; parent-closeout-head=<sha|none>; parent-closeout-base=<branch|none>; default-branch=<branch|none>; pr-body-evidence=<url/fingerprint|none>; parent-closeout-watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch-evidence=<ref|none>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
-| Codex review evidence | request-head=<sha|none>; request-object=<id/url|none>; checker-status=<not-requested|acknowledged|pending|clean|findings|stale|error>; result-head=<sha|none>; result-kind=<formal-review|provider-comment|clean-reaction|none>; result-object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
-| GitHub routing | workflow-skill=<gitstack skill>; primary-transport=connector; operation=<operation>; fallback=<unused|gh>; fallback-reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
-| Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
+| Scheduling | parallelization=<independent|depends-on|blocks|root-integrated>; dependency_ids=<refs|none>; blocked_issue_ids=<refs|none>; dependency_reason=<reason|none>; dependency_proof=<evidence|pending|none> |
+| Delivery | delivery_mode=<local-only|pull-request|direct-commit>; delivery_source=<runtime-default|feature-level-inherited|issue-level-override|owner-instruction>; delivery_source_evidence=<scoped-option-row/source-ref|none>; branch_name=<exact branch|not-applicable>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; temporary_source_execution=<forbidden|owner-approved>; completion_proof_policy=<live-required|synthetic-accepted>; pr_shape=<single-pr|per-repo-pr|none>; closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>; integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>; publication_authority=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr_closeout=<merge-ready|draft-only|not-applicable>; issue_mutation_authority=<none|pr-body-closeout-only|explicit-direct-mutation>; automation_authority=<none|explicit-owner-authorization>; automation_target=<source/workstream ref|none>; parent_prd_applicability=<required|deferred-vehicle|not-applicable>; parent_prd_applicability_reason=<whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent_prd_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_prd_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; merge_authority=<none|explicit-owner-authorization>; merge_policy=<owner-approval|automatic-after-gates>; codex_review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
+| GitHub routing | workflow_skill=<gitstack skill>; primary_transport=connector; operation=<operation>; fallback=<unused|gh>; fallback_reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority_reused=<authority> |
+| Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; publication_checkout=<checkout or not-applicable>; caller_checkout_policy=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
-For every active row, `parent-prd-applicability=required` requires a parent ref
+For every active row, `parent_prd_applicability=required` requires a parent ref
 and one of `pending-review`, `pending-closeout`, `armed`, or `blocked`.
-`parent-prd-applicability=deferred-vehicle` requires reason `non-default-base`,
+`parent_prd_applicability=deferred-vehicle` requires reason `non-default-base`,
 state `deferred-to-default-branch`, and a linked later default-branch
-`parent-closeout-vehicle` or `pending` vehicle-selection action in `ready-next`.
-`parent-prd-closeout=armed` is valid only when `parent-closeout-head` equals the
-current reviewed SHA, `parent-closeout-base` equals the current `default-branch`,
-and `pr-body-evidence` proves the parent closing keyword is present; none of
+`parent_closeout_vehicle` or `pending` vehicle-selection action in `ready-next`.
+`parent_prd_closeout=armed` is valid only when `parent_closeout_head` equals the
+current reviewed SHA, `parent_closeout_base` equals the current `default_branch`,
+and `pr_body_evidence` proves the parent closing keyword is present; none of
 those proof fields may be `none`.
-An unmerged `armed` row also requires `parent-closeout-watch=root-monitoring`,
+An unmerged `armed` row also requires `parent_closeout_watch=root-monitoring`,
 `owner-handoff`, or `automation-handoff` with matching watch evidence.
 `root-monitoring` additionally requires explicit merge authority and the root as
-the designated merger; `merge-authority=none` requires `owner-handoff`, while
+the designated merger; `merge_authority=none` requires `owner-handoff`, while
 `automation-handoff` requires an explicitly authorized event-driven monitor.
-`parent-prd-applicability=not-applicable` requires
-`parent-prd-closeout=not-applicable` plus a concrete applicability reason.
+`parent_prd_applicability=not-applicable` requires
+`parent_prd_closeout=not-applicable` plus a concrete applicability reason.
 Reconciliation must reject unsupported `armed` or unjustified
 `not-applicable` claims before dispatch, mutation, recovery, or closeout.
 
 When reading legacy ledger rows, migrate
-`prd-backed-merge-ready-pr` to `publication=prd-backed-pull-request` plus
-`pr-closeout=merge-ready`. Migrate `prd-backed-branch-plus-draft-pr` to
-`publication=prd-backed-pull-request` and resolve `pr-closeout` from an explicit
-current-user instruction or structured PRD field, defaulting to `merge-ready`.
-Rewrite the legacy value whenever the row is touched.
+`prd-backed-merge-ready-pr` to
+`publication_authority=prd-backed-pull-request` plus
+`pr_closeout=merge-ready`. Migrate `prd-backed-branch-plus-draft-pr` to
+`publication_authority=prd-backed-pull-request`, resolve `pr_closeout` from the
+canonical option record, and default it to `merge-ready`. Rewrite the legacy
+value whenever the row is touched.
 
 ### autonomous
 
-- <source id/ref, candidate item, repo, evidence it is safe to delegate, next
+- workstream_id=<id>; source_id=<id/ref>; <candidate item, repo, evidence it is safe to delegate, next
   action, closeout target>
 
 ### needs-owner
 
-- <source id/ref, decision, context/evidence, options, recommendation, minimum
+- workstream_id=<id>; source_id=<id/ref>; <decision, context/evidence, options, recommendation, minimum
   owner action, closeout impact>
 
 ### ready-next
 
-- <source id/ref, owner-ready task, proof, authorized next action, closeout
+- workstream_id=<id>; source_id=<id/ref>; <owner-ready task, proof, authorized next action, closeout
   target>
 
 ### blocked
 
-- <source id/ref, blocker, evidence, minimum next action, owner-actionable or
+- workstream_id=<id>; source_id=<id/ref>; <blocker, evidence, minimum next action, owner-actionable or
   external>
 
 ### ignored-or-suppressed
 
-- <source id/ref, source fingerprint, item, reason, date, owner>
+- workstream_id=<id>; source_id=<id/ref>; <source fingerprint, item, reason, date, owner>
 
 ### deferred
 
-- <source id/ref, follow-up issue/ticket or proposed issue body, residual scope,
+- workstream_id=<id>; source_id=<id/ref>; <follow-up issue/ticket or proposed issue body, residual scope,
   blocker, owner/action needed, closeout impact>
 
 ### completed
 
-- <source id/ref, runtime delivery, branch/PR/proof, ready-for-review state, Codex
+- workstream_id=<id>; source_id=<id/ref>; <runtime delivery, branch/PR/proof, ready-for-review state, Codex
   review proof, parent-PRD closeout state/reviewed head/PR-body evidence when
   applicable, closeout-watch/post-merge proof when applicable, validation,
   source closeout target and whether it was
   updated/closed, publication checkout, caller checkout disposition>
-- <worker id/title, integration method, publication checkout, caller checkout
+  - <worker id/title, integration method, publication checkout, caller checkout
   disposition, worker lifecycle decision, generated ignored artifacts
   removed/retained/left in helper worktree>
 
 ### released
 
-- <source id/ref, repo/version/tag/date, release gate proof, release action or
+- workstream_id=<id>; source_id=<id/ref>; <repo/version/tag/date, release gate proof, release action or
   deploy proof>
 
 ## Wave Reports
 
-Record the startup delegation baseline before dispatch. Include that CLI
-subagents are authorized by invoking `$codex-orchestrator` unless the owner
-disabled delegation, visible Codex App worker thread consent when that surface
-is available, and any visible-thread max concurrent worker limit. In a Codex
-App session, also record the App thread id/title for every newly created worker,
-integration, or publication worktree; an owner statement such as `you can use
-Codex threads if needed` records consent with a default maximum of one. Record
-each non-blocking execution report with its source items, selected worker
-surface, orchestrator-chosen split for the current wave, authorization modes,
-delivery path, stop conditions, and any owner edits to surface, authorization,
-or delivery path.
+Record the canonical startup option snapshot before dispatch:
+`delegation_mode`, `worker_surface`, `worker_limit`, `app_thread_consent`,
+`app_thread_limit`, `raw_worktree_fallback`, and
+`active_root_takeover_policy`, with their option-resolution evidence. In a
+Codex App session, also record the App
+thread id/title for every newly created worker, integration, or publication
+worktree. Record each non-blocking execution report with its source items,
+canonical worker surface, orchestrator-chosen split for the current wave,
+authorization modes, delivery path, stop conditions, and any owner-authorized
+option changes.
 
 The execution report is not an approval prompt. Continue later waves while they
-stay inside the recorded source items, CLI subagent default, visible-thread
-session consent, authorization modes, delivery path, and stop conditions. If
-visible-thread consent is missing, delegation was disabled, or a wave would
-exceed consented visible-thread limits, planned work may remain in the ledger,
-but unauthorized visible workers or disabled delegation must not start until
-the owner gives the missing consent.
+stay inside the recorded source items, canonical option snapshot, authorization
+modes, delivery path, and stop conditions. If a required option is unresolved
+or a wave would exceed its recorded limit, planned work may remain in the
+ledger, but dispatch must not start until the canonical option row is valid.
 
 Do not record a newly created raw Git worktree as the publication checkout in a
 Codex App session unless App thread/worktree creation was reported as missing,
-failed, or unsuitable and the owner explicitly authorized that fallback. This
-restriction does not apply in CLI-only sessions.
+failed, or unsuitable and the session row is
+`raw_worktree_fallback=owner-approved`. Keep the managed-worktree failure as
+runtime evidence only. This restriction does not apply in CLI-only sessions.
 
 | Wave | Started | Finished | Sources Scanned | Items Processed | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | <time> | <time> | <source ids> | <count> | <reported; startup baseline; worker split; authorization modes; delivery path; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
 Record worker evidence every time the requested or available worker surface and
-actual worker surface differ. Include the requested surface, owner consent when
-required, actual surface, tool or session id when one exists, fallback reason,
-and whether execution was parallel, sequential, root-owned, or simulated.
+actual worker surface differ. Include `worker_surface`,
+`actual_workstream_surface`, the relevant canonical authorization or consent
+field, tool or session id when one exists, fallback reason, and whether
+execution was parallel, sequential, root-owned, or simulated.
 
 ## Runtime Metrics
 
@@ -435,13 +473,13 @@ Use one ledger per portfolio. For example:
 - `~/.cache/dotagents/skills/codex-orchestrator/ledgers/mobile-stack.md`
 - `~/.cache/dotagents/skills/codex-orchestrator/ledgers/app-backend.md`
 
-Do not mix unrelated portfolios in one ledger unless the user explicitly wants a
-single combined operating view.
+Do not mix unrelated portfolios in one ledger. A combined operating view is
+one explicitly scoped portfolio with its own stable slug and repo/source set.
 
 If separate portfolios claim the same repo realpath or source id, treat that as
-an overlap unless the owner explicitly recorded non-overlapping boundaries or a
-handoff/takeover decision. Record intentional split roots in the active-root
-claim and in `## Notes`.
+an overlap unless their recorded path/source boundaries prove non-overlap or a
+canonical handoff/takeover record transfers ownership. Record intentional split
+roots in the active-root claim and in `## Notes`.
 
 ## Vocabulary
 
@@ -450,10 +488,10 @@ claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, root-owned parent-PRD PR-body closeout, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready`, so ready-for-review transition, Codex review, and applicable parent-PRD closeout remain actionable after local gates. `pr_closeout=draft-only` is valid only from an explicit current-user instruction about the PR lifecycle or structured PRD field and makes those downstream actions `not-applicable` rather than blocked. |
+| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, root-owned parent-PRD PR-body closeout, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready`, so ready-for-review transition, Codex review, and applicable parent-PRD closeout remain actionable after local gates. `pr_closeout=draft-only` is valid only from its canonical option-resolution row and makes those downstream actions `not-applicable` rather than blocked. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
-| `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. A default-branch GitHub whole-PRD closeout PR may report merge-ready with `parent-prd-closeout=armed`, proof, and an active or handed-off watch, but the parent PRD source and portfolio ledger are not complete until the PR merges and the issue is verified closed. A non-default-base PR workstream may complete at merge-ready with `deferred-to-default-branch` only when the linked later vehicle remains `active` or `ready-next`; this never completes the parent PRD or ledger. Authorized `draft-only` and other excluded workstreams record `not-applicable` with a reason. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked or pending required publication, closeout, or proof remains `active`, `ready-next`, `needs-owner`, `blocked`, or `deferred`. |
+| `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. A default-branch GitHub whole-PRD closeout PR may report merge-ready with `parent_prd_closeout=armed`, proof, and an active or handed-off watch, but the parent PRD source and portfolio ledger are not complete until the PR merges and the issue is verified closed. A non-default-base PR workstream may complete at merge-ready with `deferred-to-default-branch` only when the linked later vehicle remains `active` or `ready-next`; this never completes the parent PRD or ledger. Authorized `draft-only` and other excluded workstreams record `not-applicable` with a reason. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked or pending required publication, closeout, or proof remains `active`, `ready-next`, `needs-owner`, `blocked`, or `deferred`. |
 | `deferred` | Residual work intentionally outside current closeout. Link the follow-up or proposed body; use only for real residual scope, blocked live proof, or owner-visible follow-up work. |
 | `released` | Release gate passed and actual product/package/version release, deploy, or tag proof is recorded. Ordinary implementation remains `completed` unless a release happened. |
 
@@ -493,9 +531,9 @@ Before marking a ledger `complete`, verify:
   preflight, permitted Codex review request, existing-request wait,
   review-triggered fix, post-fix validation, fresh-result wait, or PR-thread
   disposition remains in `ready-next`. For a default-branch GitHub whole-PRD
-  closeout vehicle, merge-ready reporting requires `parent-prd-closeout=armed`,
-  the parent ref, a `parent-closeout-head` equal to the current reviewed SHA, a
-  `parent-closeout-base` equal to the current `default-branch`, PR-body evidence,
+  closeout vehicle, merge-ready reporting requires `parent_prd_closeout=armed`,
+  the parent ref, a `parent_closeout_head` equal to the current reviewed SHA, a
+  `parent_closeout_base` equal to the current `default_branch`, PR-body evidence,
   current live-body fingerprint matching that evidence, and a valid closeout
   watch. With no merge authority the watch must be `owner-handoff`; use
   `root-monitoring` only when the root has explicit merge authority and is the
@@ -510,11 +548,11 @@ Before marking a ledger `complete`, verify:
   duplicate review request in `ready-next` when a terminal result or active
   request exists for that head.
 - When `pr_closeout=draft-only`, require validated draft publication and the
-  explicit current-user instruction about the PR lifecycle or structured PRD
-  field, record downstream ready/review/merge-ready gates and parent PRD
+  canonical option-resolution evidence, record downstream
+  ready/review/merge-ready gates and parent PRD
   closeout as `not-applicable` with reason `draft-only`, and allow completion at
-  that requested state. If the user removes the
-  restriction, change the value to `merge-ready` and resume at ready-for-review.
+  that requested state. A later owner instruction changes the canonical row to
+  `pr_closeout=merge-ready`; resume at ready-for-review only after that update.
 - For merge-ready closeout, verify the publication checkout is clean, accepted
   review fixes are committed and pushed to the PR branch, current CI belongs to
   the pushed head, GitStack reports or authenticated supplemental evidence proves
@@ -591,7 +629,7 @@ source mutation and verify these invariants:
   authenticated `gh` fallback, and authority reuse;
 - merge proof exists only when explicit merge authority exists;
 - every default-branch whole-PRD closeout vehicle is merged with
-  `parent-prd-closeout=closed`, `parent-closeout-watch=complete`, matching armed
+  `parent_prd_closeout=closed`, `parent_closeout_watch=complete`, matching armed
   head/base/body history, and post-merge proof that the parent issue closed; no
   `armed` unmerged PR or `deferred-to-default-branch` vehicle remains
   outstanding;

@@ -33,7 +33,8 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 - Do not use `needs-info` as a normal output state for generated
   implementation issues. Treat unresolved product, domain, dependency, or
   acceptance-criteria questions as blockers to resolve before publishing,
-  unless the user explicitly asks for partial non-agent-ready backlog output.
+  unless `partial_output=allow-non-agent-ready`. The default
+  `partial_output=withhold` keeps them unpublished.
 - `$plan-harder` must not write files. On its caller surface it returns only the
   structured hardening result; this phase owns issue-body merging and any issue
   tracker or local Markdown writes.
@@ -42,9 +43,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   title-derived slug as a fallback only.
 - Inherit delivery mode from the PRD. The PRD is the canonical place for the
   full branch and PR strategy, but every generated issue must copy the
-  effective feature-level `Delivery mode` label for cross-session scheduling.
-  Mark it as inherited from `Source PRD` unless the issue has an explicit
-  owner-authorized issue-level exception.
+  effective feature-level `delivery_mode` label for cross-session scheduling.
+  Use `delivery_source=feature-level-inherited` unless an authorized option row
+  selects `delivery_source=issue-level-override`.
 - Treat the generated issue set as the execution graph. Before returning or
   publishing issues, validate issue order, dependency references, acyclicity,
   startability waves, and cross-repo integration proof requirements from the
@@ -61,9 +62,10 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   invoke `$project-memory` with the `domain-memory` slice, which runs its
   internal domain-modeling workflow for the durable content update.
 - Treat `tracker_backend` as planning-artifact write authority. When the
-  effective target is the configured tracker, publish GitHub issues for
+  `effective_target=configured-tracker`, publish GitHub issues for
   `github` backends and write Markdown files for `local` backends. Return draft
-  bodies or commands only for explicit no-mutation overrides.
+  bodies or commands only for `effective_target=local-dry-run` or
+  `effective_target=draft-publish-commands`.
 - Use structured values for multi-choice issue body fields. This phase owns the
   `parallelization`, `closeout_mode`, and `integration_mode` values documented
   below; `delivery_mode` and `pr_closeout` come from the PRD, and `issue_type` /
@@ -72,9 +74,12 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   surface choices to PRDs, generated issues, issue files, hosted issue bodies,
   or draft publish commands. `$codex-orchestrator` resolves those per
   workstream and session.
-- Do not add checkpoint approval, publication permission, or issue mutation
-  permission to `## Orchestrator Handoff`. Those are runtime authorization
-  decisions owned by `$codex-orchestrator`.
+- Do not add checkpoint approval, publication permission, runtime issue-mutation
+  overrides, or worker permissions to `## Orchestrator Handoff`. Those are
+  runtime authorization decisions owned by `$codex-orchestrator`. Preserve the
+  independently resolved source-contract `issue_mutation_authority` and
+  `issue_mutation_authority_evidence`; the orchestrator validates them and they
+  do not directly authorize a worker.
 - Treat `$codex-orchestrator` session settings as runtime-only. Do not copy
   worker surfaces, worker counts, or checkpoint choices into PRDs, generated
   issues, local issue files, hosted issue bodies, or draft publish commands.
@@ -84,13 +89,14 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 ## Boundaries
 
 - Do not implement the issues.
-- Do not rewrite the PRD unless the user explicitly asks for a PRD update.
+- This phase never rewrites the PRD. A requested PRD update runs through the
+  PRD phase before issue splitting and supplies a new verified handoff.
 - Do not create horizontal layer tickets such as "backend only", "frontend
   only", or "tests only" when a vertical slice is practical.
 - Do not ask for separate issue write/publish confirmation after `plan-feature`
   has resolved setup, planning identity, blockers, and effective target. Ask
-  only when the target is missing, ambiguous, or contradicted by an explicit
-  no-mutation request.
+  only when the canonical target snapshot is missing, ambiguous, or
+  internally contradictory.
 
 ## Phase Handoff Inputs
 
@@ -99,35 +105,66 @@ identity fields used by the PRD phase, with `source_prd_ref` resolved or
 carried from the draft handoff:
 
 ```text
-Plan-feature mode: <full-flow|issues-from-existing-prd>
-Execution profile: <lean-issues|standard>
-
-- Source PRD ref:
-  <#<prd-number>|repo-relative PRD path|draft-prd:<slug>>.
-- Domain knowledge delta:
-  <structured `domain_knowledge_delta` from deferred clarification or the PRD's
-  `## Domain Knowledge Handoff` section>.
+mode: <full-flow|issues-from-existing-prd>
+execution_profile: <lean-issues|standard>
+tracker_backend: <github|local>
+effective_target: <configured-tracker|local-dry-run|draft-publish-commands>
+no_mutation_override: <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-output>
+no_mutation_output: <not-applicable|local-artifacts|publish-commands>
+local_mirror: <not-requested|requested>
+local_mirror_path: <repo-relative mirror root|not-applicable>
+partial_output: <withhold|allow-non-agent-ready>
+delivery_mode: <pull-request|direct-commit>
+issue_mutation_authority: <none|pr-body-closeout-only|explicit-direct-mutation>
+issue_mutation_authority_evidence: <source PRD/owner evidence or none>
+branch_name: <feature branch or exact authorized direct-commit target branch>
+pr_closeout: <merge-ready|draft-only|not-applicable>
+pr_shape: <single-pr|per-repo-pr|none>
+source_prd_ref: <#prd-number|repo-relative PRD path|draft-prd:slug>
+feature_slug: <accepted feature slug>
+product_slug: <accepted product slug or not-applicable>
+workspace_path: <accepted workspace path or not-applicable>
+context_file: <selected CONTEXT.md or not-applicable>
+project_slug: <accepted orchestrator project slug or not-applicable>
+option_resolution: <keyed run rows; append issue:<NN> rows before output>
+option_rows_fingerprint: <incoming run-row sha256, then complete run-plus-issue sha256 on output>
+domain_knowledge_delta: <structured deferred delta or PRD handoff>
 ```
+
+Verify the incoming run-row `option_rows_fingerprint` before splitting. Every
+issue adds exactly one row per Per-Issue Registry field plus its effective
+`branch_name` data row. After the issue graph and every `issue:<NN>` row are final, recompute the
+fingerprint over the complete run-plus-issue row set and carry that value into
+publication and completion output.
 
 ## Structured Issue Values
 
 Use these values in generated issue bodies:
 
-- `parallelization`: `independent` can start in any eligible wave;
-  `depends-on <issue-id>` waits for completion proof; `blocks <issue-id>`
-  unlocks later work after completion; `root-integrated` stays in the root
-  thread.
+- `parallelization`: `independent`, `depends-on`, `blocks`, or
+  `root-integrated`. Store generated issue ids separately in `dependency_ids`
+  and `blocked_issue_ids`; never append ids to the enum value.
 - `closeout_mode`: `feature-pr-closes-issue`, `repo-pr-closes-issue`,
   `direct-commit-closes-issue`, or `local-done-move-after-proof` names the
   concrete completion path. Use `local-done-move-after-proof` for local
   markdown issues even when the delivery mode is `direct-commit`;
   `direct-commit-closes-issue` is only for hosted trackers or other sources
   where an authorized final commit can close the source item.
+- `issue_mutation_authority`: `none`, `pr-body-closeout-only`, or
+  `explicit-direct-mutation`. The explicit value is required for
+  `direct-commit-closes-issue` and must come from separately preserved owner
+  evidence; it is not inferred from `delivery_mode=direct-commit`.
 - `integration_mode`: `single-repo-pr`, `repo-pr`, `direct-commit`, or
-  `omitted` records how issue output lands when it is not obvious from the PRD.
+  `not-applicable`.
+- `domain_closeout`: `not-applicable` or `implementation-closeout`; decisions,
+  targets, evidence, and operation remain separate data fields.
 
-`delivery_mode` and `pr_closeout` are copied from the PRD. `issue_type` and
-`triage_state` are mapped through `project-memory/agents/triage-labels.md`.
+The feature-level delivery tuple is copied from the PRD by default. An
+authorized issue-level override atomically resolves `delivery_mode`,
+`issue_mutation_authority`, `pr_shape`, `pr_closeout`, `closeout_mode`, and
+`integration_mode` before
+output. `issue_type` and `triage_state` are mapped through
+`project-memory/agents/triage-labels.md`.
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
@@ -186,14 +223,27 @@ Resolve and carry the planning identity before splitting:
 - `delivery_mode`: inherit from the PRD `## Delivery Mode` section. If the PRD
   lacks it, infer `pull-request` when repo shape and affected repo set are
   unambiguous; otherwise stop and require the PRD delivery mode to be resolved.
-- `pr_closeout`: for `pull-request`, inherit the structured `PR closeout` value.
+- `branch_name`: inherit the structured PRD value. For `direct-commit`, verify
+  that it equals the exact target branch in the preserved
+  `delivery_mode_evidence`; missing or conflicting evidence is blocking.
+- `issue_mutation_authority`: inherit the structured PRD value. For GitHub
+  direct-commit, require `explicit-direct-mutation` plus separately preserved
+  owner evidence explicitly authorizing final-commit closure for the same
+  scope, target, and branch. Missing evidence is blocking; do not derive this
+  value from direct-commit publication authority.
+- `pr_shape`: inherit the canonical value from the PRD. For a legacy PRD that
+  lacks it, apply `references/options.md` legacy normalization once, record the
+  canonical value and migration evidence, and use only that value downstream.
+- `pr_closeout`: for `pull-request`, inherit the structured `pr_closeout` value.
   Default missing legacy values to `merge-ready`. Use `draft-only` only when the
-  PRD has the explicit structured value; prose such as `draft PR`, `open a draft
-  PR`, or `do not merge` is not a draft-only signal.
+  PRD or its option-resolution record carries that canonical value; do not
+  compare source prose during issue splitting. For `direct-commit`, use
+  `not-applicable`.
 - `source_prd_ref`: use the durable PRD issue number, local PRD path, or stable
   draft ref passed by the PRD phase or existing durable PRD source. In
-  `draft-publish-commands` mode, keep the draft ref in returned bodies but
-  include the replacement step required before hosted mutation.
+  either non-mutating effective target, keep the draft ref in returned bodies.
+  For `draft-publish-commands`, include the replacement step required before
+  hosted mutation; for `local-dry-run`, label it non-executable.
 
 If a multi-context local Markdown repo lacks an accepted product/context or the
 feature slug can collide with another product according to tracker conventions,
@@ -215,6 +265,8 @@ Before hardening, validate the generated issue graph from the proposed issue
 list:
 
 - `delivery_mode`: inherited from the PRD and copied in each issue.
+- `pr_shape`: inherited from the PRD or its one-time legacy normalization and
+  copied in each issue.
 - `pr_closeout`: inherited from the PRD for `pull-request` and copied in each
   issue.
 - ordered issue map with `<NN>` and short intent.
@@ -267,17 +319,18 @@ Every issue should:
 - include enough context to be implemented without rereading the whole PRD,
 - include product/workspace/context scope for monorepo work, or affected repos
   and integration gates for orchestrator work,
-- include a durable `Source PRD` pointer, copied feature-level delivery mode,
-  issue-level parallelization, dependencies, closeout, and any delivery or
-  integration exception,
+- include a durable `source_prd_ref` pointer, copied feature-level
+  `delivery_mode`, `pr_shape`, issue-level parallelization, dependencies,
+  closeout, and any delivery or integration exception,
 - include a `## Orchestrator Handoff` section that restates the dispatchable
-  source PRD, feature slug, delivery mode, affected repos or product scope,
-  scope, start rule, dependencies, validation, and closeout,
+  source PRD, feature slug, `delivery_mode`, `pr_shape`, affected repos or
+  product scope, scope, start rule, dependencies, validation, closeout, and
+  `integration_mode`,
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
-- keep dependency references in issue `Parallelization` lines as issue IDs
-  (`01`, `02`, ...) rather than prose titles,
+- keep dependency references in `dependency_ids` / `blocked_issue_ids` as
+  issue IDs (`01`, `02`, ...) rather than prose titles,
 - avoid circular dependencies that can lock the queue.
 
 The final domain owner must additionally:
@@ -402,10 +455,10 @@ and triage states to the repo's tracker values.
   must not be started until its dependencies are complete.
 - Do not create dependency cycles. Every dependency graph must be acyclic so a
   set of ready issues cannot lock the queue.
-- Use `needs-info` only for explicitly requested partial backlog output where
+- Use `needs-info` only when `partial_output=allow-non-agent-ready` and
   the next action is a concrete question for a human/reporter. Do not count
   `needs-info` issues as agent-ready, and do not publish them from
-  `plan-feature` unless it explicitly permits partial output.
+  `plan-feature` under `partial_output=withhold`.
 - Use `ready-for-human` when the PRD requires human judgment before an agent can
   proceed.
 
@@ -421,11 +474,13 @@ Use `project-memory/agents/issue-tracker.md` for the target, and read
 `$project-memory`'s `references/tracker-publishing.md` for shared
 effective-target, temporary body-file, and `source_prd_ref` rules:
 
-- `Tracker backend: github`: create issues through `$gitstack:github-issues`, attach them
+- `tracker_backend=github`: with `effective_target=configured-tracker`, create
+  issues through `$gitstack:github-issues`, attach them
   to the PRD parent when the PRD source is a GitHub issue, set the mapped
   `task` issue type when available, then apply mapped labels such as
   `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
-  `.scratch/` mirror unless the user explicitly requested one. Pass sanitized
+  `.scratch/` mirror unless `local_mirror=requested`; when requested, write
+  issue mirrors under `local_mirror_path`. Pass sanitized
   issue titles, bodies, target repo, labels, types, and parent/sub-issue intent
   to `$gitstack:github-issues`; do not assemble direct mutating `gh issue create` shell
   commands with generated Markdown in this phase.
@@ -434,8 +489,9 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   Derive `<project-slug>` and affected repos from the PRD/project context or ask
   for them. Repo-local implementation PRs or child issues link back to the
   relevant PRD or partial issue. Do not create local orchestrator feature
-  artifacts or `.scratch/` mirrors unless the user explicitly requested one.
-- `Tracker backend: local`: write to the configured repo-local issue
+  artifacts or `.scratch/` mirrors unless `local_mirror=requested`; write any
+  requested mirrors under `local_mirror_path`.
+- `tracker_backend=local`: with `effective_target=configured-tracker`, write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
   and `Status:` lines near the top and a heading that follows the local issue
   title convention `<feature-slug>: <NN> <vertical outcome>`. Use the
@@ -447,13 +503,13 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   issue title convention `<feature-slug>: <NN> <vertical outcome>`. Create the
   project/feature directories only when writing the actual feature artifacts,
   not during setup. The issue phase owns the issue files and reads
-  `PROJECT.md`, `repos/*.md`, and `integration-gates.md`; it does not create or
-  refresh those supporting files unless the user explicitly asks for that
-  broader orchestrator artifact update.
+  `PROJECT.md`, `repos/*.md`, and `integration-gates.md`; it never creates or
+  refreshes those supporting files. A broader artifact update belongs to the
+  PRD phase and must finish before the issue-phase handoff.
 For GitHub PRDs, every generated implementation or vertical feature issue must
 be attached to the PRD issue as a sub-issue when the tracker supports it. If an
 issue is created before the parent relationship is set, use `$gitstack:github-issues` to
-attach it afterward. Keep `Source PRD: #<prd-number>` in the issue body as well.
+attach it afterward. Keep `source_prd_ref: #<prd-number>` in the issue body as well.
 For multi-repo work, related partial PRDs and repo issues must link to each
 other by URL or issue number.
 
@@ -474,7 +530,10 @@ Every generated agent-ready implementation issue must include the
 handoff may repeat structured data from `## Delivery`, `## Validation`,
 `## Completion`, and `## Dependencies` so an orchestrator can register the issue
 without inferring from loose prose. It must not contain worker authorization,
-publication, issue mutation, or orchestration session settings.
+publication authority, runtime issue-mutation overrides, or orchestration
+session settings. It must carry the independently resolved source-contract
+`issue_mutation_authority` and evidence required by the delivery tuple; those
+fields do not authorize a worker.
 
 When a final domain owner exists, publish or write it last, attach it to the
 same PRD parent, and keep its dependency metadata in the generated feature-ID
@@ -485,35 +544,66 @@ preserve the same last-task ordering and replacement rules.
 Every published or returned issue must preserve cross-session scheduling
 metadata without duplicating the full PRD branch and PR details:
 
-- `Source PRD`: required. Prefer a stable GitHub issue number or local PRD path.
-  Use a stable `draft-prd:<...>` ref only for draft command output before
-  hosted mutation.
-- `Delivery mode`: required. Copy the effective value from the PRD and mark it
-  as feature-level, such as `pull-request (feature-level, inherited from Source
-  PRD)`. Feature-level means the mode applies to the whole Source PRD feature,
-  not only this generated issue. For an exception, record the issue-level
-  override and authorization reason, such as `direct-commit (issue-level
-  override, authorized by <owner/date>)`.
-- `PR closeout`: required for `pull-request`. Copy `merge-ready` or `draft-only`
-  from the PRD as feature-level metadata. Default a missing legacy value to
-  `merge-ready`; do not infer `draft-only` from PR-shape prose.
-- `Parallelization`: required. Use `independent`,
-  `depends-on <issue-id>[, <issue-id>]`, `blocks <issue-id>[, <issue-id>]`, or
-  `root-integrated`.
-- `Dependencies`: required. Use `None` or direct generated issue IDs with the
-  dependency reason.
-- `Domain closeout`: required. Use `not-applicable` unless the issue owns
+- `source_prd_ref`: required. Prefer a stable GitHub issue number or local PRD path.
+  Use a stable `draft-prd:<...>` ref only for non-mutating output before hosted
+  mutation.
+- `delivery_mode`: required. Copy the effective value from the PRD and record
+  the source separately as `delivery_source=feature-level-inherited`. For an
+  authorized exception, use `delivery_source=issue-level-override`, store the
+  authorization ref in `delivery_source_evidence`, and atomically resolve the
+  complete delivery tuple described below; never append provenance to an enum
+  value.
+- `delivery_source_evidence`: for every effective `direct-commit` issue,
+  preserve the PRD/owner `owner-ref` and target branch, set
+  `scope-ref=issue:<NN>`, preserve the PRD `target-ref` verbatim, and add
+  `scope-transfer-ref=run` when the delivery is feature-level inherited. A
+  missing owner token or a target/branch change blocks publication.
+- `issue_mutation_authority`: required. Use `none` for local trackers,
+  `pr-body-closeout-only` for GitHub pull-request delivery, and
+  `explicit-direct-mutation` for GitHub direct-commit only when the separate
+  owner closeout row is valid.
+- `issue_mutation_authority_evidence`: for
+  `explicit-direct-mutation`, project the separately authorized evidence to
+  `scope-ref=issue:<NN>`, preserve the same target and branch tokens as
+  `delivery_source_evidence`, preserve its independent closeout `owner-ref`, and
+  add `scope-transfer-ref=run` for feature-level inheritance. Recovery
+  fingerprints the delivery and mutation evidence separately.
+- `branch_name`: required data. Inherit the feature branch for
+  `delivery_source=feature-level-inherited`. For an issue-level
+  `delivery_mode=direct-commit` override, copy the exact authorized target
+  branch named by `delivery_source_evidence`; reject missing or conflicting
+  branch data.
+- `pr_shape`: required. For feature-level inheritance, copy `single-pr`,
+  `per-repo-pr`, or `none` from the PRD. For an issue-level override, derive it
+  from the effective issue `delivery_mode` and repo scope through
+  `references/options.md`; do not re-derive it from prose.
+- `pr_closeout`: required. Copy `merge-ready`, `draft-only`, or `not-applicable`
+  from the PRD only for feature-level inheritance. For an issue-level override
+  or a legacy issue with a missing value, resolve from the effective issue
+  `delivery_mode`: `merge-ready` for `pull-request` unless canonical override
+  evidence selects `draft-only`, and `not-applicable` for `direct-commit`.
+  Never resolve it from PR-shape prose.
+- `parallelization`: required. Use `independent`, `depends-on`, `blocks`, or
+  `root-integrated`. Put ids in `dependency_ids` and `blocked_issue_ids`.
+- `dependency_ids`, `blocked_issue_ids`, and `dependency_reason`: required data
+  fields; use `none` when empty.
+- `domain_closeout`: required. Use `not-applicable` unless the issue owns
   `## Domain Knowledge Closeout`; for that final owner, copy
-  `implementation-closeout` plus the exact decisions, target surfaces,
-  evidence, and `$project-memory domain-memory` operation.
-- `Closeout`: required. State the concrete completion path, such as
+  `implementation-closeout` and put the exact decisions, target surfaces,
+  evidence, and `$project-memory domain-memory` operation in
+  `domain_closeout_data`.
+- `closeout_mode`: required. Resolve the concrete completion path from the
+  effective issue `delivery_mode` and tracker backend, using
   `feature-pr-closes-issue`, `repo-pr-closes-issue`,
   `direct-commit-closes-issue`, or `local-done-move-after-proof`.
   For local markdown trackers, use `local-done-move-after-proof` even when
-  `Delivery mode` is `direct-commit`.
-- `Integration mode`: optional for ordinary issues that inherit from the PRD.
-  Include it when the issue is cross-repo, exceptional, or otherwise not
-  obvious from the PRD delivery mode.
+  `delivery_mode` is `direct-commit`.
+  `direct-commit-closes-issue` additionally requires
+  `issue_mutation_authority=explicit-direct-mutation`; otherwise stop before
+  emitting an agent-ready issue.
+- `integration_mode`: required. Resolve it from the effective issue
+  `delivery_mode`; use `not-applicable` for an ordinary issue with no
+  exceptional integration path.
 
 ### Validation Commands
 
@@ -534,18 +624,29 @@ For ordinary single-repo or monorepo `pull-request` issues, the
 ```markdown
 ## Delivery
 
-- Delivery mode: pull-request (feature-level, inherited from Source PRD)
-- PR closeout: merge-ready (feature-level, inherited from Source PRD)
-- Parallelization: independent
-- Closeout: feature-pr-closes-issue
+- delivery_mode: pull-request
+- delivery_source: feature-level-inherited
+- delivery_source_evidence: source_prd_ref
+- issue_mutation_authority: pr-body-closeout-only
+- issue_mutation_authority_evidence: source_prd_ref
+- branch_name: feature/<feature-slug>
+- pr_shape: single-pr
+- pr_closeout: merge-ready
+- parallelization: independent
+- dependency_ids: none
+- blocked_issue_ids: none
+- closeout_mode: feature-pr-closes-issue
+- integration_mode: not-applicable
 ```
 
 Every published or returned issue must state its completion path:
 
 - GitHub: close the implementation issue from the relevant PR body with a
-  closing keyword, following `Closeout`. Final-commit closure requires
-  `direct-commit` or another explicit authorization. Do not add the parent PRD
-  closing keyword from an individual child issue. For a whole-PRD final feature
+  closing keyword, following `closeout_mode`. Final-commit closure requires
+  `closeout_mode=direct-commit-closes-issue`,
+  `issue_mutation_authority=explicit-direct-mutation`, and its exact scoped
+  authorization evidence. Do not add the parent PRD closing keyword from an individual child
+  issue. For a whole-PRD final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
   only after its final current-head review and all PRD closeout gates pass.
 - Local markdown: move the issue to `issues/done/<NN>-<slug>.md` after
@@ -569,12 +670,14 @@ local markdown issue headings:
 
 Example: `team-invitations: 02 Accept invitation into team`.
 
-Use the effective target from the `plan-feature` handoff without re-asking
-unless this phase finds a new blocker or unresolved question. When the effective
-target is the configured tracker, create the GitHub issues or write the local
-issue files. In hosted tracker modes, local file writes apply only to explicit
-local mirrors or dry-run targets; hosted body-file inputs are transient files
-outside the repo and are owned by `$gitstack:github-issues`. Hosted tracker mutation in
+Use `effective_target` from the `plan-feature` handoff without re-resolving it.
+`configured-tracker` creates the GitHub issues or writes the local issue files.
+`local-dry-run` returns paths and bodies without writing.
+`draft-publish-commands` returns exact hosted commands without mutation. In
+hosted tracker modes, local file writes apply only when
+`effective_target=configured-tracker` and `local_mirror=requested`; hosted
+body-file inputs are transient files outside the repo and are owned by
+`$gitstack:github-issues`. Hosted tracker mutation in
 this phase is limited to generated planning issue publication, parent/sub-issue
 links, issue type metadata, and initial workflow-state labels. After
 implementation scheduling starts, issue lifecycle comments, label changes,
@@ -586,30 +689,33 @@ final issue body for machine-local absolute paths and replace them with
 sanitized evidence references. Treat any remaining unsanitized developer path as
 a blocker for hosted publication or shared draft command output.
 
-If the configured target is GitHub but the current run explicitly requested
-no-mutation output, do not mutate GitHub. Ask `$gitstack:github-issues` for exact draft
-commands, or use the configured local dry-run target when one is recorded. In
-`draft-publish-commands` mode, generated issue bodies may use
-`Source PRD: draft-prd:<...>` only in returned draft output; the publish plan
-must create the PRD first, capture the hosted PRD number, replace the draft ref
-with `Source PRD: #<number>`, and then create or attach implementation issues.
+For `tracker_backend=github`, branch only on `effective_target`:
+`configured-tracker` publishes, `local-dry-run` returns issue bodies and target
+refs without mutation, and `draft-publish-commands` asks
+`$gitstack:github-issues` for exact draft commands. Under either non-mutating
+target, generated issue bodies may use `source_prd_ref: draft-prd:<...>` only
+in returned output. For `draft-publish-commands`, the publish plan must create
+the PRD first, capture the hosted PRD number, replace the draft ref with
+`source_prd_ref: #<number>`, and then create or attach implementation issues.
+For `local-dry-run`, return the PRD body fingerprint and label the ref
+non-executable.
 When a blocker or unresolved question appears under `plan-feature`, return it
 as an issue-splitting blocker instead of publishing a `needs-info` issue by
-default. If the user explicitly requested partial non-agent-ready output, the
-phase may return or publish the affected issue as `needs-info` or
-`ready-for-human` after target resolution, with the blocker visible and no
-agent-ready claim.
+default. When `partial_output=allow-non-agent-ready`, the phase may return or
+publish the affected issue as `needs-info` or `ready-for-human` after target
+resolution, with the blocker visible and no agent-ready claim.
 
 ### 7. Report Completion
 
 Summarize:
 
 - source PRD,
-- execution profile used and any widening reason,
+- canonical keyed run/issue option rows and option-resolution evidence, including any
+  execution-profile widening reason,
+- `option_rows_fingerprint` for the complete run-plus-issue row set,
 - authoritative `feature_slug`,
 - product/workspace/context or orchestrator project identity used, when
   applicable,
-- delivery mode inherited,
 - number of issues produced,
 - verticality gate result, including any repairs, merges, splits,
   enabling-slice exceptions, or withheld anomalies,
@@ -618,13 +724,14 @@ Summarize:
   section,
 - GitHub PRD parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
+- `local_mirror` result and `local_mirror_path`,
 - issue types and labels/statuses assigned,
 - completion instruction included,
 - any blocked issues and why,
 - `domain_knowledge_delta` status and the exact final issue ref that owns
   capture, or confirmation that no durable change was introduced,
-- whether any non-agent-ready partial issues were withheld or explicitly
-  published as `needs-info` / `ready-for-human`,
+- the `partial_output` result and whether any non-agent-ready partial issues
+  were withheld or published as `needs-info` / `ready-for-human`,
 - confirmation that `$plan-harder` was run once per issue, that each issue
   includes the standard plan-hardening provenance line, and that the hardening
   output was merged into the issue without duplicated sections.
@@ -660,7 +767,7 @@ archives, or block publication to obtain metrics.
 Before composing or validating issue bodies, read
 `references/issue-body-template.md`. Use that template unless the tracker has a
 stronger local template. Keep `## Questions` out of `ready-for-agent` issues;
-include it only for explicitly authorized partial `needs-info` output.
+include it only when `partial_output=allow-non-agent-ready`.
 
 ## References
 

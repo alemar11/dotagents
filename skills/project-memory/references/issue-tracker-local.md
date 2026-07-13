@@ -17,13 +17,14 @@ and ADR memory.
 
 Feature-planning workflows write PRDs and generated implementation issues to
 the configured local Markdown tracker by default after setup, planning identity,
-and blockers are resolved. They do not need a separate per-run confirmation to
-create those files unless the current request explicitly asks for dry-run or
-no-mutation output.
+and blockers are resolved. Branch only on the canonical `effective_target`:
+`configured-tracker` writes tracker files and `local-dry-run` returns draft
+paths and bodies without writing them.
 
-Current-run override: treat any temp, dry-run, rehearsal, or disabled-write
-constraint as run-specific behavior. Do not record it as a durable
-issue-tracker configuration row.
+A non-mutating run requires a non-`none` `no_mutation_override`,
+`no_mutation_output=local-artifacts`, and
+`effective_target=local-dry-run`. Do not record these run-scoped rows as
+durable issue-tracker configuration.
 
 ## Conventions
 
@@ -41,8 +42,9 @@ issue-tracker configuration row.
 - Triage state is recorded as a `Status:` line near the top of each issue file,
   using the state strings from `project-memory/agents/triage-labels.md`
 - Comments and conversation history append under a `## Comments` heading
-- `$plan-feature` owns PRD and generated issue body shape, including `Source
-  PRD`, delivery metadata, partial-PRD links, and issue graph validation.
+- `$plan-feature` owns PRD and generated issue body shape, including
+  `source_prd_ref`, delivery metadata, partial-PRD links, and issue graph
+  validation. `Source PRD` is a read-only legacy migration alias.
 - In multi-context repos or monorepos, feature slugs must include the accepted
   product or workspace slug when needed to avoid collisions, for example
   `customer-portal-weekly-digest` instead of `weekly-digest`.
@@ -52,7 +54,9 @@ issue-tracker configuration row.
 ## Delivery Defaults
 
 - Default `delivery_mode`: `pull-request`.
-- Branch naming: default to `feature/<feature-slug>`.
+- Branch naming: for `delivery_mode=pull-request`, default to
+  `feature/<feature-slug>`. For `delivery_mode=direct-commit`, use the exact
+  target branch carried by the scoped owner evidence.
 - PR shape: one draft PR for a single repo or monorepo feature when the work is
   later published. In multi-repo work, every involved repo uses the same branch
   name and opens its own PR. Local issue files are scheduling units and move to
@@ -60,14 +64,17 @@ issue-tracker configuration row.
 - Direct-commit shape: `direct-commit` is delivery proof, not the local issue
   lifecycle. Implement on the current branch, validate, commit, record the
   commit/proof in the issue or ledger, then move the local issue file to
-  `issues/done/` unless the current run explicitly asks to keep completed issue
-  files in place for inspection.
+  `issues/done/`.
 - Multi-repo PRD shape: use a single PRD only when that is the accepted
   planning source. Otherwise use linked repo-scoped partial PRDs or generated
   issue files; each one names its affected repo and links the siblings that
   define the same feature. A global PRD is not required as durable setup
   configuration.
-- Exceptions: `direct-commit` only with explicit maintainer authorization.
+- Exceptions: `delivery_mode=direct-commit` requires
+  `source=owner-instruction` plus exact feature-scope and target-branch
+  evidence, or a `source-prd` row preserving that evidence.
+- Local issue completion uses `issue_mutation_authority=none`; delivery proof
+  never grants a hosted-style final-commit closure.
 
 ## Runtime Boundary
 
@@ -101,8 +108,9 @@ exist yet, create it when completing the first issue.
 ## When a skill says "publish to the issue tracker"
 
 Create a new file under `.scratch/<feature-slug>/`, creating the directory if
-needed. If a current-run no-mutation override is active, return draft file paths
-and bodies instead of writing local tracker files.
+needed for `effective_target=configured-tracker`. For
+`effective_target=local-dry-run`, return draft file paths and bodies without
+writing local tracker files.
 
 ## When a skill says "fetch the relevant issue"
 

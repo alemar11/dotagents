@@ -19,7 +19,7 @@ A good vertical issue:
 - includes the minimum layers needed to make that behavior real,
 - names the product/workspace context in monorepos or the affected repos and
   integration gates in orchestrator workspaces,
-- links back to the Source PRD for delivery mode and states how the issue
+- links back to the source_prd_ref for delivery mode and states how the issue
   can run in parallel,
 - has explicit dependencies and no hidden ordering assumptions,
 - gives the implementation agent enough local context to start,
@@ -86,7 +86,7 @@ Dependencies must be explicit, minimal, and implementable:
   complete."
 - If the issue depends on an unresolved decision, withhold it and return the
   blocker by default instead of publishing a partial issue. Emit `needs-info`
-  only when the user explicitly authorizes partial non-agent-ready output.
+  only when `partial_output=allow-non-agent-ready`.
   If it depends only on another generated implementation issue being completed,
   it may still be `ready-for-agent`; queue consumers must wait for the listed
   dependency to finish before starting it.
@@ -181,13 +181,14 @@ Mark an issue `ready-for-agent` only when it has:
   or monorepo,
 - affected repos and integration gates when the issue is an orchestrator
   workspace issue,
-- a durable `Source PRD` pointer and copied feature-level `Delivery mode`
-  metadata,
+- a durable `source_prd_ref` pointer and copied feature-level `delivery_mode`,
+  independently resolved `issue_mutation_authority`, and `pr_shape` metadata,
 - parallelization status, expected closeout path, and any delivery or
   integration exception,
 - a `## Orchestrator Handoff` section that restates the dispatchable source
-  PRD, feature slug, delivery mode, affected repos or product scope, scope,
-  start rule, dependencies, validation, and closeout,
+  PRD, feature slug, `delivery_mode`, `issue_mutation_authority`, `pr_shape`, affected repos or product
+  scope, scope, start rule, dependencies, validation, closeout, and
+  `integration_mode`,
 - acceptance criteria,
 - validation steps,
 - implementation guidance enriched by `$plan-harder`,
@@ -197,10 +198,10 @@ A `ready-for-agent` issue may list dependencies on other ready issues. That
 means it is specified enough for an agent queue, not that it is immediately
 startable before those dependencies are complete.
 
-Only publish or return a `needs-info` issue when the user explicitly authorized
-partial non-agent-ready output. Otherwise withhold the issue and report the
-blocking question. When partial output is authorized, mark the issue
-`needs-info` when any of these remain unclear:
+Only publish or return a `needs-info` issue when
+`partial_output=allow-non-agent-ready`. Otherwise withhold the issue and report
+the blocking question. Under that canonical value, mark the issue `needs-info`
+when any of these remain unclear:
 
 - product behavior or user outcome,
 - selected product/workspace/context in a multi-context repo or monorepo,
@@ -210,7 +211,7 @@ blocking question. When partial output is authorized, mark the issue
 - migration or compatibility policy,
 - access to credentials, services, fixtures, or test data,
 - validation command or acceptance signal,
-- Source PRD, delivery mode inheritance or exception, or whether the issue is
+- source_prd_ref, delivery mode inheritance or exception, or whether the issue is
   safe to implement in parallel.
 
 If the source PRD has open questions that affect scope, acceptance criteria,

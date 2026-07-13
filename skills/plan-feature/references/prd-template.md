@@ -9,8 +9,10 @@ Use these `delivery_mode` values in every PRD:
 - `pull-request`: feature branch plus PR delivery. In a single repo or monorepo,
   use one feature branch and PR. In multi-repo work, every involved repo uses
   the same branch name and opens its own PR.
-- `direct-commit`: direct commit path, only with explicit maintainer
-  authorization.
+- `direct-commit`: direct commit path. The `delivery_mode` option row must use
+  `source=owner-instruction` and its evidence must name the exact owner
+  instruction, feature scope, and authorized target branch. A migrated
+  `source-prd` row is valid only when it preserves that same evidence.
 
 For `pull-request`, use these `pr_closeout` values:
 
@@ -18,10 +20,12 @@ For `pull-request`, use these `pr_closeout` values:
   through validation, ready-for-review transition, Codex review, and
   merge-ready closeout without authorizing merge.
 - `draft-only`: terminal draft state, only when the current user explicitly
-  asks to keep or leave the PR in draft.
+  selects `pr_closeout=draft-only` or an option-resolution row records that
+  canonical value with accepted owner/source evidence.
 
-Do not infer `draft-only` from prose such as `draft PR`, `open a draft PR`, or
-`do not merge automatically`.
+Do not select `draft-only` by comparing free-form prose. Normalize an accepted
+instruction once in the option-resolution record, then read only
+`pr_closeout`.
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
@@ -79,20 +83,33 @@ What user or system problem this solves.
 
 ## Delivery Mode
 
-- Delivery mode: `pull-request` by default, or `direct-commit` only with
-  explicit authorization.
-- PR closeout: `merge-ready` by default for `pull-request`; use `draft-only`
-  only after an explicit current-user request or when preserving an existing
-  structured `PR closeout: draft-only` decision.
-- Branch naming: default to `feature/<feature-slug>`; for multi-repo work, use
-  that same branch name in each affected repo unless repo policy differs.
-- PR shape: one PR opened as draft initially for the feature in a single repo
-  or monorepo; one PR per affected repo opened as draft initially in multi-repo
-  work; no PR only for an authorized direct commit.
-- Integration proof: validation or cross-repo proof required before generated
+- delivery_mode: `pull-request` or `direct-commit`.
+- delivery_mode_evidence: option-resolution source/ref; for `direct-commit`,
+  use `owner-ref=<ref>;scope-ref=run;target-ref=<feature-or-source-ref>;target-branch=<branch_name>`
+  to name the exact owner instruction, feature scope, and authorized target
+  branch.
+- issue_mutation_authority: `none`, `pr-body-closeout-only`, or
+  `explicit-direct-mutation`. Use `none` for local trackers,
+  `pr-body-closeout-only` for GitHub pull-request delivery, and
+  `explicit-direct-mutation` for GitHub direct-commit delivery only when a
+  separate option row records explicit final-commit closure authority.
+- issue_mutation_authority_evidence: option-resolution source/ref; for
+  `explicit-direct-mutation`, use the same scope/target/branch tokens as
+  direct-commit delivery, preserve its independent `owner-ref`, and require
+  that ref to identify an instruction
+  that explicitly authorizes final-commit issue closure.
+- pr_closeout: `merge-ready`, `draft-only`, or `not-applicable`.
+- pr_closeout_evidence: option-resolution source/ref; required for
+  `draft-only`.
+- branch_name: for `pull-request`, default to `feature/<feature-slug>` and use
+  that same branch name in each affected repo unless repo policy differs; for
+  `direct-commit`, use the exact target branch named by
+  `delivery_mode_evidence`.
+- pr_shape: `single-pr`, `per-repo-pr`, or `none`.
+- integration_proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
-- Issue inheritance: generated issues link this PRD with `Source PRD`, copy the
-  effective `Delivery mode` and `PR closeout` labels as feature-level metadata,
+- issue_inheritance: generated issues link this PRD with `source_prd_ref`, copy
+  the effective `delivery_mode` and `pr_closeout` values as feature-level metadata,
   and carry issue-level ordering, dependencies, parallelization, closeout, and
   exceptions. The issue phase validates the generated issue graph before
   publication.

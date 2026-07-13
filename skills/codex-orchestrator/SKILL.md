@@ -20,6 +20,12 @@ implementation, validation, and report.
 
 ## Non-Negotiable Invariants
 
+- Load `references/options.md` during **CLAIM**. Resolve session options then;
+  resolve authority and delivery options separately for each stable source or
+  workstream ID after registration and before its dispatch or mutation. Use
+  canonical snake_case fields and lower-kebab values. Preserve owner/source
+  prose only as option-resolution evidence; downstream logic reads canonical
+  values, never phrases or booleans.
 - Resolve `references/ledger.md` before implementation, worker creation, or
   source mutation. Stop as `needs-owner` when another live root claims an
   overlapping repo realpath or source id.
@@ -34,12 +40,13 @@ implementation, validation, and report.
   operations without acquiring those decisions.
 - Treat worker status as evidence, not lifecycle or source closeout. Read the
   latest worker state before steering or lifecycle changes.
-- Preserve user-owned dirty worktrees and the caller checkout unless the source
-  contract or owner explicitly authorizes another action.
+- Preserve user-owned dirty worktrees. Preserve the caller checkout unless the
+  scoped option row is `caller_checkout_policy=caller-checkout-approved`.
 - In the Codex App, every newly created dedicated worker, integration, or
   publication worktree must belong to a visible App task created for that
-  worktree. If that surface is unavailable, obtain explicit authority before a
-  raw Git worktree fallback. CLI-only sessions are exempt.
+  worktree. If that surface is unavailable, require
+  `raw_worktree_fallback=owner-approved` before a raw Git worktree fallback.
+  CLI-only sessions are exempt.
 - Read-only discovery never grants GitHub, release, automation, or other
   external mutation authority.
 - Treat the ledger `## Recovery Packet` as a compact derived projection, never
@@ -65,7 +72,7 @@ acceptance and closure authority.
 | --- | --- |
 | Rough intent without durable PRD and issues | Run `$plan-feature` `full-flow` before implementation scheduling. |
 | Durable PRD without generated issues | Run `$plan-feature` `issues-from-existing-prd` unless inspect-only. |
-| PRD-backed issue, linked partial PRD, `Source PRD`, or `## Orchestrator Handoff` | Load `references/prd-backed-delivery.md`. |
+| PRD-backed issue, linked partial PRD, `source_prd_ref`, legacy `Source PRD` data field, or `## Orchestrator Handoff` | Load `references/prd-backed-delivery.md`; normalize legacy fields before registration. |
 | Generated issue with valid handoff | Register directly; the handoff is its canonical dispatch projection. |
 | Generated issue without valid handoff | Inspect or regenerate through `$plan-feature`; implement only with explicit ad-hoc authority. |
 | PR, review, CI failure, bug, checklist, plan, TODO, implementation request, or legacy issue | Register directly with `local-only` delivery, publication/issue mutation `none`, and local acceptance plus validation closeout. |
@@ -84,8 +91,9 @@ required. Register Markdown checklist items by stable path and heading.
 
 Run this deterministic loop:
 
-1. **CLAIM** — resolve the ledger, canonicalize repo realpaths, acquire or
-   verify the active-root claim, and establish Goal mode or its ledger fallback.
+1. **CLAIM** — resolve canonical options, resolve the ledger, canonicalize repo
+   realpaths, acquire or verify the active-root claim, and establish Goal mode
+   or its ledger fallback.
    On recovery, read and validate the compact recovery packet first; when fresh,
    load only its named active rows, gate rows, sources, and next action.
 2. **REGISTER** — snapshot authorized sources by stable id and preserve their
@@ -137,10 +145,12 @@ blockers.
 
 ## Workers And Runtime Surfaces
 
-Invoking this skill authorizes internal Codex subagents (`cli-subagent` in the
-ledger) when useful unless the owner disables or limits delegation. Visible
-user-owned App tasks require explicit session consent and a bounded maximum;
-`thread` in owner-facing wording means that visible App surface.
+Resolve `delegation_mode`, `worker_surface`, `worker_limit`,
+`app_thread_consent`, `app_thread_limit`, and `raw_worktree_fallback` from
+`references/options.md`. Defaults are `delegation_mode=auto`,
+`worker_surface=auto`, `app_thread_consent=not-requested`, and
+`raw_worktree_fallback=forbidden`. Visible user-owned App tasks require
+`app_thread_consent=granted` and a positive `app_thread_limit`.
 
 Load `references/worker.md` before delegation. It owns current tool mapping,
 surface wording, consent, capability snapshots, authorization modes, prompts,
@@ -149,8 +159,9 @@ session worker choices into PRDs, issues, project memory, or handoffs.
 
 When the App root chooses a new dedicated worktree, create the visible App task
 with that worktree before implementation and keep the work in its managed
-surface. Owner wording such as `you can use Codex threads if needed` consents to
-one concurrent visible worker unless a higher bound is stated.
+surface. Input wording may supply option-resolution evidence, but the root must
+persist the resolved fields before creating a worker. It must never carry the
+wording itself as a worker-surface, consent, or limit value.
 
 At worker create, reuse, resume-equivalent, or fork—and before any network or
 external mutation—record the capability snapshot required by `worker.md`. A
@@ -186,9 +197,9 @@ mark the parent PRD or ledger complete until merge and actual issue closure are
 verified. Record `not-applicable` for
 an explicitly `draft-only` workstream and other excluded workstreams. This arms
 closure when the PR merges; it does not authorize direct issue closure or merge.
-Use `draft-only` only from an explicit current-user PR lifecycle
-instruction or structured PRD value; initial draft wording, `do not merge`, and
-Plan Feature `draft-output` do not select it.
+Use `draft-only` only when the canonical option-resolution row selects
+`pr_closeout=draft-only`; do not compare source prose or derive it from Plan
+Feature `no_mutation_override`.
 
 Merge is root-owned and unavailable by default. Set
 `merge_authority=explicit-owner-authorization` only for an explicit instruction
@@ -223,13 +234,15 @@ operation/evidence, fallback reason/operation, reused authority, and result.
 Return a compact ledger-derived status: reconciled sources, worker evidence,
 edits/validation, publication/source mutations, active-root decision, gates and
 proof, blockers/owner decisions, fallbacks, next safe action, recovery-packet
-freshness, and phase-token evidence (`exact-phase`, `exact-interval`, or
-`unavailable`). Reference full artifacts by path/ref and fingerprint instead of
-repeating them. Use
+freshness, canonical option snapshot/resolution evidence, and phase-token
+evidence (`exact-phase`, `exact-interval`, or `unavailable`). Reference full
+artifacts by path/ref and fingerprint instead of repeating them. Use
 `references/worker.md` and `references/ledger.md` for exact fields.
 
 ## References
 
+- `references/options.md`: canonical option fields, values, defaults,
+  normalization, cross-field validation, and legacy input migration.
 - `references/ledger.md`: ledger resolution, claims, state, wave records, and
   closeout hygiene.
 - `references/worker.md`: worker surfaces, tools, authorization, lifecycle,

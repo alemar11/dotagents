@@ -81,14 +81,15 @@ For PRD-backed `pull-request` workflows,
 commit, push, initial draft PR creation, ready-for-review transition, Codex
 review, required discussion disposition, and the root-owned gated final PR-body
 parent-PRD closeout update after tests, integration checks, and `$autoreview`
-pass, unless the owner restricted the request to local-only, inspect-only,
-no-push, no-PR, or equivalent work. Default
-`pr_closeout=merge-ready`. Set `pr_closeout=draft-only` only from an explicit
-current-user instruction about the PR lifecycle or structured PRD field;
-PR-shape prose, `do not merge`, and `draft-output` do not select it.
+pass. Owner restrictions must first normalize to the scoped
+`publication_authority`, `delivery_mode`, `pr_closeout`, and worker capability
+rows; gates never reinterpret the restriction prose. Default
+`pr_closeout=merge-ready`. Set `pr_closeout=draft-only` only from its canonical
+option-resolution row. PR-shape prose and
+`no_mutation_override=draft-output` cannot select it.
 Draft-only makes downstream ready/review/merge-ready
 gates `not-applicable` until the user removes the restriction. Record both
-publication authority and PR closeout in the ledger.
+publication authority and pr_closeout in the ledger.
 This does not authorize merge, release, direct issue mutation, production
 deploy, or unrelated GitHub cleanup.
 
@@ -98,9 +99,10 @@ Before an actual merge, require `merge_authority=explicit-owner-authorization`
 for the named PR or PR set. `merge_policy=owner-approval` requires a current
 owner checkpoint after every other merge gate passes;
 `merge_policy=automatic-after-gates` permits the root to merge without another
-checkpoint only when the authorizing instruction explicitly says to merge or
-land after gates. Finish, complete, deliver, ship, close out, and make
-merge-ready do not satisfy this gate.
+checkpoint only when that canonical scoped row and the matching merge-authority
+row are valid for the named PR or PR set. Evidence text is recorded for audit
+but is never reparsed inside this gate. Finish, complete, deliver, ship, close
+out, and make merge-ready do not select either row.
 
 Merge is root-owned. Workers cannot receive merge authority. Record the owner
 instruction and timestamp, exact PR/head, mergeability, current CI, latest-head
@@ -118,7 +120,7 @@ Before push, draft PR publication, or ready-for-review transition, evaluate
   `protected-branch-blocked`, or `verified-feature-branch`.
 - `publication_checkout_guard`: `worker-worktree`, `integration-worktree`,
   `caller-checkout-approved`, or `blocked`.
-- `caller_checkout_guard`: `preserved`, `explicitly-approved-switch`, or
+- `caller_checkout_guard`: `preserved`, `policy-approved-switch`, or
   `not-applicable`.
 - `pr_diff_status`: `non-empty`, `empty`, or `not-checked`.
 - `ready_for_review_state`: `draft`, `ready`, `not-checked`, or `not-applicable`.
@@ -128,10 +130,11 @@ Publication should use an explicit refspec, target the expected feature branch,
 run from the recorded publication checkout, and verify the pushed branch or
 draft PR state after push. When worker or integration worktrees are available,
 the caller checkout should remain on its original branch; if the caller checkout
-was switched, the gate must record the explicit approval that allowed it. If the
-PR diff is empty, the publication checkout is not on the expected branch, or
-the target is the default/protected branch without explicit authorization, stop
-and record `blocked`.
+was switched, the gate must reference the scoped
+`caller_checkout_policy=caller-checkout-approved` row. If the PR diff is empty,
+the publication checkout is not on the expected branch, or the target is the
+default/protected branch without a direct-commit row whose scoped evidence
+names that exact target, stop and record `blocked`.
 
 In a Codex App session, `worker-worktree` or `integration-worktree` passes this
 gate for a newly created checkout only when the ledger records its owning App
@@ -150,24 +153,24 @@ owner deferral.
 
 When live proof is blocked, record the exact blocker, the synthetic proof that
 was collected, and the owner decision or follow-up needed. Do not land,
-release, close, or mark complete on synthetic proof alone unless the owner
-explicitly accepts that gap or the source item is moved to `deferred` with an
-owner-visible follow-up.
+release, close, or mark complete on synthetic proof alone unless
+`completion_proof_policy=synthetic-accepted` for that workstream or the source
+item is moved to `deferred` with an owner-visible follow-up.
 
 ### Closure Gate
 
 Before closing any source item or moving work to `completed`, verify that the
 source acceptance criteria are satisfied by root-verifiable proof. If live proof
 is feasible but blocked by credentials, setup, service access, or missing
-hardware, do not treat the source item as fully complete unless the owner
-explicitly accepts that gap.
+hardware, do not treat the source item as fully complete unless the scoped row
+is `completion_proof_policy=synthetic-accepted`.
 
 For implementation issues that include `## Delivery`, verify that closeout
 matches the recorded delivery mode and closeout path, and verify that direct
 dependencies or blocking relationships recorded in the issue are satisfied
 before declaring closure. Close through the relevant PR body by default. Use
-final-commit closure only when the issue records `direct-commit` or another
-explicit final-commit closeout path. For local markdown sources, completion is
+final-commit closure only for `closeout_mode=direct-commit-closes-issue` with
+the exact scoped authorization evidence. For local markdown sources, completion is
 the configured move to `issues/done/` after validation and proof; do not treat a
 commit alone as local issue closure.
 
@@ -395,11 +398,11 @@ merge-ready report. Require the live body or its fingerprint to match the
 recorded closeout evidence and contain exactly the intended parent closer. If
 the head differs, do not add the parent keyword, or remove/replace an
 already-added parent closing keyword with a non-closing reference, set
-`parent-prd-closeout=pending-review`, and return to current-head review
+`parent_prd_closeout=pending-review`, and return to current-head review
 preflight. If the default branch or PR base no longer matches, disarm the keyword
 and record `deferred-to-default-branch` until a linked default-branch closeout
 vehicle passes the gates. If only the body differs, set
-`parent-prd-closeout=pending-closeout`, reconcile the live body without
+`parent_prd_closeout=pending-closeout`, reconcile the live body without
 overwriting concurrent edits, and repeat the post-update checks. Any relevant
 change after `armed` invalidates that state and requires the matching
 disarm-and-review, body-reconciliation, or closeout-vehicle cycle.
@@ -419,8 +422,9 @@ releasing the active root, establish exactly one parent closeout watch:
   head, base, current default branch, and body fingerprint immediately before
   merge; on any mismatch the owner must not merge and must return the work to
   the orchestrator for disarm/review;
-- `automation-handoff`: use only when the owner explicitly authorized a real
-  event-driven monitor that can observe head, base/default-branch, and PR-body
+- `automation-handoff`: use only when the matching scoped row is
+  `automation_authority=explicit-owner-authorization` for a real event-driven
+  monitor that can observe head, base/default-branch, and PR-body
   mutations before merge, block the merge or disarm the closer on mismatch, and
   verify post-merge issue state. Record its id, event triggers, last successful
   check, and identical mismatch/disarm behavior; or

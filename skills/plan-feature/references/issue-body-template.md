@@ -12,9 +12,8 @@ publish commands.
 
 Type: [mapped issue type, e.g. GitHub `Task` or local `task`]
 Status: [mapped triage state, usually `ready-for-agent`]
-Source PRD: [path, issue number, or stable draft ref; use `draft-prd:<...>`
-only for draft command output before hosted mutation, never for agent-ready
-implementation issues]
+source_prd_ref: [path, issue number, or stable draft ref; draft refs are valid
+only in non-mutating output before hosted mutation]
 
 Affected Repos: [include for workspace issues; otherwise omit]
 
@@ -24,48 +23,67 @@ single-repo issues, `current repository`; for workspace issues, use
 
 ## Delivery
 
-- Delivery mode: [pull-request | direct-commit] ([feature-level, inherited from
-  Source PRD] or [issue-level override with authorization reason])
-- PR closeout: [merge-ready | draft-only] (feature-level, inherited from Source
-  PRD; omit only for direct-commit)
-- Parallelization: [independent | depends-on <issue-id>[, <issue-id>] | blocks
-  <issue-id>[, <issue-id>] | root-integrated]
-- Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
+- delivery_mode: [pull-request | direct-commit]
+- delivery_source: [feature-level-inherited | issue-level-override]
+- delivery_source_evidence: [source_prd_ref for pull-request; every effective
+  direct-commit issue uses
+  owner-ref=<ref>;scope-ref=issue:<NN>;target-ref=<preserved-feature-or-source-ref>;target-branch=<branch_name>;
+  inherited direct-commit also adds scope-transfer-ref=run]
+- issue_mutation_authority: [none | pr-body-closeout-only |
+  explicit-direct-mutation]
+- issue_mutation_authority_evidence: [source PRD/ref or none; for
+  explicit-direct-mutation, the same exact issue scope/target/branch/transfer
+  tokens as delivery_source_evidence plus the independently preserved owner-ref
+  that authorizes final-commit issue closure]
+- branch_name: [inherited feature branch or exact authorized direct-commit
+  target branch]
+- pr_shape: [single-pr | per-repo-pr | none]
+- pr_closeout: [merge-ready | draft-only | not-applicable]
+- parallelization: [independent | depends-on | blocks | root-integrated]
+- dependency_ids: [issue ids or none]
+- blocked_issue_ids: [issue ids or none]
+- closeout_mode: [feature-pr-closes-issue | repo-pr-closes-issue |
   direct-commit-closes-issue | local-done-move-after-proof; use
   local-done-move-after-proof for local markdown even with direct-commit
   delivery]
-- Integration mode: [omitted when obvious from Source PRD; otherwise
-  single-repo-pr | repo-pr | direct-commit]
+- integration_mode: [single-repo-pr | repo-pr | direct-commit | not-applicable]
 
 ## Orchestrator Handoff
 
-- Source PRD: [same value as the header `Source PRD` line]
-- Feature slug: [authoritative lowercase feature slug]
-- Delivery mode: [same effective delivery mode and inheritance or override
-  source as `## Delivery`]
-- PR closeout: [same effective PR closeout as `## Delivery`, or not-applicable
-  for direct-commit]
-- Affected repos or product scope: [repo slugs, workspace path, or current
+- source_prd_ref: [same value as the header `source_prd_ref` line]
+- feature_slug: [authoritative lowercase feature slug]
+- delivery_mode: [same effective value as `## Delivery`]
+- delivery_source: [same canonical value as `## Delivery`]
+- delivery_source_evidence: [same evidence as `## Delivery`]
+- issue_mutation_authority: [same effective value as `## Delivery`]
+- issue_mutation_authority_evidence: [same evidence as `## Delivery`]
+- branch_name: [same effective branch data as `## Delivery`]
+- pr_shape: [same effective value as `## Delivery`]
+- pr_closeout: [same effective value as `## Delivery`]
+- affected_repos_or_product_scope: [repo slugs, workspace path, or current
   repository]
-- Scope:
+- scope:
   - [Only this issue's implementation slice.]
-- Start rule: [independent | depends-on <issue-id>[, <issue-id>] | blocks
-  <issue-id>[, <issue-id>] | root-integrated]
-- Dependencies: [generated issue IDs and reason, or `None`.]
-- Validation: [commands, checks, or proof required for this issue.]
-- Domain closeout: [not-applicable | implementation-closeout with the exact
+- parallelization: [independent | depends-on | blocks | root-integrated]
+- dependency_ids: [generated issue IDs or none]
+- blocked_issue_ids: [generated issue IDs or none]
+- dependency_reason: [reason or none]
+- validation: [commands, checks, or proof required for this issue.]
+- domain_closeout: [not-applicable | implementation-closeout]
+- domain_closeout_data: [when applicable, the exact
   decisions, target surfaces, evidence, and `$project-memory domain-memory`
   operation required by `## Domain Knowledge Closeout` below]
-- Closeout: [feature-pr-closes-issue | repo-pr-closes-issue |
+- closeout_mode: [feature-pr-closes-issue | repo-pr-closes-issue |
   direct-commit-closes-issue | local-done-move-after-proof; use
   local-done-move-after-proof for local markdown even with direct-commit
   delivery]
+- integration_mode: [same effective value as `## Delivery`]
 
 Do not include worker authorization modes, worker surfaces, worker counts,
-checkpoint approval, publication authority, issue mutation authority, or
-orchestration session settings in this section.
-`$codex-orchestrator` resolves runtime authorization after registering the
-issue as a workstream.
+checkpoint approval, publication authority, or orchestration session settings
+in this section. The source-contract `issue_mutation_authority` does not grant a
+worker permission; `$codex-orchestrator` validates and projects it after
+registering the issue as a workstream.
 
 ## Goal
 
@@ -94,7 +112,7 @@ completion.]
 
 ## Domain Knowledge Closeout
 
-[Include only on the final integration task when the Source PRD carries a
+[Include only on the final integration task when the source_prd_ref carries a
 required domain-knowledge handoff. This task must also prove integrated feature
 behavior; never use this section to justify a docs-only issue.]
 
@@ -145,14 +163,16 @@ sections.]
 When all acceptance criteria pass and validation is complete:
 
 - GitHub: close this implementation issue from the relevant PR body, following
-  `## Delivery`. Use `Closes #<this-issue-number>` only when the PR lives in the
+  `closeout_mode`. Use `Closes #<this-issue-number>` only when the PR lives in the
   same GitHub repository as the issue. For orchestrator or cross-repo closeout
   where the PR repository differs from the issue repository, use
   `Closes owner/repo#<this-issue-number>` only when that cross-repo closing path
   is intended and supported; otherwise use non-closing links and record the
   coordination closeout action separately. Final-commit closure requires
-  `direct-commit` or another explicit authorization. Do not add the parent PRD
-  closing keyword from an individual child issue. For a whole-PRD final feature
+  `closeout_mode=direct-commit-closes-issue`,
+  `issue_mutation_authority=explicit-direct-mutation`, and its exact scoped
+  authorization evidence. Do not add the parent PRD closing keyword from an individual child
+  issue. For a whole-PRD final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
   only after its final current-head review and all PRD closeout gates pass.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
@@ -167,7 +187,8 @@ When all acceptance criteria pass and validation is complete:
 - Blocks: [generated issue IDs and reason, or `None`.]
 ```
 
-Include a `## Questions` section only for explicitly authorized partial
-`needs-info` output, and put the concrete human/reporter question there. Omit
+Include a `## Questions` section only when
+`partial_output=allow-non-agent-ready`, and put the concrete human/reporter
+question there. Omit
 the section entirely for `ready-for-agent` issues; never write `N/A` as a
 placeholder question.

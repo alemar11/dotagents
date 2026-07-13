@@ -10,7 +10,7 @@ Apply this reference when any of these are true:
 
 - the user asks to implement a PRD issue or a set of generated implementation
   issues;
-- an issue body contains `Source PRD: #<number>` or a linked PRD path;
+- an issue body contains `source_prd_ref: #<number>` or a linked PRD path;
 - a workspace PRD or generated issue links sibling repo-scoped partial PRDs for
   the same feature;
 - an issue body contains `## Orchestrator Handoff`;
@@ -26,27 +26,97 @@ publication `none`, issue mutation `none`, and closeout through local acceptance
 criteria plus validation. Use `worker.md` for worker authorization, and require
 explicit owner authorization before any publication or external mutation.
 
-If `Source PRD` is a draft ref such as `draft-prd:<...>`, treat it as a dry-run
+If `source_prd_ref` is a draft ref such as `draft-prd:<...>`, treat it as a dry-run
 planning reference, not durable implementation authority. The root may inspect
 the graph, but real worker dispatch, commit, push, PR creation, issue closeout,
-or tracker mutation requires a hosted PRD number, a local PRD path, or an
-explicit owner decision recorded with separate publication and issue-mutation
-authority.
+or tracker mutation requires a hosted PRD number, a local PRD path, or the
+scoped canonical row `temporary_source_execution=owner-approved`. That row
+does not replace separate publication and issue-mutation authority.
 
 For generated implementation issues, `## Orchestrator Handoff` is the
 canonical issue-level dispatch contract. It must restate the source PRD,
-feature slug, delivery mode, PR closeout when applicable, affected repos or
-product scope, scope, start rule, dependencies, validation, domain closeout,
-and closeout path. `Domain closeout` is `not-applicable` unless the issue has a
+feature slug, `delivery_mode`, `delivery_source`,
+`delivery_source_evidence`, `issue_mutation_authority`,
+`issue_mutation_authority_evidence`, `branch_name`, `pr_shape`, `pr_closeout` when applicable,
+affected repos or product scope, scope, start rule, dependencies, validation,
+domain closeout, `closeout_mode`, and `integration_mode`. `domain_closeout` is
+`not-applicable` unless the issue has a
 `## Domain Knowledge Closeout` section; when it does, preserve the exact
 `implementation-closeout` operation, decisions, target surfaces, and evidence.
 The handoff is not an
 authorization grant: worker authorization, publication authority, and issue
 mutation authority are still resolved by the root orchestrator from the owner
 request, linked PRD, issue body, gate state, and current session authority.
-For a legacy handoff that predates `PR closeout`, default a missing value to
-`merge-ready` and rewrite the projection when touched; do not reject it unless
-another field explicitly contradicts that result.
+For an inherited `direct-commit` handoff, require
+`owner-ref`, `scope-ref=issue:<NN>`, the PRD's preserved `target-ref`,
+`target-branch=<branch_name>`, and `scope-transfer-ref=run` in both delivery
+and explicit issue-mutation evidence. Preserve and fingerprint both evidence
+records independently: their scope, target, branch, and transfer tokens must
+match, while each `owner-ref` remains unchanged and the mutation ref must
+independently authorize final-commit issue closure. Delivery authority alone is
+insufficient. When registering
+the exact generated issue as `workstream:<id>`, create the scoped evidence by
+changing only `scope-ref` to that workstream and `scope-transfer-ref` to the
+issue scope. Preserve owner, target, and branch tokens verbatim; any mismatch
+is `needs-owner` and cannot grant publication.
+For a legacy handoff that predates `pr_closeout`, resolve `delivery_mode`
+first. Normalize a missing value to `merge-ready` for `pull-request` and
+`not-applicable` for `direct-commit`, then rewrite the projection when touched.
+For a legacy handoff that predates `pr_shape`, inherit the linked PRD's
+canonical value when present. Otherwise derive `single-pr` for one-repo
+`pull-request`, `per-repo-pr` for multi-repo `pull-request`, or `none` for
+`direct-commit`. If repo scope is ambiguous, stop as `needs-owner`; never infer
+the value from loose prose.
+For a legacy handoff that predates `integration_mode`, inherit a canonical
+value from the linked PRD when present. Otherwise normalize the omitted
+ordinary inherited case to `not-applicable`. An explicit legacy
+`Integration mode` field is normalized through the migration table below. If legacy
+structured integration data contradicts the inherited or default value, stop
+as `needs-owner` instead of choosing from prose.
+For a legacy handoff that predates `closeout_mode`, derive the canonical value
+from tracker backend, `delivery_mode`, and `pr_shape` using `options.md`. Stop
+as `needs-owner` when any required input is missing or contradictory.
+For a legacy handoff that predates `issue_mutation_authority`, derive
+`pr-body-closeout-only` for hosted pull-request delivery and `none` for local
+trackers. Do not derive `explicit-direct-mutation` from direct-commit delivery;
+a hosted direct-commit closeout remains `needs-owner` until separately scoped
+final-commit closure evidence is recorded.
+
+### Legacy Handoff Migration
+
+Legacy issue and handoff fields are read aliases only. Before routing,
+registration, or validation, normalize the complete projection and rewrite it
+when touched:
+
+| Legacy field or value | Canonical projection |
+| --- | --- |
+| `Source PRD` | `source_prd_ref` |
+| `Feature slug` | `feature_slug` |
+| `Delivery mode` | `delivery_mode`; move inheritance/override prose to `delivery_source` and `delivery_source_evidence` |
+| `Issue mutation authority` | `issue_mutation_authority`; preserve its separately scoped evidence in `issue_mutation_authority_evidence` |
+| `PR shape` | `pr_shape` |
+| `PR closeout` | `pr_closeout` |
+| `Affected repos or product scope` | `affected_repos_or_product_scope` |
+| `Scope` | `scope` |
+| `Start rule: independent` | `parallelization=independent`; empty dependency data |
+| `Start rule: depends-on <ids>` | `parallelization=depends-on`; move ids to `dependency_ids` |
+| `Start rule: blocks <ids>` | `parallelization=blocks`; move ids to `blocked_issue_ids` |
+| `Start rule: root-integrated` | `parallelization=root-integrated`; keep dependency data separate |
+| `Dependencies` | `dependency_ids`, `blocked_issue_ids`, and `dependency_reason` |
+| `Validation` | `validation` |
+| `Domain closeout` | `domain_closeout`; move decisions, targets, evidence, and operation to `domain_closeout_data` |
+| `Closeout` | `closeout_mode` |
+| `Integration mode` | `integration_mode` |
+| `Integration mode: omitted` | `integration_mode=not-applicable` |
+| `Issue integration shape: none` | `integration_mode=not-applicable` |
+| `Issue integration shape: feature-pr` | `integration_mode=single-repo-pr` |
+| `Issue integration shape: repo-pr` | `integration_mode=repo-pr` |
+| `Issue integration shape: direct-commit` | `integration_mode=direct-commit` |
+
+Parse only the recognized enum token and stable ids from a combined legacy
+value. Preserve the remaining text as evidence or reason data. If a legacy
+value cannot be mapped unambiguously, stop as `needs-owner`; never retain the
+combined value as a current enum and never infer a new option from its prose.
 
 For workspace features split across multiple repositories, a repo-scoped
 partial PRD may be the entry point. Before scheduling, expand its linked sibling
@@ -59,14 +129,14 @@ proof before marking the feature graph complete.
 
 Record these five authority and lifecycle concerns separately in the ledger:
 
-- **Delivery authority**: where the branch, PR shape, dependency graph, and
-  closeout path come from. For generated issues this is usually the linked
-  `Source PRD` plus the generated issue's copied delivery label, issue-level
+- **Delivery authority**: where the branch, canonical `pr_shape`, dependency
+  graph, and closeout path come from. For generated issues this is usually the linked
+  `source_prd_ref` plus the generated issue's copied delivery label, issue-level
   dependency fields, and `## Orchestrator Handoff`.
 - **Publication authority**: whether the root may commit, push, open or update
   the PR, mark it ready for review, request Codex review, and perform PR
   discussion updates or no-update-needed dispositions after gates pass.
-- **PR closeout**: whether pull-request delivery ends `merge-ready` or
+- **pr_closeout**: whether pull-request delivery ends `merge-ready` or
   intentionally ends `draft-only`. This is lifecycle intent, not publication
   authority or merge authority.
 - **Issue mutation authority**: whether the root may directly comment, label,
@@ -76,8 +146,8 @@ Record these five authority and lifecycle concerns separately in the ledger:
 
 Do not collapse these into one boolean. Pull-request publication defaults to a
 merge-ready closeout, while merge remains separately unauthorized by default.
-Only an explicit current-user instruction about the PR lifecycle or structured
-PRD `PR closeout: draft-only` value may stop the lifecycle at draft.
+Only a canonical option-resolution row containing
+`pr_closeout=draft-only` may stop the lifecycle at draft.
 
 `$plan-feature` may publish the PRD and generated implementation issues before
 implementation starts. After the root registers those generated issues as
@@ -103,9 +173,9 @@ Use these PRD-backed authority values in the ledger and worker prompts:
   is expected but blocked by a gate or access issue.
 - `pr_closeout`: `merge-ready` is the default for `pull-request` and requires
   the full review lifecycle; `draft-only` intentionally stops after validated
-  draft publication and is valid only from an explicit current-user instruction
-  about the PR lifecycle or structured PRD `PR closeout: draft-only` field. Use
-  `not-applicable` for `local-only` and `direct-commit`.
+  draft publication and requires owner-instruction or source-contract evidence
+  in `## Option Resolution`. Use `not-applicable` for `local-only` and
+  `direct-commit`.
 - `publication_owner`: `root` means the root orchestrator owns the publication
   decision. A worker may execute assigned `commit`, `push`, or `pr` steps only
   inside an exact root-assigned scope. `none` means no publication owner exists.
@@ -115,50 +185,56 @@ Use these PRD-backed authority values in the ledger and worker prompts:
   `explicit-direct-mutation` means direct issue comments, labels, or closure are
   authorized.
 - `merge_authority`: `none` is the default and means stop at merge-ready;
-  `explicit-owner-authorization` means the current owner request explicitly
-  directs the root to merge or land the named PR or PR set.
+  `explicit-owner-authorization` requires the matching scoped option row to
+  name the PR or PR set in owner evidence.
 - `merge_policy`: `owner-approval` is the default and requires a final owner
   checkpoint; `automatic-after-gates` is allowed only when the same explicit
   instruction authorizes merging after gates without another checkpoint.
 
-The words `merge` or `land` must unambiguously apply to the named PR or PR set.
-Finish, complete, deliver, ship, close out, and make merge-ready do not grant
-merge authority. When intent remains ambiguous, keep `merge_authority=none` and
-move the decision to `needs-owner`.
+`merge_authority=explicit-owner-authorization` requires an option-resolution
+row whose owner evidence unambiguously names the PR or PR set. Other lifecycle
+or completion evidence cannot select it. When authority is ambiguous, keep
+`merge_authority=none` and move the decision to `needs-owner`.
 
 ### Legacy Authority Migration
 
 Treat legacy authority values as read aliases, not current output values:
 
-| Legacy value | Normalized publication authority | Normalized PR closeout |
+| Legacy value | Normalized publication authority | Normalized pr_closeout |
 | --- | --- | --- |
 | `prd-backed-merge-ready-pr` | `prd-backed-pull-request` | `merge-ready` |
-| `prd-backed-branch-plus-draft-pr` | `prd-backed-pull-request` | Explicit current-user or structured PRD value; otherwise `merge-ready`. |
+| `prd-backed-branch-plus-draft-pr` | `prd-backed-pull-request` | Canonical `pr_closeout` from option resolution; otherwise `merge-ready`. |
 
 Rewrite either legacy value when its ledger or prompt projection is touched.
-Never infer `draft-only` from `draft PR`, `open a draft PR`, `one draft PR`,
-`do not merge automatically`, or Plan Feature's `draft-output`
-no-mutation instruction.
+Natural-language PR shape, mutation restrictions, and merge restrictions are
+option-resolution evidence only. They cannot become values or override a
+canonical field from `options.md`.
 
-## PR Closeout Resolution Matrix
+## Canonical PR Closeout Resolution
 
-Resolve intent before publication and record the evidence:
+Resolve these fields before publication and branch only on their canonical
+values:
 
-| Source evidence | Publication authority | `pr_closeout` | Merge authority | Required next state |
+| `delivery_mode` | `publication_authority` | `pr_closeout` | `merge_authority` | Required next state |
 | --- | --- | --- | --- | --- |
-| `pull-request`, `draft PR`, `one draft PR`, or `open a draft PR` | resolved pull-request authority | `merge-ready` | unchanged; default `none` | Open draft initially, then validate and continue through Codex review. |
-| `do not merge` or `do not merge automatically` | unchanged | `merge-ready` | `none` | Continue through Codex review and stop merge-ready. |
-| Current user says `keep the PR in draft`, `leave the PR in draft`, or `PR closeout: draft-only` | unchanged | `draft-only` | `none` unless separately authorized | Validate and publish the draft; do not mark ready or request Codex review. |
-| Plan Feature `draft-output` or another no-mutation planning instruction | `none` for the planning run | `merge-ready` unless separately set by PR-lifecycle evidence | `none` | Return draft planning artifacts without persisting a draft-only PR closeout decision. |
-| Structured PRD field `PR closeout: draft-only` | `prd-backed-pull-request` | `draft-only` | unchanged; default `none` | Preserve the structured decision, validate, and publish the draft without Codex review. |
-| Legacy handoff missing `PR closeout` without contradictory evidence | `prd-backed-pull-request` | `merge-ready` | unchanged; default `none` | Rewrite the touched handoff projection and continue through Codex review. |
-| Existing draft PR without explicit draft-only evidence | unchanged | `merge-ready` | unchanged | Resume at ready-for-review after required local gates. |
-| Current user removes a previous draft-only restriction | unchanged | `merge-ready` | unchanged | Resume the existing PR at ready-for-review. |
+| `pull-request` | `prd-backed-pull-request` | `merge-ready` | `none` | Open draft initially, validate, continue through current-head Codex review, and stop merge-ready. |
+| `pull-request` | `prd-backed-pull-request` | `draft-only` | `none` | Validate and publish the draft; do not mark ready or request Codex review. |
+| `local-only` | `none` | `not-applicable` | `none` | Complete local acceptance and validation only. |
+| `direct-commit` | `explicit-owner-authorization` | `not-applicable` | `none` | Follow the authorized direct-commit closeout path. |
+
+An existing draft PR with `pr_closeout=merge-ready` resumes at
+ready-for-review after required local gates. A canonical change from
+`draft-only` to `merge-ready` resumes the same path. A legacy handoff with
+missing delivery fields is normalized only after `delivery_mode` is known.
+Missing `pr_closeout` becomes `merge-ready` for `pull-request` or
+`not-applicable` for `direct-commit`. Missing `pr_shape` inherits the linked
+PRD's canonical value or uses the deterministic repo-scope rule under
+`Legacy Handoff Migration`. Rewrite the projection when touched.
 
 An initial draft state is never terminal evidence by itself. Merge authority is
 orthogonal: reaching merge-ready does not authorize merge.
 
-Delivery mode values are owned by the PRD and generated issue body. Worker
+delivery_mode values are owned by the PRD and generated issue body. Worker
 authorization modes are owned by `worker.md` and resolved per workstream by the
 root orchestrator. Ignore legacy project-memory worker-authorization setup
 values; they are not delivery, publication, or issue mutation authority.
@@ -169,14 +245,19 @@ lower-kebab-case.
 
 ## Scheduling Values
 
-Use generated issue scheduling fields as the wave graph:
+Use generated issue scheduling fields as the wave graph. Read dependency refs
+from their data fields; never append them to the enum value.
 
-| Field | Start rule |
-| --- | --- |
-| `independent` | May start when authorization, ownership boundaries, and gates allow it. |
-| `depends-on <issue>` | Queue-ready is not start-ready; wait for root-verifiable dependency proof. |
-| `blocks <issue>` | May start when otherwise eligible; dependent work remains unassigned. |
-| `root-integrated` | Keep implementation in root; workers may inspect or prove only if integration stays root-owned. |
+| `parallelization` | Dependency data | Start rule |
+| --- | --- | --- |
+| `independent` | `dependency_ids=none`; `blocked_issue_ids=none` | May start when authorization, ownership boundaries, and gates allow it. |
+| `depends-on` | One or more `dependency_ids` | Queue-ready is not start-ready; wait for root-verifiable dependency proof. |
+| `blocks` | One or more `blocked_issue_ids` | May start when otherwise eligible; dependent work remains unassigned. |
+| `root-integrated` | Dependency ids as applicable | Keep implementation in root; workers may inspect or prove only if integration stays root-owned. |
+
+Reject a workstream before dispatch when its scheduling enum and dependency
+data violate these rows. Preserve `dependency_reason` separately for every
+non-empty dependency or blocked-ID set.
 
 ## PRD-Backed Publication
 
@@ -184,14 +265,14 @@ When the owner asks to implement a PRD or generated PRD issue, and the PRD or
 generated issue defines `pull-request` delivery, treat commit, push, initial
 draft PR creation, ready-for-review transition, Codex review, feedback
 disposition, and merge-ready reporting as the default delivery contract after
-required tests, integration checks, and `$autoreview` pass, unless the owner said
-`local-only`, `inspect-only`, `no push`, `no PR`, or equivalent.
+required tests, integration checks, and `$autoreview` pass, unless canonical
+authority or delivery fields restrict those actions.
 
-Set `pr_closeout=draft-only` only from an explicit current-user instruction such
-as `keep the PR in draft`, `leave the PR in draft`, or `PR closeout:
-draft-only`, or from a structured PRD `PR closeout: draft-only` field. PR-shape
-prose, merge restrictions, and `draft-output` planning instructions do not
-select it. Draft-only blocks ready-for-review transition,
+Set `pr_closeout=draft-only` only from a valid option-resolution row with
+owner-instruction or source-contract evidence. Plan Feature's planning-only
+`no_mutation_override` is not an Orchestrator input; `pr_shape` and merge
+authority are separate fields and cannot select `pr_closeout`. Draft-only
+blocks ready-for-review transition,
 Codex review, and merge-ready reporting until the current user changes the
 decision; validation and draft publication still complete normally.
 
@@ -207,18 +288,20 @@ authority is sufficient for merge, release, production deploy, final issue
 closure by direct mutation, broad GitHub cleanup, or switching the caller
 checkout away from its current branch. When worker or integration worktrees are
 available, the root should publish from one of those checkouts and preserve the
-caller checkout unless the owner explicitly authorizes using it as the
-publication checkout.
+caller checkout unless
+`caller_checkout_policy=caller-checkout-approved` for that workstream.
 
-Direct commit remains a special case. Use `direct-commit` only when the PRD,
-generated issue, or owner request explicitly says direct commit is authorized
-and records the target branch plus closeout behavior.
+Direct commit remains a special case. Use `delivery_mode=direct-commit` only
+when its scoped option row records the target branch, closeout behavior, and
+exact owner authorization evidence. A source contract may preserve that
+evidence; unproven source prose cannot grant direct-commit publication.
 
 For local markdown trackers, `direct-commit` proves delivery but does not close
 the local issue by itself. After validation and commit proof are recorded, move
-the issue file to `issues/done/` unless the current run explicitly keeps
-completed files in place for inspection. Use final-commit closure only for
-hosted or custom sources that explicitly support that closeout path.
+the issue file to `issues/done/`. Use final-commit closure only for hosted or
+custom sources whose canonical `closeout_mode` is
+`direct-commit-closes-issue` and whose scoped authorization evidence is
+preserved.
 
 For local markdown trackers using `pull-request` delivery with
 `pr_closeout=merge-ready`, do not move the issue file
@@ -231,31 +314,37 @@ action as `needs-owner`, `blocked`, or `deferred`.
 
 Before scheduling or publishing PRD-backed work:
 
-1. Read the generated issue body and the linked `Source PRD`. If the ref is
-   `draft-prd:<...>`, stop before implementation scheduling unless the owner
-   explicitly authorizes temporary-source execution and separately records the
+1. Read the generated issue body and the linked `source_prd_ref`. Accept legacy
+   `Source PRD` only as the migration alias above and normalize it before
+   continuing. If the ref is `draft-prd:<...>`, stop before implementation
+   scheduling unless the matching scoped row is
+   `temporary_source_execution=owner-approved`; separately resolve the
    publication and issue-mutation authority that execution may use.
 2. For generated issues, read `## Orchestrator Handoff` and verify it contains
-   source PRD, feature slug, delivery mode, PR closeout when applicable,
-   affected repos or product scope, scope, start rule, dependencies, validation,
-   domain closeout, and closeout. Require `Domain closeout:
+   source PRD, feature slug, `delivery_mode`, `delivery_source`,
+   `delivery_source_evidence`, `branch_name`, `pr_shape`, `pr_closeout` when applicable,
+   affected repos or product scope, scope, start rule,
+   dependencies, validation, domain closeout, `closeout_mode`, and
+   `integration_mode`. Require `domain_closeout:
    implementation-closeout` with exact decisions, targets, and evidence when
    the issue contains `## Domain Knowledge Closeout`; otherwise require
-   `not-applicable`. For a legacy pull-request handoff missing only PR closeout,
-   default it to `merge-ready` and rewrite the touched projection. If another
-   required field is missing or the handoff contradicts the issue body, stop as
+   `not-applicable`. For a legacy handoff missing `pr_closeout`, `pr_shape`, or
+   `integration_mode`, apply the deterministic delivery-mode, repo-scope, and
+   linked-PRD/default migrations above and rewrite the touched projection. If
+   another required field is missing, repo scope is ambiguous, or the handoff contradicts the issue body, stop as
    `needs-owner` or route back through `$plan-feature` issue generation instead
    of dispatching implementation.
 3. If the linked PRD is a workspace partial PRD, expand the connected sibling
    partial-PRD graph and record each partial PRD/source item plus cross-link in
    the ledger before building waves.
 4. Resolve the effective delivery mode from the PRD first, then resolve
-   `pr_closeout`, defaulting `pull-request` to `merge-ready`; apply only
-   issue-level overrides that are explicit and authorized.
-5. Record delivery authority, publication authority, PR closeout, issue
+   `pr_shape` and `pr_closeout`, defaulting `pull-request` closeout to
+   `merge-ready`; apply only issue-level overrides that are explicit and
+   authorized.
+5. Record delivery authority, publication authority, `pr_shape`, pr_closeout, issue
    mutation authority, parent-PRD closeout applicability/reason/state, merge
    authority, merge policy, authorizing owner instruction when any, closeout
-   vehicle, branch expectation, PR expectation, publication checkout, caller
+   vehicle, branch expectation, publication checkout, caller
    checkout policy, integration proof target, and handoff projection in the
    ledger.
 6. Build the wave graph from the generated issues' handoff start rules,
@@ -375,8 +464,8 @@ PR, parent PRD, reviewed head, default base, PR-body fingerprint, recheck
 triggers, disarm procedure, and post-merge issue-closure check. A scheduled poll
 alone is insufficient. The parent PRD source and portfolio ledger remain open
 or paused until GitHub actually closes the issue; if the merged PR does not
-close it, record `needs-owner` unless explicit direct-mutation authority permits
-the root to close it.
+close it, record `needs-owner` unless the scoped row is
+`issue_mutation_authority=explicit-direct-mutation`.
 
 ## Worker Boundaries
 
@@ -384,10 +473,9 @@ The root orchestrator owns branch selection, shared PR shape, source closeout,
 final parent-PRD PR-body closeout, final publication, Codex review disposition,
 and merge-ready decision. Workers
 may inspect, implement, test, and report within their assigned authorization
-modes. The root derives those modes per workstream from the owner request,
-source item, linked `Source PRD`, publication authority, issue mutation
-authority, selected worker surface, dependency state, dirty-worktree state, and
-gates. Workers may commit, push, open PRs, mark a PR ready for review, or
+modes. The root normalizes owner/source input into scoped option rows, then
+derives worker modes only from those rows, source data, dependency state,
+dirty-worktree state, and gates. Workers may commit, push, open PRs, mark a PR ready for review, or
 request Codex review only when the root lists the corresponding `commit`,
 `push`, `pr`, or `review-ready` authorization mode for a specific repo,
 branch/refspec, PR shape, and closeout target. These modes are capability flags,

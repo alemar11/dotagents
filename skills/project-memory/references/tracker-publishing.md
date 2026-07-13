@@ -28,13 +28,21 @@ For legacy tracker configs, map old fields before acting:
   `tracker_backend=github`.
 - `tracker_mode=local`, `tracker_mode=local-markdown`, or
   `tracker_mode=orchestrator-local` maps to `tracker_backend=local`.
-- `effective_target=local-dry-run` or
-  `effective_target=draft-publish-commands` maps to a current-run no-mutation
-  override.
+- A legacy `effective_target=local-dry-run` with no preserved mutation reason
+  maps to `no_mutation_override=dry-run` plus
+  `no_mutation_output=local-artifacts`. Preserve a more specific canonical
+  legacy reason when one exists.
+- A legacy `effective_target=draft-publish-commands` with no preserved mutation
+  reason maps to `no_mutation_override=draft-output` plus
+  `no_mutation_output=publish-commands`. Preserve a more specific canonical
+  legacy reason when one exists.
 
 Hosted body-file inputs are temporary transport files. They must live outside
-the repo and be removed after mutation unless the user explicitly requests a
-local mirror. For GitHub tracker runs, `$gitstack:github-issues` owns this transport:
+the repo and be removed after mutation unless the resolved Plan Feature option
+is `local_mirror=requested`; write that mirror only under the validated
+repo-relative `local_mirror_path` carried through both Plan Feature phase
+handoffs. For GitHub tracker runs,
+`$gitstack:github-issues` owns this transport:
 create transient body files with non-interpolating writes, run `gh --body-file`,
 verify tracker state after mutation, clean up temp files, and recover partial
 publication by inspecting GitHub before retrying missing operations.
@@ -45,7 +53,8 @@ Every PRD-to-generated-issues handoff must carry `source_prd_ref`:
 
 - Hosted PRD already exists: `source_prd_ref=#<prd-number>`.
 - Local PRD exists: `source_prd_ref=<repo-relative-prd-path>`.
-- Draft command run before hosted mutation: use a deterministic draft ref,
+- Draft-command or local-dry-run output before hosted mutation: use a
+  deterministic draft ref,
   `source_prd_ref=draft-prd:<feature-slug>` for one repo or
   `source_prd_ref=draft-prd:<project-slug>/<feature-slug>` for workspace
   planning.
@@ -54,13 +63,14 @@ When using a draft PRD ref, also return the PRD title, `feature_slug`,
 `project_slug` when applicable, and a short PRD body fingerprint so later
 commands can prove the generated issues still point at the same PRD draft.
 
-Draft issue bodies may use `Source PRD: draft-prd:<...>` only while no hosted
-PRD number exists. The draft publish plan must say how to replace that value
-before mutation:
+Draft issue bodies may use `source_prd_ref: draft-prd:<...>` only in
+non-mutating output while no hosted PRD number exists. The draft publish plan
+must say how to replace that value before mutation:
 
 1. Create or update the PRD first.
 2. Capture the hosted PRD issue number as `PRD_NUMBER`.
-3. Replace `Source PRD: draft-prd:<...>` with `Source PRD: #$PRD_NUMBER` in
+3. Replace `source_prd_ref: draft-prd:<...>` with
+   `source_prd_ref: #$PRD_NUMBER` in
    each implementation issue body before creating those hosted issues.
 4. Attach each implementation issue to the PRD parent when the tracker supports
    parent/sub-issues.
@@ -68,7 +78,9 @@ before mutation:
 Do not dispatch implementation workers from a `draft-prd:<...>` source as if it
 were a durable PRD. A dry-run orchestrator may inspect the graph, but real
 implementation scheduling requires a hosted PRD number, a local PRD path, or an
-explicit owner decision to use the full PRD body as the temporary source.
+exact scoped Orchestrator row with
+`temporary_source_execution=owner-approved`. That row does not grant
+publication or issue mutation.
 
 ## Phase Ownership
 
@@ -77,10 +89,13 @@ explicit owner decision to use the full PRD body as the temporary source.
 - The `$plan-feature` issue phase owns generated implementation issue bodies,
   issue local writes, issue hosted creation, sub-issue attachment, and
   replacement of draft PRD refs in hosted publish commands.
-- `$plan-feature` owns passing the same tracker backend, effective target,
-  no-mutation override, planning identity, delivery mode, and `source_prd_ref`
-  through the full planning pipeline and its phase modes.
-- `$codex-orchestrator` may consume generated issues only after the `Source PRD`
+- `$plan-feature` owns passing the same `tracker_backend`, `effective_target`,
+  `no_mutation_override`, `no_mutation_output`, `local_mirror`,
+  `local_mirror_path`, planning identity, `delivery_mode`,
+  `issue_mutation_authority`, and
+  `source_prd_ref` through the full planning pipeline and its phase modes, with
+  the verified `option_rows_fingerprint` for each current row set.
+- `$codex-orchestrator` may consume generated issues only after `source_prd_ref`
   is durable enough for the requested action.
 
 ## Mode Summary

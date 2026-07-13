@@ -14,15 +14,26 @@ commands instead.
 ## Setup Snapshot
 
 ```text
+mode: full-flow
+execution_profile: standard
 tracker_backend: github
 effective_target: draft-publish-commands
 no_mutation_override: dry-run
+no_mutation_output: publish-commands
+local_mirror: not-requested
+local_mirror_path: not-applicable
+partial_output: withhold
 feature_slug: account-settings-export
 delivery_mode: pull-request
+issue_mutation_authority: pr-body-closeout-only
+branch_name: feature/account-settings-export
 pr_closeout: merge-ready
+pr_shape: single-pr
 source_prd_ref: draft-prd:account-settings-export
 prd_body_fingerprint: sha256:7f4a9c21d003
 capture_mode: defer-to-caller
+option_resolution: see-canonical-run-option-rows-below
+option_rows_fingerprint: sha256:d634ac958acbafcb43916e5cb8fc883a90e778e0d0bb1c5ae3b3b7f22489f338
 domain_knowledge_delta:
   status: required
   decisions:
@@ -36,6 +47,25 @@ domain_knowledge_delta:
   unresolved: []
 ```
 
+## Canonical Run Option Rows
+
+| row_id | scope_id | field | value | source | evidence |
+| --- | --- | --- | --- | --- | --- |
+| `run:mode` | `run` | `mode` | `full-flow` | `owner-instruction` | `fixture-intent` |
+| `run:execution_profile` | `run` | `execution_profile` | `standard` | `default` | `none` |
+| `run:tracker_backend` | `run` | `tracker_backend` | `github` | `tracker-config` | `project-memory/agents/issue-tracker.md` |
+| `run:effective_target` | `run` | `effective_target` | `draft-publish-commands` | `runtime-derived` | `run:no_mutation_override+run:no_mutation_output` |
+| `run:no_mutation_override` | `run` | `no_mutation_override` | `dry-run` | `owner-instruction` | `fixture-intent` |
+| `run:no_mutation_output` | `run` | `no_mutation_output` | `publish-commands` | `owner-instruction` | `fixture-intent` |
+| `run:local_mirror` | `run` | `local_mirror` | `not-requested` | `default` | `none` |
+| `run:local_mirror_path` | `run` | `local_mirror_path` | `not-applicable` | `default` | `none` |
+| `run:partial_output` | `run` | `partial_output` | `withhold` | `default` | `none` |
+| `run:delivery_mode` | `run` | `delivery_mode` | `pull-request` | `default` | `none` |
+| `run:issue_mutation_authority` | `run` | `issue_mutation_authority` | `pr-body-closeout-only` | `runtime-derived` | `run:tracker_backend+run:delivery_mode` |
+| `run:branch_name` | `run` | `branch_name` | `feature/account-settings-export` | `runtime-derived` | `run:delivery_mode+feature_slug` |
+| `run:pr_closeout` | `run` | `pr_closeout` | `merge-ready` | `default` | `run:delivery_mode` |
+| `run:pr_shape` | `run` | `pr_shape` | `single-pr` | `runtime-derived` | `current-repository` |
+
 ## Expected Pipeline
 
 1. `$plan-feature` reviews project memory and resolves the effective target.
@@ -44,10 +74,17 @@ domain_knowledge_delta:
    writes, and returns a structured `domain_knowledge_delta`.
 3. The PRD phase returns the PRD body, a draft PRD publish command,
    `source_prd_ref=draft-prd:account-settings-export`, and
-   `prd_body_fingerprint=sha256:7f4a9c21d003`. When the delta is required, the
-   PRD body carries it under `## Domain Knowledge Handoff`.
+   `prd_body_fingerprint=sha256:7f4a9c21d003`, with
+   the structured delivery handoff tuple
+   `delivery_mode=pull-request`,
+   `issue_mutation_authority=pr-body-closeout-only`,
+   `branch_name=feature/account-settings-export`,
+   `pr_closeout=merge-ready`, and `pr_shape=single-pr`. When the delta is
+   required, the PRD body carries it under `## Domain Knowledge Handoff`.
 4. The issue phase returns hardened issue bodies plus draft issue publish commands.
-   Draft issue bodies may contain `Source PRD: draft-prd:account-settings-export`
+   Every issue `## Delivery` and `## Orchestrator Handoff` projection carries
+   `branch_name: feature/account-settings-export`.
+   Draft issue bodies may contain `source_prd_ref: draft-prd:account-settings-export`
    only because no hosted PRD number exists yet. A required knowledge delta is
    assigned to the last integration task, which depends on every terminal
    implementation issue and includes `## Domain Knowledge Closeout`. That task
@@ -64,6 +101,8 @@ domain_knowledge_delta:
 6. Any `$codex-orchestrator` session settings remain runtime-only; they are not
    copied into the PRD, generated issue bodies, `## Orchestrator Handoff`, or
    draft publish commands.
+7. Each phase verifies the incoming `option_rows_fingerprint`; the issue-phase
+   report returns the recomputed fingerprint over all run and `issue:<NN>` rows.
 
 ## Expected Draft Publish Plan
 
@@ -71,14 +110,14 @@ domain_knowledge_delta:
 - Confirm the draft issue commands carry the same PRD body fingerprint as the
   draft PRD command.
 - Replace every issue body line
-  `Source PRD: draft-prd:account-settings-export` with
-  `Source PRD: #$PRD_NUMBER` before creating hosted implementation issues.
+  `source_prd_ref: draft-prd:account-settings-export` with
+  `source_prd_ref: #$PRD_NUMBER` before creating hosted implementation issues.
 - Attach each generated implementation issue to the PRD parent when the tracker
   supports parent/sub-issues.
 - Publish the final integration and domain-knowledge closeout task last, after
   all terminal issue IDs are known, and preserve its dependency edges.
 - Draft commands may include the intended future `ready-for-agent` labels, but
-  the issues are not executable agent-ready output until `Source PRD` is replaced
+  the issues are not executable agent-ready output until `source_prd_ref` is replaced
   with the durable PRD issue number.
 - Return exact commands without executing them.
 
@@ -106,8 +145,14 @@ domain_knowledge_delta:
   authorization fields or worker capability modes.
 - Draft PRDs, generated issues, or draft publish commands include orchestration
   session values such as worker surfaces, worker counts, checkpoint approval,
-  publication authority, or issue mutation authority.
-- Generated issues use a prose `Source PRD` such as the PRD title when a stable
+  or publication authority. The canonical source-contract
+  `issue_mutation_authority` is allowed and must remain independently resolved.
+- A phase handoff or generated structured field uses a prose choice, boolean
+  option, non-canonical field name, or enum value outside `options.md`.
+- A PRD-phase handoff, generated issue `## Delivery`, or generated issue
+  `## Orchestrator Handoff` omits
+  `branch_name: feature/account-settings-export`.
+- Generated issues use a prose `source_prd_ref` such as the PRD title when a stable
   draft ref is available.
 - A required `domain_knowledge_delta` is omitted, captured during planning, or
   placed in a docs-only task instead of the last integration task.

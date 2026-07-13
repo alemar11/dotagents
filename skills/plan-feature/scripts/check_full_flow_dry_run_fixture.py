@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import re
 import unittest
 from pathlib import Path
 
@@ -42,6 +44,13 @@ def read(relative: str) -> str:
 
 def read_repo(relative: str) -> str:
     return (REPO_ROOT / relative).read_text(encoding="utf-8")
+
+
+def option_row_evidence_is_valid(rows: list[list[str]]) -> bool:
+    return all(
+        source == "default" or evidence not in {"", "none"}
+        for _, _, _, _, source, evidence in rows
+    )
 
 
 def iter_active_text_files() -> list[Path]:
@@ -88,6 +97,16 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertIn("effective_target: draft-publish-commands", fixture)
         self.assertIn("no_mutation_override: dry-run", fixture)
+        self.assertIn("no_mutation_output: publish-commands", fixture)
+        self.assertIn("option_rows_fingerprint: sha256:", fixture)
+        self.assertIn("local_mirror_path: not-applicable", fixture)
+        self.assertIn("branch_name: feature/account-settings-export", fixture)
+        self.assertIn("the structured delivery handoff tuple", fixture)
+        self.assertIn("`delivery_mode=pull-request`", fixture)
+        self.assertIn("`branch_name=feature/account-settings-export`", fixture)
+        self.assertIn("`pr_closeout=merge-ready`", fixture)
+        self.assertIn("`pr_shape=single-pr`", fixture)
+        self.assertIn("`## Orchestrator Handoff` projection carries\n   `branch_name: feature/account-settings-export`", fixture)
         self.assertIn("source_prd_ref: draft-prd:account-settings-export", fixture)
         self.assertIn("prd_body_fingerprint: sha256:7f4a9c21d003", fixture)
         self.assertIn("capture_mode: defer-to-caller", fixture)
@@ -96,6 +115,42 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("target_surfaces:", fixture)
         self.assertIn("evidence:", fixture)
         self.assertIn("current-repository/src/account-settings/export.ts", fixture)
+
+        option_rows_section = fixture.split("## Canonical Run Option Rows", 1)[1].split(
+            "## Expected Pipeline", 1
+        )[0]
+        option_rows: list[list[str]] = []
+        for line in option_rows_section.splitlines():
+            if not line.startswith("|"):
+                continue
+            cells = [cell.strip() for cell in line.strip("|").split("|")]
+            if cells[0] == "row_id" or all(set(cell) <= {"-", ":", " "} for cell in cells):
+                continue
+            self.assertEqual(len(cells), 6)
+            normalized = [
+                cell[1:-1]
+                if len(cell) >= 2 and cell.startswith("`") and cell.endswith("`")
+                else cell
+                for cell in cells
+            ]
+            option_rows.append(normalized)
+
+        row_ids = [row[0] for row in option_rows]
+        self.assertEqual(len(row_ids), len(set(row_ids)))
+        self.assertIn("run:branch_name", row_ids)
+        self.assertTrue(option_row_evidence_is_valid(option_rows))
+        serialized = "".join(
+            "\t".join(row) + "\n" for row in sorted(option_rows, key=lambda row: row[0])
+        )
+        expected_fingerprint = re.search(
+            r"option_rows_fingerprint: sha256:([0-9a-f]{64})",
+            fixture,
+        )
+        self.assertIsNotNone(expected_fingerprint)
+        self.assertEqual(
+            hashlib.sha256(serialized.encode("utf-8")).hexdigest(),
+            expected_fingerprint.group(1),
+        )
         self.assertIn("## Domain Knowledge Handoff", fixture)
         self.assertIn("## Domain Knowledge Closeout", fixture)
         self.assertIn("last integration task", fixture)
@@ -111,14 +166,30 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("one `tokens=unavailable` result without estimation", fixture)
         self.assertIn("repeatedly emitted between phases", fixture)
 
+    def test_non_default_option_sources_reject_empty_or_none_evidence(self) -> None:
+        base = [["run:mode", "run", "mode", "full-flow", "owner-instruction", "request-1"]]
+        self.assertTrue(option_row_evidence_is_valid(base))
+        for invalid in ("", "none"):
+            with self.subTest(evidence=invalid):
+                row = [base[0][:-1] + [invalid]]
+                self.assertFalse(option_row_evidence_is_valid(row))
+
+        options = read("plan-feature/references/options.md")
+        self.assertIn("whose `source` is not `default`", options)
+        self.assertIn("neither empty nor `none`", options)
+
     def test_shared_contract_documents_draft_publish_handoff(self) -> None:
         contract = read("project-memory/references/tracker-publishing.md")
 
         self.assertIn("source_prd_ref", contract)
         self.assertIn("draft-prd:<feature-slug>", contract)
         self.assertIn("Create or update the PRD first", contract)
-        self.assertIn("Replace `Source PRD: draft-prd:<...>`", contract)
+        self.assertIn("Replace `source_prd_ref: draft-prd:<...>`", contract)
+        self.assertIn("`no_mutation_override=dry-run`", contract)
+        self.assertIn("`no_mutation_override=draft-output`", contract)
         self.assertIn("Do not dispatch implementation workers", contract)
+        self.assertIn("`temporary_source_execution=owner-approved`", contract)
+        self.assertNotIn("explicit owner decision to use the full PRD body", contract)
 
     def test_project_memory_does_not_own_orchestration_policy_setup(self) -> None:
         project_memory = read("project-memory/SKILL.md")
@@ -131,11 +202,11 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertNotIn("orchestration-policy", setup_workflow)
         self.assertIn("## Structured Configuration", project_memory)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, orchestrator)
-        self.assertIn("delegation\nconsent", worker)
+        self.assertIn("## Session Option Resolution", worker)
         self.assertNotIn("policy-auto-dispatched", worker)
         self.assertNotIn("policy-auto-dispatched", ledger)
-        self.assertIn("Session CLI subagents consented", ledger)
-        self.assertIn("Session Codex App threads consented", ledger)
+        self.assertIn("delegation_mode: auto|disabled|bounded", ledger)
+        self.assertIn("app_thread_consent: not-requested|granted|denied", ledger)
         self.assertIn("## Wave Reports", ledger)
         self.assertIn("Execution Report", ledger)
         self.assertNotIn("## Wave Checkpoints", ledger)
@@ -146,13 +217,29 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "project-memory/references/issue-tracker-local.md",
         ):
             contents = read(relative)
+            normalized = " ".join(contents.split())
             with self.subTest(file=relative):
                 self.assertIn("## Configuration", contents)
                 self.assertIn("| Key | Type | Value | Allowed values | Meaning |", contents)
                 self.assertNotIn(ORCHESTRATION_POLICY_PATH, contents)
                 self.assertIn("Tracker setup records artifact routing", contents)
+                self.assertIn("Branch only on the canonical `effective_target`", normalized)
+                self.assertIn("`source_prd_ref`", contents)
+                self.assertIn("`Source PRD` is a read-only legacy migration alias", contents)
+                self.assertNotIn("current request explicitly asks for dry-run", contents)
+                self.assertNotIn("current-run no-mutation override is active", contents)
                 for field in RUNTIME_POLICY_FIELDS:
                     self.assertNotIn(field, contents)
+
+        github_contract = read("project-memory/references/issue-tracker-github.md")
+        self.assertIn("`source_prd_ref`, delivery metadata", github_contract)
+        self.assertIn("`Source PRD` is a read-only legacy migration alias", github_contract)
+        self.assertIn("`local_mirror=requested`", github_contract)
+        self.assertNotIn("explicitly asks to keep a local mirror", github_contract)
+
+        local_contract = read("project-memory/references/issue-tracker-local.md")
+        self.assertIn("`effective_target=local-dry-run`", local_contract)
+        self.assertNotIn("explicitly asks to keep completed issue", local_contract)
 
     def test_plan_feature_references_internal_phase_templates(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
@@ -161,9 +248,13 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         prd_template = read("plan-feature/references/prd-template.md")
         issue_template = read("plan-feature/references/issue-body-template.md")
         vertical_slices = read("plan-feature/references/vertical-slices.md")
+        options = read("plan-feature/references/options.md")
         prd_delivery = read("codex-orchestrator/references/prd-backed-delivery.md")
 
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
+        self.assertIn("`tracker_backend`", plan_feature)
+        self.assertIn("keyed `option_resolution` rows", plan_feature)
+        self.assertIn("`branch_name`, `pr_closeout`, and `pr_shape`", plan_feature)
         self.assertIn("Keep worker surfaces, worker counts", plan_feature)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, plan_feature)
         self.assertIn("`tracker_backend` as planning-artifact write authority", plan_feature)
@@ -184,10 +275,79 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("PRD body fingerprint", prd_phase)
         self.assertIn("PRD planning-artifact publication", prd_phase)
         self.assertIn("tracker_backend` is the planning-artifact write authority", prd_phase)
+        self.assertIn("`effective_target=configured-tracker`", prd_phase)
+        self.assertIn("`local_mirror=requested`", prd_phase)
+        self.assertIn("local_mirror_path: <repo-relative mirror root", prd_phase)
+        self.assertIn("local_mirror_path: <repo-relative mirror root", issue_phase)
+        self.assertIn("branch_name: <feature branch or exact authorized direct-commit target branch>", prd_phase)
+        self.assertIn("branch_name: <feature branch or exact authorized direct-commit target branch>", issue_phase)
+        self.assertIn("For `effective_target=local-dry-run`", prd_phase)
+        self.assertIn("exact owner\n  instruction, feature scope, and authorized target branch", prd_phase)
+        self.assertIn("the structured delivery handoff tuple: `delivery_mode`,", prd_phase)
+        self.assertIn("`issue_mutation_authority`, `issue_mutation_authority_evidence`", prd_phase)
+        self.assertIn("exact target branch named by\n  `delivery_mode_evidence`", prd_template)
+        self.assertIn("separate `branch_name` data must equal the exact target", options)
+        self.assertIn("- branch_name: [inherited feature branch or exact authorized", issue_template)
+        self.assertIn("- branch_name: [same effective branch data as `## Delivery`]", issue_template)
+        self.assertIn("every effective\n  direct-commit issue uses", issue_template)
+        self.assertIn("scope-transfer-ref=run", issue_template)
+        self.assertIn("- issue_mutation_authority: [none | pr-body-closeout-only |", issue_template)
+        self.assertIn("`issue_mutation_authority=explicit-direct-mutation`", issue_phase)
+        self.assertIn("Direct-commit publication wording alone cannot select", prd_phase)
+        self.assertIn("delivery\nauthority alone cannot select it", options)
+        self.assertIn("`scope-ref=issue:<NN>`", issue_phase)
+        self.assertIn("preserve the PRD `target-ref` verbatim", issue_phase)
+        self.assertIn("preserves the PRD owner, `target-ref`, and target branch verbatim", options)
+        self.assertIn("`closeout_mode=direct-commit-closes-issue`,\n  `issue_mutation_authority=explicit-direct-mutation`", issue_template)
+        self.assertNotIn("`direct-commit` or another explicit authorization", issue_template)
+        self.assertNotIn("`direct-commit` or another explicit authorization", issue_phase)
+        self.assertIn("label the ref\nnon-executable", issue_phase)
+        for identity_field in (
+            "feature_slug",
+            "product_slug",
+            "workspace_path",
+            "context_file",
+            "project_slug",
+        ):
+            self.assertIn(f"{identity_field}: <", issue_phase)
+        self.assertNotIn("run explicitly requested no-mutation output", prd_phase)
+        self.assertNotIn("explicitly asked for a local mirror", prd_phase)
+        self.assertIn("## Effective Target Resolution", options)
+        self.assertIn("## Per-Issue Registry", options)
+        self.assertIn("Records the issue-effective value", options)
+        self.assertIn("complete effective delivery", options)
+        self.assertIn("## Row Serialization And Fingerprint", options)
+        self.assertIn("Record exactly one row per Run Registry field", options)
+        self.assertIn("plus issue-effective `branch_name`", options)
+        self.assertIn(
+            "owner-ref=<ref>;scope-ref=<run-or-issue-scope>;target-ref=<feature-or-source-ref>;target-branch=<branch_name>",
+            options,
+        )
+        self.assertIn("row_id`, `scope_id`, `field`, `value`, `source`, and", options)
+        self.assertIn("option_rows_fingerprint=sha256:", options)
+        self.assertIn("`issue:<NN>:<field>`", options)
+        self.assertIn("`local-artifacts` | `local-dry-run`", options)
+        self.assertIn("`closeout_mode=local-done-move-after-proof`", options)
+        self.assertIn("`closeout_mode=direct-commit-closes-issue`", options)
+        self.assertIn("after the issue graph exists and\nbefore emitting", options)
+        self.assertIn("`parallelization=depends-on` requires", options)
+        self.assertIn("one or more `dependency_ids`", options)
+        self.assertIn("atomically resolves", options)
+        self.assertIn("Any non-`none` registry value", options)
+        self.assertIn("Reject any other combination", options)
         self.assertIn("tracker-publishing.md", issue_phase)
         self.assertIn("Do not add worker authorization defaults", issue_phase)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_phase)
         self.assertIn("final hardened issue bodies", issue_phase)
+        self.assertIn("`pr_shape`: required", issue_phase)
+        self.assertIn("atomically resolve the", issue_phase)
+        self.assertIn("complete delivery tuple", issue_phase)
+        self.assertIn("- pr_shape: single-pr", issue_phase)
+        self.assertIn("`partial_output=allow-non-agent-ready`", issue_phase)
+        self.assertNotIn("explicitly requested partial backlog output", issue_phase)
+        self.assertNotIn("unless it explicitly permits partial output", issue_phase)
+        self.assertNotIn("current run explicitly requested\nno-mutation", issue_phase)
+        self.assertNotIn("user explicitly requested one", issue_phase)
         self.assertIn("machine-local absolute paths", issue_phase)
         self.assertIn("planning issue publication", issue_phase)
         self.assertIn("tracker_backend` as planning-artifact write authority", issue_phase)
@@ -202,12 +362,21 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Delivery Mode", prd_template)
         self.assertIn("## Domain Knowledge Handoff", prd_template)
         self.assertIn("# <feature-slug>: <NN> <vertical outcome>", issue_template)
+        self.assertIn("Type: [mapped issue type", issue_template)
+        self.assertIn("Status: [mapped triage state", issue_template)
+        self.assertNotIn("\ntype:", issue_template)
+        self.assertNotIn("\nstatus:", issue_template)
+        self.assertIn("- pr_shape: [single-pr | per-repo-pr | none]", issue_template)
+        self.assertIn(
+            "- pr_shape: [same effective value as `## Delivery`]",
+            issue_template,
+        )
         self.assertIn("## Orchestrator Handoff", issue_template)
         self.assertIn("## Domain Knowledge Closeout", issue_template)
         self.assertIn("Do not include worker authorization modes", issue_template)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_template)
-        self.assertIn("Source PRD: [path, issue number, or stable draft ref;", issue_template)
-        self.assertIn("never for agent-ready", issue_template)
+        self.assertIn("source_prd_ref: [path, issue number, or stable draft ref;", issue_template)
+        self.assertIn("draft refs are valid", issue_template)
         self.assertIn("portable references", issue_template)
         self.assertIn("Placeholders are scheduling expectations", issue_template)
         self.assertIn("## Dependency Rules", vertical_slices)
@@ -219,6 +388,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Orchestrator Handoff", vertical_slices)
         self.assertIn("draft-prd:<...>", prd_delivery)
         self.assertIn("canonical issue-level dispatch contract", prd_delivery)
+        self.assertIn("`delivery_source_evidence`", prd_delivery)
         self.assertIn("resolved per workstream", prd_delivery)
         self.assertIn("source lifecycle and closeout mutations are orchestrator-owned", prd_delivery)
         self.assertIn("Repo PR placeholders copied from PRDs", prd_delivery)
@@ -265,8 +435,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Domain Knowledge Handoff", prd_phase)
         self.assertIn("deferred-work carrier", prd_phase)
         self.assertIn("<repo-slug>/<repo-relative-path>", prd_phase)
-        self.assertIn("    status: <required|none>", prd_phase)
-        self.assertNotIn("  - status: <required|none>", prd_phase)
+        self.assertIn("\n  status: <required|none>", prd_phase)
+        self.assertNotIn("\n- status: <required|none>", prd_phase)
         self.assertIn("choose its final owner", issue_phase)
         self.assertIn("append the last generated issue", issue_phase)
         self.assertIn("depend directly\n   on every other terminal issue", issue_phase)
@@ -293,10 +463,11 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         plan_harder = read("plan-harder/SKILL.md")
         plan_harder_templates = read("plan-harder/references/templates.md")
 
-        self.assertIn("default for new intent", plan_feature)
+        self.assertIn("default for new feature intent after input normalization", plan_feature)
+        self.assertIn("branch only on that canonical value", plan_feature)
         self.assertIn("Select full-flow for new intent", plan_feature_metadata)
         self.assertNotIn("split it into hardened vertical issues when requested", plan_feature_metadata)
-        self.assertIn("Only an explicit request for partial non-agent-ready output", plan_feature)
+        self.assertIn("`partial_output=allow-non-agent-ready` permits", plan_feature)
         self.assertIn("caller surface", issue_phase)
         self.assertIn("status: ready | blocked", plan_harder_templates)
         self.assertIn("Do not auto-select this skill merely because an implementation request", plan_harder)
@@ -399,10 +570,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         worker = read("codex-orchestrator/references/worker.md")
         orchestrator = read("codex-orchestrator/SKILL.md")
 
-        self.assertIn("Authorization resolution: per-workstream", ledger)
+        self.assertIn("authorization_resolution: per-workstream", ledger)
         self.assertIn("per workstream and session", worker)
         self.assertIn("The root resolves worker authorization per workstream", orchestrator)
-        self.assertIn("Authorization modes:", worker)
+        self.assertIn("worker_authorization:", worker)
         self.assertIn("Worker evidence", ledger)
         self.assertIn("Worker evidence", worker)
         self.assertIn("parallelism=<parallel|sequential|root-owned|simulated>", ledger)

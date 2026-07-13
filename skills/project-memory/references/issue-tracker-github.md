@@ -13,27 +13,30 @@ PRDs and implementation issues for this repo live as GitHub issues. Use
 GitHub is the authoritative artifact store in this mode. Do not create or keep
 repo-local `.scratch/` PRD/issue mirrors, `project-memory/features/` mirrors, or
 other local planning copies merely to feed `gh --body-file`. Temporary body
-files must live outside the repo and be removed after mutation unless the user
-explicitly asks to keep a local mirror.
+files must live outside the repo and be removed after mutation. Create a
+persistent mirror only when the canonical Plan Feature rows contain
+`local_mirror=requested` and a validated `local_mirror_path`.
 
 Feature-planning workflows write to GitHub by default in this mode after setup,
-planning identity, and blockers are resolved. They do not need a separate
-per-run confirmation to create PRD or generated implementation issues unless the
-current request explicitly asks for dry-run or no-mutation output.
+planning identity, and blockers are resolved. Branch only on the canonical
+`effective_target`: `configured-tracker` writes to GitHub,
+`draft-publish-commands` returns exact draft commands, and `local-dry-run`
+returns non-executable local artifacts.
 
 ## Non-Mutating Runs
 
-If this setup is being used for a temp exercise, validation pass, rehearsal,
-dry run, or any workflow where tracker writes are explicitly disabled, do not
-mutate GitHub. Use local markdown only when a local dry-run target is configured
-or explicitly chosen for that run, or ask `$gitstack:github-issues` to return draft issue
-bodies and exact `gh` commands without executing them.
+Require a non-`none` `no_mutation_override` before either non-mutating target.
+For `effective_target=local-dry-run`, return local paths and bodies without
+writing GitHub. For `effective_target=draft-publish-commands`, ask
+`$gitstack:github-issues` for draft issue bodies and exact `gh` commands without
+executing them.
 When returning draft commands before the PRD issue exists, use
 `source_prd_ref=draft-prd:<feature-slug>` and publish the PRD first; generated
-issue bodies must replace that draft ref with `Source PRD: #<prd-number>` before
+issue bodies must replace that draft ref with `source_prd_ref: #<prd-number>` before
 hosted mutation.
-Treat any non-mutating choice as a current-run override. Do not record it as a
-durable issue-tracker configuration row.
+Treat `no_mutation_override`, `no_mutation_output`, and the derived
+non-mutating target as run-scoped rows. Do not record them as durable
+issue-tracker configuration.
 
 ## Conventions
 
@@ -63,7 +66,9 @@ the actual available values or fallback label convention in
 ## Delivery Defaults
 
 - Default `delivery_mode`: `pull-request`.
-- Branch naming: default to `feature/<feature-slug>`.
+- Branch naming: for `delivery_mode=pull-request`, default to
+  `feature/<feature-slug>`. For `delivery_mode=direct-commit`, use the exact
+  target branch carried by the scoped owner evidence.
 - PR shape: one draft PR for a single repo or monorepo feature. In multi-repo
   work, every involved repo uses the same branch name and opens its own PR.
   Generated implementation issues are scheduling units and normally close from
@@ -73,7 +78,12 @@ the actual available values or fallback label convention in
   issues; each one names its affected repo and links the siblings that define
   the same feature. No central repo, central issue, project label, or global
   PRD is required as durable setup configuration.
-- Exceptions: `direct-commit` only with explicit maintainer authorization.
+- Exceptions: `delivery_mode=direct-commit` requires
+  `source=owner-instruction` plus exact feature-scope and target-branch
+  evidence, or a `source-prd` row preserving that evidence. Final-commit issue
+  closure additionally requires a separate
+  `issue_mutation_authority=explicit-direct-mutation` row whose owner evidence
+  explicitly authorizes that closeout for the same scope, target, and branch.
 
 ## Runtime Boundary
 
@@ -102,14 +112,15 @@ For feature planning:
 - The PRD is a GitHub issue titled `PRD: <Feature Name>` with type `Feature`
   unless the repo maps `feature` to a different value.
 - Generated implementation issues are the execution graph. Do not create a
-  separate execution-plan issue unless the user explicitly requests a
-  non-authoritative summary.
+  separate execution-plan issue. A requested non-authoritative summary remains
+  a response view and is not tracker publication.
 - Implementation issues are GitHub sub-issues of the PRD issue with type
   `Task` unless the repo maps `task` to a different value.
 - Implementation issue titles use
   `<feature-slug>: <NN> <vertical outcome>`.
-- `$plan-feature` owns PRD and generated issue body shape, including `Source
-  PRD`, delivery metadata, partial-PRD links, and issue graph validation.
+- `$plan-feature` owns PRD and generated issue body shape, including
+  `source_prd_ref`, delivery metadata, partial-PRD links, and issue graph
+  validation. `Source PRD` is a read-only legacy migration alias.
 
 For triage:
 
@@ -127,8 +138,10 @@ When all acceptance criteria pass and validation is complete, close that
 implementation issue from the relevant PR body with a GitHub closing keyword
 such as `Closes #<issue-number>`. For the default `pull-request` delivery mode,
 the relevant feature or repo PR closes generated implementation issues.
-Final-commit closure is allowed only when the issue records `direct-commit` or another
-explicit maintainer authorization. The issue closes when that PR or authorized
+Final-commit closure is allowed only for
+`closeout_mode=direct-commit-closes-issue` with
+`issue_mutation_authority=explicit-direct-mutation` and exact separately scoped
+authorization evidence. The issue closes when that authorized
 commit reaches the default branch.
 
 Use closing keywords only for issues actually satisfied by the change. Do not

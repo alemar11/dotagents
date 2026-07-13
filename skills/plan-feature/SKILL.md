@@ -18,15 +18,24 @@ a manually invoked parent workflow routes here. Do not auto-select it for
 ordinary planning, PRD, implementation, issue-splitting, or triage requests.
 Do not implement the planned feature.
 
+## Structured Option Contract
+
+Load `references/options.md` before resolving mode, target, delivery, or output
+behavior. Every selectable choice uses a snake_case field and a lower-kebab
+value from that registry. Natural-language instructions and legacy labels are
+evidence for resolving a field, never alternative option values. Record the
+canonical option-resolution rows once and pass only those values to phases,
+handoffs, templates, draft commands, and reports.
+
 ## Modes
 
-Choose the smallest mode that satisfies the request:
+Resolve `mode` once from the registry and branch only on that canonical value:
 
 | Mode | Use when | Stop point |
 | --- | --- | --- |
-| `full-flow` | New feature intent needs a PRD and implementation graph. This is the default for new intent unless the user asks to stop at the PRD. | PRD plus hardened issues. |
-| `prd-only` | The user explicitly wants a PRD without generated issues. | PRD phase report. |
-| `issues-from-existing-prd` | A durable PRD already exists and needs implementation issues. Do not rewrite it unless asked. | Hardened issues. |
+| `full-flow` | `mode=full-flow`; default for new feature intent after input normalization. | PRD plus hardened issues. |
+| `prd-only` | `mode=prd-only`. | PRD phase report. |
+| `issues-from-existing-prd` | `mode=issues-from-existing-prd`; a durable PRD already exists and supplies the verified handoff. | Hardened issues. |
 
 In `issues-from-existing-prd`, skip clarification unless unresolved PRD
 questions affect scope, acceptance criteria, dependencies, validation,
@@ -58,19 +67,20 @@ domain-closeout gates required by the selected mode.
   phase that needs them.
 - Treat `tracker_backend` as planning-artifact write authority. `github`
   publishes through `$gitstack:github-issues`; `local` writes the configured
-  Markdown paths. A current-run no-mutation override returns local dry-run
-  output or draft publish commands instead.
+  Markdown paths when `effective_target=configured-tracker`.
+  `effective_target=local-dry-run` or `draft-publish-commands` is non-mutating.
 - In hosted tracker mode, keep body files transient and outside the repo. Do
   not create `.scratch/`, `project-memory/features/`, or other local mirrors
-  unless the configured target or user explicitly requires one.
+  unless `effective_target=configured-tracker` and
+  `local_mirror=requested`.
 - Resolve and carry one planning identity: `feature_slug`, selected
   product/workspace/context when applicable, and `project_slug` for
   orchestrator workspaces.
 - Default `delivery_mode` to `pull-request`; use `direct-commit` only with
-  explicit authorization. For pull requests, default `pr_closeout` to
-  `merge-ready`; use `draft-only` only from an explicit current-user PR
-  lifecycle instruction or structured PRD value. `draft PR`, `do not merge`,
-  and the planning no-mutation value `draft-output` do not select it.
+  accepted option-resolution evidence. For pull requests, default
+  `pr_closeout` to `merge-ready`; use `draft-only` only when the canonical
+  option-resolution row selects it. Do not select it by comparing source prose
+  or from the separate `no_mutation_override` value.
 - Initialize every run with a structured `domain_knowledge_delta`: `status`
   (`none` or `required`) plus `decisions`, `target_surfaces`, `evidence`, and
   `unresolved` lists. Empty all lists when status is `none`.
@@ -85,15 +95,19 @@ domain-closeout gates required by the selected mode.
 - Run `$plan-harder` once per generated issue in issue-hardening caller mode.
   Then run the final verticality and graph gates; repair and re-harden changed
   issues before output.
-- Never label unresolved planning work `ready-for-agent`. Withhold it by
-  default. Only an explicit request for partial non-agent-ready output permits
-  `needs-info` or `ready-for-human` artifacts.
+- Never label unresolved planning work `ready-for-agent`. Resolve
+  `partial_output=withhold` by default. Only
+  `partial_output=allow-non-agent-ready` permits `needs-info` or
+  `ready-for-human` artifacts.
 - Carry a durable `source_prd_ref` into every generated issue. A
   `draft-prd:<...>` ref is inspection-only until replaced by a hosted PRD
   number or durable local path.
-- Keep worker surfaces, worker counts, publication authority, issue mutation
-  authority, and other `$codex-orchestrator` session choices out of PRDs,
-  generated issues, handoffs, local tracker files, and draft commands.
+- Keep worker surfaces, worker counts, publication authority, runtime issue
+  mutation overrides, and other `$codex-orchestrator` session choices out of
+  PRDs, generated issues, handoffs, local tracker files, and draft commands.
+  The independently resolved source-contract `issue_mutation_authority` and its
+  scoped evidence are delivery metadata, not a worker/session grant, and must
+  remain in PRDs and generated issue handoffs.
 - Snapshot each source or artifact in full at most once per unchanged
   fingerprint. On later passes use paths, fingerprints, changed sections, and
   failed-gate excerpts; emit a full body only when chat/draft output requires
@@ -129,16 +143,27 @@ target, run only `$project-memory tracker-routing`. Do not bootstrap unrelated
 domain, localization, ADR, or `AGENTS.md` content. Orchestrator-workspace setup
 is config-only and does not create project or feature artifacts.
 
-Resolve:
+Resolve and record the canonical option snapshot from `references/options.md`:
 
-- execution profile: `lean-prd`, `lean-issues`, or `standard`;
-- effective target: `configured-tracker`, `local-dry-run`, or
+- `execution_profile`: `lean-prd`, `lean-issues`, or `standard`;
+- `effective_target`: `configured-tracker`, `local-dry-run`, or
   `draft-publish-commands`;
-- no-mutation override: `none`, `dry-run`, `temp`, `rehearsal`, `validation`,
+- `no_mutation_override`: `none`, `dry-run`, `temp`, `rehearsal`, `validation`,
   `disabled-writes`, or `draft-output`;
+- `no_mutation_output`: `not-applicable`, `local-artifacts`, or
+  `publish-commands`;
+- `partial_output`: `withhold` or `allow-non-agent-ready`;
+- `local_mirror` and its repo-relative `local_mirror_path` data when requested;
 - `feature_slug` and, when applicable, `product_slug`, `workspace_path`,
   `context_file`, and `project_slug`;
-- `delivery_mode` and `pr_closeout` using the defaults above.
+- `delivery_mode`, `issue_mutation_authority`, `branch_name`, `pr_closeout`, and `pr_shape` using the
+  registry defaults and scoped evidence.
+
+Phase handoffs use the snake_case fields `mode`, `execution_profile`, `tracker_backend`,
+`effective_target`, `no_mutation_override`, `no_mutation_output`,
+`local_mirror`, `local_mirror_path`, `partial_output`, `delivery_mode`,
+`issue_mutation_authority`, `branch_name`, `pr_closeout`, and `pr_shape`, plus keyed `option_resolution` rows and the
+`option_rows_fingerprint` data field.
 
 Use `$project-memory`'s `references/tracker-publishing.md` for effective-target,
 temporary-body-file, and draft `source_prd_ref` mechanics. Stop before writing
@@ -163,8 +188,9 @@ those that block a safe split.
 Skip only when `issues-from-existing-prd` uses an unchanged durable PRD.
 Otherwise load `references/prd-phase.md` and its required template, then pass
 the resolved mode, execution profile, target, no-mutation override, planning
-identity, delivery values, source-ref state, and domain delta. A `lean-prd`
-run reads only the phase's minimum evidence set unless a gate forces widening.
+identity, delivery values, partial-output value, option-resolution evidence,
+source-ref state, and domain delta. A `lean-prd` run reads only the phase's
+minimum evidence set unless a gate forces widening.
 
 Require a durable local/hosted `source_prd_ref`, or a deterministic
 `draft-prd:<feature-slug>` / `draft-prd:<project-slug>/<feature-slug>` plus
@@ -175,9 +201,9 @@ material blocker back through clarification. Stop here for `prd-only`.
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 `references/vertical-slices.md`. Pass the same identity, delivery, source-ref,
-target, domain-delta, and execution-profile fields. A `lean-issues` run still
-hardens and validates every issue separately; it only narrows discovery and
-uses delta evidence between issue passes.
+target, domain-delta, partial-output, option-resolution, and execution-profile
+fields. A `lean-issues` run still hardens and validates every issue separately;
+it only narrows discovery and uses delta evidence between issue passes.
 
 The issue phase owns vertical splitting, one `$plan-harder` pass per issue,
 mapped metadata, dependency/acyclicity validation, PRD parent/sub-issue links,
@@ -194,9 +220,11 @@ like every other issue.
 ### 5. Report Completion
 
 Return the phase locations/counts and the effective target, planning identity,
-execution profile, delivery values, verticality repairs/exceptions, graph
-validation, blockers, applied tracker metadata, artifact fingerprints, and
-phase-token evidence (`exact-phase`, `exact-interval`, or `unavailable`).
+canonical keyed option rows with resolution evidence, verticality
+repairs/exceptions, graph validation, blockers, applied tracker metadata,
+`option_rows_fingerprint`, local-mirror result and path, artifact fingerprints,
+and phase-token evidence (`exact-phase`,
+`exact-interval`, or `unavailable`).
 Include exactly one domain outcome:
 
 - `Domain knowledge: deferred to <final task ref> because Plan Feature assigns durable capture to implementation closeout`;
@@ -207,6 +235,8 @@ Plan Feature never reports domain knowledge as captured.
 
 ## References
 
+- `references/options.md`: canonical option fields, values, defaults,
+  normalization, and legacy input migration.
 - `references/prd-phase.md`: PRD handoff, drafting, publication, sanitization,
   and `source_prd_ref` rules.
 - `references/issue-phase.md`: issue splitting, hardening, graph validation,
