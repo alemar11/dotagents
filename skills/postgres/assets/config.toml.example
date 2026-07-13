@@ -1,20 +1,20 @@
-schema_version = "2.1.0"
+schema_version = "3.0.0"
 
 [defaults]
 profile = "local"
 
 [tools.postgres]
-sslmode = false
+ssl_mode = "disable"
 migrations_path = "db/migrations"
 
 [tools.postgres.profiles.local]
 project = "app"
 description = "local dev"
-access = "read_write"
+access_mode = "read-write"
 host = "localhost"
 port = 5432
 database = "app_local"
 user = "postgres"
 password = "postgres"
-sslmode = false
+ssl_mode = "disable"
 migrations_path = "db/migrations"

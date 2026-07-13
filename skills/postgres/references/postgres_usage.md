@@ -173,8 +173,8 @@ Doctor success:
     "project_root": "/path/to/project",
     "config_path": "/path/to/project/.skills/postgres/config.toml",
     "toml_path": "/path/to/project/.skills/postgres/config.toml",
-    "sslmode": "disable",
-    "access": "read_write",
+    "ssl_mode": "disable",
+    "access_mode": "read-write",
     "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
     "url_source": "config"
   }
@@ -190,8 +190,8 @@ Profile success:
   "toml_path": "/path/to/project/.skills/postgres/config.toml",
   "profile_name": "local",
   "url": "postgresql://postgres:***@localhost:5432/app?sslmode=disable",
-  "sslmode": "disable",
-  "access": "read_write",
+  "ssl_mode": "disable",
+  "access_mode": "read-write",
   "url_source": "config",
   "application_name": "codex-postgres-skill"
 }
@@ -237,7 +237,7 @@ The CLI resolves connections in this order:
 5. `<project-root>/.skills/postgres/config.toml`
 6. legacy `<project-root>/.skills/postgres/postgres.toml` as a read-only
    compatibility input when canonical `config.toml` is absent; persist the
-   canonical form only with `profile migrate-toml`
+   canonical form only with `profile migrate-config`
 
 Project-root precedence:
 
@@ -246,26 +246,28 @@ Project-root precedence:
 3. current git top-level unless that resolves to the skill repo itself
 4. current working directory
 
-## Access modes
+## Access Modes
 
-Profiles may declare `access = "read"`, `access = "write"`, or
-`access = "read_write"` under `[tools.postgres.profiles.<name>]`.
+Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
+`access_mode = "read-write"` under `[tools.postgres.profiles.<name>]`.
 
-- Missing `access` values are backward compatible and resolve to `read_write`.
-- Loading a `2.0.0` config or a `2.1.0` config with missing access values
-  normalizes it to `schema_version = "2.1.0"` with explicit per-profile
-  `access` values in memory. Health, inspection, query, dry-run, and other
+- Missing `access_mode` values are backward compatible and resolve to
+  `read-write`.
+- Loading a v1, `2.0.0`, or `2.1.0` config normalizes it to
+  `schema_version = "3.0.0"` with explicit per-profile `access_mode` and
+  `ssl_mode` values in memory. Health, inspection, query, dry-run, and other
   ordinary runtime paths never persist that normalization.
-- `profile migrate-toml` is the explicit config-migration write path. It
-  persists canonical schema and access normalization.
-- `[tools.postgres].access` is allowed only as an inheritance/default source;
-  prefer explicit per-profile access.
+- `profile migrate-config` is the explicit config-migration write path. It
+  creates a pre-migration backup and atomically persists canonical schema and
+  option normalization. A no-change rerun performs no write.
+- `[tools.postgres].access_mode` is allowed only as an inheritance/default
+  source; prefer explicit per-profile values.
 - `read` permits read-oriented profile, query, activity, and schema inspection
   commands, and rejects obvious write SQL or write-control commands.
 - `write` permits write-oriented SQL/control operations and rejects read-only
   inspection commands, except neutral connection commands such as `doctor`,
   `profile resolve`, and `profile test`.
-- Ambiguous SQL or SQL that mixes reads and writes requires `read_write`.
+- Ambiguous SQL or SQL that mixes reads and writes requires `read-write`.
 - Access modes are CLI safety guards only. PostgreSQL roles, grants, RLS, and
   server-side read-only settings remain authoritative.
 
@@ -288,12 +290,14 @@ Profiles may declare `access = "read"`, `access = "write"`, or
   - Inspect focused PostgreSQL runtime settings.
 - `profile version`
   - Show server version.
-- `profile migrate-toml`
+- `profile migrate-config`
   - Explicitly persist legacy `postgres.toml` or an older canonical schema as
-    canonical `config.toml`; update ignore coverage so
-    `.skills/postgres/config.toml` stays untracked too.
-- `profile set-ssl <profile> <true|false>`
-  - Persist `sslmode`.
+    canonical `config.toml`; create a backup, write atomically, and update
+    ignore coverage so `.skills/postgres/config.toml` stays untracked too.
+- `profile set-ssl-mode <profile> <disable|require>`
+  - Persist canonical `ssl_mode`.
+- Hidden compatibility aliases: `profile migrate-toml` and
+  `profile set-ssl <profile> <legacy-value>` remain accepted as input only.
 - `query run`
   - Execute SQL from `-c`, `-f`, or stdin, preserving per-statement results.
 - `query explain`

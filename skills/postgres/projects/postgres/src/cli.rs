@@ -65,9 +65,15 @@ pub enum ProfileSubcommand {
     Settings(ProfileSettingsCommand),
     #[command(about = "Show the PostgreSQL server version")]
     Version,
-    #[command(about = "Migrate legacy postgres.toml to config.toml")]
-    MigrateToml,
-    #[command(about = "Persist sslmode for a saved profile")]
+    #[command(
+        name = "migrate-config",
+        alias = "migrate-toml",
+        about = "Migrate legacy or older config to the canonical schema"
+    )]
+    MigrateConfig,
+    #[command(about = "Persist ssl_mode for a saved profile")]
+    SetSslMode(SetSslModeArgs),
+    #[command(name = "set-ssl", hide = true)]
     SetSsl(SetSslArgs),
 }
 
@@ -78,10 +84,18 @@ pub struct BootstrapArgs {
 }
 
 #[derive(Debug, Args)]
+pub struct SetSslModeArgs {
+    #[arg(help = "Profile name to update")]
+    pub profile: String,
+    #[arg(help = "SSL mode: disable or require")]
+    pub ssl_mode: String,
+}
+
+#[derive(Debug, Args)]
 pub struct SetSslArgs {
     #[arg(help = "Profile name to update")]
     pub profile: String,
-    #[arg(help = "SSL mode value: true/require or false/disable")]
+    #[arg(help = "Legacy SSL value: true/require or false/disable")]
     pub sslmode: String,
 }
 
@@ -124,6 +138,46 @@ pub struct SqlInputArgs {
 
     #[arg(short = 'f', long, help = "Path to a SQL file to execute")]
     pub file: Option<PathBuf>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonical_and_legacy_migration_commands_share_one_handler() {
+        for command in ["migrate-config", "migrate-toml"] {
+            let cli = Cli::try_parse_from(["postgres", "profile", command]).unwrap();
+            assert!(matches!(
+                cli.command,
+                Command::Profile(ProfileCommand {
+                    command: ProfileSubcommand::MigrateConfig
+                })
+            ));
+        }
+    }
+
+    #[test]
+    fn ssl_commands_keep_canonical_and_legacy_inputs_separate() {
+        let canonical =
+            Cli::try_parse_from(["postgres", "profile", "set-ssl-mode", "local", "require"])
+                .unwrap();
+        assert!(matches!(
+            canonical.command,
+            Command::Profile(ProfileCommand {
+                command: ProfileSubcommand::SetSslMode(_)
+            })
+        ));
+
+        let legacy =
+            Cli::try_parse_from(["postgres", "profile", "set-ssl", "local", "true"]).unwrap();
+        assert!(matches!(
+            legacy.command,
+            Command::Profile(ProfileCommand {
+                command: ProfileSubcommand::SetSsl(_)
+            })
+        ));
+    }
 }
 
 #[derive(Debug, Args)]

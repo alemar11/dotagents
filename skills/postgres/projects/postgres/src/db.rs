@@ -1,4 +1,4 @@
-use crate::config::{RuntimeContext, normalize_sslmode_value, update_sslmode};
+use crate::config::{RuntimeContext, SslMode, update_ssl_mode};
 use anyhow::{Context, Result, anyhow};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
@@ -68,15 +68,16 @@ impl DbClient {
         match self.run_once(&self.ctx.url, sql).await {
             Ok(messages) => Ok(messages),
             Err(error)
-                if self.ctx.sslmode == "disable" && looks_like_ssl_failure(&error.to_string()) =>
+                if self.ctx.ssl_mode == SslMode::Disable
+                    && looks_like_ssl_failure(&error.to_string()) =>
             {
                 let retry_url = set_sslmode(&self.ctx.url, "require")?;
                 let messages = self.run_once(&retry_url, sql).await?;
                 if self.ctx.url_source == "config"
-                    && std::env::var("DB_AUTO_UPDATE_SSLMODE").ok().as_deref() == Some("1")
+                    && auto_update_ssl_mode_enabled()
                     && let Some(config_path) = &self.ctx.config_path
                 {
-                    let _ = update_sslmode(config_path, &self.ctx.profile_name, true);
+                    let _ = update_ssl_mode(config_path, &self.ctx.profile_name, SslMode::Require);
                 }
                 Ok(messages)
             }
@@ -85,7 +86,7 @@ impl DbClient {
     }
 
     async fn run_once(&self, url: &str, sql: &str) -> Result<Vec<SimpleQueryMessage>> {
-        if normalize_sslmode_value(&self.ctx.sslmode) == "require"
+        if self.ctx.ssl_mode == SslMode::Require
             || url.contains("sslmode=require")
             || url.contains("sslmode=verify")
         {
@@ -119,6 +120,12 @@ impl DbClient {
                 .with_context(|| "Failed to execute SQL query".to_string())
         }
     }
+}
+
+fn auto_update_ssl_mode_enabled() -> bool {
+    ["DB_AUTO_UPDATE_SSL_MODE", "DB_AUTO_UPDATE_SSLMODE"]
+        .iter()
+        .any(|key| std::env::var(key).ok().as_deref() == Some("1"))
 }
 
 async fn apply_session_settings(

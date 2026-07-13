@@ -10,6 +10,9 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
   `target/` directly.
 - `Cargo.toml` is the single source of truth for the CLI version.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
+- Config schema v3 persists `ssl_mode=disable|require` and
+  `access_mode=read|write|read-write`; PostgreSQL URL `sslmode` and `PGSSLMODE`
+  remain external compatibility syntax.
 - Platform-specific release binaries live under `../../scripts/bin/` and use
   `postgres-<os>-<arch>` names, such as `postgres-darwin-arm64` and
   `postgres-linux-x86_64`.
@@ -19,6 +22,8 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 - Build: `cargo build --release --manifest-path skills/postgres/projects/postgres/Cargo.toml`
 - Rebuild and install the runtime binary for the current platform:
   `skills/postgres/projects/postgres/scripts/install-runtime-binary`
+- Darwin runtime installs are ad-hoc re-signed after the copy by the install
+  helper so the shipped path remains executable under macOS runtime validation.
 - Rebuild and install a cross-targeted runtime binary when the Rust target and
   linker are available:
   `skills/postgres/projects/postgres/scripts/install-runtime-binary x86_64-unknown-linux-gnu`
@@ -41,7 +46,9 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
   `doctor`, `profile`, `query`, `activity`, `schema`, `migration`, and `docs`.
 - Prefer adding behavior in Rust over reintroducing per-task shell wrappers.
 - Keep config migration one-way from legacy `postgres.toml` to canonical
-  `config.toml`; do not reintroduce writes to the legacy path.
+  `config.toml`; do not reintroduce writes to the legacy path. Explicit schema
+  migrations must create a pre-migration backup and atomically write canonical
+  config; ordinary reads normalize only in memory.
 - Keep the runtime surface focused on SQL, inspection, diagnostics, and
   migration release; do not reintroduce dump, restore, export, or schema-diff
   flows into this CLI.

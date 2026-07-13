@@ -24,13 +24,16 @@ patterns, and manage migration release flow through the shipped
   check.
 - Runtime model, platform binary, and maintenance implementation details live in
   `references/postgres_usage.md`.
+- Load `references/options.md` before reading or reporting behavior-affecting
+  config choices.
 - Canonical persisted config lives at `<project-root>/.skills/postgres/config.toml`.
 - Ordinary runtime commands read and normalize config only in memory. Use
-  `profile migrate-toml`, `profile bootstrap --save`, `profile set-ssl`, or the
-  documented `DB_AUTO_UPDATE_SSLMODE=1` opt-in when a config write is intended.
-- Profile `access` modes are local CLI safety guards with values `read`,
-  `write`, and `read_write`; they do not replace PostgreSQL roles, grants, RLS,
-  or server-side read-only settings.
+  `profile migrate-config`, `profile bootstrap --save`,
+  `profile set-ssl-mode`, or the documented
+  `DB_AUTO_UPDATE_SSL_MODE=1` opt-in when a config write is intended.
+- Profile `access_mode` values `read`, `write`, and `read-write` are local CLI
+  safety guards; they do not replace PostgreSQL roles, grants, RLS, or
+  server-side read-only settings.
 - This runtime skill does not provide dump, restore, export, or schema-diff
   workflows. Keep those operator tasks outside this skill.
 - If a target repo has `.skills/postgres/config.toml` or legacy
@@ -78,7 +81,7 @@ Use `references/common-workflows.md` for copy/paste playbooks:
   - then run the identity query from `references/common-workflows.md` (“Which DB am I connected to?”).
 - If the user says “production”, “prod”, “staging”, or “remote DB”:
   - stop and ask for the exact `DB_PROFILE` / `DB_URL` they intend
-  - default to `access=read` and require an explicit confirmation before any write/DDL
+  - default to `access_mode=read` and require an explicit confirmation before any write/DDL
 - Always ask for approval before DDL changes.
 - Keep schema changes in a pending migration file; do not edit released files.
 - Before editing migrations, resolve the repo's exact `migrations_path` and
@@ -91,6 +94,7 @@ Use `references/common-workflows.md` for copy/paste playbooks:
 ## References
 
 - Usage + command surface + JSON mode: `references/postgres_usage.md`
+- Canonical option fields and compatibility aliases: `references/options.md`
 - Common workflows playbook: `references/common-workflows.md`
 - Env var contract: `references/postgres_env.md`
 - Config schema: `references/postgres_skill_schema.md`

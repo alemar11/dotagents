@@ -3,7 +3,8 @@ use clap::Parser;
 use postgres_skill_cli::cli::*;
 use postgres_skill_cli::config::{
     AccessMode, RuntimeOptions, application_name, bootstrap_profile, canonical_config_path,
-    load_and_migrate_config, runtime_context, update_sslmode,
+    migrate_config_file, parse_legacy_ssl_mode, parse_ssl_mode, redact_connection_url,
+    runtime_context, update_ssl_mode,
 };
 use postgres_skill_cli::db::{
     DbClient, QueryExecution, QueryTable, escape_literal, execution_to_json, expect_non_empty,
@@ -17,7 +18,7 @@ use serde_json::{Value, json};
 use std::env;
 use std::fs;
 use std::io::{self, IsTerminal, Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[tokio::main]
 async fn main() {
@@ -40,31 +41,49 @@ async fn main() {
 }
 
 async fn run(cli: &Cli) -> Result<()> {
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let skill_root = manifest_dir
-        .parent()
-        .and_then(|path| path.parent())
-        .ok_or_else(|| anyhow!("Failed to resolve postgres skill root from project layout."))?;
+    let skill_root = resolve_skill_root()?;
 
     match &cli.command {
-        Command::Doctor => doctor(&cli, skill_root).await,
-        Command::Profile(command) => profile(&cli, command, skill_root).await,
-        Command::Query(command) => query(&cli, command, skill_root).await,
-        Command::Activity(command) => activity(&cli, command, skill_root).await,
-        Command::Schema(command) => schema(&cli, command, skill_root).await,
-        Command::Migration(command) => migration(&cli, command, skill_root).await,
+        Command::Doctor => doctor(&cli, &skill_root).await,
+        Command::Profile(command) => profile(&cli, command, &skill_root).await,
+        Command::Query(command) => query(&cli, command, &skill_root).await,
+        Command::Activity(command) => activity(&cli, command, &skill_root).await,
+        Command::Schema(command) => schema(&cli, command, &skill_root).await,
+        Command::Migration(command) => migration(&cli, command, &skill_root).await,
         Command::Docs(command) => docs_command(&cli, command).await,
     }
+}
+
+fn resolve_skill_root() -> Result<PathBuf> {
+    let executable = env::current_exe().context("Failed to resolve postgres executable path")?;
+    resolve_skill_root_from(&executable)
+}
+
+fn resolve_skill_root_from(executable: &Path) -> Result<PathBuf> {
+    executable
+        .ancestors()
+        .skip(1)
+        .find(|path| path.join("SKILL.md").is_file() && path.join("scripts/postgres").is_file())
+        .map(Path::to_path_buf)
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to resolve postgres skill root from executable path {}.",
+                executable.display()
+            )
+        })
 }
 
 fn sanitize_error_message(message: &str) -> String {
     let postgres_url =
         regex::Regex::new(r"(?i)(postgres(?:ql)?://[^:/\s?#]+:)([^@/\s?#]+)@").unwrap();
     let key_value_password =
-        regex::Regex::new(r"(?i)\b(password|pgpassword)\s*=\s*([^ \n\r\t;]+)").unwrap();
+        regex::Regex::new(r"(?i)\b(password|pgpassword)\s*=\s*([^ \n\r\t;?&#]+)").unwrap();
+    let query_password =
+        regex::Regex::new(r"(?i)([?&](?:password|sslpassword)=)([^&#\s]+)").unwrap();
 
     let masked_url = postgres_url.replace_all(message, "$1***@");
-    let masked_password = key_value_password.replace_all(&masked_url, "$1=***");
+    let masked_query = query_password.replace_all(&masked_url, "$1***");
+    let masked_password = key_value_password.replace_all(&masked_query, "$1=***");
     masked_password.into_owned()
 }
 
@@ -80,7 +99,7 @@ impl AccessRequirement {
         match self {
             AccessRequirement::Read => "read",
             AccessRequirement::Write => "write",
-            AccessRequirement::ReadWrite => "read_write",
+            AccessRequirement::ReadWrite => "read-write",
         }
     }
 }
@@ -88,7 +107,7 @@ impl AccessRequirement {
 fn require_db_access(db: &DbClient, requirement: AccessRequirement, operation: &str) -> Result<()> {
     ensure_access(
         &db.context().profile_name,
-        db.context().access,
+        db.context().access_mode,
         requirement,
         operation,
     )
@@ -96,11 +115,11 @@ fn require_db_access(db: &DbClient, requirement: AccessRequirement, operation: &
 
 fn ensure_access(
     profile_name: &str,
-    access: AccessMode,
+    access_mode: AccessMode,
     requirement: AccessRequirement,
     operation: &str,
 ) -> Result<()> {
-    let allowed = match (access, requirement) {
+    let allowed = match (access_mode, requirement) {
         (AccessMode::ReadWrite, _) => true,
         (AccessMode::Read, AccessRequirement::Read) => true,
         (AccessMode::Write, AccessRequirement::Write) => true,
@@ -112,15 +131,15 @@ fn ensure_access(
 
     if requirement == AccessRequirement::ReadWrite {
         bail!(
-            "{operation} requires access = \"read_write\" because the SQL access intent is ambiguous or mixes reads and writes; profile '{profile_name}' has access = \"{}\". Use a read_write profile or rely on PostgreSQL roles/grants for authoritative enforcement.",
-            access.as_str()
+            "{operation} requires access_mode = \"read-write\" because the SQL access intent is ambiguous or mixes reads and writes; profile '{profile_name}' has access_mode = \"{}\". Use a read-write profile or rely on PostgreSQL roles/grants for authoritative enforcement.",
+            access_mode.as_str()
         );
     }
 
     bail!(
-        "{operation} requires {} access; profile '{profile_name}' has access = \"{}\". Use a profile with access = \"{}\" or \"read_write\", and keep PostgreSQL roles/grants as the authoritative enforcement boundary.",
+        "{operation} requires {} access; profile '{profile_name}' has access_mode = \"{}\". Use a profile with access_mode = \"{}\" or \"read-write\", and keep PostgreSQL roles/grants as the authoritative enforcement boundary.",
         requirement.as_str(),
-        access.as_str(),
+        access_mode.as_str(),
         requirement.as_str()
     )
 }
@@ -230,9 +249,11 @@ fn trim_leading_sql_trivia(mut statement: &str) -> &str {
 mod tests {
     use super::{
         AccessRequirement, classify_sql_access, ensure_access, parse_query_text_max_chars,
-        sanitize_error_message,
+        resolve_skill_root_from, sanitize_error_message,
     };
     use postgres_skill_cli::config::AccessMode;
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn masks_password_in_postgres_url() {
@@ -250,6 +271,28 @@ mod tests {
             sanitize_error_message(message),
             "password=*** PGPASSWORD=***"
         );
+    }
+
+    #[test]
+    fn masks_password_query_parameters_in_errors() {
+        let message = "postgresql://postgres@localhost/app?password=secret&sslpassword=tls-secret";
+        assert_eq!(
+            sanitize_error_message(message),
+            "postgresql://postgres@localhost/app?password=***&sslpassword=***"
+        );
+    }
+
+    #[test]
+    fn resolves_skill_root_from_the_shipped_executable_layout() {
+        let temp = tempdir().unwrap();
+        let skill_root = temp.path().join("postgres-skill");
+        let executable = skill_root.join("scripts/bin/postgres-linux-x86_64");
+        fs::create_dir_all(executable.parent().unwrap()).unwrap();
+        fs::write(skill_root.join("SKILL.md"), "# Postgres").unwrap();
+        fs::write(skill_root.join("scripts/postgres"), "#!/bin/sh").unwrap();
+        fs::write(&executable, "binary").unwrap();
+
+        assert_eq!(resolve_skill_root_from(&executable).unwrap(), skill_root);
     }
 
     #[test]
@@ -359,8 +402,8 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
             let resolved = bootstrap_profile(&config_path, args.save)?;
             let output = json!({
                 "profile": resolved.name,
-                "url": resolved.url,
-                "access": resolved.access,
+                "url": redact_connection_url(&resolved.url),
+                "access_mode": resolved.access_mode,
                 "saved": args.save,
                 "config_path": config_path,
                 "toml_path": config_path,
@@ -372,17 +415,41 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
                 Ok(())
             }
         }
-        ProfileSubcommand::MigrateToml => {
+        ProfileSubcommand::MigrateConfig => {
             let project_root = postgres_skill_cli::config::resolve_project_root(
                 cli.project_root.clone(),
                 skill_root,
             )?;
             let config_path = canonical_config_path(&project_root);
-            let config = load_and_migrate_config(&config_path)?;
+            let migration = migrate_config_file(&config_path)?;
             let output = json!({
                 "config_path": config_path,
                 "toml_path": config_path,
-                "schema_version": config.schema_version,
+                "source_path": migration.source_path,
+                "backup_path": migration.backup_path,
+                "schema_version": migration.config.schema_version,
+                "migration_outcome": migration.migration_outcome,
+            });
+            if cli.json {
+                print_json(&output)
+            } else {
+                println!("{}", serde_json::to_string_pretty(&output)?);
+                Ok(())
+            }
+        }
+        ProfileSubcommand::SetSslMode(args) => {
+            let project_root = postgres_skill_cli::config::resolve_project_root(
+                cli.project_root.clone(),
+                skill_root,
+            )?;
+            let config_path = canonical_config_path(&project_root);
+            let ssl_mode = parse_ssl_mode(&args.ssl_mode)?;
+            update_ssl_mode(&config_path, &args.profile, ssl_mode)?;
+            let output = json!({
+                "config_path": config_path,
+                "toml_path": config_path,
+                "profile": args.profile,
+                "ssl_mode": ssl_mode,
             });
             if cli.json {
                 print_json(&output)
@@ -397,13 +464,14 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
                 skill_root,
             )?;
             let config_path = canonical_config_path(&project_root);
-            let enabled = postgres_skill_cli::config::parse_sslmode_bool(&args.sslmode)?;
-            update_sslmode(&config_path, &args.profile, enabled)?;
+            let ssl_mode = parse_legacy_ssl_mode(&args.sslmode)?;
+            update_ssl_mode(&config_path, &args.profile, ssl_mode)?;
             let output = json!({
                 "config_path": config_path,
                 "toml_path": config_path,
                 "profile": args.profile,
-                "sslmode": if enabled { "require" } else { "disable" },
+                "ssl_mode": ssl_mode,
+                "compatibility_alias": "set-ssl",
             });
             if cli.json {
                 print_json(&output)
@@ -424,9 +492,9 @@ async fn profile(cli: &Cli, command: &ProfileCommand, skill_root: &Path) -> Resu
             if cli.json {
                 print_json(&ctx)
             } else {
-                println!("DB_URL={:?}", ctx.url);
-                println!("DB_SSLMODE={}", ctx.sslmode);
-                println!("DB_ACCESS={}", ctx.access.as_str());
+                println!("DB_URL={:?}", redact_connection_url(&ctx.url));
+                println!("DB_SSL_MODE={}", ctx.ssl_mode.as_str());
+                println!("DB_ACCESS_MODE={}", ctx.access_mode.as_str());
                 println!("DB_PROFILE={}", ctx.profile_name);
                 println!("DB_URL_SOURCE={}", ctx.url_source);
                 if let Some(path) = ctx.config_path {
@@ -795,7 +863,7 @@ async fn migration(cli: &Cli, command: &MigrationCommand, skill_root: &Path) -> 
             )?;
             ensure_access(
                 &ctx.profile_name,
-                ctx.access,
+                ctx.access_mode,
                 AccessRequirement::Write,
                 "migration release",
             )?;

@@ -1,14 +1,15 @@
 use anyhow::{Context, Result, anyhow, bail};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tempfile::NamedTempFile;
 use url::Url;
 
-pub const LATEST_SCHEMA_VERSION: &str = "2.1.0";
+pub const LATEST_SCHEMA_VERSION: &str = "3.0.0";
 const DEFAULT_PROFILE: &str = "local";
 const CONFIG_FILENAME: &str = "config.toml";
 const LEGACY_CONFIG_FILENAME: &str = "postgres.toml";
@@ -19,9 +20,10 @@ pub struct RuntimeContext {
     pub config_path: Option<PathBuf>,
     pub toml_path: Option<PathBuf>,
     pub profile_name: String,
+    #[serde(serialize_with = "serialize_redacted_url")]
     pub url: String,
-    pub sslmode: String,
-    pub access: AccessMode,
+    pub ssl_mode: SslMode,
+    pub access_mode: AccessMode,
     pub url_source: String,
     pub application_name: String,
 }
@@ -68,13 +70,15 @@ pub struct PostgresToolConfig {
     #[serde(default)]
     pub password: Option<String>,
     #[serde(default)]
-    pub sslmode: Option<BoolLike>,
+    #[serde(alias = "sslmode")]
+    pub ssl_mode: Option<SslMode>,
     #[serde(default)]
     pub url: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
-    pub access: Option<AccessMode>,
+    #[serde(alias = "access")]
+    pub access_mode: Option<AccessMode>,
     #[serde(default)]
     pub migrations_path: Option<String>,
     #[serde(default)]
@@ -88,7 +92,8 @@ pub struct ProfileConfig {
     #[serde(default)]
     pub description: Option<String>,
     #[serde(default)]
-    pub access: Option<AccessMode>,
+    #[serde(alias = "access")]
+    pub access_mode: Option<AccessMode>,
     #[serde(default)]
     pub migrations_path: Option<String>,
     #[serde(default)]
@@ -102,7 +107,8 @@ pub struct ProfileConfig {
     #[serde(default)]
     pub password: Option<String>,
     #[serde(default)]
-    pub sslmode: Option<BoolLike>,
+    #[serde(alias = "sslmode")]
+    pub ssl_mode: Option<SslMode>,
     #[serde(default)]
     pub url: Option<String>,
 }
@@ -148,12 +154,14 @@ struct LegacyDatabaseConfig {
     #[serde(default)]
     password: Option<String>,
     #[serde(default)]
-    sslmode: Option<BoolLike>,
+    #[serde(alias = "ssl_mode")]
+    sslmode: Option<SslMode>,
     #[serde(default)]
     url: Option<String>,
     #[serde(default)]
     description: Option<String>,
     #[serde(default)]
+    #[serde(alias = "access_mode")]
     access: Option<AccessMode>,
     #[serde(default)]
     migrations_path: Option<String>,
@@ -161,21 +169,14 @@ struct LegacyDatabaseConfig {
     profiles: BTreeMap<String, ProfileConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum BoolLike {
-    Bool(bool),
-    String(String),
-    #[default]
-    Empty,
-}
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum AccessMode {
+    #[serde(rename = "read")]
     Read,
+    #[serde(rename = "write")]
     Write,
     #[default]
+    #[serde(rename = "read-write", alias = "read_write")]
     ReadWrite,
 }
 
@@ -184,17 +185,47 @@ impl AccessMode {
         match self {
             AccessMode::Read => "read",
             AccessMode::Write => "write",
-            AccessMode::ReadWrite => "read_write",
+            AccessMode::ReadWrite => "read-write",
         }
     }
 }
 
-impl BoolLike {
-    pub fn as_bool(&self) -> Result<Option<bool>> {
+#[derive(Debug, Clone, Copy, Serialize, Default, PartialEq, Eq)]
+pub enum SslMode {
+    #[default]
+    #[serde(rename = "disable")]
+    Disable,
+    #[serde(rename = "require")]
+    Require,
+}
+
+impl SslMode {
+    pub fn as_str(&self) -> &'static str {
         match self {
-            BoolLike::Bool(value) => Ok(Some(*value)),
-            BoolLike::String(value) => parse_sslmode_bool(value).map(Some),
-            BoolLike::Empty => Ok(None),
+            SslMode::Disable => "disable",
+            SslMode::Require => "require",
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SslMode {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum LegacySslMode {
+            Bool(bool),
+            String(String),
+        }
+
+        match LegacySslMode::deserialize(deserializer)? {
+            LegacySslMode::Bool(false) => Ok(SslMode::Disable),
+            LegacySslMode::Bool(true) => Ok(SslMode::Require),
+            LegacySslMode::String(value) => {
+                parse_legacy_ssl_mode(&value).map_err(de::Error::custom)
+            }
         }
     }
 }
@@ -203,14 +234,60 @@ impl BoolLike {
 pub struct ResolvedProfile {
     pub name: String,
     pub description: Option<String>,
+    #[serde(serialize_with = "serialize_redacted_url")]
     pub url: String,
-    pub sslmode: bool,
-    pub access: AccessMode,
+    pub ssl_mode: SslMode,
+    pub access_mode: AccessMode,
     pub migrations_path: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct ConfigMigrationResult {
+    pub config: SkillConfig,
+    pub source_path: PathBuf,
+    pub backup_path: Option<PathBuf>,
+    pub migration_outcome: &'static str,
 }
 
 pub fn canonical_config_path(project_root: &Path) -> PathBuf {
     project_root.join(".skills/postgres").join(CONFIG_FILENAME)
+}
+
+fn serialize_redacted_url<S>(url: &str, serializer: S) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&redact_connection_url(url))
+}
+
+pub fn redact_connection_url(url: &str) -> String {
+    let Ok(mut parsed) = Url::parse(url) else {
+        return "<redacted-invalid-url>".to_string();
+    };
+    if parsed.password().is_some() {
+        let _ = parsed.set_password(Some("***"));
+    }
+    let query_pairs = parsed
+        .query_pairs()
+        .map(|(key, value)| (key.into_owned(), value.into_owned()))
+        .collect::<Vec<_>>();
+    if query_pairs.iter().any(|(key, _)| {
+        key.eq_ignore_ascii_case("password") || key.eq_ignore_ascii_case("sslpassword")
+    }) {
+        parsed.set_query(None);
+        let mut query = parsed.query_pairs_mut();
+        for (key, value) in query_pairs {
+            let value = if key.eq_ignore_ascii_case("password")
+                || key.eq_ignore_ascii_case("sslpassword")
+            {
+                "***"
+            } else {
+                &value
+            };
+            query.append_pair(&key, value);
+        }
+    }
+    parsed.to_string()
 }
 
 pub fn legacy_config_path(project_root: &Path) -> PathBuf {
@@ -234,7 +311,7 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
         .clone()
         .or_else(|| env_url().ok().flatten())
     {
-        let sslmode = sslmode_from_url(&url).unwrap_or_else(|| "disable".to_string());
+        let ssl_mode = ssl_mode_from_url(&url).unwrap_or_default();
         let profile_name = options
             .profile_override
             .clone()
@@ -249,8 +326,8 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
             toml_path: config_path,
             profile_name,
             url,
-            sslmode,
-            access: AccessMode::ReadWrite,
+            ssl_mode,
+            access_mode: AccessMode::ReadWrite,
             url_source: "env".to_string(),
             application_name: application_name(),
         });
@@ -281,13 +358,8 @@ pub fn runtime_context(options: &RuntimeOptions, skill_root: &Path) -> Result<Ru
         toml_path: Some(config_path),
         profile_name: resolved.name,
         url: resolved.url,
-        sslmode: if resolved.sslmode {
-            "require"
-        } else {
-            "disable"
-        }
-        .to_string(),
-        access: resolved.access,
+        ssl_mode: resolved.ssl_mode,
+        access_mode: resolved.access_mode,
         url_source: "config".to_string(),
         application_name: application_name(),
     })
@@ -302,16 +374,40 @@ pub fn load_config(path: &Path) -> Result<SkillConfig> {
 /// Load config and explicitly persist any legacy or schema normalization.
 /// Callers must already have mutation authority.
 pub fn load_and_migrate_config(path: &Path) -> Result<SkillConfig> {
+    Ok(migrate_config_file(path)?.config)
+}
+
+/// Explicitly migrate config with a pre-migration backup and atomic canonical write.
+pub fn migrate_config_file(path: &Path) -> Result<ConfigMigrationResult> {
     let (config, loaded) = load_config_from_disk(path)?;
-    if should_save_loaded_config(path, &loaded.read_path, &loaded.original, &config) {
+    let changed = loaded.needs_option_normalization
+        || should_save_loaded_config(path, &loaded.read_path, &loaded.original, &config);
+    let backup_path = if changed {
+        let backup_path = next_backup_path(&loaded.read_path);
+        fs::copy(&loaded.read_path, &backup_path).with_context(|| {
+            format!(
+                "Failed to back up postgres config from {} to {}",
+                loaded.read_path.display(),
+                backup_path.display()
+            )
+        })?;
         save_config(path, &config)?;
-    }
-    Ok(config)
+        Some(backup_path)
+    } else {
+        None
+    };
+    Ok(ConfigMigrationResult {
+        config,
+        source_path: loaded.read_path,
+        backup_path,
+        migration_outcome: if changed { "migrated" } else { "no-change" },
+    })
 }
 
 struct LoadedConfig {
     read_path: PathBuf,
     original: SkillConfig,
+    needs_option_normalization: bool,
 }
 
 fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
@@ -328,6 +424,7 @@ fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
 
     let raw = fs::read_to_string(&read_path)
         .with_context(|| format!("Failed to read postgres config at {}", read_path.display()))?;
+    let needs_option_normalization = has_legacy_option_encoding(&raw)?;
     let mut config = parse_config(&raw)?;
     let original = config.clone();
     migrate_config_in_place(&mut config)?;
@@ -336,17 +433,39 @@ fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
         LoadedConfig {
             read_path,
             original,
+            needs_option_normalization,
         },
     ))
 }
 
 pub fn save_config(path: &Path, config: &SkillConfig) -> Result<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow!("Postgres config path has no parent: {}", path.display()))?;
+    fs::create_dir_all(parent)?;
     let content = toml::to_string_pretty(config).context("Failed to serialize postgres config")?;
-    fs::write(path, content)
-        .with_context(|| format!("Failed to write postgres config at {}", path.display()))
+    let mut temp = NamedTempFile::new_in(parent)
+        .with_context(|| format!("Failed to create temp config in {}", parent.display()))?;
+    temp.write_all(content.as_bytes())?;
+    temp.as_file().sync_all()?;
+    temp.persist(path)
+        .map_err(|error| error.error)
+        .with_context(|| format!("Failed to atomically write config at {}", path.display()))?;
+    Ok(())
+}
+
+fn next_backup_path(path: &Path) -> PathBuf {
+    let base = PathBuf::from(format!("{}.bak", path.display()));
+    if !base.exists() {
+        return base;
+    }
+    for index in 1.. {
+        let candidate = PathBuf::from(format!("{}.bak.{index}", path.display()));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    unreachable!("backup index iteration is unbounded")
 }
 
 fn parse_config(raw: &str) -> Result<SkillConfig> {
@@ -370,6 +489,45 @@ fn parse_config(raw: &str) -> Result<SkillConfig> {
     }
 }
 
+fn has_legacy_option_encoding(raw: &str) -> Result<bool> {
+    let value: toml::Value = toml::from_str(raw).context("Failed to parse postgres config")?;
+    let Some(postgres) = value
+        .get("tools")
+        .and_then(|tools| tools.get("postgres"))
+        .and_then(toml::Value::as_table)
+    else {
+        return Ok(false);
+    };
+    if table_has_legacy_option_encoding(postgres) {
+        return Ok(true);
+    }
+    Ok(postgres
+        .get("profiles")
+        .and_then(toml::Value::as_table)
+        .is_some_and(|profiles| {
+            profiles.values().any(|profile| {
+                profile
+                    .as_table()
+                    .is_some_and(table_has_legacy_option_encoding)
+            })
+        }))
+}
+
+fn table_has_legacy_option_encoding(table: &toml::Table) -> bool {
+    if table.contains_key("sslmode") || table.contains_key("access") {
+        return true;
+    }
+    let legacy_ssl_value = table.get("ssl_mode").is_some_and(|value| match value {
+        toml::Value::String(value) => !matches!(value.as_str(), "disable" | "require"),
+        _ => true,
+    });
+    let legacy_access_value = table
+        .get("access_mode")
+        .and_then(toml::Value::as_str)
+        .is_some_and(|value| value == "read_write");
+    legacy_ssl_value || legacy_access_value
+}
+
 fn should_save_loaded_config(
     canonical_path: &Path,
     read_path: &Path,
@@ -383,6 +541,7 @@ pub fn migrate_config_in_place(config: &mut SkillConfig) -> Result<()> {
     let schema_version = config.schema_version.clone().unwrap_or_default();
     if !schema_version.is_empty()
         && schema_version != "2.0.0"
+        && schema_version != "2.1.0"
         && schema_version != LATEST_SCHEMA_VERSION
     {
         bail!("Unsupported schema_version: {schema_version}");
@@ -392,7 +551,7 @@ pub fn migrate_config_in_place(config: &mut SkillConfig) -> Result<()> {
         config.defaults.profile = None;
     }
 
-    normalize_canonical_sslmodes(config)?;
+    normalize_ssl_modes(config);
     normalize_access_modes(config);
     config.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
     Ok(())
@@ -412,16 +571,7 @@ fn migrate_legacy_config(mut legacy: LegacySkillConfig) -> Result<SkillConfig> {
         bail!("Unsupported schema_version: {schema_version}");
     }
 
-    if let Some(value) = legacy.database.sslmode.clone() {
-        legacy.database.sslmode = Some(BoolLike::Bool(value.as_bool()?.unwrap_or(false)));
-    } else {
-        legacy.database.sslmode = Some(BoolLike::Bool(false));
-    }
-    for profile in legacy.database.profiles.values_mut() {
-        if let Some(value) = profile.sslmode.clone() {
-            profile.sslmode = Some(BoolLike::Bool(value.as_bool()?.unwrap_or(false)));
-        }
-    }
+    legacy.database.sslmode.get_or_insert_default();
 
     let default_profile = if legacy.database.profiles.len() == 1 {
         legacy.database.profiles.keys().next().cloned()
@@ -443,10 +593,10 @@ fn migrate_legacy_config(mut legacy: LegacySkillConfig) -> Result<SkillConfig> {
                 database: legacy.database.database,
                 user: legacy.database.user,
                 password: legacy.database.password,
-                sslmode: legacy.database.sslmode,
+                ssl_mode: legacy.database.sslmode,
                 url: legacy.database.url,
                 description: legacy.database.description,
-                access: legacy.database.access,
+                access_mode: legacy.database.access,
                 migrations_path: legacy
                     .database
                     .migrations_path
@@ -463,28 +613,15 @@ fn normalize_access_modes(config: &mut SkillConfig) {
     let shared_access = config
         .tools
         .postgres
-        .access
+        .access_mode
         .unwrap_or(AccessMode::ReadWrite);
     for profile in config.tools.postgres.profiles.values_mut() {
-        profile.access = Some(profile.access.unwrap_or(shared_access));
+        profile.access_mode = Some(profile.access_mode.unwrap_or(shared_access));
     }
 }
 
-fn normalize_canonical_sslmodes(config: &mut SkillConfig) -> Result<()> {
-    if config.tools.postgres.sslmode.is_none() {
-        config.tools.postgres.sslmode = Some(BoolLike::Bool(false));
-    }
-    if let Some(sslmode) = config.tools.postgres.sslmode.clone() {
-        config.tools.postgres.sslmode = Some(BoolLike::Bool(sslmode.as_bool()?.unwrap_or(false)));
-    }
-
-    for profile in config.tools.postgres.profiles.values_mut() {
-        if let Some(value) = profile.sslmode.clone() {
-            profile.sslmode = Some(BoolLike::Bool(value.as_bool()?.unwrap_or(false)));
-        }
-    }
-
-    Ok(())
+fn normalize_ssl_modes(config: &mut SkillConfig) {
+    config.tools.postgres.ssl_mode.get_or_insert_default();
 }
 
 fn choose_profile(config: &SkillConfig, requested: Option<String>) -> Result<String> {
@@ -571,31 +708,12 @@ pub fn resolve_profile(config: &SkillConfig, name: &str) -> Result<ResolvedProfi
             .clone()
             .or_else(|| tool.password.clone())
             .ok_or_else(|| anyhow!("Profile '{name}' is missing password."))?;
-        let sslmode = profile
-            .sslmode
-            .clone()
-            .or_else(|| tool.sslmode.clone())
-            .unwrap_or(BoolLike::Bool(false))
-            .as_bool()?
-            .unwrap_or(false);
+        let ssl_mode = profile.ssl_mode.or(tool.ssl_mode).unwrap_or_default();
 
-        build_url(
-            &host,
-            port,
-            &database,
-            &user,
-            &password,
-            if sslmode { "require" } else { "disable" },
-        )?
+        build_url(&host, port, &database, &user, &password, ssl_mode.as_str())?
     };
 
-    let sslmode = profile
-        .sslmode
-        .clone()
-        .or_else(|| tool.sslmode.clone())
-        .unwrap_or(BoolLike::Bool(false))
-        .as_bool()?
-        .unwrap_or(false);
+    let ssl_mode = profile.ssl_mode.or(tool.ssl_mode).unwrap_or_default();
 
     Ok(ResolvedProfile {
         name: name.to_string(),
@@ -604,10 +722,10 @@ pub fn resolve_profile(config: &SkillConfig, name: &str) -> Result<ResolvedProfi
             .clone()
             .or_else(|| tool.description.clone()),
         url,
-        sslmode,
-        access: profile
-            .access
-            .or(tool.access)
+        ssl_mode,
+        access_mode: profile
+            .access_mode
+            .or(tool.access_mode)
             .unwrap_or(AccessMode::ReadWrite),
         migrations_path: profile
             .migrations_path
@@ -616,7 +734,7 @@ pub fn resolve_profile(config: &SkillConfig, name: &str) -> Result<ResolvedProfi
     })
 }
 
-pub fn update_sslmode(path: &Path, profile_name: &str, enabled: bool) -> Result<()> {
+pub fn update_ssl_mode(path: &Path, profile_name: &str, ssl_mode: SslMode) -> Result<()> {
     let mut config = load_and_migrate_config(path)?;
     let profile = config
         .tools
@@ -624,7 +742,7 @@ pub fn update_sslmode(path: &Path, profile_name: &str, enabled: bool) -> Result<
         .profiles
         .get_mut(profile_name)
         .ok_or_else(|| anyhow!("Profile '{profile_name}' not found in config.toml."))?;
-    profile.sslmode = Some(BoolLike::Bool(enabled));
+    profile.ssl_mode = Some(ssl_mode);
     save_config(path, &config)
 }
 
@@ -709,11 +827,11 @@ pub fn build_url(
     Ok(url.to_string())
 }
 
-pub fn sslmode_from_url(url: &str) -> Option<String> {
+pub fn ssl_mode_from_url(url: &str) -> Option<SslMode> {
     if let Ok(parsed) = Url::parse(url) {
         for (key, value) in parsed.query_pairs() {
             if key == "sslmode" {
-                return Some(normalize_sslmode_value(&value));
+                return parse_legacy_ssl_mode(&value).ok();
             }
         }
     }
@@ -724,21 +842,22 @@ pub fn application_name() -> String {
     env::var("DB_APPLICATION_NAME").unwrap_or_else(|_| "codex-postgres-skill".to_string())
 }
 
-pub fn parse_sslmode_bool(value: &str) -> Result<bool> {
+pub fn parse_ssl_mode(value: &str) -> Result<SslMode> {
     let lowered = value.trim().to_ascii_lowercase();
     match lowered.as_str() {
-        "true" | "t" | "1" | "yes" | "y" | "on" | "enable" | "enabled" | "require" | "required"
-        | "verify-ca" | "verify-full" => Ok(true),
-        "false" | "f" | "0" | "no" | "n" | "off" | "disable" | "disabled" => Ok(false),
-        _ => bail!("Unrecognized sslmode value: {value}"),
+        "disable" => Ok(SslMode::Disable),
+        "require" => Ok(SslMode::Require),
+        _ => bail!("Invalid ssl_mode value '{value}'. Expected disable or require."),
     }
 }
 
-pub fn normalize_sslmode_value(value: &str) -> String {
-    if parse_sslmode_bool(value).unwrap_or(false) {
-        "require".to_string()
-    } else {
-        "disable".to_string()
+pub fn parse_legacy_ssl_mode(value: &str) -> Result<SslMode> {
+    let lowered = value.trim().to_ascii_lowercase();
+    match lowered.as_str() {
+        "true" | "t" | "1" | "yes" | "y" | "on" | "enable" | "enabled" | "require" | "required"
+        | "verify-ca" | "verify-full" => Ok(SslMode::Require),
+        "false" | "f" | "0" | "no" | "n" | "off" | "disable" | "disabled" => Ok(SslMode::Disable),
+        _ => bail!("Unrecognized legacy sslmode value: {value}"),
     }
 }
 
@@ -781,11 +900,11 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
     let database = prompt("Database", None, false)?;
     let user = prompt("User", None, false)?;
     let password = prompt("Password", None, true)?;
-    let sslmode = prompt("sslmode (true/false)", Some("false"), false)?;
+    let ssl_mode = prompt("ssl_mode (disable/require)", Some("disable"), false)?;
     let description = prompt("Description", Some(""), false)?;
     let migrations_path = prompt("migrations_path", Some(""), false)?;
 
-    let ssl_enabled = parse_sslmode_bool(&sslmode)?;
+    let ssl_mode = parse_ssl_mode(&ssl_mode)?;
     let resolved = ResolvedProfile {
         name: profile_name.clone(),
         description: if description.is_empty() {
@@ -793,16 +912,9 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
         } else {
             Some(description.clone())
         },
-        url: build_url(
-            &host,
-            port,
-            &database,
-            &user,
-            &password,
-            if ssl_enabled { "require" } else { "disable" },
-        )?,
-        sslmode: ssl_enabled,
-        access: AccessMode::ReadWrite,
+        url: build_url(&host, port, &database, &user, &password, ssl_mode.as_str())?,
+        ssl_mode,
+        access_mode: AccessMode::ReadWrite,
         migrations_path: if migrations_path.is_empty() {
             None
         } else {
@@ -813,8 +925,8 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
     if save {
         config.schema_version = Some(LATEST_SCHEMA_VERSION.to_string());
         config.defaults.profile = Some(profile_name.clone());
-        if config.tools.postgres.sslmode.is_none() {
-            config.tools.postgres.sslmode = Some(BoolLike::Bool(false));
+        if config.tools.postgres.ssl_mode.is_none() {
+            config.tools.postgres.ssl_mode = Some(SslMode::Disable);
         }
         if config.tools.postgres.migrations_path.is_none() && !migrations_path.is_empty() {
             config.tools.postgres.migrations_path = Some(migrations_path.clone());
@@ -823,14 +935,14 @@ pub fn bootstrap_profile(path: &Path, save: bool) -> Result<ResolvedProfile> {
             profile_name.clone(),
             ProfileConfig {
                 description: resolved.description.clone(),
-                access: Some(resolved.access),
+                access_mode: Some(resolved.access_mode),
                 migrations_path: resolved.migrations_path.clone(),
                 host: Some(host),
                 port: Some(port),
                 database: Some(database),
                 user: Some(user),
                 password: Some(password),
-                sslmode: Some(BoolLike::Bool(ssl_enabled)),
+                ssl_mode: Some(ssl_mode),
                 url: None,
                 ..ProfileConfig::default()
             },
@@ -898,11 +1010,14 @@ path = "db/migrations"
             Some("db/migrations")
         );
         assert_eq!(
-            config.tools.postgres.profiles["local"].sslmode,
-            Some(BoolLike::Bool(false))
+            config.tools.postgres.profiles["local"].ssl_mode,
+            Some(SslMode::Disable)
         );
-        assert!(written.contains("schema_version = \"2.1.0\""));
-        assert!(written.contains("access = \"read_write\""));
+        assert!(written.contains("schema_version = \"3.0.0\""));
+        assert!(written.contains("access_mode = \"read-write\""));
+        assert!(written.contains("ssl_mode = \"disable\""));
+        assert!(!written.contains("sslmode ="));
+        assert!(!written.contains("access ="));
         assert!(written.contains("[defaults]"));
         assert!(written.contains("[tools.postgres]"));
         assert!(written.contains("[tools.postgres.profiles.local]"));
@@ -934,7 +1049,7 @@ password = "postgres"
             Some(LATEST_SCHEMA_VERSION)
         );
         assert_eq!(
-            config.tools.postgres.profiles["local"].access,
+            config.tools.postgres.profiles["local"].access_mode,
             Some(AccessMode::ReadWrite)
         );
         assert!(!canonical_path.exists());
@@ -961,7 +1076,7 @@ password = "postgres"
         let config = load_config(&canonical_path).unwrap();
 
         assert_eq!(
-            config.tools.postgres.profiles["local"].access,
+            config.tools.postgres.profiles["local"].access_mode,
             Some(AccessMode::Read)
         );
         assert_eq!(fs::read_to_string(&canonical_path).unwrap(), original);
@@ -992,13 +1107,13 @@ sslmode = "require"
             config.schema_version.as_deref(),
             Some(LATEST_SCHEMA_VERSION)
         );
-        assert_eq!(config.tools.postgres.sslmode, Some(BoolLike::Bool(true)));
+        assert_eq!(config.tools.postgres.ssl_mode, Some(SslMode::Require));
         assert_eq!(
-            config.tools.postgres.profiles["alpha"].sslmode,
-            Some(BoolLike::Bool(true))
+            config.tools.postgres.profiles["alpha"].ssl_mode,
+            Some(SslMode::Require)
         );
         assert_eq!(
-            config.tools.postgres.profiles["alpha"].access,
+            config.tools.postgres.profiles["alpha"].access_mode,
             Some(AccessMode::ReadWrite)
         );
     }
@@ -1048,7 +1163,7 @@ password = "postgres"
     }
 
     #[test]
-    fn update_sslmode_rewrites_canonical_config() {
+    fn update_ssl_mode_rewrites_canonical_config() {
         let temp = tempdir().unwrap();
         let canonical_path = canonical_config_path(temp.path());
         fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
@@ -1071,16 +1186,16 @@ sslmode = false
         )
         .unwrap();
 
-        update_sslmode(&canonical_path, "local", true).unwrap();
+        update_ssl_mode(&canonical_path, "local", SslMode::Require).unwrap();
         let config = load_and_migrate_config(&canonical_path).unwrap();
         assert_eq!(
-            config.tools.postgres.profiles["local"].sslmode,
-            Some(BoolLike::Bool(true))
+            config.tools.postgres.profiles["local"].ssl_mode,
+            Some(SslMode::Require)
         );
     }
 
     #[test]
-    fn migrates_20_config_to_21_and_adds_explicit_profile_access() {
+    fn migrates_v2_config_to_v3_clean_option_fields() {
         let temp = tempdir().unwrap();
         let canonical_path = canonical_config_path(temp.path());
         fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
@@ -1105,13 +1220,16 @@ password = "postgres"
         let config = load_and_migrate_config(&canonical_path).unwrap();
         let written = fs::read_to_string(&canonical_path).unwrap();
 
-        assert_eq!(config.schema_version.as_deref(), Some("2.1.0"));
+        assert_eq!(config.schema_version.as_deref(), Some("3.0.0"));
         assert_eq!(
-            config.tools.postgres.profiles["local"].access,
+            config.tools.postgres.profiles["local"].access_mode,
             Some(AccessMode::ReadWrite)
         );
-        assert!(written.contains("schema_version = \"2.1.0\""));
-        assert!(written.contains("access = \"read_write\""));
+        assert!(written.contains("schema_version = \"3.0.0\""));
+        assert!(written.contains("access_mode = \"read-write\""));
+        assert!(written.contains("ssl_mode = \"disable\""));
+        assert!(!written.contains("sslmode ="));
+        assert!(!written.contains("access ="));
     }
 
     #[test]
@@ -1144,11 +1262,11 @@ password = "postgres"
         let config = load_and_migrate_config(&canonical_path).unwrap();
 
         assert_eq!(
-            config.tools.postgres.profiles["local"].access,
+            config.tools.postgres.profiles["local"].access_mode,
             Some(AccessMode::Read)
         );
         assert_eq!(
-            config.tools.postgres.profiles["writer"].access,
+            config.tools.postgres.profiles["writer"].access_mode,
             Some(AccessMode::Write)
         );
     }
@@ -1160,10 +1278,10 @@ password = "postgres"
         fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
         fs::write(
             &canonical_path,
-            r#"schema_version = "2.1.0"
+            r#"schema_version = "3.0.0"
 
 [tools.postgres.profiles.local]
-access = "admin"
+access_mode = "admin"
 database = "app"
 user = "postgres"
 password = "postgres"
@@ -1212,5 +1330,160 @@ password = "postgres"
             &original,
             &normalized
         ));
+    }
+
+    #[test]
+    fn explicit_migration_creates_one_backup_and_is_idempotent() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        let original = r#"schema_version = "2.1.0"
+
+[tools.postgres]
+sslmode = false
+access = "read_write"
+
+[tools.postgres.profiles.local]
+database = "app"
+user = "postgres"
+password = "postgres"
+"#;
+        fs::write(&canonical_path, original).unwrap();
+
+        let first = migrate_config_file(&canonical_path).unwrap();
+        let backup_path = first.backup_path.expect("migration backup");
+        assert_eq!(first.migration_outcome, "migrated");
+        assert_eq!(fs::read_to_string(&backup_path).unwrap(), original);
+
+        let canonical = fs::read_to_string(&canonical_path).unwrap();
+        assert!(canonical.contains("schema_version = \"3.0.0\""));
+        assert!(canonical.contains("ssl_mode = \"disable\""));
+        assert!(canonical.contains("access_mode = \"read-write\""));
+
+        let second = migrate_config_file(&canonical_path).unwrap();
+        assert_eq!(second.migration_outcome, "no-change");
+        assert_eq!(second.backup_path, None);
+        assert!(!PathBuf::from(format!("{}.bak.1", canonical_path.display())).exists());
+        assert_eq!(fs::read_to_string(&canonical_path).unwrap(), canonical);
+    }
+
+    #[test]
+    fn explicit_migration_normalizes_legacy_keys_even_with_v3_version() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        fs::write(
+            &canonical_path,
+            r#"schema_version = "3.0.0"
+
+[tools.postgres]
+sslmode = false
+
+[tools.postgres.profiles.local]
+access = "read_write"
+database = "app"
+user = "postgres"
+password = "postgres"
+"#,
+        )
+        .unwrap();
+
+        let result = migrate_config_file(&canonical_path).unwrap();
+        assert_eq!(result.migration_outcome, "migrated");
+        assert!(result.backup_path.is_some());
+        let canonical = fs::read_to_string(&canonical_path).unwrap();
+        assert!(canonical.contains("ssl_mode = \"disable\""));
+        assert!(canonical.contains("access_mode = \"read-write\""));
+        assert!(!canonical.contains("sslmode ="));
+        assert!(!canonical.contains("access ="));
+    }
+
+    #[test]
+    fn explicit_migration_normalizes_legacy_values_under_v3_keys() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        fs::write(
+            &canonical_path,
+            r#"schema_version = "3.0.0"
+
+[tools.postgres]
+ssl_mode = true
+
+[tools.postgres.profiles.local]
+access_mode = "read_write"
+database = "app"
+user = "postgres"
+password = "postgres"
+"#,
+        )
+        .unwrap();
+
+        let result = migrate_config_file(&canonical_path).unwrap();
+        assert_eq!(result.migration_outcome, "migrated");
+        let canonical = fs::read_to_string(&canonical_path).unwrap();
+        assert!(canonical.contains("ssl_mode = \"require\""));
+        assert!(canonical.contains("access_mode = \"read-write\""));
+        assert!(!canonical.contains("ssl_mode = true"));
+        assert!(!canonical.contains("read_write"));
+    }
+
+    #[test]
+    fn future_schema_fails_without_backup_or_rewrite() {
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        let original = r#"schema_version = "99.0.0"
+
+[tools.postgres.profiles.local]
+database = "app"
+user = "postgres"
+password = "postgres"
+"#;
+        fs::write(&canonical_path, original).unwrap();
+
+        let error = migrate_config_file(&canonical_path).unwrap_err();
+        assert!(format!("{error:#}").contains("Unsupported schema_version: 99.0.0"));
+        assert_eq!(fs::read_to_string(&canonical_path).unwrap(), original);
+        assert!(!PathBuf::from(format!("{}.bak", canonical_path.display())).exists());
+    }
+
+    #[test]
+    fn canonical_ssl_mode_parser_rejects_legacy_boolean_phrases() {
+        assert_eq!(parse_ssl_mode("disable").unwrap(), SslMode::Disable);
+        assert_eq!(parse_ssl_mode("require").unwrap(), SslMode::Require);
+        assert!(parse_ssl_mode("true").is_err());
+        assert_eq!(parse_legacy_ssl_mode("true").unwrap(), SslMode::Require);
+    }
+
+    #[test]
+    fn runtime_json_redacts_connection_passwords() {
+        let context = RuntimeContext {
+            project_root: None,
+            config_path: None,
+            toml_path: None,
+            profile_name: "local".to_string(),
+            url: "postgresql://postgres:secret@localhost:5432/app?sslmode=disable".to_string(),
+            ssl_mode: SslMode::Disable,
+            access_mode: AccessMode::ReadWrite,
+            url_source: "config".to_string(),
+            application_name: "codex-postgres-skill".to_string(),
+        };
+
+        let serialized = serde_json::to_string(&context).unwrap();
+        assert!(!serialized.contains("secret"));
+        assert!(serialized.contains("***"));
+    }
+
+    #[test]
+    fn connection_url_redaction_masks_credential_query_parameters() {
+        let redacted = redact_connection_url(
+            "postgresql://postgres@localhost/app?password=secret&sslpassword=tls-secret&sslmode=require",
+        );
+
+        assert!(!redacted.contains("secret"));
+        assert!(redacted.contains("password=***"));
+        assert!(redacted.contains("sslpassword=***"));
+        assert!(redacted.contains("sslmode=require"));
     }
 }

@@ -71,8 +71,26 @@ else
 fi
 
 dest="$skill_dir/scripts/bin/postgres-$platform"
+case "$platform" in
+  darwin-*)
+    if ! command -v codesign >/dev/null 2>&1; then
+      echo "codesign is required to install a runnable Darwin binary" >&2
+      exit 2
+    fi
+    ;;
+esac
+
 mkdir -p "$(dirname "$dest")"
-cp "$built" "$dest"
-chmod +x "$dest"
+temp_dest="$dest.tmp.$$"
+trap 'rm -f "$temp_dest"' 0 1 2 15
+cp "$built" "$temp_dest"
+chmod +x "$temp_dest"
+case "$platform" in
+  darwin-*)
+    codesign --force --sign - "$temp_dest"
+    ;;
+esac
+mv "$temp_dest" "$dest"
+trap - 0 1 2 15
 
 echo "$dest"

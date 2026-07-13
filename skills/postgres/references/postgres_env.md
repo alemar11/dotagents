@@ -17,10 +17,10 @@ the skill package.
   - Session statement timeout.
 - `DB_LOCK_TIMEOUT_MS`
   - Session lock timeout.
-- `DB_AUTO_UPDATE_SSLMODE=1`
-  - Explicitly authorize persisting `sslmode=true` after a successful retry
-    against a saved profile in canonical `config.toml`. Without this opt-in,
-    connection and inspection paths never update config.
+- `DB_AUTO_UPDATE_SSL_MODE=1`
+  - Explicitly authorize persisting `ssl_mode=require` after a successful
+    retry against a saved profile in canonical `config.toml`. Without this
+    opt-in, connection and inspection paths never update config.
 
 ## Docs lookup
 
@@ -43,6 +43,9 @@ These are accepted when `DB_URL` is absent:
 - `PGUSER`
 - `PGPASSWORD`
 - `PGSSLMODE`
+- `DB_AUTO_UPDATE_SSLMODE=1`
+  - Legacy alias for `DB_AUTO_UPDATE_SSL_MODE=1`; current docs and output use
+    the canonical name.
 
 ## Unsupported
 
