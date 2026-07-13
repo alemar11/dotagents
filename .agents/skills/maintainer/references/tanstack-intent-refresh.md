@@ -47,7 +47,8 @@ the local `skills/tanstack/` skill.
    precise and avoid speculating about unshipped Intent surfaces.
 5. `scoped-check`: run a scoped consistency pass across touched TanStack skill
    files and any directly coupled repo docs.
-6. `final-report`: use the release checklist schema and return `PASS (NOOP)` if
+6. `final-report`: use the release checklist schema and return `result=pass`
+   with `change_state=no-change` if
    no persistent updates were needed.
 
 ## Read-only Evaluation Mode

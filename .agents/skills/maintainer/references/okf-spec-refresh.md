@@ -23,7 +23,8 @@ or review whether the local OKF skill is aligned with the official spec.
 4. `runtime-check`: run
    `python3 .agents/skills/maintainer/scripts/okf_spec_check.py`.
 5. `cli-tests`: run `python3 -m unittest discover -s skills/okf/tests`.
-6. `final-report`: use the release checklist schema and return `PASS (NOOP)`
+6. `final-report`: use the release checklist schema and return `result=pass`
+   with `change_state=no-change`
    if the spec was already current and no persistent edits were needed.
 
 ## Targeted Maintenance Mode

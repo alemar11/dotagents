@@ -26,7 +26,7 @@ Run this checklist before finalizing maintainer updates.
 - Run every selected validation lane and record its commands and results.
 - Run `$autoreview` for non-trivial implementations and resolve or explicitly
   disposition accepted findings.
-- Treat a missing required lane as `FAIL` unless the user explicitly accepts a
+- Treat a missing required lane as `result=fail` unless the user explicitly accepts a
   narrower result.
 
 ## 4. Review Evidence Efficiently
@@ -68,13 +68,15 @@ changing Git history.
 
 ## Final Report
 
+- `result`: `pass` or `fail`
+- `change_state`: `changed` or `no-change`
 - Scope: `<packages and workflow covered>`
 - Validation lanes: `<selected lanes>`
 - Commands run: `<key commands in order>`
 - Files changed: `<paths>` or `none`
-- Why changed: `<rationale per target>` or `NOOP`
+- Why changed: `<rationale per target>`; use `not applicable` when
+  `change_state=no-change`
 - Runtime evidence: `<sessions/logs/tests used>` or `not applicable`
 - Artifacts/install state: `<versions, fingerprints, cache/reinstall proof>` or `not applicable`
-- Result: `PASS`, `PASS (NOOP)`, or `FAIL`
 - Findings: `<blocking and warning items>`
 - Follow-ups: `<deferred work>`

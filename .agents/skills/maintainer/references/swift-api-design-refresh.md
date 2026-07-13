@@ -26,7 +26,8 @@ review the `swift-api-design` manifest and local fast-path layer.
    routing gaps.
 5. `integrity-check`: run
    `python3 .agents/skills/maintainer/scripts/swift_api_design_check.py`.
-6. `final-report`: use the release checklist schema and return `PASS (NOOP)` if
+6. `final-report`: use the release checklist schema and return `result=pass`
+   with `change_state=no-change` if
    the bundle was already current and no persistent reference edits were needed.
 
 ## Read-only Evaluation Mode

@@ -23,7 +23,7 @@ union of its lanes; one successful lane never substitutes for another.
 - Read the complete relevant diff before final review and publication.
 - Record commands, artifact paths or refs, fingerprints/versions, results, and
   skipped proof with its blocker.
-- A required lane that cannot run is `FAIL` unless the user explicitly accepts a
+- A required lane that cannot run is `result=fail` unless the user explicitly accepts a
   narrower delivery result.
 
 ## Scenario Safety

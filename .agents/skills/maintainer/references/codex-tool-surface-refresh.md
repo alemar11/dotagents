@@ -48,7 +48,8 @@ workers to a live task, or update unrelated skills.
    differs from the documented contract. Material differences include renamed
    tools, changed arguments, new required lifecycle calls, new visibility
    behavior, removed capabilities, or newly exposed safer primitives.
-5. If no material drift exists, return `PASS (NOOP)` and include the discovered
+5. If no material drift exists, return `result=pass` and
+   `change_state=no-change`, and include the discovered
    current callable names in the report.
 6. Finish with `release-checklist.md` for touched files.
 
@@ -76,5 +77,6 @@ Report:
 - Tool registry queries or commands used
 - Current subagent creation and lifecycle surface
 - Current Codex App thread creation and lifecycle surface
-- `codex-orchestrator` files changed, or `PASS (NOOP)`
+- `change_state=changed` with the changed `codex-orchestrator` files, or
+  `change_state=no-change`
 - Any runtime-dependent uncertainty that should be rechecked in Codex App or CLI

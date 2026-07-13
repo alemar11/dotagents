@@ -35,14 +35,16 @@ or other default maintenance requests.
 3. For each shortlisted target, apply a targeted upgrade using the rules from `skill-upgrade.md`.
 4. Run `metadata-sync.md` for the touched skills, plugins, and coupled repo docs.
 5. Run the relevant checks from `doc-consistency.md` across touched areas and repo-level reference drift.
-6. Finish with `release-checklist.md` and report `PASS`, `PASS (NOOP)`, or `FAIL`.
+6. Finish with `release-checklist.md` and report canonical `result` and
+   `change_state` values.
 
 ## Quality Gates
 - Every changed skill or plugin has a concrete rationale.
 - Multi-target runs stay easy to explain target by target.
 - Touched Codex-dependent skills name their required Codex tools/contracts clearly, and touched portable skills keep Codex-only helpers optional.
 - `run` ends with no unresolved metadata drift or broken references in the touched scope.
-- Return `PASS (NOOP)` when no low-ambiguity improvements are found.
+- Return `result=pass` and `change_state=no-change` when no low-ambiguity
+  improvements are found.
 
 ## Reporting Contract
 - Scope covered

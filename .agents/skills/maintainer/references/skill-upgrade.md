@@ -44,7 +44,9 @@ or more existing skills or plugins.
    - referenced scripts/docs exist
    - no contradictory instructions were introduced
    - `references/` markdown naming still follows repo policy
-6. Select the applicable lanes from `references/validation-matrix.md`, finish with `references/release-checklist.md`, and report `PASS`, `PASS (NOOP)`, or `FAIL`.
+6. Select the applicable lanes from `references/validation-matrix.md`, finish
+   with `references/release-checklist.md`, and report canonical `result` and
+   `change_state` values.
 
 ## Parallel Subagent Pattern
 - Use internal subagents when the active runtime policy permits and the split materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
@@ -62,7 +64,8 @@ or more existing skills or plugins.
 - Touched descriptions stay concise and preserve trigger family without duplicating detailed workflow or guardrail text.
 - `AGENTS.md` changes happen only when the upgrade introduces durable repository guidance.
 - If a touched skill is Codex-dependent, its required Codex tools/runtime contracts are named plainly; if it is portable, Codex-only helpers remain optional.
-- Return `PASS (NOOP)` when no meaningful improvement is needed after inspection.
+- Return `result=pass` and `change_state=no-change` when no meaningful
+  improvement is needed after inspection.
 
 ## Reporting Contract
 - Scope covered

@@ -46,7 +46,8 @@ skill against the upstream `tanstack-skills/tanstack-skills` plugin tree.
    coverage or official product docs create a meaningful delta.
 6. `scoped-check`: run structure, metadata, and no-runtime-maintainer-reference
    checks across touched files.
-7. `final-report`: use the release checklist schema and return `PASS (NOOP)`
+7. `final-report`: use the release checklist schema and return `result=pass`
+   with `change_state=no-change`
    when no persistent updates were needed.
 
 ## Upstream Fetch Order

@@ -15,7 +15,9 @@ the `swift-docc` manifest and local fast-path layer.
 3. `refresh-if-needed`: if the manifest or bundled asset tree is stale, run `python3 .agents/skills/maintainer/scripts/swift_docc_refresh.py`.
 4. `review-fast-paths`: inspect `skills/swift-docc/references/*.md`, especially the workflow pages, async/stateful API routing, local preview guidance, and `source-map.md`, for missing high-frequency layers or stale local links.
 5. `integrity-check`: run `python3 .agents/skills/maintainer/scripts/swift_docc_check.py`.
-6. `final-report`: use the release checklist schema and return `PASS (NOOP)` if the bundle was already current and no persistent reference edits were needed.
+6. `final-report`: use the release checklist schema and return `result=pass`
+   with `change_state=no-change` if the bundle was already current and no
+   persistent reference edits were needed.
 
 ## Read-only Evaluation Mode
 When a read-only verification is requested:

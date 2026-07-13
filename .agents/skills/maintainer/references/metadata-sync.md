@@ -54,5 +54,6 @@ when a brand-new skill scaffold is needed.
 - No stale skill names remain in README/install prompts.
 - Description changes preserve original intent while improving consistency.
 - Descriptions are compact enough for prompt-budget inventory and do not carry detailed workflow contracts that belong in the skill body.
-- `PASS`: no metadata/doc drift remains.
-- `FAIL`: unresolved drift in any of `SKILL.md`, `agents/openai.yaml`, or README mapping.
+- `result=pass`: no metadata/doc drift remains.
+- `result=fail`: unresolved drift in any of `SKILL.md`, `agents/openai.yaml`,
+  or README mapping.

@@ -40,7 +40,8 @@ Use this playbook when the user asks to audit which skills are Codex-dependent v
 - `AGENTS.md` accurately lists the current Codex-dependent skills when that inventory changes.
 - Every Codex-dependent skill clearly names the Codex tool/runtime contract it requires.
 - No portable skill accidentally hard-requires a Codex-only helper.
-- `PASS (NOOP)` is valid when the inventory and wording are already correct.
+- `result=pass` with `change_state=no-change` is valid when the inventory and
+  wording are already correct.
 
 ## Reporting Contract
 - Scope covered

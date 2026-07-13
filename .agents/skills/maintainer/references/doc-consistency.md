@@ -23,14 +23,14 @@ Use this playbook for repository-wide structure and policy checks.
 - Portable skills do not accidentally hard-require Codex-only helpers when a generic fallback is intended.
 
 ## Severity Rules
-- `FAIL` (blocking):
+- `result=fail` (blocking):
   - Missing required skill files (`SKILL.md`, required `agents/openai.yaml` where expected).
   - Broken script/reference links in active playbooks.
   - Policy contradictions that can cause unsafe or incorrect task execution.
 - `WARN` (non-blocking):
   - Cleanup opportunities (wording drift, overly broad commands, minor doc mismatches).
   - Recommendations that improve maintainability but do not break current behavior.
-- `PASS`:
+- `result=pass`:
   - No blocking issues and no unresolved warnings requiring immediate action.
 
 ## Suggested Commands
@@ -47,9 +47,10 @@ Use this playbook for repository-wide structure and policy checks.
   - one subagent for naming/layout and required-file checks
   - one subagent for script/reference integrity
   - one subagent for policy alignment and guardrail review
-- Keep final severity assignment, duplicate-findings cleanup, and the user-facing PASS/FAIL/WARN report in the main agent.
+- Keep final severity assignment, duplicate-findings cleanup, canonical
+  `result`, and warning prose in the main agent.
 
 ## Reporting Format
-- `PASS`: check succeeded
-- `FAIL`: blocking inconsistency with file path
+- `result=pass`: check succeeded
+- `result=fail`: blocking inconsistency with file path
 - `WARN`: non-blocking cleanup recommendation

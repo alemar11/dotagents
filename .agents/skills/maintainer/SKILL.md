@@ -81,7 +81,10 @@ Use this skill when users ask to:
 12) For TanStack skills coverage refresh on `skills/tanstack/`, follow `references/tanstack-skills-alignment.md`.
 13) For Codex worker/thread tool surface refresh, follow `references/codex-tool-surface-refresh.md`.
 14) For OKF official spec refresh on `skills/okf/`, follow `references/okf-spec-refresh.md`.
-15) Before finishing, select the applicable lanes from `references/validation-matrix.md`, then run `references/release-checklist.md` and report pass/fail with actionable findings.
+15) Before finishing, load `references/options.md`, select the applicable lanes
+    from `references/validation-matrix.md`, then run
+    `references/release-checklist.md` and report canonical `result` and
+    `change_state` values with actionable findings.
 
 ## References
 
@@ -91,6 +94,7 @@ Use this skill when users ask to:
 - `references/skill-upgrade.md`: use for scoped improvements to one or more existing skills or plugins.
 - `references/workflow-family-hardening.md`: use runtime evidence to harden ownership and handoffs across a connected workflow family.
 - `references/package-lifecycle.md`: use for existing-package merges, renames, moves, bundling, replacements, and retirement.
+- `references/options.md`: canonical maintainer closeout result options.
 - `references/validation-matrix.md`: select validation by the changed package and behavior surface.
 - `references/metadata-sync.md`: use for `SKILL.md`, `agents/openai.yaml`, and repo-doc alignment.
 - `references/skill_openai_metadata.md`: field-shape reference for maintaining `agents/openai.yaml` UI metadata.
@@ -126,4 +130,5 @@ Use this skill when users ask to:
 - Use `$skill-creator` or `$plugin-creator` first for substantial public package reshapes; return here for repo integration, lifecycle cleanup, validation, and release checks.
 - Keep changes scoped to the selected or discovered skills.
 - Keep internal delegation within the active runtime policy and the user's scope; do not treat it as authority for external writes or broader maintenance.
-- If no meaningful updates are needed, return `PASS (NOOP)` and avoid persistent file edits.
+- If no meaningful updates are needed, return `result=pass` and
+  `change_state=no-change`, and avoid persistent file edits.
