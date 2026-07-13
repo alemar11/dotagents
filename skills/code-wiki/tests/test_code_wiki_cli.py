@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import io
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 
@@ -15,6 +17,7 @@ sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 from code_wiki.wiki_contract import REQUIRED_PAGES  # noqa: E402
 from code_wiki.validation.diagrams import validate_polished_diagram_images  # noqa: E402
+from code_wiki.validation.report import print_report  # noqa: E402
 from code_wiki.validation.ui import validate_ui_patterns  # noqa: E402
 
 
@@ -41,6 +44,21 @@ class CodeWikiCliTests(unittest.TestCase):
         (repo / "pkg" / "main.py").write_text("def main():\n    return 'ok'\n", encoding="utf-8")
         (repo / "tests" / "test_main.py").write_text("def test_main():\n    assert True\n", encoding="utf-8")
         return repo
+
+    def test_validation_report_emits_canonical_status_for_every_outcome(self) -> None:
+        cases = (
+            ([], [], "pass", "PASS"),
+            ([], ["warning"], "pass-with-warnings", "PASS WITH WARNINGS"),
+            (["error"], [], "fail", "FAIL"),
+        )
+        for errors, warnings, status, display in cases:
+            with self.subTest(status=status), io.StringIO() as output, redirect_stdout(output):
+                print_report(errors, warnings)
+                self.assertTrue(
+                    output.getvalue().startswith(
+                        f"validation_status={status}\nValidation: {display}\n"
+                    )
+                )
 
     def evidence_blocks(self) -> str:
         anchors = "\n".join(
@@ -89,7 +107,7 @@ class CodeWikiCliTests(unittest.TestCase):
     def test_help_and_version_use_public_launcher(self) -> None:
         version = self.run_code_wiki("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertIn("code-wiki 0.5.2", version.stdout)
+        self.assertIn("code-wiki 0.6.0", version.stdout)
 
         help_result = self.run_code_wiki("--help")
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
@@ -267,7 +285,12 @@ class CodeWikiCliTests(unittest.TestCase):
 
             result = self.run_code_wiki("validate", "--wiki", str(wiki))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertTrue(result.stdout.startswith("PASS_WITH_WARNINGS"), result.stdout)
+            self.assertTrue(
+                result.stdout.startswith(
+                    "validation_status=pass-with-warnings\nValidation: PASS WITH WARNINGS"
+                ),
+                result.stdout,
+            )
 
     def test_strict_validation_requires_claim_matrix_and_ready_claims(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
