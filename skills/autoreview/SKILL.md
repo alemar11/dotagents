@@ -64,6 +64,18 @@ Do not use this skill for:
   without creating configuration directories, then `codex exec` provides the
   authoritative success or structured failure.
 
+## Structured Result Contract
+
+The validated JSON result uses canonical option values:
+
+- `review_outcome=pass|fail`
+- `priority=0|1|2|3`, rendered to people as `P0` through `P3`
+- `finding_category=bug|security|regression|test-gap|maintainability`
+
+`review_explanation`, `review_confidence`, finding prose, and code locations
+remain separate data. Human output may explain the result as "patch is correct"
+or "patch is incorrect", but callers must branch on `review_outcome`.
+
 ## Closeout Entry Modes
 
 - Before final or before commit on a dirty worktree: `scripts/autoreview --mode local`

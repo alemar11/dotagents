@@ -28,7 +28,71 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 0.4.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 1.0.0")
+
+    def test_schema_uses_canonical_option_values(self) -> None:
+        self.assertEqual(
+            cli.SCHEMA["properties"]["review_outcome"]["enum"],
+            ["fail", "pass"],
+        )
+        finding = cli.SCHEMA["properties"]["findings"]["items"]
+        self.assertEqual(finding["properties"]["priority"]["enum"], [0, 1, 2, 3])
+        self.assertIn("test-gap", finding["properties"]["finding_category"]["enum"])
+        self.assertNotIn("category", finding["properties"])
+
+    def test_canonical_report_validates_and_renders_human_labels(self) -> None:
+        report = {
+            "findings": [
+                {
+                    "title": "Handle the edge case",
+                    "body": "The changed path fails for an empty value.",
+                    "priority": 2,
+                    "confidence": 0.9,
+                    "finding_category": "test-gap",
+                    "code_location": {"file_path": "src/app.py", "line": 7},
+                }
+            ],
+            "review_outcome": "fail",
+            "review_explanation": "One actionable finding remains.",
+            "review_confidence": 0.95,
+        }
+
+        cli.validate_report(report, {"src/app.py"})
+        rendered = cli.human_report(report)
+
+        self.assertIn("[P2] Handle the edge case", rendered)
+        self.assertIn("overall: patch is incorrect (0.95)", rendered)
+
+    def test_legacy_prose_schema_is_rejected(self) -> None:
+        report = {
+            "findings": [],
+            "overall_correctness": "patch is correct",
+            "overall_explanation": "No findings.",
+            "overall_confidence": 1.0,
+        }
+
+        with self.assertRaises(cli.AutoreviewError):
+            cli.validate_report(report, set())
+
+    def test_findings_require_fail_outcome(self) -> None:
+        report = {
+            "findings": [
+                {
+                    "title": "Handle the edge case",
+                    "body": "The changed path fails for an empty value.",
+                    "priority": 2,
+                    "confidence": 0.9,
+                    "finding_category": "bug",
+                    "code_location": {"file_path": "src/app.py", "line": 7},
+                }
+            ],
+            "review_outcome": "pass",
+            "review_explanation": "Contradictory outcome.",
+            "review_confidence": 0.95,
+        }
+
+        with self.assertRaisesRegex(cli.AutoreviewError, "must set review_outcome to fail"):
+            cli.validate_report(report, {"src/app.py"})
 
     def test_environment_status_reports_codex_home_and_temp(self) -> None:
         status = cli.environment_status()
