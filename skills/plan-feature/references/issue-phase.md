@@ -54,14 +54,15 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   Do not create a separate planning issue, local plan file, PRD plan section, or
   inline scheduling artifact. If the user asks for a summary, label it as a
   non-authoritative view derived from the generated issues.
-- When `domain_knowledge_delta.status` is `required`, make its capture and
+- When `domain_knowledge_delta.knowledge_delta` is `required`, make its capture and
   verification part of the final integration task. Prefer an existing terminal
   task that already owns feature-level integration proof. Otherwise append one
   final integration and domain-knowledge closeout task that depends on every
   terminal implementation issue. This final task must be system-verifiable and
   must not be a docs-only horizontal ticket. It must require its implementor to
-  invoke `$project-memory` with the `domain-memory` slice, which runs its
-  internal domain-modeling workflow for the durable content update.
+  invoke `$project-memory` with `memory_slice=domain-memory` and
+  `domain_operation=implementation-closeout`, which runs its internal
+  domain-modeling workflow for the durable content update.
 - Treat `tracker_backend` as planning-artifact write authority. When the
   `effective_target=configured-tracker`, publish GitHub issues for
   `github` backends and write Markdown files for `local` backends. Return draft
@@ -69,8 +70,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   `effective_target=draft-publish-commands`.
 - Use structured values for multi-choice issue body fields. This phase owns the
   `parallelization`, `closeout_mode`, and `integration_mode` values documented
-  below; `delivery_mode` and `pr_closeout` come from the PRD, and `issue_type` /
-  `triage_state` come from project memory mappings.
+  below; `delivery_mode` and `pr_closeout` come from the PRD, while
+  `issue_type` and `workflow_state` use the canonical Triage contract before
+  any GitHub boundary mapping.
 - Do not add worker authorization defaults, worker capability modes, or worker
   surface choices to PRDs, generated issues, issue files, hosted issue bodies,
   or draft publish commands. `$codex-orchestrator` resolves those per
@@ -129,6 +131,7 @@ context_file: <selected CONTEXT.md or not-applicable>
 project_slug: <accepted orchestrator project slug or not-applicable>
 option_resolution: <keyed run rows; append issue:<NN> rows before output>
 option_rows_fingerprint: <incoming run-row sha256, then complete run-plus-issue sha256 on output>
+capture_outcome: <deferred|no-durable-change>
 domain_knowledge_delta: <structured deferred delta or PRD handoff>
 ```
 
@@ -137,6 +140,16 @@ issue adds exactly one row per Per-Issue Registry field plus its effective
 `branch_name` data row. After the issue graph and every `issue:<NN>` row are final, recompute the
 fingerprint over the complete run-plus-issue row set and carry that value into
 publication and completion output.
+
+Validate `capture_outcome=deferred` when
+`domain_knowledge_delta.knowledge_delta=required` and
+`capture_outcome=no-durable-change` when `knowledge_delta=none`. Preserve a
+non-empty `unresolved` list independently as planning blockers. For
+`mode=issues-from-existing-prd`, reconstruct the pair from the PRD's canonical
+Domain Knowledge Handoff when the explicit phase handoff is unavailable; a
+legacy PRD with a handoff resolves to `required` plus `deferred`, while no
+handoff resolves to `none` plus `no-durable-change`. Never invent
+`capture_outcome=captured` in Plan Feature.
 
 ## Structured Issue Values
 
@@ -158,14 +171,14 @@ Use these values in generated issue bodies:
 - `integration_mode`: `single-repo-pr`, `repo-pr`, `direct-commit`, or
   `not-applicable`.
 - `domain_closeout`: `not-applicable` or `implementation-closeout`; decisions,
-  targets, evidence, and operation remain separate data fields.
+  targets, evidence, and `domain_operation` remain separate data fields.
 
 The feature-level delivery tuple is copied from the PRD by default. An
 authorized issue-level override atomically resolves `delivery_mode`,
 `issue_mutation_authority`, `pr_shape`, `pr_closeout`, `closeout_mode`, and
 `integration_mode` before
-output. `issue_type` and `triage_state` are mapped through
-`project-memory/agents/triage-labels.md`.
+output. `issue_type` and `workflow_state` remain canonical in issue bodies;
+`project-memory/agents/triage-labels.md` maps them only at the GitHub boundary.
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 as legacy aliases when reading existing artifacts. When updating an artifact
 that contains legacy aliases, rewrite touched structured values to
@@ -287,7 +300,7 @@ list:
 - Treat the issue bodies as the durable ordering contract for scheduling and
   worker-routing. Do not persist a separate scheduling artifact.
 
-When `domain_knowledge_delta.status` is `required`, choose its final owner from
+When `domain_knowledge_delta.knowledge_delta` is `required`, choose its final owner from
 that pre-closeout terminal snapshot after the initial graph is formed:
 
 1. If exactly one terminal issue already runs the end-to-end integration or
@@ -297,9 +310,11 @@ that pre-closeout terminal snapshot after the initial graph is formed:
 2. Otherwise append the last generated issue as a final integration and
    domain-knowledge closeout task. It depends directly on every terminal issue,
    reruns the feature-level integration proof, invokes `$project-memory` with
-   the `domain-memory` slice, updates the named context/docs/ADR targets through
-   Project Memory's internal domain-modeling workflow and the feature delivery
-   path, and verifies the resulting docs against the implemented behavior.
+   `memory_slice=domain-memory` and
+   `domain_operation=implementation-closeout`, updates the named
+   context/docs/ADR targets through Project Memory's internal domain-modeling
+   workflow and the feature delivery path, and verifies the resulting docs
+   against the implemented behavior.
 3. Add the exact decisions, target surfaces, and evidence under
    `## Domain Knowledge Closeout`; merge corresponding work into Requirements,
    Acceptance Criteria, Validation, Completion, and Orchestrator Handoff.
@@ -307,8 +322,8 @@ that pre-closeout terminal snapshot after the initial graph is formed:
    required; otherwise use explicit `depends-on` IDs.
 
 The final owner is part of the implementation graph and must be passed through
-`$plan-harder`. Never append a documentation-only task. When the delta status is
-`none`, do not create a synthetic closeout issue. After choosing or appending
+`$plan-harder`. Never append a documentation-only task. When
+`knowledge_delta=none`, do not create a synthetic closeout issue. After choosing or appending
 the owner, revalidate generated IDs, direct dependency edges, acyclicity,
 startability waves, and final-task ordering before hardening begins. Treat an
 existing integration owner that does not depend on every other terminal issue
@@ -493,15 +508,17 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   artifacts or `.scratch/` mirrors unless `local_mirror=requested`; write any
   requested mirrors under `local_mirror_path`.
 - `tracker_backend=local`: with `effective_target=configured-tracker`, write to the configured repo-local issue
-  path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with `Type:`
-  and `Status:` lines near the top and a heading that follows the local issue
-  title convention `<feature-slug>: <NN> <vertical outcome>`. Use the
+  path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with
+  `issue_type:`, `workflow_state:`, and `source_prd_ref:` lines near the top and
+  a heading that follows the local issue title convention
+  `<feature-slug>: <NN> <vertical outcome>`. Use the
   authoritative feature slug from the handoff or PRD path; derive it from the
   PRD title only when no accepted slug/path exists.
 - Local workspace issues: write to
   `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` with
-  `Type:` and `Status:` lines near the top and a heading that follows the local
-  issue title convention `<feature-slug>: <NN> <vertical outcome>`. Create the
+  `issue_type:`, `workflow_state:`, and `source_prd_ref:` lines near the top and
+  a heading that follows the local issue title convention
+  `<feature-slug>: <NN> <vertical outcome>`. Create the
   project/feature directories only when writing the actual feature artifacts,
   not during setup. The issue phase owns the issue files and reads
   `PROJECT.md`, `repos/*.md`, and `integration-gates.md`; it never creates or
@@ -591,7 +608,8 @@ metadata without duplicating the full PRD branch and PR details:
 - `domain_closeout`: required. Use `not-applicable` unless the issue owns
   `## Domain Knowledge Closeout`; for that final owner, copy
   `implementation-closeout` and put the exact decisions, target surfaces,
-  evidence, and `$project-memory domain-memory` operation in
+  evidence, `memory_slice=domain-memory`, and
+  `domain_operation=implementation-closeout` in
   `domain_closeout_data`.
 - `closeout_mode`: required. Resolve the concrete completion path from the
   effective issue `delivery_mode` and tracker backend, using
@@ -729,8 +747,8 @@ Summarize:
 - issue types and labels/statuses assigned,
 - completion instruction included,
 - any blocked issues and why,
-- `domain_knowledge_delta` status and the exact final issue ref that owns
-  capture, or confirmation that no durable change was introduced,
+- `knowledge_delta`, `capture_outcome`, and the exact final issue ref that owns
+  capture, or `capture_outcome=no-durable-change`,
 - the `partial_output` result and whether any non-agent-ready partial issues
   were withheld or published as `needs-info` / `ready-for-human`,
 - confirmation that `$plan-harder` was run once per issue, that each issue

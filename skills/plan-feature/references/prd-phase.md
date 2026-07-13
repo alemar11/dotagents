@@ -59,19 +59,23 @@ branch_name: <feature branch or exact authorized direct-commit target branch>
 pr_closeout: <merge-ready|draft-only|not-applicable>
 pr_shape: <single-pr|per-repo-pr|none>
 capture_mode: defer-to-caller
+capture_outcome: <deferred|no-durable-change>
 option_resolution: <keyed run rows from references/options.md>
 option_rows_fingerprint: <sha256:lowercase-hex for run rows>
 domain_knowledge_delta:
-  status: <required|none>
+  knowledge_delta: <required|none>
   decisions: <accepted durable terms, rules, boundaries, or decisions>
   target_surfaces: <repo-relative or repo-qualified context/docs/ADR destinations>
   evidence: <portable repo, hosted, or owner-decision references>
   unresolved: <empty for agent-ready planning, otherwise blockers>
 ```
 
-The handoff is mandatory even when no grilling occurred. Use `status: none`
-with empty `decisions`, `target_surfaces`, `evidence`, and `unresolved` lists
-when planning introduced no durable project knowledge.
+The handoff is mandatory even when no grilling occurred. Use
+`knowledge_delta: none` with `capture_outcome: no-durable-change` and empty
+`decisions`, `target_surfaces`, and `evidence` lists when planning introduced
+no durable project knowledge. Preserve `unresolved` independently and route
+non-empty blockers through clarification and readiness gates. Use
+`capture_outcome: deferred` when `knowledge_delta: required`.
 Recompute `option_rows_fingerprint` with `references/options.md` before any
 drafting or write. Stop on a mismatch.
 
@@ -231,7 +235,7 @@ Keep the PRD implementation-facing:
 - risks and open questions,
 - notes for later issue splitting.
 
-When `domain_knowledge_delta.status` is `required`, include a
+When `domain_knowledge_delta.knowledge_delta` is `required`, include a
 `## Domain Knowledge Handoff` section using `references/prd-template.md`. Keep
 the decisions and target surfaces portable and specific enough for the final
 implementation task to update the repository after the behavior lands. This
@@ -392,7 +396,7 @@ Return:
 - support docs created or updated and the accepted source used for each, when
   applicable,
 - any open questions,
-- `domain_knowledge_delta` status and whether the PRD contains a
+- `knowledge_delta`, `capture_outcome`, and whether the PRD contains a
   `## Domain Knowledge Handoff`,
 - whether it is ready for the issue phase to create generated implementation
   issues.

@@ -15,7 +15,7 @@ review:
 - `tracker_backend`
 - `delivery_mode`
 - `issue_type` mapping
-- `triage_state` mapping
+- `workflow_state` mapping
 - domain memory layout
 - context seed decision
 - translation memory decision

@@ -1,8 +1,9 @@
 # Triage Labels
 
 The skills speak in terms of canonical issue types and canonical triage states.
-This file maps those canonical values to the actual GitHub issue types, labels,
-or local markdown values used in this repo's issue tracker.
+This file maps those canonical values to actual GitHub issue types and labels.
+Local Markdown persists the canonical `issue_type` and `workflow_state` values
+directly.
 
 ## Issue Types
 
@@ -14,8 +15,7 @@ GitHub examples into local markdown modes.
 
 - GitHub backend: use native issue types when available, normally `Bug`,
   `Feature`, and `Task`.
-- Local backend: use canonical `bug`, `feature`, and `task` unless the repo
-  already has a committed tracker-specific convention.
+- Local backend: emit canonical `bug`, `feature`, and `task`.
 
 | Canonical type | Tracker value | Meaning |
 | --- | --- | --- |
@@ -24,14 +24,14 @@ GitHub examples into local markdown modes.
 | `task` | `Task` | Maintenance, docs, refactor, follow-up, cleanup, or implementation work item |
 
 The table above uses the default GitHub type names. Rewrite the right-hand
-`Tracker value` cells only when the actual tracker uses different values. For
-local tracking, prefer canonical values such as `bug`, `feature`, and `task`.
+`Tracker value` cells only when the actual GitHub tracker uses different
+values.
 
 In GitHub issue-tracker mode, use `$gitstack:github-issues` to apply native GitHub
 Issue Type values when available.
 
-In local markdown mode, record the mapped value as a `Type:` line near the top
-of the issue file.
+In local markdown mode, record the canonical value as an `issue_type:` line
+near the top of the issue file.
 
 ## Triage States
 
@@ -46,12 +46,9 @@ information arrives or work becomes ready.
 | `ready-for-human` | `ready-for-human` | Requires human implementation or judgment |
 | `wontfix` | `wontfix` | Will not be actioned |
 
-When a skill mentions a canonical state, use the corresponding tracker label or
-status from this table. In GitHub mode, these are usually labels. In local
-markdown mode, record the mapped value as a `Status:` line near the top of the
-issue file. For local markdown and local orchestrator tracking, prefer
-canonical values such as `needs-triage` and `ready-for-agent` unless the repo
-already has a committed lowercase status convention.
+When a skill mentions a canonical state, use the corresponding GitHub label
+from this table at the hosted boundary. In local markdown mode, record the
+canonical value as a `workflow_state:` line near the top of the issue file.
 
 `needs-info` is a waiting state, not an agent queue state. When the reporter or
 requester answers, the issue should be re-evaluated as `needs-triage` before it

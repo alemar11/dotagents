@@ -2,4 +2,4 @@ interface:
   display_name: "Project Memory"
   short_description: "Maintain tracker routing, domain language, ADRs, context, and localization memory."
   brand_color: "#3B5BDB"
-  default_prompt: "Use $project-memory for the smallest requested tracker, domain-memory, localization, or AGENTS-pointer slice. For domain-memory, choose setup-bootstrap, inline-update, implementation-closeout, or periodic-review; load only the operation-specific references and update authorized durable surfaces from accepted evidence."
+  default_prompt: "Use $project-memory with the smallest requested memory_slice. For memory_slice=domain-memory, resolve domain_operation as setup-bootstrap, inline-update, implementation-closeout, or periodic-review; load only operation-specific references and update authorized durable surfaces from accepted evidence."

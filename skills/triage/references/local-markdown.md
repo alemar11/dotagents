@@ -7,18 +7,18 @@ folders or orchestrator workspace
 
 ## Header Fields
 
-Each issue file should have `Type:` and `Status:` lines near the top:
+Each issue file should have canonical metadata lines near the top:
 
 ```markdown
 # [Issue Title]
 
-Type: bug | feature | task
-Status: needs-triage | needs-info | ready-for-agent | ready-for-human | wontfix
-Source PRD: [path, issue number, title, or `None`]
+issue_type: bug | feature | task
+workflow_state: needs-triage | needs-info | ready-for-agent | ready-for-human | wontfix
+source_prd_ref: [path, issue number, stable ref, or none]
 ```
 
-Use mapped values from `project-memory/agents/triage-labels.md` if the repo has
-custom strings. Keep `Type:` for work kind and `Status:` for workflow state.
+Use the canonical values from `references/options.md`. GitHub display mappings
+do not change local persisted values.
 `needs-info` means waiting for reporter/requester input; when that input
 arrives, re-triage the issue before marking it `ready-for-agent`.
 `ready-for-agent` means queue-ready; listed dependencies still gate when work
@@ -33,10 +33,14 @@ For orchestrator workspace issues, preserve additional fields such as
 ## Update Rules
 
 - Preserve existing body content unless the user asks for a rewrite.
-- Update an existing `Type:` line in place; otherwise insert it under the
+- Update an existing `issue_type:` line in place; otherwise insert it under the
   title.
-- Update an existing `Status:` line in place; otherwise insert it near
-  `Type:`.
+- Update an existing `workflow_state:` line in place; otherwise insert it near
+  `issue_type:`.
+- Preserve or add `source_prd_ref:` as reference data.
+- Apply the header-region scope, canonical precedence, conflict stop, and
+  authorized normalization rules from `references/options.md`. Do not read or
+  rewrite similarly named fields inside issue-body sections.
 - Append new information under the most specific existing heading.
 - If a heading does not exist, append it at the end of the file.
 - Keep comments and triage notes summarized; do not paste raw session logs.
@@ -54,16 +58,16 @@ For orchestrator workspace issues, preserve additional fields such as
 
 ## Questions
 
-- [Concrete question for requester or reporter. Required when `Status:
-  needs-info`.]
+- [Concrete question for requester or reporter. Required when
+  `workflow_state: needs-info`.]
 
 ## Agent Brief
 
-[Only present when status is ready-for-agent.]
+[Only present when `workflow_state: ready-for-agent`.]
 
 ## Human Handoff
 
-[Only present when status is ready-for-human.]
+[Only present when `workflow_state: ready-for-human`.]
 
 ## Decision
 

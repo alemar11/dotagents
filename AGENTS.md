@@ -174,7 +174,10 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 ### Triage skill
 - Keep `triage` focused on existing incoming GitHub or local markdown issues; new feature planning should still go through `plan-feature`.
 - In GitHub mode, use GitHub Issue Type for work kind (`Bug`, `Feature`, `Task` by default) and labels for workflow state.
-- In local markdown mode, use `Type:` for work kind and `Status:` for workflow state.
+- In local markdown mode, persist `issue_type`, `workflow_state`, and
+  `source_prd_ref`; accept `Type:`, `Status:`, `State:`, and `Source PRD:` only
+  as legacy read aliases and normalize them only during an authorized issue
+  mutation.
 - Treat `needs-info` as a human/reporter waiting state, not an implementation queue state: reporter activity returns the issue to `needs-triage` for re-evaluation before it can become `ready-for-agent`.
 - In local markdown mode, completed issues move to the configured `issues/done/` path instead of adding a new completed status; create the `done/` directory on demand when completing the first issue.
 - Before marking an existing issue `ready-for-agent`, `triage` must harden that single issue through `$plan-harder` and preserve the resulting agent brief in the tracker.

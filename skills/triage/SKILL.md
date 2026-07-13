@@ -16,10 +16,11 @@ come from a tracker queue. For planning a new feature from scratch, use
 
 ## Core Model
 
-Triage has two separate dimensions:
+Load `references/options.md` before classification. Triage resolves two
+separate canonical fields:
 
-- **Type/category**: what kind of work this is.
-- **State**: where the issue is in the workflow.
+- `issue_type`: what kind of work this is.
+- `workflow_state`: where the issue is in the workflow.
 
 Canonical issue types:
 
@@ -42,7 +43,8 @@ requester answers, move or treat the issue as `needs-triage` again and
 re-evaluate it before it can become `ready-for-agent`.
 
 Use `project-memory/agents/triage-labels.md` to map these canonical names to
-the actual tracker issue types, labels, or markdown status values.
+GitHub issue types and labels. Local Markdown persists the canonical fields
+and values directly.
 
 ## Hard Requirements
 
@@ -52,23 +54,24 @@ the actual tracker issue types, labels, or markdown status values.
 - Do not require broad project-memory setup merely to inspect or classify one
   named issue. If routing or mappings are missing, use the one-issue
   best-effort fallback below. For queue-wide work or mutations whose target or
-  metadata cannot be resolved safely, run only `$project-memory`'s
-  `tracker-routing` slice.
+  metadata cannot be resolved safely, run only `$project-memory` with
+  `memory_slice=tracker-routing`.
 - Every triaged issue must have exactly one type/category and one workflow
   state.
 - In GitHub mode, use native GitHub Issue Type for `bug`, `feature`, or `task`
   whenever the repo's tracker configuration says issue types are available.
-- In local markdown mode, record type and state as frontmatter-like lines near
-  the top of the issue file.
+- In local markdown mode, record `issue_type`, `workflow_state`, and
+  `source_prd_ref` as frontmatter-like lines near the top of the issue file.
 - Before marking an issue `ready-for-agent`, load and run `$plan-harder` with
   `planning_mode=issue-hardening` and `output_surface=caller`, then embed or
   post the resulting agent brief.
 - If the issue is underspecified, load and run `$grill-me-with-context` to
   resolve the smallest blocking question set before writing an agent-ready
-  brief. Use `capture_mode: inline` only when the current request explicitly
-  authorizes durable domain-memory writes; otherwise use `defer-to-caller` and
-  return the proposed delta without editing domain docs. Tracker mutation
-  authority alone does not authorize domain-memory writes.
+  brief. Use `capture_mode=inline` only when the current request explicitly
+  authorizes durable domain-memory writes; otherwise use
+  `capture_mode=defer-to-caller` and return the proposed delta without editing
+  domain docs. Tracker mutation authority alone does not authorize
+  domain-memory writes.
 - Do not run `$plan-harder` or post an agent brief for `needs-info`; preserve
   established facts and ask concrete questions instead.
 - Do not implement the issue.
@@ -112,7 +115,7 @@ Read when present and relevant:
 If the configured tracker backend is not `github` or `local`, or required
 routing is absent, use the one-issue fallback for one named issue. For a queue
 or requested mutation that cannot be routed safely, run `$project-memory` for
-the `tracker-routing` slice instead of inventing tracker semantics.
+  `memory_slice=tracker-routing` instead of inventing tracker semantics.
 
 ### 2. Select issue or queue
 
@@ -184,10 +187,11 @@ leave a `needs-info` note with the smallest useful question set.
 
 If the issue is almost agent-ready but still under-specified, use
 `$grill-me-with-context` to clarify the missing product/domain decisions. Use
-`capture_mode: inline` and `$project-memory domain-memory` with `operation:
-inline-update` only when durable domain-memory writes are explicitly authorized.
+`capture_mode=inline` and `$project-memory domain-memory` with
+`memory_slice=domain-memory` and `domain_operation=inline-update` only when
+durable domain-memory writes are explicitly authorized.
 For inspect-only, review-only, proposal, dry-run, or tracker-only mutation
-requests, use `capture_mode: defer-to-caller`; keep the structured delta in the
+requests, use `capture_mode=defer-to-caller`; keep the structured delta in the
 triage result and do not edit `CONTEXT.md`, domain docs, or ADRs.
 
 If blocker resolution still depends on the reporter or requester, stop at
@@ -220,8 +224,12 @@ For GitHub:
 For local markdown:
 
 - Preserve the original issue content.
-- Insert or update the `Type:` line.
-- Insert or update the `Status:` line.
+- Insert or update the `issue_type:` line.
+- Insert or update the `workflow_state:` line.
+- Preserve or add `source_prd_ref:` as reference data.
+- Read legacy `Type:`, `Status:`, `State:`, and `Source PRD:` aliases, but
+  apply the header scope and precedence in `references/options.md`; normalize
+  them to current fields only during an authorized issue mutation.
 - Append triage notes, questions, decisions, or the agent brief under the
   headings in `references/local-markdown.md`.
 - Preserve orchestrator workspace fields such as affected repos, integration
@@ -233,8 +241,8 @@ For local markdown:
 Return:
 
 - issue identity and tracker backend,
-- selected type/category,
-- selected state,
+- selected `issue_type`,
+- selected `workflow_state`,
 - labels/statuses or GitHub issue type applied,
 - whether `$grill-me-with-context` or `$plan-harder` was used,
 - any missing setup or companion that triggered the one-issue fallback,
@@ -243,5 +251,7 @@ Return:
 
 ## References
 
+- `references/options.md`: canonical classification fields and local legacy
+  normalization.
 - `references/agent-brief.md`: template for `ready-for-agent` handoff notes.
 - `references/local-markdown.md`: local markdown issue format and update rules.

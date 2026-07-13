@@ -1,6 +1,6 @@
 # Domain Memory Modeling
 
-Use this internal reference whenever the `domain-memory` slice creates,
+Use this internal reference whenever `memory_slice=domain-memory` creates,
 updates, reviews, or reconciles `CONTEXT.md`, relevant domain docs, or ADRs.
 `$project-memory domain-memory` is the public invocation; this reference owns
 the internal semantic workflow.
@@ -14,16 +14,17 @@ before there is evidence from the user, repository, or existing docs.
 
 ## Operation Boundary
 
-Honor the operation and write authority resolved by `$project-memory`:
+Honor `domain_operation`, `execution_context`, and `write_mode` resolved by
+`$project-memory` through `references/options.md`:
 
-- `fresh-setup`: create the smallest evidence-backed initial context surface.
-- `existing-project-bootstrap`: reconcile accepted knowledge from current repo
+- `execution_context=fresh-setup`: create the smallest evidence-backed initial context surface.
+- `execution_context=existing-project-bootstrap`: reconcile accepted knowledge from current repo
   evidence and, when explicitly loaded, strong recent same-repo history.
-- `inline-update`: capture durable decisions accepted during a direct composed
+- `domain_operation=inline-update`: capture durable decisions accepted during a direct composed
   workflow such as `$grill-me-with-context`.
-- `implementation-closeout`: reconcile a carried knowledge delta against the
+- `domain_operation=implementation-closeout`: reconcile a carried knowledge delta against the
   behavior and validation that actually landed.
-- `periodic-review`: report or propose changes by default; write only when the
+- `domain_operation=periodic-review`: report or propose changes by default; write only when the
   evidence and acceptance satisfy Project Memory's authority boundary.
 
 Stay within the selected context, authorized target surfaces, and evidence
@@ -123,7 +124,9 @@ Return to `$project-memory`:
 - candidates or capture deferred and why,
 - unresolved domain questions,
 - ADR-worthy decisions,
-- documentation-diff verification for `implementation-closeout`.
+- `capture_outcome` plus separate destination or deferral data,
+- documentation-diff verification for
+  `domain_operation=implementation-closeout`.
 
 ## Guardrails
 

@@ -17,12 +17,16 @@ memory:
 - `CONTEXT.md`, domain docs, and ADRs under `project-memory/adr/`;
 - optional `TRANSLATION.md` when localization rules are real.
 
-Use the smallest requested slice. Tracker routing does not require domain or
-localization work, and domain updates do not require tracker setup.
+Use the smallest requested `memory_slice`. Tracker routing does not require
+domain or localization work, and domain updates do not require tracker setup.
+
+Load `references/options.md` before resolving any branch. Normalize natural
+language and legacy fields once, then use only canonical field/value
+assignments in current handoffs and reports.
 
 ## Operations And Shape
 
-| Slice | Owns |
+| `memory_slice` | Owns |
 | --- | --- |
 | `tracker-routing` | Tracker backend, delivery mode, issue-type mapping, and triage-state mapping. |
 | `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
@@ -30,18 +34,22 @@ localization work, and domain updates do not require tracker setup.
 | `agents-pointers` | Missing or stale project-memory pointers only. |
 | `full-setup` | All applicable slices, only when explicitly requested. |
 
-For `domain-memory`, use an explicit operation from
+For `memory_slice=domain-memory`, resolve `domain_operation` from
 `references/domain-modeling.md`: `setup-bootstrap`, `inline-update`,
 `implementation-closeout`, or `periodic-review`.
 
-Execution context is orthogonal to the slice and operation:
+`execution_context` is orthogonal to `memory_slice` and `domain_operation`:
 
-- `fresh-setup`: selected files are missing;
-- `existing-project-bootstrap`: reconcile accepted repo or recent same-repo
+- `execution_context=fresh-setup`: selected files are missing;
+- `execution_context=existing-project-bootstrap`: reconcile accepted repo or recent same-repo
   session evidence;
-- `orchestrator-workspace`: configure only root coordination memory and never
+- `execution_context=orchestrator-workspace`: configure only root coordination memory and never
   create project/feature artifacts during setup;
-- current-run no-mutation override: review/propose without persistent writes.
+- `execution_context=current-project`: operate on established project memory
+  without bootstrap semantics.
+
+Resolve `write_mode=propose` for a current-run no-mutation override; otherwise
+use `write_mode=apply` only when the selected scope has write authority.
 
 ## Non-Negotiable Boundaries
 
@@ -58,9 +66,10 @@ Execution context is orthogonal to the slice and operation:
 - Create `TRANSLATION.md` only when localization support or durable translation
   rules are evidenced or confirmed. Do not create empty ADR directories.
 - Explicit setup/configure/initialize/update/refresh instructions authorize
-  only the requested slice. A ready implementation-closeout task authorizes
+  only the requested `memory_slice`. A ready implementation-closeout task authorizes
   only its named decisions, evidence, and target surfaces.
-- An explicitly invoked composed workflow may authorize `inline-update` only
+- An explicitly invoked composed workflow may authorize
+  `domain_operation=inline-update` only
   when its caller has durable domain-memory write authority. Tracker mutation
   authority alone is insufficient.
 - Inspect-only, review-only, proposal, dry-run, or indirect suggestions are not
@@ -99,7 +108,7 @@ Load only the selected branch:
 | Work | Required references |
 | --- | --- |
 | Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
-| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only for existing-project bootstrap. |
+| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only for `execution_context=existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md`. |
 | Pointer/settings work | `setup-workflow.md`. |
@@ -111,10 +120,11 @@ work. This operation-specific loading rule is part of the token contract.
 
 ### 1. Resolve Slice, Operation, And Write Authority
 
-Select the smallest slice and execution context above. For
-`implementation-closeout`, carry only the named decisions, evidence, targets,
-and integrated feature proof. For temporary/rehearsal/validation work, use a
-current-run no-mutation override rather than persisting it as configuration.
+Select the smallest `memory_slice` and `execution_context` above. For
+`domain_operation=implementation-closeout`, carry only the named decisions,
+evidence, targets, and integrated feature proof. For
+temporary/rehearsal/validation work, resolve `write_mode=propose` rather than
+persisting the no-mutation intent as configuration.
 
 ### 2. Inspect Focused Evidence
 
@@ -136,10 +146,11 @@ decisions to ADRs.
 
 ### 3. Resolve Settings Or Delta
 
-For setup/review, summarize only the selected slice and use `Unknown` for
-ambiguous values. Resolve only its behavior-affecting settings. For
-implementation closeout or inline update, summarize the carried decisions,
-evidence, named targets, and write authority instead of unrelated setup.
+For setup/review, summarize only the selected `memory_slice` and use `Unknown`
+for ambiguous values. Resolve only its behavior-affecting settings. For
+`domain_operation=implementation-closeout` or
+`domain_operation=inline-update`, summarize the carried decisions, evidence,
+named targets, and write authority instead of unrelated setup.
 
 ### 4. Draft And Show The Change
 
@@ -163,14 +174,19 @@ not create orchestration runtime config files. Before completing a touched
 
 ### 6. Report
 
-Report the operation, slice, files changed, reviewed settings/surfaces, evidence,
-and consuming workflows. For implementation closeout, also report the source
+Report `memory_slice`, `domain_operation`, `execution_context`, `write_mode`,
+files changed, reviewed settings/surfaces, evidence, and consuming workflows.
+For `memory_slice=domain-memory`, also report `capture_outcome`; other slices
+omit that domain-only field. Keep destinations, accepted/rejected decisions,
+and deferral explanations as separate data. For
+`domain_operation=implementation-closeout`, also report the source
 task/decision, durable decisions accepted or rejected, named targets updated,
-feature proof, and documentation-diff verification. Mention unavailable or weak
-session evidence plainly.
+feature proof, and documentation-diff verification. Mention unavailable or
+weak session evidence plainly.
 
 ## Reference Responsibilities
 
+- `options.md`: canonical option fields, values, and legacy normalization.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
 - `issue-tracker-*.md`, `tracker-publishing.md`, `triage-labels.md`: tracker,
   artifact, type/state, source-ref, and completion contracts.

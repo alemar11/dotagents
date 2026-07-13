@@ -37,14 +37,16 @@ durable issue-tracker configuration.
 - Completed implementation issues move to
   `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
 - Create `issues/done/` only when moving the first completed issue into it.
-- Issue type is recorded as a `Type:` line near the top of each issue file,
-  using the type strings from `project-memory/agents/triage-labels.md`
-- Triage state is recorded as a `Status:` line near the top of each issue file,
-  using the state strings from `project-memory/agents/triage-labels.md`
+- Issue type is recorded as an `issue_type:` line near the top of each issue
+  file, using canonical `bug`, `feature`, or `task`.
+- Triage state is recorded as a `workflow_state:` line near the top of each
+  issue file, using the canonical values from the Triage option contract.
+- The PRD pointer is recorded as `source_prd_ref:` reference data.
 - Comments and conversation history append under a `## Comments` heading
 - `$plan-feature` owns PRD and generated issue body shape, including
   `source_prd_ref`, delivery metadata, partial-PRD links, and issue graph
-  validation. `Source PRD` is a read-only legacy migration alias.
+  validation. `Type:`, `Status:`, `State:`, and `Source PRD:` are read-only
+  legacy aliases until an authorized issue mutation normalizes them.
 - In multi-context repos or monorepos, feature slugs must include the accepted
   product or workspace slug when needed to avoid collisions, for example
   `customer-portal-weekly-digest` instead of `weekly-digest`.
@@ -83,9 +85,10 @@ durable issue-tracker configuration.
 - If an existing setup file contains the legacy worker-authorization setup key,
   treat it as stale state and remove it when touching the file.
 
-Implementation issues created from a PRD usually use `Type: task`. PRD files
-do not need `Type:` or `Status:` lines unless the repo chooses to treat PRDs as
-local feature issues. Do not add `Status: Draft` to ordinary PRD files;
+Implementation issues created from a PRD usually use `issue_type: task`. PRD
+files do not need `issue_type:` or `workflow_state:` lines unless the repo
+chooses to treat PRDs as local feature issues. Do not add `Status: Draft` to
+ordinary PRD files;
 workflow status belongs on implementation issues or in the tracker convention.
 
 ## Completion
@@ -101,8 +104,8 @@ delivery mode is `direct-commit`; `direct-commit-closes-issue` is not a local
 markdown lifecycle signal.
 
 Do not delete completed issue files. Do not add a `done` status; the
-`issues/done/` folder is the completion signal, while `Status:` remains the
-triage/workflow state used for active issues. If `issues/done/` does not
+`issues/done/` folder is the completion signal, while `workflow_state:` remains
+the lifecycle state used for active issues. If `issues/done/` does not
 exist yet, create it when completing the first issue.
 
 ## When a skill says "publish to the issue tracker"

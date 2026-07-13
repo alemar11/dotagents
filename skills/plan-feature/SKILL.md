@@ -81,17 +81,20 @@ domain-closeout gates required by the selected mode.
   `pr_closeout` to `merge-ready`; use `draft-only` only when the canonical
   option-resolution row selects it. Do not select it by comparing source prose
   or from the separate `no_mutation_override` value.
-- Initialize every run with a structured `domain_knowledge_delta`: `status`
-  (`none` or `required`) plus `decisions`, `target_surfaces`, `evidence`, and
-  `unresolved` lists. Empty all lists when status is `none`.
-- Call `$grill-me-with-context` only with `capture_mode: defer-to-caller`.
+- Initialize every run with a structured `domain_knowledge_delta`:
+  `knowledge_delta` (`none` or `required`) plus `decisions`,
+  `target_surfaces`, `evidence`, and `unresolved` lists. Empty `decisions`,
+  `target_surfaces`, and `evidence` when `knowledge_delta=none`; preserve
+  independent `unresolved` blockers and route them through planning gates.
+- Call `$grill-me-with-context` only with `capture_mode=defer-to-caller`.
   Planning may read durable context but must not update `CONTEXT.md`, domain
   docs, ADRs, or other domain-memory surfaces.
 - When a required domain delta exists, preserve it in the PRD handoff and make
   exactly one final implementation/integration issue own feature-level proof
-  plus `$project-memory domain-memory` with `operation:
-  implementation-closeout`. That issue depends on every other terminal issue
-  and is never docs-only.
+  plus `$project-memory domain-memory` with
+  `memory_slice=domain-memory` and
+  `domain_operation=implementation-closeout`. That issue depends on every
+  other terminal issue and is never docs-only.
 - Run `$plan-harder` once per generated issue with
   `planning_mode=issue-hardening` and `output_surface=caller`. Then run the
   final verticality and graph gates; repair and re-harden changed issues before
@@ -124,7 +127,7 @@ domain-closeout gates required by the selected mode.
 | Skill | Load when | Boundary |
 | --- | --- | --- |
 | `$project-memory` | Tracker routing is missing, incomplete, or stale. | Use only `tracker-routing`; Plan Feature never invokes `domain-memory`. |
-| `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always `capture_mode: defer-to-caller`; consume its structured delta. |
+| `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always `capture_mode=defer-to-caller`; consume its structured delta. |
 | `$plan-harder` | For every generated implementation issue. | One issue per `planning_mode=issue-hardening` call; the issue phase owns writes. |
 | `$gitstack:github-issues` | Publishing GitHub PRDs/issues or producing hosted dry-run commands. | It owns safe body transport, metadata, parent/sub-issues, verification, cleanup, and partial recovery. |
 
@@ -202,9 +205,10 @@ material blocker back through clarification. Stop here for `prd-only`.
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 `references/vertical-slices.md`. Pass the same identity, delivery, source-ref,
-target, domain-delta, partial-output, option-resolution, and execution-profile
-fields. A `lean-issues` run still hardens and validates every issue separately;
-it only narrows discovery and uses delta evidence between issue passes.
+target, `capture_outcome`, domain-delta, partial-output, option-resolution, and
+execution-profile fields. A `lean-issues` run still hardens and validates every
+issue separately; it only narrows discovery and uses delta evidence between
+issue passes.
 
 The issue phase owns vertical splitting, one `$plan-harder` pass per issue,
 mapped metadata, dependency/acyclicity validation, PRD parent/sub-issue links,
@@ -212,11 +216,12 @@ the canonical `## Orchestrator Handoff`, publication or local writes, and final
 reporting. In draft-command runs, output remains non-executable until the draft
 PRD ref is replaced by a durable source.
 
-If a required domain delta exists, make its exact decisions, targets, evidence,
-and `implementation-closeout` operation part of the final integration issue and
-its Orchestrator Handoff. Reuse a suitable terminal integration issue or append
-one that depends directly on every terminal issue, then harden and validate it
-like every other issue.
+If `knowledge_delta=required`, make its exact decisions, targets, evidence,
+`memory_slice=domain-memory`, and
+`domain_operation=implementation-closeout` part of the final integration issue
+and its Orchestrator Handoff. Reuse a suitable terminal integration issue or
+append one that depends directly on every terminal issue, then harden and
+validate it like every other issue.
 
 ### 5. Report Completion
 
@@ -226,13 +231,18 @@ repairs/exceptions, graph validation, blockers, applied tracker metadata,
 `option_rows_fingerprint`, local-mirror result and path, artifact fingerprints,
 and phase-token evidence (`exact-phase`,
 `exact-interval`, or `unavailable`).
-Include exactly one domain outcome:
+Include exactly one canonical domain outcome plus separate target/reason data
+when deferred:
 
-- `Domain knowledge: deferred to <final task ref> because Plan Feature assigns durable capture to implementation closeout`;
-- for required `prd-only` deltas: `Domain knowledge: deferred to the final implementation task generated from <source_prd_ref> because prd-only stops before issue creation`; or
-- `Domain knowledge: no durable change`.
+- `capture_outcome=deferred`, `capture_target_ref=<final task ref>`, and
+  `capture_reason=implementation-closeout`;
+- for a `mode=prd-only` run with `knowledge_delta=required`,
+  `capture_outcome=deferred`,
+  `capture_target_ref=final-implementation-task-from:<source_prd_ref>`, and
+  `capture_reason=prd-only-stop`; or
+- `capture_outcome=no-durable-change`.
 
-Plan Feature never reports domain knowledge as captured.
+Plan Feature never emits `capture_outcome=captured`.
 
 ## References
 

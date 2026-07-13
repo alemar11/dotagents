@@ -10,8 +10,8 @@ publish commands.
 ```markdown
 # <feature-slug>: <NN> <vertical outcome>
 
-Type: [mapped issue type, e.g. GitHub `Task` or local `task`]
-Status: [mapped triage state, usually `ready-for-agent`]
+issue_type: [canonical bug | feature | task]
+workflow_state: [canonical state, usually ready-for-agent]
 source_prd_ref: [path, issue number, or stable draft ref; draft refs are valid
 only in non-mutating output before hosted mutation]
 
@@ -71,8 +71,9 @@ single-repo issues, `current repository`; for workspace issues, use
 - validation: [commands, checks, or proof required for this issue.]
 - domain_closeout: [not-applicable | implementation-closeout]
 - domain_closeout_data: [when applicable, the exact
-  decisions, target surfaces, evidence, and `$project-memory domain-memory`
-  operation required by `## Domain Knowledge Closeout` below]
+  decisions, target surfaces, evidence, `memory_slice=domain-memory`, and
+  `domain_operation=implementation-closeout` required by
+  `## Domain Knowledge Closeout` below]
 - closeout_mode: [feature-pr-closes-issue | repo-pr-closes-issue |
   direct-commit-closes-issue | local-done-move-after-proof; use
   local-done-move-after-proof for local markdown even with direct-commit
@@ -117,10 +118,11 @@ required domain-knowledge handoff. This task must also prove integrated feature
 behavior; never use this section to justify a docs-only issue.]
 
 - Required workflow:
-  - Invoke `$project-memory` with the `domain-memory` slice after the integrated
-    behavior is proven. Project Memory must run its internal domain-modeling
-    workflow; reading `project-memory/agents/domain.md` or editing the targets
-    directly is not a substitute.
+  - Invoke `$project-memory` with `memory_slice=domain-memory` and
+    `domain_operation=implementation-closeout` after the integrated behavior is
+    proven. Project Memory must run its internal domain-modeling workflow;
+    reading `project-memory/agents/domain.md` or editing the targets directly
+    is not a substitute.
 
 - Decisions:
   - [Accepted durable term, rule, boundary, or decision carried from the PRD.]

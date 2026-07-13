@@ -27,8 +27,8 @@ or rejected options unless the rejection prevents repeat mistakes.
 ```markdown
 ## Agent Brief
 
-Type: bug | feature | task
-State: ready-for-agent
+issue_type: bug | feature | task
+workflow_state: ready-for-agent
 
 ### Summary
 

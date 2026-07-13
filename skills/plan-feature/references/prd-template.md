@@ -147,6 +147,10 @@ splitting or closeout.
 Include only when planning resolved new durable project knowledge. This is a
 deferred handoff for the final implementation task, not completed capture.
 
+- `knowledge_delta=required`
+- `capture_outcome=deferred`
+- `memory_slice=domain-memory`
+- `domain_operation=implementation-closeout`
 - Decisions:
   - Accepted durable term, rule, boundary, or decision.
 - Target surfaces:

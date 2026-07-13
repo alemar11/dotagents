@@ -32,10 +32,11 @@ pr_shape: single-pr
 source_prd_ref: draft-prd:account-settings-export
 prd_body_fingerprint: sha256:7f4a9c21d003
 capture_mode: defer-to-caller
+capture_outcome: deferred
 option_resolution: see-canonical-run-option-rows-below
 option_rows_fingerprint: sha256:d634ac958acbafcb43916e5cb8fc883a90e778e0d0bb1c5ae3b3b7f22489f338
 domain_knowledge_delta:
-  status: required
+  knowledge_delta: required
   decisions:
     - Account settings export is a user-owned portable archive.
   target_surfaces:
@@ -69,7 +70,7 @@ domain_knowledge_delta:
 ## Expected Pipeline
 
 1. `$plan-feature` reviews project memory and resolves the effective target.
-2. `$grill-me-with-context` runs with `capture_mode: defer-to-caller`, resolves
+2. `$grill-me-with-context` runs with `capture_mode=defer-to-caller`, resolves
    only blockers that affect the PRD or issue split, performs no documentation
    writes, and returns a structured `domain_knowledge_delta`.
 3. The PRD phase returns the PRD body, a draft PRD publish command,
