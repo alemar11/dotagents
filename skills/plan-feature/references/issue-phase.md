@@ -12,8 +12,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 ## Hard Requirements
 
 - Load and follow `$plan-harder` for every issue.
-- Pass exactly one issue at a time to `$plan-harder` in issue-hardening mode on
-  its caller surface, and request the structured caller result.
+- Pass exactly one issue at a time to `$plan-harder` with
+  `planning_mode=issue-hardening` and `output_surface=caller`, and request the
+  structured caller result.
 - Use the returned `$plan-harder` brief to enrich `## Implementation Plan` and
   merge acceptance, validation, dependency, and blocker details into the
   matching top-level sections. If `$plan-harder` finds an unresolved blocker,
@@ -35,9 +36,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
   acceptance-criteria questions as blockers to resolve before publishing,
   unless `partial_output=allow-non-agent-ready`. The default
   `partial_output=withhold` keeps them unpublished.
-- `$plan-harder` must not write files. On its caller surface it returns only the
-  structured hardening result; this phase owns issue-body merging and any issue
-  tracker or local Markdown writes.
+- `$plan-harder` must not write files. With `output_surface=caller` it returns
+  only the structured hardening result; this phase owns issue-body merging and
+  any issue tracker or local Markdown writes.
 - Use the authoritative feature slug in this order: explicit slug from
   `plan-feature`, PRD file path directory, configured tracker path, then PRD
   title-derived slug as a fallback only.
@@ -347,16 +348,16 @@ The final domain owner must additionally:
 
 ### 3. Harden Every Issue With `$plan-harder`
 
-For each issue, call `$plan-harder` in issue-hardening mode with only that
-issue's draft body and the minimum relevant PRD context. Explicitly request the
-caller surface and the structured result from
+For each issue, call `$plan-harder` with `planning_mode=issue-hardening` using
+only that issue's draft body and the minimum relevant PRD context. Explicitly
+request `output_surface=caller` and the structured result from
 `$plan-harder`'s `references/templates.md`.
 
 After `$plan-harder` returns:
 
-- require `status`, `implementation_plan`, `acceptance_criteria`, `validation`,
-  `dependencies`, and `blockers`; treat a non-empty `blockers` list or
-  `status: blocked` as a blocker rather than an agent-ready brief,
+- require `result_status`, `implementation_plan`, `acceptance_criteria`,
+  `validation`, `dependencies`, and `blockers`; treat a non-empty `blockers`
+  list or `result_status: blocked` as a blocker rather than an agent-ready brief,
 - add concise implementation guidance under `## Implementation Plan` only when
   the issue is ready for the queue,
 - add the first line under that heading as:

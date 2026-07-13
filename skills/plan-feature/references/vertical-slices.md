@@ -240,8 +240,8 @@ For each issue:
 
 - pass only that draft issue body plus the minimum relevant PRD context to
   `$plan-harder`,
-- request issue-hardening mode on the caller surface and consume its structured
-  result,
+- request `planning_mode=issue-hardening` with `output_surface=caller` and
+  consume its structured result,
 - start `## Implementation Plan` with the standard provenance line
   `Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.`,
 - synthesize the implementation-relevant guidance under `## Implementation Plan`,
@@ -254,7 +254,7 @@ For each issue:
 Do not paste the `$plan-harder` output wholesale if doing so duplicates
 sections already present in the issue body.
 
-`$plan-harder` never writes files; its caller surface returns the structured
+`$plan-harder` never writes files; `output_surface=caller` returns the structured
 brief to the issue phase, which owns any issue tracker or local Markdown writes.
 
 ## Good Split Example

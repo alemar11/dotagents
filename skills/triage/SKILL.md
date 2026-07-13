@@ -60,9 +60,9 @@ the actual tracker issue types, labels, or markdown status values.
   whenever the repo's tracker configuration says issue types are available.
 - In local markdown mode, record type and state as frontmatter-like lines near
   the top of the issue file.
-- Before marking an issue `ready-for-agent`, load and run `$plan-harder` in
-  issue-hardening mode on its caller surface and embed or post the resulting
-  agent brief.
+- Before marking an issue `ready-for-agent`, load and run `$plan-harder` with
+  `planning_mode=issue-hardening` and `output_surface=caller`, then embed or
+  post the resulting agent brief.
 - If the issue is underspecified, load and run `$grill-me-with-context` to
   resolve the smallest blocking question set before writing an agent-ready
   brief. Use `capture_mode: inline` only when the current request explicitly
@@ -195,9 +195,10 @@ If blocker resolution still depends on the reporter or requester, stop at
 brief, and do not call it ready for implementation.
 
 If the issue is queue-ready for agent execution, use `$plan-harder` once on
-that single issue in issue-hardening caller mode and embed the structured result
-using `references/agent-brief.md`. If a companion required for the current issue
-is unavailable, apply the one-issue fallback instead of broadening setup.
+that single issue with `planning_mode=issue-hardening` and
+`output_surface=caller`, then embed the structured result using
+`references/agent-brief.md`. If a companion required for the current issue is
+unavailable, apply the one-issue fallback instead of broadening setup.
 
 ### 6. Write changes
 

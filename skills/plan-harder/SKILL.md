@@ -13,30 +13,35 @@ is ready for careful execution.
 
 Only create the plan. Do not implement the work.
 
-Plan Harder has two modes:
+Plan Harder resolves one `planning_mode`:
 
-- **Full-plan mode**: create a phased implementation plan for a feature,
+- `planning_mode=full-plan`: create a phased implementation plan for a feature,
   migration, refactor, or other multi-step change.
-- **Issue-hardening mode**: make one vertical slice or issue agent-ready by
-  adding the missing execution detail an implementation agent needs.
+- `planning_mode=issue-hardening`: make one vertical slice or issue agent-ready
+  by adding the missing execution detail an implementation agent needs.
 
-It also has two output surfaces:
+It also resolves one `output_surface`:
 
-- **Standalone surface**: return the plan or hardened issue brief to the user
-  in chat.
-- **Caller surface**: when another skill explicitly invokes Plan Harder in
-  issue-hardening mode, return the structured result to that workflow so it can
-  merge or persist the brief. Do not emit standalone closeout text on this
-  surface. Full-plan mode remains standalone.
+- `output_surface=standalone`: return the plan or hardened issue brief to the
+  user in chat.
+- `output_surface=caller`: when another skill explicitly invokes Plan Harder
+  with `planning_mode=issue-hardening`, return the structured result to that
+  workflow so it can merge or persist the brief. Do not emit standalone
+  closeout text on this surface. `planning_mode=full-plan` requires
+  `output_surface=standalone`.
+
+Load `references/options.md` before resolving either field. Normalize legacy
+or natural-language input once and use only canonical field/value assignments
+in current handoffs and results.
 
 Default to the smallest valid route:
 
 - If the input is one issue, one slice, or one task from another planning
-  skill, use issue-hardening mode.
+  skill, use `planning_mode=issue-hardening`.
 - If the user can reasonably accept recommended assumptions, offer a compact
   defaults-based clarification path instead of a long question loop.
-- Escalate to full-plan mode only when the work genuinely needs phases or
-  cross-cutting sequencing.
+- Escalate to `planning_mode=full-plan` only when the work genuinely needs
+  phases or cross-cutting sequencing.
 
 ## Planning-Only Contract
 
@@ -55,9 +60,10 @@ Default to the smallest valid route:
 
 - Use when the user explicitly invokes `plan-harder` or asks for a harder,
   deeper, or more stress-tested plan.
-- Use issue-hardening mode when the user asks to harden, solidify, make
-  agent-ready, or de-risk a single issue or vertical slice before implementation.
-- Use issue-hardening mode when another skill invokes `plan-harder` on one
+- Use `planning_mode=issue-hardening` when the user asks to harden, solidify,
+  make agent-ready, or de-risk a single issue or vertical slice before
+  implementation.
+- Use `planning_mode=issue-hardening` when another skill invokes `plan-harder` on one
   issue as a pre-implementation rigor pass.
 - Use for ambiguous, high-risk, or multi-phase work only when the user has
   explicitly asked for planning, plan hardening, or a pre-implementation rigor
@@ -71,7 +77,8 @@ Default to the smallest valid route:
 
 ## Output Surface
 
-- On the standalone surface, return the plan or issue-hardening brief in chat.
+- With `output_surface=standalone`, return the plan or issue-hardening brief in
+  chat.
 - Never save to `plans/`, create `plans/`, or write a Markdown plan file.
 - If the user asks to save the plan, explain that this skill only plans harder
   and returns the result; a separate workflow can persist it afterward.
@@ -83,12 +90,12 @@ Default to the smallest valid route:
 For routine issue-hardening runs, prefer a compact brief that reaches
 `## Implementation Plan` quickly instead of repeating generic planning doctrine.
 
-On the caller surface:
+With `output_surface=caller`:
 
-- require the caller to name `issue-hardening` mode and provide one bounded work
-  item plus the minimum relevant context;
+- require the caller to set `planning_mode=issue-hardening` and provide one
+  bounded work item plus the minimum relevant context;
 - return the structured caller template from `references/templates.md`, with
-  `status` set to `ready` or `blocked`;
+  `result_status=ready` or `result_status=blocked`;
 - include every unresolved blocker in `blockers`; never infer `ready` when that
   list is non-empty;
 - resolve unknowns from the supplied context and focused repo evidence when
@@ -103,28 +110,29 @@ On the caller surface:
 
 ### 1. Choose the Mode
 
-- Use full-plan mode for a feature, migration, refactor, or plan that still
-  needs phases or multiple tasks.
-- Use issue-hardening mode for one existing issue, one vertical slice, or one
-  work item produced by a PRD or issue-splitting skill.
+- Use `planning_mode=full-plan` for a feature, migration, refactor, or plan that
+  still needs phases or multiple tasks.
+- Use `planning_mode=issue-hardening` for one existing issue, one vertical
+  slice, or one work item produced by a PRD or issue-splitting skill.
 - If another skill calls Plan Harder with an issue body, treat that as
-  issue-hardening mode on the caller surface. Full-plan mode uses the standalone
-  surface.
+  `planning_mode=issue-hardening` with `output_surface=caller`.
+  `planning_mode=full-plan` uses `output_surface=standalone`.
 
 ### 2. Research First
 
 - Inspect the codebase, architecture, existing patterns, and nearby tests.
 - Identify dependencies, edge cases, rollout concerns, and likely failure
   modes before drafting the plan.
-- In issue-hardening mode, inspect only the files, tests, docs, and contracts
-  needed to make that issue executable; do not expand into a full feature plan.
+- With `planning_mode=issue-hardening`, inspect only the files, tests, docs, and
+  contracts needed to make that issue executable; do not expand into a full
+  feature plan.
 
 ### 3. Clarify High-Risk Unknowns
 
-- On the standalone surface, ask focused clarifying questions before drafting
-  when ambiguity could materially change the work. On the caller surface,
-  return unresolved material questions in `blockers` so the caller can apply
-  its own clarification workflow.
+- With `output_surface=standalone`, ask focused clarifying questions before
+  drafting when ambiguity could materially change the work. With
+  `output_surface=caller`, return unresolved material questions in `blockers`
+  so the caller can apply its own clarification workflow.
 - Ask only the minimum question batch needed to eliminate wrong plan branches.
 - Prefer `request_user_input` when available.
 - Respect the runtime limit of 1-3 questions per `request_user_input` call;
@@ -169,7 +177,7 @@ On the caller surface:
 Use `references/templates.md` for the exact standalone shapes and the caller
 surface result envelope.
 
-In full-plan mode, create a phased plan with:
+With `planning_mode=full-plan`, create a phased plan with:
 
 - a short overview
 - prerequisites
@@ -187,7 +195,7 @@ Each task should be:
 - testable or otherwise verifiable
 - concrete about what "done" means
 
-In issue-hardening mode, create a compact issue brief with:
+With `planning_mode=issue-hardening`, create a compact issue brief with:
 
 - issue goal and non-goals,
 - assumptions and resolved interpretation,
@@ -228,11 +236,11 @@ Keep the brief small enough to paste into an issue body or issue comment.
 
 ## Output Expectations
 
-- On the standalone surface, return the final plan or hardened issue brief
+- With `output_surface=standalone`, return the final plan or hardened issue brief
   directly in chat, explicitly say that no repo files or `plans/` Markdown were
   created, summarize the riskiest assumptions and remaining questions, and
   include the handoff boundary for later implementation or publication.
-- On the caller surface, return only the structured issue-hardening result
+- With `output_surface=caller`, return only the structured issue-hardening result
   envelope. The caller owns user-facing closeout, persistence, and any
   implementation or publication handoff.
 - Do not implement the plan.
@@ -246,4 +254,6 @@ Keep the brief small enough to paste into an issue body or issue comment.
 
 ## References
 
+- `references/options.md`: canonical option fields, values, and compatibility
+  normalization.
 - `references/templates.md`: full-plan and issue-hardening output templates.

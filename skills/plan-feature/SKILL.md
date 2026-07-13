@@ -92,9 +92,10 @@ domain-closeout gates required by the selected mode.
   plus `$project-memory domain-memory` with `operation:
   implementation-closeout`. That issue depends on every other terminal issue
   and is never docs-only.
-- Run `$plan-harder` once per generated issue in issue-hardening caller mode.
-  Then run the final verticality and graph gates; repair and re-harden changed
-  issues before output.
+- Run `$plan-harder` once per generated issue with
+  `planning_mode=issue-hardening` and `output_surface=caller`. Then run the
+  final verticality and graph gates; repair and re-harden changed issues before
+  output.
 - Never label unresolved planning work `ready-for-agent`. Resolve
   `partial_output=withhold` by default. Only
   `partial_output=allow-non-agent-ready` permits `needs-info` or
@@ -124,7 +125,7 @@ domain-closeout gates required by the selected mode.
 | --- | --- | --- |
 | `$project-memory` | Tracker routing is missing, incomplete, or stale. | Use only `tracker-routing`; Plan Feature never invokes `domain-memory`. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always `capture_mode: defer-to-caller`; consume its structured delta. |
-| `$plan-harder` | For every generated implementation issue. | One issue per issue-hardening call; the issue phase owns writes. |
+| `$plan-harder` | For every generated implementation issue. | One issue per `planning_mode=issue-hardening` call; the issue phase owns writes. |
 | `$gitstack:github-issues` | Publishing GitHub PRDs/issues or producing hosted dry-run commands. | It owns safe body transport, metadata, parent/sub-issues, verification, cleanup, and partial recovery. |
 
 After implementation scheduling begins, issue lifecycle mutations belong to

@@ -1,20 +1,21 @@
 # Plan Harder Templates
 
-Use these templates only after `$plan-harder` has selected the matching mode and
-output surface. On the standalone surface, keep the returned plan or
-issue-hardening brief in chat. The caller surface applies only to
-issue-hardening mode and returns its structured result to the calling workflow.
-Never create `plans/` or write files from this skill.
+Use these templates only after `$plan-harder` has selected the matching
+`planning_mode` and `output_surface` from `references/options.md`. With
+`output_surface=standalone`, keep the returned plan or issue-hardening brief in
+chat. `output_surface=caller` applies only to
+`planning_mode=issue-hardening` and returns its structured result to the
+calling workflow. Never create `plans/` or write files from this skill.
 
 ## Full-Plan Template
 
-Use this for full-plan mode.
+Use this for `planning_mode=full-plan`.
 
 ```markdown
 # Plan: [Task Name]
 
 **Generated**: [Date]
-**Estimated Complexity**: [Low/Medium/High]
+`estimated_complexity: <low|medium|high>`
 
 ## Overview
 [Summary of the work and the recommended approach]
@@ -58,7 +59,7 @@ Use this for full-plan mode.
 
 ## Issue-Hardening Template
 
-Use this for issue-hardening mode.
+Use this for `planning_mode=issue-hardening`.
 
 ```markdown
 ## Implementation Plan
@@ -96,12 +97,13 @@ Use this for issue-hardening mode.
 
 ## Caller-Surface Issue-Hardening Result
 
-Use this exact field structure when another skill invokes issue-hardening mode.
+Use this exact field structure when another skill invokes
+`planning_mode=issue-hardening` with `output_surface=caller`.
 Return only this result; do not append standalone closeout text. Use `[]` for an
-empty list and set `status: blocked` whenever `blockers` is non-empty.
+empty list and set `result_status: blocked` whenever `blockers` is non-empty.
 
 ```yaml
-status: ready | blocked
+result_status: ready | blocked
 goal: >-
   Exact vertical outcome.
 non_goals:
