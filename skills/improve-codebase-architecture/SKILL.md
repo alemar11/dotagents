@@ -29,6 +29,8 @@ This is a discovery and decision-shaping skill, not an automatic refactor.
 
 ## Workflow
 
+Load `references/options.md` before classifying candidate strength.
+
 ### 1. Ground in repo evidence
 
 - Inspect project docs, `CONTEXT.md`, `CONTEXT-MAP.md`,
@@ -59,7 +61,11 @@ For each candidate, identify:
 - expected benefit for locality, testability, and change safety,
 - risks and migration cost,
 - evidence from code or docs,
-- recommendation strength: `Strong`, `Worth exploring`, or `Speculative`.
+- `recommendation_strength=strong|worth-exploring|speculative`.
+
+Use separate prose to explain why a candidate received that value. Human
+headings may capitalize the value for display, but downstream selection must
+branch on `recommendation_strength`.
 
 Apply a deletion test to suspected shallow modules: would removing the module
 concentrate complexity in one place, or merely move the same complexity
@@ -110,3 +116,7 @@ Summarize:
 - Keep speculative candidates clearly labeled.
 - Do not implement until the user explicitly switches from architecture
   discovery to execution.
+
+## References
+
+- Canonical candidate-strength option: `references/options.md`

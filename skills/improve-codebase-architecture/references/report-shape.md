@@ -23,7 +23,8 @@ Each candidate should include:
 - proposed architectural move,
 - benefits for locality, testability, and change safety,
 - risks or migration cost,
-- recommendation strength: `Strong`, `Worth exploring`, or `Speculative`,
+- `recommendation_strength=strong|worth-exploring|speculative`, with separate
+  prose explaining the classification,
 - source evidence links or file paths,
 - a simple before/after relationship diagram when it clarifies the move.
 
