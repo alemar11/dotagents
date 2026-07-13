@@ -84,10 +84,17 @@ migrations_path = "db/migrations"
 - Missing legacy `schema_version`, `1`, `1.0.0`, and `1.1.0` all migrate to
   canonical `3.0.0`.
 - Before any migration write, copy the source config to the next available
-  `.bak` path. Write canonical `config.toml` through a temporary file and
-  atomic rename. A no-change rerun creates no backup and performs no write.
-  Backups may contain credentials, so keep them local and ignored with the
-  canonical config.
+  `.bak` path under the owner-scoped cache at
+  `$XDG_CACHE_HOME/dotagents/skills/postgres/config-backups/<source-key>/` or
+  `~/.cache/dotagents/skills/postgres/config-backups/<source-key>/`. Backup
+  directories use `0700` and backup files are allocated collision-free with
+  descriptor-relative, no-follow operations and `0600` before the already-read
+  source bytes are written and synced on Unix.
+  Empty, relative, parent-traversing, project-local, or symlink-resolved
+  project-local cache roots are rejected in favor of a safe absolute fallback;
+  migration stops if no external cache root is available.
+  Write canonical `config.toml` only after that proof, through a temporary file
+  and atomic rename. A no-change rerun creates no backup and performs no write.
 - Ordinary config loads normalize only in memory and never create a backup or
   write a file.
 - Unsupported future schema versions are a hard stop with no backup or write.

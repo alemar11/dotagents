@@ -47,8 +47,10 @@ public runtime entrypoint at `skills/postgres/scripts/postgres`.
 - Prefer adding behavior in Rust over reintroducing per-task shell wrappers.
 - Keep config migration one-way from legacy `postgres.toml` to canonical
   `config.toml`; do not reintroduce writes to the legacy path. Explicit schema
-  migrations must create a pre-migration backup and atomically write canonical
-  config; ordinary reads normalize only in memory.
+  migrations must create a private pre-migration backup under the owner-scoped
+  Postgres cache, outside the consuming repo, reject symlink traversal through
+  descriptor-relative creation, and atomically write canonical config;
+  ordinary reads normalize only in memory.
 - Keep the runtime surface focused on SQL, inspection, diagnostics, and
   migration release; do not reintroduce dump, restore, export, or schema-diff
   flows into this CLI.

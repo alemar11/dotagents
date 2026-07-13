@@ -258,8 +258,13 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
   `ssl_mode` values in memory. Health, inspection, query, dry-run, and other
   ordinary runtime paths never persist that normalization.
 - `profile migrate-config` is the explicit config-migration write path. It
-  creates a pre-migration backup and atomically persists canonical schema and
-  option normalization. A no-change rerun performs no write.
+  creates a private pre-migration backup under the owner-scoped Postgres cache
+  outside the consuming repository, writes and syncs it through a
+  collision-free, descriptor-relative, no-follow `0600` file on Unix, then
+  atomically persists canonical schema and option normalization. Relative,
+  empty, parent-traversing, or project-local cache roots are ignored; migration
+  stops if no safe absolute fallback exists. A no-change rerun performs no
+  write.
 - `[tools.postgres].access_mode` is allowed only as an inheritance/default
   source; prefer explicit per-profile values.
 - `read` permits read-oriented profile, query, activity, and schema inspection
@@ -292,8 +297,10 @@ Profiles may declare `access_mode = "read"`, `access_mode = "write"`, or
   - Show server version.
 - `profile migrate-config`
   - Explicitly persist legacy `postgres.toml` or an older canonical schema as
-    canonical `config.toml`; create a backup, write atomically, and update
-    ignore coverage so `.skills/postgres/config.toml` stays untracked too.
+    canonical `config.toml`; create a private backup under
+    `~/.cache/dotagents/skills/postgres/config-backups/` (or
+    `$XDG_CACHE_HOME`), write atomically, and update ignore coverage so
+    `.skills/postgres/config.toml` stays untracked too.
 - `profile set-ssl-mode <profile> <disable|require>`
   - Persist canonical `ssl_mode`.
 - Hidden compatibility aliases: `profile migrate-toml` and

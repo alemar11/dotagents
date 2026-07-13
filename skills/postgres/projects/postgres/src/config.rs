@@ -3,6 +3,10 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::collections::BTreeMap;
 use std::env;
 use std::fs;
+#[cfg(unix)]
+use std::fs::File;
+#[cfg(not(unix))]
+use std::fs::OpenOptions;
 use std::io::{self, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -379,18 +383,30 @@ pub fn load_and_migrate_config(path: &Path) -> Result<SkillConfig> {
 
 /// Explicitly migrate config with a pre-migration backup and atomic canonical write.
 pub fn migrate_config_file(path: &Path) -> Result<ConfigMigrationResult> {
+    migrate_config_file_with_backup_root(path, None)
+}
+
+fn migrate_config_file_with_backup_root(
+    path: &Path,
+    backup_root: Option<&Path>,
+) -> Result<ConfigMigrationResult> {
     let (config, loaded) = load_config_from_disk(path)?;
     let changed = loaded.needs_persisted_normalization
         || should_save_loaded_config(path, &loaded.read_path, &loaded.original, &config);
     let backup_path = if changed {
-        let backup_path = next_backup_path(&loaded.read_path);
-        fs::copy(&loaded.read_path, &backup_path).with_context(|| {
-            format!(
-                "Failed to back up postgres config from {} to {}",
-                loaded.read_path.display(),
-                backup_path.display()
-            )
-        })?;
+        let default_backup_root;
+        let backup_root = match backup_root {
+            Some(path) => path,
+            None => {
+                default_backup_root = config_backup_root(&loaded.read_path)?;
+                &default_backup_root
+            }
+        };
+        let backup_path = write_config_backup(
+            &loaded.read_path,
+            backup_root,
+            loaded.original_content.as_bytes(),
+        )?;
         save_config(path, &config)?;
         Some(backup_path)
     } else {
@@ -407,6 +423,7 @@ pub fn migrate_config_file(path: &Path) -> Result<ConfigMigrationResult> {
 struct LoadedConfig {
     read_path: PathBuf,
     original: SkillConfig,
+    original_content: String,
     needs_persisted_normalization: bool,
 }
 
@@ -433,6 +450,7 @@ fn load_config_from_disk(path: &Path) -> Result<(SkillConfig, LoadedConfig)> {
         LoadedConfig {
             read_path,
             original,
+            original_content: raw,
             needs_persisted_normalization,
         },
     ))
@@ -454,18 +472,302 @@ pub fn save_config(path: &Path, config: &SkillConfig) -> Result<()> {
     Ok(())
 }
 
-fn next_backup_path(path: &Path) -> PathBuf {
-    let base = PathBuf::from(format!("{}.bak", path.display()));
-    if !base.exists() {
-        return base;
-    }
-    for index in 1.. {
-        let candidate = PathBuf::from(format!("{}.bak.{index}", path.display()));
-        if !candidate.exists() {
-            return candidate;
+fn config_backup_root(config_path: &Path) -> Result<PathBuf> {
+    select_config_backup_root(
+        config_path,
+        env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
+        env::var_os("HOME").map(PathBuf::from),
+    )
+}
+
+fn select_config_backup_root(
+    config_path: &Path,
+    xdg_cache_home: Option<PathBuf>,
+    home: Option<PathBuf>,
+) -> Result<PathBuf> {
+    let project_root = config_path
+        .parent()
+        .and_then(Path::parent)
+        .and_then(Path::parent)
+        .ok_or_else(|| {
+            anyhow!(
+                "Cannot resolve the consuming project root from postgres config {}",
+                config_path.display()
+            )
+        })?;
+    let resolved_project_root = resolve_for_containment(project_root)?;
+    let candidates = [xdg_cache_home, home.map(|path| path.join(".cache"))];
+    for cache_home in candidates.into_iter().flatten() {
+        if !cache_home.is_absolute()
+            || cache_home
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir))
+        {
+            continue;
+        }
+        let backup_root = cache_home
+            .join("dotagents")
+            .join("skills")
+            .join("postgres")
+            .join("config-backups");
+        let resolved_backup_root = resolve_for_containment(&backup_root)?;
+        if !resolved_backup_root.starts_with(&resolved_project_root) {
+            return Ok(resolved_backup_root);
         }
     }
+    bail!(
+        "Cannot resolve a postgres config backup cache outside the consuming project {}. Set HOME or XDG_CACHE_HOME to an absolute external path.",
+        resolved_project_root.display()
+    )
+}
+
+fn resolve_for_containment(path: &Path) -> Result<PathBuf> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        env::current_dir()
+            .context("Failed to resolve the current directory")?
+            .join(path)
+    };
+    resolve_absolute_for_containment(&absolute)
+}
+
+fn resolve_absolute_for_containment(path: &Path) -> Result<PathBuf> {
+    if path.exists() {
+        return fs::canonicalize(path)
+            .with_context(|| format!("Failed to resolve path {}", path.display()));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow!("Cannot resolve path {}", path.display()))?;
+    let filename = path
+        .file_name()
+        .ok_or_else(|| anyhow!("Cannot resolve path {}", path.display()))?;
+    Ok(resolve_absolute_for_containment(parent)?.join(filename))
+}
+
+fn backup_source_key(path: &Path) -> String {
+    let normalized = fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let mut hash = 0xcbf29ce484222325_u64;
+    for byte in normalized.to_string_lossy().as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
+}
+
+#[cfg(unix)]
+fn write_config_backup(path: &Path, backup_root: &Path, content: &[u8]) -> Result<PathBuf> {
+    use std::ffi::{CString, OsStr};
+    use std::os::fd::{AsRawFd, FromRawFd};
+    use std::os::unix::ffi::OsStrExt;
+
+    let backup_root = resolve_for_containment(backup_root)?;
+    let directory = backup_root.join(backup_source_key(path));
+    let backup_root_handle = open_or_create_absolute_directory(&backup_root)?;
+    let source_key = directory
+        .file_name()
+        .ok_or_else(|| anyhow!("Postgres backup directory has no source key"))?;
+    let source_key = CString::new(source_key.as_bytes())
+        .context("Postgres backup source key contains a null byte")?;
+    let directory_handle =
+        open_or_create_child_directory(&backup_root_handle, &source_key, &directory)?;
+    set_private_directory_handle(&directory_handle, &directory)?;
+    let filename = path
+        .file_name()
+        .unwrap_or_else(|| OsStr::new(CONFIG_FILENAME))
+        .to_string_lossy();
+    for index in 0.. {
+        let candidate_name = if index == 0 {
+            format!("{filename}.bak")
+        } else {
+            format!("{filename}.bak.{index}")
+        };
+        let candidate = directory.join(&candidate_name);
+        let candidate_name = CString::new(candidate_name.as_bytes())
+            .context("Postgres backup filename contains a null byte")?;
+        let descriptor = unsafe {
+            libc::openat(
+                directory_handle.as_raw_fd(),
+                candidate_name.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if descriptor < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::AlreadyExists {
+                continue;
+            }
+            return Err(error).with_context(|| {
+                format!(
+                    "Failed to create postgres config backup {}",
+                    candidate.display()
+                )
+            });
+        }
+        let mut backup = unsafe { File::from_raw_fd(descriptor) };
+        if let Err(error) = backup.write_all(content).and_then(|_| backup.sync_all()) {
+            drop(backup);
+            unsafe {
+                libc::unlinkat(directory_handle.as_raw_fd(), candidate_name.as_ptr(), 0);
+            }
+            return Err(error).with_context(|| {
+                format!(
+                    "Failed to write postgres config backup {}",
+                    candidate.display()
+                )
+            });
+        }
+        return Ok(candidate);
+    }
     unreachable!("backup index iteration is unbounded")
+}
+
+#[cfg(unix)]
+fn open_or_create_absolute_directory(path: &Path) -> Result<File> {
+    use std::ffi::CString;
+    use std::os::fd::FromRawFd;
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Component;
+
+    if !path.is_absolute() {
+        bail!(
+            "Postgres backup directory must be absolute: {}",
+            path.display()
+        );
+    }
+    let root = CString::new("/").expect("root contains no null byte");
+    let descriptor = unsafe {
+        libc::open(
+            root.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if descriptor < 0 {
+        return Err(io::Error::last_os_error()).context("Failed to open filesystem root");
+    }
+    let mut directory = unsafe { File::from_raw_fd(descriptor) };
+    for component in path.components() {
+        let Component::Normal(name) = component else {
+            if matches!(component, Component::RootDir) {
+                continue;
+            }
+            bail!(
+                "Postgres backup directory contains an unsupported component: {}",
+                path.display()
+            );
+        };
+        let name = CString::new(name.as_bytes())
+            .context("Postgres backup directory contains a null byte")?;
+        directory = open_or_create_child_directory(&directory, &name, path)?;
+    }
+    set_private_directory_handle(&directory, path)?;
+    Ok(directory)
+}
+
+#[cfg(not(unix))]
+fn write_config_backup(path: &Path, backup_root: &Path, content: &[u8]) -> Result<PathBuf> {
+    let directory = backup_root.join(backup_source_key(path));
+    fs::create_dir_all(&directory).with_context(|| {
+        format!(
+            "Failed to create postgres config backup directory {}",
+            directory.display()
+        )
+    })?;
+    let filename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(CONFIG_FILENAME);
+    for index in 0.. {
+        let candidate = if index == 0 {
+            directory.join(format!("{filename}.bak"))
+        } else {
+            directory.join(format!("{filename}.bak.{index}"))
+        };
+        let mut backup = match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&candidate)
+        {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(error).with_context(|| {
+                    format!(
+                        "Failed to create postgres config backup {}",
+                        candidate.display()
+                    )
+                });
+            }
+        };
+        if let Err(error) = backup.write_all(content).and_then(|_| backup.sync_all()) {
+            drop(backup);
+            let _ = fs::remove_file(&candidate);
+            return Err(error).with_context(|| {
+                format!(
+                    "Failed to write postgres config backup {}",
+                    candidate.display()
+                )
+            });
+        }
+        return Ok(candidate);
+    }
+    unreachable!("backup index iteration is unbounded")
+}
+
+#[cfg(unix)]
+fn open_or_create_child_directory(
+    parent: &File,
+    name: &std::ffi::CStr,
+    display_path: &Path,
+) -> Result<File> {
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    let result = unsafe { libc::mkdirat(parent.as_raw_fd(), name.as_ptr(), 0o700) };
+    if result != 0 {
+        let error = io::Error::last_os_error();
+        if error.kind() != io::ErrorKind::AlreadyExists {
+            return Err(error).with_context(|| {
+                format!(
+                    "Failed to create postgres backup directory {}",
+                    display_path.display()
+                )
+            });
+        }
+    }
+    let descriptor = unsafe {
+        libc::openat(
+            parent.as_raw_fd(),
+            name.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+        )
+    };
+    if descriptor < 0 {
+        return Err(io::Error::last_os_error()).with_context(|| {
+            format!(
+                "Failed to open postgres backup directory without following symlinks: {}",
+                display_path.display()
+            )
+        });
+    }
+    Ok(unsafe { File::from_raw_fd(descriptor) })
+}
+
+#[cfg(unix)]
+fn set_private_directory_handle(directory: &File, display_path: &Path) -> Result<()> {
+    use std::os::fd::AsRawFd;
+
+    let result = unsafe { libc::fchmod(directory.as_raw_fd(), 0o700) };
+    if result != 0 {
+        return Err(io::Error::last_os_error()).with_context(|| {
+            format!(
+                "Failed to set private permissions on postgres backup directory {}",
+                display_path.display()
+            )
+        });
+    }
+    Ok(())
 }
 
 fn parse_config(raw: &str) -> Result<SkillConfig> {
@@ -973,6 +1275,14 @@ mod tests {
     use pretty_assertions::assert_eq;
     use tempfile::tempdir;
 
+    fn migrate_for_test(path: &Path, temp_root: &Path) -> Result<ConfigMigrationResult> {
+        migrate_config_file_with_backup_root(path, Some(&temp_root.join("backups")))
+    }
+
+    fn load_and_migrate_for_test(path: &Path, temp_root: &Path) -> Result<SkillConfig> {
+        Ok(migrate_for_test(path, temp_root)?.config)
+    }
+
     #[test]
     fn migrates_legacy_schema_to_canonical_config() {
         let temp = tempdir().unwrap();
@@ -1006,7 +1316,7 @@ path = "db/migrations"
         .unwrap();
 
         let canonical_path = canonical_config_path(project_root);
-        let config = load_and_migrate_config(&canonical_path).unwrap();
+        let config = load_and_migrate_for_test(&canonical_path, temp.path()).unwrap();
         let written = fs::read_to_string(&canonical_path).unwrap();
 
         assert_eq!(
@@ -1111,7 +1421,8 @@ sslmode = "require"
         )
         .unwrap();
 
-        let config = load_and_migrate_config(&canonical_config_path(project_root)).unwrap();
+        let config =
+            load_and_migrate_for_test(&canonical_config_path(project_root), temp.path()).unwrap();
         assert_eq!(
             config.schema_version.as_deref(),
             Some(LATEST_SCHEMA_VERSION)
@@ -1164,7 +1475,7 @@ password = "postgres"
         )
         .unwrap();
 
-        let config = load_and_migrate_config(&canonical_path).unwrap();
+        let config = load_and_migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(
             config.tools.postgres.profiles["local"].database.as_deref(),
             Some("canonical")
@@ -1178,25 +1489,25 @@ password = "postgres"
         fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
         fs::write(
             &canonical_path,
-            r#"schema_version = "2.0.0"
+            r#"schema_version = "3.0.0"
 
 [defaults]
 profile = "local"
 
 [tools.postgres]
-sslmode = false
+ssl_mode = "disable"
 
 [tools.postgres.profiles.local]
 database = "app"
 user = "postgres"
 password = "postgres"
-sslmode = false
+ssl_mode = "disable"
 "#,
         )
         .unwrap();
 
         update_ssl_mode(&canonical_path, "local", SslMode::Require).unwrap();
-        let config = load_and_migrate_config(&canonical_path).unwrap();
+        let config = load_and_migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(
             config.tools.postgres.profiles["local"].ssl_mode,
             Some(SslMode::Require)
@@ -1226,7 +1537,7 @@ password = "postgres"
         )
         .unwrap();
 
-        let config = load_and_migrate_config(&canonical_path).unwrap();
+        let config = load_and_migrate_for_test(&canonical_path, temp.path()).unwrap();
         let written = fs::read_to_string(&canonical_path).unwrap();
 
         assert_eq!(config.schema_version.as_deref(), Some("3.0.0"));
@@ -1268,7 +1579,7 @@ password = "postgres"
         )
         .unwrap();
 
-        let config = load_and_migrate_config(&canonical_path).unwrap();
+        let config = load_and_migrate_for_test(&canonical_path, temp.path()).unwrap();
 
         assert_eq!(
             config.tools.postgres.profiles["local"].access_mode,
@@ -1359,21 +1670,197 @@ password = "postgres"
 "#;
         fs::write(&canonical_path, original).unwrap();
 
-        let first = migrate_config_file(&canonical_path).unwrap();
+        let first = migrate_for_test(&canonical_path, temp.path()).unwrap();
         let backup_path = first.backup_path.expect("migration backup");
         assert_eq!(first.migration_outcome, "migrated");
         assert_eq!(fs::read_to_string(&backup_path).unwrap(), original);
+        assert!(
+            backup_path.starts_with(resolve_for_containment(&temp.path().join("backups")).unwrap())
+        );
+        assert!(!PathBuf::from(format!("{}.bak", canonical_path.display())).exists());
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&backup_path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+            assert_eq!(
+                fs::metadata(backup_path.parent().unwrap())
+                    .unwrap()
+                    .permissions()
+                    .mode()
+                    & 0o777,
+                0o700
+            );
+        }
 
         let canonical = fs::read_to_string(&canonical_path).unwrap();
         assert!(canonical.contains("schema_version = \"3.0.0\""));
         assert!(canonical.contains("ssl_mode = \"disable\""));
         assert!(canonical.contains("access_mode = \"read-write\""));
 
-        let second = migrate_config_file(&canonical_path).unwrap();
+        let second = migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(second.migration_outcome, "no-change");
         assert_eq!(second.backup_path, None);
-        assert!(!PathBuf::from(format!("{}.bak.1", canonical_path.display())).exists());
+        assert!(!PathBuf::from(format!("{}.1", backup_path.display())).exists());
         assert_eq!(fs::read_to_string(&canonical_path).unwrap(), canonical);
+    }
+
+    #[test]
+    fn backup_root_ignores_relative_and_project_local_cache_candidates() {
+        let project = tempdir().unwrap();
+        let safe_home = tempdir().unwrap();
+        let config_path = canonical_config_path(project.path());
+        let expected = resolve_for_containment(
+            &safe_home
+                .path()
+                .join(".cache/dotagents/skills/postgres/config-backups"),
+        )
+        .unwrap();
+
+        let relative = select_config_backup_root(
+            &config_path,
+            Some(PathBuf::from(".cache")),
+            Some(safe_home.path().to_path_buf()),
+        )
+        .unwrap();
+        assert_eq!(relative, expected);
+
+        let project_local = select_config_backup_root(
+            &config_path,
+            Some(project.path().join(".cache")),
+            Some(safe_home.path().to_path_buf()),
+        )
+        .unwrap();
+        assert_eq!(project_local, expected);
+    }
+
+    #[test]
+    fn backup_root_ignores_cache_candidates_with_parent_traversal() {
+        let project = tempdir().unwrap();
+        let safe_home = tempdir().unwrap();
+        let config_path = canonical_config_path(project.path());
+        let deceptive_cache = project
+            .path()
+            .parent()
+            .unwrap()
+            .join("missing-cache-parent")
+            .join("..")
+            .join(project.path().file_name().unwrap())
+            .join(".cache");
+
+        let selected = select_config_backup_root(
+            &config_path,
+            Some(deceptive_cache),
+            Some(safe_home.path().to_path_buf()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            selected,
+            resolve_for_containment(
+                &safe_home
+                    .path()
+                    .join(".cache/dotagents/skills/postgres/config-backups")
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn backup_root_fails_when_every_candidate_is_project_local() {
+        let project = tempdir().unwrap();
+        let config_path = canonical_config_path(project.path());
+
+        let error = select_config_backup_root(
+            &config_path,
+            Some(project.path().join("cache")),
+            Some(project.path().to_path_buf()),
+        )
+        .unwrap_err();
+
+        assert!(format!("{error:#}").contains("outside the consuming project"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn backup_root_rejects_symlink_resolving_inside_project() {
+        use std::os::unix::fs::symlink;
+
+        let project = tempdir().unwrap();
+        let safe_home = tempdir().unwrap();
+        let link_root = tempdir().unwrap();
+        let project_cache = project.path().join("cache");
+        fs::create_dir_all(&project_cache).unwrap();
+        let cache_link = link_root.path().join("cache-link");
+        symlink(&project_cache, &cache_link).unwrap();
+        let config_path = canonical_config_path(project.path());
+
+        let selected = select_config_backup_root(
+            &config_path,
+            Some(cache_link),
+            Some(safe_home.path().to_path_buf()),
+        )
+        .unwrap();
+
+        assert_eq!(
+            selected,
+            resolve_for_containment(
+                &safe_home
+                    .path()
+                    .join(".cache/dotagents/skills/postgres/config-backups")
+            )
+            .unwrap()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn backup_creation_skips_existing_symlink_without_touching_its_target() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        fs::write(&canonical_path, "source").unwrap();
+        let backup_root = temp.path().join("backups");
+        let backup_directory = backup_root.join(backup_source_key(&canonical_path));
+        fs::create_dir_all(&backup_directory).unwrap();
+        let victim = temp.path().join("victim");
+        fs::write(&victim, "untouched").unwrap();
+        symlink(&victim, backup_directory.join("config.toml.bak")).unwrap();
+
+        let backup = write_config_backup(&canonical_path, &backup_root, b"original").unwrap();
+
+        assert_eq!(backup.file_name().unwrap(), "config.toml.bak.1");
+        assert_eq!(fs::read_to_string(victim).unwrap(), "untouched");
+        assert_eq!(fs::read_to_string(backup).unwrap(), "original");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn backup_creation_rejects_symlinked_source_key_directory() {
+        use std::os::unix::fs::symlink;
+
+        let temp = tempdir().unwrap();
+        let canonical_path = canonical_config_path(temp.path());
+        fs::create_dir_all(canonical_path.parent().unwrap()).unwrap();
+        fs::write(&canonical_path, "source").unwrap();
+        let backup_root = temp.path().join("backups");
+        fs::create_dir_all(&backup_root).unwrap();
+        let victim = temp.path().join("victim");
+        fs::create_dir_all(&victim).unwrap();
+        symlink(
+            &victim,
+            backup_root.join(backup_source_key(&canonical_path)),
+        )
+        .unwrap();
+
+        let error = write_config_backup(&canonical_path, &backup_root, b"original").unwrap_err();
+
+        assert!(format!("{error:#}").contains("without following symlinks"));
+        assert!(!victim.join("config.toml.bak").exists());
     }
 
     #[test]
@@ -1397,7 +1884,7 @@ password = "postgres"
         )
         .unwrap();
 
-        let result = migrate_config_file(&canonical_path).unwrap();
+        let result = migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(result.migration_outcome, "migrated");
         assert!(result.backup_path.is_some());
         let canonical = fs::read_to_string(&canonical_path).unwrap();
@@ -1423,7 +1910,7 @@ sslmode = "disable"
 "#;
         fs::write(&canonical_path, original).unwrap();
 
-        let first = migrate_config_file(&canonical_path).unwrap();
+        let first = migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(first.migration_outcome, "migrated");
         let backup_path = first.backup_path.expect("legacy-layout backup");
         assert_eq!(fs::read_to_string(backup_path).unwrap(), original);
@@ -1435,7 +1922,7 @@ sslmode = "disable"
         assert!(!canonical.contains("[configuration]"));
         assert!(!canonical.contains("[database.local]"));
 
-        let second = migrate_config_file(&canonical_path).unwrap();
+        let second = migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(second.migration_outcome, "no-change");
         assert_eq!(second.backup_path, None);
     }
@@ -1461,7 +1948,7 @@ password = "postgres"
         )
         .unwrap();
 
-        let result = migrate_config_file(&canonical_path).unwrap();
+        let result = migrate_for_test(&canonical_path, temp.path()).unwrap();
         assert_eq!(result.migration_outcome, "migrated");
         let canonical = fs::read_to_string(&canonical_path).unwrap();
         assert!(canonical.contains("ssl_mode = \"require\""));
@@ -1484,10 +1971,10 @@ password = "postgres"
 "#;
         fs::write(&canonical_path, original).unwrap();
 
-        let error = migrate_config_file(&canonical_path).unwrap_err();
+        let error = migrate_for_test(&canonical_path, temp.path()).unwrap_err();
         assert!(format!("{error:#}").contains("Unsupported schema_version: 99.0.0"));
         assert_eq!(fs::read_to_string(&canonical_path).unwrap(), original);
-        assert!(!PathBuf::from(format!("{}.bak", canonical_path.display())).exists());
+        assert!(!temp.path().join("backups").exists());
     }
 
     #[test]

@@ -25,5 +25,8 @@ tokio-postgres-rustls = "0.14.0"
 toml = "1.1.2"
 url = "2.5.8"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.186"
+
 [dev-dependencies]
 pretty_assertions = "1.4.1"
