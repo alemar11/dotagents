@@ -10,7 +10,9 @@ description: Commit or commit-and-push local changes with explicit staging and d
 Use direct `git` commands. This skill is scriptless by design.
 
 For the common case of a small cohesive change and a user ask like `commit`,
-`commit this`, or `commit and push`, stay on the shortest safe path:
+`commit this`, or `commit and push`, normalize the phrase once to
+`commit_operation=commit-only|commit-and-push|push-only`, then stay on the
+shortest safe path:
 
 1. `git status --short --branch`
 2. `git diff --staged --name-status` to identify anything staged before this
@@ -19,17 +21,18 @@ For the common case of a small cohesive change and a user ask like `commit`,
 4. `git add -- <explicit-paths>`
 5. `git diff --staged`
 6. `git commit -F <message-file>`
-7. `git push` only if the user asked to push
+7. `git push` only for `commit_operation=commit-and-push`
 
 Escalate to broader diff review or split commits only when the worktree is
 mixed, generated files are involved, or the staged scope is still unclear.
 
 If the user asks for a PR, draft PR, branch publication, or "publish", use
-`$gitstack:yeet` instead. If the user says "commit and push" without PR language, treat it
-as push-only. When the user explicitly authorizes direct-to-main issue closure,
-use issue-closing commit trailers such as `Closes #123` only after staging the
-intended paths and verifying the diff. Route GitHub issue comments, labels,
-type changes, follow-up issue creation, or manual closure to `$gitstack:github-issues`.
+`$gitstack:yeet` instead. `commit_operation=push-only` never creates a commit;
+`commit_operation=commit-and-push` does both operations. When the user
+explicitly authorizes direct-to-main issue closure, use issue-closing commit
+trailers such as `Closes #123` only after staging the intended paths and
+verifying the diff. Route GitHub issue comments, labels, type changes,
+follow-up issue creation, or manual closure to `$gitstack:github-issues`.
 
 ## Trigger Cues
 
@@ -60,11 +63,27 @@ git commit -F <message-file>
 git log -1 --pretty=fuller
 ```
 
-For push-only follow-through, append:
+For `commit_operation=commit-and-push`, append:
 
 ```bash
 git push
 ```
+
+For `commit_operation=push-only`, do not use the commit-producing baseline.
+Inspect the existing commit range without staging or committing:
+
+```bash
+git status --short --branch
+git diff --staged --name-status
+git branch --show-current
+git remote get-url origin
+git rev-parse --abbrev-ref --symbolic-full-name @{upstream}
+```
+
+With a verified upstream, inspect `@{upstream}..HEAD` and run `git push`. When
+the branch has no upstream, verify the intended `origin` repository and base,
+inspect `<verified-base>..HEAD`, then use `git push -u origin HEAD`. Stop rather
+than guessing the base, remote, or target branch.
 
 ## Workflow
 
@@ -87,8 +106,11 @@ git push
 7. Commit with `git commit -F <message-file>`.
 8. Verify with `git status --short --branch` and
    `git log -1 --pretty=fuller`.
-9. For push-only requests, use `git push` or `git push -u origin HEAD`.
+9. For `commit_operation=commit-and-push`, use `git push` or
+   `git push -u origin HEAD`; for `push-only`, verify the existing commit range
+   and push without staging or committing.
 
 ## References
 
 - `references/workflows.md`: commit, split-commit, and push-only workflows.
+- `../../references/options.md`: shared canonical GitStack options.

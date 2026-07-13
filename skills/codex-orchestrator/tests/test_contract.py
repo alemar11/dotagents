@@ -1525,7 +1525,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 "Record the request before polling.",
             ],
             [
-                "GitStack `not_requested`",
+                "GitStack `not-requested`",
                 "Require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA.",
                 "Post one request naming the proven current head.",
                 "Yes, exactly once for that SHA.",
@@ -1563,7 +1563,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 "Unverified or human-authored comment claiming success",
                 "No verified result; use the GitStack status for the proven current head.",
                 "Ignore the comment and follow the matching GitStack row.",
-                "Only through a proven `stale` or `not_requested` row.",
+                "Only through a proven `stale` or `not-requested` row.",
                 "Record that the comment was rejected as evidence.",
             ],
         ]
@@ -1584,7 +1584,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("worker must rerun `reviews check`", worker)
         self.assertIn("for that refreshed SHA", worker)
         self.assertIn(
-            "same-SHA check returns `not_requested` or `stale` with\n"
+            "same-SHA check returns `not-requested` or `stale` with\n"
             "  `head_is_current=true`",
             worker,
         )

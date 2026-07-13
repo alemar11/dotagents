@@ -533,7 +533,7 @@ it may only open a PR from an already-pushed branch, record `pr` only.
   GitStack status check for the assigned head. If the result shows the assigned
   head is stale, the root must refresh the assignment to the PR's current SHA
   and the worker must rerun `reviews check` for that refreshed SHA. Request only
-  when that same-SHA check returns `not_requested` or `stale` with
+  when that same-SHA check returns `not-requested` or `stale` with
   `head_is_current=true`. Immediately before requesting, re-read the PR head and
   stop if it changed or the ledger already records a request for that SHA. Root
   retry or fresh-review wording cannot bypass the refreshed check or authorize

@@ -18,7 +18,7 @@ CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
 REVIEW_EXIT_CODES = {
     "clean": 0,
     "findings": 1,
-    "not_requested": 2,
+    "not-requested": 2,
     "acknowledged": 2,
     "pending": 2,
     "stale": 3,
@@ -237,13 +237,13 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
     ):
         status = "stale"
     else:
-        status = "not_requested"
+        status = "not-requested"
 
     return {
         "repo": repo,
         "pr": pr,
         "provider": provider,
-        "status": status,
+        "review_state": status,
         "head": head,
         "current_head": current_head,
         "head_is_current": head_is_current,
@@ -279,8 +279,8 @@ def wait_for_automated_review(
         payload = check_automated_review(repo, pr, provider, expected_head)
         payload["attempts"] = attempts
         payload["elapsed_seconds"] = round(time.monotonic() - started, 3)
-        status = str(payload["status"])
-        if status in {"clean", "findings", "not_requested", "stale"}:
+        status = str(payload["review_state"])
+        if status in {"clean", "findings", "not-requested", "stale"}:
             return payload, REVIEW_EXIT_CODES[status]
         remaining = timeout - (time.monotonic() - started)
         if remaining <= 0:
@@ -500,9 +500,9 @@ def post_replies(repo: str, pr: int, entries: list[dict[str, Any]], body: str, d
 
 
 def render_text(payload: dict[str, Any]) -> str:
-    if "status" in payload:
+    if "review_state" in payload:
         lines = [
-            f"{payload['provider']} review for {payload['repo']}#{payload['pr']}: {payload['status']}",
+            f"{payload['provider']} review for {payload['repo']}#{payload['pr']}: {payload['review_state']}",
             f"head={payload['head']} current={payload['current_head']}",
         ]
         if payload.get("timed_out"):
@@ -617,7 +617,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command in {"check", "wait"}:
             if args.command == "check":
                 payload = check_automated_review(repo, pr, args.provider, args.head)
-                exit_code = REVIEW_EXIT_CODES[str(payload["status"])]
+                exit_code = REVIEW_EXIT_CODES[str(payload["review_state"])]
             else:
                 timeout = duration_seconds(args.timeout, "timeout")
                 interval = duration_seconds(args.interval, "interval")

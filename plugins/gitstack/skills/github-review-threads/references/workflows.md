@@ -11,7 +11,7 @@ wait. Always pass the intended PR head SHA when freshness matters:
 ```
 
 `check` reads once. `wait` polls with bounded backoff until it sees `clean` or
-`findings`, detects `not_requested` or `stale`, or reaches its timeout. The
+`findings`, detects `not-requested` or `stale`, or reaches its timeout. The
 current provider adapter is `codex`; provider-specific bot identities,
 acknowledgements, clean reactions, and review formats belong to the CLI rather
 than this workflow.
@@ -67,7 +67,7 @@ requests:
 Use `--dry-run` unless the user explicitly asked to post the discussion comment
 or a calling skill assignment names the exact PR, comment body, and posting
 authority. `$codex-orchestrator` may use resolved
-`publication_authority=prd-backed-merge-ready-pr` or
+`publication_authority=prd-backed-pull-request` or
 `publication_authority=explicit-owner-authorization` with those actions named
 to post the top-level `@codex review` request and any required root-supplied PR
 discussion disposition for that assigned PR.

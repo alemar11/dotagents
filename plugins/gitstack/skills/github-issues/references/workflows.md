@@ -1,8 +1,9 @@
 # GitHub Issue Workflows
 
 Use these commands for GitHub issue lifecycle work after resolving repository
-context and write mode. Add `--repo <owner>/<repo>` when the current checkout is
-not the target repo or the caller supplied an explicit repository.
+context, `issue_operation`, and `mutation_mode`. Add `--repo <owner>/<repo>`
+when the current checkout is not the target repo or the caller supplied an
+explicit repository.
 
 ## Tracker Write Policy
 
@@ -29,9 +30,16 @@ effective_target: configured-tracker # configured-tracker | draft-publish-comman
 - `local-dry-run`: do not create GitHub issues; local artifact handling belongs
   to the caller.
 
-Direct user instructions such as create, publish, or open the issues also grant
-write mode for the requested operation unless the same request says do not
-mutate GitHub, dry run, draft only, or local-only.
+Normalize that caller-owned policy once at the GitStack boundary:
+
+- `tracker_backend=github` plus `effective_target=configured-tracker` resolves
+  `mutation_mode=apply`.
+- `draft-publish-commands` or `local-dry-run` resolves
+  `mutation_mode=dry-run`.
+
+Direct user instructions such as create, publish, or open the issues resolve
+`mutation_mode=apply` for the requested `issue_operation` unless the same
+request supplies no-mutation evidence, which resolves `mutation_mode=dry-run`.
 
 Legacy tracker configs may still use:
 
@@ -40,10 +48,10 @@ tracker_mode: github # github | local
 tracker_writes: prompt # disabled | prompt | auto
 ```
 
-When present, `tracker_writes: disabled` returns draft commands,
+When present, `tracker_writes: disabled` resolves `mutation_mode=dry-run`,
 `tracker_writes: prompt` asks only if no create/publish/open instruction was
-provided, and `tracker_writes: auto` writes issue-ready content after the normal
-repository and duplicate checks.
+provided, and `tracker_writes: auto` resolves `mutation_mode=apply` after the
+normal repository and duplicate checks.
 
 ## Repository Context
 
@@ -226,6 +234,16 @@ Before closing partially satisfied work, create or link an owner-visible
 follow-up when the effective target permits the write. If a no-mutation override
 is active, keep the source issue open and report the proposed follow-up
 title/body.
+
+## Reopening
+
+Reopen only when the user or calling workflow explicitly requests that state
+transition. Verify the resulting issue state.
+
+```bash
+gh issue reopen <number-or-url> --comment "<reopening rationale>"
+gh issue view <number-or-url> --json number,state,url
+```
 
 ## Dry Runs
 

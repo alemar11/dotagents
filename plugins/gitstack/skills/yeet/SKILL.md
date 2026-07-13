@@ -24,7 +24,7 @@ authenticated `gh` for its preflight and fallback commands.
 If there is no local work to publish, or the request is only GitHub issue
 hygiene such as creating, commenting on, labeling, or closing issues, do not run
 the full publish flow. Route that work to `$gitstack:github-issues`, perform the
-authorized GitHub issue mutation or dry-run draft command,
+authorized GitHub issue operation with resolved `mutation_mode=apply|dry-run`,
 and state that full `yeet` was not applicable.
 
 Prefer the shortest publish path that matches the state in front of you:
@@ -44,7 +44,8 @@ Prefer the shortest publish path that matches the state in front of you:
    and look up an existing open PR for that branch.
 2. Inspect worktree state and confirm the intended scope when it is mixed.
 3. Reuse the current commit when it already represents the intended scope.
-   Otherwise create one through `$gitstack:git-commit` in commit-only mode; Yeet retains
+   Otherwise create one through `$gitstack:git-commit` with
+   `commit_operation=commit-only`; Yeet retains
    ownership of push.
 4. Rerun the complete publish preflight immediately before pushing. Use a
    normal push to the verified upstream, or `git push -u origin HEAD` only when
@@ -62,3 +63,4 @@ Prefer the shortest publish path that matches the state in front of you:
 ## References
 
 - `references/workflows.md`: publish, existing-PR, and retry workflows.
+- `../../references/options.md`: shared canonical GitStack options.

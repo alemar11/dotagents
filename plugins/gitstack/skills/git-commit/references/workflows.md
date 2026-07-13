@@ -10,6 +10,11 @@ Treat these user phrasings as direct entry points into this workflow:
 - `push-only`
 - `stage only these files and commit`
 
+Normalize them once using the shared registry: commit phrases select
+`commit_operation=commit-only`, `commit and push` selects
+`commit_operation=commit-and-push`, and `push-only` selects
+`commit_operation=push-only`.
+
 ## Fast Path
 
 Use when changes are tiny, cohesive, and low risk:
@@ -76,19 +81,19 @@ while excluding other staged paths. Do not use it when only selected hunks of
 an intended file should be committed; stop and ask the user to finish or
 authorize index isolation instead.
 
-If the user said only `commit`, stop after commit verification unless they also
-asked to push.
+For `commit_operation=commit-only`, stop after commit verification. Continue to
+push only for `commit_operation=commit-and-push`.
 
 ## Split Commits
 
 Default to splitting when changes touch unrelated top-level roots or mix
 independent concerns. Stage and verify one commit at a time.
 
-## Issue-Closing Push-Only
+## Issue-Closing Commit And Push
 
-Use when the owner explicitly authorizes committing directly to the current
-branch, pushing, and closing GitHub issues through commit trailers instead of a
-PR.
+Use for `commit_operation=commit-and-push` when the owner explicitly authorizes
+committing directly to the current branch, pushing, and closing GitHub issues
+through commit trailers instead of a PR. This is never a `push-only` path.
 
 ```bash
 git status --short --branch

@@ -46,9 +46,9 @@ The script does not write configuration files.
 
 ## Automated Review State
 
-Both `check` and `wait` return `data.provider`, `data.status`, `data.head`,
+Both `check` and `wait` return `data.provider`, `data.review_state`, `data.head`,
 `data.current_head`, `data.head_is_current`, plus review and request evidence.
-States are `not_requested`, `acknowledged`, `pending`, `clean`, `findings`, and
+States are `not-requested`, `acknowledged`, `pending`, `clean`, `findings`, and
 `stale`.
 
 Exit codes are stable: `0` for clean, `1` for findings, `2` for

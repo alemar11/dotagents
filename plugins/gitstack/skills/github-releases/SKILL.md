@@ -29,13 +29,17 @@ confirmation.
 3. Compare the intended version against package manifests or changelog files.
 4. Treat release creation, tag creation, asset upload, publishing, and deletion
    as mutations that require explicit user authorization. Without that
-   authorization, return the proposed command or draft release notes only.
+   authorization, resolve `mutation_mode=dry-run` and return the proposed
+   command or draft release notes only.
 5. Generate or review notes with `gh release view` and
-   `gh release create --generate-notes` only inside the resolved write mode.
-6. After publishing, verify GitHub Release state and any package registry
-   availability requested by the user.
+   `gh release create --generate-notes` only after resolving
+   `release_operation=inspect|create-tag|draft|publish|upload-asset|delete` and
+   `mutation_mode=apply|dry-run`.
+6. After a mutation, verify the resulting tag, GitHub Release, asset state, and
+   any package registry availability requested by the user.
 
 ## References
 
 - `references/workflows.md`: release, tag, notes, and asset workflows.
 - `references/package-checks.md`: registry availability checks.
+- `../../references/options.md`: shared canonical GitStack options.

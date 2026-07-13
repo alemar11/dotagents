@@ -152,7 +152,11 @@ Bug: <one or two sentences>
 Cause: <code path + confidence>
 Provenance: <introduced/made visible/carried forward by commit/PR/date, or N/A/unknown>
 Best fix: <what should change and why>
-Refactor: <yes/no, specific shape>
+refactor_disposition: <required|optional|not-required>
+refactor_shape: <specific shape|not-applicable>
 Proof: <tests/live/CI/source/dependency docs>
 Risk: <remaining uncertainty>
 ```
+
+Use the canonical values from `../../references/options.md`; keep the
+explanation of why a refactor is or is not warranted in the surrounding prose.

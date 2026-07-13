@@ -55,25 +55,25 @@ This skill only handles GitHub Issues.
 - Treat direct user instructions such as create, publish, or open the issue as
   mutation authority for the requested GitHub issue operation unless the same
   request explicitly says dry run, draft only, local only, or do not mutate.
-- Resolve compact and legacy tracker write policy through
-  `references/workflows.md`; keep the top-level contract focused on the final
-  write mode and requested GitHub operation.
+- Normalize those phrases once to `mutation_mode=apply|dry-run`, and resolve
+  one canonical `issue_operation` from the shared option registry. Resolve
+  compact and legacy tracker policy through `references/workflows.md`.
 - Do not create new label taxonomy unless the repo's tracker configuration or
   user explicitly asks for it.
 
 ## Workflow
 
-1. Resolve the target repository and write mode:
+1. Resolve the target repository and `issue_operation`:
    - current checkout repo,
    - explicit `--repo <owner>/<repo>`,
    - or a target repository supplied by the user or calling workflow.
-2. Resolve the effective target and write mode from the user request or calling
-   workflow handoff, using `references/workflows.md` for legacy tracker fields.
-3. If the resolved write mode says dry run, draft only, local only, or do not
-   mutate, return draft issue bodies and exact `gh` commands without mutating
-   GitHub.
-4. If the resolved write mode requires a user decision before publishing, ask
-   whether to create or update the GitHub issues immediately.
+2. Resolve `mutation_mode` from the user request or calling workflow handoff,
+   using `references/workflows.md` for legacy tracker fields. Default to
+   `dry-run` when mutation authority is absent.
+3. If `mutation_mode=dry-run`, return draft issue bodies and exact `gh`
+   commands without mutating GitHub.
+4. If the evidence requires a user decision before publishing, ask, then store
+   the answer as `mutation_mode=apply|dry-run` rather than branching on prose.
 5. Read the relevant issue or label state before mutation.
 6. For create, edit, or comment operations with generated Markdown, prepare
    safe body files using the pattern in `references/workflows.md`.
@@ -83,7 +83,8 @@ This skill only handles GitHub Issues.
    - add or remove labels,
    - add comments,
    - attach parent/sub-issue relationships,
-   - close only after the requested disposition is explicit.
+   - close only after the requested disposition is explicit,
+   - reopen only when the requested transition is explicit.
 8. If any multi-issue publication step fails after a partial mutation, stop,
    verify the current tracker state, clean up temp files, and retry only the
    missing or incorrect operations. Do not create duplicates from stale local
@@ -107,3 +108,4 @@ This skill only handles GitHub Issues.
 
 - `references/workflows.md`: direct `gh` issue lifecycle commands and dry-run
   conventions.
+- `../../references/options.md`: shared canonical GitStack options.

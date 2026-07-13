@@ -63,7 +63,7 @@ It cannot invoke connector tools.
    scheduling or heartbeat ownership remains with that caller.
 
 For `$codex-orchestrator`, resolved
-`publication_authority=prd-backed-merge-ready-pr` or
+`publication_authority=prd-backed-pull-request` or
 `publication_authority=explicit-owner-authorization` is sufficient only for
 the exact review actions assigned to that PR.
 
@@ -71,3 +71,4 @@ the exact review actions assigned to that PR.
 
 - `references/workflows.md`: feedback, reply, resolution, and fallback flows.
 - `references/script-summary.md`: shared `gitstack reviews` contract.
+- `../../references/options.md`: shared canonical GitStack options and caller handoffs.

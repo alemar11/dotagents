@@ -37,7 +37,8 @@ Apply all of these gates before continuing:
   push target.
 
 After preflight and scope verification, reuse a suitable existing commit or run
-the complete `$gitstack:git-commit` workflow in **commit-only mode**, even when the
+the complete `$gitstack:git-commit` workflow with
+`commit_operation=commit-only`, even when the
 overall user request includes publishing. Do not stage or commit directly in
 Yeet: `$gitstack:git-commit` owns the pre-existing-index guard, explicit staging,
 staged-diff verification, and commit authoring. Do not let the

@@ -34,14 +34,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "1.1.1")
+        self.assertEqual(stdout.getvalue().strip(), "2.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], "2.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -75,7 +75,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], "2.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -140,7 +140,7 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "1.1.1")
+        self.assertEqual(payload["version"], "2.0.0")
         self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
 
     def test_review_reply_uses_pr_scoped_endpoint(self) -> None:
@@ -219,7 +219,7 @@ class ReviewsContractTests(unittest.TestCase):
         ):
             payload = cli.check_automated_review("owner/repo", 12, "codex", head)
 
-        self.assertEqual(payload["status"], "findings")
+        self.assertEqual(payload["review_state"], "findings")
         self.assertEqual(payload["review"]["findings"], 1)
 
     def test_check_codex_reports_acknowledged_request(self) -> None:
@@ -233,8 +233,20 @@ class ReviewsContractTests(unittest.TestCase):
         ):
             payload = cli.check_automated_review("owner/repo", 12, "codex", head)
 
-        self.assertEqual(payload["status"], "acknowledged")
+        self.assertEqual(payload["review_state"], "acknowledged")
         self.assertTrue(payload["request"]["acknowledged"])
+
+    def test_check_codex_emits_canonical_not_requested_state(self) -> None:
+        head = "c" * 40
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "not-requested")
+        self.assertNotIn("not_requested", json.dumps(payload))
 
     def test_check_codex_rejects_stale_review(self) -> None:
         head = "c" * 40
@@ -247,7 +259,7 @@ class ReviewsContractTests(unittest.TestCase):
         ):
             payload = cli.check_automated_review("owner/repo", 12, "codex", head)
 
-        self.assertEqual(payload["status"], "stale")
+        self.assertEqual(payload["review_state"], "stale")
 
     def test_check_never_marks_a_non_current_head_clean(self) -> None:
         current_head = "e" * 40
@@ -260,7 +272,7 @@ class ReviewsContractTests(unittest.TestCase):
         ):
             payload = cli.check_automated_review("owner/repo", 12, "codex", expected_head)
 
-        self.assertEqual(payload["status"], "stale")
+        self.assertEqual(payload["review_state"], "stale")
         self.assertFalse(payload["head_is_current"])
 
     def test_check_rejects_ambiguous_head_prefix(self) -> None:
@@ -280,7 +292,7 @@ class ReviewsContractTests(unittest.TestCase):
         ):
             payload = cli.check_automated_review("owner/repo", 12, "codex", head)
 
-        self.assertEqual(payload["status"], "stale")
+        self.assertEqual(payload["review_state"], "stale")
 
     def test_review_request_rejects_different_sha_with_same_prefix(self) -> None:
         head = "abcdef0" + "1" * 33
@@ -296,7 +308,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertTrue(cli.review_request_matches(request, "codex", head))
 
     def test_wait_times_out_pending_review(self) -> None:
-        pending = {"status": "pending", "repo": "owner/repo", "pr": 12}
+        pending = {"review_state": "pending", "repo": "owner/repo", "pr": 12}
         with mock.patch.object(cli, "check_automated_review", return_value=pending), mock.patch.object(
             cli.time, "monotonic", side_effect=[0.0, 0.0, 2.0]
         ), mock.patch.object(cli.time, "sleep"):
