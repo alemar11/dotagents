@@ -536,9 +536,11 @@ it may only open a PR from an already-pushed branch, record `pr` only.
   closeout target after required validation and publication-safety checks. This
   is the first mode that may place GitHub closing keywords such as `Closes #123`
   in a PR body when the generated issue's closeout path calls for PR-body
-  closure. It does not permit local commits or push unless those modes are also
-  listed, and it does not authorize ready-for-review transition, Codex review
-  request, merge, release, or direct issue mutation.
+  closure. A worker must not add or remove the parent PRD closing keyword; that
+  post-review mutation and its reviewed-head revalidation are root-owned. This
+  mode does not permit local commits or push unless those modes are also listed,
+  and it does not authorize ready-for-review transition, Codex review request,
+  merge, release, or direct issue mutation.
 - `review-ready`: umbrella capability for exact root-listed PR-review
   sub-actions: `mark-ready`, `request-codex-review`, `poll-codex-review`, and
   `post-root-supplied-disposition`. A worker may perform only the listed
@@ -601,6 +603,7 @@ Scope:
 - Publication authority: <none|explicit-owner-authorization|prd-backed-pull-request|blocked, with reason>
 - PR closeout: <merge-ready|draft-only|not-applicable, with explicit draft-only evidence when selected>
 - Issue mutation authority: <none|pr-body-closeout-only|explicit-direct-mutation>
+- Parent PRD closeout: <applicability=required|deferred-vehicle|not-applicable; reason; state=not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked; root-owned parent ref, later closeout vehicle, reviewed head, closeout PR base, current default branch, PR-body evidence, closeout watch, and post-merge proof when applicable>
 - Codex PR review: <not-applicable|not-requested|requested|received|passed|blocked>
 - Codex review evidence: <request-head/object; GitStack checker status; result-head/kind/object; verified provider; terminal status; disposition>
 - Parallelization: <independent|depends-on source/workstream|blocks source/workstream|root-integrated>

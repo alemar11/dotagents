@@ -171,9 +171,24 @@ release-ready, or final status. Pull-request delivery defaults to
 `merge-ready`: validate, leave draft, transition ready, reuse or request exactly
 one Codex review per current head, receive a verified terminal result, resolve
 or disposition findings, publish fixes, verify current CI, and leave the
-publication checkout clean. Use `draft-only` only from an explicit current-user
-PR lifecycle instruction or structured PRD value; initial draft wording,
-`do not merge`, and Plan Feature `draft-output` do not select it.
+publication checkout clean. For a GitHub-backed `merge-ready` final feature or
+integration PR that completes the whole PRD and targets the current default
+branch, add the parent PRD closing keyword only after the current-head Codex
+review gate passes, revalidate that reviewed head around the root-owned PR-body
+update, and require parent closeout `armed` before reporting merge-ready. A
+non-default-base PR may report merge-ready with a linked later default-branch
+closeout vehicle still active; the whole PRD and ledger may not complete until
+that vehicle is armed. Because an armed PR remains mutable until merge, keep a
+root closeout watch only when the root has explicit merge authority and is the
+designated merger; otherwise require a durable owner pre-merge or explicitly
+authorized event-driven-automation handoff before reporting merge-ready. Do not
+mark the parent PRD or ledger complete until merge and actual issue closure are
+verified. Record `not-applicable` for
+an explicitly `draft-only` workstream and other excluded workstreams. This arms
+closure when the PR merges; it does not authorize direct issue closure or merge.
+Use `draft-only` only from an explicit current-user PR lifecycle
+instruction or structured PRD value; initial draft wording, `do not merge`, and
+Plan Feature `draft-output` do not select it.
 
 Merge is root-owned and unavailable by default. Set
 `merge_authority=explicit-owner-authorization` only for an explicit instruction

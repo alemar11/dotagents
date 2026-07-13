@@ -151,8 +151,10 @@ When all acceptance criteria pass and validation is complete:
   `Closes owner/repo#<this-issue-number>` only when that cross-repo closing path
   is intended and supported; otherwise use non-closing links and record the
   coordination closeout action separately. Final-commit closure requires
-  `direct-commit` or another explicit authorization. Do not close the parent PRD
-  unless the maintainer says the whole PRD is complete.
+  `direct-commit` or another explicit authorization. Do not add the parent PRD
+  closing keyword from an individual child issue. For a whole-PRD final feature
+  or integration PR, the root delivery orchestrator adds that parent keyword
+  only after its final current-head review and all PRD closeout gates pass.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
   `issues/done/` on demand after validation and, for `direct-commit`, after the
   commit/proof is recorded. For orchestrator workspace issues, move it only

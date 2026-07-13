@@ -51,19 +51,20 @@ overlapping active-root claims before dispatch.
 
 Classify each overlapping active-root claim as live, stale, released, or
 non-overlapping by reading only the active-root claim, active workers,
-`autonomous`, `ready-next`, and recent notes. If another non-stale active root
-claims overlapping repo realpaths or source ids, stop as `needs-owner`. Report
-the claiming root, overlap, last progress read, and options: resume the
-existing root, wait, hand off, or explicitly take over.
+`autonomous`, `ready-next`, the parent closeout watch, and recent notes. If
+another non-stale active root claims overlapping repo realpaths or source ids,
+stop as `needs-owner`. Report the claiming root, overlap, last progress read,
+and options: resume the existing root, wait, hand off, or explicitly take over.
 
 Staleness is recovery logic, not permission to race. Use `Last Progress Read`
 plus active workstream `Next Check` values to decide whether a claim is stale.
 For a stale overlap with no active workers and no actionable `autonomous` or
-authorized `ready-next` items, preserve history: mark the prior claim
+authorized `ready-next` items, no `root-monitoring` parent closeout watch, and
+no unhanded `armed` parent closeout, preserve history: mark the prior claim
 `released` or `takeover-recorded`, add a dated note naming the new owning
-ledger/root, then continue only after the current ledger has a clear
-active-root claim. Use explicit owner approval when freshness, worker output,
-source mutation, or publication safety is unclear.
+ledger/root, then continue only after the current ledger has a clear active-root
+claim. Use explicit owner approval when freshness, worker output, source
+mutation, or publication safety is unclear.
 
 ## Structured Ledger Values
 
@@ -80,8 +81,10 @@ Use these ledger-owned values:
   follow-up.
 - `active_root_status`: `claimed` means this root currently owns the portfolio
   source graph, `stale` means the claim missed the recorded ledger check window,
-  `released` means closeout completed, and `takeover-recorded` means a new root
-  explicitly recorded a takeover from a stale or owner-approved prior root.
+  `released` means closeout completed or a durable parent-closeout handoff
+  transferred the remaining watch while the ledger stayed `paused`, and
+  `takeover-recorded` means a new root explicitly recorded a takeover from a
+  stale or owner-approved prior root.
 - `active_root_takeover_policy`: `owner-approval` requires an explicit owner
   decision, while `stale-ledger-check` permits takeover only after the recorded
   stale-read note and takeover note are present.
@@ -90,6 +93,10 @@ Use these ledger-owned values:
 - `merge_policy`: `owner-approval` by default or
   `automatic-after-gates` when the explicit merge instruction waives another
   checkpoint after gates pass.
+- `parent_closeout_watch`: `not-applicable`, `root-monitoring`,
+  `owner-handoff`, `automation-handoff`, or `complete`. Owner and automation
+  handoffs release the root only with the durable packet defined below and keep
+  the ledger `paused` until actual parent closure is reconciled.
 - `github_workflow_skill`: the selected `$gitstack:*` workflow skill.
 - `github_primary_transport`: `connector`; authenticated `gh` is fallback only.
 - `github_fallback_reason`: `none`, `connector-unavailable`,
@@ -149,6 +156,8 @@ Takeover policy: owner-approval|stale-ledger-check
 Merge authority: none|explicit-owner-authorization
 Merge policy: owner-approval|automatic-after-gates
 Merge authorization evidence: <owner instruction and timestamp or none>
+Parent closeout watch: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
+Parent closeout watch evidence: <ledger section/fingerprint plus owner-visible handoff or automation id, or none>
 Claimed repo realpaths:
 - <absolute realpath or unknown>; source=<scope evidence>
 Claimed source ids:
@@ -162,7 +171,41 @@ Takeover history:
 Refresh `Last Progress Read` during each wave or due ledger check. Release or
 mark the active-root claim `released` during final closeout when there is no
 active worker, authorized `ready-next` action, or root-owned closeout action
-remaining.
+remaining. An unmerged `armed` parent closeout is a root-owned action unless a
+durable `owner-handoff` or explicitly authorized `automation-handoff` transfers
+the watch; that handoff releases the root with `ledger_status=paused`, never
+`complete`.
+
+## Parent Closeout Watch
+
+Status: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
+Parent PRD: <issue ref or none>
+Closeout PR: <PR ref or pending>
+Armed head: <reviewed SHA or none>
+Closeout base: <branch or none>
+Current default branch: <branch or none>
+PR-body evidence: <URL/fingerprint or none>
+Merge state: open|merged|closed|unknown|not-applicable
+Watch owner: <root id|owner|automation id|none>
+Last checked: <time or none>
+Next check: <time/event/owner action or none>
+Handoff evidence: <persisted owner-visible packet or automation id/config, or none>
+Mutation triggers: <head push, base retarget, default-branch change, PR-body edit, merge>
+Mismatch action: <remove/replace parent closer, set pending-review or deferred-to-default-branch, rerun gates>
+Merge control: <root-authorized-merger|owner-pre-merge-check|event-driven-automation|not-applicable>
+Post-merge proof: <merged head/base/body plus parent issue closed state, or none>
+
+`owner-handoff` requires this packet in the ledger and the same actionable
+packet in the owner-visible final report. `automation-handoff` additionally
+requires explicit owner authority and a real event-driven monitor id/config that
+can catch head, base/default-branch, and body mutations before merge, block the
+merge or disarm the closer on mismatch, and verify post-merge issue state; a
+scheduled poll or suggested automation is not a handoff. `root-monitoring` is
+valid only with explicit merge authority and the root recorded as the designated
+merger. Otherwise require `owner-handoff` before reporting merge-ready. Keep
+`ledger_status=paused` and the parent PRD under `needs-owner` or an active
+monitor until post-merge proof shows the issue closed. Only then set this watch
+to `complete` and parent closeout to `closed`.
 
 ## Recovery Packet
 
@@ -171,7 +214,7 @@ Status: fresh|stale|invalid|unavailable
 Updated: <YYYY-MM-DD HH:MM TZ>
 Projection fingerprint: <sha256 of ledger content before Notes, excluding this Recovery Packet, using runtime-efficiency.md canonical extraction>
 Content fingerprint: <sha256 of packet derived fields, excluding status/timestamps/fingerprints, also recorded under Active Root>
-Root: <root id>; claim=<status>; goal=<objective ref>; active-workers=<ids or none>
+Root: <root id>; claim=<status>; goal=<objective ref>; active-workers=<ids or none>; parent-closeout-watch=<status/ref>
 Current wave: <wave id/status>; current-workstreams=<ids>; next-action=<one bounded action or blocker>
 Authority: source-mutation=<none|propose|write>; publication=<value>; issue-mutation=<value>; merge=<value>; worker-modes=<values>
 Repo checkpoints:
@@ -257,11 +300,30 @@ Use one compact block per active workstream:
 | Wave / status | <wave>; active; last-read=<time>; next-check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | <independent|depends-on|blocks|root-integrated plus proof/dependency refs> |
-| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr-closeout=<merge-ready|draft-only|not-applicable>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
+| Delivery | <local-only|pull-request|direct-commit>; publication=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr-closeout=<merge-ready|draft-only|not-applicable>; issue-mutation=<none|pr-body-closeout-only|explicit-direct-mutation>; parent-prd-applicability=<required|deferred-vehicle|not-applicable>; parent-prd-applicability-reason=<whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent-prd-closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent-prd=<ref|none>; parent-closeout-vehicle=<pr-ref|pending|none>; parent-closeout-head=<sha|none>; parent-closeout-base=<branch|none>; default-branch=<branch|none>; pr-body-evidence=<url/fingerprint|none>; parent-closeout-watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch-evidence=<ref|none>; merge-authority=<none|explicit-owner-authorization>; merge-policy=<owner-approval|automatic-after-gates>; codex-review=<not-applicable|not-requested|requested|received|passed|blocked> |
 | Codex review evidence | request-head=<sha|none>; request-object=<id/url|none>; checker-status=<not-requested|acknowledged|pending|clean|findings|stale|error>; result-head=<sha|none>; result-kind=<formal-review|provider-comment|clean-reaction|none>; result-object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | workflow-skill=<gitstack skill>; primary-transport=connector; operation=<operation>; fallback=<unused|gh>; fallback-reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority-reused=<authority> |
 | Integration | baseline=<commit/wave>; resync=<synced|needs-resync|replaced|root-owned>; publication checkout=<checkout or not-applicable>; caller checkout=<policy> |
 | Gates / proof | <required gates and current proof target> |
+
+For every active row, `parent-prd-applicability=required` requires a parent ref
+and one of `pending-review`, `pending-closeout`, `armed`, or `blocked`.
+`parent-prd-applicability=deferred-vehicle` requires reason `non-default-base`,
+state `deferred-to-default-branch`, and a linked later default-branch
+`parent-closeout-vehicle` or `pending` vehicle-selection action in `ready-next`.
+`parent-prd-closeout=armed` is valid only when `parent-closeout-head` equals the
+current reviewed SHA, `parent-closeout-base` equals the current `default-branch`,
+and `pr-body-evidence` proves the parent closing keyword is present; none of
+those proof fields may be `none`.
+An unmerged `armed` row also requires `parent-closeout-watch=root-monitoring`,
+`owner-handoff`, or `automation-handoff` with matching watch evidence.
+`root-monitoring` additionally requires explicit merge authority and the root as
+the designated merger; `merge-authority=none` requires `owner-handoff`, while
+`automation-handoff` requires an explicitly authorized event-driven monitor.
+`parent-prd-applicability=not-applicable` requires
+`parent-prd-closeout=not-applicable` plus a concrete applicability reason.
+Reconciliation must reject unsupported `armed` or unjustified
+`not-applicable` claims before dispatch, mutation, recovery, or closeout.
 
 When reading legacy ledger rows, migrate
 `prd-backed-merge-ready-pr` to `publication=prd-backed-pull-request` plus
@@ -302,7 +364,9 @@ Rewrite the legacy value whenever the row is touched.
 ### completed
 
 - <source id/ref, runtime delivery, branch/PR/proof, ready-for-review state, Codex
-  review proof, validation, source closeout target and whether it was
+  review proof, parent-PRD closeout state/reviewed head/PR-body evidence when
+  applicable, closeout-watch/post-merge proof when applicable, validation,
+  source closeout target and whether it was
   updated/closed, publication checkout, caller checkout disposition>
 - <worker id/title, integration method, publication checkout, caller checkout
   disposition, worker lifecycle decision, generated ignored artifacts
@@ -386,10 +450,10 @@ claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready`, so ready-for-review transition and Codex review remain actionable after local gates. `pr_closeout=draft-only` is valid only from an explicit current-user instruction about the PR lifecycle or structured PRD field and makes those downstream actions `not-applicable` rather than blocked. |
+| `ready-next` | Owner-ready work still needing review, commit, push, PR, Codex PR review, root-owned parent-PRD PR-body closeout, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. PRD-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready`, so ready-for-review transition, Codex review, and applicable parent-PRD closeout remain actionable after local gates. `pr_closeout=draft-only` is valid only from an explicit current-user instruction about the PR lifecycle or structured PRD field and makes those downstream actions `not-applicable` rather than blocked. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
-| `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked required publication, closeout, or proof remains `needs-owner`, `blocked`, or `deferred`. |
+| `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. A default-branch GitHub whole-PRD closeout PR may report merge-ready with `parent-prd-closeout=armed`, proof, and an active or handed-off watch, but the parent PRD source and portfolio ledger are not complete until the PR merges and the issue is verified closed. A non-default-base PR workstream may complete at merge-ready with `deferred-to-default-branch` only when the linked later vehicle remains `active` or `ready-next`; this never completes the parent PRD or ledger. Authorized `draft-only` and other excluded workstreams record `not-applicable` with a reason. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked or pending required publication, closeout, or proof remains `active`, `ready-next`, `needs-owner`, `blocked`, or `deferred`. |
 | `deferred` | Residual work intentionally outside current closeout. Link the follow-up or proposed body; use only for real residual scope, blocked live proof, or owner-visible follow-up work. |
 | `released` | Release gate passed and actual product/package/version release, deploy, or tag proof is recorded. Ordinary implementation remains `completed` unless a release happened. |
 
@@ -406,6 +470,13 @@ Before marking a ledger `complete`, verify:
   concrete active worker, root-owned next check, or authorized next action, do
   not mark the ledger `complete`; keep the ledger active, paused, or blocked
   and say so in the final report.
+- Do not mark the ledger `complete` while a parent PRD is only `armed`, while a
+  deferred default-branch vehicle remains, or while an owner/automation handoff
+  is waiting for merge. `root-monitoring` keeps the root claimed;
+  `owner-handoff` or `automation-handoff` may release the root only with the
+  durable watch packet and `ledger_status=paused`. Ledger completion requires
+  watch `complete`, parent closeout `closed`, and post-merge proof that GitHub
+  closed the parent issue.
 - `active` contains no worker that is merely done; every active row needs a real
   next check or root-owned closeout action.
 - `autonomous` is empty, or every item was reclassified as non-actionable under
@@ -421,29 +492,49 @@ Before marking a ledger `complete`, verify:
   not mark it complete while ready-for-review transition, current-head review
   preflight, permitted Codex review request, existing-request wait,
   review-triggered fix, post-fix validation, fresh-result wait, or PR-thread
-  disposition remains in `ready-next`. Never keep a duplicate review request in
-  `ready-next` when a terminal result or active request exists for that head.
+  disposition remains in `ready-next`. For a default-branch GitHub whole-PRD
+  closeout vehicle, merge-ready reporting requires `parent-prd-closeout=armed`,
+  the parent ref, a `parent-closeout-head` equal to the current reviewed SHA, a
+  `parent-closeout-base` equal to the current `default-branch`, PR-body evidence,
+  current live-body fingerprint matching that evidence, and a valid closeout
+  watch. With no merge authority the watch must be `owner-handoff`; use
+  `root-monitoring` only when the root has explicit merge authority and is the
+  designated merger, and use `automation-handoff` only for an explicitly
+  authorized event-driven monitor. Parent-source and ledger completion
+  additionally require the PR merged, parent closeout `closed`, watch
+  `complete`, and post-merge issue-closure proof.
+  A non-default-base PR workstream may report merge-ready with
+  `deferred-to-default-branch` only when its linked later closeout vehicle stays
+  `active` or `ready-next`. Authorized `draft-only` workstreams and other
+  excluded workstreams must record `not-applicable` with a reason. Never keep a
+  duplicate review request in `ready-next` when a terminal result or active
+  request exists for that head.
 - When `pr_closeout=draft-only`, require validated draft publication and the
   explicit current-user instruction about the PR lifecycle or structured PRD
-  field, record downstream ready/review/merge-ready gates as `not-applicable`,
-  and allow completion at that requested state. If the user removes the
+  field, record downstream ready/review/merge-ready gates and parent PRD
+  closeout as `not-applicable` with reason `draft-only`, and allow completion at
+  that requested state. If the user removes the
   restriction, change the value to `merge-ready` and resume at ready-for-review.
 - For merge-ready closeout, verify the publication checkout is clean, accepted
   review fixes are committed and pushed to the PR branch, current CI belongs to
   the pushed head, GitStack reports or authenticated supplemental evidence proves
   a terminal Codex result for that same head, and unresolved review threads are
   either fixed, explicitly dispositioned, or recorded as a blocker. Record the
-  request/result ids so reconciliation reuses them instead of retriggering. If
-  any check fails, keep the ledger active, `ready-next`, or blocked instead of
-  `complete`.
+  request/result ids so reconciliation reuses them instead of retriggering. For
+  an applicable parent PRD, also verify the armed closeout head equals that
+  current result head, the closeout PR still targets the current default branch,
+  and the recorded PR-body evidence still contains the parent closing keyword.
+  If any check fails, keep the ledger active,
+  `ready-next`, or blocked instead of `complete`.
 - `needs-owner` and `blocked` entries are explicitly non-Codex-actionable and
   include decision briefs, blockers, evidence, and minimum next actions.
 - `deferred` contains only residual work with a linked or proposed
   owner-visible follow-up.
 - `completed` records the final proof, source closeout state, integration
   method, publication state, ready-for-review state, Codex review proof,
-  publication checkout, caller checkout disposition, and worker lifecycle
-  decision for each completed worker-backed item.
+  applicable parent-PRD closeout state/head/PR-body evidence, closeout-watch and
+  post-merge proof, publication checkout, caller checkout disposition, and
+  worker lifecycle decision for each completed worker-backed item.
 - Generated ignored artifacts and helper worktrees are either removed, retained
   for inspection with a reason, left only inside a helper worktree with an
   explicit lifecycle decision, or explicitly handed off.
@@ -490,8 +581,8 @@ After recording the result, refresh the recovery packet from the reconciled
 projection and record only its changed sections and new fingerprint in normal
 progress output.
 
-Before setting the ledger `complete` or releasing the active root, run the
-reconciliation after the last source mutation and verify these invariants:
+Before setting the ledger `complete`, run the reconciliation after the last
+source mutation and verify these invariants:
 
 - no closed source is described as open or pending in a current-state field;
 - no merged PR is described as draft, open, or merge-ready-only;
@@ -499,9 +590,24 @@ reconciliation after the last source mutation and verify these invariants:
 - every fallback records its GitStack workflow, primary connector attempt,
   authenticated `gh` fallback, and authority reuse;
 - merge proof exists only when explicit merge authority exists;
+- every default-branch whole-PRD closeout vehicle is merged with
+  `parent-prd-closeout=closed`, `parent-closeout-watch=complete`, matching armed
+  head/base/body history, and post-merge proof that the parent issue closed; no
+  `armed` unmerged PR or `deferred-to-default-branch` vehicle remains
+  outstanding;
+  every authorized `draft-only` or otherwise excluded workstream records
+  `not-applicable` with a reason;
 - the current gate matrix, workstream rows, bucket membership, wave report,
   root status, and final note agree.
 
 If any invariant fails, keep the ledger active or blocked and repair the
 current projection before final status. Historical notes are evidence, not a
 substitute for current-state reconciliation.
+
+Releasing the active root before parent closure is a distinct handoff, not
+ledger completion. It requires a fresh reconciliation, a complete
+`owner-handoff` or explicitly authorized `automation-handoff` packet under
+`## Parent Closeout Watch`, the same actionable packet in the owner-visible
+final report, `ledger_status=paused`, and the PRD retained under `needs-owner`
+or the named active monitor. Otherwise keep the root `claimed` and the watch
+`root-monitoring` until the merge and actual parent closure are verified.

@@ -132,8 +132,9 @@ explicit maintainer authorization. The issue closes when that PR or authorized
 commit reaches the default branch.
 
 Use closing keywords only for issues actually satisfied by the change. Do not
-close the parent PRD issue from a child implementation issue unless the
-maintainer explicitly says the whole PRD is complete.
+add the parent PRD closing keyword from an individual child issue. For a
+whole-PRD final feature or integration PR, the root delivery orchestrator may
+add that parent keyword only after its review and all PRD closeout gates pass.
 
 ## When a skill says "fetch the relevant issue"
 

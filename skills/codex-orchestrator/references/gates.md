@@ -79,9 +79,10 @@ to imply local commit creation.
 For PRD-backed `pull-request` workflows,
 `publication_authority=prd-backed-pull-request` satisfies authorization for
 commit, push, initial draft PR creation, ready-for-review transition, Codex
-review, and required discussion disposition after tests, integration checks,
-and `$autoreview` pass, unless the owner restricted the request to local-only,
-inspect-only, no-push, no-PR, or equivalent work. Default
+review, required discussion disposition, and the root-owned gated final PR-body
+parent-PRD closeout update after tests, integration checks, and `$autoreview`
+pass, unless the owner restricted the request to local-only, inspect-only,
+no-push, no-PR, or equivalent work. Default
 `pr_closeout=merge-ready`. Set `pr_closeout=draft-only` only from an explicit
 current-user instruction about the PR lifecycle or structured PRD field;
 PR-shape prose, `do not merge`, and `draft-output` do not select it.
@@ -177,12 +178,21 @@ the PR is still draft after local gates pass or missing a satisfied
 `codex-pr-review` gate. Either record the PR URL, ready-for-review state, Codex
 review evidence when required, and PR-body closeout path, or record the blocker
 and move the publication or review action to `needs-owner`, `blocked`, or
-`deferred`. When `pr_closeout=draft-only`, require validation and the expected
-draft PR, record the explicit restriction, and mark ready/review/merge-ready
-gates `not-applicable`; the requested terminal state is not itself a blocker.
-Treat direct issue comments, labels, manual issue closure, parent
-PRD closure, merge, and release as separate mutations that require explicit
-authority.
+`deferred`. For a default-branch GitHub PR that is the whole-PRD closeout
+vehicle, do not declare completion or merge-ready until the current-head
+`codex-pr-review` gate passes, all PRD closeout proof is satisfied, and the PR
+body has been updated with the parent PRD closing keyword. A non-default-base PR
+may report merge-ready only through the linked deferred-vehicle path below.
+When `pr_closeout=draft-only`, require validation
+and the expected draft PR, record the explicit restriction, and mark
+ready/review/merge-ready gates `not-applicable`; the requested terminal state
+is not itself a blocker. Record parent PRD closeout as `not-applicable` with
+reason `draft-only`; if the restriction is later removed, return it to
+`pending-review` and resume the merge-ready flow. Direct issue comments, labels,
+manual issue or parent PRD closure, merge, and release are separate mutations requiring explicit
+authority; the gated parent closing keyword in the final PR body is part of
+`prd-backed-pull-request` publication authority and closes the parent only on
+merge.
 
 For local markdown sources using `pull-request` delivery with
 `pr_closeout=merge-ready`, do not move the issue to
@@ -296,27 +306,33 @@ retry instructions cannot override unchanged-head idempotency.
 1. Verify the PR exists, targets the expected branch/base, contains the latest
    intended commit, and has passed required local gates plus current CI or a
    recorded CI blocker.
-2. If the PR is still draft, mark it ready for review with `gh pr ready <pr>`
+2. Reconcile the PR body before current-head review preflight. If it already
+   contains the parent PRD closing keyword while parent closeout is not `armed`
+   with the same current reviewed SHA and recorded PR-body evidence, the root
+   must remove it or replace it with a non-closing reference and record
+   `pending-review`. If the authorized root cannot disarm it, record `blocked`
+   and stop before merge-ready.
+3. If the PR is still draft, mark it ready for review with `gh pr ready <pr>`
    or an equivalent authorized GitHub action, then record the non-draft state.
-3. Run GitStack `reviews check --provider codex` with the exact current head.
+4. Run GitStack `reviews check --provider codex` with the exact current head.
    Apply the returned status and the matrix before posting anything. Use an
    authenticated connector read only for supplemental terminal-comment evidence
    or the documented checker fallback.
-4. Only when the matrix permits it, immediately re-read the PR head and verify
+5. Only when the matrix permits it, immediately re-read the PR head and verify
    it still equals the checked SHA and the ledger has no request object for that
    SHA. Then post exactly one top-level PR comment. The official trigger is
    exactly `@codex review`; name the current head and add a short focus only when
    useful. Record the request object and head before any other action.
-5. Run bounded GitStack `reviews wait --provider codex` against the same head.
+6. Run bounded GitStack `reviews wait --provider codex` against the same head.
    Reuse the request across `acknowledged`, `pending`, and timeouts; never post
    another request merely because the wait returned without a terminal result.
    If no terminal result appears, record the blocker and troubleshooting
    evidence: Code review enabled for the repository, Codex cloud configured for
    the repository, exact trigger used, request object, and current head.
-6. Evaluate Codex feedback. Fix accepted actionable findings, rerun the relevant
+7. Evaluate Codex feedback. Fix accepted actionable findings, rerun the relevant
    tests, `$autoreview`, CI, and review-thread checks, then push the update and
    run the request matrix for the new head when the diff materially changed.
-7. For findings judged non-actionable, not applicable, or intentionally
+8. For findings judged non-actionable, not applicable, or intentionally
    deferred, post a PR discussion update with the disposition, evidence, and
    validation so the discussion is not left silent. If Codex reports no
    findings, or every finding is fully addressed by commits plus validation,
@@ -334,7 +350,10 @@ Use this closeout state order for merge-ready PR work:
 7. `fixes-validated-and-pushed`
 8. `post-fix-ci-current`
 9. `fresh-current-head-result-current`
-10. `merge-ready-report`
+10. `parent-prd-closeout-resolved` (`armed`, `deferred-to-default-branch`, or `not-applicable`)
+11. `post-closeout-head-current` (`pass` for `armed`; otherwise `not-applicable` with reason)
+12. `parent-closeout-watch-established` (`root-monitoring`, `owner-handoff`, `automation-handoff`, or `not-applicable`)
+13. `merge-ready-report`
 
 Do not final-answer from an intermediate state as complete, released, or
 merge-ready. Keep the ledger active, `ready-next`, or blocked while review is
@@ -349,6 +368,77 @@ exists for the current PR head, actionable feedback is fixed or explicitly
 dispositioned, the PR discussion was updated or explicitly marked
 `no-update-needed`, and no required check blocks human merge. It does not
 authorize merging the PR.
+
+After this gate passes, resolve parent PRD closeout before the merge-ready
+report. A final feature or integration PR that completes the whole PRD and
+targets the repository's current default branch must add the parent PRD closing
+keyword. Verify the PR body now closes every satisfied generated issue plus the
+parent PRD, record the updated body URL or fingerprint, and leave the PRD open
+until GitHub processes the closing keyword on merge. If the PR targets a
+non-default branch, leave the keyword absent, record
+`deferred-to-default-branch`, and select or create a linked later default-branch
+PR as the parent closeout vehicle; do not record `armed` for the
+non-default-branch PR. The current PR may report merge-ready after its own gates
+pass, but keep the later closeout vehicle in `ready-next` or `active` and do not
+mark the whole PRD or ledger complete until that vehicle reaches `armed`. If any PRD scope,
+dependency, integration proof, or required domain closeout remains, also leave
+the parent keyword absent and record `pending-closeout`; use `blocked` only when
+an external condition prevents the next safe action. For partial PRs, ad hoc
+PRs, local-tracker PRs, and workstreams without a parent GitHub PRD, record
+parent closeout as `not-applicable` and continue.
+
+Immediately before the root updates the PR body, re-read the PR head and require
+it to equal the reviewed SHA; also re-read the current default branch and
+require the PR base to match it. Re-read the head, current default branch, PR
+base, and current PR body after the body update and immediately before the
+merge-ready report. Require the live body or its fingerprint to match the
+recorded closeout evidence and contain exactly the intended parent closer. If
+the head differs, do not add the parent keyword, or remove/replace an
+already-added parent closing keyword with a non-closing reference, set
+`parent-prd-closeout=pending-review`, and return to current-head review
+preflight. If the default branch or PR base no longer matches, disarm the keyword
+and record `deferred-to-default-branch` until a linked default-branch closeout
+vehicle passes the gates. If only the body differs, set
+`parent-prd-closeout=pending-closeout`, reconcile the live body without
+overwriting concurrent edits, and repeat the post-update checks. Any relevant
+change after `armed` invalidates that state and requires the matching
+disarm-and-review, body-reconciliation, or closeout-vehicle cycle.
+
+`armed` is not terminal parent closure while the PR remains open. Before
+releasing the active root, establish exactly one parent closeout watch:
+
+- `root-monitoring`: use only when
+  `merge_authority=explicit-owner-authorization` and the root is the designated
+  merger. Keep the root claim active through the root-controlled merge and
+  actual PRD closure check. Immediately before merge, re-read the PR head, base,
+  current default branch, and live body fingerprint; on any mismatch disarm the
+  parent closer and stop the merge for the matching review or closeout cycle;
+- `owner-handoff`: required when `merge_authority=none` or another actor will
+  merge. Move the unmerged parent closeout to `needs-owner`, keep the ledger
+  `paused`, and record an owner-visible handoff that requires rechecking the PR
+  head, base, current default branch, and body fingerprint immediately before
+  merge; on any mismatch the owner must not merge and must return the work to
+  the orchestrator for disarm/review;
+- `automation-handoff`: use only when the owner explicitly authorized a real
+  event-driven monitor that can observe head, base/default-branch, and PR-body
+  mutations before merge, block the merge or disarm the closer on mismatch, and
+  verify post-merge issue state. Record its id, event triggers, last successful
+  check, and identical mismatch/disarm behavior; or
+- `not-applicable`: only when parent closeout itself is not applicable.
+
+The durable watch packet must name the PR, parent PRD, reviewed SHA,
+base/default branch, PR-body evidence, mutation triggers, and post-merge
+issue-state check. A final report alone is owner-visible but is not durable
+handoff evidence unless the same packet is persisted in the ledger. Do not set
+the ledger `complete` while the parent is merely `armed` or
+`deferred-to-default-branch`; a released root with owner or automation handoff
+leaves the ledger `paused`, not complete.
+
+After merge, verify that the merged head/base and closing keyword still match
+the armed evidence and that GitHub actually closed the parent PRD. Only then set
+the watch to `complete` and parent closeout to `closed`. If the PR merged but the issue
+remains open, record `needs-owner`; direct closure still requires
+`explicit-direct-mutation`.
 
 ### Owner Decision Gate
 

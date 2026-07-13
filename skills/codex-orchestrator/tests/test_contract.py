@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 from pathlib import Path
 
@@ -405,6 +406,145 @@ class OrchestratorContractTests(unittest.TestCase):
             "Reuse the request across `acknowledged`, `pending`, and timeouts",
             gates,
         )
+
+    def test_parent_prd_closeout_follows_successful_current_head_review(self) -> None:
+        skill = self.read("SKILL.md")
+        delivery = self.read("references/prd-backed-delivery.md")
+        gates = self.read("references/gates.md")
+        ledger = self.read("references/ledger.md")
+        worker = self.read("references/worker.md")
+        issue_phase = (
+            ROOT / "skills/plan-feature/references/issue-phase.md"
+        ).read_text(encoding="utf-8")
+        issue_template = (
+            ROOT / "skills/plan-feature/references/issue-body-template.md"
+        ).read_text(encoding="utf-8")
+        tracker = (
+            ROOT / "skills/project-memory/references/issue-tracker-github.md"
+        ).read_text(encoding="utf-8")
+        normalized_skill = " ".join(skill.split())
+        normalized_gates = " ".join(gates.split())
+
+        state_section = gates.split(
+            "Use this closeout state order for merge-ready PR work:", 1
+        )[1].split("Do not final-answer", 1)[0]
+        states = [
+            match.group(1)
+            for line in state_section.splitlines()
+            if (match := re.match(r"\d+\. `([^`]+)`", line))
+        ]
+
+        self.assertLess(
+            states.index("fresh-current-head-result-current"),
+            states.index("parent-prd-closeout-resolved"),
+        )
+        self.assertLess(
+            states.index("parent-prd-closeout-resolved"),
+            states.index("post-closeout-head-current"),
+        )
+        self.assertLess(
+            states.index("post-closeout-head-current"),
+            states.index("parent-closeout-watch-established"),
+        )
+        self.assertLess(
+            states.index("parent-closeout-watch-established"),
+            states.index("merge-ready-report"),
+        )
+        self.assertIn("current-head Codex review gate passes", normalized_skill)
+        self.assertIn("`Closes #<PRD-number>`", delivery)
+        self.assertIn("`Closes owner/repo#<PRD-number>`", delivery)
+        self.assertIn("all PRD closeout proof is satisfied", gates)
+        self.assertIn(
+            "parent-prd-closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>",
+            ledger,
+        )
+        self.assertIn(
+            "parent-prd-applicability=<required|deferred-vehicle|not-applicable>",
+            ledger,
+        )
+        self.assertIn("parent-prd-applicability-reason=", ledger)
+        self.assertIn("parent-closeout-head=<sha|none>", ledger)
+        self.assertIn("parent-closeout-base=<branch|none>", ledger)
+        self.assertIn("parent-closeout-vehicle=<pr-ref|pending|none>", ledger)
+        self.assertIn(
+            "parent-closeout-watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>",
+            ledger,
+        )
+        self.assertIn("default-branch=<branch|none>", ledger)
+        self.assertIn("none of\nthose proof fields may be `none`", ledger)
+        self.assertIn("requires\n`parent-prd-closeout=not-applicable`", ledger)
+        closeout_hygiene = ledger.split("## Closeout Hygiene", 1)[1]
+        self.assertIn(
+            "merge-ready reporting requires `parent-prd-closeout=armed`",
+            " ".join(closeout_hygiene.split()),
+        )
+        self.assertIn(
+            "`parent-closeout-head` equal to the current reviewed SHA",
+            closeout_hygiene,
+        )
+        self.assertIn("PR-body evidence", closeout_hygiene)
+        self.assertIn(
+            "excluded workstreams must record `not-applicable`", closeout_hygiene
+        )
+        self.assertIn("A worker must not add or remove the parent PRD", worker)
+        self.assertIn("post-review mutation", worker)
+        self.assertIn("Immediately before the root updates the PR body", gates)
+        self.assertIn("immediately before the merge-ready report", normalized_gates)
+        self.assertIn("set\n`parent-prd-closeout=pending-review`", gates)
+        self.assertIn("current PR body after the body update", normalized_gates)
+        self.assertIn("live body or its fingerprint", normalized_gates)
+        self.assertIn(
+            "`merge_authority=explicit-owner-authorization`", gates
+        )
+        self.assertIn(
+            "required when `merge_authority=none`", gates
+        )
+        self.assertIn("real event-driven monitor", normalized_gates)
+        self.assertIn(
+            "record parent closeout as `not-applicable`", normalized_gates
+        )
+        self.assertIn(
+            "Reconcile the PR body before current-head review preflight", gates
+        )
+        self.assertIn(
+            "must remove it or replace it with a non-closing reference", gates
+        )
+        self.assertIn("A pre-existing keyword is\nnever proof", delivery)
+        self.assertIn("current default branch", delivery)
+        self.assertIn("require the PR base to match it", gates)
+        self.assertIn(
+            "select or create a linked later default-branch PR", normalized_gates
+        )
+        self.assertIn("current PR may report merge-ready", normalized_gates)
+        self.assertIn("state `deferred-to-default-branch`", ledger)
+        self.assertIn("reason `draft-only`", closeout_hygiene)
+        self.assertIn(
+            "no `armed` unmerged PR or `deferred-to-default-branch` vehicle remains outstanding",
+            " ".join(ledger.split()),
+        )
+        self.assertIn("## Parent Closeout Watch", ledger)
+        self.assertIn("Do not mark the ledger `complete` while a parent PRD is only `armed`", ledger)
+        self.assertIn("watch `complete`, parent closeout `closed`", ledger)
+        self.assertIn("`armed` is not terminal parent closure", gates)
+        self.assertIn("durable watch packet", gates)
+        self.assertIn("parent closeout to `closed`", gates)
+        self.assertIn("Treat `armed` as a monitored pre-merge state", delivery)
+        self.assertIn(
+            "`parent-closeout-base` equal to the current `default-branch`",
+            closeout_hygiene,
+        )
+        for producer in (issue_phase, issue_template, tracker):
+            normalized = " ".join(producer.split())
+            self.assertIn("Do not add the parent PRD", normalized)
+            self.assertIn("all PRD closeout gates pass", normalized)
+            self.assertNotIn(
+                "unless the maintainer says the whole PRD is complete", producer
+            )
+        for plan_producer in (issue_phase, issue_template):
+            normalized = " ".join(plan_producer.split())
+            self.assertIn("root delivery orchestrator", normalized)
+            self.assertIn("final current-head review", normalized)
+        self.assertIn("root delivery orchestrator", " ".join(tracker.split()))
 
 
 if __name__ == "__main__":

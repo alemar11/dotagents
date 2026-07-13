@@ -544,8 +544,10 @@ Every published or returned issue must state its completion path:
 
 - GitHub: close the implementation issue from the relevant PR body with a
   closing keyword, following `Closeout`. Final-commit closure requires
-  `direct-commit` or another explicit authorization. Do not close the PRD parent
-  unless the maintainer says the whole PRD is complete.
+  `direct-commit` or another explicit authorization. Do not add the parent PRD
+  closing keyword from an individual child issue. For a whole-PRD final feature
+  or integration PR, the root delivery orchestrator adds that parent keyword
+  only after its final current-head review and all PRD closeout gates pass.
 - Local markdown: move the issue to `issues/done/<NN>-<slug>.md` after
   validation, creating `issues/done/` on demand. Orchestrator workspace issues
   also require recorded cross-repo integration proof. Do not delete the file or
