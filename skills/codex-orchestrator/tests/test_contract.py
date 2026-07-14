@@ -236,7 +236,7 @@ class OrchestratorContractTests(unittest.TestCase):
         issue_template = (
             ROOT / "skills/plan-feature/references/issue-body-template.md"
         ).read_text(encoding="utf-8")
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         worker = self.read("references/worker.md")
 
         for text in (issue_template, delivery, worker):
@@ -245,7 +245,7 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_merge_is_root_owned_and_explicit(self) -> None:
         worker = self.read("references/worker.md")
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         gates = self.read("references/gates.md")
 
         authorization_row = next(
@@ -469,7 +469,7 @@ class OrchestratorContractTests(unittest.TestCase):
         }
         scoped_values = {
             "source_mutation_authority": ("none", "default", "none"),
-            "publication_authority": ("prd-backed-pull-request", "source-contract", "issue-1"),
+            "publication_authority": ("spec-backed-pull-request", "source-contract", "issue-1"),
             "issue_mutation_authority": ("pr-body-closeout-only", "source-contract", "issue-1"),
             "merge_authority": ("none", "default", "none"),
             "merge_policy": ("owner-approval", "default", "none"),
@@ -1075,7 +1075,7 @@ class OrchestratorContractTests(unittest.TestCase):
             invalid_publication = row(
                 "workstream:a",
                 "publication_authority",
-                ("prd-backed-pull-request", "default", "none"),
+                ("spec-backed-pull-request", "default", "none"),
             )
             invalid_source = run(
                 complete_ids,
@@ -1086,7 +1086,7 @@ class OrchestratorContractTests(unittest.TestCase):
             empty_evidence_publication = row(
                 "workstream:a",
                 "publication_authority",
-                ("prd-backed-pull-request", "source-contract", ""),
+                ("spec-backed-pull-request", "source-contract", ""),
             )
             empty_evidence = run(
                 complete_ids,
@@ -1633,28 +1633,28 @@ class OrchestratorContractTests(unittest.TestCase):
     def test_pr_closeout_branches_only_on_canonical_values(self) -> None:
         gates = self.read("references/gates.md")
         rows = self.table_rows(
-            "references/prd-backed-delivery.md",
+            "references/spec-backed-delivery.md",
             "## Canonical PR Closeout Resolution",
         )
 
         merge_ready = next(row for row in rows if row[:4] == [
-            "`pull-request`", "`prd-backed-pull-request`", "`merge-ready`", "`required`"
+            "`pull-request`", "`spec-backed-pull-request`", "`merge-ready`", "`required`"
         ])
         self.assertIn("Codex review", merge_ready[5])
 
         skip_review = next(row for row in rows if row[:4] == [
-            "`pull-request`", "`prd-backed-pull-request`", "`merge-ready`", "`skip`"
+            "`pull-request`", "`spec-backed-pull-request`", "`merge-ready`", "`skip`"
         ])
         self.assertIn("skip Codex review request/wait", skip_review[5])
         self.assertIn("parent closeout", skip_review[5])
 
         draft_only = next(row for row in rows if row[:4] == [
-            "`pull-request`", "`prd-backed-pull-request`", "`draft-only`", "`not-applicable`"
+            "`pull-request`", "`spec-backed-pull-request`", "`draft-only`", "`not-applicable`"
         ])
         self.assertIn("do not mark ready", draft_only[5])
         self.assertNotIn(
             "| `delivery_mode` | `no_mutation_override` |",
-            self.read("references/prd-backed-delivery.md"),
+            self.read("references/spec-backed-delivery.md"),
         )
         self.assertIn(
             "Draft-only makes downstream ready/review/merge-ready\n"
@@ -1663,7 +1663,7 @@ class OrchestratorContractTests(unittest.TestCase):
         )
 
     def test_runtime_contract_has_no_phrase_choice_matrix(self) -> None:
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         worker = self.read("references/worker.md")
 
         self.assertNotIn("## PR Closeout Resolution Matrix", delivery)
@@ -1677,7 +1677,7 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_codex_review_policy_is_default_required_and_owner_scoped_skip(self) -> None:
         options = self.read("references/options.md")
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         gates = self.read("references/codex-review-closeout.md")
         ledger_template = self.read("references/ledger-template.md")
         worker = self.read("references/worker.md")
@@ -1724,17 +1724,18 @@ class OrchestratorContractTests(unittest.TestCase):
         ):
             self.assertNotIn("codex_review_policy", path.read_text())
 
-    def test_legacy_handoff_is_normalized_before_prd_routing(self) -> None:
+    def test_legacy_handoff_is_normalized_before_spec_routing(self) -> None:
         skill = self.read("SKILL.md")
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         rows = self.table_rows(
-            "references/prd-backed-delivery.md",
+            "references/spec-backed-delivery.md",
             "### Legacy Handoff Migration",
         )
 
-        self.assertIn("legacy `Source PRD` data field", skill)
-        source_prd = self.row_containing(rows, "`Source PRD`")
-        self.assertEqual(source_prd[1], "`source_prd_ref`")
+        self.assertIn("`source_spec_ref`", skill)
+        retired_source_label = "Source " + "Feature Spec"
+        self.assertNotIn(retired_source_label, skill)
+        self.assertNotIn(retired_source_label, delivery)
 
         pr_shape = self.row_containing(rows, "`PR shape`")
         self.assertEqual(pr_shape[1], "`pr_shape`")
@@ -1850,7 +1851,7 @@ class OrchestratorContractTests(unittest.TestCase):
         ledger_template = self.read("references/ledger-template.md")
         options = self.read("references/options.md")
         gates = self.read("references/gates.md")
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
 
         self.assertIn("- pr_shape: <single-pr|per-repo-pr|none>", worker)
         self.assertIn("pr_shape=<single-pr|per-repo-pr|none>", ledger_template)
@@ -1897,7 +1898,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertNotIn("owner explicitly authorizes temporary-source execution", delivery)
         self.assertIn("`scope-transfer-ref=run`", delivery)
         self.assertIn("changing only `scope-ref` to that workstream", delivery)
-        self.assertIn("A PRD-backed scope transfer is valid only", options)
+        self.assertIn("A Feature Spec-backed scope transfer is valid only", options)
 
     def test_requested_and_actual_worker_surfaces_use_distinct_canonical_fields(self) -> None:
         worker = self.read("references/worker.md")
@@ -1910,33 +1911,23 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertNotIn(stale, worker)
             self.assertNotIn(stale, ledger_template)
 
-    def test_legacy_publication_authority_values_migrate_to_separate_closeout(self) -> None:
+    def test_retired_publication_authority_aliases_are_not_supported(self) -> None:
         ledger_template = self.read("references/ledger-template.md")
-        rows = self.table_rows(
-            "references/prd-backed-delivery.md",
-            "### Legacy Authority Migration",
-        )
+        delivery = self.read("references/spec-backed-delivery.md")
+        retired_suffixes = ("backed-merge-ready-pr", "backed-branch-plus-draft-pr")
 
-        merge_ready = self.row_containing(rows, "prd-backed-merge-ready-pr")
-        self.assertEqual(merge_ready[1], "`prd-backed-pull-request`")
-        self.assertEqual(merge_ready[2], "`merge-ready`")
-
-        draft_named = self.row_containing(rows, "prd-backed-branch-plus-draft-pr")
-        self.assertEqual(draft_named[1], "`prd-backed-pull-request`")
-        self.assertIn("otherwise `merge-ready`", draft_named[2])
-
-        for legacy in (merge_ready[0].strip("`"), draft_named[0].strip("`")):
-            self.assertIn(legacy, ledger_template)
-        self.assertIn("publication_authority=prd-backed-pull-request", ledger_template)
-        self.assertIn("default it to `merge-ready`", ledger_template)
+        for retired_suffix in retired_suffixes:
+            self.assertNotIn(retired_suffix, ledger_template)
+            self.assertNotIn(retired_suffix, delivery)
+        self.assertNotIn("### Legacy Authority Migration", delivery)
 
     def test_plan_feature_and_orchestrator_share_pr_closeout_contract(self) -> None:
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         options = (
             ROOT / "skills/plan-feature/references/options.md"
         ).read_text(encoding="utf-8")
-        prd_template = (
-            ROOT / "skills/plan-feature/references/prd-template.md"
+        spec_template = (
+            ROOT / "skills/plan-feature/references/spec-template.md"
         ).read_text(encoding="utf-8")
         issue_template = (
             ROOT / "skills/plan-feature/references/issue-body-template.md"
@@ -1945,13 +1936,13 @@ class OrchestratorContractTests(unittest.TestCase):
         for value in ("merge-ready", "draft-only"):
             self.assertIn(value, delivery)
             self.assertIn(value, options)
-        self.assertIn("- pr_shape: [verified `pr_shape` row value]", prd_template)
+        self.assertIn("- pr_shape: [verified `pr_shape` row value]", spec_template)
         self.assertIn("- pr_closeout: [verified `pr_closeout` row value]", issue_template)
         self.assertIn(
-            "Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-prd`",
+            "Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-spec`",
             options,
         )
-        self.assertIn("do not resolve or override\noptions here", prd_template)
+        self.assertIn("do not resolve or override\noptions here", spec_template)
         plan_skill = (ROOT / "skills/plan-feature/SKILL.md").read_text(
             encoding="utf-8"
         )
@@ -2231,9 +2222,9 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertNotIn("wait_profile", options)
 
-    def test_parent_prd_closeout_follows_resolved_review_policy(self) -> None:
+    def test_parent_spec_closeout_follows_resolved_review_policy(self) -> None:
         skill = self.read("SKILL.md")
-        delivery = self.read("references/prd-backed-delivery.md")
+        delivery = self.read("references/spec-backed-delivery.md")
         gates = self.read("references/codex-review-closeout.md")
         gate_router = self.read("references/gates.md")
         ledger = self.read("references/ledger.md")
@@ -2263,10 +2254,10 @@ class OrchestratorContractTests(unittest.TestCase):
 
         self.assertLess(
             states.index("closeout-head-current"),
-            states.index("parent-prd-closeout-resolved"),
+            states.index("parent-spec-closeout-resolved"),
         )
         self.assertLess(
-            states.index("parent-prd-closeout-resolved"),
+            states.index("parent-spec-closeout-resolved"),
             states.index("post-closeout-head-current"),
         )
         self.assertLess(
@@ -2286,18 +2277,18 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("do not load that reference", normalized_gate_router)
         self.assertIn("reason `draft-only`", normalized_gate_router)
         self.assertIn("`delivery-mode-not-pull-request`", normalized_gate_router)
-        self.assertIn("`Closes #<PRD-number>`", gates)
-        self.assertIn("`Closes owner/repo#<PRD-number>`", gates)
-        self.assertIn("all PRD closeout proof is satisfied", gates)
+        self.assertIn("`Closes #<spec-number>`", gates)
+        self.assertIn("`Closes owner/repo#<spec-number>`", gates)
+        self.assertIn("all Feature Spec closeout proof is satisfied", gates)
         self.assertIn(
-            "parent_prd_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>",
+            "parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>",
             ledger_template,
         )
         self.assertIn(
-            "parent_prd_applicability=<required|deferred-vehicle|not-applicable>",
+            "parent_spec_applicability=<required|deferred-vehicle|not-applicable>",
             ledger_template,
         )
-        self.assertIn("parent_prd_applicability_reason=", ledger_template)
+        self.assertIn("parent_spec_applicability_reason=", ledger_template)
         self.assertIn("parent_closeout_head=<sha|none>", ledger_template)
         self.assertIn("parent_closeout_base=<branch|none>", ledger_template)
         self.assertIn("parent_closeout_vehicle=<pr-ref|pending|none>", ledger_template)
@@ -2307,26 +2298,26 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn("default_branch=<branch|none>", ledger_template)
         self.assertIn("none of\nthose proof fields may be `none`", ledger_template)
-        self.assertIn("requires\n`parent_prd_closeout=not-applicable`", ledger_template)
+        self.assertIn("requires\n`parent_spec_closeout=not-applicable`", ledger_template)
         closeout_hygiene = ledger.split("## Closeout Hygiene", 1)[1]
         self.assertIn(
             "conditional canonical review and parent-closeout result",
             " ".join(closeout_hygiene.split()),
         )
         self.assertIn(
-            "Completion requires `parent_prd_closeout=closed`",
+            "Completion requires `parent_spec_closeout=closed`",
             " ".join(closeout_hygiene.split()),
         )
         self.assertIn(
             "Authorized `draft-only` and excluded workstreams record",
             closeout_hygiene,
         )
-        self.assertIn("A worker must not add or remove the parent PRD", worker)
+        self.assertIn("A worker must not add or remove the parent Feature Spec", worker)
         self.assertIn("post-gate mutation", worker)
         self.assertIn("Immediately before the root updates the PR body", gates)
         self.assertIn("immediately before the merge-ready report", normalized_gates)
-        self.assertIn("`parent_prd_closeout=pending-review`", gates)
-        self.assertIn("`parent_prd_closeout=pending-closeout`", gates)
+        self.assertIn("`parent_spec_closeout=pending-review`", gates)
+        self.assertIn("`parent_spec_closeout=pending-closeout`", gates)
         self.assertIn("current PR body after the body update", normalized_gates)
         self.assertIn("live body or its fingerprint", normalized_gates)
         self.assertIn(
@@ -2366,7 +2357,7 @@ class OrchestratorContractTests(unittest.TestCase):
             " ".join(ledger.split()),
         )
         self.assertIn("## Parent Closeout Watch", ledger_template)
-        self.assertIn("A parent PRD is not complete while closeout is `armed`", ledger)
+        self.assertIn("A parent Feature Spec is not complete while closeout is `armed`", ledger)
         self.assertIn("`parent_closeout_watch=complete`", ledger)
         self.assertIn("`armed` is not terminal parent closure", gates)
         self.assertIn("durable watch packet", gates)
@@ -2378,10 +2369,10 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         for producer in (issue_phase, issue_template, tracker):
             normalized = " ".join(producer.split())
-            self.assertIn("Do not add the parent PRD", normalized)
-            self.assertIn("all PRD closeout gates pass", normalized)
+            self.assertIn("Do not add the parent Feature Spec", normalized)
+            self.assertIn("all Feature Spec closeout gates pass", normalized)
             self.assertNotIn(
-                "unless the maintainer says the whole PRD is complete", producer
+                "unless the maintainer says the whole Feature Spec is complete", producer
             )
         for plan_producer in (issue_phase, issue_template):
             normalized = " ".join(plan_producer.split())

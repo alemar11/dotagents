@@ -3,7 +3,7 @@
 Load this reference only when `delivery_mode=pull-request` and
 `pr_closeout=merge-ready`. `gates.md` owns this route and all gate selection;
 this file owns the resulting current-head review, wait, feedback disposition,
-parent-PRD closeout, watch, and post-merge algorithm.
+parent Feature Spec closeout, watch, and post-merge algorithm.
 
 ## Codex PR Review Gate
 
@@ -12,9 +12,9 @@ For `pull-request` delivery with `pr_closeout=merge-ready`, resolve
 workstream complete. The default `required` value requires a verified terminal
 Codex result for the current head. An exact scoped owner instruction may select
 `skip`; that bypasses only the Codex request and wait, not local `$autoreview`,
-CI, validation, PRD acceptance, integration, domain closeout, or parent-closeout
+CI, validation, Feature Spec acceptance, integration, domain closeout, or parent-closeout
 head checks. For `pr_closeout=draft-only`, record the policy and this gate as
-`not-applicable` with the explicit user instruction or structured PRD field. If
+`not-applicable` with the explicit user instruction or structured Feature Spec field. If
 that restriction is removed, resume this sequence at ready-for-review with the
 newly resolved review policy.
 
@@ -159,7 +159,7 @@ the wait-profile PR identity, profile, budget, timestamps, elapsed time, and sta
    intended commit, and has passed required local gates plus current CI or a
    recorded CI blocker.
 2. Reconcile the PR body before the policy-specific closeout gate. If it already
-   contains the parent PRD closing keyword while parent closeout is not `armed`
+   contains the parent Feature Spec closing keyword while parent closeout is not `armed`
    with the same closeout-qualified SHA and recorded PR-body evidence, the root
    must remove it or replace it with a non-closing reference and record
    `pending-review` for `required` or `pending-closeout` for `skip`. If the
@@ -199,7 +199,7 @@ the wait-profile PR identity, profile, budget, timestamps, elapsed time, and sta
    changed; for `skip`, revalidate the new head without requesting review.
 8. For findings judged non-actionable, not applicable, or intentionally
    deferred, post a PR discussion update with the disposition, evidence, and
-   validation so the discussion is not left silent. Merge-ready PRD-backed
+   validation so the discussion is not left silent. Merge-ready Feature Spec-backed
    publication authority covers this disposition mutation for both `required`
    and `skip`; otherwise require separate comment authority or record the
    disposition only in the ledger and keep external comment mutation pending.
@@ -220,7 +220,7 @@ Use this closeout state order for merge-ready PR work:
 8. `fixes-validated-and-pushed`
 9. `post-fix-ci-current`
 10. `closeout-head-current` (reviewed SHA for `required`; fully validated current SHA for `skip`)
-11. `parent-prd-closeout-resolved` (`armed`, `deferred-to-default-branch`, or `not-applicable`)
+11. `parent-spec-closeout-resolved` (`armed`, `deferred-to-default-branch`, or `not-applicable`)
 12. `post-closeout-head-current` (`pass` for `armed`; otherwise `not-applicable` with reason)
 13. `parent-closeout-watch-established` (`root-monitoring`, `owner-handoff`, `automation-handoff`, or `not-applicable`)
 14. `merge-ready-report`
@@ -243,26 +243,26 @@ evidence is recorded, no request/wait remains actionable, and any already-known
 actionable feedback is fixed or explicitly dispositioned. In both paths, no
 required check may block human merge. Neither path authorizes merging the PR.
 
-After this gate passes, resolve parent PRD closeout before the merge-ready
-report. Arm it only after all PRD closeout proof is satisfied. A final feature
-or integration PR that completes the whole PRD and
-targets the repository's current default branch must add the parent PRD closing
+After this gate passes, resolve parent Feature Spec closeout before the merge-ready
+report. Arm it only after all Feature Spec closeout proof is satisfied. A final feature
+or integration PR that completes the whole Feature Spec and
+targets the repository's current default branch must add the parent Feature Spec closing
 keyword. Verify the PR body now closes every satisfied generated issue plus the
-parent PRD, record the updated body URL or fingerprint, and leave the PRD open
+parent Feature Spec, record the updated body URL or fingerprint, and leave the Feature Spec open
 until GitHub processes the closing keyword on merge. Use
-`Closes #<PRD-number>` in the same repository. Across repositories, use
-`Closes owner/repo#<PRD-number>` only when that closeout path is intended and
+`Closes #<spec-number>` in the same repository. Across repositories, use
+`Closes owner/repo#<spec-number>` only when that closeout path is intended and
 supported; otherwise record `blocked` or `needs-owner`. If the PR targets a
 non-default branch, leave the keyword absent, record
 `deferred-to-default-branch`, and select or create a linked later default-branch
 PR as the parent closeout vehicle; do not record `armed` for the
 non-default-branch PR. The current PR may report merge-ready after its own gates
 pass, but keep the later closeout vehicle in `ready-next` or `active` and do not
-mark the whole PRD or ledger complete until that vehicle reaches `armed`. If any PRD scope,
+mark the whole Feature Spec or ledger complete until that vehicle reaches `armed`. If any Feature Spec scope,
 dependency, integration proof, or required domain closeout remains, also leave
 the parent keyword absent and record `pending-closeout`; use `blocked` only when
 an external condition prevents the next safe action. For partial PRs, ad hoc
-PRs, local-tracker PRs, and workstreams without a parent GitHub PRD, record
+PRs, local-tracker PRs, and workstreams without a parent GitHub Feature Spec, record
 parent closeout as `not-applicable` and continue.
 
 Immediately before the root updates the PR body, re-read the PR head and require
@@ -274,13 +274,13 @@ merge-ready report. Require the live body or its fingerprint to match the
 recorded closeout evidence and contain exactly the intended parent closer. If
 the head differs, do not add the parent keyword, or remove/replace an
 already-added parent closing keyword with a non-closing reference, set
-`parent_prd_closeout=pending-review` and return to current-head review preflight
-for `required`; for `skip`, set `parent_prd_closeout=pending-closeout`, rerun the
+`parent_spec_closeout=pending-review` and return to current-head review preflight
+for `required`; for `skip`, set `parent_spec_closeout=pending-closeout`, rerun the
 affected validation and current CI for the new head, and do not request review.
 If the default branch or PR base no longer matches, disarm the keyword
 and record `deferred-to-default-branch` until a linked default-branch closeout
 vehicle passes the gates. If only the body differs, set
-`parent_prd_closeout=pending-closeout`, reconcile the live body without
+`parent_spec_closeout=pending-closeout`, reconcile the live body without
 overwriting concurrent edits, and repeat the post-update checks. Any relevant
 change after `armed` invalidates that state and requires the matching
 disarm-and-review or disarm-and-revalidate cycle, body reconciliation, or
@@ -292,7 +292,7 @@ releasing the active root, establish exactly one parent closeout watch:
 - `root-monitoring`: use only when
   `merge_authority=explicit-owner-authorization` and the root is the designated
   merger. Keep the root claim active through the root-controlled merge and
-  actual PRD closure check. Immediately before merge, re-read the PR head, base,
+  actual Feature Spec closure check. Immediately before merge, re-read the PR head, base,
   current default branch, and live body fingerprint; on any mismatch disarm the
   parent closer and stop the merge for the matching review/revalidation or
   closeout cycle;
@@ -310,7 +310,7 @@ releasing the active root, establish exactly one parent closeout watch:
   check, and identical mismatch/disarm behavior; or
 - `not-applicable`: only when parent closeout itself is not applicable.
 
-The durable watch packet must name the PR, parent PRD, resolved review policy,
+The durable watch packet must name the PR, parent Feature Spec, resolved review policy,
 closeout-qualified SHA,
 base/default branch, PR-body evidence, mutation triggers, and post-merge
 issue-state check. A final report alone is owner-visible but is not durable
@@ -320,7 +320,7 @@ the ledger `complete` while the parent is merely `armed` or
 leaves the ledger `paused`, not complete.
 
 After merge, verify that the merged head/base and closing keyword still match
-the armed evidence and that GitHub actually closed the parent PRD. Only then set
+the armed evidence and that GitHub actually closed the parent Feature Spec. Only then set
 the watch to `complete` and parent closeout to `closed`. If the PR merged but the issue
 remains open, record `needs-owner`; direct closure still requires
 `explicit-direct-mutation`.

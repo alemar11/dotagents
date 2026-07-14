@@ -12,7 +12,7 @@ owns worker capability and lifecycle fields.
 Worker authorization is resolved per workstream and session by the root
 orchestrator. Do not read worker assignments, worker-count limits, dispatch
 flags, authorization ceilings, publication policy, issue mutation policy,
-PRD-specific worker settings, or issue-specific worker settings from
+Feature Spec-specific worker settings, or issue-specific worker settings from
 project-memory defaults, tracker templates, generated issues, or draft publish
 commands. If legacy project-memory
 worker-authorization setup appears, ignore it as stale, non-authoritative state.
@@ -233,7 +233,7 @@ field is unresolved, continue only root-owned discovery, source registration,
 and wave shaping that does not create workers, edit implementation, mutate
 sources, commit, push, or publish.
 
-Do not re-resolve fields for later PRDs or waves while the canonical session
+Do not re-resolve fields for later Feature Specs or waves while the canonical session
 snapshot remains applicable. Ask again only when a required field is missing or
 the next action would exceed the recorded option values or cross an independent
 authority, credential, risk, or gate boundary.
@@ -255,7 +255,7 @@ Then use this compact decision table:
 
 | Decision | Planned value | Meaning |
 | --- | --- | --- |
-| Source items | <issue/PR/PRD/checklist refs> | Durable work sources this report covers. |
+| Source items | <issue/PR/Feature Spec/checklist refs> | Durable work sources this report covers. |
 | Delivery and gates | <branch/PR/closeout plus tests/autoreview/CI/integration proof> | Landing path and proof before closeout. |
 | Stop condition | <scope/surface/auth/delivery/gate change, blocker, or completion> | When the orchestrator must return to the owner. |
 
@@ -275,32 +275,32 @@ the owner-facing report. Use `actual_workstream_surface=root-thread`. If no
 automation will be created or updated, do not mention automation in the report
 unless it is relevant to a stop condition.
 
-## Recurring PRD Automation
+## Recurring Feature Spec Automation
 
-For a recurring PRD automation, require
-the PRD-scoped `automation_authority=explicit-owner-authorization` row and
+For a recurring Feature Spec automation, require
+the Feature Spec-scoped `automation_authority=explicit-owner-authorization` row and
 carry that scoped row plus the canonical session option snapshot into every
-run. Ask no PRD-specific worker-surface
+run. Ask no Feature Spec-specific worker-surface
 question unless a run lacks an applicable canonical field or would exceed its
 recorded value.
 
-Process one PRD at a time. If a PRD stops as `blocked`, `needs-owner`, or
-`deferred`, record that PRD's blocker and continue to the next unrelated
-eligible PRD in a later run. Stop the automation queue only when the blocker is
+Process one Feature Spec at a time. If a Feature Spec stops as `blocked`, `needs-owner`, or
+`deferred`, record that Feature Spec's blocker and continue to the next unrelated
+eligible Feature Spec in a later run. Stop the automation queue only when the blocker is
 systemic, such as missing credentials, unavailable worker/thread tools, broken
-tracker access, unsafe repository state shared by multiple PRDs, failing shared
-infrastructure, or another general condition that can affect multiple PRDs.
+tracker access, unsafe repository state shared by multiple Feature Specs, failing shared
+infrastructure, or another general condition that can affect multiple Feature Specs.
 
-Each automation run starts and ends with the ledger: select the next PRD from
+Each automation run starts and ends with the ledger: select the next Feature Spec from
 `Next Scan/Check`, source status, dependencies, and blocker state, then write
 progress, blockers, proof, or the next check before stopping.
 
 ## Delivery Mode Rules
 
 The root passes the effective runtime delivery plus its source. Use
-`local-only` for ad-hoc or legacy implementation without a PRD delivery
-contract. Otherwise pass the PRD-backed mode plus whether it is inherited from
-`source_prd_ref` or an issue-level override. `prd-backed-delivery.md` owns the full
+`local-only` for ad-hoc or legacy implementation without a Feature Spec delivery
+contract. Otherwise pass the Feature Spec-backed mode plus whether it is inherited from
+`source_spec_ref` or an issue-level override. `spec-backed-delivery.md` owns the full
 delivery/publication/issue-mutation authority model; workers only enforce the
 assignment they receive.
 
@@ -319,7 +319,7 @@ from Plan Feature or inferred from review availability. The root also passes
 the refreshed `current_pr_ref`; PR-scoped skip evidence is valid only while its
 immutable `pr-ref` equals that value.
 
-The root also passes `pr_shape`. PRD-backed work inherits `single-pr` or
+The root also passes `pr_shape`. Feature Spec-backed work inherits `single-pr` or
 `per-repo-pr`; ad hoc `local-only` and `direct-commit` work use `none`. Branch
 names, repository refs, and expected PR URLs remain separate data.
 
@@ -331,7 +331,7 @@ permission to change branch/PR strategy.
 
 | Mode | Worker handling |
 | --- | --- |
-| `local-only` | Implement and validate within the assigned paths. Do not commit, push, create or transition a PR, request Codex review, mutate issues, merge, release, or deploy. Missing PRD delivery metadata is expected, not a blocker. |
+| `local-only` | Implement and validate within the assigned paths. Do not commit, push, create or transition a PR, request Codex review, mutate issues, merge, release, or deploy. Missing Feature Spec delivery metadata is expected, not a blocker. |
 | `pull-request` | Root owns the branch/PR shape, Codex review disposition, and merge-ready decision. In single-repo or monorepo work, workers provide patches, helper-worktree diffs, handoff, or reviewed commits unless their canonical `worker_authorization` set includes publication modes. In multi-repo work, repo-scoped workers may prepare their repo branch/PR only when `commit`, `push`, `pr`, and/or `review-ready` plus the exact `review_ready_actions` are present. |
 | `direct-commit` | Require the scoped delivery option row and ledger evidence to name the exact owner instruction and workstream, and require `branch_name` to equal the authorized target branch. |
 
@@ -498,7 +498,7 @@ that cleanup is safe and available, or record why they remain.
 
 Record one or more authorization modes for the specific workstream. Modes are
 capability flags, not a cumulative ladder. The root derives them from the owner
-request, source item, linked `source_prd_ref`, publication authority, issue mutation
+request, source item, linked `source_spec_ref`, publication authority, issue mutation
 authority, selected worker surface, dependency state, dirty-worktree state, and
 gates. If a worker may edit, commit, push, open a draft PR, mark it ready for
 review, and request Codex review, record `implement, commit, push, pr,
@@ -528,7 +528,7 @@ it may only open a PR from an already-pushed branch, record `pr` only.
   closeout target after required validation and publication-safety checks. This
   is the first mode that may place GitHub closing keywords such as `Closes #123`
   in a PR body when the generated issue's closeout path calls for PR-body
-  closure. A worker must not add or remove the parent PRD closing keyword; that
+  closure. A worker must not add or remove the parent Feature Spec closing keyword; that
   post-gate mutation and its closeout-head revalidation are root-owned. This
   mode does not permit local commits or push unless those modes are also listed,
   and it does not authorize ready-for-review transition, Codex review request,
@@ -601,7 +601,7 @@ Scope:
 - orchestrator_handoff: <canonical handoff fields, or not-applicable for ad hoc work>
 - domain_closeout: <not-applicable|implementation-closeout>
 - domain_closeout_data: <exact decisions, target surfaces, evidence, and `$project-memory domain-memory` operation or none>
-- publication_authority: <none|explicit-owner-authorization|prd-backed-pull-request|blocked>
+- publication_authority: <none|explicit-owner-authorization|spec-backed-pull-request|blocked>
 - publication_authority_evidence: <option-resolution or source-contract evidence>
 - pr_closeout: <merge-ready|draft-only|not-applicable>
 - pr_closeout_evidence: <option-resolution evidence>
@@ -610,10 +610,10 @@ Scope:
 - pr_shape: <single-pr|per-repo-pr|none>
 - closeout_mode: <feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>
 - issue_mutation_authority: <none|pr-body-closeout-only|explicit-direct-mutation>
-- parent_prd_applicability: <required|deferred-vehicle|not-applicable>
-- parent_prd_applicability_reason: <whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>
-- parent_prd_closeout: <not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>
-- parent_prd_ref: <issue ref or none>
+- parent_spec_applicability: <required|deferred-vehicle|not-applicable>
+- parent_spec_applicability_reason: <whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>
+- parent_spec_closeout: <not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>
+- parent_spec_ref: <issue ref or none>
 - parent_closeout_vehicle: <PR ref, pending, or none>
 - parent_closeout_head: <closeout-qualified SHA or none>
 - parent_closeout_base: <branch or none>

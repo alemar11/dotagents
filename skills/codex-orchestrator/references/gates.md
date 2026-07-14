@@ -33,7 +33,7 @@ URLs, timestamps, and owner decisions.
 
 Use the narrowest review lens that matches the current phase:
 
-- `source-readiness`: source scope, PRD or issue readiness, dependencies, and
+- `source-readiness`: source scope, Feature Spec or issue readiness, dependencies, and
   blockers.
 - `implementation`: code behavior, regressions, tests, and live proof.
 - `documentation`: durable wording, portable evidence, rationale, and handoff
@@ -76,11 +76,11 @@ For worker assignments, `commit`, `push`, and `pr` are separate capability
 flags. Do not allow PR creation to imply commit or push, and do not allow push
 to imply local commit creation.
 
-For PRD-backed `pull-request` workflows,
-`publication_authority=prd-backed-pull-request` satisfies authorization for
+For Feature Spec-backed `pull-request` workflows,
+`publication_authority=spec-backed-pull-request` satisfies authorization for
 commit, push, initial draft PR creation, ready-for-review transition, Codex
 review, required discussion disposition, and the root-owned gated final PR-body
-parent-PRD closeout update after tests, integration checks, and `$autoreview`
+parent Feature Spec closeout update after tests, integration checks, and `$autoreview`
 pass. Owner restrictions must first normalize to the scoped
 `publication_authority`, `delivery_mode`, `pr_closeout`, and worker capability
 rows; gates never reinterpret the restriction prose. Default
@@ -175,7 +175,7 @@ the exact scoped authorization evidence. For local markdown sources, completion 
 the configured move to `issues/done/` after validation and proof; do not treat a
 commit alone as local issue closure.
 
-For PRD-backed workflows with authorized pull-request delivery, do not declare
+For Feature Spec-backed workflows with authorized pull-request delivery, do not declare
 the workstream `completed` while the expected PR remains uncreated. For
 `pr_closeout=merge-ready`, require the conditional Codex review and parent
 closeout gate below. For `pr_closeout=draft-only`, require validation and the
@@ -286,7 +286,7 @@ pinning, migration order, deploy order, fixtures, or an explicit integration
 test.
 
 For multi-repo `pull-request` delivery, also require the real repo PR links or
-equivalent integration proof promised by the PRD or issue before declaring the
+equivalent integration proof promised by the Feature Spec or issue before declaring the
 cross-repo issue closed, merge-ready, or complete.
 
 ### Credential And Access Gate

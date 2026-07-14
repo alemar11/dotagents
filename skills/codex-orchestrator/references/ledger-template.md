@@ -112,7 +112,7 @@ row and deadline for each new head.
 ## Parent Closeout Watch
 
 Status: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
-Parent PRD: <issue ref or none>
+Parent Feature Spec: <issue ref or none>
 Closeout PR: <PR ref or pending>
 Review policy: <required|skip|not-applicable>
 Armed head: <closeout-qualified SHA or none>
@@ -137,7 +137,7 @@ merge or disarm the closer on mismatch, and verify post-merge issue state; a
 scheduled poll or suggested automation is not a handoff. `root-monitoring` is
 valid only with explicit merge authority and the root recorded as the designated
 merger. Otherwise require `owner-handoff` before reporting merge-ready. Keep
-`ledger_status=paused` and the parent PRD under `needs-owner` or an active
+`ledger_status=paused` and the parent Feature Spec under `needs-owner` or an active
 monitor until post-merge proof shows the issue closed. Only then set this watch
 to `complete` and parent closeout to `closed`.
 
@@ -196,8 +196,8 @@ GitHub primary transport: connector
 GitHub fallback: fallback_status=<unused|used>; transport=<none|gh>; reason=<none|connector-unavailable|capability-unsupported|transport-failure>; operation=<operation or none>; evidence=<failure or none>; authority_reused=<authority or none>; result=<result or none>
 
 Worker fields follow `worker.md`. Delivery, publication, and issue-mutation
-authority follow `prd-backed-delivery.md`. Gates follow `gates.md`. Keep only
-the current session summary here; put full source contracts in PRDs, generated
+authority follow `spec-backed-delivery.md`. Gates follow `gates.md`. Keep only
+the current session summary here; put full source contracts in Feature Specs, generated
 issues, owner requests, or the linked references.
 
 ## Gate Policy
@@ -249,18 +249,18 @@ Use one compact block per active workstream:
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | parallelization=<independent|depends-on|blocks|root-integrated>; dependency_ids=<refs|none>; blocked_issue_ids=<refs|none>; dependency_reason=<reason|none>; dependency_proof=<evidence|pending|none> |
-| Delivery | delivery_mode=<local-only|pull-request|direct-commit>; delivery_source=<runtime-default|feature-level-inherited|issue-level-override|owner-instruction>; delivery_source_evidence=<scoped-option-row/source-ref|none>; branch_name=<exact branch|not-applicable>; current_pr_ref=<owner/repo#number|pending|not-applicable>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; temporary_source_execution=<forbidden|owner-approved>; completion_proof_policy=<live-required|synthetic-accepted>; pr_shape=<single-pr|per-repo-pr|none>; closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>; integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>; publication_authority=<none|explicit-owner-authorization|prd-backed-pull-request|blocked>; pr_closeout=<merge-ready|draft-only|not-applicable>; codex_review_policy=<required|skip|not-applicable>; issue_mutation_authority=<none|pr-body-closeout-only|explicit-direct-mutation>; automation_authority=<none|explicit-owner-authorization>; automation_target=<source/workstream ref|none>; parent_prd_applicability=<required|deferred-vehicle|not-applicable>; parent_prd_applicability_reason=<whole-prd-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent_prd_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_prd_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; merge_authority=<none|explicit-owner-authorization>; merge_policy=<owner-approval|automatic-after-gates>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
+| Delivery | delivery_mode=<local-only|pull-request|direct-commit>; delivery_source=<runtime-default|feature-level-inherited|issue-level-override|owner-instruction>; delivery_source_evidence=<scoped-option-row/source-ref|none>; branch_name=<exact branch|not-applicable>; current_pr_ref=<owner/repo#number|pending|not-applicable>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; temporary_source_execution=<forbidden|owner-approved>; completion_proof_policy=<live-required|synthetic-accepted>; pr_shape=<single-pr|per-repo-pr|none>; closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>; integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>; publication_authority=<none|explicit-owner-authorization|spec-backed-pull-request|blocked>; pr_closeout=<merge-ready|draft-only|not-applicable>; codex_review_policy=<required|skip|not-applicable>; issue_mutation_authority=<none|pr-body-closeout-only|explicit-direct-mutation>; automation_authority=<none|explicit-owner-authorization>; automation_target=<source/workstream ref|none>; parent_spec_applicability=<required|deferred-vehicle|not-applicable>; parent_spec_applicability_reason=<whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_spec_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; merge_authority=<none|explicit-owner-authorization>; merge_policy=<owner-approval|automatic-after-gates>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
 | Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; wait_record=<pr-ref@head|none|not-applicable>; wait_profile_pr=<pr-ref|none|not-applicable>; wait_profile=<standard|extended|not-applicable>; wait_budget_minutes=<15|30|not-applicable>; wait_started_at=<timestamp|none|not-applicable>; wait_deadline=<timestamp|none|not-applicable>; wait_elapsed_seconds=<number|none|not-applicable>; wait_state=<not-started|active|monitoring-required|terminal|not-applicable>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | workflow_skill=<gitstack skill>; primary_transport=connector; operation=<operation>; fallback=<unused|gh>; fallback_reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority_reused=<authority> |
 | Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; publication_checkout=<checkout or not-applicable>; caller_checkout_policy=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
-For every active row, `parent_prd_applicability=required` requires a parent ref
+For every active row, `parent_spec_applicability=required` requires a parent ref
 and one of `pending-review`, `pending-closeout`, `armed`, or `blocked`.
-`parent_prd_applicability=deferred-vehicle` requires reason `non-default-base`,
+`parent_spec_applicability=deferred-vehicle` requires reason `non-default-base`,
 state `deferred-to-default-branch`, and a linked later default-branch
 `parent_closeout_vehicle` or `pending` vehicle-selection action in `ready-next`.
-`parent_prd_closeout=armed` is valid only when `parent_closeout_head` equals the
+`parent_spec_closeout=armed` is valid only when `parent_closeout_head` equals the
 current closeout-qualified SHA (reviewed for `required`, fully validated for
 `skip`), `parent_closeout_base` equals the current `default_branch`,
 and `pr_body_evidence` proves the parent closing keyword is present; none of
@@ -270,18 +270,10 @@ An unmerged `armed` row also requires `parent_closeout_watch=root-monitoring`,
 `root-monitoring` additionally requires explicit merge authority and the root as
 the designated merger; `merge_authority=none` requires `owner-handoff`, while
 `automation-handoff` requires an explicitly authorized event-driven monitor.
-`parent_prd_applicability=not-applicable` requires
-`parent_prd_closeout=not-applicable` plus a concrete applicability reason.
+`parent_spec_applicability=not-applicable` requires
+`parent_spec_closeout=not-applicable` plus a concrete applicability reason.
 Reconciliation must reject unsupported `armed` or unjustified
 `not-applicable` claims before dispatch, mutation, recovery, or closeout.
-
-When reading legacy ledger rows, migrate
-`prd-backed-merge-ready-pr` to
-`publication_authority=prd-backed-pull-request` plus
-`pr_closeout=merge-ready`. Migrate `prd-backed-branch-plus-draft-pr` to
-`publication_authority=prd-backed-pull-request`, resolve `pr_closeout` from the
-canonical option record, and default it to `merge-ready`. Rewrite the legacy
-value whenever the row is touched.
 
 ### autonomous
 
@@ -315,7 +307,7 @@ value whenever the row is touched.
 ### completed
 
 - workstream_id=<id>; source_id=<id/ref>; <runtime delivery, branch/PR/proof, ready-for-review state, Codex
-  review policy/evidence, parent-PRD closeout state/closeout-qualified head/PR-body evidence when
+  review policy/evidence, parent Feature Spec closeout state/closeout-qualified head/PR-body evidence when
   applicable, closeout-watch/post-merge proof when applicable, validation,
   source closeout target and whether it was
   updated/closed, publication checkout, caller checkout disposition>
