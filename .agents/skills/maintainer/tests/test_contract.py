@@ -247,6 +247,22 @@ class MaintainerContractTests(unittest.TestCase):
 
         self.assertEqual(option_registry_failures(option_files), [])
 
+    def test_agents_defines_behavior_preserving_compaction_contract(self) -> None:
+        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        normalized = " ".join(agents.split())
+
+        for contract in (
+            "progressive disclosure",
+            "one canonical owner",
+            "explicit read conditions",
+            "decidable from already-loaded content or the target artifact",
+            "representative invoked paths",
+            "focused contract tests",
+        ):
+            self.assertIn(contract, normalized)
+        self.assertIn("not total repository lines or text moved between files", normalized)
+        self.assertIn("trigger, workflow-order, safety, mutation, and output semantics", normalized)
+
     def test_option_registry_validation_rejects_malformed_rows(self) -> None:
         with TemporaryDirectory() as temp:
             options = Path(temp) / "options.md"
