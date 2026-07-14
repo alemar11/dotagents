@@ -18,7 +18,7 @@ Per-Issue Registry rows without resolving or defaulting them here.
 
 issue_type: [canonical bug | feature | task]
 workflow_state: [canonical state, usually ready-for-agent]
-source_prd_ref: [path, issue number, or stable draft ref; draft refs are valid
+source_spec_ref: [path, issue number, or stable draft ref; draft refs are valid
 only in non-mutating output before hosted mutation]
 
 Affected Repos: [include for workspace issues; otherwise omit]
@@ -58,7 +58,7 @@ cells; do not infer or omit row metadata here.
 
 ## Orchestrator Handoff
 
-- source_prd_ref: [same value as the header `source_prd_ref` line]
+- source_spec_ref: [same value as the header `source_spec_ref` line]
 - feature_slug: [authoritative lowercase feature slug]
 - delivery_mode: [same effective value as `## Delivery`]
 - delivery_source: [same canonical value as `## Delivery`]
@@ -101,7 +101,7 @@ registering the issue as a workstream.
 
 ## Context
 
-[Relevant PRD and repo context using portable references only.]
+[Relevant Feature Spec and repo context using portable references only.]
 
 ## Cross-Repo Notes
 
@@ -118,7 +118,7 @@ completion.]
 
 ## Domain Knowledge Closeout
 
-[Include only on the final integration task when the source_prd_ref carries a
+[Include only on the final integration task when the source_spec_ref carries a
 required domain-knowledge handoff. This task must also prove integrated feature
 behavior; never use this section to justify a docs-only issue.]
 
@@ -130,7 +130,7 @@ behavior; never use this section to justify a docs-only issue.]
     is not a substitute.
 
 - Decisions:
-  - [Accepted durable term, rule, boundary, or decision carried from the PRD.]
+  - [Accepted durable term, rule, boundary, or decision carried from the Feature Spec.]
 - Target surfaces:
   - [`current-repository/<repo-relative-path>` or
     `<repo-slug>/<repo-relative-path>` destination.]
@@ -178,10 +178,10 @@ When all acceptance criteria pass and validation is complete:
   coordination closeout action separately. Final-commit closure requires
   `closeout_mode=direct-commit-closes-issue`,
   `issue_mutation_authority=explicit-direct-mutation`, and its exact scoped
-  authorization evidence. Do not add the parent PRD closing keyword from an individual child
-  issue. For a whole-PRD final feature
+  authorization evidence. Do not add the parent Feature Spec closing keyword from an individual child
+  issue. For a whole Feature Spec final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
-  only after its resolved review policy and all PRD closeout gates pass.
+  only after its resolved review policy and all Feature Spec closeout gates pass.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
   `issues/done/` on demand after validation and, for `direct-commit`, after the
   commit/proof is recorded. For orchestrator workspace issues, move it only

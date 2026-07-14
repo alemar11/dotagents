@@ -1,6 +1,6 @@
 # Vertical Slices
 
-Use this reference when turning a PRD into implementation issues. The default
+Use this reference when turning a Feature Spec into implementation issues. The default
 is always vertical slicing. Use a horizontal issue only when a vertical slice is
 not practical and the exception rules below are satisfied.
 
@@ -19,7 +19,7 @@ A good vertical issue:
 - includes the minimum layers needed to make that behavior real,
 - names the product/workspace context in monorepos or the affected repos and
   integration gates in orchestrator workspaces,
-- links back to the source_prd_ref for delivery mode and states how the issue
+- links back to the source_spec_ref for delivery mode and states how the issue
   can run in parallel,
 - has explicit dependencies and no hidden ordering assumptions,
 - gives the implementation agent enough local context to start,
@@ -40,7 +40,7 @@ types:
 - one migration or compatibility step becomes verifiable,
 - one observable system behavior changes.
 
-When a PRD contains CRUD work, do not create one issue per technical operation
+When a Feature Spec contains CRUD work, do not create one issue per technical operation
 by default. Split by meaningful workflow path instead, such as "user can create
 and see a draft" before "user can publish a draft" before "user can archive a
 published item."
@@ -52,7 +52,7 @@ backtracking:
 
 1. **Walking skeleton**: the smallest end-to-end path that proves the main
    architecture, route, state, permissions, and validation surface can work.
-2. **Primary happy path**: the core user or system behavior from the PRD.
+2. **Primary happy path**: the core user or system behavior from the Feature Spec.
 3. **Required variants**: important alternate actors, states, integrations, or
    data shapes.
 4. **Failure and edge paths**: validation failures, permission denials,
@@ -177,16 +177,16 @@ Mark an issue `ready-for-agent` only when it has:
 - a clear vertical outcome,
 - non-goals,
 - direct dependencies,
-- product/workspace/context scope when the PRD comes from a multi-context repo
+- product/workspace/context scope when the Feature Spec comes from a multi-context repo
   or monorepo,
 - affected repos and integration gates when the issue is an orchestrator
   workspace issue,
-- a durable `source_prd_ref` pointer and copied feature-level `delivery_mode`,
+- a durable `source_spec_ref` pointer and copied feature-level `delivery_mode`,
   independently resolved `issue_mutation_authority`, and `pr_shape` metadata,
 - parallelization status, expected closeout path, and any delivery or
   integration exception,
 - a `## Orchestrator Handoff` section that restates the dispatchable source
-  PRD, feature slug, `delivery_mode`, `issue_mutation_authority`, `pr_shape`, affected repos or product
+  Feature Spec, feature slug, `delivery_mode`, `issue_mutation_authority`, `pr_shape`, affected repos or product
   scope, scope, start rule, dependencies, validation, closeout, and
   `integration_mode`,
 - acceptance criteria,
@@ -211,10 +211,10 @@ when any of these remain unclear:
 - migration or compatibility policy,
 - access to credentials, services, fixtures, or test data,
 - validation command or acceptance signal,
-- source_prd_ref, delivery mode inheritance or exception, or whether the issue is
+- source_spec_ref, delivery mode inheritance or exception, or whether the issue is
   safe to implement in parallel.
 
-If the source PRD has open questions that affect scope, acceptance criteria,
+If the source Feature Spec has open questions that affect scope, acceptance criteria,
 dependency ordering, validation, permissions, publication target, data
 contracts, or cross-repo contracts, stop and resolve them before returning or
 publishing `ready-for-agent` issues. A deferred question is safe only when it
@@ -238,7 +238,7 @@ is returned or published.
 
 For each issue:
 
-- pass only that draft issue body plus the minimum relevant PRD context to
+- pass only that draft issue body plus the minimum relevant Feature Spec context to
   `$plan-harder`,
 - request `planning_mode=issue-hardening` with `output_surface=caller` and
   consume its structured result,
@@ -259,7 +259,7 @@ brief to the issue phase, which owns any issue tracker or local Markdown writes.
 
 ## Good Split Example
 
-For a PRD that adds team invitations:
+For a Feature Spec that adds team invitations:
 
 1. `01 Create pending invitation`
    - Outcome: admin can invite an email and see a pending invite.

@@ -8,9 +8,9 @@ from pathlib import Path
 
 SKILLS_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = SKILLS_ROOT.parent
-REMOVED_PRD_SKILL = "$to" + "-prd"
+REMOVED_LEGACY_PLANNING_SKILL = "$to" + "-p" + "rd"
 REMOVED_ISSUE_SKILL = "$to" + "-issues"
-REMOVED_PRD_PATH = "skills/to" + "-prd"
+REMOVED_LEGACY_PLANNING_PATH = "skills/to" + "-p" + "rd"
 REMOVED_ISSUE_PATH = "skills/to" + "-issues"
 LEGACY_WORKER_AUTH_KEY = "default" + "_worker_authorization"
 LEGACY_WORKER_AUTH_HEADING = "Worker " + "Authorization Defaults"
@@ -126,19 +126,19 @@ def iter_active_text_files() -> list[Path]:
 
 
 class FullFlowDryRunFixtureTests(unittest.TestCase):
-    def test_fixture_covers_pipeline_and_draft_source_prd(self) -> None:
+    def test_fixture_covers_pipeline_and_draft_source_spec(self) -> None:
         fixture = read("plan-feature/references/full-flow-dry-run.md")
 
         for text in (
             "$plan-feature",
             "$grill-me-with-context",
-            "The PRD phase",
+            "The Feature Spec phase",
             "The issue phase",
             "$codex-orchestrator",
         ):
             self.assertIn(text, fixture)
 
-        self.assertNotIn(REMOVED_PRD_SKILL, fixture)
+        self.assertNotIn(REMOVED_LEGACY_PLANNING_SKILL, fixture)
         self.assertNotIn(REMOVED_ISSUE_SKILL, fixture)
 
         self.assertIn("effective_target: draft-publish-commands", fixture)
@@ -153,8 +153,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("`pr_closeout=merge-ready`", fixture)
         self.assertIn("`pr_shape=single-pr`", fixture)
         self.assertIn("`## Orchestrator Handoff` projection carries\n   `branch_name: feature/account-settings-export`", fixture)
-        self.assertIn("source_prd_ref: draft-prd:account-settings-export", fixture)
-        self.assertIn("prd_body_fingerprint: sha256:7f4a9c21d003", fixture)
+        self.assertIn("source_spec_ref: draft-spec:account-settings-export", fixture)
+        self.assertIn("spec_body_fingerprint: sha256:7f4a9c21d003", fixture)
         self.assertIn("capture_mode: defer-to-caller", fixture)
         self.assertIn("capture_outcome: deferred", fixture)
         self.assertIn("domain_knowledge_delta", fixture)
@@ -287,17 +287,17 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         expected_issue_contract = {
             "delivery_source": (
                 "feature-level-inherited",
-                "source-prd",
-                "draft-prd:account-settings-export",
+                "source-spec",
+                "draft-spec:account-settings-export",
             ),
-            "delivery_mode": ("pull-request", "source-prd", "run:delivery_mode"),
+            "delivery_mode": ("pull-request", "source-spec", "run:delivery_mode"),
             "issue_mutation_authority": (
                 "pr-body-closeout-only",
-                "source-prd",
+                "source-spec",
                 "run:issue_mutation_authority",
             ),
-            "pr_shape": ("single-pr", "source-prd", "run:pr_shape"),
-            "pr_closeout": ("merge-ready", "source-prd", "run:pr_closeout"),
+            "pr_shape": ("single-pr", "source-spec", "run:pr_shape"),
+            "pr_closeout": ("merge-ready", "source-spec", "run:pr_closeout"),
             "parallelization": (
                 "independent",
                 "runtime-derived",
@@ -320,7 +320,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             ),
             "branch_name": (
                 "feature/account-settings-export",
-                "source-prd",
+                "source-spec",
                 "run:branch_name",
             ),
         }
@@ -386,15 +386,15 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
     def test_shared_contract_documents_draft_publish_handoff(self) -> None:
         contract = read("project-memory/references/tracker-publishing.md")
 
-        self.assertIn("source_prd_ref", contract)
-        self.assertIn("draft-prd:<feature-slug>", contract)
-        self.assertIn("Create or update the PRD first", contract)
-        self.assertIn("Replace `source_prd_ref: draft-prd:<...>`", contract)
+        self.assertIn("source_spec_ref", contract)
+        self.assertIn("draft-spec:<feature-slug>", contract)
+        self.assertIn("Create or update the Feature Spec first", contract)
+        self.assertIn("Replace `source_spec_ref: draft-spec:<...>`", contract)
         self.assertIn("`no_mutation_override=dry-run`", contract)
         self.assertIn("`no_mutation_override=draft-output`", contract)
         self.assertIn("Do not dispatch implementation workers", contract)
         self.assertIn("`temporary_source_execution=owner-approved`", contract)
-        self.assertNotIn("explicit owner decision to use the full PRD body", contract)
+        self.assertNotIn("explicit owner decision to use the full Feature Spec body", contract)
 
     def test_project_memory_does_not_own_orchestration_policy_setup(self) -> None:
         project_memory = read("project-memory/SKILL.md")
@@ -439,17 +439,20 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
                 self.assertNotIn(ORCHESTRATION_POLICY_PATH, contents)
                 self.assertIn("Tracker setup records artifact routing", contents)
                 self.assertIn("Branch only on the canonical `effective_target`", normalized)
-                self.assertIn("`source_prd_ref`", contents)
-                self.assertIn("Source PRD", contents)
-                self.assertIn("read-only legacy", normalized)
+                self.assertIn("`source_spec_ref`", contents)
+                self.assertNotIn("Source " + "Feature Spec", contents)
+                if relative.endswith("issue-tracker-local.md"):
+                    self.assertIn("read-only legacy", normalized)
+                else:
+                    self.assertIn("Retired source-reference labels are not read aliases", contents)
                 self.assertNotIn("current request explicitly asks for dry-run", contents)
                 self.assertNotIn("current-run no-mutation override is active", contents)
                 for field in RUNTIME_POLICY_FIELDS:
                     self.assertNotIn(field, contents)
 
         github_contract = read("project-memory/references/issue-tracker-github.md")
-        self.assertIn("`source_prd_ref`, delivery metadata", github_contract)
-        self.assertIn("`Source PRD` is a read-only legacy migration alias", github_contract)
+        self.assertIn("`source_spec_ref`, delivery metadata", github_contract)
+        self.assertIn("Retired source-reference labels are not read aliases", github_contract)
         self.assertIn("`local_mirror=requested`", github_contract)
         self.assertNotIn("explicitly asks to keep a local mirror", github_contract)
 
@@ -459,15 +462,15 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
     def test_plan_feature_references_internal_phase_templates(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
-        prd_phase = read("plan-feature/references/prd-phase.md")
+        spec_phase = read("plan-feature/references/spec-phase.md")
         issue_phase = read("plan-feature/references/issue-phase.md")
-        prd_template = read("plan-feature/references/prd-template.md")
+        spec_template = read("plan-feature/references/spec-template.md")
         issue_template = read("plan-feature/references/issue-body-template.md")
         vertical_slices = read("plan-feature/references/vertical-slices.md")
         options = read("plan-feature/references/options.md")
-        prd_delivery = read("codex-orchestrator/references/prd-backed-delivery.md")
-        normalized_prd_phase = " ".join(prd_phase.split())
-        normalized_prd_template = " ".join(prd_template.split())
+        spec_delivery = read("codex-orchestrator/references/spec-backed-delivery.md")
+        normalized_spec_phase = " ".join(spec_phase.split())
+        normalized_spec_template = " ".join(spec_template.split())
         normalized_options = " ".join(options.split())
 
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
@@ -482,29 +485,29 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertNotIn("Domain knowledge: captured in <path or durable surface>", plan_feature)
         self.assertIn("`capture_outcome=deferred`", plan_feature)
         self.assertIn("`capture_outcome=no-durable-change`", plan_feature)
-        self.assertIn("`mode=prd-only`", plan_feature)
+        self.assertIn("`mode=spec-only`", plan_feature)
         self.assertIn("never emits `capture_outcome=captured`", plan_feature)
         self.assertIn("issue lifecycle mutations belong to", plan_feature)
         self.assertNotIn(STALE_NO_GATES_REMAIN, plan_feature)
         self.assertNotIn(STALE_GATES_RESOLVED, plan_feature)
-        self.assertIn("references/prd-phase.md", plan_feature)
+        self.assertIn("references/spec-phase.md", plan_feature)
         self.assertIn("references/issue-phase.md", plan_feature)
-        self.assertIn("tracker-publishing.md", prd_phase)
-        self.assertIn("## PRD Target Model", prd_phase)
-        self.assertIn("PRD body fingerprint", prd_phase)
-        self.assertIn("PRD planning-artifact publication", prd_phase)
-        self.assertIn("tracker_backend` is the planning-artifact write authority", prd_phase)
-        self.assertIn("`effective_target=configured-tracker`", prd_phase)
-        self.assertIn("`local_mirror=requested`", prd_phase)
-        self.assertIn("validated `local_mirror_path`", prd_phase)
+        self.assertIn("tracker-publishing.md", spec_phase)
+        self.assertIn("## Feature Spec Target Model", spec_phase)
+        self.assertIn("Feature Spec body fingerprint", spec_phase)
+        self.assertIn("Feature Spec planning-artifact publication", spec_phase)
+        self.assertIn("tracker_backend` is the planning-artifact write authority", spec_phase)
+        self.assertIn("`effective_target=configured-tracker`", spec_phase)
+        self.assertIn("`local_mirror=requested`", spec_phase)
+        self.assertIn("validated `local_mirror_path`", spec_phase)
         self.assertIn("`local_mirror_path`", issue_phase)
-        self.assertIn("`branch_name`", prd_phase)
+        self.assertIn("`branch_name`", spec_phase)
         self.assertIn("`branch_name`", issue_phase)
-        self.assertIn("For `effective_target=local-dry-run`", prd_phase)
+        self.assertIn("For `effective_target=local-dry-run`", spec_phase)
         self.assertIn("exact instruction, feature scope, and authorized target branch", options)
-        self.assertIn("the structured delivery handoff tuple: `delivery_mode`,", prd_phase)
-        self.assertIn("`issue_mutation_authority`, `issue_mutation_authority_evidence`", prd_phase)
-        self.assertIn("- branch_name: [verified exact branch data]", prd_template)
+        self.assertIn("the structured delivery handoff tuple: `delivery_mode`,", spec_phase)
+        self.assertIn("`issue_mutation_authority`, `issue_mutation_authority_evidence`", spec_phase)
+        self.assertIn("- branch_name: [verified exact branch data]", spec_template)
         self.assertIn("must equal the exact target branch in the scoped owner evidence", normalized_options)
         self.assertIn("separate `branch_name` data must equal the exact target", options)
         self.assertIn("- branch_name: [verified exact branch data]", issue_template)
@@ -515,13 +518,13 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             issue_template,
         )
         self.assertIn("`issue_mutation_authority=explicit-direct-mutation`", issue_phase)
-        self.assertIn("Do not resolve delivery or mutation options in this phase", prd_phase)
-        self.assertNotIn("Resolve the PRD `delivery_mode`", prd_phase)
+        self.assertIn("Do not resolve delivery or mutation options in this phase", spec_phase)
+        self.assertNotIn("Resolve the Feature Spec `delivery_mode`", spec_phase)
         self.assertIn("direct-commit publication authority alone is insufficient", normalized_options)
         self.assertIn("delivery\nauthority alone cannot select it", options)
         self.assertIn("`scope-ref=issue:<NN>`", options)
-        self.assertIn("preserves the PRD owner, `target-ref`", options)
-        self.assertIn("preserves the PRD owner, `target-ref`, and target branch verbatim", options)
+        self.assertIn("preserves the Feature Spec owner, `target-ref`", options)
+        self.assertIn("preserves the Feature Spec owner, `target-ref`, and target branch verbatim", options)
         self.assertIn("`closeout_mode=direct-commit-closes-issue`,\n  `issue_mutation_authority=explicit-direct-mutation`", issue_template)
         self.assertNotIn("`direct-commit` or another explicit authorization", issue_template)
         self.assertNotIn("`direct-commit` or another explicit authorization", issue_phase)
@@ -534,38 +537,38 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "project_slug",
         ):
             self.assertIn(f"`{identity_field}`", issue_phase)
-        self.assertNotIn("run explicitly requested no-mutation output", prd_phase)
-        self.assertNotIn("explicitly asked for a local mirror", prd_phase)
+        self.assertNotIn("run explicitly requested no-mutation output", spec_phase)
+        self.assertNotIn("explicitly asked for a local mirror", spec_phase)
         self.assertIn("## Effective Target Resolution", options)
         self.assertIn("## Per-Issue Registry", options)
         self.assertIn("sole owner of option values", issue_phase)
-        self.assertIn("sole owner of option values", normalized_prd_phase)
+        self.assertIn("sole owner of option values", normalized_spec_phase)
         self.assertIn(
             "Resolve `effective_target` only through `references/options.md`",
-            normalized_prd_phase,
+            normalized_spec_phase,
         )
         self.assertIn(
             "`references/options.md` solely owns effective-target and local-mirror option resolution",
-            normalized_prd_phase,
+            normalized_spec_phase,
         )
         self.assertIn(
             "owns transient body transport, mirror-path application, draft-ref replacement",
-            normalized_prd_phase,
+            normalized_spec_phase,
         )
         self.assertIn(
             "`references/options.md` is the sole owner of option names, values, defaults",
-            normalized_prd_template,
+            normalized_spec_template,
         )
         self.assertIn(
             "only projects an already verified option snapshot",
-            normalized_prd_template,
+            normalized_spec_template,
         )
         for duplicated_schema in (
             "tracker_backend: <github|local>",
             "delivery_mode: <pull-request|direct-commit>",
             "pr_shape: <single-pr|per-repo-pr|none>",
         ):
-            self.assertNotIn(duplicated_schema, prd_phase)
+            self.assertNotIn(duplicated_schema, spec_phase)
             self.assertNotIn(duplicated_schema, issue_phase)
         self.assertIn("Records the issue-effective value", options)
         self.assertIn("complete effective delivery", options)
@@ -613,9 +616,9 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Orchestrator Handoff", issue_phase)
         self.assertIn("must not contain worker authorization", issue_phase)
         self.assertNotIn("# <feature-slug>: <NN> <vertical outcome>", issue_phase)
-        self.assertIn("# PRD: [Feature Name]", prd_template)
-        self.assertIn("## Delivery Mode", prd_template)
-        self.assertIn("## Domain Knowledge Handoff", prd_template)
+        self.assertIn("# Feature Spec: [Feature Name]", spec_template)
+        self.assertIn("## Delivery Mode", spec_template)
+        self.assertIn("## Domain Knowledge Handoff", spec_template)
         self.assertIn("# <feature-slug>: <NN> <vertical outcome>", issue_template)
         self.assertIn("issue_type: [canonical bug | feature | task]", issue_template)
         self.assertIn("workflow_state: [canonical state", issue_template)
@@ -649,7 +652,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Domain Knowledge Closeout", issue_template)
         self.assertIn("Do not include worker authorization modes", issue_template)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_template)
-        self.assertIn("source_prd_ref: [path, issue number, or stable draft ref;", issue_template)
+        self.assertIn("source_spec_ref: [path, issue number, or stable draft ref;", issue_template)
         self.assertIn("draft refs are valid", issue_template)
         self.assertIn("portable references", issue_template)
         self.assertIn("Placeholders are scheduling expectations", issue_template)
@@ -660,17 +663,17 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("final integration and domain-knowledge closeout task", vertical_slices)
         self.assertIn("orchestrator closeout", vertical_slices)
         self.assertIn("## Orchestrator Handoff", vertical_slices)
-        self.assertIn("draft-prd:<...>", prd_delivery)
-        self.assertIn("canonical issue-level dispatch contract", prd_delivery)
-        self.assertIn("`delivery_source_evidence`", prd_delivery)
-        self.assertIn("resolved per workstream", prd_delivery)
-        self.assertIn("source lifecycle and closeout mutations are orchestrator-owned", prd_delivery)
+        self.assertIn("draft-spec:<...>", spec_delivery)
+        self.assertIn("canonical issue-level dispatch contract", spec_delivery)
+        self.assertIn("`delivery_source_evidence`", spec_delivery)
+        self.assertIn("resolved per workstream", spec_delivery)
+        self.assertIn("source lifecycle and closeout mutations are orchestrator-owned", spec_delivery)
         self.assertIn(
-            "expected branches and real PR links replace PRD placeholders",
-            prd_delivery,
+            "expected branches and real PR links replace Feature Spec placeholders",
+            spec_delivery,
         )
-        self.assertIn("direct-commit` proves delivery", prd_delivery)
-        self.assertIn("issues/done/", prd_delivery)
+        self.assertIn("direct-commit` proves delivery", spec_delivery)
+        self.assertIn("issues/done/", spec_delivery)
         self.assertIn("Validation Commands", issue_phase)
         self.assertIn("equivalent fallback", issue_phase)
         self.assertIn("local-done-move-after-proof", options)
@@ -681,7 +684,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
     def test_plan_feature_defers_domain_capture_to_final_integration_task(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
         grill_with_context = read("grill-me-with-context/SKILL.md")
-        prd_phase = read("plan-feature/references/prd-phase.md")
+        spec_phase = read("plan-feature/references/spec-phase.md")
         issue_phase = read("plan-feature/references/issue-phase.md")
         issue_template = read("plan-feature/references/issue-body-template.md")
         fixture = read("plan-feature/references/full-flow-dry-run.md")
@@ -693,7 +696,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("must not update `CONTEXT.md`", plan_feature)
         self.assertIn("final implementation/integration issue", plan_feature)
         self.assertIn("is never docs-only", plan_feature)
-        self.assertIn("preserve it in the PRD handoff", plan_feature)
+        self.assertIn("preserve it in the Feature Spec handoff", plan_feature)
         self.assertIn("Plan Feature never invokes `domain-memory`", plan_feature)
 
         self.assertIn("## Capture Modes", grill_with_context)
@@ -712,12 +715,12 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("record\nremaining product-shaping questions there", grill_with_context)
         self.assertIn("For a direct user request, add a", grill_with_context)
 
-        self.assertIn("## Domain Knowledge Handoff", prd_phase)
-        self.assertIn("deferred-work carrier", prd_phase)
-        self.assertIn("<repo-slug>/<repo-relative-path>", prd_phase)
-        self.assertIn("structured\n  `domain_knowledge_delta`", prd_phase)
-        self.assertIn("`knowledge_delta`, `decisions`, `target_surfaces`", prd_phase)
-        self.assertNotIn("domain_knowledge_delta.status", prd_phase)
+        self.assertIn("## Domain Knowledge Handoff", spec_phase)
+        self.assertIn("deferred-work carrier", spec_phase)
+        self.assertIn("<repo-slug>/<repo-relative-path>", spec_phase)
+        self.assertIn("structured\n  `domain_knowledge_delta`", spec_phase)
+        self.assertIn("`knowledge_delta`, `decisions`, `target_surfaces`", spec_phase)
+        self.assertNotIn("domain_knowledge_delta.status", spec_phase)
         self.assertIn("choose its final owner", issue_phase)
         self.assertIn("append the last generated issue", issue_phase)
         self.assertIn("depend directly\n   on every other terminal issue", issue_phase)
@@ -778,11 +781,11 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
     def test_lean_profiles_reduce_discovery_without_skipping_gates(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
-        prd_phase = read("plan-feature/references/prd-phase.md")
+        spec_phase = read("plan-feature/references/spec-phase.md")
         issue_phase = read("plan-feature/references/issue-phase.md")
 
         self.assertIn("## Execution Profiles", plan_feature)
-        self.assertIn("`lean-prd`", plan_feature)
+        self.assertIn("`lean-spec`", plan_feature)
         self.assertIn("`lean-issues`", plan_feature)
         self.assertIn("Lean profiles reduce discovery and repeated output only", plan_feature)
         for required_gate in (
@@ -794,28 +797,28 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         ):
             self.assertIn(required_gate, plan_feature)
 
-        self.assertIn("For `lean-prd`, begin with only", prd_phase)
-        self.assertIn("project-memory/config/domain.md", prd_phase)
-        self.assertIn("`CONTEXT-MAP.md` when either exists", prd_phase)
-        self.assertIn("Widen to\n`standard`", prd_phase)
-        self.assertIn("For `lean-issues`, read the durable PRD once", issue_phase)
+        self.assertIn("For `lean-spec`, begin with only", spec_phase)
+        self.assertIn("project-memory/config/domain.md", spec_phase)
+        self.assertIn("`CONTEXT-MAP.md` when either exists", spec_phase)
+        self.assertIn("Widen to\n`standard`", spec_phase)
+        self.assertIn("For `lean-issues`, read the durable Feature Spec once", issue_phase)
         self.assertIn("The lean profile does not weaken any hardening or output gate", issue_phase)
         self.assertIn("at most two candidate vertical", plan_feature)
 
     def test_planning_uses_delta_evidence_and_exact_optional_metrics(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
-        prd_phase = read("plan-feature/references/prd-phase.md")
+        spec_phase = read("plan-feature/references/spec-phase.md")
         issue_phase = read("plan-feature/references/issue-phase.md")
 
         self.assertIn("Snapshot each source or artifact in full at most once", plan_feature)
         self.assertIn("Label\n  interleaved cumulative deltas `exact-interval`", plan_feature)
         self.assertIn("Never estimate or make metrics a completion gate", plan_feature)
-        self.assertIn("## Evidence And Phase Metrics", prd_phase)
-        self.assertIn("phase=prd", prd_phase)
-        self.assertIn("completion output should identify the\nPRD and its fingerprint", prd_phase)
+        self.assertIn("## Evidence And Phase Metrics", spec_phase)
+        self.assertIn("phase=spec", spec_phase)
+        self.assertIn("completion output should identify the\nFeature Spec and its fingerprint", spec_phase)
         self.assertIn("## Evidence And Phase Metrics", issue_phase)
         self.assertIn("phase=issue-hardening:<issue-id>", issue_phase)
-        self.assertIn("Do not repeat unchanged\nPRD or issue bodies", issue_phase)
+        self.assertIn("Do not repeat unchanged\nFeature Spec or issue bodies", issue_phase)
         self.assertIn("never estimate, reread session\narchives", issue_phase)
         self.assertIn("do not attribute it to an\nissue phase", issue_phase)
 
@@ -854,7 +857,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
     def test_plan_feature_outputs_do_not_define_runtime_policy(self) -> None:
         for relative in (
-            "plan-feature/references/prd-template.md",
+            "plan-feature/references/spec-template.md",
             "plan-feature/references/issue-body-template.md",
             "plan-feature/references/issue-phase.md",
             "plan-feature/references/vertical-slices.md",
@@ -900,7 +903,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         )
         self.assertIn("issue_type: bug | feature | task", triage_local)
         self.assertIn("workflow_state: needs-triage | needs-info", triage_local)
-        self.assertIn("source_prd_ref:", triage_local)
+        self.assertIn("source_spec_ref:", triage_local)
         self.assertIn("The header metadata region starts after the first H1", triage_options)
         self.assertIn("Canonical fields take precedence", triage_options)
         self.assertIn("Stop and report a conflict only when duplicate canonical", triage_options)
@@ -943,10 +946,17 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         for path in iter_active_text_files():
             contents = path.read_text(encoding="utf-8")
             with self.subTest(file=str(path.relative_to(REPO_ROOT))):
-                self.assertNotIn(REMOVED_PRD_SKILL, contents)
+                self.assertNotIn(REMOVED_LEGACY_PLANNING_SKILL, contents)
                 self.assertNotIn(REMOVED_ISSUE_SKILL, contents)
-                self.assertNotIn(REMOVED_PRD_PATH, contents)
+                self.assertNotIn(REMOVED_LEGACY_PLANNING_PATH, contents)
                 self.assertNotIn(REMOVED_ISSUE_PATH, contents)
+
+    def test_runtime_contracts_use_feature_spec_vocabulary(self) -> None:
+        retired_term = "p" + "rd"
+        for path in iter_active_text_files():
+            contents = path.read_text(encoding="utf-8").lower()
+            with self.subTest(file=str(path.relative_to(REPO_ROOT))):
+                self.assertNotIn(retired_term, contents)
 
 
 if __name__ == "__main__":

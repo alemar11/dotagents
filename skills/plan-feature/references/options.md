@@ -24,8 +24,8 @@ These run-level options resolve before the first phase handoff.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `mode` | `full-flow`, `prd-only`, `issues-from-existing-prd` | `full-flow` for new intent | A direct existing-PRD issue split resolves to `issues-from-existing-prd`; an explicit PRD stop resolves to `prd-only`. |
-| `execution_profile` | `lean-prd`, `lean-issues`, `standard` | `standard` | Internal optimization only; it cannot weaken a selected mode's gates. |
+| `mode` | `full-flow`, `spec-only`, `issues-from-existing-spec` | `full-flow` for new intent | A direct existing Feature Spec issue split resolves to `issues-from-existing-spec`; an explicit Feature Spec stop resolves to `spec-only`. |
+| `execution_profile` | `lean-spec`, `lean-issues`, `standard` | `standard` | Internal optimization only; it cannot weaken a selected mode's gates. |
 | `tracker_backend` | `github`, `local` | From project memory | Planning-artifact write authority. |
 | `effective_target` | `configured-tracker`, `local-dry-run`, `draft-publish-commands` | `configured-tracker` | Derived from tracker routing plus the current-run mutation option. |
 | `no_mutation_override` | `none`, `dry-run`, `temp`, `rehearsal`, `validation`, `disabled-writes`, `draft-output` | `none` | Changes the effective target, not delivery or PR lifecycle. |
@@ -41,7 +41,7 @@ These run-level options resolve before the first phase handoff.
 mirror root when `local_mirror=requested`; use `not-applicable` otherwise.
 
 `branch_name` is also data. For `pull-request`, default it to
-`feature/<feature_slug>` unless an accepted source PRD or repository policy
+`feature/<feature_slug>` unless an accepted source Feature Spec or repository policy
 provides another valid branch; multi-repo work uses the same exact branch in
 every involved repository. For `direct-commit`, it must equal the exact target
 branch in the scoped owner evidence.
@@ -152,17 +152,17 @@ that issue is emitted; use canonical defaults instead of omission:
 | --- | --- | --- | --- | --- | --- |
 | `run:<field>` | `run` | `<run registry field>` | `<canonical value>` | <allowed source for this field/value below> | `<instruction ref, config path, issue ref, or none>` |
 | `run:local_mirror_path` | `run` | `local_mirror_path` | `<repo-relative root or not-applicable>` | `owner-instruction` or `default` | `<instruction ref or none>` |
-| `run:branch_name` | `run` | `branch_name` | `<exact branch>` | `runtime-derived`, `owner-instruction`, or `source-prd` | `<delivery/source evidence>` |
-| `issue:<NN>:<field>` | `issue:<NN>` | `<per-issue registry field>` | `<canonical value>` | <allowed source for this field/value below> | `<instruction ref, PRD ref, issue ref, or none>` |
-| `issue:<NN>:branch_name` | `issue:<NN>` | `branch_name` | `<exact branch>` | `source-prd`, `owner-instruction`, or `runtime-derived` | `<delivery/source evidence>` |
+| `run:branch_name` | `run` | `branch_name` | `<exact branch>` | `runtime-derived`, `owner-instruction`, or `source-spec` | `<delivery/source evidence>` |
+| `issue:<NN>:<field>` | `issue:<NN>` | `<per-issue registry field>` | `<canonical value>` | <allowed source for this field/value below> | `<instruction ref, Feature Spec ref, issue ref, or none>` |
+| `issue:<NN>:branch_name` | `issue:<NN>` | `branch_name` | `<exact branch>` | `source-spec`, `owner-instruction`, or `runtime-derived` | `<delivery/source evidence>` |
 
 ## Resolution Source Constraints
 
 | Field/value | Allowed sources |
 | --- | --- |
 | `mode=full-flow` | `default` or `owner-instruction` |
-| `mode=prd-only` | `owner-instruction` |
-| `mode=issues-from-existing-prd` | `owner-instruction` or `source-prd` |
+| `mode=spec-only` | `owner-instruction` |
+| `mode=issues-from-existing-spec` | `owner-instruction` or `source-spec` |
 | `execution_profile` | `default` or `runtime-derived` |
 | `tracker_backend` | `tracker-config` or `legacy-migration` |
 | `effective_target` | `runtime-derived` from the target-resolution matrix |
@@ -174,25 +174,25 @@ that issue is emitted; use canonical defaults instead of omission:
 | `local_mirror=requested` and its path | `owner-instruction` |
 | `partial_output=withhold` | `default` |
 | `partial_output=allow-non-agent-ready` | `owner-instruction` |
-| Feature `delivery_mode=pull-request` | `default` or `source-prd` |
-| Feature `delivery_mode=direct-commit` | `owner-instruction` naming the exact instruction, feature scope, and authorized target branch; or `source-prd` preserving that same owner evidence |
+| Feature `delivery_mode=pull-request` | `default` or `source-spec` |
+| Feature `delivery_mode=direct-commit` | `owner-instruction` naming the exact instruction, feature scope, and authorized target branch; or `source-spec` preserving that same owner evidence |
 | Feature `issue_mutation_authority=none` or `pr-body-closeout-only` | `runtime-derived` from tracker and delivery |
-| Feature `issue_mutation_authority=explicit-direct-mutation` | `owner-instruction` separately authorizing final-commit issue closure for the exact feature scope, target, and branch; or `source-prd` preserving that evidence |
-| Feature `branch_name` for `pull-request` | `runtime-derived` or `source-prd` |
-| Feature `branch_name` for `direct-commit` | `owner-instruction`, or `source-prd` preserving exact scoped owner and target-branch evidence |
-| Feature `pr_closeout=merge-ready` | `default` or `source-prd` |
-| Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-prd` preserving explicit owner evidence |
-| Feature `pr_closeout=not-applicable` and feature `pr_shape` | `runtime-derived` from `delivery_mode` and repo scope, or `source-prd` |
-| Issue `delivery_source=feature-level-inherited` and its effective delivery tuple | `source-prd` |
-| Issue `delivery_source=issue-level-override` and its effective delivery tuple | `owner-instruction`; for `direct-commit`, name the exact instruction, issue scope, and authorized target branch; or use `source-prd` only when it preserves that same owner evidence and branch data |
-| Issue `issue_mutation_authority=none` or `pr-body-closeout-only` | `runtime-derived` or `source-prd` from the validated tracker/delivery tuple |
-| Issue `issue_mutation_authority=explicit-direct-mutation` | `owner-instruction`, or `source-prd` preserving the separately authorized final-commit closure evidence projected to the exact issue scope |
-| Issue `branch_name` with feature inheritance | `source-prd` |
-| Issue `branch_name` with an authorized override | `owner-instruction`, or `source-prd` preserving the same scoped evidence; `runtime-derived` only for a non-authority pull-request branch |
-| `parallelization`, `closeout_mode`, and `integration_mode` | `runtime-derived` from the validated issue graph, tracker, and effective delivery tuple, or `source-prd` |
-| `domain_closeout` | `runtime-derived` from the accepted knowledge delta and final-owner graph, or `source-prd` |
+| Feature `issue_mutation_authority=explicit-direct-mutation` | `owner-instruction` separately authorizing final-commit issue closure for the exact feature scope, target, and branch; or `source-spec` preserving that evidence |
+| Feature `branch_name` for `pull-request` | `runtime-derived` or `source-spec` |
+| Feature `branch_name` for `direct-commit` | `owner-instruction`, or `source-spec` preserving exact scoped owner and target-branch evidence |
+| Feature `pr_closeout=merge-ready` | `default` or `source-spec` |
+| Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-spec` preserving explicit owner evidence |
+| Feature `pr_closeout=not-applicable` and feature `pr_shape` | `runtime-derived` from `delivery_mode` and repo scope, or `source-spec` |
+| Issue `delivery_source=feature-level-inherited` and its effective delivery tuple | `source-spec` |
+| Issue `delivery_source=issue-level-override` and its effective delivery tuple | `owner-instruction`; for `direct-commit`, name the exact instruction, issue scope, and authorized target branch; or use `source-spec` only when it preserves that same owner evidence and branch data |
+| Issue `issue_mutation_authority=none` or `pr-body-closeout-only` | `runtime-derived` or `source-spec` from the validated tracker/delivery tuple |
+| Issue `issue_mutation_authority=explicit-direct-mutation` | `owner-instruction`, or `source-spec` preserving the separately authorized final-commit closure evidence projected to the exact issue scope |
+| Issue `branch_name` with feature inheritance | `source-spec` |
+| Issue `branch_name` with an authorized override | `owner-instruction`, or `source-spec` preserving the same scoped evidence; `runtime-derived` only for a non-authority pull-request branch |
+| `parallelization`, `closeout_mode`, and `integration_mode` | `runtime-derived` from the validated issue graph, tracker, and effective delivery tuple, or `source-spec` |
+| `domain_closeout` | `runtime-derived` from the accepted knowledge delta and final-owner graph, or `source-spec` |
 
-`tracker-config`, `source-prd`, and `runtime-derived` may select only the
+`tracker-config`, `source-spec`, and `runtime-derived` may select only the
 field/value pairs allowed above. They never grant `direct-commit`, local-mirror
 writes, partial backlog publication, or an issue-level delivery override
 without the required preserved owner evidence. `legacy-migration` cannot
@@ -203,7 +203,7 @@ same owner evidence required by this table.
 For a direct-commit feature or issue override, the delivery, `branch_name`, and
 `issue_mutation_authority=explicit-direct-mutation` rows use evidence containing
 `owner-ref=<ref>;scope-ref=<run-or-issue-scope>;target-ref=<feature-or-source-ref>;target-branch=<branch_name>`.
-A `source-prd` row preserves those tokens and never synthesizes them from
+A `source-spec` row preserves those tokens and never synthesizes them from
 prose. The mutation row is separate and its `owner-ref` must resolve to an
 instruction that explicitly authorizes final-commit issue closure; delivery
 authority alone cannot select it. For an effective direct-commit issue, the
@@ -213,7 +213,7 @@ delivery and closure `owner-ref` values independently; they may name different
 owner instructions and must never be rewritten to match.
 For feature-level inherited direct commit, each issue rewrites only the scope
 projection to `scope-ref=issue:<NN>` and adds `scope-transfer-ref=run`; it
-preserves the PRD owner, `target-ref`, and target branch verbatim.
+preserves the Feature Spec owner, `target-ref`, and target branch verbatim.
 
 Every row whose `source` is not `default` requires normalized `evidence` that
 is neither empty nor `none`. Validate this after the source-constraint table
@@ -238,7 +238,7 @@ these exact rules:
 7. SHA-256 hash the serialized UTF-8 bytes and emit the Markdown field
    `option_rows_fingerprint: sha256:<lowercase-hex>`.
 
-The entrypoint computes the run-row fingerprint before the PRD phase. Each
+The entrypoint computes the run-row fingerprint before the Feature Spec phase. Each
 phase recomputes and verifies the incoming rows before acting. The issue phase
 then adds all `issue:<NN>` rows, recomputes the fingerprint over the complete
 run-plus-issue set, and returns that value in its handoff and completion
@@ -274,7 +274,7 @@ Read older human labels only for compatibility and rewrite them when touched:
 | `PR closeout` | `pr_closeout` |
 
 Legacy labels are read aliases, not valid current output fields. For a legacy
-PRD without canonical `pr_shape`, resolve `delivery_mode` first, then normalize
+Feature Spec without canonical `pr_shape`, resolve `delivery_mode` first, then normalize
 to `single-pr` for one-repo `pull-request`, `per-repo-pr` for multi-repo
 `pull-request`, or `none` for `direct-commit`. Treat older PR-shape prose only
 as evidence for the repo-scope check, record `source=legacy-migration`, and

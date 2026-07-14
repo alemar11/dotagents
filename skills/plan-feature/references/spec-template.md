@@ -1,22 +1,22 @@
-# PRD Template
+# Feature Spec Template
 
-Use this shape unless the project already has a stronger local PRD format.
+Use this shape unless the project already has a stronger local Feature Spec format.
 
 ## Structured Value Projection
 
 `references/options.md` is the sole owner of option names, values, defaults,
 sources, evidence, and cross-field constraints. This template only projects an
-already verified option snapshot into the PRD; do not resolve or override
+already verified option snapshot into the Feature Spec; do not resolve or override
 options here.
 Render each field and its evidence exactly from that verified snapshot; keep
 derived paths, fingerprints, and integration proof as separate data.
 
 ```markdown
-# PRD: [Feature Name]
+# Feature Spec: [Feature Name]
 
 ## Source
 
-- Conversation, issue, doc, or repo evidence used to create this PRD.
+- Conversation, issue, doc, or repo evidence used to create this Feature Spec.
 - Use portable evidence references only: repo-relative paths for current-repo
   files, `<repo-name>/<repo-relative-path>` for sibling repos, hosted URLs, or
   descriptive labels for local-only references. Do not include
@@ -35,7 +35,7 @@ What user or system problem this solves.
 
 ## Goals
 
-- Concrete outcome this PRD should deliver.
+- Concrete outcome this Feature Spec should deliver.
 
 ## Non-Goals
 
@@ -53,11 +53,11 @@ What user or system problem this solves.
 
 ## Product / Repository Scope
 
-- For single-repo PRDs: say `current repository` and name any relevant module
+- For single-repo Feature Specs: say `current repository` and name any relevant module
   or package.
-- For monorepo PRDs: selected product/workspace path, selected context file,
+- For monorepo Feature Specs: selected product/workspace path, selected context file,
   and explicitly out-of-scope sibling workspaces when relevant.
-- For orchestrator workspace PRDs: affected repos, each repo's role, and any
+- For orchestrator workspace Feature Specs: affected repos, each repo's role, and any
   repo-local implementation notes.
 
 ## Delivery Mode
@@ -72,7 +72,7 @@ What user or system problem this solves.
 - pr_shape: [verified `pr_shape` row value].
 - integration_proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
-- issue_inheritance: generated issues link this PRD with `source_prd_ref`, copy
+- issue_inheritance: generated issues link this Feature Spec with `source_spec_ref`, copy
   the effective `delivery_mode` and `pr_closeout` values as feature-level metadata,
   and carry issue-level ordering, dependencies, parallelization, closeout, and
   exceptions. The issue phase validates the generated issue graph before
