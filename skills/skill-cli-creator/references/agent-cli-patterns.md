@@ -43,19 +43,17 @@ canonical value.
 
 Apply these rules:
 
-- Normalize natural-language and legacy inputs once at the command boundary.
-- Emit and persist only canonical values after normalization.
+- Resolve natural-language instructions directly to canonical inputs at the
+  command boundary. Reject noncanonical structured inputs.
+- Emit and persist only canonical values.
 - Keep the option value separate from associated prose, data, identifiers, or
   references; for example, use `publication_target` plus `publication_ref`
   rather than one combined phrase.
 - Keep factual observations such as `ok: true` as booleans. Do not replace
   externally owned syntax such as provider fields, protocol values, or standard
   environment variables merely to match this repository convention.
-- When compatibility requires aliases, document them as input-only and test
-  that every output path returns the canonical value.
 - Treat a breaking change to machine-readable option keys or values as a major
-  CLI version change unless the owner documents a narrower compatibility
-  guarantee.
+  CLI version change.
 
 When one CLI has several options or multiple consumers, keep its concrete
 registry in one owner-local reference and make consumer tests prove that their
@@ -100,7 +98,7 @@ compiled-launcher, and semver rules live in
 Use the owner-aligned `config.toml` contract in
 [embedded-cli-layout.md](embedded-cli-layout.md). Command design must keep reads
 and health checks non-mutating and reserve config writes for explicit
-`init`, `login`, `configure`, or migration commands.
+`init`, `login`, or `configure` commands.
 
 ## Runtime cache paths
 

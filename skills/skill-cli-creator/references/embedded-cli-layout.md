@@ -208,8 +208,6 @@ Keep config-only directories explicit:
 Do not place helper scripts or implementation code there.
 
 Consuming repos should gitignore the local `config.toml` path that the CLI uses.
-When a skill or plugin migrates from a legacy config filename to `config.toml`,
-update consuming repo ignore rules in the same rollout.
 
 Normative config format:
 
@@ -247,7 +245,7 @@ Rules:
 - Do not require top-level `version` or `tools.<tool>.version`.
 - Create parent directories only when the user actually persists config.
 
-## Config Migrations
+## Config Path Changes
 
 Promotion from plugin single-skill ownership to plugin-shared ownership changes
 both config storage and the canonical artifact path:
@@ -256,12 +254,8 @@ both config storage and the canonical artifact path:
   `.plugins/<plugin>/config.toml`.
 - Update owning docs and examples to the new artifact path under the plugin root
   in the same rollout.
-- Handle old-to-new import only during an explicit mutating flow such as `init`,
-  `login`, `configure`, or `migrate-config`.
-- If `.plugins/<plugin>/config.toml` already exists, import or merge only keys
-  that are still absent and never silently overwrite existing keys.
-- Preserve the CLI-owned `[tools.<tool>]` subtree plus any shared section the CLI
-  uniquely owns as the documented single writer.
+- Do not import from or probe old config paths. The new owner path is a hard
+  cut; users configure it explicitly through the current mutating commands.
 - Keep ignore rules aligned with the new canonical path in the same rollout.
 
 ## Runtime Cache

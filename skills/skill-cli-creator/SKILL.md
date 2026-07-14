@@ -43,7 +43,7 @@ Load only what the current change needs:
 | New/changed commands, JSON, pagination, files, writes, or raw escape hatch | `references/agent-cli-patterns.md` |
 
 A small fix to an existing skill-owned script does not require loading the
-plugin, migration, or multi-OS sections. A docs-only correction does not require
+plugin ownership, config, or multi-OS sections. A docs-only correction does not require
 the implementation workflow.
 
 ## Core Workflow
@@ -86,8 +86,8 @@ the implementation workflow.
   installed path. Bare commands require a documented wrapper or `PATH` setup.
 - `<artifact-path> --version` is required and must report one semver source of
   truth.
-- Create or migrate config only through an explicit mutating command. Reads and
-  health checks, including `doctor`, must not write config.
+- Create config only through an explicit mutating command. Reads and health
+  checks, including `doctor`, must not write config.
 - Runtime caches under `~/.cache/dotagents/...` are only for rebuildable
   downloaded or generated runtime artifacts, never for user config or normal repo
   content.
@@ -99,7 +99,7 @@ the implementation workflow.
 
 - [references/embedded-cli-layout.md](references/embedded-cli-layout.md):
   owner roots, artifact placement, naming, config namespaces, runtime cache,
-  multi-OS compiled layouts, config migration, and versioning rules.
+  multi-OS compiled layouts, config changes, and versioning rules.
 - [references/implementation-workflow.md](references/implementation-workflow.md):
   runtime choice, command-contract sketching, auth/config handling, build
   workflow, validation lanes, language defaults, and host integration.
