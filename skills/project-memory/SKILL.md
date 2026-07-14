@@ -176,9 +176,8 @@ language and verify the docs diff alongside feature proof.
 
 In orchestrator-workspace setup, do not create project or feature folders. Do
 not create orchestration runtime config files. Before completing a touched
-`issue-tracker.md`, search for `tracker_mode`, `tracker_writes`,
-`effective_target`, `local_artifact_writes`, and
-`external_tracker_mutation`; remove them or explain why retained prose remains.
+`issue-tracker.md`, reject unknown configuration keys rather than rewriting or
+removing them implicitly.
 
 ### 6. Report
 

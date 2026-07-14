@@ -84,6 +84,12 @@ publication or issue mutation.
   `change_delivery_permission`, `issue_update_permission`, and
   `source_spec_ref` through the full planning pipeline and its phase modes, with
   the verified `option_rows_fingerprint` for each current row set.
+- Non-mutating handoffs preserve the resolved canonical run value:
+  `no_mutation_override=dry-run`, `no_mutation_override=temp`,
+  `no_mutation_override=rehearsal`, `no_mutation_override=validation`,
+  `no_mutation_override=disabled-writes`, or
+  `no_mutation_override=draft-output`. They are not inferred from older field
+  names or prose.
 - `$codex-orchestrator` may consume generated issues only after `source_spec_ref`
   is durable enough for the requested action.
 
