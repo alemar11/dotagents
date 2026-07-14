@@ -82,7 +82,7 @@ It reports `explicit-user`, `skill-injection`, `opened-skill-doc`, and
 `runtime-command` buckets from direct function calls and code-mode custom tool
 calls. Examples also record transport, `thread_source`, `parent_thread_id`, and
 the raw `forked_from_id` when present so worker-thread evidence can be
-attributed across current and legacy session metadata without counting tool
+attributed across supported session metadata shapes without counting tool
 outputs or tool discovery as usage. Read a representative trace before making
 a high-risk behavior claim.
 
