@@ -113,7 +113,7 @@ With `output_surface=caller`:
 - Use `planning_mode=full-plan` for a feature, migration, refactor, or plan that
   still needs phases or multiple tasks.
 - Use `planning_mode=issue-hardening` for one existing issue, one vertical
-  slice, or one work item produced by a PRD or issue-splitting skill.
+  slice, or one work item produced by a Feature Spec or issue-splitting skill.
 - If another skill calls Plan Harder with an issue body, treat that as
   `planning_mode=issue-hardening` with `output_surface=caller`.
   `planning_mode=full-plan` uses `output_surface=standalone`.
