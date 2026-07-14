@@ -68,7 +68,7 @@ Orchestrator workspace:
 ├── CONTEXT.md                 # coordination vocabulary
 ├── project-memory/
 │   └── adr/                   # durable coordination decisions
-└── projects/
+└── orchestration/
     └── customer-growth/
         ├── PROJECT.md         # initiative-level overview and constraints
         ├── repos/
@@ -123,7 +123,7 @@ than silently overriding it.
 ## Orchestrator boundaries
 
 Orchestrator workspace memory coordinates work across repos. It should not copy
-or replace child repo memory. Use `projects/<project>/repos/*.md` as pointer
+or replace child repo memory. Use `orchestration/<project>/repos/*.md` as pointer
 sheets for repo path, role, tracker, validation, and linked work only.
 
 ## Existing-project bootstrap

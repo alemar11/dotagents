@@ -179,7 +179,7 @@ issue_refs: draft-issue:account-settings-export:01
 
 ## Failure Conditions
 
-- A repo-local `.scratch/` Feature Spec or issue file is created.
+- A repo-local `planning/tmp/` Feature Spec or issue file is created.
 - `CONTEXT.md`, project domain docs, or ADRs are edited during the planning run.
 - A GitHub issue is created, edited, labeled, typed, closed, or attached.
 - An implementation worker receives `commit`, `push`, or `pr` authorization

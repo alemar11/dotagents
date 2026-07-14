@@ -11,7 +11,7 @@ Feature Specs and implementation issues for this repo live as GitHub issues. Use
 | `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
 
 GitHub is the authoritative artifact store in this mode. Do not create or keep
-repo-local `.scratch/` Feature Spec/issue mirrors, `project-memory/features/` mirrors, or
+repo-local `planning/tmp/` Feature Spec/issue mirrors, `project-memory/features/` mirrors, or
 other local planning copies merely to feed `gh --body-file`. Temporary body
 files must live outside the repo and be removed after mutation. Create a
 persistent mirror only when the canonical Plan Feature rows contain

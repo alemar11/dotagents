@@ -23,7 +23,7 @@ question set or route back through `$grill-me-with-context`.
   `tracker_backend` is the planning-artifact write authority only when
   `effective_target=configured-tracker`; other target values are non-mutating.
 - In GitHub tracker mode, do not persist repo-local Feature Spec mirrors
-  or `.scratch/` staging copies unless `local_mirror=requested` and
+  or `planning/tmp/` staging copies unless `local_mirror=requested` and
   `effective_target=configured-tracker`.
 - Use structured values for multi-choice fields. `references/options.md` is the
   sole owner of option values, defaults, evidence, and cross-field resolution;
@@ -86,8 +86,8 @@ For `standard`, inspect the current project context before drafting:
 - `CONTEXT.md` or `CONTEXT-MAP.md`
 - `TRANSLATION.md`, when present for the selected context
 - `project-memory/adr/`
-- orchestrator workspace docs such as `projects/<project>/PROJECT.md` and
-  `projects/<project>/repos/*.md`, when planning from a local orchestrator
+- orchestrator workspace docs such as `orchestration/<project>/PROJECT.md` and
+  `orchestration/<project>/repos/*.md`, when planning from a local orchestrator
   workspace
 - README, product docs, issue templates, and relevant source/tests
 
@@ -130,7 +130,7 @@ partials preserve the child repo's durable topology in `repo_project_topology`.
 | Project topology | Tracker backend | Feature Spec target | Generated issue source |
 | --- | --- | --- | --- |
 | `single-repo` | `github` | One Feature Spec GitHub issue in the repo. | `source_spec_ref: #<number>` |
-| `single-repo` | `local` | `.scratch/<feature-slug>/SPEC.md` | `source_spec_ref: .scratch/<feature-slug>/SPEC.md` |
+| `single-repo` | `local` | `planning/features/<feature-slug>/SPEC.md` | `source_spec_ref: planning/features/<feature-slug>/SPEC.md` |
 | `monorepo` | `github` or `local` | One Feature Spec for the selected product/workspace context. | The selected Feature Spec issue/path plus product or workspace scope in each issue. |
 | `multi-repo-workspace` | Parent `github` or `local`; child tracker per affected repo | Parent/global Feature Spec only when it is the accepted source. Repo-scoped partial Feature Specs route through each affected child repo's tracker. | Each repo issue points at its repo partial Feature Spec and links sibling partial Feature Specs. |
 
@@ -266,7 +266,7 @@ the validated `local_mirror_path`.
 
 For a local orchestrator workspace with an accepted parent/global Feature Spec,
 the resolved parent path is
-`projects/<project-slug>/features/<feature-slug>/SPEC.md`. This phase may also
+`orchestration/<project-slug>/features/<feature-slug>/SPEC.md`. This phase may also
 create or update `PROJECT.md`, `repos/<repo-slug>.md`, and
 `integration-gates.md` only from accepted planning sources and must report that
 source. Do not publish repo-scoped child partials in that same parent run.

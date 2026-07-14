@@ -108,9 +108,9 @@ Normalize touched legacy aliases to the canonical lower-kebab values.
 
 Find or ask for the Feature Spec source:
 
-- `.scratch/<feature-slug>/SPEC.md`,
+- `planning/features/<feature-slug>/SPEC.md`,
 - a GitHub Feature Spec issue,
-- `projects/<project-slug>/features/<feature-slug>/SPEC.md`,
+- `orchestration/<project-slug>/features/<feature-slug>/SPEC.md`,
 - a linked GitHub workspace Feature Spec issue,
 - a handoff `source_spec_ref` from the Feature Spec phase or an existing durable Feature Spec
   source,
@@ -125,8 +125,8 @@ Also inspect:
 - `CONTEXT.md` or `CONTEXT-MAP.md`,
 - `TRANSLATION.md`, when present for the selected context,
 - `project-memory/adr/`,
-- orchestrator workspace docs such as `projects/<project>/PROJECT.md`,
-  `projects/<project>/repos/*.md`, and feature `integration-gates.md` when
+- orchestrator workspace docs such as `orchestration/<project>/PROJECT.md`,
+  `orchestration/<project>/repos/*.md`, and feature `integration-gates.md` when
   planning from a local orchestrator workspace,
 - nearby source files, tests, and docs relevant to the Feature Spec.
 
@@ -376,7 +376,7 @@ effective-target, temporary body-file, and `source_spec_ref` rules:
   to the Feature Spec parent when the Feature Spec source is a GitHub issue, set the mapped
   `task` issue type when available, then apply mapped labels such as
   `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
-  `.scratch/` mirror unless `local_mirror=requested`; when requested, write
+  `planning/tmp/` mirror unless `local_mirror=requested`; when requested, write
   issue mirrors under `local_mirror_path`. Pass sanitized
   issue titles, bodies, target repo, labels, types, and parent/sub-issue intent
   to `$gitstack:github-issues`; do not assemble direct mutating `gh issue create` shell
@@ -386,17 +386,17 @@ effective-target, temporary body-file, and `source_spec_ref` rules:
   Derive `<project-slug>` and affected repos from the Feature Spec/project context or ask
   for them. Repo-local implementation PRs or child issues link back to the
   relevant Feature Spec or partial issue. Do not create local orchestrator feature
-  artifacts or `.scratch/` mirrors unless `local_mirror=requested`; write any
+  artifacts or `planning/tmp/` mirrors unless `local_mirror=requested`; write any
   requested mirrors under `local_mirror_path`.
 - `tracker_backend=local`: with `effective_target=configured-tracker`, write to the configured repo-local issue
-  path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with
+  path, normally `planning/features/<feature-slug>/issues/<NN>-<slug>.md`, with
   `issue_type:`, `workflow_state:`, and `source_spec_ref:` lines near the top and
   a heading that follows the local issue title convention
   `<feature-slug>: <NN> <vertical outcome>`. Use the
   authoritative feature slug from the handoff or Feature Spec path; derive it from the
   Feature Spec title only when no accepted slug/path exists.
 - Local workspace issues: write to
-  `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` with
+  `orchestration/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` with
   `issue_type:`, `workflow_state:`, and `source_spec_ref:` lines near the top and
   a heading that follows the local issue title convention
   `<feature-slug>: <NN> <vertical outcome>`. Create the

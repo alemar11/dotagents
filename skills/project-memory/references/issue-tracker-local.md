@@ -1,7 +1,8 @@
 # Issue Tracker: Local Markdown
 
-Feature Specs and implementation issues for this repo live as markdown files under
-`.scratch/`.
+Feature Specs and implementation issues for this repo live as durable Markdown
+files under each `planning/features/<feature-slug>/` subtree. The
+`planning/tmp/` tree is temporary working space only.
 
 ## Configuration
 
@@ -10,10 +11,11 @@ Feature Specs and implementation issues for this repo live as markdown files und
 | `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs and implementation issues are written as local Markdown files. |
 | `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
 
-This root `.scratch/` tree is the authoritative local Markdown tracker path. Do
-not relocate these feature artifacts under `project-memory/features/` unless the
-repo records a custom tracker mode; `project-memory/` remains routing, domain,
-and ADR memory.
+Durable local tracker artifacts must not live under `planning/tmp/`,
+legacy `.scratch/`, or `project-memory/features/`. Keep `project-memory/` for
+routing, domain, and ADR memory. Keep `planning/tmp/` for dry-run output,
+rehearsal files, temporary body files, fingerprints, and comparison snapshots
+that are safe to delete after the run.
 
 Feature-planning workflows write Feature Specs and generated implementation issues to
 the configured local Markdown tracker by default after setup, planning identity,
@@ -28,15 +30,16 @@ durable issue-tracker configuration.
 
 ## Conventions
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The Feature Spec is `.scratch/<feature-slug>/SPEC.md`
-- Implementation issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`,
-  numbered from `01`
+- One feature per directory: `planning/features/<feature-slug>/`
+- The Feature Spec is `planning/features/<feature-slug>/SPEC.md`
+- Implementation issues are
+  `planning/features/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
 - Implementation issue headings use:
   `<feature-slug>: <NN> <vertical outcome>`
 - Completed implementation issues move to
-  `.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`
-- Create `issues/done/` only when moving the first completed issue into it.
+  `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`
+- Create `planning/features/<feature-slug>/issues/done/` only when moving the
+  first completed issue into it.
 - Issue type is recorded as an `issue_type:` line near the top of each issue
   file, using canonical `bug`, `feature`, or `task`.
 - Triage state is recorded as a `workflow_state:` line near the top of each
@@ -95,8 +98,8 @@ workflow status belongs on implementation issues or in the tracker convention.
 ## Completion
 
 When all acceptance criteria pass and validation is complete, move the issue
-file from `.scratch/<feature-slug>/issues/<NN>-<slug>.md` to
-`.scratch/<feature-slug>/issues/done/<NN>-<slug>.md`.
+file from `planning/features/<feature-slug>/issues/<NN>-<slug>.md` to
+`planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`.
 
 For `delivery_mode: direct-commit`, commit on the authorized current branch and
 record the commit/proof before moving the issue file. Use
@@ -105,16 +108,20 @@ delivery mode is `direct-commit`; `direct-commit-closes-issue` is not a local
 markdown lifecycle signal.
 
 Do not delete completed issue files. Do not add a `done` status; the
-`issues/done/` folder is the completion signal, while `workflow_state:` remains
-the lifecycle state used for active issues. If `issues/done/` does not
-exist yet, create it when completing the first issue.
+`done/` folder is the completion signal, while `workflow_state:` remains the
+lifecycle state used for active issues. If the feature's `done/` folder does
+not exist yet, create it when completing the first issue.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `.scratch/<feature-slug>/`, creating the directory if
-needed for `effective_target=configured-tracker`. For
-`effective_target=local-dry-run`, return draft file paths and bodies without
-writing local tracker files.
+Create or update the durable Feature Spec or issue file under
+`planning/features/<feature-slug>/`, creating directories as needed for
+`effective_target=configured-tracker`. For
+`effective_target=local-dry-run`, return bodies and either the would-be durable
+target path or a clearly temporary `planning/tmp/<feature-slug>/...` draft
+path without writing local tracker files. Never use a `planning/tmp/` or
+legacy `.scratch/` path as a durable `source_spec_ref` or `ready-for-agent`
+issue location.
 
 ## When a skill says "fetch the relevant issue"
 

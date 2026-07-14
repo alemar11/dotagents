@@ -103,7 +103,7 @@ publication or issue mutation.
 | Tracker backend | Feature Spec owner output | Issue owner output |
 | --- | --- | --- |
 | `github` | Feature Spec GitHub issue, linked partial Feature Spec issues for multi-repo work, or Feature Spec body plus draft command | GitHub sub-issues under the Feature Spec, linked repo issues for multi-repo work, or issue bodies plus draft commands |
-| `local` | `.scratch/<feature-slug>/SPEC.md` or `projects/<project-slug>/features/<feature-slug>/SPEC.md` for local workspaces | `.scratch/<feature-slug>/issues/<NN>-<slug>.md` or `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` for local workspaces |
+| `local` | `planning/features/<feature-slug>/SPEC.md` or `orchestration/<project-slug>/features/<feature-slug>/SPEC.md` for local workspace parents | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` or `orchestration/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` for local workspace parents |
 
 Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
 and legacy tracker modes as aliases when reading existing artifacts, and rewrite

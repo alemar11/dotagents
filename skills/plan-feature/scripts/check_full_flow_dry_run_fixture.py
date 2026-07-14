@@ -179,9 +179,9 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             }
 
         issues = [
-            build_issue("01", ("api",), "projects/platform/features/auth/SPEC.md"),
-            build_issue("02", ("web",), "projects/platform/features/auth/SPEC.md"),
-            build_issue("03", ("api", "web"), "projects/platform/features/auth/SPEC.md"),
+            build_issue("01", ("api",), "orchestration/platform/features/auth/SPEC.md"),
+            build_issue("02", ("web",), "orchestration/platform/features/auth/SPEC.md"),
+            build_issue("03", ("api", "web"), "orchestration/platform/features/auth/SPEC.md"),
         ]
 
         self.assertEqual("single-repo", issues[0]["issue_project_topology"])
@@ -559,6 +559,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         local_contract = read("project-memory/references/issue-tracker-local.md")
         self.assertIn("`effective_target=local-dry-run`", local_contract)
+        self.assertIn("temporary working space only", local_contract)
+        self.assertIn("`planning/features/<feature-slug>/SPEC.md`", local_contract)
+        self.assertIn("`planning/features/<feature-slug>/issues/<NN>-<slug>.md`", local_contract)
+        self.assertIn("Never use a `planning/tmp/`", local_contract)
         self.assertNotIn("explicitly asks to keep completed issue", local_contract)
 
     def test_plan_feature_references_internal_phase_templates(self) -> None:
@@ -609,6 +613,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("references/issue-phase.md", plan_feature)
         self.assertIn("tracker-publishing.md", spec_phase)
         self.assertIn("## Feature Spec Target Model", spec_phase)
+        self.assertIn("planning/features/<feature-slug>/SPEC.md", spec_phase)
         self.assertIn("When `workspace_context=multi-repo-workspace`", spec_phase)
         self.assertIn("Feature Spec body fingerprint", spec_phase)
         self.assertIn("Feature Spec planning-artifact publication", spec_phase)

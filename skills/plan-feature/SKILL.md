@@ -70,7 +70,7 @@ domain-closeout gates required by the selected mode.
   Markdown paths when `effective_target=configured-tracker`.
   `effective_target=local-dry-run` or `draft-publish-commands` is non-mutating.
 - In hosted tracker mode, keep body files transient and outside the repo. Do
-  not create `.scratch/`, `project-memory/features/`, or other local mirrors
+  not create `planning/tmp/`, `project-memory/features/`, or other local mirrors
   unless `effective_target=configured-tracker` and
   `local_mirror=requested`.
 - Resolve and carry one planning identity: `feature_slug`, selected
