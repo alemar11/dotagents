@@ -1,17 +1,17 @@
 # Issue Tracker: GitHub
 
-PRDs and implementation issues for this repo live as GitHub issues. Use
+Feature Specs and implementation issues for this repo live as GitHub issues. Use
 `$gitstack:github-issues` for GitHub issue lifecycle operations.
 
 ## Configuration
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `github` | `github`, `local` | PRDs and implementation issues are written as GitHub issues. |
+| `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs and implementation issues are written as GitHub issues. |
 | `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
 
 GitHub is the authoritative artifact store in this mode. Do not create or keep
-repo-local `.scratch/` PRD/issue mirrors, `project-memory/features/` mirrors, or
+repo-local `.scratch/` Feature Spec/issue mirrors, `project-memory/features/` mirrors, or
 other local planning copies merely to feed `gh --body-file`. Temporary body
 files must live outside the repo and be removed after mutation. Create a
 persistent mirror only when the canonical Plan Feature rows contain
@@ -30,9 +30,9 @@ For `effective_target=local-dry-run`, return local paths and bodies without
 writing GitHub. For `effective_target=draft-publish-commands`, ask
 `$gitstack:github-issues` for draft issue bodies and exact `gh` commands without
 executing them.
-When returning draft commands before the PRD issue exists, use
-`source_prd_ref=draft-prd:<feature-slug>` and publish the PRD first; generated
-issue bodies must replace that draft ref with `source_prd_ref: #<prd-number>` before
+When returning draft commands before the Feature Spec issue exists, use
+`source_spec_ref=draft-spec:<feature-slug>` and publish the Feature Spec first; generated
+issue bodies must replace that draft ref with `source_spec_ref: #<spec-number>` before
 hosted mutation.
 Treat `no_mutation_override`, `no_mutation_output`, and the derived
 non-mutating target as run-scoped rows. Do not record them as durable
@@ -73,14 +73,14 @@ the actual available values or fallback label convention in
   work, every involved repo uses the same branch name and opens its own PR.
   Generated implementation issues are scheduling units and normally close from
   the relevant PR body.
-- Multi-repo PRD shape: use a single PRD only when that is the accepted
-  planning source. Otherwise use linked repo-scoped partial PRDs or generated
+- Multi-repo Feature Spec shape: use a single Feature Spec only when that is the accepted
+  planning source. Otherwise use linked repo-scoped partial Feature Specs or generated
   issues; each one names its affected repo and links the siblings that define
   the same feature. No central repo, central issue, project label, or global
-  PRD is required as durable setup configuration.
+  Feature Spec is required as durable setup configuration.
 - Exceptions: `delivery_mode=direct-commit` requires
   `source=owner-instruction` plus exact feature-scope and target-branch
-  evidence, or a `source-prd` row preserving that evidence. Final-commit issue
+  evidence, or a `source-spec` row preserving that evidence. Final-commit issue
   closure additionally requires a separate
   `issue_mutation_authority=explicit-direct-mutation` row whose owner evidence
   explicitly authorizes that closeout for the same scope, target, and branch.
@@ -94,14 +94,14 @@ the actual available values or fallback label convention in
 
 ## Title Format
 
-- PRD issue: `PRD: <Feature Name>`
+- Feature Spec issue: `Feature Spec: <Feature Name>`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
 
 Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
-the PRD planning identity, or the PRD source path. Derive it from the PRD title
+the Feature Spec planning identity, or the Feature Spec source path. Derive it from the Feature Spec title
 only when no accepted slug exists. Use two-digit ordering (`01`, `02`, `03`)
 for implementation issues so the global issue list remains scannable even
-outside the PRD sub-issue view.
+outside the Feature Spec sub-issue view.
 
 ## When a skill says "publish to the issue tracker"
 
@@ -109,18 +109,18 @@ Use `$gitstack:github-issues` to create a GitHub issue.
 
 For feature planning:
 
-- The PRD is a GitHub issue titled `PRD: <Feature Name>` with type `Feature`
+- The Feature Spec is a GitHub issue titled `Feature Spec: <Feature Name>` with type `Feature`
   unless the repo maps `feature` to a different value.
 - Generated implementation issues are the execution graph. Do not create a
   separate execution-plan issue. A requested non-authoritative summary remains
   a response view and is not tracker publication.
-- Implementation issues are GitHub sub-issues of the PRD issue with type
+- Implementation issues are GitHub sub-issues of the Feature Spec issue with type
   `Task` unless the repo maps `task` to a different value.
 - Implementation issue titles use
   `<feature-slug>: <NN> <vertical outcome>`.
-- `$plan-feature` owns PRD and generated issue body shape, including
-  `source_prd_ref`, delivery metadata, partial-PRD links, and issue graph
-  validation. `Source PRD` is a read-only legacy migration alias.
+- `$plan-feature` owns Feature Spec and generated issue body shape, including
+  `source_spec_ref`, delivery metadata, partial Feature Spec links, and issue graph
+  validation. Retired source-reference labels are not read aliases.
 
 For triage:
 
@@ -145,9 +145,9 @@ authorization evidence. The issue closes when that authorized
 commit reaches the default branch.
 
 Use closing keywords only for issues actually satisfied by the change. Do not
-add the parent PRD closing keyword from an individual child issue. For a
-whole-PRD final feature or integration PR, the root delivery orchestrator may
-add that parent keyword only after its resolved review policy and all PRD
+add the parent Feature Spec closing keyword from an individual child issue. For a
+whole Feature Spec final feature or integration PR, the root delivery orchestrator may
+add that parent keyword only after its resolved review policy and all Feature Spec
 closeout gates pass.
 
 ## When a skill says "fetch the relevant issue"

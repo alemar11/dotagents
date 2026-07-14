@@ -87,7 +87,7 @@ Behavior-affecting setup uses human-first Markdown tables with
 | Key | Values | Owner |
 | --- | --- | --- |
 | `tracker_backend` | `github`, `local` | `issue-tracker.md` |
-| `delivery_mode` | `pull-request`, `direct-commit` | `issue-tracker.md`, PRDs, generated issues |
+| `delivery_mode` | `pull-request`, `direct-commit` | `issue-tracker.md`, Feature Specs, generated issues |
 
 Treat uppercase kebab values as read aliases and normalize touched values.
 Do not add durable keys for workspace shape, setup flow, GitHub repo,

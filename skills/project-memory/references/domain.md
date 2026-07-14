@@ -76,7 +76,7 @@ Orchestrator workspace:
         │   └── mobile.md
         └── features/
             └── team-invitations/
-                ├── PRD.md
+                ├── SPEC.md
                 ├── integration-gates.md
                 └── issues/
                     ├── 01-accept-invitation.md
@@ -108,7 +108,7 @@ stale, noisy, or broken.
 
 ## Use the glossary vocabulary
 
-When output names a domain concept in a PRD, issue title, refactor proposal,
+When output names a domain concept in a Feature Spec, issue title, refactor proposal,
 hypothesis, or test name, use the term as defined in the relevant `CONTEXT.md`.
 Do not drift to synonyms the glossary explicitly avoids.
 
