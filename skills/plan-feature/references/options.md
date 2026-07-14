@@ -61,12 +61,12 @@ or its `## Orchestrator Handoff`.
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
 | `delivery_decision_origin` | `inherited-from-feature-spec`, `overridden-by-implementation-issue` | `inherited-from-feature-spec` | Override evidence remains separate. |
-| `change_delivery_target` | Same four run-level targets | Inherited | Records the issue-effective stopping point. |
+| `change_delivery_target` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | Inherited | Records the issue-effective stopping point. |
 | `change_delivery_permission` | `not-granted`, `granted-for-selected-target` | Inherited | Must be re-resolved atomically with any issue override. |
 | `issue_repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From the issue target repository | Preserves heterogeneous child layouts. |
-| `issue_update_permission` | Same run-level values | Inherited | Re-resolve with tracker, target, and completion method. |
-| `codex_review_requirement` | Same run-level values | Inherited or derived from an override | Never infer a skip from prose. |
-| `pull_request_count_strategy` | Same run-level values | Inherited | Re-resolve with any target override. |
+| `issue_update_permission` | `no-issue-changes`, `pull-request-closing-keyword-only`, `direct-issue-updates-explicitly-authorized` | Inherited | Re-resolve with tracker, target, and completion method. |
+| `codex_review_requirement` | `required-on-current-pull-request-head`, `explicitly-skipped-by-authorized-user`, `not-needed-for-selected-delivery-target` | Inherited or derived from an override | Never infer a skip from prose. |
+| `pull_request_count_strategy` | `one-pull-request-total`, `one-pull-request-per-repository`, `no-pull-request` | Inherited | Re-resolve with any target override. |
 | `parallelization` | `independent`, `depends-on`, `blocks`, `root-integrated` | Derived | Dependency ids remain data. |
 | `issue_completion_method` | `feature-pull-request-closing-keyword`, `repository-pull-request-closing-keyword`, `final-commit-closing-keyword`, `move-local-issue-to-done-after-proof`, `no-issue-completion` | Derived from tracker and target | Names the terminal lifecycle action. |
 | `domain_closeout` | `not-applicable`, `implementation-closeout` | `not-applicable` | Decisions and targets remain data. |
