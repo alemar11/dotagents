@@ -337,7 +337,7 @@ class OrchestratorContractTests(unittest.TestCase):
         normalized_ledger = " ".join(ledger.split())
         self.assertIn("missing, duplicate, out-of-order, or wrongly nested marker", normalized_ledger)
         self.assertIn("stop as `needs-owner`", normalized_ledger)
-        self.assertIn("do not\nload the new-ledger template", ledger)
+        self.assertIn("Do not\nload `ledger-template.md`", ledger)
         self.assertIn(
             "Never use it to reinterpret or overwrite an existing invalid ledger",
             " ".join(ledger_template.split()),
@@ -384,7 +384,7 @@ class OrchestratorContractTests(unittest.TestCase):
         positions = [marker_block.index(marker) for marker in displayed_markers]
         self.assertEqual(positions, sorted(positions))
         self.assertIn(
-            "## Ledger Resolution And Current-Format Classification",
+            "## Ledger Resolution And Validation",
             ledger,
         )
 
@@ -1025,7 +1025,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("Retired delivery", delivery)
         self.assertIn("Do not normalize them at runtime", delivery)
         self.assertIn("Retired surface and capability values\nare invalid input", worker)
-        self.assertIn("Retired orchestration\n  fields and values are invalid input", options)
+        self.assertIn("Unknown or retired\n  orchestration fields and values are invalid input", options)
         self.assertNotIn("## Legacy Input Normalization", options)
         self.assertNotIn("## Canonical PR Closeout Resolution", delivery)
 
@@ -1097,7 +1097,7 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertIn(value, actual[1])
 
         self.assertNotIn("## Legacy Input Normalization", options)
-        self.assertIn("Retired orchestration\n  fields and values are invalid input", options)
+        self.assertIn("Unknown or retired\n  orchestration fields and values are invalid input", options)
         self.assertIn("Retired surface and capability values\nare invalid input", worker)
         self.assertIn(
             "| `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` |",
