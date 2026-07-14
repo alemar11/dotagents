@@ -238,8 +238,8 @@ gh issue view <number-or-url> --json number,state,url
 
 ## Dry Runs
 
-When `effective_target=draft-publish-commands`, `tracker_writes: disabled`, or
-another explicit no-mutation override is active, do not run mutating commands.
+When `effective_target=draft-publish-commands` or another explicit
+no-mutation override is active, do not run mutating commands.
 Return:
 
 - the exact issue title and body or comment body,

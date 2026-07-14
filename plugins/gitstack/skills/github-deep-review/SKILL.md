@@ -91,7 +91,7 @@ Read beyond the first touched file. Follow the real path:
 
 - entrypoint -> validation/parsing -> routing/dispatch -> owner module ->
   shared helper -> persistence/network/runtime boundary
-- config/schema/docs -> runtime usage -> doctor/migration/fix path
+- config/schema/docs -> runtime usage -> doctor/fix path
 - provider/channel/plugin owner code -> generic core only when multiple owners
   need the same invariant
 - tests around the touched surface plus adjacent regression tests
@@ -119,13 +119,12 @@ For bug or regression reviews, include a compact provenance answer when feasible
 Good fixes usually:
 
 - live at the ownership boundary where the bug belongs;
-- preserve public or backward-compatible behavior unless the task is explicitly
-  about retiring it;
+- preserve public behavior unless the task is explicitly about changing it;
 - add a regression test at the smallest meaningful seam;
-- avoid broad special cases, hidden migrations, semantic sentinels, and
+- avoid broad special cases, hidden conversions, semantic sentinels, and
   provider/channel IDs in generic core;
 - update docs or changelog when user-visible behavior changes;
-- fail clearly in runtime paths and repair through doctor or migration paths
+- fail clearly in runtime paths and repair through doctor paths
   when that is the established contract.
 
 Call out symptom-level fixes. Recommend a larger refactor only when it makes
