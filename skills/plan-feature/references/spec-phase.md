@@ -1,37 +1,37 @@
-# PRD Phase
+# Feature Spec Phase
 
 Use this reference when `plan-feature` needs to turn clarified feature,
-product, migration, cross-repo project, or workflow intent into a practical PRD.
+product, migration, cross-repo project, or workflow intent into a practical Feature Spec.
 This is an internal phase, not a public skill.
 
 ## Goal
 
-Produce or publish a PRD that can feed the issue phase. If the source material
-is still too vague to produce a useful PRD, return the smallest blocking
+Produce or publish a Feature Spec that can feed the issue phase. If the source material
+is still too vague to produce a useful Feature Spec, return the smallest blocking
 question set or route back through `$grill-me-with-context`.
 
 ## Boundaries
 
 - Do not implement the feature.
-- Do not split the PRD into implementation issues; the issue phase owns that.
+- Do not split the Feature Spec into implementation issues; the issue phase owns that.
 - Do not edit `CONTEXT.md`, project domain docs, or ADRs. Carry accepted durable
   knowledge as the caller-provided `domain_knowledge_delta`.
 - Do not invent requirements, users, constraints, or acceptance criteria that
   are not supported by user input, repo evidence, or project memory.
-- Do not ask for separate PRD write/publish confirmation after `plan-feature`
+- Do not ask for separate Feature Spec write/publish confirmation after `plan-feature`
   has resolved setup, planning identity, blockers, and effective target.
   `tracker_backend` is the planning-artifact write authority only when
   `effective_target=configured-tracker`; other target values are non-mutating.
-- In GitHub tracker mode, do not persist repo-local PRD mirrors
+- In GitHub tracker mode, do not persist repo-local Feature Spec mirrors
   or `.scratch/` staging copies unless `local_mirror=requested` and
   `effective_target=configured-tracker`.
 - Use structured values for multi-choice fields. `references/options.md` is the
   sole owner of option values, defaults, evidence, and cross-field resolution;
   read tracker and type mappings from project memory, then project the verified
-  values through `references/prd-template.md`.
+  values through `references/spec-template.md`.
 - Resolve `effective_target` only through `references/options.md`. After
   resolution, use `$project-memory`'s `references/tracker-publishing.md` for
-  publication transport, stable `source_prd_ref` behavior, mutation
+  publication transport, stable `source_spec_ref` behavior, mutation
   verification, cleanup, and partial recovery.
 
 ## Phase Handoff Inputs
@@ -41,7 +41,7 @@ Receive the verified run-level `option_resolution` rows and
 
 - the planning identity (`feature_slug` and any selected `product_slug`,
   `workspace_path`, `context_file`, and `project_slug`);
-- pending or existing `source_prd_ref` state and the
+- pending or existing `source_spec_ref` state and the
   `hosted_body_file_policy=transient-outside-repo` transport rule;
 - `capture_mode=defer-to-caller`, `capture_outcome`, and the structured
   `domain_knowledge_delta` (`knowledge_delta`, `decisions`, `target_surfaces`,
@@ -60,7 +60,7 @@ drafting or write. Stop on a mismatch.
 
 ### 1. Ground In Project Memory
 
-For `lean-prd`, begin with only:
+For `lean-spec`, begin with only:
 
 - `project-memory/config/issue-tracker.md`;
 - `project-memory/config/triage-labels.md`;
@@ -112,24 +112,24 @@ resolution before drafting. Project the accepted rows without reinterpreting
 their prose or applying another default.
 
 If the repo shape makes the affected repo set ambiguous, ask before writing the
-PRD.
+Feature Spec.
 
-## PRD Target Model
+## Feature Spec Target Model
 
-Use this model before writing or publishing a PRD:
+Use this model before writing or publishing a Feature Spec:
 
-| Project shape | Tracker backend | PRD target | Generated issue source |
+| Project shape | Tracker backend | Feature Spec target | Generated issue source |
 | --- | --- | --- | --- |
-| Single repo | `github` | One PRD GitHub issue in the repo. | `source_prd_ref: #<number>` |
-| Single repo | `local` | `.scratch/<feature-slug>/PRD.md` | `source_prd_ref: .scratch/<feature-slug>/PRD.md` |
-| Monorepo or multi-context repo | `github` or `local` | One PRD for the selected product/workspace context. | The selected PRD issue/path plus product or workspace scope in each issue. |
-| Workspace with multiple independent repos | `github` | Linked repo-scoped partial PRD issues when there is no accepted global PRD. | Each repo issue points at its repo partial PRD and links sibling partial PRDs. |
-| Workspace with multiple independent repos | `local` | `projects/<project-slug>/features/<feature-slug>/PRD.md` or linked repo-scoped partial PRDs when that is the accepted source. | Each local issue points at the relevant PRD path and links sibling partial PRDs/issues. |
+| Single repo | `github` | One Feature Spec GitHub issue in the repo. | `source_spec_ref: #<number>` |
+| Single repo | `local` | `.scratch/<feature-slug>/SPEC.md` | `source_spec_ref: .scratch/<feature-slug>/SPEC.md` |
+| Monorepo or multi-context repo | `github` or `local` | One Feature Spec for the selected product/workspace context. | The selected Feature Spec issue/path plus product or workspace scope in each issue. |
+| Workspace with multiple independent repos | `github` | Linked repo-scoped partial Feature Spec issues when there is no accepted global Feature Spec. | Each repo issue points at its repo partial Feature Spec and links sibling partial Feature Specs. |
+| Workspace with multiple independent repos | `local` | `projects/<project-slug>/features/<feature-slug>/SPEC.md` or linked repo-scoped partial Feature Specs when that is the accepted source. | Each local issue points at the relevant Feature Spec path and links sibling partial Feature Specs/issues. |
 
-Do not invent a global PRD for workspace features. Use one only when it is the
-accepted planning source; otherwise preserve the linked partial-PRD graph.
+Do not invent a global Feature Spec for workspace features. Use one only when it is the
+accepted planning source; otherwise preserve the linked partial Feature Spec graph.
 
-### 2. Confirm The PRD Source
+### 2. Confirm The Feature Spec Source
 
 Identify the source material:
 
@@ -140,15 +140,15 @@ Identify the source material:
 - repo behavior that needs to become a defined product surface.
 
 If key facts are missing, ask only for decisions that would materially change
-the PRD. Prefer defaults when the repo or project memory already implies them.
+the Feature Spec. Prefer defaults when the repo or project memory already implies them.
 
-### 3. Draft The PRD
+### 3. Draft The Feature Spec
 
-Use `references/prd-template.md` unless the repo has a stronger local PRD
+Use `references/spec-template.md` unless the repo has a stronger local Feature Spec
 format.
 
-Before returning, writing, or publishing the PRD, sanitize every source and
-evidence reference that came from local filesystem inspection. Published PRDs
+Before returning, writing, or publishing the Feature Spec, sanitize every source and
+evidence reference that came from local filesystem inspection. Published Feature Specs
 must not include developer-machine absolute paths such as `/Users/<name>/...`,
 `/home/<name>/...`, drive-root paths, temp directories, or cache paths. Use
 portable references instead:
@@ -163,13 +163,13 @@ portable references instead:
   descriptive label such as `<local-reference>: runtime session collector`, not
   the raw absolute path.
 
-If the same file is useful both locally and in the PRD, keep the raw absolute
+If the same file is useful both locally and in the Feature Spec, keep the raw absolute
 path only in private working context and put only the sanitized reference in
-the PRD body or GitHub issue body. If sanitization would make the evidence
+the Feature Spec body or GitHub issue body. If sanitization would make the evidence
 ambiguous, add the repo name or source label rather than restoring an absolute
 path.
 
-Keep the PRD implementation-facing:
+Keep the Feature Spec implementation-facing:
 
 - clear problem and target user,
 - goals and non-goals,
@@ -188,7 +188,7 @@ Keep the PRD implementation-facing:
 - notes for later issue splitting.
 
 When `domain_knowledge_delta.knowledge_delta` is `required`, include a
-`## Domain Knowledge Handoff` section using `references/prd-template.md`. Keep
+`## Domain Knowledge Handoff` section using `references/spec-template.md`. Keep
 the decisions and target surfaces portable and specific enough for the final
 implementation task to update the repository after the behavior lands. This
 section is a deferred-work carrier, not proof that domain docs were captured.
@@ -196,16 +196,16 @@ For multi-repo work, use `<repo-slug>/<repo-relative-path>` for every target and
 repo-local evidence item; never publish an ambiguous bare `CONTEXT.md` or ADR
 path.
 
-Before returning, writing, or publishing the PRD, run a small documentation
+Before returning, writing, or publishing the Feature Spec, run a small documentation
 gate: verify that evidence references are portable, runtime worker settings are
 absent, delivery expectations are not presented as completion proof, open
 questions are explicit, and rationale is sufficient for issue splitting without
-turning the PRD into an implementation plan. Repair the PRD before output when
+turning the Feature Spec into an implementation plan. Repair the Feature Spec before output when
 this gate fails.
 
-Do not include workflow status fields such as `Status: Draft` in the PRD body.
-PRD readiness and lifecycle state belong in the issue tracker, mapped labels,
-or the generated implementation issues, not in the PRD content itself.
+Do not include workflow status fields such as `Status: Draft` in the Feature Spec body.
+Feature Spec readiness and lifecycle state belong in the issue tracker, mapped labels,
+or the generated implementation issues, not in the Feature Spec content itself.
 
 ### 4. Choose Publication Target
 
@@ -217,50 +217,50 @@ resolution. After that resolution, `$project-memory`'s
 application, draft-ref replacement, hosted mutation verification, cleanup, and
 partial recovery. Branch only on the verified target:
 
-| Target | PRD phase action |
+| Target | Feature Spec phase action |
 | --- | --- |
-| `tracker_backend=github`, `effective_target=configured-tracker` | Publish the sanitized `PRD: <Feature Name>` through `$gitstack:github-issues`; apply the mapped feature type when supported. |
-| `tracker_backend=local`, `effective_target=configured-tracker` | Write the resolved path from the PRD Target Model. |
-| `effective_target=local-dry-run` | Return the resolved target, body, deterministic `draft-prd:<...>` ref, and PRD body fingerprint without writing; label the source non-executable. |
-| `effective_target=draft-publish-commands` | Ask `$gitstack:github-issues` for exact commands and return the title, body, identity, deterministic draft ref, and fingerprint; publish the PRD first and replace draft refs before issue mutation. |
+| `tracker_backend=github`, `effective_target=configured-tracker` | Publish the sanitized `Feature Spec: <Feature Name>` through `$gitstack:github-issues`; apply the mapped feature type when supported. |
+| `tracker_backend=local`, `effective_target=configured-tracker` | Write the resolved path from the Feature Spec Target Model. |
+| `effective_target=local-dry-run` | Return the resolved target, body, deterministic `draft-spec:<...>` ref, and Feature Spec body fingerprint without writing; label the source non-executable. |
+| `effective_target=draft-publish-commands` | Ask `$gitstack:github-issues` for exact commands and return the title, body, identity, deterministic draft ref, and fingerprint; publish the Feature Spec first and replace draft refs before issue mutation. |
 
 For `effective_target=local-dry-run`, Orchestrator may inspect but must not
 dispatch or mutate from the temporary source. Hosted local writes require both
 `effective_target=configured-tracker` and `local_mirror=requested`, and must use
 the validated `local_mirror_path`.
 
-For a local orchestrator workspace, the resolved PRD path is
-`projects/<project-slug>/features/<feature-slug>/PRD.md`. This phase may also
+For a local orchestrator workspace, the resolved Feature Spec path is
+`projects/<project-slug>/features/<feature-slug>/SPEC.md`. This phase may also
 create or update `PROJECT.md`, `repos/<repo-slug>.md`, and
 `integration-gates.md` only from accepted planning sources and must report that
-source. For GitHub workspace planning, publish linked partial PRDs through
+source. For GitHub workspace planning, publish linked partial Feature Specs through
 `$gitstack:github-issues`, preserve cross-repo links, and create no local feature
 artifacts except an authorized mirror.
 
 Derive `<Feature Name>` from the accepted product or short feature phrase; omit
 issue numbers, statuses, and slice names. State concrete repo/workspace scope,
 including affected repos, cross-repo contracts, integration gates, and order
-when material. In every PRD, render the verified delivery tuple through
-`references/prd-template.md`, including the resolved repo/branch/PR shape and
+when material. In every Feature Spec, render the verified delivery tuple through
+`references/spec-template.md`, including the resolved repo/branch/PR shape and
 integration proof. Placeholders are expectations, not completion proof.
 
-The PRD remains canonical for the feature delivery tuple; the issue phase
+The Feature Spec remains canonical for the feature delivery tuple; the issue phase
 projects it, adds issue-level scheduling/closeout, and validates the graph. For
 GitHub, `$gitstack:github-issues` owns safe body transport, mutation
 verification, cleanup, and recovery; do not construct a mutating `gh issue
 create` command with generated Markdown.
 
 Immediately before hosted publication, reject any remaining machine-local
-absolute path. Hosted mutation is limited to PRD planning-artifact publication
+absolute path. Hosted mutation is limited to Feature Spec planning-artifact publication
 and metadata; implementation lifecycle and closeout mutations
-belong to `$codex-orchestrator`. If tracker setup is absent, return the PRD in
+belong to `$codex-orchestrator`. If tracker setup is absent, return the Feature Spec in
 chat and recommend `$project-memory` before publication.
 
 ### 5. Report Completion
 
 Return:
 
-- PRD title,
+- Feature Spec title,
 - canonical keyed option rows and option-resolution evidence, including any
   execution-profile widening reason,
 - `option_rows_fingerprint`,
@@ -274,13 +274,13 @@ Return:
   issue phase,
 - target location or "chat only",
 - `local_mirror` result and `local_mirror_path`,
-- `source_prd_ref` for the issue phase,
-- PRD body fingerprint when `source_prd_ref` is a `draft-prd:<...>` value,
+- `source_spec_ref` for the issue phase,
+- Feature Spec body fingerprint when `source_spec_ref` is a `draft-spec:<...>` value,
 - issue type applied, when the tracker supports it,
 - support docs created or updated and the accepted source used for each, when
   applicable,
 - any open questions,
-- `knowledge_delta`, `capture_outcome`, and whether the PRD contains a
+- `knowledge_delta`, `capture_outcome`, and whether the Feature Spec contains a
   `## Domain Knowledge Handoff`,
 - whether it is ready for the issue phase to create generated implementation
   issues.
@@ -289,47 +289,47 @@ Return:
 
 Read each unchanged source body once. Keep a compact working index containing
 its portable path/ref, fingerprint, and relevant headings. After drafting or
-repairing the PRD, carry only the target path/ref, body fingerprint, changed
+repairing the Feature Spec, carry only the target path/ref, body fingerprint, changed
 headings, and failed-gate excerpts between passes. Re-open or emit the complete
 body only when its fingerprint changed, a gate requires the relevant section,
 the effective target is chat/draft output, or final publication needs it.
 
 For configured local or hosted targets, completion output should identify the
-PRD and its fingerprint instead of repeating the complete body. Draft/chat
+Feature Spec and its fingerprint instead of repeating the complete body. Draft/chat
 output still returns the requested body.
 
-When root-scoped runtime token counters cover an uncontaminated PRD interval,
+When root-scoped runtime token counters cover an uncontaminated Feature Spec interval,
 capture start and end checkpoints and return:
 
 ```text
-phase=prd
+phase=spec
 tokens=<exact delta|unavailable>
 references_loaded=<paths actually opened>
-artifact=<source_prd_ref>; fingerprint=<sha256 or hosted revision>
+artifact=<source_spec_ref>; fingerprint=<sha256 or hosted revision>
 full_body_emitted=<no|chat-output|draft-output|publication|gate-failure>
 ```
 
 If the interval contains other activity, label its delta `exact-interval` and
-do not attribute it to the PRD phase. If exact counters are unavailable, record
+do not attribute it to the Feature Spec phase. If exact counters are unavailable, record
 `tokens=unavailable` once without probing session archives, estimating from
 text size, or blocking the phase.
 
 ## Guardrails
 
 - Do not hide uncertainty. Put unresolved decisions in `## Open Questions`.
-- Do not make the PRD a broad architecture plan; keep implementation details at
+- Do not make the Feature Spec a broad architecture plan; keep implementation details at
   the level needed for issue splitting.
-- Do not create implementation issues from the PRD in this phase.
-- Do not treat the PRD's `## Domain Knowledge Handoff` as completed durable
+- Do not create implementation issues from the Feature Spec in this phase.
+- Do not treat the Feature Spec's `## Domain Knowledge Handoff` as completed durable
   capture.
-- Preserve existing PRD content when updating a local PRD file; revise only the
+- Preserve existing Feature Spec content when updating a local Feature Spec file; revise only the
   sections needed for the current source material.
-- Do not leak developer-machine paths in PRD evidence, source, or publication
+- Do not leak developer-machine paths in Feature Spec evidence, source, or publication
   output. Use repo-relative, sibling-repo-relative, hosted, or descriptive
   sanitized references.
 
 ## References
 
-- `references/prd-template.md`: default PRD shape.
+- `references/spec-template.md`: default Feature Spec shape.
 - `$project-memory`'s `references/tracker-publishing.md`: shared tracker
-  publication and `source_prd_ref` contract.
+  publication and `source_spec_ref` contract.

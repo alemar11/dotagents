@@ -111,7 +111,7 @@ Before writing, show only applicable items from this list:
 For orchestrator workspace mode, preserve these points in the draft:
 
 - selected local or GitHub tracker backend;
-- linked partial PRDs, local project folders, vertical issues, repo pointer
+- linked partial Feature Specs, local project folders, vertical issues, repo pointer
   sheets, and integration gates are durable planning artifacts only when
   `$plan-feature` writes them for real feature planning;
 - setup is config-only and must not create project or feature folders;
@@ -159,7 +159,7 @@ exists or is authorized; never create a broken pointer:
 
 ### Issue tracker
 
-[one-line summary of where PRDs and issues live]. See `project-memory/config/issue-tracker.md`.
+[one-line summary of where Feature Specs and issues live]. See `project-memory/config/issue-tracker.md`.
 
 ### Triage types and labels
 

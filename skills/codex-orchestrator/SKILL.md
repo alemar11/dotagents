@@ -70,9 +70,9 @@ acceptance and closure authority.
 
 | Source shape | Route |
 | --- | --- |
-| Rough intent without durable PRD and issues | Run `$plan-feature` `full-flow` before implementation scheduling. |
-| Durable PRD without generated issues | Run `$plan-feature` `issues-from-existing-prd` unless inspect-only. |
-| PRD-backed issue, linked partial PRD, `source_prd_ref`, legacy `Source PRD` data field, or `## Orchestrator Handoff` | Load `references/prd-backed-delivery.md`; normalize legacy fields before registration. |
+| Rough intent without durable Feature Spec and issues | Run `$plan-feature` `full-flow` before implementation scheduling. |
+| Durable Feature Spec without generated issues | Run `$plan-feature` `issues-from-existing-spec` unless inspect-only. |
+| Feature Spec-backed issue, linked partial Feature Spec, `source_spec_ref`, or `## Orchestrator Handoff` | Load `references/spec-backed-delivery.md`; normalize supported legacy fields before registration. |
 | Generated issue with valid handoff | Register directly; the handoff is its canonical dispatch projection. |
 | Generated issue without valid handoff | Inspect or regenerate through `$plan-feature`; implement only with explicit ad-hoc authority. |
 | PR, review, CI failure, bug, checklist, plan, TODO, implementation request, or legacy issue | Register directly with `local-only` delivery, publication/issue mutation `none`, and local acceptance plus validation closeout. |
@@ -82,9 +82,9 @@ Commit, push, PR, issue mutation, merge, release, and deployment require
 explicit authority. Authorized pull-request delivery defaults to
 `pr_closeout=merge-ready` but never authorizes merge.
 
-`$plan-feature` owns PRD and generated-issue publication before scheduling.
+`$plan-feature` owns Feature Spec and generated-issue publication before scheduling.
 After registration, the root owns authorized issue lifecycle and closeout. For
-workspace features, expand linked repo-scoped partial PRDs; no global PRD is
+workspace features, expand linked repo-scoped partial Feature Specs; no global Feature Spec is
 required. Register Markdown checklist items by stable path and heading.
 
 ## Controller Loop
@@ -156,7 +156,7 @@ Resolve `delegation_mode`, `worker_surface`, `worker_limit`,
 Load `references/worker.md` before delegation. It owns current tool mapping,
 surface wording, consent, capability snapshots, authorization modes, prompts,
 execution reports, resync, integration, artifacts, and lifecycle. Do not copy
-session worker choices into PRDs, issues, project memory, or handoffs.
+session worker choices into Feature Specs, issues, project memory, or handoffs.
 
 When the App root chooses a new dedicated worktree, create the visible App task
 with that worktree before implementation and keep the work in its managed
@@ -172,7 +172,7 @@ nonexistent resume, close, or scheduling action.
 
 ## Delivery, Gates, And Closeout
 
-For PRD-backed sources, load `references/prd-backed-delivery.md` before
+For Feature Spec-backed sources, load `references/spec-backed-delivery.md` before
 scheduling or publication. It owns separate delivery, publication, PR
 closeout, issue mutation, and merge authorities. For ad-hoc/legacy sources,
 local acceptance plus validation completes `local-only` work; publication is a
@@ -181,12 +181,12 @@ later explicit authority change.
 Load `references/gates.md` before owner-ready, issue-closed, merge-ready,
 release-ready, or final status. It owns gate selection and conditionally routes
 `pull-request` plus `merge-ready` work through the canonical current-head Codex
-review and parent-PRD closeout algorithm. Apply its resolved review policy;
+review and parent Feature Spec closeout algorithm. Apply its resolved review policy;
 pull-request delivery defaults to
 `pr_closeout=merge-ready` and `codex_review_policy=required`; an exact scoped
 owner instruction may select `skip`, which bypasses only review request/wait.
 Use `draft-only` only from its canonical option-resolution row. Parent closeout
-is root-owned, `armed` is not actual closure, and neither the parent PRD nor the
+is root-owned, `armed` is not actual closure, and neither the parent Feature Spec nor the
 ledger completes before merge and verified issue closure.
 
 Merge is root-owned and unavailable by default. Set
@@ -235,7 +235,7 @@ artifacts by path/ref and fingerprint instead of repeating them. Use
   closeout hygiene.
 - `references/worker.md`: worker surfaces, tools, authorization, lifecycle,
   integration, and reports.
-- `references/prd-backed-delivery.md`: PRD graph, authorities, publication,
+- `references/spec-backed-delivery.md`: Feature Spec graph, authorities, publication,
   issue mutation, review, and closeout.
 - `references/gates.md`: authorization, proof, review, integration, release,
   and closeout gates.

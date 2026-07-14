@@ -1,12 +1,12 @@
 # Issue Phase
 
-Use this reference when `plan-feature` needs to turn a PRD into vertical
+Use this reference when `plan-feature` needs to turn a Feature Spec into vertical
 implementation issues that can be assigned to agents or humans. This is an
 internal phase, not a public skill.
 
 ## Goal
 
-Split a PRD into vertical, agent-ready implementation issues. Every generated
+Split a Feature Spec into vertical, agent-ready implementation issues. Every generated
 issue must be hardened with `$plan-harder` before it is returned or published.
 
 ## Hard Requirements
@@ -31,7 +31,7 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 - Treat `tracker_backend` as planning-artifact write authority only through the
   resolved `effective_target`; use `$project-memory`'s
   `references/tracker-publishing.md` for publication and stable
-  `source_prd_ref` mechanics.
+  `source_spec_ref` mechanics.
 - Withhold unresolved work by default. Only
   `partial_output=allow-non-agent-ready` permits a visible `needs-info` or
   `ready-for-human` issue; it never permits a `ready-for-agent` claim.
@@ -44,8 +44,8 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 ## Boundaries
 
 - Do not implement the issues.
-- This phase never rewrites the PRD. A requested PRD update runs through the
-  PRD phase before issue splitting and supplies a new verified handoff.
+- This phase never rewrites the Feature Spec. A requested Feature Spec update runs through the
+  Feature Spec phase before issue splitting and supplies a new verified handoff.
 - Do not create horizontal layer tickets such as "backend only", "frontend
   only", or "tests only" when a vertical slice is practical.
 - Do not ask for separate issue write/publish confirmation after `plan-feature`
@@ -60,7 +60,7 @@ Receive the verified run-level `option_resolution` rows and
 
 - the planning identity (`feature_slug` and any selected `product_slug`,
   `workspace_path`, `context_file`, `project_slug`, and affected repos);
-- the resolved `source_prd_ref` and draft fingerprint when applicable;
+- the resolved `source_spec_ref` and draft fingerprint when applicable;
 - `capture_outcome` and the structured `domain_knowledge_delta`;
 - the mapped tracker/type configuration needed at publication.
 
@@ -75,9 +75,9 @@ Validate `capture_outcome=deferred` when
 `domain_knowledge_delta.knowledge_delta=required` and
 `capture_outcome=no-durable-change` when `knowledge_delta=none`. Preserve a
 non-empty `unresolved` list independently as planning blockers. For
-`mode=issues-from-existing-prd`, reconstruct the pair from the PRD's canonical
+`mode=issues-from-existing-spec`, reconstruct the pair from the Feature Spec's canonical
 Domain Knowledge Handoff when the explicit phase handoff is unavailable; a
-legacy PRD with a handoff resolves to `required` plus `deferred`, while no
+legacy Feature Spec with a handoff resolves to `required` plus `deferred`, while no
 handoff resolves to `none` plus `no-durable-change`. Never invent
 `capture_outcome=captured` in Plan Feature.
 
@@ -99,16 +99,16 @@ Normalize touched legacy aliases to the canonical lower-kebab values.
 
 ### 1. Load Inputs
 
-Find or ask for the PRD source:
+Find or ask for the Feature Spec source:
 
-- `.scratch/<feature-slug>/PRD.md`,
-- a GitHub PRD issue,
-- `projects/<project-slug>/features/<feature-slug>/PRD.md`,
-- a linked GitHub workspace PRD issue,
-- a handoff `source_prd_ref` from the PRD phase or an existing durable PRD
+- `.scratch/<feature-slug>/SPEC.md`,
+- a GitHub Feature Spec issue,
+- `projects/<project-slug>/features/<feature-slug>/SPEC.md`,
+- a linked GitHub workspace Feature Spec issue,
+- a handoff `source_spec_ref` from the Feature Spec phase or an existing durable Feature Spec
   source,
-- pasted PRD text,
-- another project document that clearly acts as the PRD.
+- pasted Feature Spec text,
+- another project document that clearly acts as the Feature Spec.
 
 Also inspect:
 
@@ -120,17 +120,17 @@ Also inspect:
 - orchestrator workspace docs such as `projects/<project>/PROJECT.md`,
   `projects/<project>/repos/*.md`, and feature `integration-gates.md` when
   planning from a local orchestrator workspace,
-- nearby source files, tests, and docs relevant to the PRD.
+- nearby source files, tests, and docs relevant to the Feature Spec.
 
 Load `domain_knowledge_delta` from the Plan Feature handoff. For
-`issues-from-existing-prd`, reconstruct it from `## Domain Knowledge Handoff`
+`issues-from-existing-spec`, reconstruct it from `## Domain Knowledge Handoff`
 when that section exists. Treat an unresolved item that changes implementation
 scope as a blocker; do not silently move product questions into the final task.
 
-If there is no PRD-quality source, stop and ask the user to provide one or run
-the PRD phase first.
+If there is no Feature Spec-quality source, stop and ask the user to provide one or run
+the Feature Spec phase first.
 
-For `lean-issues`, read the durable PRD once, then inspect only tracker/type
+For `lean-issues`, read the durable Feature Spec once, then inspect only tracker/type
 mappings and source/tests directly needed to validate its candidate slices.
 Keep the profile only when one repo/context is unambiguous, no more than two
 vertical issues are expected, and no cross-repo gate, enabling slice, unresolved
@@ -140,20 +140,20 @@ condition. The lean profile does not weaken any hardening or output gate.
 
 Resolve and carry the planning identity before splitting:
 
-- `feature_slug`: explicit handoff value first, then the PRD directory slug,
+- `feature_slug`: explicit handoff value first, then the Feature Spec directory slug,
   then title-derived fallback only when no accepted path exists.
 - For multi-context repos or monorepos: `product_slug`, `workspace_path`, and
   `context_file`.
 - For orchestrator workspaces: `project_slug` and affected repos.
-- `source_prd_ref`: use the durable PRD issue number, local PRD path, or stable
-  draft ref passed by the PRD phase or existing durable PRD source. In
+- `source_spec_ref`: use the durable Feature Spec issue number, local Feature Spec path, or stable
+  draft ref passed by the Feature Spec phase or existing durable Feature Spec source. In
   either non-mutating effective target, keep the draft ref in returned bodies.
   For `draft-publish-commands`, include the replacement step required before
   hosted mutation; for `local-dry-run`, label it non-executable.
 
 Receive the complete verified feature delivery tuple and `branch_name` data
-from the PRD handoff. Do not infer, default, or reinterpret those fields here.
-When a legacy PRD lacks canonical rows, apply only the one-time legacy
+from the Feature Spec handoff. Do not infer, default, or reinterpret those fields here.
+When a legacy Feature Spec lacks canonical rows, apply only the one-time legacy
 normalization in `references/options.md`, record the migrated rows and evidence,
 and then continue from that verified snapshot. Missing, contradictory, or
 unauthorized rows block splitting.
@@ -162,7 +162,7 @@ If a multi-context local Markdown repo lacks an accepted product/context or the
 feature slug can collide with another product according to tracker conventions,
 stop and resolve that identity before writing issues.
 
-Review PRD open questions before splitting. If any open question affects scope,
+Review Feature Spec open questions before splitting. If any open question affects scope,
 acceptance criteria, dependencies, validation, publication target, permissions,
 data contracts, or cross-repo contracts, treat it as a blocker instead of
 creating `ready-for-agent` issues.
@@ -226,14 +226,14 @@ as an invalid graph.
 Every issue should:
 
 - deliver a user-visible or system-verifiable increment,
-- include enough context to be implemented without rereading the whole PRD,
+- include enough context to be implemented without rereading the whole Feature Spec,
 - include product/workspace/context scope for monorepo work, or affected repos
   and integration gates for orchestrator work,
-- include a durable `source_prd_ref` pointer, copied feature-level
+- include a durable `source_spec_ref` pointer, copied feature-level
   `delivery_mode`, `pr_shape`, issue-level parallelization, dependencies,
   closeout, and any delivery or integration exception,
 - include a `## Orchestrator Handoff` section that restates the dispatchable
-  source PRD, feature slug, `delivery_mode`, `pr_shape`, affected repos or
+  source Feature Spec, feature slug, `delivery_mode`, `pr_shape`, affected repos or
   product scope, scope, start rule, dependencies, validation, closeout, and
   `integration_mode`,
 - have clear non-goals,
@@ -250,7 +250,7 @@ The final domain owner must additionally:
   `current-repository/<path>` or `<repo-slug>/<path>` ownership so multi-repo
   destinations are unambiguous,
 - reconcile provisional planning language with the behavior that actually
-  landed rather than copying the PRD blindly,
+  landed rather than copying the Feature Spec blindly,
 - include `git diff --check` or the repository's equivalent documentation diff
   check,
 - record one completion proof covering both integration and durable capture.
@@ -258,7 +258,7 @@ The final domain owner must additionally:
 ### 3. Harden Every Issue With `$plan-harder`
 
 For each issue, call `$plan-harder` with `planning_mode=issue-hardening` using
-only that issue's draft body and the minimum relevant PRD context. Explicitly
+only that issue's draft body and the minimum relevant Feature Spec context. Explicitly
 request `output_surface=caller` and the structured result from
 `$plan-harder`'s `references/templates.md`.
 
@@ -281,7 +281,7 @@ After `$plan-harder` returns:
 Do not paste the `$plan-harder` output wholesale when it would create nested or
 duplicated sections such as a second acceptance-criteria list. Do not batch
 multiple issues into one `$plan-harder` call. If a blocker cannot be resolved
-from the PRD, repo evidence, or project memory, stop and return the blocker
+from the Feature Spec, repo evidence, or project memory, stop and return the blocker
 instead of publishing an agent-ready issue.
 
 ### 4. Run The Verticality Gate
@@ -315,7 +315,7 @@ and triage states to the repo's tracker values.
   the next action is a concrete question for a human/reporter. Do not count
   `needs-info` issues as agent-ready, and do not publish them from
   `plan-feature` under `partial_output=withhold`.
-- Use `ready-for-human` when the PRD requires human judgment before an agent can
+- Use `ready-for-human` when the Feature Spec requires human judgment before an agent can
   proceed.
 
 Canonical values are decision inputs, not necessarily tracker values. Before
@@ -328,11 +328,11 @@ do not assume the canonical string is the label; read the mapping first.
 
 Use `project-memory/config/issue-tracker.md` for the target, and read
 `$project-memory`'s `references/tracker-publishing.md` for shared
-effective-target, temporary body-file, and `source_prd_ref` rules:
+effective-target, temporary body-file, and `source_spec_ref` rules:
 
 - `tracker_backend=github`: with `effective_target=configured-tracker`, create
   issues through `$gitstack:github-issues`, attach them
-  to the PRD parent when the PRD source is a GitHub issue, set the mapped
+  to the Feature Spec parent when the Feature Spec source is a GitHub issue, set the mapped
   `task` issue type when available, then apply mapped labels such as
   `ready-for-agent` for `ready-for-agent`. Do not create a repo-local
   `.scratch/` mirror unless `local_mirror=requested`; when requested, write
@@ -341,34 +341,34 @@ effective-target, temporary body-file, and `source_prd_ref` rules:
   to `$gitstack:github-issues`; do not assemble direct mutating `gh issue create` shell
   commands with generated Markdown in this phase.
 - GitHub workspace issues: create linked repo or partial issues through
-  `$gitstack:github-issues`, using PRD parent/sub-issue relationships where available.
-  Derive `<project-slug>` and affected repos from the PRD/project context or ask
+  `$gitstack:github-issues`, using Feature Spec parent/sub-issue relationships where available.
+  Derive `<project-slug>` and affected repos from the Feature Spec/project context or ask
   for them. Repo-local implementation PRs or child issues link back to the
-  relevant PRD or partial issue. Do not create local orchestrator feature
+  relevant Feature Spec or partial issue. Do not create local orchestrator feature
   artifacts or `.scratch/` mirrors unless `local_mirror=requested`; write any
   requested mirrors under `local_mirror_path`.
 - `tracker_backend=local`: with `effective_target=configured-tracker`, write to the configured repo-local issue
   path, normally `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, with
-  `issue_type:`, `workflow_state:`, and `source_prd_ref:` lines near the top and
+  `issue_type:`, `workflow_state:`, and `source_spec_ref:` lines near the top and
   a heading that follows the local issue title convention
   `<feature-slug>: <NN> <vertical outcome>`. Use the
-  authoritative feature slug from the handoff or PRD path; derive it from the
-  PRD title only when no accepted slug/path exists.
+  authoritative feature slug from the handoff or Feature Spec path; derive it from the
+  Feature Spec title only when no accepted slug/path exists.
 - Local workspace issues: write to
   `projects/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` with
-  `issue_type:`, `workflow_state:`, and `source_prd_ref:` lines near the top and
+  `issue_type:`, `workflow_state:`, and `source_spec_ref:` lines near the top and
   a heading that follows the local issue title convention
   `<feature-slug>: <NN> <vertical outcome>`. Create the
   project/feature directories only when writing the actual feature artifacts,
   not during setup. The issue phase owns the issue files and reads
   `PROJECT.md`, `repos/*.md`, and `integration-gates.md`; it never creates or
   refreshes those supporting files. A broader artifact update belongs to the
-  PRD phase and must finish before the issue-phase handoff.
-For GitHub PRDs, every generated implementation or vertical feature issue must
-be attached to the PRD issue as a sub-issue when the tracker supports it. If an
+  Feature Spec phase and must finish before the issue-phase handoff.
+For GitHub Feature Specs, every generated implementation or vertical feature issue must
+be attached to the Feature Spec issue as a sub-issue when the tracker supports it. If an
 issue is created before the parent relationship is set, use `$gitstack:github-issues` to
-attach it afterward. Keep `source_prd_ref: #<prd-number>` in the issue body as well.
-For multi-repo work, related partial PRDs and repo issues must link to each
+attach it afterward. Keep `source_spec_ref: #<spec-number>` in the issue body as well.
+For multi-repo work, related partial Feature Specs and repo issues must link to each
 other by URL or issue number.
 
 When GitHub issue types are available, create or update each implementation
@@ -394,7 +394,7 @@ session settings. It must carry the independently resolved source-contract
 fields do not authorize a worker.
 
 When a final domain owner exists, publish or write it last, attach it to the
-same PRD parent, and keep its dependency metadata in the generated feature-ID
+same Feature Spec parent, and keep its dependency metadata in the generated feature-ID
 space (`01`, `02`, ...), including after hosted issue numbers or local paths
 exist. Track those published or local refs separately. In draft command mode,
 preserve the same last-task ordering and replacement rules.
@@ -402,7 +402,7 @@ preserve the same last-task ordering and replacement rules.
 Every published or returned issue renders the complete validated Per-Issue
 Registry row set through `references/issue-body-template.md`. This is the sole
 cross-session scheduling projection and carries its independently verifiable
-`issue_option_rows_fingerprint`; do not duplicate the full PRD branch and PR
+`issue_option_rows_fingerprint`; do not duplicate the full Feature Spec branch and PR
 narrative. Keep generated dependency IDs and domain payloads as data, and apply
 the exact direct-commit evidence transfer and independent mutation-owner rules
 from `references/options.md`. Missing, conflicting, or unauthorized rows block
@@ -431,10 +431,10 @@ Every published or returned issue must state its completion path:
   closing keyword, following `closeout_mode`. Final-commit closure requires
   `closeout_mode=direct-commit-closes-issue`,
   `issue_mutation_authority=explicit-direct-mutation`, and its exact scoped
-  authorization evidence. Do not add the parent PRD closing keyword from an individual child
-  issue. For a whole-PRD final feature
+  authorization evidence. Do not add the parent Feature Spec closing keyword from an individual child
+  issue. For a whole Feature Spec final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
-  only after its resolved review policy and all PRD closeout gates pass.
+  only after its resolved review policy and all Feature Spec closeout gates pass.
 - Local markdown: move the issue to `issues/done/<NN>-<slug>.md` after
   validation, creating `issues/done/` on demand. Orchestrator workspace issues
   also require recorded cross-repo integration proof. Do not delete the file or
@@ -448,8 +448,8 @@ local markdown issue headings:
 ```
 
 - `<feature-slug>` is the authoritative lowercase kebab-case slug from
-  `plan-feature`, PRD path, or configured tracker target. Derive it from the
-  PRD title without the `PRD:` prefix only as a fallback.
+  `plan-feature`, Feature Spec path, or configured tracker target. Derive it from the
+  Feature Spec title without the `Feature Spec:` prefix only as a fallback.
 - `<NN>` is the two-digit sequence from the vertical issue ordering.
 - `<vertical outcome>` is a short imperative or outcome phrase, without a
   trailing period.
@@ -479,11 +479,11 @@ For `tracker_backend=github`, branch only on `effective_target`:
 `configured-tracker` publishes, `local-dry-run` returns issue bodies and target
 refs without mutation, and `draft-publish-commands` asks
 `$gitstack:github-issues` for exact draft commands. Under either non-mutating
-target, generated issue bodies may use `source_prd_ref: draft-prd:<...>` only
+target, generated issue bodies may use `source_spec_ref: draft-spec:<...>` only
 in returned output. For `draft-publish-commands`, the publish plan must create
-the PRD first, capture the hosted PRD number, replace the draft ref with
-`source_prd_ref: #<number>`, and then create or attach implementation issues.
-For `local-dry-run`, return the PRD body fingerprint and label the ref
+the Feature Spec first, capture the hosted Feature Spec number, replace the draft ref with
+`source_spec_ref: #<number>`, and then create or attach implementation issues.
+For `local-dry-run`, return the Feature Spec body fingerprint and label the ref
 non-executable.
 When a blocker or unresolved question appears under `plan-feature`, return it
 as an issue-splitting blocker instead of publishing a `needs-info` issue by
@@ -495,7 +495,7 @@ resolution, with the blocker visible and no agent-ready claim.
 
 Summarize:
 
-- source PRD,
+- source Feature Spec,
 - canonical keyed run/issue option rows and option-resolution evidence, including any
   execution-profile widening reason,
 - `option_rows_fingerprint` for the complete run-plus-issue row set,
@@ -508,7 +508,7 @@ Summarize:
 - issue graph validation summary, including dependency and acyclicity checks,
 - confirmation that each issue includes a validated `## Orchestrator Handoff`
   section,
-- GitHub PRD parent issue and sub-issues attached, when applicable,
+- GitHub Feature Spec parent issue and sub-issues attached, when applicable,
 - where issues were published or that output stayed in chat,
 - `local_mirror` result and `local_mirror_path`,
 - issue types and labels/statuses assigned,
@@ -524,11 +524,11 @@ Summarize:
 
 ## Evidence And Phase Metrics
 
-Keep one PRD snapshot keyed by `source_prd_ref` and fingerprint. For each issue,
+Keep one Feature Spec snapshot keyed by `source_spec_ref` and fingerprint. For each issue,
 store its current body in the configured target or transient body file and
 carry only the issue id/ref, body fingerprint, changed headings, hardening
 status, and failed-gate excerpts into the next pass. Do not repeat unchanged
-PRD or issue bodies between `$plan-harder`, repair, graph, and publication
+Feature Spec or issue bodies between `$plan-harder`, repair, graph, and publication
 steps. Re-open or emit a complete body only when its fingerprint changed, a
 gate needs the relevant section, draft/chat output requires it, or final
 publication/review needs it.
@@ -561,4 +561,4 @@ include it only when `partial_output=allow-non-agent-ready`.
 - `references/issue-body-template.md`: generated implementation issue body
   template.
 - `$project-memory`'s `references/tracker-publishing.md`: shared tracker
-  publication and `source_prd_ref` contract.
+  publication and `source_spec_ref` contract.

@@ -36,7 +36,7 @@ workflow_state: ready-for-agent
 
 ### Current Context
 
-- [Relevant current behavior, code area, docs, PRD, or issue link.]
+- [Relevant current behavior, code area, docs, Feature Spec, or issue link.]
 
 ### Desired Outcome
 

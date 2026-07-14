@@ -34,14 +34,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "2.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "2.0.1")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "2.0.1")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -75,7 +75,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "2.0.1")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -140,7 +140,7 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "2.0.0")
+        self.assertEqual(payload["version"], "2.0.1")
         self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
 
     def test_review_reply_uses_pr_scoped_endpoint(self) -> None:

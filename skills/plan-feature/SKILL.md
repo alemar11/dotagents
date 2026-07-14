@@ -1,21 +1,21 @@
 ---
 name: plan-feature
-description: Manually plan features into PRDs and agent-ready issues through full-flow, prd-only, or issues-from-existing-prd modes.
+description: Manually plan features into Feature Specs and agent-ready issues through full-flow, spec-only, or issues-from-existing-spec modes.
 ---
 
 # Plan Feature
 
 ## Purpose And Invocation
 
-Use this planning-only skill to turn feature intent into a durable Product
-Requirements Document (PRD) and, when requested by the selected mode, hardened
-vertical implementation issues. The public pipeline is:
+Use this planning-only skill to turn feature intent into a durable Feature Spec
+and, when requested by the selected mode, hardened vertical implementation
+issues. The public pipeline is:
 
-`project-memory routing if needed -> repo-backed clarification if needed -> PRD phase -> issue phase -> deferred domain-memory closeout`
+`project-memory routing if needed -> repo-backed clarification if needed -> Feature Spec phase -> issue phase -> deferred domain-memory closeout`
 
 Use it only when the user invokes `$plan-feature`, asks to run Plan Feature, or
 a manually invoked parent workflow routes here. Do not auto-select it for
-ordinary planning, PRD, implementation, issue-splitting, or triage requests.
+ordinary planning, Feature Spec, implementation, issue-splitting, or triage requests.
 Do not implement the planned feature.
 
 ## Structured Option Contract
@@ -33,11 +33,11 @@ Resolve `mode` once from the registry and branch only on that canonical value:
 
 | Mode | Use when | Stop point |
 | --- | --- | --- |
-| `full-flow` | `mode=full-flow`; default for new feature intent after input normalization. | PRD plus hardened issues. |
-| `prd-only` | `mode=prd-only`. | PRD phase report. |
-| `issues-from-existing-prd` | `mode=issues-from-existing-prd`; a durable PRD already exists and supplies the verified handoff. | Hardened issues. |
+| `full-flow` | `mode=full-flow`; default for new feature intent after input normalization. | Feature Spec plus hardened issues. |
+| `spec-only` | `mode=spec-only`. | Feature Spec phase report. |
+| `issues-from-existing-spec` | `mode=issues-from-existing-spec`; a durable Feature Spec already exists and supplies the verified handoff. | Hardened issues. |
 
-In `issues-from-existing-prd`, skip clarification unless unresolved PRD
+In `issues-from-existing-spec`, skip clarification unless unresolved Feature Spec
 questions affect scope, acceptance criteria, dependencies, validation,
 publication, permissions, or cross-repo contracts.
 
@@ -45,10 +45,10 @@ publication, permissions, or cross-repo contracts.
 
 Select an internal profile after resolving mode and identity:
 
-- `lean-prd`: use only for `prd-only` when tracker routing exists, one
-  repo/context is unambiguous, the supplied intent is PRD-ready, and no
+- `lean-spec`: use only for `spec-only` when tracker routing exists, one
+  repo/context is unambiguous, the supplied intent is Feature Spec-ready, and no
   clarification or cross-repo contract is needed.
-- `lean-issues`: use only for `issues-from-existing-prd` when the durable PRD is
+- `lean-issues`: use only for `issues-from-existing-spec` when the durable Feature Spec is
   unambiguous, one repo/context is involved, at most two candidate vertical
   issues are expected, and no cross-repo gate, enabling slice, or separate
   domain-closeout owner is needed.
@@ -61,8 +61,8 @@ domain-closeout gates required by the selected mode.
 
 ## Non-Negotiable Invariants
 
-- Keep PRD writing and issue splitting as internal phases. Load
-  `references/prd-phase.md` before PRD work and `references/issue-phase.md`
+- Keep Feature Spec writing and issue splitting as internal phases. Load
+  `references/spec-phase.md` before Feature Spec work and `references/issue-phase.md`
   before issue work; load their templates and `vertical-slices.md` only for the
   phase that needs them.
 - Treat `tracker_backend` as planning-artifact write authority. `github`
@@ -89,7 +89,7 @@ domain-closeout gates required by the selected mode.
 - Call `$grill-me-with-context` only with `capture_mode=defer-to-caller`.
   Planning may read durable context but must not update `CONTEXT.md`, domain
   docs, ADRs, or other domain-memory surfaces.
-- When a required domain delta exists, preserve it in the PRD handoff and make
+- When a required domain delta exists, preserve it in the Feature Spec handoff and make
   exactly one final implementation/integration issue own feature-level proof
   plus `$project-memory domain-memory` with
   `memory_slice=domain-memory` and
@@ -103,22 +103,22 @@ domain-closeout gates required by the selected mode.
   `partial_output=withhold` by default. Only
   `partial_output=allow-non-agent-ready` permits `needs-info` or
   `ready-for-human` artifacts.
-- Carry a durable `source_prd_ref` into every generated issue. A
-  `draft-prd:<...>` ref is inspection-only until replaced by a hosted PRD
+- Carry a durable `source_spec_ref` into every generated issue. A
+  `draft-spec:<...>` ref is inspection-only until replaced by a hosted Feature Spec
   number or durable local path.
 - Keep worker surfaces, worker counts, publication authority, runtime issue
   mutation overrides, and other `$codex-orchestrator` session choices out of
-  PRDs, generated issues, handoffs, local tracker files, and draft commands.
+  Feature Specs, generated issues, handoffs, local tracker files, and draft commands.
   The independently resolved source-contract `issue_mutation_authority` and its
   scoped evidence are delivery metadata, not a worker/session grant, and must
-  remain in PRDs and generated issue handoffs.
+  remain in Feature Specs and generated issue handoffs.
 - Snapshot each source or artifact in full at most once per unchanged
   fingerprint. On later passes use paths, fingerprints, changed sections, and
   failed-gate excerpts; emit a full body only when chat/draft output requires
   it or at the final publication/review boundary.
 - When the runtime exposes counters scoped to this run, checkpoint only
   uncontaminated phase intervals and report deltas for routing, clarification,
-  PRD work, each issue-hardening call, and final validation/publication. Label
+  Feature Spec work, each issue-hardening call, and final validation/publication. Label
   interleaved cumulative deltas `exact-interval`, not phase usage; otherwise
   record `unavailable`. Never estimate or make metrics a completion gate.
 
@@ -129,7 +129,7 @@ domain-closeout gates required by the selected mode.
 | `$project-memory` | Tracker routing is missing, incomplete, or stale. | Use only `tracker-routing`; Plan Feature never invokes `domain-memory`. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always `capture_mode=defer-to-caller`; consume its structured delta. |
 | `$plan-harder` | For every generated implementation issue. | One issue per `planning_mode=issue-hardening` call; the issue phase owns writes. |
-| `$gitstack:github-issues` | Publishing GitHub PRDs/issues or producing hosted dry-run commands. | It owns safe body transport, metadata, parent/sub-issues, verification, cleanup, and partial recovery. |
+| `$gitstack:github-issues` | Publishing GitHub Feature Specs/issues or producing hosted dry-run commands. | It owns safe body transport, metadata, parent/sub-issues, verification, cleanup, and partial recovery. |
 
 After implementation scheduling begins, issue lifecycle mutations belong to
 `$codex-orchestrator`, not Plan Feature.
@@ -149,7 +149,7 @@ is config-only and does not create project or feature artifacts.
 
 Resolve and record the canonical option snapshot from `references/options.md`:
 
-- `execution_profile`: `lean-prd`, `lean-issues`, or `standard`;
+- `execution_profile`: `lean-spec`, `lean-issues`, or `standard`;
 - `effective_target`: `configured-tracker`, `local-dry-run`, or
   `draft-publish-commands`;
 - `no_mutation_override`: `none`, `dry-run`, `temp`, `rehearsal`, `validation`,
@@ -170,13 +170,13 @@ Phase handoffs use the snake_case fields `mode`, `execution_profile`, `tracker_b
 `option_rows_fingerprint` data field.
 
 Use `$project-memory`'s `references/tracker-publishing.md` for effective-target,
-temporary-body-file, and draft `source_prd_ref` mechanics. Stop before writing
+temporary-body-file, and draft `source_spec_ref` mechanics. Stop before writing
 when repo/context identity or cross-repo delivery is materially ambiguous.
 
 ### 2. Clarify Only Material Unknowns
 
-In `full-flow` and `prd-only`, run `$grill-me-with-context` only when the
-provided intent and repository evidence are not sufficient for the PRD and
+In `full-flow` and `spec-only`, run `$grill-me-with-context` only when the
+provided intent and repository evidence are not sufficient for the Feature Spec and
 issue graph. Resolve one blocking question at a time.
 
 Build or consume the canonical `domain_knowledge_delta`. Durable accepted
@@ -184,22 +184,22 @@ terms, rules, boundaries, and decisions use repo-relative or repo-qualified
 targets and evidence. Planning blockers must be resolved or explicitly proven
 non-blocking before agent-ready output.
 
-For `issues-from-existing-prd`, inspect open questions first and clarify only
+For `issues-from-existing-spec`, inspect open questions first and clarify only
 those that block a safe split.
 
-### 3. Run The PRD Phase
+### 3. Run The Feature Spec Phase
 
-Skip only when `issues-from-existing-prd` uses an unchanged durable PRD.
-Otherwise load `references/prd-phase.md` and its required template, then pass
+Skip only when `issues-from-existing-spec` uses an unchanged durable Feature Spec.
+Otherwise load `references/spec-phase.md` and its required template, then pass
 the resolved mode, execution profile, target, no-mutation override, planning
 identity, delivery values, partial-output value, option-resolution evidence,
-source-ref state, and domain delta. A `lean-prd` run reads only the phase's
+source-ref state, and domain delta. A `lean-spec` run reads only the phase's
 minimum evidence set unless a gate forces widening.
 
-Require a durable local/hosted `source_prd_ref`, or a deterministic
-`draft-prd:<feature-slug>` / `draft-prd:<project-slug>/<feature-slug>` plus
+Require a durable local/hosted `source_spec_ref`, or a deterministic
+`draft-spec:<feature-slug>` / `draft-spec:<project-slug>/<feature-slug>` plus
 body fingerprint and publish-order note for draft commands. Route any new
-material blocker back through clarification. Stop here for `prd-only`.
+material blocker back through clarification. Stop here for `spec-only`.
 
 ### 4. Run The Issue Phase
 
@@ -211,10 +211,10 @@ issue separately; it only narrows discovery and uses delta evidence between
 issue passes.
 
 The issue phase owns vertical splitting, one `$plan-harder` pass per issue,
-mapped metadata, dependency/acyclicity validation, PRD parent/sub-issue links,
+mapped metadata, dependency/acyclicity validation, Feature Spec parent/sub-issue links,
 the canonical `## Orchestrator Handoff`, publication or local writes, and final
 reporting. In draft-command runs, output remains non-executable until the draft
-PRD ref is replaced by a durable source.
+Feature Spec ref is replaced by a durable source.
 
 If `knowledge_delta=required`, make its exact decisions, targets, evidence,
 `memory_slice=domain-memory`, and
@@ -236,10 +236,10 @@ when deferred:
 
 - `capture_outcome=deferred`, `capture_target_ref=<final task ref>`, and
   `capture_reason=implementation-closeout`;
-- for a `mode=prd-only` run with `knowledge_delta=required`,
+- for a `mode=spec-only` run with `knowledge_delta=required`,
   `capture_outcome=deferred`,
-  `capture_target_ref=final-implementation-task-from:<source_prd_ref>`, and
-  `capture_reason=prd-only-stop`; or
+  `capture_target_ref=final-implementation-task-from:<source_spec_ref>`, and
+  `capture_reason=spec-only-stop`; or
 - `capture_outcome=no-durable-change`.
 
 Plan Feature never emits `capture_outcome=captured`.
@@ -248,11 +248,11 @@ Plan Feature never emits `capture_outcome=captured`.
 
 - `references/options.md`: canonical option fields, values, defaults,
   normalization, and legacy input migration.
-- `references/prd-phase.md`: PRD handoff, drafting, publication, sanitization,
-  and `source_prd_ref` rules.
+- `references/spec-phase.md`: Feature Spec handoff, drafting, publication, sanitization,
+  and `source_spec_ref` rules.
 - `references/issue-phase.md`: issue splitting, hardening, graph validation,
   publication, and completion.
-- `references/prd-template.md`: default PRD shape.
+- `references/spec-template.md`: default Feature Spec shape.
 - `references/issue-body-template.md`: generated issue and Orchestrator
   Handoff shape.
 - `references/vertical-slices.md`: slicing, verticality, and readiness gates.

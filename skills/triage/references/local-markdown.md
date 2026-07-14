@@ -14,7 +14,7 @@ Each issue file should have canonical metadata lines near the top:
 
 issue_type: bug | feature | task
 workflow_state: needs-triage | needs-info | ready-for-agent | ready-for-human | wontfix
-source_prd_ref: [path, issue number, stable ref, or none]
+source_spec_ref: [path, issue number, stable ref, or none]
 ```
 
 Use the canonical values from `references/options.md`. GitHub display mappings
@@ -37,7 +37,7 @@ For orchestrator workspace issues, preserve additional fields such as
   title.
 - Update an existing `workflow_state:` line in place; otherwise insert it near
   `issue_type:`.
-- Preserve or add `source_prd_ref:` as reference data.
+- Preserve or add `source_spec_ref:` as reference data.
 - Apply the header-region scope, canonical precedence, conflict stop, and
   authorized normalization rules from `references/options.md`. Do not read or
   rewrite similarly named fields inside issue-body sections.

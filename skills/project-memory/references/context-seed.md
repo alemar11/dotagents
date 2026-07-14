@@ -13,7 +13,7 @@ content:
 - package manifests, schemas, tests, source directories, or public APIs
 - accepted user decisions and committed repo behavior
 
-Issues, PRs, PRDs, tracker discussions, and final session summaries may help
+Issues, PRs, Feature Specs, tracker discussions, and final session summaries may help
 discover candidate knowledge, but they are not durable repo authority by
 themselves. Before citing a candidate in `CONTEXT.md`, capture or verify it in a
 repo-owned document, ADR, source file, schema, or test. Tracker links may remain
@@ -60,7 +60,7 @@ verify the statement, for example `README.md`, `VISION.md`, `docs/...`,
 
 - Project purpose and explicit non-goals.
 - Product areas, subprojects, services, packages, or ownership boundaries.
-- Canonical names and terms future PRDs/issues should reuse.
+- Canonical names and terms future Feature Specs/issues should reuse.
 - Durable rules that affect implementation, validation, promotion, or docs.
 - Open questions only when current evidence clearly leaves a decision
   unresolved or conflicting.

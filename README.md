@@ -53,7 +53,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `plan-feature` | Manually plan features into PRDs and agent-ready issues through full-flow, prd-only, or issues-from-existing-prd modes. |
+| `plan-feature` | Manually plan features into Feature Specs and agent-ready issues through full-flow, spec-only, or issues-from-existing-spec modes. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
@@ -78,10 +78,10 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` when workflow hardening needs portfolio or session evidence, requires `$skill-creator` or `$plugin-creator` for substantial package reshapes, and requires `$autoreview` for non-trivial implementation closeout.
-- `codex-orchestrator` requires `$autoreview` and the relevant GitStack bundled skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work. It routes rough new feature intent and existing PRDs without generated implementation issues through `$plan-feature` before scheduling implementation work.
+- `codex-orchestrator` requires `$autoreview` and the relevant GitStack bundled skills for GitHub-backed triage, issue lifecycle, CI, review, release, commit, or publish work. It routes rough new feature intent and existing Feature Specs without generated implementation issues through `$plan-feature` before scheduling implementation work.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, PRD writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$gitstack:github-issues` for GitHub PRD or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
+- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, Feature Spec writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$gitstack:github-issues` for GitHub Feature Spec or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
 - `triage` requires `$project-memory` for tracker setup when project memory is missing, uses `$grill-me-with-context` when issue intent needs repo-backed clarification, requires `$plan-harder` before marking an issue `ready-for-agent`, and uses `$gitstack:github-issues` for GitHub issue mutations.
 
 ## Project-Local Skills

@@ -1,13 +1,13 @@
 # Issue Tracker: Local Markdown
 
-PRDs and implementation issues for this repo live as markdown files under
+Feature Specs and implementation issues for this repo live as markdown files under
 `.scratch/`.
 
 ## Configuration
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `local` | `github`, `local` | PRDs and implementation issues are written as local Markdown files. |
+| `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs and implementation issues are written as local Markdown files. |
 | `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
 
 This root `.scratch/` tree is the authoritative local Markdown tracker path. Do
@@ -15,7 +15,7 @@ not relocate these feature artifacts under `project-memory/features/` unless the
 repo records a custom tracker mode; `project-memory/` remains routing, domain,
 and ADR memory.
 
-Feature-planning workflows write PRDs and generated implementation issues to
+Feature-planning workflows write Feature Specs and generated implementation issues to
 the configured local Markdown tracker by default after setup, planning identity,
 and blockers are resolved. Branch only on the canonical `effective_target`:
 `configured-tracker` writes tracker files and `local-dry-run` returns draft
@@ -29,7 +29,7 @@ durable issue-tracker configuration.
 ## Conventions
 
 - One feature per directory: `.scratch/<feature-slug>/`
-- The PRD is `.scratch/<feature-slug>/PRD.md`
+- The Feature Spec is `.scratch/<feature-slug>/SPEC.md`
 - Implementation issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`,
   numbered from `01`
 - Implementation issue headings use:
@@ -41,17 +41,18 @@ durable issue-tracker configuration.
   file, using canonical `bug`, `feature`, or `task`.
 - Triage state is recorded as a `workflow_state:` line near the top of each
   issue file, using the canonical values from the Triage option contract.
-- The PRD pointer is recorded as `source_prd_ref:` reference data.
+- The Feature Spec pointer is recorded as `source_spec_ref:` reference data.
 - Comments and conversation history append under a `## Comments` heading
-- `$plan-feature` owns PRD and generated issue body shape, including
-  `source_prd_ref`, delivery metadata, partial-PRD links, and issue graph
-  validation. `Type:`, `Status:`, `State:`, and `Source PRD:` are read-only
-  legacy aliases until an authorized issue mutation normalizes them.
+- `$plan-feature` owns Feature Spec and generated issue body shape, including
+  `source_spec_ref`, delivery metadata, partial Feature Spec links, and issue graph
+  validation. `Type:`, `Status:`, and `State:` are read-only legacy aliases until
+  an authorized issue mutation normalizes them; retired source-reference labels
+  are not read aliases.
 - In multi-context repos or monorepos, feature slugs must include the accepted
   product or workspace slug when needed to avoid collisions, for example
   `customer-portal-weekly-digest` instead of `weekly-digest`.
-- When a PRD has an accepted `Planning Identity`, use that `feature_slug`
-  rather than deriving a new slug from the PRD title.
+- When a Feature Spec has an accepted `Planning Identity`, use that `feature_slug`
+  rather than deriving a new slug from the Feature Spec title.
 
 ## Delivery Defaults
 
@@ -67,14 +68,14 @@ durable issue-tracker configuration.
   lifecycle. Implement on the current branch, validate, commit, record the
   commit/proof in the issue or ledger, then move the local issue file to
   `issues/done/`.
-- Multi-repo PRD shape: use a single PRD only when that is the accepted
-  planning source. Otherwise use linked repo-scoped partial PRDs or generated
+- Multi-repo Feature Spec shape: use a single Feature Spec only when that is the accepted
+  planning source. Otherwise use linked repo-scoped partial Feature Specs or generated
   issue files; each one names its affected repo and links the siblings that
-  define the same feature. A global PRD is not required as durable setup
+  define the same feature. A global Feature Spec is not required as durable setup
   configuration.
 - Exceptions: `delivery_mode=direct-commit` requires
   `source=owner-instruction` plus exact feature-scope and target-branch
-  evidence, or a `source-prd` row preserving that evidence.
+  evidence, or a `source-spec` row preserving that evidence.
 - Local issue completion uses `issue_mutation_authority=none`; delivery proof
   never grants a hosted-style final-commit closure.
 
@@ -85,10 +86,10 @@ durable issue-tracker configuration.
 - If an existing setup file contains the legacy worker-authorization setup key,
   treat it as stale state and remove it when touching the file.
 
-Implementation issues created from a PRD usually use `issue_type: task`. PRD
+Implementation issues created from a Feature Spec usually use `issue_type: task`. Feature Spec
 files do not need `issue_type:` or `workflow_state:` lines unless the repo
-chooses to treat PRDs as local feature issues. Do not add `Status: Draft` to
-ordinary PRD files;
+chooses to treat Feature Specs as local feature issues. Do not add `Status: Draft` to
+ordinary Feature Spec files;
 workflow status belongs on implementation issues or in the tracker convention.
 
 ## Completion

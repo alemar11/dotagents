@@ -39,6 +39,6 @@ other externally owned syntax are not option values and remain unchanged.
 
 GitStack does not own planning or orchestration authority. When Codex
 Orchestrator calls GitHub Review Threads, the accepted current values are
-`publication_authority=prd-backed-pull-request` and
+`publication_authority=spec-backed-pull-request` and
 `publication_authority=explicit-owner-authorization`, scoped to the exact PR
 actions in the handoff. The caller remains the source of truth for that field.

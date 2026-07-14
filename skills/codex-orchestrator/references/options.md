@@ -49,21 +49,21 @@ scope only when it is registered as a workstream.
 | Field | Allowed values | Default | Owner |
 | --- | --- | --- | --- |
 | `source_mutation_authority` | `none`, `propose`, `write` | `none` | Root resolves from the source and owner authority. |
-| `publication_authority` | `none`, `explicit-owner-authorization`, `prd-backed-pull-request`, `blocked` | `none` | PRD-backed delivery may supply `prd-backed-pull-request`. |
+| `publication_authority` | `none`, `explicit-owner-authorization`, `spec-backed-pull-request`, `blocked` | `none` | Feature Spec-backed delivery may supply `spec-backed-pull-request`. |
 | `issue_mutation_authority` | `none`, `pr-body-closeout-only`, `explicit-direct-mutation` | `none` | Direct comments, labels, and closure require the explicit value. |
 | `merge_authority` | `none`, `explicit-owner-authorization` | `none` | Merge remains root-owned. |
 | `merge_policy` | `owner-approval`, `automatic-after-gates` | `owner-approval` | The automatic value requires matching explicit merge authority. |
 | `caller_checkout_policy` | `preserve-current-branch`, `caller-checkout-approved`, `not-applicable` | `preserve-current-branch` | Checkout mutation is separate from publication authority. |
 | `automation_authority` | `none`, `explicit-owner-authorization` | `none` | Authority applies only to the row's exact source/workstream automation target. |
-| `temporary_source_execution` | `forbidden`, `owner-approved` | `forbidden` | Controls implementation dispatch from a non-durable `draft-prd:<...>` source; it never grants publication or issue mutation. |
+| `temporary_source_execution` | `forbidden`, `owner-approved` | `forbidden` | Controls implementation dispatch from a non-durable `draft-spec:<...>` source; it never grants publication or issue mutation. |
 | `completion_proof_policy` | `live-required`, `synthetic-accepted` | `live-required` | The exceptional value requires exact owner evidence naming the accepted proof gap and follow-up. |
-| `delivery_mode` | `local-only`, `pull-request`, `direct-commit` | `local-only` for ad hoc sources | PRD-backed sources inherit their canonical value. |
+| `delivery_mode` | `local-only`, `pull-request`, `direct-commit` | `local-only` for ad hoc sources | Feature Spec-backed sources inherit their canonical value. |
 | `delivery_source` | `runtime-default`, `feature-level-inherited`, `issue-level-override`, `owner-instruction` | `runtime-default` for ad hoc sources | Source refs and authorization evidence remain separate data. |
 | `pr_closeout` | `merge-ready`, `draft-only`, `not-applicable` | `merge-ready` for `pull-request`; otherwise `not-applicable` | `draft-only` requires canonical source or owner evidence. |
 | `codex_review_policy` | `required`, `skip`, `not-applicable` | `required` for `pull-request` with `pr_closeout=merge-ready`; otherwise `not-applicable` | `skip` requires scoped owner-instruction evidence resolved to the exact workstream. |
-| `pr_shape` | `single-pr`, `per-repo-pr`, `none` | Inherited for PRD-backed work; `none` for ad hoc `local-only` | Repository refs and branch names remain separate data. |
-| `closeout_mode` | `feature-pr-closes-issue`, `repo-pr-closes-issue`, `direct-commit-closes-issue`, `local-done-move-after-proof`, `not-applicable` | Inherited for PRD-backed work; `not-applicable` for ad hoc work | Completion refs and proof remain separate data. |
-| `integration_mode` | `single-repo-pr`, `repo-pr`, `direct-commit`, `not-applicable` | Inherited for PRD-backed work; otherwise `not-applicable` | Integration refs and proof remain separate data. |
+| `pr_shape` | `single-pr`, `per-repo-pr`, `none` | Inherited for Feature Spec-backed work; `none` for ad hoc `local-only` | Repository refs and branch names remain separate data. |
+| `closeout_mode` | `feature-pr-closes-issue`, `repo-pr-closes-issue`, `direct-commit-closes-issue`, `local-done-move-after-proof`, `not-applicable` | Inherited for Feature Spec-backed work; `not-applicable` for ad hoc work | Completion refs and proof remain separate data. |
+| `integration_mode` | `single-repo-pr`, `repo-pr`, `direct-commit`, `not-applicable` | Inherited for Feature Spec-backed work; otherwise `not-applicable` | Integration refs and proof remain separate data. |
 
 `branch_name` is required scoped data, not an enum option. Record it in the
 same six-column resolution table for every workstream scope; use
@@ -146,7 +146,7 @@ Resolution sources are field- and value-specific:
 | `source_mutation_authority=none` | `default`, `runtime-capability`, or `legacy-migration` |
 | `source_mutation_authority=propose` or `write` | `owner-instruction`, or `legacy-migration` preserving owner evidence |
 | `publication_authority=none` or `blocked` | `default`, `runtime-capability`, or `owner-instruction` |
-| `publication_authority=prd-backed-pull-request` | `source-contract` or `legacy-migration` preserving the source contract |
+| `publication_authority=spec-backed-pull-request` | `source-contract` or `legacy-migration` preserving the source contract |
 | `publication_authority=explicit-owner-authorization` | `owner-instruction`, or `source-contract` preserving the exact scoped owner authorization evidence for `direct-commit` |
 | `issue_mutation_authority=none` | `default` or `runtime-capability` |
 | `issue_mutation_authority=pr-body-closeout-only` | `source-contract` |
@@ -203,10 +203,10 @@ automation authority, temporary-source execution, synthetic-proof acceptance,
 and owner-authorized delivery overrides. Generic evidence text is not scoped
 authority.
 
-A PRD-backed scope transfer is valid only when the generated issue evidence
+A Feature Spec-backed scope transfer is valid only when the generated issue evidence
 contains an exact issue `scope-ref`, preserved owner, target, and branch tokens,
 and current source evidence. Feature-level inherited evidence also requires
-the PRD's preserved `target-ref` and `scope-transfer-ref=run`; issue-level
+the Feature Spec's preserved `target-ref` and `scope-transfer-ref=run`; issue-level
 override evidence instead preserves its exact issue-scoped owner authorization.
 When registering that issue as a workstream, the root may replace only
 `scope-ref` with the exact `workstream:<id>` and set `scope-transfer-ref` to the
@@ -240,7 +240,7 @@ unchanged.
   `automation_authority=explicit-owner-authorization` is required before an
   automation mutation for that exact workstream target.
 - `temporary_source_execution=owner-approved` is required before dispatch from
-  a `draft-prd:<...>` source. Publication and issue mutation still require
+  a `draft-spec:<...>` source. Publication and issue mutation still require
   their own scoped authority rows.
 - `completion_proof_policy=synthetic-accepted` requires owner evidence naming
   the exact live-proof gap and owner-visible follow-up.

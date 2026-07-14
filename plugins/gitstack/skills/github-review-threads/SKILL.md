@@ -63,7 +63,7 @@ It cannot invoke connector tools.
    scheduling or heartbeat ownership remains with that caller.
 
 For `$codex-orchestrator`, resolved
-`publication_authority=prd-backed-pull-request` or
+`publication_authority=spec-backed-pull-request` or
 `publication_authority=explicit-owner-authorization` is sufficient only for
 the exact review actions assigned to that PR.
 

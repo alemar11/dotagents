@@ -10,19 +10,20 @@ canonical registry for issue kind and workflow state.
 | `issue_type` | `bug`, `feature`, `task` | Describes the kind of work. |
 | `workflow_state` | `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix` | Describes the issue lifecycle state. |
 
-`source_prd_ref` is reference data, not an enum. Paths, issue numbers, titles,
+`source_spec_ref` is reference data, not an enum. Paths, issue numbers, titles,
 classification rationale, labels, and comments are also data.
 
 ## Local Markdown Compatibility
 
 Current local Markdown issues emit `issue_type`, `workflow_state`, and
-`source_prd_ref` with canonical lower-kebab values for the two enums. Do not
+`source_spec_ref` with canonical lower-kebab values for the two enums. Do not
 add a schema-version field.
 
 The header metadata region starts after the first H1 title and ends at the
-first `##` heading. Read legacy `Type:`, `Status:`, `State:`, and
-`Source PRD:` fields only inside that region; never treat similarly named
-fields inside `## Agent Brief` or other body sections as issue metadata.
+first `##` heading. Read legacy `Type:`, `Status:`, and `State:` fields only
+inside that region; never treat similarly named fields inside `## Agent Brief`
+or other body sections as issue metadata. Retired source-reference labels are
+not read aliases.
 
 Canonical fields take precedence over every legacy alias, even when the legacy
 value disagrees. Stop and report a conflict only when duplicate canonical

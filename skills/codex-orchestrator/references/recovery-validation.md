@@ -381,7 +381,7 @@ On resume:
        if (field == "raw_worktree_fallback") return matches(value, "forbidden|owner-approved")
        if (field == "active_root_takeover_policy") return matches(value, "owner-approval|stale-ledger-check")
        if (field == "source_mutation_authority") return matches(value, "none|propose|write")
-       if (field == "publication_authority") return matches(value, "none|explicit-owner-authorization|prd-backed-pull-request|blocked")
+       if (field == "publication_authority") return matches(value, "none|explicit-owner-authorization|spec-backed-pull-request|blocked")
        if (field == "issue_mutation_authority") return matches(value, "none|pr-body-closeout-only|explicit-direct-mutation")
        if (field == "merge_authority") return matches(value, "none|explicit-owner-authorization")
        if (field == "merge_policy") return matches(value, "owner-approval|automatic-after-gates")
@@ -417,7 +417,7 @@ On resume:
        if (field == "source_mutation_authority") return value == "none" ? matches(source, "default|runtime-capability|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
        if (field == "publication_authority") {
          if (matches(value, "none|blocked")) return matches(source, "default|runtime-capability|owner-instruction")
-         if (value == "prd-backed-pull-request") return matches(source, "source-contract|legacy-migration")
+         if (value == "spec-backed-pull-request") return matches(source, "source-contract|legacy-migration")
          return matches(source, "owner-instruction|source-contract")
        }
        if (field == "issue_mutation_authority") {

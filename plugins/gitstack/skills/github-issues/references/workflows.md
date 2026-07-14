@@ -89,7 +89,7 @@ such as `<<EOF`; backticks and `$...` must remain literal. Use a runtime
 file-write tool when available. If writing from a shell, use a quoted heredoc
 delimiter such as `<<'EOF'` or another non-interpolating writer.
 
-For multi-issue publication, especially PRD plus child issues, publish in
+For multi-issue publication, especially a Feature Spec plus child issues, publish in
 checkpoints:
 
 1. Create or update the parent issue.
