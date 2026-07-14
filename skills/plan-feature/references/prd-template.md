@@ -2,35 +2,14 @@
 
 Use this shape unless the project already has a stronger local PRD format.
 
-## Structured Values
+## Structured Value Projection
 
-Use these `delivery_mode` values in every PRD:
-
-- `pull-request`: feature branch plus PR delivery. In a single repo or monorepo,
-  use one feature branch and PR. In multi-repo work, every involved repo uses
-  the same branch name and opens its own PR.
-- `direct-commit`: direct commit path. The `delivery_mode` option row must use
-  `source=owner-instruction` and its evidence must name the exact owner
-  instruction, feature scope, and authorized target branch. A migrated
-  `source-prd` row is valid only when it preserves that same evidence.
-
-For `pull-request`, use these `pr_closeout` values:
-
-- `merge-ready`: default. The PR opens as draft initially and progresses
-  through validation, ready-for-review transition, Codex review, and
-  merge-ready closeout without authorizing merge.
-- `draft-only`: terminal draft state, only when the current user explicitly
-  selects `pr_closeout=draft-only` or an option-resolution row records that
-  canonical value with accepted owner/source evidence.
-
-Do not select `draft-only` by comparing free-form prose. Normalize an accepted
-instruction once in the option-resolution record, then read only
-`pr_closeout`.
-
-Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-as legacy aliases when reading existing artifacts. When updating an artifact
-that contains legacy aliases, rewrite touched structured values to
-lower-kebab-case.
+`references/options.md` is the sole owner of option names, values, defaults,
+sources, evidence, and cross-field constraints. This template only projects an
+already verified option snapshot into the PRD; do not resolve or override
+options here.
+Render each field and its evidence exactly from that verified snapshot; keep
+derived paths, fingerprints, and integration proof as separate data.
 
 ```markdown
 # PRD: [Feature Name]
@@ -83,29 +62,14 @@ What user or system problem this solves.
 
 ## Delivery Mode
 
-- delivery_mode: `pull-request` or `direct-commit`.
-- delivery_mode_evidence: option-resolution source/ref; for `direct-commit`,
-  use `owner-ref=<ref>;scope-ref=run;target-ref=<feature-or-source-ref>;target-branch=<branch_name>`
-  to name the exact owner instruction, feature scope, and authorized target
-  branch.
-- issue_mutation_authority: `none`, `pr-body-closeout-only`, or
-  `explicit-direct-mutation`. Use `none` for local trackers,
-  `pr-body-closeout-only` for GitHub pull-request delivery, and
-  `explicit-direct-mutation` for GitHub direct-commit delivery only when a
-  separate option row records explicit final-commit closure authority.
-- issue_mutation_authority_evidence: option-resolution source/ref; for
-  `explicit-direct-mutation`, use the same scope/target/branch tokens as
-  direct-commit delivery, preserve its independent `owner-ref`, and require
-  that ref to identify an instruction
-  that explicitly authorizes final-commit issue closure.
-- pr_closeout: `merge-ready`, `draft-only`, or `not-applicable`.
-- pr_closeout_evidence: option-resolution source/ref; required for
-  `draft-only`.
-- branch_name: for `pull-request`, default to `feature/<feature-slug>` and use
-  that same branch name in each affected repo unless repo policy differs; for
-  `direct-commit`, use the exact target branch named by
-  `delivery_mode_evidence`.
-- pr_shape: `single-pr`, `per-repo-pr`, or `none`.
+- delivery_mode: [verified `delivery_mode` row value].
+- delivery_mode_evidence: [verified option-row source and evidence].
+- issue_mutation_authority: [verified `issue_mutation_authority` row value].
+- issue_mutation_authority_evidence: [verified independent option-row source and evidence].
+- pr_closeout: [verified `pr_closeout` row value].
+- pr_closeout_evidence: [verified option-row source and evidence].
+- branch_name: [verified exact branch data].
+- pr_shape: [verified `pr_shape` row value].
 - integration_proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
 - issue_inheritance: generated issues link this PRD with `source_prd_ref`, copy

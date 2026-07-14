@@ -25,50 +25,27 @@ question set or route back through `$grill-me-with-context`.
 - In GitHub tracker mode, do not persist repo-local PRD mirrors
   or `.scratch/` staging copies unless `local_mirror=requested` and
   `effective_target=configured-tracker`.
-- Use structured values for multi-choice fields. Read tracker and type mappings
-  from project memory, and use the `delivery_mode` and `pr_closeout` values
-  documented in `references/prd-template.md`.
-- For publication mechanics, effective targets, and stable `source_prd_ref`
-  behavior in draft command runs, use `$project-memory`'s `references/tracker-publishing.md`.
+- Use structured values for multi-choice fields. `references/options.md` is the
+  sole owner of option values, defaults, evidence, and cross-field resolution;
+  read tracker and type mappings from project memory, then project the verified
+  values through `references/prd-template.md`.
+- Resolve `effective_target` only through `references/options.md`. After
+  resolution, use `$project-memory`'s `references/tracker-publishing.md` for
+  publication transport, stable `source_prd_ref` behavior, mutation
+  verification, cleanup, and partial recovery.
 
 ## Phase Handoff Inputs
 
-When called by `plan-feature`, receive these fields from the entrypoint:
+Receive the verified run-level `option_resolution` rows and
+`option_rows_fingerprint` defined by `references/options.md`, plus:
 
-```text
-mode: <full-flow|prd-only|issues-from-existing-prd>
-execution_profile: <lean-prd|standard>
-tracker_backend: <github|local>
-effective_target: <configured-tracker|local-dry-run|draft-publish-commands>
-no_mutation_override: <none|dry-run|temp|rehearsal|validation|disabled-writes|draft-output>
-no_mutation_output: <not-applicable|local-artifacts|publish-commands>
-local_mirror: <not-requested|requested>
-local_mirror_path: <repo-relative mirror root|not-applicable>
-partial_output: <withhold|allow-non-agent-ready>
-source_prd_ref: <pending until #number, local path, or draft-prd:slug>
-hosted_body_file_policy: transient-outside-repo
-feature_slug: <accepted feature slug>
-product_slug: <accepted product slug or not-applicable>
-workspace_path: <accepted workspace path or not-applicable>
-context_file: <selected CONTEXT.md or not-applicable>
-project_slug: <accepted orchestrator project slug or not-applicable>
-delivery_mode: <pull-request|direct-commit>
-issue_mutation_authority: <none|pr-body-closeout-only|explicit-direct-mutation>
-issue_mutation_authority_evidence: <option row evidence or none>
-branch_name: <feature branch or exact authorized direct-commit target branch>
-pr_closeout: <merge-ready|draft-only|not-applicable>
-pr_shape: <single-pr|per-repo-pr|none>
-capture_mode: defer-to-caller
-capture_outcome: <deferred|no-durable-change>
-option_resolution: <keyed run rows from references/options.md>
-option_rows_fingerprint: <sha256:lowercase-hex for run rows>
-domain_knowledge_delta:
-  knowledge_delta: <required|none>
-  decisions: <accepted durable terms, rules, boundaries, or decisions>
-  target_surfaces: <repo-relative or repo-qualified context/docs/ADR destinations>
-  evidence: <portable repo, hosted, or owner-decision references>
-  unresolved: <empty for agent-ready planning, otherwise blockers>
-```
+- the planning identity (`feature_slug` and any selected `product_slug`,
+  `workspace_path`, `context_file`, and `project_slug`);
+- pending or existing `source_prd_ref` state and the
+  `hosted_body_file_policy=transient-outside-repo` transport rule;
+- `capture_mode=defer-to-caller`, `capture_outcome`, and the structured
+  `domain_knowledge_delta` (`knowledge_delta`, `decisions`, `target_surfaces`,
+  `evidence`, and independent `unresolved` blockers).
 
 The handoff is mandatory even when no grilling occurred. Use
 `knowledge_delta: none` with `capture_outcome: no-durable-change` and empty
@@ -121,43 +98,18 @@ before writing:
 - `workspace_path`
 - `context_file`
 - `feature_slug`
-- `delivery_mode`
-- `issue_mutation_authority`
-- `pr_closeout`
 
-Use values passed by `plan-feature` when present. Otherwise derive them from
-project memory and repo evidence, asking only when multiple contexts could
-plausibly own the feature.
+Use identity values passed by `plan-feature` when present. Otherwise derive
+only those identity fields from project memory and repo evidence, asking when
+multiple contexts could plausibly own the feature.
 
-Resolve the PRD `delivery_mode` before drafting:
-
-- `pull-request`: default for single-repo, monorepo, orchestrator workspace, and
-  true cross-repo work. In a single repo or monorepo, use one feature branch and
-  PR. In multi-repo work, every involved repo uses the same branch name and opens
-  its own PR.
-- `direct-commit`: a new decision records `delivery_mode=direct-commit` with
-  `source=owner-instruction`; the row evidence names the exact owner
-  instruction, feature scope, and authorized target branch, and `branch_name`
-  equals that target. An existing PRD may use `source=source-prd` only when it
-  preserves the same evidence. Unproven PRD prose cannot grant this mode.
-
-Resolve `issue_mutation_authority` independently from delivery authority:
-
-- local trackers use `none`;
-- GitHub pull-request delivery uses `pr-body-closeout-only`;
-- GitHub direct-commit delivery requires
-  `explicit-direct-mutation` with a separate owner-authority row whose evidence
-  explicitly authorizes final-commit issue closure for the same feature scope,
-  target, and branch. Direct-commit publication wording alone cannot select
-  this value; stop on the missing canonical choice before drafting.
-
-For `pull-request`, resolve `pr_closeout` separately:
-
-- `merge-ready`: default. Open the PR as draft initially, then validate, mark
-  it ready, request Codex review, address feedback, and stop merge-ready.
-- `draft-only`: use only when the option-resolution row records
-  `pr_closeout=draft-only` with `source=owner-instruction` or `source-prd`.
-  Other option evidence cannot select this value.
+Do not resolve delivery or mutation options in this phase. Consume the complete
+verified delivery tuple and `branch_name` data from the run-level
+`option_resolution` handoff, whose values, defaults, evidence, and cross-field
+rules are owned by `references/options.md`. If required rows are absent,
+contradictory, or fail their fingerprint, return to caller-owned option
+resolution before drafting. Project the accepted rows without reinterpreting
+their prose or applying another default.
 
 If the repo shape makes the affected repo set ambiguous, ask before writing the
 PRD.
@@ -257,120 +209,52 @@ or the generated implementation issues, not in the PRD content itself.
 
 ### 4. Choose Publication Target
 
-Read `project-memory/agents/issue-tracker.md` to determine where PRDs live.
-Also read `$project-memory`'s `references/tracker-publishing.md` for the
-shared effective-target and `source_prd_ref` contract.
+Read `project-memory/agents/issue-tracker.md` for the repo target and
+`project-memory/agents/triage-labels.md` for the mapped `feature` type.
+`references/options.md` solely owns effective-target and local-mirror option
+resolution. After that resolution, `$project-memory`'s
+`references/tracker-publishing.md` owns transient body transport, mirror-path
+application, draft-ref replacement, hosted mutation verification, cleanup, and
+partial recovery. Branch only on the verified target:
 
-- `tracker_backend=github`: when `effective_target=configured-tracker`, publish through
-  `$gitstack:github-issues`, using the title format `PRD: <Feature Name>` and the
-  mapped `feature` issue type when available. Do not write
-  `.scratch/<feature-slug>/PRD.md` or `project-memory/features/...` as part of
-  GitHub publishing unless `local_mirror=requested`; when requested, write the
-  mirror under `local_mirror_path`.
-- `tracker_backend=local`: when `effective_target=configured-tracker`, write to the configured repo-local PRD path,
-  normally `.scratch/<feature-slug>/PRD.md`. Derive or ask for
-  `<feature-slug>` before writing. In multi-context repos, require the accepted
-  product/workspace context and use the tracker's product-scoped slug convention
-  when one is recorded.
-- Local workspace PRDs: when the planning target is an orchestrator workspace,
-  write `projects/<project-slug>/features/<feature-slug>/PRD.md`. Derive or ask
-  for both `<project-slug>` and `<feature-slug>` before writing. The PRD phase
-  owns the PRD and may create or update
-  `projects/<project-slug>/PROJECT.md`,
-  `projects/<project-slug>/repos/<repo-slug>.md`, and
-  `projects/<project-slug>/features/<feature-slug>/integration-gates.md` only
-  from accepted project, repo, or PRD source material needed for planning.
-  Record the accepted source in each support doc or in the completion report so
-  the source boundary is auditable.
-- GitHub workspace PRDs: publish the relevant PRD issue or linked partial PRD
-  issues through `$gitstack:github-issues`. Derive or ask for `<project-slug>`,
-  `<feature-slug>`, and the affected repo list. Related PRDs and implementation
-  issues must link to each other. Do not create local `projects/...` feature
-  artifacts or `.scratch/` mirrors unless
-  `effective_target=configured-tracker` and `local_mirror=requested`; write any
-  requested mirror under `local_mirror_path`.
+| Target | PRD phase action |
+| --- | --- |
+| `tracker_backend=github`, `effective_target=configured-tracker` | Publish the sanitized `PRD: <Feature Name>` through `$gitstack:github-issues`; apply the mapped feature type when supported. |
+| `tracker_backend=local`, `effective_target=configured-tracker` | Write the resolved path from the PRD Target Model. |
+| `effective_target=local-dry-run` | Return the resolved target, body, deterministic `draft-prd:<...>` ref, and PRD body fingerprint without writing; label the source non-executable. |
+| `effective_target=draft-publish-commands` | Ask `$gitstack:github-issues` for exact commands and return the title, body, identity, deterministic draft ref, and fingerprint; publish the PRD first and replace draft refs before issue mutation. |
 
-For GitHub PRDs, derive `<Feature Name>` from the
-accepted product name or short feature phrase in title case. Do not include
-issue numbers, status labels, or implementation slice names in the PRD title.
+For `effective_target=local-dry-run`, Orchestrator may inspect but must not
+dispatch or mutate from the temporary source. Hosted local writes require both
+`effective_target=configured-tracker` and `local_mirror=requested`, and must use
+the validated `local_mirror_path`.
 
-For orchestrator workspace PRDs, include repository scope, cross-repo
-contracts, integration gates, and release or validation order when those affect
-issue splitting.
+For a local orchestrator workspace, the resolved PRD path is
+`projects/<project-slug>/features/<feature-slug>/PRD.md`. This phase may also
+create or update `PROJECT.md`, `repos/<repo-slug>.md`, and
+`integration-gates.md` only from accepted planning sources and must report that
+source. For GitHub workspace planning, publish linked partial PRDs through
+`$gitstack:github-issues`, preserve cross-repo links, and create no local feature
+artifacts except an authorized mirror.
 
-For single-repo and monorepo PRDs, include concrete product or workspace scope
-instead of using `N/A` when scope helps later issue splitting. For a simple
-single repo, say "current repository." For a monorepo, include the selected
-workspace path, context file, and explicitly out-of-scope sibling workspaces
-when relevant.
+Derive `<Feature Name>` from the accepted product or short feature phrase; omit
+issue numbers, statuses, and slice names. State concrete repo/workspace scope,
+including affected repos, cross-repo contracts, integration gates, and order
+when material. In every PRD, render the verified delivery tuple through
+`references/prd-template.md`, including the resolved repo/branch/PR shape and
+integration proof. Placeholders are expectations, not completion proof.
 
-Include a `## Delivery Mode` section in every PRD. For `pull-request`, record
-branch naming such as `feature/<feature-slug>`, `pr_closeout`, canonical
-`pr_shape`, and the validation required before implementation issues close. In
-multi-repo work,
-record the same branch name for each affected repo, expected repo PR slots or
-pre-implementation placeholders, and the cross-repo proof needed before issues
-close. For `delivery_mode=direct-commit`, record the exact authorized target
-branch, scoped `delivery_mode_evidence`, and separately scoped
-`issue_mutation_authority_evidence` from their option rows. Placeholders in
-the PRD are delivery expectations, not completion proof;
-`$codex-orchestrator` records real PR links or equivalent integration proof
-during closeout.
+The PRD remains canonical for the feature delivery tuple; the issue phase
+projects it, adds issue-level scheduling/closeout, and validates the graph. For
+GitHub, `$gitstack:github-issues` owns safe body transport, mutation
+verification, cleanup, and recovery; do not construct a mutating `gh issue
+create` command with generated Markdown.
 
-Treat the PRD as the canonical source for `delivery_mode`,
-`issue_mutation_authority`, `pr_closeout`, `pr_shape`, and branch/PR data.
-The issue phase owns issue splitting and validates the generated issue graph
-before publication. Generated issues copy the effective `delivery_mode`,
-`issue_mutation_authority`, `pr_closeout`, and `pr_shape` values as
-feature-level metadata inherited from `source_prd_ref`, plus
-issue-level dependencies, parallelization, closeout, and any explicit
-issue-level exception or cross-repo closeout rule.
-
-Read `project-memory/agents/triage-labels.md` for the mapped `feature` type.
-When GitHub issue types are available, create or update the PRD issue with that
-mapped type, usually `Feature`. If issue types are disabled or unsupported,
-publish the PRD without a type and keep the PRD title/body convention intact.
-Use `$gitstack:github-issues` for GitHub create, type, label, and dry-run command
-mechanics. In mutating GitHub runs, pass the sanitized PRD title, body, target
-repo, type, and labels to `$gitstack:github-issues`; do not assemble a direct `gh issue
-create` shell command with generated Markdown in this phase. `$gitstack:github-issues`
-owns safe temporary body-file creation, non-interpolating body writes, cleanup,
-state verification, and partial-failure recovery.
-
-Use `effective_target` from the `plan-feature` handoff without re-resolving it.
-`configured-tracker` performs the backend write. `local-dry-run` returns paths
-and bodies without writing. `draft-publish-commands` returns exact hosted
-commands without mutation. In hosted tracker modes, local file writes apply
-only when `effective_target=configured-tracker` and `local_mirror=requested`;
-hosted body-file inputs are transient files outside the repo. Hosted
-tracker mutation in this phase is limited to PRD planning-artifact publication
-and metadata; implementation lifecycle comments, labels, direct closure, and
-closeout mutations after scheduling starts belong to `$codex-orchestrator`.
-
-Immediately before handing content to `$gitstack:github-issues`, re-scan the final PRD
-body for machine-local absolute paths and replace them with sanitized evidence
-references. Treat any remaining unsanitized developer path as a blocker for
-hosted publication.
-
-For `tracker_backend=github`, branch only on `effective_target`:
-`configured-tracker` publishes, `local-dry-run` returns the PRD body and target
-without mutation, and `draft-publish-commands` asks `$gitstack:github-issues`
-for the exact draft publish command. For `draft-publish-commands`, also return the PRD title,
-`feature_slug`, `project_slug` when applicable, and a short PRD body fingerprint
-so later issue commands can prove they target the same draft. Return
-`source_prd_ref=draft-prd:<feature-slug>` or
-`source_prd_ref=draft-prd:<project-slug>/<feature-slug>` and state that the PRD
-must be published first so generated issues can replace the draft ref with the
-hosted PRD number before mutation.
-
-For `effective_target=local-dry-run`, return the same deterministic
-`draft-prd:<...>` form plus the PRD body fingerprint and resolved local target.
-This is a non-executable temporary source: the issue phase may use it to build
-dry-run bodies, but Orchestrator may inspect only and must not dispatch or
-mutate from it.
-
-If no issue-tracker setup exists, return the PRD in chat and recommend running
-`$project-memory` before publishing.
+Immediately before hosted publication, reject any remaining machine-local
+absolute path. Hosted mutation is limited to PRD planning-artifact publication
+and metadata; implementation lifecycle and closeout mutations
+belong to `$codex-orchestrator`. If tracker setup is absent, return the PRD in
+chat and recommend `$project-memory` before publication.
 
 ### 5. Report Completion
 

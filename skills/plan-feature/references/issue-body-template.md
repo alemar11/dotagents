@@ -1,11 +1,17 @@
 # Issue Body Template
 
-Use this shape unless the tracker has a stronger local template. Delete optional
-delivery lines when they do not apply. Evidence references in issue bodies must
-be portable: use repo-relative paths, sibling-repo-relative paths, hosted issue
-or PR URLs, or descriptive references. Do not include developer-machine absolute
-paths in returned bodies, local issue files, hosted issue bodies, or draft
-publish commands.
+Use this shape unless the tracker has a stronger local template. Delete only
+optional presentation fields whose bracketed instructions say to omit them;
+never omit a verified Per-Issue Registry projection. Evidence references in
+issue bodies must be portable: use repo-relative paths,
+sibling-repo-relative paths, hosted issue or PR URLs, or descriptive references.
+Do not include developer-machine absolute paths in returned bodies, local issue
+files, hosted issue bodies, or draft publish commands.
+
+`references/options.md` is the sole owner of delivery, scheduling, closeout,
+integration, domain-closeout, source, and evidence values. This template owns
+only their output placement and completion prose; project the complete verified
+Per-Issue Registry rows without resolving or defaulting them here.
 
 ```markdown
 # <feature-slug>: <NN> <vertical outcome>
@@ -21,32 +27,34 @@ Product Scope: [for monorepos, workspace path and selected context file; for
 single-repo issues, `current repository`; for workspace issues, use
 `Affected Repos`]
 
+## Option Resolution
+
+issue_option_rows_fingerprint: [verified fingerprint over this issue's rows
+below]
+
+| row_id | scope_id | field | value | source | evidence |
+| --- | --- | --- | --- | --- | --- |
+| `issue:<NN>:<field>` | `issue:<NN>` | [Per-Issue Registry field or `branch_name`] | [verified value or data] | [verified canonical source] | [verified portable evidence or `none` only when allowed] |
+
+Expand the row above into exactly one row for every Per-Issue Registry field
+plus the issue-effective `branch_name` row. Preserve the verified six-column
+cells; do not infer or omit row metadata here.
+
 ## Delivery
 
-- delivery_mode: [pull-request | direct-commit]
-- delivery_source: [feature-level-inherited | issue-level-override]
-- delivery_source_evidence: [source_prd_ref for pull-request; every effective
-  direct-commit issue uses
-  owner-ref=<ref>;scope-ref=issue:<NN>;target-ref=<preserved-feature-or-source-ref>;target-branch=<branch_name>;
-  inherited direct-commit also adds scope-transfer-ref=run]
-- issue_mutation_authority: [none | pr-body-closeout-only |
-  explicit-direct-mutation]
-- issue_mutation_authority_evidence: [source PRD/ref or none; for
-  explicit-direct-mutation, the same exact issue scope/target/branch/transfer
-  tokens as delivery_source_evidence plus the independently preserved owner-ref
-  that authorizes final-commit issue closure]
-- branch_name: [inherited feature branch or exact authorized direct-commit
-  target branch]
-- pr_shape: [single-pr | per-repo-pr | none]
-- pr_closeout: [merge-ready | draft-only | not-applicable]
-- parallelization: [independent | depends-on | blocks | root-integrated]
+- delivery_mode: [verified `delivery_mode` row value]
+- delivery_source: [verified `delivery_source` row value]
+- delivery_source_evidence: [verified delivery evidence data]
+- issue_mutation_authority: [verified `issue_mutation_authority` row value]
+- issue_mutation_authority_evidence: [verified independent mutation evidence data]
+- branch_name: [verified exact branch data]
+- pr_shape: [verified `pr_shape` row value]
+- pr_closeout: [verified `pr_closeout` row value]
+- parallelization: [verified `parallelization` row value]
 - dependency_ids: [issue ids or none]
 - blocked_issue_ids: [issue ids or none]
-- closeout_mode: [feature-pr-closes-issue | repo-pr-closes-issue |
-  direct-commit-closes-issue | local-done-move-after-proof; use
-  local-done-move-after-proof for local markdown even with direct-commit
-  delivery]
-- integration_mode: [single-repo-pr | repo-pr | direct-commit | not-applicable]
+- closeout_mode: [verified `closeout_mode` row value]
+- integration_mode: [verified `integration_mode` row value]
 
 ## Orchestrator Handoff
 
@@ -64,20 +72,17 @@ single-repo issues, `current repository`; for workspace issues, use
   repository]
 - scope:
   - [Only this issue's implementation slice.]
-- parallelization: [independent | depends-on | blocks | root-integrated]
+- parallelization: [same verified value as `## Delivery`]
 - dependency_ids: [generated issue IDs or none]
 - blocked_issue_ids: [generated issue IDs or none]
 - dependency_reason: [reason or none]
 - validation: [commands, checks, or proof required for this issue.]
-- domain_closeout: [not-applicable | implementation-closeout]
+- domain_closeout: [verified `domain_closeout` row value]
 - domain_closeout_data: [when applicable, the exact
   decisions, target surfaces, evidence, `memory_slice=domain-memory`, and
   `domain_operation=implementation-closeout` required by
   `## Domain Knowledge Closeout` below]
-- closeout_mode: [feature-pr-closes-issue | repo-pr-closes-issue |
-  direct-commit-closes-issue | local-done-move-after-proof; use
-  local-done-move-after-proof for local markdown even with direct-commit
-  delivery]
+- closeout_mode: [same verified value as `## Delivery`]
 - integration_mode: [same effective value as `## Delivery`]
 
 Do not include worker authorization modes, worker surfaces, worker counts,

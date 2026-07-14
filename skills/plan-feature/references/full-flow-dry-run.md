@@ -67,6 +67,42 @@ domain_knowledge_delta:
 | `run:pr_closeout` | `run` | `pr_closeout` | `merge-ready` | `default` | `run:delivery_mode` |
 | `run:pr_shape` | `run` | `pr_shape` | `single-pr` | `runtime-derived` | `current-repository` |
 
+## Representative Emitted Issue
+
+This serialization check emits every `issue:01` row with an artifact-local
+fingerprint. The graph-wide fingerprint remains in the issue-phase handoff.
+
+```markdown
+# account-settings-export: 01 Export account settings end to end
+
+issue_type: task
+workflow_state: ready-for-agent
+source_prd_ref: draft-prd:account-settings-export
+
+## Option Resolution
+
+issue_option_rows_fingerprint: sha256:92b2748d73d29436dc88e2544f51cff216032a0a758f0b2dc65fc421de7a4592
+
+| row_id | scope_id | field | value | source | evidence |
+| --- | --- | --- | --- | --- | --- |
+| `issue:01:delivery_source` | `issue:01` | `delivery_source` | `feature-level-inherited` | `source-prd` | `draft-prd:account-settings-export` |
+| `issue:01:delivery_mode` | `issue:01` | `delivery_mode` | `pull-request` | `source-prd` | `run:delivery_mode` |
+| `issue:01:issue_mutation_authority` | `issue:01` | `issue_mutation_authority` | `pr-body-closeout-only` | `source-prd` | `run:issue_mutation_authority` |
+| `issue:01:pr_shape` | `issue:01` | `pr_shape` | `single-pr` | `source-prd` | `run:pr_shape` |
+| `issue:01:pr_closeout` | `issue:01` | `pr_closeout` | `merge-ready` | `source-prd` | `run:pr_closeout` |
+| `issue:01:parallelization` | `issue:01` | `parallelization` | `independent` | `runtime-derived` | `issue-graph:01` |
+| `issue:01:closeout_mode` | `issue:01` | `closeout_mode` | `feature-pr-closes-issue` | `runtime-derived` | `run:tracker_backend+issue:01:pr_shape` |
+| `issue:01:integration_mode` | `issue:01` | `integration_mode` | `single-repo-pr` | `runtime-derived` | `run:delivery_mode+current-repository` |
+| `issue:01:domain_closeout` | `issue:01` | `domain_closeout` | `implementation-closeout` | `runtime-derived` | `domain_knowledge_delta+issue-graph:01` |
+| `issue:01:branch_name` | `issue:01` | `branch_name` | `feature/account-settings-export` | `source-prd` | `run:branch_name` |
+```
+
+## Representative Issue-Phase Handoff
+
+option_rows_fingerprint: sha256:02437261e61ebd4cc50adc0c3d740e9f8d156ca7821ed26426fbbaffd4da26fe
+issue_count: 1
+issue_refs: draft-issue:account-settings-export:01
+
 ## Expected Pipeline
 
 1. `$plan-feature` reviews project memory and resolves the effective target.

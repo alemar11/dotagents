@@ -40,6 +40,12 @@ These run-level options resolve before the first phase handoff.
 `local_mirror_path` is a data field, not an enum. Use a validated repo-relative
 mirror root when `local_mirror=requested`; use `not-applicable` otherwise.
 
+`branch_name` is also data. For `pull-request`, default it to
+`feature/<feature_slug>` unless an accepted source PRD or repository policy
+provides another valid branch; multi-repo work uses the same exact branch in
+every involved repository. For `direct-commit`, it must equal the exact target
+branch in the scoped owner evidence.
+
 ## Per-Issue Registry
 
 Resolve these fields once per generated issue after the issue graph exists and
@@ -85,6 +91,14 @@ branch only on `effective_target`; they do not reinterpret the mutation reason.
 - `delivery_mode=pull-request` requires
   `pr_closeout=merge-ready` or `pr_closeout=draft-only` and requires
   `pr_shape=single-pr` or `pr_shape=per-repo-pr`.
+- Single-repo and monorepo pull-request delivery uses `pr_shape=single-pr` with
+  one feature branch and PR. Multi-repo pull-request delivery uses
+  `pr_shape=per-repo-pr`, the same `branch_name` in every involved repo, and one
+  PR per repo.
+- `pr_closeout=merge-ready` opens each PR as draft, then proceeds through
+  validation, ready-for-review, Codex review, and merge-ready closeout without
+  authorizing merge. `pr_closeout=draft-only` stops after validated draft
+  publication.
 - `delivery_mode=direct-commit` requires `pr_closeout=not-applicable` and
   `pr_shape=none`. Its separate `branch_name` data must equal the exact target
   branch named in the scoped owner evidence.
@@ -221,8 +235,8 @@ these exact rules:
 5. Sort rows bytewise by normalized `row_id` using the C locale.
 6. Serialize each row as its six normalized cells joined by one tab, with one
    trailing newline per row and no header row.
-7. SHA-256 hash the serialized UTF-8 bytes and record
-   `option_rows_fingerprint=sha256:<lowercase-hex>`.
+7. SHA-256 hash the serialized UTF-8 bytes and emit the Markdown field
+   `option_rows_fingerprint: sha256:<lowercase-hex>`.
 
 The entrypoint computes the run-row fingerprint before the PRD phase. Each
 phase recomputes and verifies the incoming rows before acting. The issue phase
@@ -230,6 +244,13 @@ then adds all `issue:<NN>` rows, recomputes the fingerprint over the complete
 run-plus-issue set, and returns that value in its handoff and completion
 report. A missing or mismatched row, duplicate `row_id`, or fingerprint
 mismatch is a blocking invalid snapshot; never reinterpret prose to repair it.
+
+For each durable issue body, apply the same serialization rules to that issue's
+Per-Issue Registry rows plus its `branch_name` row and record
+`issue_option_rows_fingerprint: sha256:<lowercase-hex>`. This artifact-local
+fingerprint is independently verifiable from the issue body; it does not
+replace the graph-wide `option_rows_fingerprint` in the phase handoff and
+completion report.
 
 The `source` column is itself canonical lower-kebab. The `evidence` cell may be
 free-form because it is data. If wording is ambiguous between two values, ask

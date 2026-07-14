@@ -112,9 +112,12 @@ workstream; use the canonical default or
 | `<scope_id>:scope_transfer_ref` | `workstream:<id>` | `scope_transfer_ref` | `<issue:<NN> or not-applicable>` | `source-contract`, `default`, or `runtime-derived` | `<exact source handoff evidence or none>` |
 | `<scope_id>:issue_mutation_transfer_ref` | `workstream:<id>` | `issue_mutation_transfer_ref` | `<issue:<NN> or not-applicable>` | `source-contract`, `default`, or `runtime-derived` | `<exact source mutation evidence or none>` |
 
-Keep `row_id` unique across the resolution set. Use the exact six-column
-schema and `%7C` evidence encoding defined by `ledger.md` and
-`runtime-efficiency.md`; never omit or reorder the leading ID columns.
+Keep `row_id` unique across the resolution set. This section is the sole owner
+of the exact six-column schema: `row_id`, `scope_id`, `field`, `value`,
+`source`, and `evidence`. Trim only outer cell whitespace and encode a literal
+`|` in evidence data as `%7C`; never omit or reorder the leading ID columns.
+Ledger tables project this schema, and recovery validation verifies it without
+redefining its ownership.
 
 If input wording is ambiguous between canonical values, ask for the field
 choice. Once resolved, downstream logic reads the field, not the evidence text.

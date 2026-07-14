@@ -12,10 +12,175 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 SKILL_ROOT = ROOT / "skills" / "codex-orchestrator"
 
+CURRENT_LEDGER_HEADINGS = (
+    "## Scope",
+    "## Option Resolution",
+    "### Session Rows",
+    "### Scoped Rows",
+    "## Discovery Sources",
+    "## Active Root",
+    "## Codex Review Wait Registry",
+    "## Parent Closeout Watch",
+    "## Recovery Packet",
+    "## Worker And Delivery References",
+    "## Gate Policy",
+    "## Workstreams",
+    "### active",
+    "### autonomous",
+    "### needs-owner",
+    "### ready-next",
+    "### blocked",
+    "### ignored-or-suppressed",
+    "### deferred",
+    "### completed",
+    "### released",
+    "## Wave Reports",
+    "## Runtime Metrics",
+    "## Notes",
+)
+
+CURRENT_LEDGER_STATUSES = {
+    "active",
+    "paused",
+    "blocked",
+    "complete",
+    "released",
+    "archived",
+}
+
 
 class OrchestratorContractTests(unittest.TestCase):
     def read(self, relative: str) -> str:
         return (SKILL_ROOT / relative).read_text(encoding="utf-8")
+
+    def ledger_template_body(self) -> str:
+        template = self.read("references/ledger-template.md")
+        return template.split("```md\n", 1)[1].rsplit("\n```", 1)[0]
+
+    def is_current_ledger(self, contents: str) -> bool:
+        structural_lines: list[str] = []
+        headings: list[tuple[int, str]] = []
+        fence_char: str | None = None
+        fence_length = 0
+        for raw_line in contents.splitlines():
+            line = raw_line.rstrip()
+            if fence_char is not None:
+                closing = re.fullmatch(
+                    rf" {{0,3}}{re.escape(fence_char)}{{{fence_length},}}[ \t]*",
+                    line,
+                )
+                if closing:
+                    fence_char = None
+                    fence_length = 0
+                continue
+
+            opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+            if opening and not (
+                opening.group(1).startswith("`") and "`" in opening.group(2)
+            ):
+                fence_char = opening.group(1)[0]
+                fence_length = len(opening.group(1))
+                continue
+            if "<!--" in line or "-->" in line or line.lstrip().startswith("<"):
+                return False
+            if re.fullmatch(r" {0,3}(?:=+|-+)[ \t]*", line):
+                return False
+            line = re.sub(r"^ {1,3}(?=#)", "", line)
+            atx = re.fullmatch(r"(?P<marks>#{1,6})(?:[ \t]+(?P<title>.*))?", line)
+            if atx:
+                title = (atx.group("title") or "").strip()
+                title = re.sub(r"[ \t]+#+[ \t]*$", "", title).rstrip()
+                level = len(atx.group("marks"))
+                line = f"{'#' * level} {title}"
+                headings.append((level, line))
+            structural_lines.append(line)
+        if fence_char is not None:
+            return False
+
+        nonblank = [line for line in structural_lines if line.strip()]
+        if not nonblank:
+            return False
+        title = re.fullmatch(r"# (?P<name>.+) Maintainer Ledger", nonblank[0])
+        if title is None or not title.group("name").strip():
+            return False
+
+        h1 = [line for level, line in headings if level == 1]
+        expected_h2 = [
+            heading for heading in CURRENT_LEDGER_HEADINGS if heading.startswith("## ")
+        ]
+        expected_h3 = [
+            heading for heading in CURRENT_LEDGER_HEADINGS if heading.startswith("### ")
+        ]
+        h2 = [line for level, line in headings if level == 2]
+        h3 = [line for level, line in headings if level == 3]
+        if h1 != [nonblank[0]] or h2 != expected_h2 or h3 != expected_h3:
+            return False
+
+        positions: list[int] = []
+        for heading in CURRENT_LEDGER_HEADINGS:
+            matches = [
+                index for index, line in enumerate(structural_lines) if line == heading
+            ]
+            if len(matches) != 1:
+                return False
+            positions.append(matches[0])
+        if positions != sorted(positions):
+            return False
+
+        option_start = structural_lines.index("## Option Resolution")
+        option_end = structural_lines.index("## Discovery Sources")
+        if [
+            line
+            for line in structural_lines[option_start:option_end]
+            if re.match(r"^### [^#]", line)
+        ] != ["### Session Rows", "### Scoped Rows"]:
+            return False
+
+        workstreams_start = structural_lines.index("## Workstreams")
+        workstreams_end = structural_lines.index("## Wave Reports")
+        if [
+            line
+            for line in structural_lines[workstreams_start:workstreams_end]
+            if re.match(r"^### [^#]", line)
+        ] != [heading for heading in expected_h3 if heading not in {
+            "### Session Rows",
+            "### Scoped Rows",
+        }]:
+            return False
+
+        scope_index = structural_lines.index("## Scope")
+        header = structural_lines[:scope_index]
+        for prefix in ("Last updated:", "Owner:", "Status:"):
+            matches = [line for line in header if line.startswith(prefix)]
+            if len(matches) != 1 or not matches[0][len(prefix) :].strip():
+                return False
+        status = next(line for line in header if line.startswith("Status:"))
+        if status.removeprefix("Status:").strip() not in CURRENT_LEDGER_STATUSES:
+            return False
+
+        recovery_start = structural_lines.index("## Recovery Packet")
+        recovery_end = structural_lines.index("## Worker And Delivery References")
+        recovery = structural_lines[recovery_start:recovery_end]
+        packet_versions = [
+            (index, line)
+            for index, line in enumerate(recovery)
+            if line.startswith("Packet version:")
+        ]
+        if len(packet_versions) != 1 or packet_versions[0][1] != "Packet version: 1":
+            return False
+        marker_positions = [packet_versions[0][0]]
+        for prefix in ("Option resolution refs:", "References to load next:"):
+            matches = [
+                index
+                for index, line in enumerate(recovery)
+                if line.startswith(prefix)
+            ]
+            if len(matches) != 1:
+                return False
+            marker_positions.append(matches[0])
+        if marker_positions != sorted(marker_positions):
+            return False
+        return True
 
     def table_rows(self, relative: str, heading: str) -> list[list[str]]:
         section = self.read(relative).split(heading, 1)[1]
@@ -36,14 +201,14 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_gitstack_is_primary_and_fallback_reuses_authority(self) -> None:
         skill = self.read("SKILL.md")
-        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
 
         self.assertIn("Within GitStack, use the official GitHub\nconnector first", skill)
-        self.assertIn("GitHub workflow skill", ledger)
-        self.assertIn("GitHub primary transport: connector", ledger)
-        self.assertNotIn("primary=standalone", ledger)
-        self.assertNotIn("github-plugin", ledger)
-        self.assertIn("authority_reused=<authority", ledger)
+        self.assertIn("GitHub workflow skill", ledger_template)
+        self.assertIn("GitHub primary transport: connector", ledger_template)
+        self.assertNotIn("primary=standalone", ledger_template)
+        self.assertNotIn("github-plugin", ledger_template)
+        self.assertIn("authority_reused=<authority", ledger_template)
 
     def test_worker_capabilities_cannot_be_bypassed_by_allowed_surfaces(self) -> None:
         worker = self.read("references/worker.md")
@@ -105,22 +270,134 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("Reconciliation updates the current projection", ledger)
         self.assertIn("Stale Values Removed", ledger)
 
+    def test_current_existing_ledger_skips_template_loading(self) -> None:
+        ledger = self.read("references/ledger.md")
+        current = self.ledger_template_body().replace(
+            "Status: active|paused|blocked|complete|released|archived",
+            "Status: active",
+            1,
+        )
+
+        self.assertTrue(self.is_current_ledger(current))
+        self.assertTrue(
+            self.is_current_ledger(
+                f"{current}\n   ~~~markdown\n## Scope\n# Fake Maintainer Ledger\n   ~~~\n"
+            )
+        )
+        self.assertTrue(
+            self.is_current_ledger(
+                f"{current}\n```markdown\n## Scope\n# Fake Maintainer Ledger\n```\n"
+            )
+        )
+        self.assertIn("Do not load the template for an existing\nledger that passes", ledger)
+
+    def test_legacy_ledger_loads_template_for_migration(self) -> None:
+        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
+        current = self.ledger_template_body().replace(
+            "Status: active|paused|blocked|complete|released|archived",
+            "Status: active",
+            1,
+        )
+        malformed = (
+            current.replace("## Discovery Sources\n", "", 1),
+            f"{current}\n## Scope\n",
+            current.replace("## Scope", "## TEMP", 1)
+            .replace("## Option Resolution", "## Scope", 1)
+            .replace("## TEMP", "## Option Resolution", 1),
+            current.replace("Owner: <person or team>\n", "", 1),
+            current.replace("Status: active", "Status: unknown", 1),
+            current.replace("## Scope", "# Other Maintainer Ledger\n## Scope", 1),
+            current.replace("### active", "## Other\n### active", 1),
+            current.replace(
+                "# <Portfolio Name> Maintainer Ledger",
+                "#   Maintainer Ledger",
+                1,
+            ),
+            current.replace("Packet version: 1", "Packet version: 10", 1),
+            current.replace("Packet version: 1", "Packet version: 1-invalid", 1),
+            current.replace("Packet version: 1", "__PACKET_MARKER__", 1)
+            .replace("References to load next:", "Packet version: 1", 1)
+            .replace("__PACKET_MARKER__", "References to load next:", 1),
+            f"<!--\n{current}\n-->",
+            f"{current}\n-->\n",
+            f"<div>\n{current}\n</div>",
+            f"{current}\n   ## Scope\n",
+            f"{current}\n  ### unexpected\n",
+            f"{current}\n##\tScope\n",
+            f"{current}\n##\n",
+            f"{current}\nUnexpected\n---\n",
+            f"{current}\nUnexpected\n===\n",
+        )
+
+        for contents in malformed:
+            self.assertFalse(self.is_current_ledger(contents))
+        normalized_ledger = " ".join(ledger.split())
+        self.assertIn("missing, duplicate, out-of-order, or wrongly nested marker", normalized_ledger)
+        self.assertIn("load `ledger-template.md` to migrate", normalized_ledger)
+        self.assertIn("marker check in `ledger.md` classifies", ledger_template)
+
+    def test_missing_ledger_loads_template_for_creation(self) -> None:
+        ledger = self.read("references/ledger.md")
+        normalized_ledger = " ".join(ledger.split())
+
+        self.assertIn("If the resolved ledger file does not exist", normalized_ledger)
+        self.assertIn("load `ledger-template.md` and create it", normalized_ledger)
+        self.assertIn("set `Status: active`", normalized_ledger)
+        self.assertIn("add a dated note", normalized_ledger)
+
+    def test_current_ledger_marker_set_matches_template_structure(self) -> None:
+        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
+        normalized_ledger = " ".join(ledger.split())
+
+        for marker in CURRENT_LEDGER_HEADINGS + (
+            "Packet version: 1",
+            "Option resolution refs:",
+            "References to load next:",
+        ):
+            self.assertIn(marker, ledger)
+            self.assertIn(marker, ledger_template)
+        self.assertIn("parsing Markdown structure,\nnot by substring search", ledger)
+        self.assertIn("exactly one non-empty `Last updated:`", normalized_ledger)
+        self.assertIn("Text copied into `## Notes` never satisfies", ledger)
+        self.assertIn("any HTML comment marker", normalized_ledger)
+        self.assertIn("classifies the ledger as legacy", normalized_ledger)
+        self.assertIn("normalize up to three leading spaces", normalized_ledger)
+        self.assertIn("use ATX headings only", normalized_ledger)
+        self.assertIn("any Setext underline syntax", normalized_ledger)
+        displayed_markers = (
+            "## Recovery Packet",
+            "Packet version: 1",
+            "Option resolution refs:",
+            "References to load next:",
+            "## Worker And Delivery References",
+            "## Notes",
+        )
+        marker_block = ledger.split("```text\n", 1)[1].split("\n```", 1)[0]
+        positions = [marker_block.index(marker) for marker in displayed_markers]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn(
+            "## Ledger Resolution And Current-Format Classification",
+            ledger,
+        )
+
     def test_recovery_packet_is_compact_derived_and_freshness_gated(self) -> None:
         skill = self.read("SKILL.md")
-        ledger = self.read("references/ledger.md")
-        efficiency = self.read("references/runtime-efficiency.md")
+        ledger_template = self.read("references/ledger-template.md")
+        efficiency = self.read("references/recovery-validation.md")
 
-        self.assertIn("## Recovery Packet", ledger)
-        self.assertIn("Projection fingerprint", ledger)
-        self.assertIn("Content fingerprint", ledger)
-        self.assertIn("Recovery packet content fingerprint", ledger)
-        self.assertIn("References to load next", ledger)
-        self.assertIn("Option resolution refs: session_rows=", ledger)
-        self.assertIn("rows_fingerprint=<sha256", ledger)
-        self.assertIn("Workstream checkpoints:", ledger)
-        self.assertIn("scope_transfer_ref=<issue:<NN>|not-applicable>", ledger)
-        self.assertIn("delivery_evidence_fingerprint=<sha256 or not-applicable>", ledger)
-        self.assertIn("issue_mutation_evidence_fingerprint=<sha256 or not-applicable>", ledger)
+        self.assertIn("## Recovery Packet", ledger_template)
+        self.assertIn("Projection fingerprint", ledger_template)
+        self.assertIn("Content fingerprint", ledger_template)
+        self.assertIn("Recovery packet content fingerprint", ledger_template)
+        self.assertIn("References to load next", ledger_template)
+        self.assertIn("Option resolution refs: session_rows=", ledger_template)
+        self.assertIn("rows_fingerprint=<sha256", ledger_template)
+        self.assertIn("Workstream checkpoints:", ledger_template)
+        self.assertIn("scope_transfer_ref=<issue:<NN>|not-applicable>", ledger_template)
+        self.assertIn("delivery_evidence_fingerprint=<sha256 or not-applicable>", ledger_template)
+        self.assertIn("issue_mutation_evidence_fingerprint=<sha256 or not-applicable>", ledger_template)
         self.assertIn("compact derived projection, never\n  as authority", skill)
         self.assertIn("Read only the ledger `## Recovery Packet`", efficiency)
         self.assertIn("Recompute the packet's Projection fingerprint", efficiency)
@@ -175,7 +452,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("never bypasses claims,\ncapabilities, authority", efficiency)
 
     def test_recovery_option_hash_rejects_omitted_applicable_row(self) -> None:
-        efficiency = self.read("references/runtime-efficiency.md")
+        efficiency = self.read("references/recovery-validation.md")
         marker = efficiency.index("OPTION_ROW_IDS=")
         block_start = efficiency.rfind("```bash", 0, marker) + len("```bash")
         block_end = efficiency.index("```", marker)
@@ -1269,7 +1546,7 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_runtime_evidence_is_delta_based_and_metrics_are_exact_or_unavailable(self) -> None:
         skill = self.read("SKILL.md")
-        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
         efficiency = self.read("references/runtime-efficiency.md")
 
         self.assertIn("Do not re-emit\n  complete unchanged ledgers or diffs", skill)
@@ -1281,7 +1558,7 @@ class OrchestratorContractTests(unittest.TestCase):
         ):
             self.assertIn(command, efficiency)
         self.assertIn("before `$autoreview`, commit/publication", efficiency)
-        self.assertIn("## Runtime Metrics", ledger)
+        self.assertIn("## Runtime Metrics", ledger_template)
         self.assertIn("claim-register-route", efficiency)
         self.assertIn("dispatch-integrate:<wave>", efficiency)
         self.assertIn("gate-reconcile:<wave>", efficiency)
@@ -1294,19 +1571,31 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_runtime_efficiency_reference_is_conditionally_loaded(self) -> None:
         skill = self.read("SKILL.md")
+        recovery = self.read("references/recovery-validation.md")
+        efficiency = self.read("references/runtime-efficiency.md")
 
+        self.assertIn("references/recovery-validation.md", skill)
+        self.assertIn("only when resuming from a packet", skill)
         self.assertIn("references/runtime-efficiency.md", skill)
-        self.assertIn("before resuming from a packet, entering\na second wave", skill)
-        self.assertIn("a simple first wave need not load it", skill)
+        self.assertIn("before entering a second wave or recording\nexact counters", skill)
+        self.assertIn("a simple first wave need not load either reference", skill)
+        self.assertIn("Load this reference only when resuming", recovery)
+        self.assertIn("On resume, load `recovery-validation.md` first", efficiency)
 
     def test_option_registries_use_snake_fields_and_kebab_values(self) -> None:
         skill = self.read("SKILL.md")
         plan_skill = (ROOT / "skills/plan-feature/SKILL.md").read_text(
             encoding="utf-8"
         )
+        options = self.read("references/options.md")
+        recovery = self.read("references/recovery-validation.md")
 
         self.assertIn("references/options.md", skill)
         self.assertIn("references/options.md", plan_skill)
+        self.assertIn("sole owner\nof the exact six-column schema", options)
+        self.assertIn("encode a literal\n`|` in evidence data as `%7C`", options)
+        self.assertNotIn("runtime-efficiency.md", options)
+        self.assertIn("`options.md` owns the option-row schema", recovery)
 
         registries = (
             (SKILL_ROOT / "references/options.md", "## Session Registry"),
@@ -1389,8 +1678,8 @@ class OrchestratorContractTests(unittest.TestCase):
     def test_codex_review_policy_is_default_required_and_owner_scoped_skip(self) -> None:
         options = self.read("references/options.md")
         delivery = self.read("references/prd-backed-delivery.md")
-        gates = self.read("references/gates.md")
-        ledger = self.read("references/ledger.md")
+        gates = self.read("references/codex-review-closeout.md")
+        ledger_template = self.read("references/ledger-template.md")
         worker = self.read("references/worker.md")
 
         rows = self.table_rows(
@@ -1424,7 +1713,7 @@ class OrchestratorContractTests(unittest.TestCase):
             "publication authority covers this disposition mutation for both `required` and `skip`",
             " ".join(gates.split()),
         )
-        self.assertIn("codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked>", ledger)
+        self.assertIn("codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked>", ledger_template)
         self.assertIn("codex_review_policy: <required|skip|not-applicable>", worker)
         self.assertIn("`skip` permits `mark-ready`", worker)
 
@@ -1519,7 +1808,7 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_mutation_and_merge_grants_require_owner_scoped_evidence(self) -> None:
         options = self.read("references/options.md")
-        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
         gates = self.read("references/gates.md")
 
         self.assertIn("## Resolution Source Constraints", options)
@@ -1539,15 +1828,15 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn("never grants mutation, publication", options)
         self.assertIn("owner-instruction` naming the exact source/workstream target", options)
-        self.assertIn("`runtime-capability`, `runtime-derived`, or", ledger)
-        self.assertIn("automation_target=<source/workstream ref|none>", ledger)
-        self.assertIn("`raw_worktree_fallback=owner-approved`", ledger)
-        self.assertNotIn("owner explicitly authorized that fallback", ledger)
+        self.assertIn("`runtime-capability`, `runtime-derived`, or", ledger_template)
+        self.assertIn("automation_target=<source/workstream ref|none>", ledger_template)
+        self.assertIn("`raw_worktree_fallback=owner-approved`", ledger_template)
+        self.assertNotIn("owner explicitly authorized that fallback", ledger_template)
         self.assertIn(
             "`delivery_mode=direct-commit` | `owner-instruction` naming the exact instruction, workstream scope, and target branch",
             options,
         )
-        active_root = ledger.split("## Active Root", 1)[1].split(
+        active_root = ledger_template.split("## Active Root", 1)[1].split(
             "## Parent Closeout Watch", 1
         )[0]
         self.assertIn("Scoped merge option refs", active_root)
@@ -1558,13 +1847,13 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_pr_shape_and_dependency_ids_reach_current_worker_contract(self) -> None:
         worker = self.read("references/worker.md")
-        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
         options = self.read("references/options.md")
         gates = self.read("references/gates.md")
         delivery = self.read("references/prd-backed-delivery.md")
 
         self.assertIn("- pr_shape: <single-pr|per-repo-pr|none>", worker)
-        self.assertIn("pr_shape=<single-pr|per-repo-pr|none>", ledger)
+        self.assertIn("pr_shape=<single-pr|per-repo-pr|none>", ledger_template)
         self.assertIn("separately recorded `dependency_ids` entry", worker)
         self.assertNotIn("separately recorded `dependency_id` entry", worker)
         self.assertIn("| parallelization | dependency_ids |", worker)
@@ -1576,13 +1865,13 @@ class OrchestratorContractTests(unittest.TestCase):
             worker,
         )
         self.assertNotIn("issue_integration_shape", worker)
-        self.assertIn("dependency_reason=<reason|none>", ledger)
+        self.assertIn("dependency_reason=<reason|none>", ledger_template)
         self.assertIn(
             "integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>",
-            ledger,
+            ledger_template,
         )
-        self.assertIn("delivery_source=<runtime-default|feature-level-inherited", ledger)
-        self.assertIn("delivery_source_evidence=<scoped-option-row/source-ref|none>", ledger)
+        self.assertIn("delivery_source=<runtime-default|feature-level-inherited", ledger_template)
+        self.assertIn("delivery_source_evidence=<scoped-option-row/source-ref|none>", ledger_template)
         self.assertIn("`temporary_source_execution`", options)
         self.assertIn("`completion_proof_policy`", options)
         self.assertIn("`closeout_mode`", options)
@@ -1597,10 +1886,10 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("- branch_name: <exact branch or not-applicable>", worker)
         self.assertIn("- scope_transfer_ref: <issue:<NN>|not-applicable>", worker)
         self.assertIn("- issue_mutation_transfer_ref: <issue:<NN>|not-applicable>", worker)
-        self.assertIn("temporary_source_execution=<forbidden|owner-approved>", ledger)
-        self.assertIn("completion_proof_policy=<live-required|synthetic-accepted>", ledger)
-        self.assertIn("closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|", ledger)
-        self.assertIn("branch_name=<exact branch|not-applicable>", ledger)
+        self.assertIn("temporary_source_execution=<forbidden|owner-approved>", ledger_template)
+        self.assertIn("completion_proof_policy=<live-required|synthetic-accepted>", ledger_template)
+        self.assertIn("closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|", ledger_template)
+        self.assertIn("branch_name=<exact branch|not-applicable>", ledger_template)
         self.assertIn("`completion_proof_policy=synthetic-accepted`", gates)
         self.assertIn("`caller_checkout_policy=caller-checkout-approved`", gates)
         self.assertNotIn("record the explicit approval that allowed it", gates)
@@ -1612,17 +1901,17 @@ class OrchestratorContractTests(unittest.TestCase):
 
     def test_requested_and_actual_worker_surfaces_use_distinct_canonical_fields(self) -> None:
         worker = self.read("references/worker.md")
-        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
 
         self.assertIn("- worker_surface: <auto|root-thread|codex-app-thread|cli-subagent>", worker)
         self.assertIn("- actual_workstream_surface: <root-thread|codex-app-thread|cli-subagent>", worker)
-        self.assertIn("actual_workstream_surface=<root-thread|cli-subagent|codex-app-thread>", ledger)
+        self.assertIn("actual_workstream_surface=<root-thread|cli-subagent|codex-app-thread>", ledger_template)
         for stale in ("requested_surface", "actual_surface"):
             self.assertNotIn(stale, worker)
-            self.assertNotIn(stale, ledger)
+            self.assertNotIn(stale, ledger_template)
 
     def test_legacy_publication_authority_values_migrate_to_separate_closeout(self) -> None:
-        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
         rows = self.table_rows(
             "references/prd-backed-delivery.md",
             "### Legacy Authority Migration",
@@ -1637,12 +1926,15 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("otherwise `merge-ready`", draft_named[2])
 
         for legacy in (merge_ready[0].strip("`"), draft_named[0].strip("`")):
-            self.assertIn(legacy, ledger)
-        self.assertIn("publication_authority=prd-backed-pull-request", ledger)
-        self.assertIn("default it to `merge-ready`", ledger)
+            self.assertIn(legacy, ledger_template)
+        self.assertIn("publication_authority=prd-backed-pull-request", ledger_template)
+        self.assertIn("default it to `merge-ready`", ledger_template)
 
     def test_plan_feature_and_orchestrator_share_pr_closeout_contract(self) -> None:
         delivery = self.read("references/prd-backed-delivery.md")
+        options = (
+            ROOT / "skills/plan-feature/references/options.md"
+        ).read_text(encoding="utf-8")
         prd_template = (
             ROOT / "skills/plan-feature/references/prd-template.md"
         ).read_text(encoding="utf-8")
@@ -1652,16 +1944,14 @@ class OrchestratorContractTests(unittest.TestCase):
 
         for value in ("merge-ready", "draft-only"):
             self.assertIn(value, delivery)
-            self.assertIn(value, prd_template)
-            self.assertIn(value, issue_template)
-        self.assertIn("- pr_shape: `single-pr`, `per-repo-pr`, or `none`", prd_template)
-        self.assertIn("- pr_closeout: [merge-ready | draft-only | not-applicable]", issue_template)
+            self.assertIn(value, options)
+        self.assertIn("- pr_shape: [verified `pr_shape` row value]", prd_template)
+        self.assertIn("- pr_closeout: [verified `pr_closeout` row value]", issue_template)
         self.assertIn(
-            "`pr_closeout=draft-only` with `source=owner-instruction` or `source-prd`",
-            (ROOT / "skills/plan-feature/references/prd-phase.md").read_text(
-                encoding="utf-8"
-            ),
+            "Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-prd`",
+            options,
         )
+        self.assertIn("do not resolve or override\noptions here", prd_template)
         plan_skill = (ROOT / "skills/plan-feature/SKILL.md").read_text(
             encoding="utf-8"
         )
@@ -1669,12 +1959,12 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("separate `no_mutation_override` value", plan_skill)
 
     def test_codex_review_requests_are_idempotent_per_current_head(self) -> None:
-        gates = self.read("references/gates.md")
-        ledger = self.read("references/ledger.md")
+        gates = self.read("references/codex-review-closeout.md")
+        ledger_template = self.read("references/ledger-template.md")
         worker = self.read("references/worker.md")
         rows = self.table_rows(
-            "references/gates.md",
-            "#### Codex Review Request Matrix",
+            "references/codex-review-closeout.md",
+            "### Codex Review Request Matrix",
         )
 
         expected_rows = [
@@ -1756,8 +2046,8 @@ class OrchestratorContractTests(unittest.TestCase):
             "--repo <owner/repo> --pr <number> --head <current-sha>",
             gates,
         )
-        self.assertIn("request_head=<sha|none>", ledger)
-        self.assertIn("result_kind=<formal-review|provider-comment|clean-reaction|none>", ledger)
+        self.assertIn("request_head=<sha|none>", ledger_template)
+        self.assertIn("result_kind=<formal-review|provider-comment|clean-reaction|none>", ledger_template)
         self.assertIn(
             "authenticated Codex clean reaction that GitStack binds",
             gates,
@@ -1788,11 +2078,11 @@ class OrchestratorContractTests(unittest.TestCase):
         )
 
     def test_codex_review_wait_budget_is_total_capped_and_pr_scoped(self) -> None:
-        gates = self.read("references/gates.md")
-        ledger = self.read("references/ledger.md")
+        gates = self.read("references/codex-review-closeout.md")
+        ledger_template = self.read("references/ledger-template.md")
         options = self.read("references/options.md")
         normalized_gates = " ".join(gates.split())
-        wait_contract = gates.split("#### Codex Review Wait Budget", 1)[1].split(
+        wait_contract = gates.split("### Codex Review Wait Budget", 1)[1].split(
             "\n\n1. Verify the PR exists",
             1,
         )[0]
@@ -1925,27 +2215,29 @@ class OrchestratorContractTests(unittest.TestCase):
             "wait_profile_pr=<pr-ref|none|not-applicable>; "
             "wait_profile=<standard|extended|not-applicable>; "
             "wait_budget_minutes=<15|30|not-applicable>",
-            ledger,
+            ledger_template,
         )
-        self.assertIn("## Codex Review Wait Registry", ledger)
-        self.assertIn("sole authority for review wait timing", ledger)
-        self.assertIn("exactly one row for", ledger)
-        self.assertIn("every one must carry\nthe same `wait_record`", ledger)
-        self.assertIn("wait_record=<pr-ref@head|none|not-applicable>", ledger)
-        self.assertIn("wait_started_at=<timestamp|none|not-applicable>", ledger)
-        self.assertIn("wait_deadline=<timestamp|none|not-applicable>", ledger)
-        self.assertIn("wait_elapsed_seconds=<number|none|not-applicable>", ledger)
+        self.assertIn("## Codex Review Wait Registry", ledger_template)
+        self.assertIn("sole authority for review wait timing", ledger_template)
+        self.assertIn("exactly one row for", ledger_template)
+        self.assertIn("every one must carry\nthe same `wait_record`", ledger_template)
+        self.assertIn("wait_record=<pr-ref@head|none|not-applicable>", ledger_template)
+        self.assertIn("wait_started_at=<timestamp|none|not-applicable>", ledger_template)
+        self.assertIn("wait_deadline=<timestamp|none|not-applicable>", ledger_template)
+        self.assertIn("wait_elapsed_seconds=<number|none|not-applicable>", ledger_template)
         self.assertIn(
             "wait_state=<not-started|active|monitoring-required|terminal|not-applicable>",
-            ledger,
+            ledger_template,
         )
         self.assertNotIn("wait_profile", options)
 
     def test_parent_prd_closeout_follows_resolved_review_policy(self) -> None:
         skill = self.read("SKILL.md")
         delivery = self.read("references/prd-backed-delivery.md")
-        gates = self.read("references/gates.md")
+        gates = self.read("references/codex-review-closeout.md")
+        gate_router = self.read("references/gates.md")
         ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
         worker = self.read("references/worker.md")
         issue_phase = (
             ROOT / "skills/plan-feature/references/issue-phase.md"
@@ -1958,6 +2250,7 @@ class OrchestratorContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         normalized_skill = " ".join(skill.split())
         normalized_gates = " ".join(gates.split())
+        normalized_gate_router = " ".join(gate_router.split())
 
         state_section = gates.split(
             "Use this closeout state order for merge-ready PR work:", 1
@@ -1985,40 +2278,48 @@ class OrchestratorContractTests(unittest.TestCase):
             states.index("merge-ready-report"),
         )
         self.assertIn("resolved review policy", normalized_skill)
-        self.assertIn("`Closes #<PRD-number>`", delivery)
-        self.assertIn("`Closes owner/repo#<PRD-number>`", delivery)
+        self.assertIn(
+            "For `delivery_mode=pull-request` with `pr_closeout=merge-ready`, load "
+            "`codex-review-closeout.md`",
+            normalized_gate_router,
+        )
+        self.assertIn("do not load that reference", normalized_gate_router)
+        self.assertIn("reason `draft-only`", normalized_gate_router)
+        self.assertIn("`delivery-mode-not-pull-request`", normalized_gate_router)
+        self.assertIn("`Closes #<PRD-number>`", gates)
+        self.assertIn("`Closes owner/repo#<PRD-number>`", gates)
         self.assertIn("all PRD closeout proof is satisfied", gates)
         self.assertIn(
             "parent_prd_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>",
-            ledger,
+            ledger_template,
         )
         self.assertIn(
             "parent_prd_applicability=<required|deferred-vehicle|not-applicable>",
-            ledger,
+            ledger_template,
         )
-        self.assertIn("parent_prd_applicability_reason=", ledger)
-        self.assertIn("parent_closeout_head=<sha|none>", ledger)
-        self.assertIn("parent_closeout_base=<branch|none>", ledger)
-        self.assertIn("parent_closeout_vehicle=<pr-ref|pending|none>", ledger)
+        self.assertIn("parent_prd_applicability_reason=", ledger_template)
+        self.assertIn("parent_closeout_head=<sha|none>", ledger_template)
+        self.assertIn("parent_closeout_base=<branch|none>", ledger_template)
+        self.assertIn("parent_closeout_vehicle=<pr-ref|pending|none>", ledger_template)
         self.assertIn(
             "parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>",
-            ledger,
+            ledger_template,
         )
-        self.assertIn("default_branch=<branch|none>", ledger)
-        self.assertIn("none of\nthose proof fields may be `none`", ledger)
-        self.assertIn("requires\n`parent_prd_closeout=not-applicable`", ledger)
+        self.assertIn("default_branch=<branch|none>", ledger_template)
+        self.assertIn("none of\nthose proof fields may be `none`", ledger_template)
+        self.assertIn("requires\n`parent_prd_closeout=not-applicable`", ledger_template)
         closeout_hygiene = ledger.split("## Closeout Hygiene", 1)[1]
         self.assertIn(
-            "merge-ready reporting requires `parent_prd_closeout=armed`",
+            "conditional canonical review and parent-closeout result",
             " ".join(closeout_hygiene.split()),
         )
         self.assertIn(
-            "`parent_closeout_head` equal to the current closeout-qualified SHA",
+            "Completion requires `parent_prd_closeout=closed`",
             " ".join(closeout_hygiene.split()),
         )
-        self.assertIn("PR-body evidence", closeout_hygiene)
         self.assertIn(
-            "excluded workstreams must record `not-applicable`", closeout_hygiene
+            "Authorized `draft-only` and excluded workstreams record",
+            closeout_hygiene,
         )
         self.assertIn("A worker must not add or remove the parent PRD", worker)
         self.assertIn("post-gate mutation", worker)
@@ -2046,30 +2347,34 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn(
             "A pre-existing keyword is never proof",
-            " ".join(delivery.split()),
+            " ".join(gates.split()),
         )
-        self.assertIn("current default branch", delivery)
+        self.assertIn("current default branch", gates)
         self.assertIn("require the PR base to match it", gates)
         self.assertIn(
             "select or create a linked later default-branch PR", normalized_gates
         )
         self.assertIn("current PR may report merge-ready", normalized_gates)
-        self.assertIn("state `deferred-to-default-branch`", ledger)
-        self.assertIn("reason `draft-only`", closeout_hygiene)
+        self.assertIn("state `deferred-to-default-branch`", ledger_template)
+        self.assertIn(
+            "Authorized `draft-only` and excluded workstreams record",
+            closeout_hygiene,
+        )
+        self.assertIn("`not-applicable` with a reason", closeout_hygiene)
         self.assertIn(
             "no `armed` unmerged PR or `deferred-to-default-branch` vehicle remains outstanding",
             " ".join(ledger.split()),
         )
-        self.assertIn("## Parent Closeout Watch", ledger)
-        self.assertIn("Do not mark the ledger `complete` while a parent PRD is only `armed`", ledger)
-        self.assertIn("watch `complete`, parent closeout `closed`", ledger)
+        self.assertIn("## Parent Closeout Watch", ledger_template)
+        self.assertIn("A parent PRD is not complete while closeout is `armed`", ledger)
+        self.assertIn("`parent_closeout_watch=complete`", ledger)
         self.assertIn("`armed` is not terminal parent closure", gates)
         self.assertIn("durable watch packet", gates)
         self.assertIn("parent closeout to `closed`", gates)
-        self.assertIn("Treat `armed` as a monitored pre-merge state", delivery)
+        self.assertIn("`armed` is a monitored pre-merge state", delivery)
         self.assertIn(
-            "`parent_closeout_base` equal to the current `default_branch`",
-            closeout_hygiene,
+            "`parent_closeout_base` equals the current `default_branch`",
+            ledger_template,
         )
         for producer in (issue_phase, issue_template, tracker):
             normalized = " ".join(producer.split())

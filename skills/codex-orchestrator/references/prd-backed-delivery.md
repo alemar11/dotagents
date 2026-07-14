@@ -382,126 +382,31 @@ Before scheduling or publishing PRD-backed work:
 
 ## Closeout Rules
 
-For PRD-backed implementation, local code completion is not enough for
-`completed` when publication authority exists. A workstream reaches
-`completed` only after:
+For PRD-backed implementation, local code completion is insufficient whenever
+the resolved delivery contract requires publication, integration proof, source
+closeout, or domain closeout. Before owner-ready, merge-ready, or completion,
+load `gates.md`; it is the sole router for the conditional current-head Codex
+review and parent-PRD closeout algorithm.
 
-- acceptance criteria are satisfied with root-verifiable proof;
-- required gates pass, including focused tests and `$autoreview` for
-  non-trivial code edits;
-- dependency and integration proof targets are satisfied;
-- the expected branch and PR exist when PRD-backed publication is authorized;
-- if `pr_closeout=merge-ready`, the PR is marked ready for review when local
-  gates pass;
-- if `pr_closeout=merge-ready` and `codex_review_policy=required`, GitStack
-  review-status preflight ran for the
-  current head, an existing request/result was reused or exactly one request was
-  posted when needed, a verified terminal Codex result exists for that head,
-  and accepted actionable feedback was fixed or explicitly dispositioned;
-- if `pr_closeout=merge-ready` and `codex_review_policy=skip`, the scoped owner
-  evidence is recorded, no review request or wait remains actionable, and any
-  already-known actionable Codex feedback was fixed or explicitly dispositioned;
-- for a GitHub-backed `merge-ready` default-branch PR that is the whole-PRD
-  closeout vehicle, the PR body closes every satisfied generated issue and
-  includes the parent PRD closing keyword added by the root after the resolved
-  review policy and all other closeout gates passed, with the PR head
-  revalidated against the closeout-qualified SHA immediately before the body
-  update and again before merge-ready reporting; and
-- the ledger records the PR URL, publication checkout, caller checkout
-  disposition, and, when `pr_closeout=merge-ready`, the resolved review policy
-  plus either Codex result evidence or scoped owner-skip evidence, any required
-  feedback disposition, and parent-PRD PR-body closeout evidence when
-  applicable; otherwise it
-  records why publication/review is blocked and moves the remaining action to
-  `needs-owner`, `blocked`, or `deferred`.
+Preserve these PRD-specific projections:
 
-If PRD-backed publication is authorized and the only remaining action is
-commit, push, or initial draft PR creation, keep that action in `ready-next` and
-execute it before stopping when runtime access allows. If
-`pr_closeout=merge-ready` and the only remaining action is ready-for-review
-transition, a policy-required Codex review preflight/request/wait,
-review-triggered fixes, PR discussion disposition, or the gated parent-PRD
-PR-body closeout update, keep that action in `ready-next` and execute or poll it
-before stopping when runtime access allows. A
-`codex_review_policy=skip` row makes request and wait actions `not-applicable`;
-do not keep them in `ready-next`. For
-`pr_closeout=draft-only`, record downstream ready/review/merge-ready gates as
-`not-applicable` with the explicit restriction and allow validated draft
-publication to satisfy the requested closeout without classifying it as a
-blocker. If the current user later removes the restriction, change
-`pr_closeout` to `merge-ready` and resume at ready-for-review.
+- acceptance criteria, dependencies, integration targets, and required domain
+  closeout must have root-verifiable proof;
+- expected branches and real PR links replace PRD placeholders before
+  completion; authorized remaining publication work stays `ready-next`;
+- generated hosted issues close through the relevant PR body by default, while
+  direct comments, labels, closure, merge, and release retain their separate
+  authority requirements;
+- local Markdown issues move to `issues/done/` only after their delivery,
+  validation, and applicable review/integration proof is recorded; and
+- `pr_closeout=draft-only` ends at validated draft publication and records
+  downstream review, merge-ready, and parent closeout as `not-applicable`.
 
-Repo PR placeholders copied from PRDs or generated issues are not completion
-proof. The root must replace or augment them during closeout with real PR links
-or equivalent integration proof before marking a PRD-backed workstream
-`completed`.
-
-Close generated GitHub implementation issues through the relevant PR body by
-default, using the closeout wording specified by the generated issue or PRD.
-For a GitHub-backed PRD completed by one final feature or integration PR that
-targets the current default branch, make that PR the parent closeout vehicle.
-After the resolved `codex_review_policy` gate passes for the current head, and
-only after every generated implementation issue is satisfied and represented by its
-required PR-body closeout, every PRD acceptance criterion, dependency,
-integration gate, and required domain closeout is satisfied with no deferred
-PRD scope, update the PR body with
-`Closes #<PRD-number>`. When the PR and PRD live in different repositories, use
-`Closes owner/repo#<PRD-number>` only when that cross-repo closeout path is
-intended and supported; otherwise record the parent closeout as blocked or
-`needs-owner`. This PR-body update arms GitHub closure when the PR reaches the
-default branch; it does not close the PRD at review time. Do not add the parent
-closing keyword to a partial PR, a `draft-only` PR, or a PR with unresolved or
-deferred PRD scope. Direct comments, labels, manual issue or parent closure,
-merge, and release remain separate mutations that require explicit authority.
-
-The root must re-read the PR head immediately before the parent PRD PR-body
-update and require it to equal the closeout-qualified SHA: the reviewed SHA for
-`required`, or the fully validated current SHA for `skip`. Re-read the head, base/current
-default branch, and live PR body again after the update and immediately before
-merge-ready reporting. Require the live body fingerprint to match the recorded
-evidence and contain exactly the intended parent closer. A head change returns
-parent closeout to `pending-review` for `required` or `pending-closeout` for
-`skip`; a body-only mismatch returns it to `pending-closeout` for
-non-destructive reconciliation. Do not add the keyword,
-or remove/replace an invalid already-added keyword, until the matching cycle
-passes. For workstreams where parent closure does not apply, record
-`not-applicable` instead of blocking merge-ready closeout.
-
-At registration, recovery, and immediately before the policy-specific closeout
-gate, inspect the PR body for a parent PRD closing keyword. If one exists while
-parent closeout is not already `armed` with a matching closeout-qualified SHA
-and recorded PR-body evidence, the root must remove it or replace it with a
-non-closing reference, then record `pending-review` for `required` or
-`pending-closeout` for `skip`. A pre-existing keyword is never proof that the
-root's post-gate mutation occurred. If publication access
-cannot disarm it, mark parent closeout `blocked` and do not proceed to
-merge-ready.
-
-Before arming parent closeout, resolve the repository's current default branch
-and require the closeout PR to target it; GitHub does not honor PR-description
-closing keywords for a PR targeting another base. Revalidate both the current
-default branch and PR base immediately before the PR-body update and again
-before merge-ready reporting. If the closeout PR targets an integration,
-release, or other non-default branch, do not add the parent keyword or record
-`armed`; record `deferred-to-default-branch`, select the later default-branch PR
-as the parent closeout vehicle, and apply the same resolved review policy and
-closeout gates to that PR. The non-default-base PR may reach merge-ready after
-its own gates pass, but the whole PRD, source graph, and ledger remain active
-until the later vehicle is `armed`. If no authorized default-branch closeout
-vehicle can be selected, record `blocked` or `needs-owner`.
-
-Treat `armed` as a monitored pre-merge state, not completed parent closure.
-Follow the parent closeout watch in `gates.md`: use `root-monitoring` only when
-the root has explicit merge authority and is the designated merger; otherwise
-require an owner pre-merge handoff or an explicitly authorized event-driven
-automation handoff before reporting merge-ready. A handoff must preserve the
-PR, parent PRD, review policy and closeout-qualified head, default base,
-PR-body fingerprint, recheck
-triggers, disarm procedure, and post-merge issue-closure check. A scheduled poll
-alone is insufficient. The parent PRD source and portfolio ledger remain open
-or paused until GitHub actually closes the issue; if the merged PR does not
-close it, record `needs-owner` unless the scoped row is
-`issue_mutation_authority=explicit-direct-mutation`.
+For `pull-request` plus `merge-ready`, project the resolved review policy,
+current PR/head evidence, parent-closeout applicability and state, watch, and
+post-merge proof from the gate result into the ledger. Do not independently
+add, remove, or validate the parent PRD closing keyword from this delivery
+reference. `armed` is a monitored pre-merge state, never actual parent closure.
 
 ## Worker Boundaries
 

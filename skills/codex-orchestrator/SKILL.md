@@ -115,8 +115,9 @@ Every wave must produce a ledger transition, proof, authorized source update,
 owner decision brief, or explicit no-progress record. Never loop silently.
 Update the recovery packet, delta evidence index, and exact phase metrics (or
 one `unavailable` record) at the same boundary.
-Load `references/runtime-efficiency.md` before resuming from a packet, entering
-a second wave, or recording exact counters; a simple first wave need not load it.
+Load `references/recovery-validation.md` only when resuming from a packet. Load
+`references/runtime-efficiency.md` before entering a second wave or recording
+exact counters; a simple first wave need not load either reference.
 Before final closeout, reconcile again and require no active worker,
 `autonomous` candidate, authorized `ready-next` action, due check, or newly
 surfaced source item.
@@ -178,37 +179,15 @@ local acceptance plus validation completes `local-only` work; publication is a
 later explicit authority change.
 
 Load `references/gates.md` before owner-ready, issue-closed, merge-ready,
-release-ready, or final status. Pull-request delivery defaults to
-`merge-ready`: validate, leave draft, transition ready, apply the resolved
-`codex_review_policy`, verify current CI, and leave the publication checkout
-clean. Review is `required` by default: reuse or request exactly one Codex
-review per current head, receive a verified terminal result, and resolve or
-disposition findings. The current user may set `codex_review_policy=skip` for
-an exact workstream or PR. Resolve a PR-scoped instruction to each current
-workstream mapped to that PR, preserve the immutable canonical PR ref, and
-reset to `required` if the live PR identity changes, then follow the normal
-required-review path for the replacement PR. While the skip remains valid, do
-not request or wait for Codex review, but still disposition already-known
-actionable Codex feedback and satisfy every other closeout gate. For a
-GitHub-backed `merge-ready` final feature or
-integration PR that completes the whole PRD and targets the current default
-branch, add the parent PRD closing keyword only after the resolved review policy
-and all other closeout gates pass, revalidate that closeout-qualified head
-around the root-owned PR-body update, and require parent closeout `armed` before
-reporting merge-ready. A
-non-default-base PR may report merge-ready with a linked later default-branch
-closeout vehicle still active; the whole PRD and ledger may not complete until
-that vehicle is armed. Because an armed PR remains mutable until merge, keep a
-root closeout watch only when the root has explicit merge authority and is the
-designated merger; otherwise require a durable owner pre-merge or explicitly
-authorized event-driven-automation handoff before reporting merge-ready. Do not
-mark the parent PRD or ledger complete until merge and actual issue closure are
-verified. Record `not-applicable` for
-an explicitly `draft-only` workstream and other excluded workstreams. This arms
-closure when the PR merges; it does not authorize direct issue closure or merge.
-Use `draft-only` only when the canonical option-resolution row selects
-`pr_closeout=draft-only`; do not compare source prose or derive it from Plan
-Feature `no_mutation_override`.
+release-ready, or final status. It owns gate selection and conditionally routes
+`pull-request` plus `merge-ready` work through the canonical current-head Codex
+review and parent-PRD closeout algorithm. Apply its resolved review policy;
+pull-request delivery defaults to
+`pr_closeout=merge-ready` and `codex_review_policy=required`; an exact scoped
+owner instruction may select `skip`, which bypasses only review request/wait.
+Use `draft-only` only from its canonical option-resolution row. Parent closeout
+is root-owned, `armed` is not actual closure, and neither the parent PRD nor the
+ledger completes before merge and verified issue closure.
 
 Merge is root-owned and unavailable by default. Set
 `merge_authority=explicit-owner-authorization` only for an explicit instruction
@@ -260,5 +239,7 @@ artifacts by path/ref and fingerprint instead of repeating them. Use
   issue mutation, review, and closeout.
 - `references/gates.md`: authorization, proof, review, integration, release,
   and closeout gates.
-- `references/runtime-efficiency.md`: conditional recovery validation,
-  delta-evidence transport, and exact phase-token metrics.
+- `references/recovery-validation.md`: conditional Recovery Packet freshness
+  validation before resumed mutation or dispatch.
+- `references/runtime-efficiency.md`: conditional multi-wave delta-evidence
+  transport and exact phase-token metrics.
