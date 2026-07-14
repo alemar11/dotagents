@@ -19,12 +19,11 @@ Before mutation, record:
 - replacement behavior and any intentionally removed capability;
 - callers, composed-skill dependencies, repo docs, install commands, manifests,
   marketplace entries, scripts, tests, caches, and generated artifacts;
-- compatibility policy: hard migration, bounded alias, or independent surfaces;
+- hard-cut boundary and any intentionally independent surfaces;
 - plugin and embedded CLI version impact under repository semantic-versioning
   rules.
 
-Do not keep an alias by default. Use one only when an external consumer cannot
-migrate atomically and the user accepts the temporary duplicate surface.
+Do not keep aliases or duplicate compatibility surfaces for retired packages.
 
 ## Workflow
 
@@ -51,11 +50,11 @@ migrate atomically and the user accepts the temporary duplicate surface.
 - Stop on unresolved callers, duplicate discovery, incompatible replacement
   behavior, missing version authority, non-reproducible artifacts, install/cache
   mismatch, or reinstall-induced checkout changes.
-- Do not delete the old surface until the replacement and migration evidence are
-  available in the same rollout.
+- Do not delete the old surface until replacement discovery and validation
+  evidence are available in the same rollout.
 
 ## Output
 
-Report the lifecycle map, compatibility choice, migrated and retired surfaces,
+Report the lifecycle map, hard-cut boundary, moved and retired surfaces,
 version/artifact/install evidence, stale-reference scan, commit split, and final
 result.
