@@ -34,7 +34,7 @@ Load `references/options.md` before classifying candidate strength.
 ### 1. Ground in repo evidence
 
 - Inspect project docs, `CONTEXT.md`, `CONTEXT-MAP.md`,
-  `project-memory/agents/domain.md`, `project-memory/adr/`, package
+  `project-memory/config/domain.md`, `project-memory/adr/`, package
   boundaries, public APIs, tests, and the files near the requested area.
 - If subagents are available and the repo is large, use bounded read-only
   exploration slices; otherwise inspect sequentially.

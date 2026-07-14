@@ -138,8 +138,8 @@ After implementation scheduling begins, issue lifecycle mutations belong to
 
 ### 1. Resolve Setup, Target, And Identity
 
-Read `project-memory/agents/issue-tracker.md` and
-`project-memory/agents/triage-labels.md`. Read `project-memory/agents/domain.md`,
+Read `project-memory/config/issue-tracker.md` and
+`project-memory/config/triage-labels.md`. Read `project-memory/config/domain.md`,
 `CONTEXT.md`, or `CONTEXT-MAP.md` only when context selection is material.
 
 If tracker routing or mappings are missing or inconsistent with the requested

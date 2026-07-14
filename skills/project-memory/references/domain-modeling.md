@@ -36,7 +36,7 @@ domain surfaces.
 ### 1. Inspect existing context
 
 - Look for `CONTEXT.md`, `CONTEXT-MAP.md`,
-  `project-memory/agents/domain.md`, `project-memory/adr/`, `README.md`,
+  `project-memory/config/domain.md`, `project-memory/adr/`, `README.md`,
   project docs, product specs, issue templates, and nearby source or tests that
   define the vocabulary already in use.
 - If `CONTEXT-MAP.md` exists, choose the relevant context-specific

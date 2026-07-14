@@ -62,7 +62,7 @@ explicit override, direct invocation preserves `capture_mode=inline`.
 ### 1. Ground in the project
 
 - Inspect the relevant repo files, existing docs, `CONTEXT.md`,
-  `CONTEXT-MAP.md`, `project-memory/agents/domain.md`, and
+  `CONTEXT-MAP.md`, `project-memory/config/domain.md`, and
   `project-memory/adr/` before asking questions.
 - Load and follow `$grill-me` for the one-question-at-a-time interrogation
   loop.

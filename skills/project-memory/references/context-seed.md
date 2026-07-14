@@ -24,7 +24,7 @@ or generic architecture advice.
 
 When `AGENTS.md` is a source, capture only durable project context or accepted
 repo behavior. Leave agent operating rules in `AGENTS.md`, and move tracker or
-triage details to `project-memory/agents/*` instead of copying them into
+triage details to `project-memory/config/*` instead of copying them into
 `CONTEXT.md`.
 
 ## Seed shape

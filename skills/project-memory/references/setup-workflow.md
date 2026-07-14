@@ -26,7 +26,7 @@ to view current settings, stop after the summary.
 
 If existing setup files contain the legacy worker-authorization setup key,
 report it as stale orchestrator-owned state. Remove it from any touched
-`project-memory/agents/*` file when that file is authorized for writing; do not
+`project-memory/config/*` file when that file is authorized for writing; do not
 offer it as an editable project-memory setting.
 
 ## Settings Editor
@@ -101,9 +101,9 @@ Before writing, show only applicable items from this list:
 - before/after summary for proposed changes;
 - intended `AGENTS.md` pointer block;
 - `AGENTS.md` minimization plan;
-- intended `project-memory/agents/issue-tracker.md`;
-- intended `project-memory/agents/triage-labels.md`;
-- intended `project-memory/agents/domain.md`;
+- intended `project-memory/config/issue-tracker.md`;
+- intended `project-memory/config/triage-labels.md`;
+- intended `project-memory/config/domain.md`;
 - intended `CONTEXT.md` seed, or why none should be written;
 - intended `TRANSLATION.md`, or why localization memory should not be written;
 - intended ADR drafts, if any.
@@ -125,8 +125,8 @@ For orchestrator workspace mode, preserve these points in the draft:
 
 After direct write authority or separate affirmative confirmation:
 
-- Create `project-memory/agents/` if needed.
-- Write or update the authorized setup files under `project-memory/agents/`.
+- Create `project-memory/config/` if needed.
+- Write or update the authorized setup files under `project-memory/config/`.
 - In review mode, update only files needed for separately confirmed changes.
 - Normalize any touched `issue-tracker.md` setup header to lower-snake-case
   keys with backticked structured values. Remove legacy `tracker_mode`,
@@ -159,15 +159,15 @@ exists or is authorized; never create a broken pointer:
 
 ### Issue tracker
 
-[one-line summary of where PRDs and issues live]. See `project-memory/agents/issue-tracker.md`.
+[one-line summary of where PRDs and issues live]. See `project-memory/config/issue-tracker.md`.
 
 ### Triage types and labels
 
-[one-line summary of issue type and state vocabulary]. See `project-memory/agents/triage-labels.md`.
+[one-line summary of issue type and state vocabulary]. See `project-memory/config/triage-labels.md`.
 
 ### Domain memory
 
-[one-line summary of single-context, multi-context, or orchestrator layout]. See `project-memory/agents/domain.md`.
+[one-line summary of single-context, multi-context, or orchestrator layout]. See `project-memory/config/domain.md`.
 
 ### Localization
 
