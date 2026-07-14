@@ -126,6 +126,97 @@ def iter_active_text_files() -> list[Path]:
 
 
 class FullFlowDryRunFixtureTests(unittest.TestCase):
+    def test_multi_repo_workspace_topology_propagation_fixture(self) -> None:
+        workspace_feature_repos = ("api", "web")
+        child_specs = {
+            "api": {
+                "source_spec_ref": "https://github.com/example/api/issues/10",
+                "project_topology": "multi-repo-workspace",
+                "repo_project_topology": "single-repo",
+            },
+            "web": {
+                "source_spec_ref": "https://github.com/example/web/issues/20",
+                "project_topology": "multi-repo-workspace",
+                "repo_project_topology": "monorepo",
+            },
+        }
+        workspace_child_source_refs = {
+            repo: spec["source_spec_ref"] for repo, spec in child_specs.items()
+        }
+
+        self.assertEqual(set(workspace_child_source_refs), set(workspace_feature_repos))
+        for child_spec in child_specs.values():
+            self.assertEqual("multi-repo-workspace", child_spec["project_topology"])
+            self.assertIn(
+                child_spec["repo_project_topology"],
+                {"single-repo", "monorepo", "multi-repo-workspace"},
+            )
+
+        def build_issue(
+            issue_id: str,
+            target_repos: tuple[str, ...],
+            parent_source_ref: str,
+        ) -> dict[str, object]:
+            if not set(target_repos).issubset(workspace_feature_repos):
+                raise ValueError("issue target repos must be within workspace_feature_repos")
+            if len(target_repos) == 1:
+                repo = target_repos[0]
+                return {
+                    "issue_id": issue_id,
+                    "target_repos": target_repos,
+                    "source_spec_ref": workspace_child_source_refs[repo],
+                    "issue_project_topology": child_specs[repo]["repo_project_topology"],
+                    "workspace_child_source_refs": workspace_child_source_refs,
+                }
+            if parent_source_ref == "not-applicable":
+                raise ValueError("root-owned spanning issues require a workspace-level source")
+            return {
+                "issue_id": issue_id,
+                "target_repos": target_repos,
+                "source_spec_ref": parent_source_ref,
+                "issue_project_topology": "multi-repo-workspace",
+                "workspace_child_source_refs": workspace_child_source_refs,
+            }
+
+        issues = [
+            build_issue("01", ("api",), "projects/platform/features/auth/SPEC.md"),
+            build_issue("02", ("web",), "projects/platform/features/auth/SPEC.md"),
+            build_issue("03", ("api", "web"), "projects/platform/features/auth/SPEC.md"),
+        ]
+
+        self.assertEqual("single-repo", issues[0]["issue_project_topology"])
+        self.assertEqual("monorepo", issues[1]["issue_project_topology"])
+        self.assertEqual("multi-repo-workspace", issues[2]["issue_project_topology"])
+        with self.assertRaisesRegex(ValueError, "workspace-level source"):
+            build_issue("04", ("api", "web"), "not-applicable")
+
+        ledger_workstreams = {
+            issue["issue_id"]: {
+                "source_spec_ref": issue["source_spec_ref"],
+                "workstream_project_topology": issue["issue_project_topology"],
+                "workspace_child_source_refs": issue["workspace_child_source_refs"],
+            }
+            for issue in issues
+        }
+
+        self.assertEqual(
+            "single-repo",
+            ledger_workstreams["01"]["workstream_project_topology"],
+        )
+        self.assertEqual(
+            "monorepo",
+            ledger_workstreams["02"]["workstream_project_topology"],
+        )
+        self.assertEqual(
+            "multi-repo-workspace",
+            ledger_workstreams["03"]["workstream_project_topology"],
+        )
+        for workstream in ledger_workstreams.values():
+            self.assertEqual(
+                set(workstream["workspace_child_source_refs"]),
+                set(workspace_feature_repos),
+            )
+
     def test_fixture_covers_pipeline_and_draft_source_spec(self) -> None:
         fixture = read("plan-feature/references/full-flow-dry-run.md")
 
@@ -152,7 +243,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("`branch_name=feature/account-settings-export`", fixture)
         self.assertIn("`pr_closeout=merge-ready`", fixture)
         self.assertIn("`pr_shape=single-pr`", fixture)
-        self.assertIn("`## Orchestrator Handoff` projection carries\n   `branch_name: feature/account-settings-export`", fixture)
+        self.assertIn("`project_topology: single-repo` and\n   `branch_name: feature/account-settings-export`", fixture)
         self.assertIn("source_spec_ref: draft-spec:account-settings-export", fixture)
         self.assertIn("spec_body_fingerprint: sha256:7f4a9c21d003", fixture)
         self.assertIn("capture_mode: defer-to-caller", fixture)
@@ -182,6 +273,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "local_mirror",
             "local_mirror_path",
             "partial_output",
+            "project_topology",
+            "workspace_context",
             "delivery_mode",
             "issue_mutation_authority",
             "branch_name",
@@ -222,6 +315,12 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "local_mirror": ("not-requested", "default", "none"),
             "local_mirror_path": ("not-applicable", "default", "none"),
             "partial_output": ("withhold", "default", "none"),
+            "project_topology": (
+                "single-repo",
+                "project-layout-config",
+                "project-memory/config/project-layout.md",
+            ),
+            "workspace_context": ("not-applicable", "default", "none"),
             "delivery_mode": ("pull-request", "default", "none"),
             "issue_mutation_authority": (
                 "pr-body-closeout-only",
@@ -234,7 +333,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
                 "run:delivery_mode+feature_slug",
             ),
             "pr_closeout": ("merge-ready", "default", "run:delivery_mode"),
-            "pr_shape": ("single-pr", "runtime-derived", "current-repository"),
+            "pr_shape": ("single-pr", "runtime-derived", "affected_repos=current-repository"),
         }
         self.assertEqual(
             {row[2]: (row[3], row[4], row[5]) for row in option_rows},
@@ -265,6 +364,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         expected_issue_fields = {
             "delivery_source",
             "delivery_mode",
+            "issue_project_topology",
             "issue_mutation_authority",
             "pr_shape",
             "pr_closeout",
@@ -291,6 +391,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
                 "draft-spec:account-settings-export",
             ),
             "delivery_mode": ("pull-request", "source-spec", "run:delivery_mode"),
+            "issue_project_topology": ("single-repo", "source-spec", "run:project_topology"),
             "issue_mutation_authority": (
                 "pr-body-closeout-only",
                 "source-spec",
@@ -469,15 +570,29 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         vertical_slices = read("plan-feature/references/vertical-slices.md")
         options = read("plan-feature/references/options.md")
         spec_delivery = read("codex-orchestrator/references/spec-backed-delivery.md")
+        normalized_plan_feature = " ".join(plan_feature.split())
         normalized_spec_phase = " ".join(spec_phase.split())
         normalized_spec_template = " ".join(spec_template.split())
         normalized_options = " ".join(options.split())
 
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
         self.assertIn("`tracker_backend`", plan_feature)
-        self.assertIn("keyed `option_resolution` rows", plan_feature)
+        self.assertIn("keyed\n`option_resolution` rows", plan_feature)
+        self.assertIn("`project_topology`", plan_feature)
+        self.assertIn("`repo_project_topology`", plan_feature)
+        self.assertIn("run only `$project-memory project-layout`\nbefore recording the option snapshot", plan_feature)
         self.assertIn("`branch_name`, `pr_closeout`, and `pr_shape`", plan_feature)
         self.assertIn("Keep worker surfaces, worker counts", plan_feature)
+        self.assertIn("run child repo partial planning only when all affected child repos share one effective child `tracker_backend`", normalized_plan_feature)
+        self.assertIn("when child backends are mixed", plan_feature)
+        self.assertIn("two-pass child publication flow", plan_feature)
+        self.assertIn("the run-level `project_topology` row is `multi-repo-workspace`", normalized_plan_feature)
+        self.assertIn("per-issue `issue_project_topology`", plan_feature)
+        self.assertIn("each affected child repo's `project-memory/config/project-layout.md`", plan_feature)
+        self.assertIn("`workspace_context=multi-repo-workspace`", plan_feature)
+        self.assertIn("`workspace_child_source_refs` repo-to-Feature-Spec mapping", plan_feature)
+        self.assertIn("`workspace_child_source_refs=unresolved-first-pass`", plan_feature)
+        self.assertIn("Invoke the issue phase only after the required child partial Feature Spec refs", plan_feature)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, plan_feature)
         self.assertIn("`tracker_backend` as planning-artifact write authority", plan_feature)
         self.assertIn("Planning blockers", plan_feature)
@@ -494,9 +609,20 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("references/issue-phase.md", plan_feature)
         self.assertIn("tracker-publishing.md", spec_phase)
         self.assertIn("## Feature Spec Target Model", spec_phase)
+        self.assertIn("When `workspace_context=multi-repo-workspace`", spec_phase)
         self.assertIn("Feature Spec body fingerprint", spec_phase)
         self.assertIn("Feature Spec planning-artifact publication", spec_phase)
         self.assertIn("tracker_backend` is the planning-artifact write authority", spec_phase)
+        self.assertIn("affected child repo's `project-memory/config/issue-tracker.md`", spec_phase)
+        self.assertIn("`project-memory/config/project-layout.md`", spec_phase)
+        self.assertIn("source for `repo_project_topology`", spec_phase)
+        self.assertIn("one\noption-resolution run may publish only one artifact set", spec_phase)
+        self.assertIn("then publish child repo partials in\nchild run(s) that cite the parent `source_spec_ref`", spec_phase)
+        self.assertIn("All affected child repos\nin one generated issue graph must share the same effective child backend", spec_phase)
+        self.assertIn("child\nbackends are mixed", spec_phase)
+        self.assertIn("two-pass child publication flow", spec_phase)
+        self.assertIn("`workspace_context=multi-repo-workspace`", spec_phase)
+        self.assertIn("Parent `tracker_backend` controls only the parent/global", spec_phase)
         self.assertIn("`effective_target=configured-tracker`", spec_phase)
         self.assertIn("`local_mirror=requested`", spec_phase)
         self.assertIn("validated `local_mirror_path`", spec_phase)
@@ -506,7 +632,21 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("For `effective_target=local-dry-run`", spec_phase)
         self.assertIn("exact instruction, feature scope, and authorized target branch", options)
         self.assertIn("the structured delivery handoff tuple: `delivery_mode`,", spec_phase)
+        self.assertIn("`project_topology`", spec_phase)
+        self.assertIn("`repo_project_topology`", spec_phase)
+        self.assertIn("`workspace_context`, `workspace_parent_source_ref`", spec_phase)
+        self.assertIn("`workspace_child_source_refs` mapping each `workspace_feature_repos` repo", spec_phase)
+        self.assertIn("Keys are canonical repo slugs and must match\n  `workspace_feature_repos`", spec_phase)
+        self.assertIn("workspace_child_source_refs=unresolved-first-pass", normalized_spec_phase)
         self.assertIn("`issue_mutation_authority`, `issue_mutation_authority_evidence`", spec_phase)
+        self.assertNotIn("- Project topology: verified `project_topology` row value.", spec_template)
+        self.assertIn("- project_topology: [verified `project_topology` row value]", spec_template)
+        self.assertIn("- repo_project_topology: [child repo durable topology", spec_template)
+        self.assertIn("- workspace_context: [multi-repo-workspace or not-applicable].", spec_template)
+        self.assertIn("- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable].", spec_template)
+        self.assertIn("- workspace_child_source_refs: [complete repo-to-child Feature Spec mapping", spec_template)
+        self.assertIn("`unresolved-first-pass` during first-pass workspace child publication", spec_template)
+        self.assertIn("Never choose an individual child partial as the primary source", issue_phase)
         self.assertIn("- branch_name: [verified exact branch data]", spec_template)
         self.assertIn("must equal the exact target branch in the scoped owner evidence", normalized_options)
         self.assertIn("separate `branch_name` data must equal the exact target", options)
@@ -615,6 +755,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("references/issue-body-template.md", issue_phase)
         self.assertIn("## Orchestrator Handoff", issue_phase)
         self.assertIn("must not contain worker authorization", issue_phase)
+        self.assertIn("For root-owned\n  integration or domain-closeout issues spanning multiple repos", issue_phase)
+        self.assertIn("Never choose an individual child partial as the primary source", issue_phase)
+        self.assertIn("do not choose one child repo's durable topology as the run-level\n  value", issue_phase)
+        self.assertIn("for root-owned issues spanning multiple repos, use\n  `multi-repo-workspace`", issue_phase)
         self.assertNotIn("# <feature-slug>: <NN> <vertical outcome>", issue_phase)
         self.assertIn("# Feature Spec: [Feature Name]", spec_template)
         self.assertIn("## Delivery Mode", spec_template)
@@ -634,6 +778,12 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertNotIn("\nStatus: [mapped triage state", issue_template)
         self.assertNotIn("\ntype:", issue_template)
         self.assertNotIn("\nstatus:", issue_template)
+        self.assertNotIn("Project Topology: [verified inherited `project_topology` row value]", issue_template)
+        self.assertIn("- project_topology: [same feature/workspace graph value as the source Feature Spec]", issue_template)
+        self.assertIn("- issue_project_topology: [verified `issue_project_topology` row value]", issue_template)
+        self.assertIn("- workspace_context: [multi-repo-workspace or not-applicable]", issue_template)
+        self.assertIn("- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable]", issue_template)
+        self.assertIn("- workspace_child_source_refs: [complete repo-to-Feature-Spec-ref mapping", issue_template)
         self.assertIn("- pr_shape: [verified `pr_shape` row value]", issue_template)
         self.assertIn("sole owner of delivery, scheduling, closeout", issue_template)
         self.assertIn("without resolving or defaulting them here", issue_template)
@@ -644,6 +794,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "[independent | depends-on | blocks | root-integrated]",
         ):
             self.assertNotIn(duplicated_schema, issue_template)
+        self.assertIn(
+            "- issue_project_topology: [same issue-effective value as `## Delivery`]",
+            issue_template,
+        )
         self.assertIn(
             "- pr_shape: [same effective value as `## Delivery`]",
             issue_template,
@@ -877,9 +1031,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         triage_local = read("triage/references/local-markdown.md")
 
         self.assertIn(
-            "`memory_slice` | `tracker-routing`, `domain-memory`, `translation-memory`",
+            "`memory_slice` | `tracker-routing`, `project-layout`, `domain-memory`, `translation-memory`",
             project_memory_options,
         )
+        self.assertIn("Use only `tracker-routing` or `project-layout`", plan_feature)
         self.assertIn("`capture_mode` | `inline`, `defer-to-caller`", project_memory_options)
         self.assertIn("`knowledge_delta` | `required`, `none`", project_memory_options)
         self.assertIn(

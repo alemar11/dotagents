@@ -136,6 +136,9 @@ The root chooses the number of workers and split for each wave within
 `delegation_mode`, `worker_surface`, `worker_limit`, `app_thread_consent`, and
 `app_thread_limit`. It may still keep work in the root thread or stop for owner
 input when source, repo, dependency, gate, or tool state makes dispatch unsafe.
+There is no separate workspace execution mode; serial and parallel owner
+requests are resolved through these existing session fields plus the issue
+graph, dependency state, and repo/branch/worktree safety.
 
 When the current runtime is the Codex App and the root chooses a new dedicated
 worker, integration, or publication worktree, select `codex-app-thread` and
@@ -211,6 +214,7 @@ worker_limit=unbounded
 app_thread_consent=not-requested
 app_thread_limit=unspecified
 raw_worktree_fallback=forbidden
+project_topology=<from project memory, safe repo evidence, or owner instruction>
 ```
 
 These defaults authorize internal CLI subagent selection but not visible App

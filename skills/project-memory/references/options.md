@@ -19,7 +19,7 @@ Grill Me With Context, and planning callers.
 
 | Field | Allowed values | Default | Notes |
 | --- | --- | --- | --- |
-| `memory_slice` | `tracker-routing`, `domain-memory`, `translation-memory`, `agents-pointers`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. |
+| `memory_slice` | `tracker-routing`, `project-layout`, `domain-memory`, `translation-memory`, `agents-pointers`, `full-setup` | Smallest slice implied by the request | Selects the owned memory surface. |
 | `domain_operation` | `not-applicable`, `setup-bootstrap`, `inline-update`, `implementation-closeout`, `periodic-review` | `not-applicable` | A domain operation is required only for `memory_slice=domain-memory`. |
 | `execution_context` | `current-project`, `fresh-setup`, `existing-project-bootstrap`, `orchestrator-workspace` | `current-project` | Describes the evidence and layout context; it does not grant writes. |
 | `write_mode` | `apply`, `propose` | Derived from scoped authority | Inspect-only, review-only, dry-run, and proposal requests select `propose`. |

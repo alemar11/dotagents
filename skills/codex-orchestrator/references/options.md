@@ -29,6 +29,7 @@ behavior. Statuses and runtime evidence are not options.
 | `app_thread_consent` | `not-requested`, `granted`, `denied` | `not-requested` | Consent applies only to visible user-owned App tasks. |
 | `raw_worktree_fallback` | `forbidden`, `owner-approved` | `forbidden` | Applies when the App cannot create the required managed worktree. |
 | `active_root_takeover_policy` | `owner-approval`, `stale-ledger-check` | `owner-approval` | Controls overlapping-root recovery for the session. |
+| `project_topology` | `single-repo`, `monorepo`, `multi-repo-workspace` | From project memory or safe repo evidence | Durable project layout. It is not an execution-order setting. |
 
 `worker_limit` and `app_thread_limit` are data fields, not enums. Use a positive
 integer when bounded; otherwise use `unbounded` for `worker_limit` and
@@ -59,6 +60,7 @@ scope only when it is registered as a workstream.
 | `completion_proof_policy` | `live-required`, `synthetic-accepted` | `live-required` | The exceptional value requires exact owner evidence naming the accepted proof gap and follow-up. |
 | `delivery_mode` | `local-only`, `pull-request`, `direct-commit` | `local-only` for ad hoc sources | Feature Spec-backed sources inherit their canonical value. |
 | `delivery_source` | `runtime-default`, `feature-level-inherited`, `issue-level-override`, `owner-instruction` | `runtime-default` for ad hoc sources | Source refs and authorization evidence remain separate data. |
+| `workstream_project_topology` | `single-repo`, `monorepo`, `multi-repo-workspace` | From `issue_project_topology` for Feature Spec-backed work; session topology for ad hoc work | Preserves workstream topology separately from root session topology. |
 | `pr_closeout` | `merge-ready`, `draft-only`, `not-applicable` | `merge-ready` for `pull-request`; otherwise `not-applicable` | `draft-only` requires canonical source or owner evidence. |
 | `codex_review_policy` | `required`, `skip`, `not-applicable` | `required` for `pull-request` with `pr_closeout=merge-ready`; otherwise `not-applicable` | `skip` requires scoped owner-instruction evidence resolved to the exact workstream. |
 | `pr_shape` | `single-pr`, `per-repo-pr`, `none` | Inherited for Feature Spec-backed work; `none` for ad hoc `local-only` | Repository refs and branch names remain separate data. |
@@ -135,8 +137,10 @@ Resolution sources are field- and value-specific:
 | `app_thread_consent=granted` or `denied` | `owner-instruction`, or `legacy-migration` preserving owner evidence |
 | `raw_worktree_fallback=owner-approved` | `owner-instruction` |
 | `active_root_takeover_policy=stale-ledger-check` | `owner-instruction` |
+| `project_topology` | `project-layout-config`, `runtime-derived`, `owner-instruction`, or `legacy-migration` |
 | `worker_limit=unbounded` or `app_thread_limit=unspecified` | `default`, `owner-instruction`, or `legacy-migration` |
 | Positive `worker_limit` or `app_thread_limit` data | `owner-instruction`, or `legacy-migration` preserving the matching bounded-delegation or App-thread-consent owner evidence |
+| `workstream_project_topology` | `source-contract`, `runtime-derived`, or `legacy-migration` |
 | `automation_authority=none` | `default` or `runtime-capability` |
 | `automation_authority=explicit-owner-authorization` | `owner-instruction` naming the exact source/workstream target |
 | `temporary_source_execution=forbidden` | `default`, `runtime-capability`, or `source-contract` |
@@ -236,6 +240,11 @@ unchanged.
   requires the granted tuple before creating a visible task.
 - `raw_worktree_fallback=owner-approved` is required before a raw Git worktree
   fallback in an App session.
+- `project_topology=multi-repo-workspace` or a registered source/handoff with
+  `workspace_context=multi-repo-workspace` requires the root to load
+  `references/multi-repo-workspace.md` before worker dispatch. Other topology
+  values must not load that reference unless workspace context selects it or a
+  source contradiction needs owner-facing diagnosis.
 - A matching scoped row with
   `automation_authority=explicit-owner-authorization` is required before an
   automation mutation for that exact workstream target.

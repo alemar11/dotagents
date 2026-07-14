@@ -126,7 +126,7 @@ domain-closeout gates required by the selected mode.
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Tracker routing is missing, incomplete, or stale. | Use only `tracker-routing`; Plan Feature never invokes `domain-memory`. |
+| `$project-memory` | Tracker routing or project layout is missing, incomplete, stale, or contradictory. | Use only `tracker-routing` or `project-layout`; Plan Feature never invokes `domain-memory`. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always `capture_mode=defer-to-caller`; consume its structured delta. |
 | `$plan-harder` | For every generated implementation issue. | One issue per `planning_mode=issue-hardening` call; the issue phase owns writes. |
 | `$gitstack:github-issues` | Publishing GitHub Feature Specs/issues or producing hosted dry-run commands. | It owns safe body transport, metadata, parent/sub-issues, verification, cleanup, and partial recovery. |
@@ -138,14 +138,18 @@ After implementation scheduling begins, issue lifecycle mutations belong to
 
 ### 1. Resolve Setup, Target, And Identity
 
-Read `project-memory/config/issue-tracker.md` and
+Read `project-memory/config/project-layout.md`,
+`project-memory/config/issue-tracker.md`, and
 `project-memory/config/triage-labels.md`. Read `project-memory/config/domain.md`,
 `CONTEXT.md`, or `CONTEXT-MAP.md` only when context selection is material.
 
 If tracker routing or mappings are missing or inconsistent with the requested
-target, run only `$project-memory tracker-routing`. Do not bootstrap unrelated
-domain, localization, ADR, or `AGENTS.md` content. Orchestrator-workspace setup
-is config-only and does not create project or feature artifacts.
+target, run only `$project-memory tracker-routing`. If
+`project-memory/config/project-layout.md` is missing, stale, or contradicts
+current repo/workspace evidence, run only `$project-memory project-layout`
+before recording the option snapshot. Do not bootstrap unrelated domain,
+localization, ADR, or `AGENTS.md` content. Orchestrator-workspace setup is
+config-only and does not create project or feature artifacts.
 
 Resolve and record the canonical option snapshot from `references/options.md`:
 
@@ -160,14 +164,52 @@ Resolve and record the canonical option snapshot from `references/options.md`:
 - `local_mirror` and its repo-relative `local_mirror_path` data when requested;
 - `feature_slug` and, when applicable, `product_slug`, `workspace_path`,
   `context_file`, and `project_slug`;
-- `delivery_mode`, `issue_mutation_authority`, `branch_name`, `pr_closeout`, and `pr_shape` using the
-  registry defaults and scoped evidence.
+- `project_topology`, `workspace_context`, `delivery_mode`,
+  `issue_mutation_authority`, `branch_name`, `pr_closeout`, and `pr_shape`
+  using the registry defaults and scoped evidence.
 
 Phase handoffs use the snake_case fields `mode`, `execution_profile`, `tracker_backend`,
 `effective_target`, `no_mutation_override`, `no_mutation_output`,
 `local_mirror`, `local_mirror_path`, `partial_output`, `delivery_mode`,
-`issue_mutation_authority`, `branch_name`, `pr_closeout`, and `pr_shape`, plus keyed `option_resolution` rows and the
-`option_rows_fingerprint` data field.
+`issue_mutation_authority`, `branch_name`, `pr_closeout`, `pr_shape`, and
+`project_topology`, plus `repo_project_topology`, `workspace_context`,
+`workspace_parent_source_ref`, and `workspace_feature_repos` data fields, optional
+`workspace_child_source_refs` repo-to-Feature-Spec mapping data, keyed
+`option_resolution` rows, and the `option_rows_fingerprint` data field.
+
+For `mode=full-flow` with `project_topology=multi-repo-workspace` or
+`workspace_context=multi-repo-workspace`, do not force parent and child
+planning artifacts through one option snapshot. If an accepted parent/global
+Feature Spec is needed, run that parent artifact first and carry its
+`source_spec_ref`. Then run child repo partial planning only when all affected
+child repos share one effective child `tracker_backend`; stop before
+agent-ready issue generation when child backends are mixed because the current
+issue publication, closeout, and option-fingerprint contract is single-backend
+per generated issue graph. Before publishing child partials, read or validate
+each affected child repo's `project-memory/config/project-layout.md` alongside
+its tracker config; stop when child topology cannot be established from that
+config, an existing child Feature Spec, or explicit owner-validated fallback.
+For combined workspace issue generation, the run-level `project_topology` row
+is `multi-repo-workspace` and represents the workspace graph snapshot, not any
+child repo's durable topology. Child partial Feature Specs carry each child
+repo's durable topology as
+`repo_project_topology`; generated issues project that child value through
+per-issue `issue_project_topology` rows. The option fingerprint includes one
+workspace run row plus one issue-effective topology row per generated issue, so
+heterogeneous child topologies remain explicit without merging child run
+snapshots. Carry the
+parent/global `source_spec_ref`,
+`workspace_context=multi-repo-workspace`, `workspace_feature_repos`,
+`workspace_child_source_refs`, and cross-links as workspace context data. Use a
+two-pass child publication flow: first publish or draft every child partial to
+obtain stable refs using `workspace_child_source_refs=unresolved-first-pass`
+when the mapping is not yet available, then update every child partial with the
+complete `workspace_child_source_refs` mapping and cross-links before issue
+generation.
+Invoke the issue phase only after the required child partial Feature Spec refs
+and cross-links exist for one backend-neutral cross-repo graph; return a
+combined summary derived from those refs rather than a separate scheduling
+artifact.
 
 Use `$project-memory`'s `references/tracker-publishing.md` for effective-target,
 temporary-body-file, and draft `source_spec_ref` mechanics. Stop before writing
@@ -205,8 +247,8 @@ material blocker back through clarification. Stop here for `spec-only`.
 
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 `references/vertical-slices.md`. Pass the same identity, delivery, source-ref,
-target, `capture_outcome`, domain-delta, partial-output, option-resolution, and
-execution-profile fields. A `lean-issues` run still hardens and validates every
+target, `capture_outcome`, domain-delta, partial-output, option-resolution,
+workspace child source mapping, and execution-profile fields. A `lean-issues` run still hardens and validates every
 issue separately; it only narrows discovery and uses delta evidence between
 issue passes.
 

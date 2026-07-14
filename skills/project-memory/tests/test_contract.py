@@ -17,11 +17,34 @@ class ProjectMemoryContractTests(unittest.TestCase):
 
         for relative_path in (
             "project-memory/config/issue-tracker.md",
+            "project-memory/config/project-layout.md",
             "project-memory/config/triage-labels.md",
             "project-memory/config/domain.md",
         ):
             self.assertIn(relative_path, skill)
             self.assertIn(relative_path, setup)
+
+    def test_project_layout_is_owned_separately_from_tracker_routing(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        options = (SKILL_ROOT / "references" / "options.md").read_text(
+            encoding="utf-8"
+        )
+        layout = (SKILL_ROOT / "references" / "project-layout.md").read_text(
+            encoding="utf-8"
+        )
+        setup = (SKILL_ROOT / "references" / "setup-workflow.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("`project-layout`", options)
+        self.assertIn("`project_topology`", skill)
+        self.assertIn("`project_topology`", setup)
+        for value in ("`single-repo`", "`monorepo`", "`multi-repo-workspace`"):
+            self.assertIn(value, layout)
+            self.assertIn(value, skill)
+        self.assertIn("Keep `project-layout.md` limited to `project_topology`", setup)
+        self.assertIn("`tracker_backend`", skill)
+        self.assertIn("Keep tracker routing in `project-memory/config/issue-tracker.md`", layout)
 
     def test_runtime_contracts_do_not_reference_legacy_agents_directory(self) -> None:
         roots = [

@@ -32,6 +32,7 @@ tables below project that contract into a newly created or migrated ledger.
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
 | `session:<field>` | `session` | <Session Registry field from options.md> | <canonical value> | `default`, `owner-instruction`, `runtime-capability`, or `legacy-migration` | <instruction/tool ref or none> |
+| `session:project_topology` | `session` | `project_topology` | `single-repo`, `monorepo`, or `multi-repo-workspace` | `project-layout-config`, `runtime-derived`, `owner-instruction`, or `legacy-migration` | <project-layout path, repo evidence, instruction ref, or migrated source> |
 | `session:worker_limit` | `session` | `worker_limit` | <positive integer or `unbounded`> | `default` only for `unbounded`; otherwise `owner-instruction` or evidence-preserving `legacy-migration` | <matching bounded-delegation owner evidence or none> |
 | `session:app_thread_limit` | `session` | `app_thread_limit` | <positive integer or `unspecified`> | `default` only for `unspecified`; otherwise `owner-instruction` or evidence-preserving `legacy-migration` | <matching App-thread-consent owner evidence or none> |
 
@@ -180,6 +181,8 @@ worker_limit: <positive integer|unbounded>
 app_thread_consent: not-requested|granted|denied
 app_thread_limit: <positive integer|unspecified>
 raw_worktree_fallback: forbidden|owner-approved
+project_topology: single-repo|monorepo|multi-repo-workspace
+workstream_project_topology: single-repo|monorepo|multi-repo-workspace
 pr_shape: single-pr|per-repo-pr|none
 branch_name: <exact branch|not-applicable>
 scope_transfer_ref: <issue:<NN>|not-applicable>

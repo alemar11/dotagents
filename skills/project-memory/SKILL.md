@@ -12,6 +12,7 @@ memory:
 
 - lean project-memory pointers in `AGENTS.md`;
 - tracker and delivery routing in `project-memory/config/issue-tracker.md`;
+- durable project topology in `project-memory/config/project-layout.md`;
 - issue type/state mappings in `project-memory/config/triage-labels.md`;
 - domain layout in `project-memory/config/domain.md`;
 - `CONTEXT.md`, domain docs, and ADRs under `project-memory/adr/`;
@@ -29,6 +30,7 @@ assignments in current handoffs and reports.
 | `memory_slice` | Owns |
 | --- | --- |
 | `tracker-routing` | Tracker backend, delivery mode, issue-type mapping, and triage-state mapping. |
+| `project-layout` | Durable project topology: `single-repo`, `monorepo`, or `multi-repo-workspace`. |
 | `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
@@ -88,12 +90,14 @@ Behavior-affecting setup uses human-first Markdown tables with
 | --- | --- | --- |
 | `tracker_backend` | `github`, `local` | `issue-tracker.md` |
 | `delivery_mode` | `pull-request`, `direct-commit` | `issue-tracker.md`, Feature Specs, generated issues |
+| `project_topology` | `single-repo`, `monorepo`, `multi-repo-workspace` | `project-layout.md` |
 
 Treat uppercase kebab values as read aliases and normalize touched values.
-Do not add durable keys for workspace shape, setup flow, GitHub repo,
-coordination repo, workers, publication/issue-mutation authority, scheduled
-checks, or current-run no-mutation intent. Use prose, planning artifacts, or
-the orchestrator ledger for those concerns.
+Do not add durable keys for Codex runtime workspace shape, source-root lists,
+worktree paths, setup flow, GitHub repo, coordination repo, workers,
+publication/issue-mutation authority, scheduled checks, or current-run
+no-mutation intent. Use prose, planning artifacts, or the orchestrator ledger
+for those concerns.
 
 `references/setup-workflow.md` owns the settings editor, legacy-key migration,
 table normalization, draft checklist, pointer block, and completion report.
@@ -108,6 +112,7 @@ Load only the selected branch:
 | Work | Required references |
 | --- | --- |
 | Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
+| Project layout | `project-layout.md` and `setup-workflow.md` for edits. |
 | Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only for `execution_context=existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md`. |
@@ -130,6 +135,9 @@ persisting the no-mutation intent as configuration.
 
 - tracker: current setup, remotes/config, templates, tracker docs, and relevant
   local/workspace conventions;
+- project layout: Git root shape, package/workspace manifests,
+  `CONTEXT-MAP.md`, child repository evidence, and existing project-memory
+  topology config;
 - domain: current pointers, README/docs/manifests, relevant source/tests/schema,
   context files, domain layout, and ADRs;
 - translation: translation memory, locale catalogs/config, copy guidance, and
@@ -188,6 +196,8 @@ weak session evidence plainly.
 
 - `options.md`: canonical option fields, values, and legacy normalization.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
+- `project-layout.md`: durable `project_topology` configuration and topology
+  detection boundaries.
 - `issue-tracker-*.md`, `tracker-publishing.md`, `triage-labels.md`: tracker,
   artifact, type/state, source-ref, and completion contracts.
 - `domain.md`: domain-memory layout and ownership.

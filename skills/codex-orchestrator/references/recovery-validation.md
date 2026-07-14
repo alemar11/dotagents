@@ -315,10 +315,10 @@ On resume:
    COMPUTED_OPTION_ROWS_FINGERPRINT="$(
    awk -F '|' -v wanted="$OPTION_ROW_IDS" -v scopes="$OPTION_SCOPE_IDS" -v active_delegated_count="$ACTIVE_DELEGATED_WORKER_COUNT" -v active_app_count="$ACTIVE_APP_WORKER_COUNT" '
      BEGIN {
-       split("delegation_mode worker_surface worker_limit app_thread_consent app_thread_limit raw_worktree_fallback active_root_takeover_policy", fields, " ")
+       split("delegation_mode worker_surface worker_limit app_thread_consent app_thread_limit raw_worktree_fallback active_root_takeover_policy project_topology", fields, " ")
        for (i in fields) expected_session[fields[i]]=1
        expected_source["source_mutation_authority"]=1
-       split("source_mutation_authority publication_authority issue_mutation_authority merge_authority merge_policy caller_checkout_policy automation_authority temporary_source_execution completion_proof_policy delivery_mode delivery_source branch_name current_pr_ref scope_transfer_ref issue_mutation_transfer_ref pr_closeout codex_review_policy pr_shape closeout_mode integration_mode", fields, " ")
+      split("source_mutation_authority publication_authority issue_mutation_authority merge_authority merge_policy caller_checkout_policy automation_authority temporary_source_execution completion_proof_policy delivery_mode delivery_source workstream_project_topology branch_name current_pr_ref scope_transfer_ref issue_mutation_transfer_ref pr_closeout codex_review_policy pr_shape closeout_mode integration_mode", fields, " ")
        for (i in fields) expected_workstream[fields[i]]=1
        count=split(wanted, ids, ",")
        for (i=1; i <= count; i++) {
@@ -380,6 +380,7 @@ On resume:
        if (field == "app_thread_limit") return matches(value, "unspecified|[1-9][0-9]*")
        if (field == "raw_worktree_fallback") return matches(value, "forbidden|owner-approved")
        if (field == "active_root_takeover_policy") return matches(value, "owner-approval|stale-ledger-check")
+       if (field == "project_topology") return matches(value, "single-repo|monorepo|multi-repo-workspace")
        if (field == "source_mutation_authority") return matches(value, "none|propose|write")
        if (field == "publication_authority") return matches(value, "none|explicit-owner-authorization|spec-backed-pull-request|blocked")
        if (field == "issue_mutation_authority") return matches(value, "none|pr-body-closeout-only|explicit-direct-mutation")
@@ -399,7 +400,8 @@ On resume:
        if (field == "codex_review_policy") return matches(value, "required|skip|not-applicable")
        if (field == "pr_shape") return matches(value, "single-pr|per-repo-pr|none")
        if (field == "closeout_mode") return matches(value, "feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable")
-       if (field == "integration_mode") return matches(value, "single-repo-pr|repo-pr|direct-commit|not-applicable")
+      if (field == "integration_mode") return matches(value, "single-repo-pr|repo-pr|direct-commit|not-applicable")
+      if (field == "workstream_project_topology") return matches(value, "single-repo|monorepo|multi-repo-workspace")
        return 0
      }
      function allowed_source(field, value, source) {
@@ -414,6 +416,7 @@ On resume:
        if (field == "app_thread_consent") return value == "not-requested" ? matches(source, "default|owner-instruction|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
        if (field == "raw_worktree_fallback") return value == "forbidden" ? matches(source, "default|owner-instruction|legacy-migration") : source == "owner-instruction"
        if (field == "active_root_takeover_policy") return value == "owner-approval" ? matches(source, "default|owner-instruction|legacy-migration") : source == "owner-instruction"
+       if (field == "project_topology") return matches(source, "project-layout-config|runtime-derived|owner-instruction|legacy-migration")
        if (field == "source_mutation_authority") return value == "none" ? matches(source, "default|runtime-capability|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
        if (field == "publication_authority") {
          if (matches(value, "none|blocked")) return matches(source, "default|runtime-capability|owner-instruction")
@@ -447,7 +450,7 @@ On resume:
          if (value == "skip") return source == "owner-instruction"
          return matches(source, "runtime-derived|legacy-migration")
        }
-       if (field == "pr_shape" || field == "closeout_mode" || field == "integration_mode") return matches(source, "source-contract|runtime-derived|legacy-migration")
+      if (field == "pr_shape" || field == "closeout_mode" || field == "integration_mode" || field == "workstream_project_topology") return matches(source, "source-contract|runtime-derived|legacy-migration")
        return 0
      }
      /^## Option Resolution$/ { options=1; next }

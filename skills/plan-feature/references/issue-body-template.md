@@ -21,7 +21,7 @@ workflow_state: [canonical state, usually ready-for-agent]
 source_spec_ref: [path, issue number, or stable draft ref; draft refs are valid
 only in non-mutating output before hosted mutation]
 
-Affected Repos: [include for workspace issues; otherwise omit]
+Affected Repos: [issue-local target repo slugs for workspace issues; otherwise omit]
 
 Product Scope: [for monorepos, workspace path and selected context file; for
 single-repo issues, `current repository`; for workspace issues, use
@@ -45,6 +45,8 @@ cells; do not infer or omit row metadata here.
 - delivery_mode: [verified `delivery_mode` row value]
 - delivery_source: [verified `delivery_source` row value]
 - delivery_source_evidence: [verified delivery evidence data]
+- project_topology: [same feature/workspace graph value as the source Feature Spec]
+- issue_project_topology: [verified `issue_project_topology` row value]
 - issue_mutation_authority: [verified `issue_mutation_authority` row value]
 - issue_mutation_authority_evidence: [verified independent mutation evidence data]
 - branch_name: [verified exact branch data]
@@ -63,6 +65,12 @@ cells; do not infer or omit row metadata here.
 - delivery_mode: [same effective value as `## Delivery`]
 - delivery_source: [same canonical value as `## Delivery`]
 - delivery_source_evidence: [same evidence as `## Delivery`]
+- project_topology: [same feature/workspace graph value as the source Feature Spec]
+- issue_project_topology: [same issue-effective value as `## Delivery`]
+- workspace_context: [multi-repo-workspace or not-applicable]
+- workspace_parent_source_ref: [parent/global Feature Spec ref or not-applicable]
+- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable]
+- workspace_child_source_refs: [complete repo-to-Feature-Spec-ref mapping for `workspace_feature_repos`, or not-applicable]
 - issue_mutation_authority: [same effective value as `## Delivery`]
 - issue_mutation_authority_evidence: [same evidence as `## Delivery`]
 - branch_name: [same effective branch data as `## Delivery`]

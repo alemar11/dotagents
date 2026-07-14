@@ -12,6 +12,7 @@ review:
 
 - setup flow: `fresh-setup`, `existing-project-bootstrap`, or
   `orchestrator-workspace` (runtime classification, not a stored key)
+- `project_topology`
 - `tracker_backend`
 - `delivery_mode`
 - `issue_type` mapping
@@ -39,6 +40,7 @@ tracker-specific values unless the user explicitly changes them.
 Editable sections:
 
 - `issue-tracker`
+- `project-layout`
 - `delivery-mode`
 - `issue-type-mapping`
 - `triage-state-mapping`
@@ -52,6 +54,7 @@ For each selected section, show the current value first, then `keep-current`
 and the relevant alternatives:
 
 - `issue-tracker`: `github` or `local`.
+- `project-layout`: `single-repo`, `monorepo`, or `multi-repo-workspace`.
 - `delivery-mode`: `pull-request` or `direct-commit`.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
   custom per canonical type.
@@ -77,6 +80,11 @@ through unrelated editable sections.
 
 - Default to GitHub for code repos with a GitHub remote; default to local
   markdown when no clear GitHub issue tracker exists.
+- Default `project_topology` from durable repo evidence: `single-repo` for one
+  Git repo and one primary context, `monorepo` for one Git repo with multiple
+  independently planned contexts, and `multi-repo-workspace` for a parent
+  coordination workspace with multiple child Git repos. Ask when evidence is
+  contradictory.
 - For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
   mutation. Treat the no-mutation choice as current-run behavior, not durable
   issue-tracker configuration.
@@ -101,6 +109,7 @@ Before writing, show only applicable items from this list:
 - before/after summary for proposed changes;
 - intended `AGENTS.md` pointer block;
 - `AGENTS.md` minimization plan;
+- intended `project-memory/config/project-layout.md`;
 - intended `project-memory/config/issue-tracker.md`;
 - intended `project-memory/config/triage-labels.md`;
 - intended `project-memory/config/domain.md`;
@@ -135,6 +144,9 @@ After direct write authority or separate affirmative confirmation:
 - Keep behavior-affecting setup fields in typed configuration tables with
   `Key`, `Type`, `Value`, `Allowed values`, and `Meaning` columns before
   explanatory prose.
+- Keep `project-layout.md` limited to `project_topology`. Do not store
+  source-root lists, worktree paths, worker surfaces, thread limits, or Codex
+  App runtime state there.
 - Preserve custom prose outside known configuration tables. Report unknown
   configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only authorized
@@ -160,6 +172,10 @@ exists or is authorized; never create a broken pointer:
 ### Issue tracker
 
 [one-line summary of where Feature Specs and issues live]. See `project-memory/config/issue-tracker.md`.
+
+### Project layout
+
+[one-line summary of project topology]. See `project-memory/config/project-layout.md`.
 
 ### Triage types and labels
 
@@ -189,6 +205,7 @@ Summarize only the applicable fields:
 - files written;
 - settings reviewed and changed;
 - selected issue tracker;
+- project topology;
 - delivery mode;
 - issue-type and triage-state mapping;
 - domain-memory layout;

@@ -35,8 +35,9 @@ does not replace separate publication and issue-mutation authority.
 
 For generated implementation issues, `## Orchestrator Handoff` is the
 canonical issue-level dispatch contract. It must restate the source Feature Spec,
-feature slug, `delivery_mode`, `delivery_source`,
-`delivery_source_evidence`, `issue_mutation_authority`,
+feature slug, `delivery_mode`, `project_topology`, `issue_project_topology`, `delivery_source`,
+`delivery_source_evidence`, `workspace_context`, `workspace_parent_source_ref`,
+`workspace_feature_repos`, `workspace_child_source_refs`, `issue_mutation_authority`,
 `issue_mutation_authority_evidence`, `branch_name`, `pr_shape`, `pr_closeout` when applicable,
 affected repos or product scope, scope, start rule, dependencies, validation,
 domain closeout, `closeout_mode`, and `integration_mode`. `domain_closeout` is
@@ -67,6 +68,27 @@ canonical value when present. Otherwise derive `single-pr` for one-repo
 `pull-request`, `per-repo-pr` for multi-repo `pull-request`, or `none` for
 `direct-commit`. If repo scope is ambiguous, stop as `needs-owner`; never infer
 the value from loose prose.
+For a legacy handoff that predates `project_topology`, inherit the linked
+Feature Spec's canonical value when present. Otherwise read
+`project-memory/config/project-layout.md` or derive only from safe repo evidence.
+If repo topology is ambiguous, stop as `needs-owner`; do not treat requested
+parallelism as topology evidence.
+For a legacy handoff that predates `workspace_context`, derive
+`multi-repo-workspace` when `project_topology=multi-repo-workspace`, when the
+linked source has repo-scoped partial Feature Spec siblings, or when it carries
+parent/global source evidence; otherwise normalize to `not-applicable`. For a legacy handoff that predates
+`workspace_parent_source_ref`, normalize to `not-applicable` unless the linked
+Feature Spec supplies an explicit parent/global source ref.
+For a legacy handoff that predates `workspace_feature_repos`, normalize to the
+sorted keys from explicit `workspace_child_source_refs` or linked sibling
+partial Feature Specs. If `workspace_context=multi-repo-workspace` and that
+set cannot be reconstructed, stop as `needs-owner`; use `not-applicable` only
+for non-workspace handoffs.
+For a legacy handoff that predates `workspace_child_source_refs`, normalize to
+the complete repo-to-partial mapping from explicit refs or linked sibling
+partial Feature Specs. If `workspace_context=multi-repo-workspace`, the mapping
+must match `workspace_feature_repos` or the run stops as `needs-owner`; use
+`not-applicable` only for non-workspace handoffs.
 For a legacy handoff that predates `integration_mode`, inherit a canonical
 value from the linked Feature Spec when present. Otherwise normalize the omitted
 ordinary inherited case to `not-applicable`. An explicit legacy
@@ -93,6 +115,12 @@ when touched:
 | `Feature slug` | `feature_slug` |
 | `Delivery mode` | `delivery_mode`; move inheritance/override prose to `delivery_source` and `delivery_source_evidence` |
 | `Issue mutation authority` | `issue_mutation_authority`; preserve its separately scoped evidence in `issue_mutation_authority_evidence` |
+| `Project topology` | `project_topology` |
+| `Issue project topology` | `issue_project_topology` |
+| `Workspace context` | `workspace_context` |
+| `Workspace parent source ref` | `workspace_parent_source_ref` |
+| `Workspace feature repos` | `workspace_feature_repos` |
+| `Workspace child source refs` | `workspace_child_source_refs` |
 | `PR shape` | `pr_shape` |
 | `PR closeout` | `pr_closeout` |
 | `Affected repos or product scope` | `affected_repos_or_product_scope` |
@@ -330,27 +358,42 @@ Before scheduling or publishing Feature Spec-backed work:
    `temporary_source_execution=owner-approved`; separately resolve the
    publication and issue-mutation authority that execution may use.
 2. For generated issues, read `## Orchestrator Handoff` and verify it contains
-   source Feature Spec, feature slug, `delivery_mode`, `delivery_source`,
+   source Feature Spec, feature slug, `delivery_mode`, `project_topology`,
+   `issue_project_topology`,
+   `workspace_context`, `workspace_parent_source_ref`,
+   `workspace_feature_repos`, `workspace_child_source_refs`, `delivery_source`,
    `delivery_source_evidence`, `branch_name`, `pr_shape`, `pr_closeout` when applicable,
    affected repos or product scope, scope, start rule,
    dependencies, validation, domain closeout, `closeout_mode`, and
    `integration_mode`. Require `domain_closeout:
    implementation-closeout` with exact decisions, targets, and evidence when
    the issue contains `## Domain Knowledge Closeout`; otherwise require
-   `not-applicable`. For a legacy handoff missing `pr_closeout`, `pr_shape`, or
-   `integration_mode`, apply the deterministic delivery-mode, repo-scope, and
-   linked Feature Spec/default migrations above and rewrite the touched projection. If
+   `not-applicable`. For a legacy handoff missing `issue_project_topology`,
+   derive it from the repo-scoped source Feature Spec's `repo_project_topology`
+   for repo-scoped workspace issues, from `multi-repo-workspace` for
+   root-owned workspace-spanning issues, and from `project_topology` otherwise.
+   For a legacy handoff missing `project_topology`,
+   `issue_project_topology`, `workspace_context`, `workspace_parent_source_ref`,
+   `workspace_feature_repos`, `workspace_child_source_refs`, `pr_closeout`,
+   `pr_shape`, or
+   `integration_mode`, apply the deterministic
+   delivery-mode, repo-scope, and linked Feature Spec/default migrations above
+   and rewrite the touched projection. If
    another required field is missing, repo scope is ambiguous, or the handoff contradicts the issue body, stop as
    `needs-owner` or route back through `$plan-feature` issue generation instead
    of dispatching implementation.
-3. If the linked Feature Spec is a workspace partial Feature Spec, expand the connected sibling
-   partial Feature Spec graph and record each partial Feature Spec/source item plus cross-link in
-   the ledger before building waves.
+3. If `project_topology=multi-repo-workspace` or
+   `workspace_context=multi-repo-workspace`, load
+   `references/multi-repo-workspace.md`. If the linked Feature Spec is a
+   workspace partial Feature Spec, expand the connected sibling partial Feature
+   Spec graph and record each partial Feature Spec/source item plus cross-link
+   in the ledger before building waves.
 4. Resolve the effective delivery mode from the Feature Spec first, then resolve
    `pr_shape`, `pr_closeout`, and `codex_review_policy`, defaulting
    `pull-request` closeout to `merge-ready` and its review policy to `required`;
    apply only issue-level overrides that are explicit and authorized.
-5. Record delivery authority, publication authority, `pr_shape`, `pr_closeout`,
+5. Record delivery authority, publication authority,
+   `workstream_project_topology` from the handoff `issue_project_topology`, `pr_shape`, `pr_closeout`,
    `codex_review_policy`, issue
    mutation authority, parent Feature Spec closeout applicability/reason/state, merge
    authority, merge policy, authorizing owner instruction when any, closeout

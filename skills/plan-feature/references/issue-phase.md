@@ -59,8 +59,15 @@ Receive the verified run-level `option_resolution` rows and
 `option_rows_fingerprint` defined by `references/options.md`, plus:
 
 - the planning identity (`feature_slug` and any selected `product_slug`,
-  `workspace_path`, `context_file`, `project_slug`, and affected repos);
+  `workspace_path`, `context_file`, `project_slug`, `project_topology`,
+  `repo_project_topology`, `workspace_context`, `workspace_parent_source_ref`,
+  `workspace_feature_repos`, and issue target repos);
 - the resolved `source_spec_ref` and draft fingerprint when applicable;
+- `workspace_child_source_refs`, mapping each feature-wide repo to its
+  repo-scoped partial Feature Spec ref when
+  `workspace_context=multi-repo-workspace`. Keys are canonical repo slugs and
+  must match `workspace_feature_repos`; each generated issue's target repos
+  must be a non-empty subset of `workspace_feature_repos`;
 - `capture_outcome` and the structured `domain_knowledge_delta`;
 - the mapped tracker/type configuration needed at publication.
 
@@ -113,6 +120,7 @@ Find or ask for the Feature Spec source:
 Also inspect:
 
 - `project-memory/config/issue-tracker.md`,
+- `project-memory/config/project-layout.md`,
 - `project-memory/config/triage-labels.md`,
 - `CONTEXT.md` or `CONTEXT-MAP.md`,
 - `TRANSLATION.md`, when present for the selected context,
@@ -144,10 +152,34 @@ Resolve and carry the planning identity before splitting:
   then title-derived fallback only when no accepted path exists.
 - For multi-context repos or monorepos: `product_slug`, `workspace_path`, and
   `context_file`.
-- For orchestrator workspaces: `project_slug` and affected repos.
+- `project_topology`: use the Feature Spec handoff value first, then
+  `project-memory/config/project-layout.md`, then safe repo evidence.
+  For a workspace issue graph spanning multiple child partials, the handoff
+  must use `project_topology=multi-repo-workspace` as the workspace graph
+  snapshot; do not choose one child repo's durable topology as the run-level
+  value. Record child repo topology only in each issue's
+  `issue_project_topology` row.
+- `workspace_context`: use the Feature Spec handoff value first; when absent,
+  derive `multi-repo-workspace` from `project_topology=multi-repo-workspace`,
+  linked repo-scoped partial Feature Spec siblings, or parent/global source
+  evidence; otherwise default to `not-applicable`.
+- `workspace_parent_source_ref`: use the Feature Spec handoff value first;
+  default to `not-applicable` when absent.
+- For `project_topology=multi-repo-workspace` or
+  `workspace_context=multi-repo-workspace`: `project_slug` or
+  `workspace_parent_source_ref`, plus affected repos, are required.
 - `source_spec_ref`: use the durable Feature Spec issue number, local Feature Spec path, or stable
   draft ref passed by the Feature Spec phase or existing durable Feature Spec source. In
   either non-mutating effective target, keep the draft ref in returned bodies.
+- For workspace issues with one target repo, select `source_spec_ref` from
+  `workspace_child_source_refs` using that issue's target repo. For root-owned
+  integration or domain-closeout issues spanning multiple repos, use
+  `workspace_parent_source_ref` when it is not `not-applicable`. When no
+  parent/global source exists, do not create a root-owned spanning issue:
+  split the work into repo-scoped integration or domain-closeout issues using
+  their child partial refs, or stop for an explicit workspace-level source and
+  owner. Never choose an individual child partial as the primary source for
+  spanning work.
   For `draft-publish-commands`, include the replacement step required before
   hosted mutation; for `local-dry-run`, label it non-executable.
 
@@ -175,7 +207,8 @@ implementation, and make dependencies explicit rather than relying on issue
 numbering.
 
 Before hardening, validate the generated issue graph from the proposed issue
-list, carrying the verified feature delivery tuple into each issue:
+list, carrying the verified feature delivery tuple, including
+the issue-effective `issue_project_topology`, into each issue:
 
 - ordered issue map with `<NN>` and short intent.
 - dependency graph plus `blocks` / `depends-on` intent.
@@ -191,6 +224,14 @@ list, carrying the verified feature delivery tuple into each issue:
 - startability waves and unblock conditions.
 - repo-level boundaries and integration proof requirements for orchestrator
   work.
+- issue-level topology: use the repo-scoped Feature Spec or target repo
+  `repo_project_topology`; for root-owned issues spanning multiple repos, use
+  `multi-repo-workspace` when `workspace_context=multi-repo-workspace`; fall
+  back to the run-level value only when the issue is neither repo-scoped nor
+  workspace-spanning.
+- generated issue bodies keep `project_topology` equal to the source Feature
+  Spec's feature/workspace graph value and emit `issue_project_topology` as the
+  issue-effective workstream topology used by Orchestrator.
 - Treat the issue bodies as the durable ordering contract for scheduling and
   worker-routing. Do not persist a separate scheduling artifact.
 
@@ -375,13 +416,16 @@ When GitHub issue types are available, create or update each implementation
 issue with the mapped `task` type, usually `Task`. If issue types are disabled
 or unsupported, publish without a type and keep the mapped state labels.
 
-For orchestrator workspace issues, include affected repos, cross-repo contract
-notes, integration gates by name or link, repo-local PR or implementation issue
-links when they exist, expected repo PR slots or pre-implementation
-placeholders, and the proof required before the issue can move to `done` or
-close. Placeholders are delivery expectations for scheduling, not completion
-proof; `$codex-orchestrator` records real PR links or equivalent integration
-proof during source closeout.
+For orchestrator workspace issues, include `project_topology`,
+`issue_project_topology`, `workspace_context=multi-repo-workspace`,
+`workspace_parent_source_ref` when a parent/global source exists, affected
+repos, cross-repo contract notes, integration gates by name or link, repo-local
+PR or implementation issue links when they exist, expected repo PR slots or
+pre-implementation placeholders, and the proof required before the issue can
+move to `done` or close. Placeholders
+are delivery expectations for scheduling, not completion proof;
+`$codex-orchestrator` records real PR links or equivalent integration proof
+during source closeout.
 
 Every generated agent-ready implementation issue must include the
 `## Orchestrator Handoff` shape from `references/issue-body-template.md`. The
@@ -500,7 +544,7 @@ Summarize:
   execution-profile widening reason,
 - `option_rows_fingerprint` for the complete run-plus-issue row set,
 - authoritative `feature_slug`,
-- product/workspace/context or orchestrator project identity used, when
+- product/workspace/context, project topology, or orchestrator project identity used, when
   applicable,
 - number of issues produced,
 - verticality gate result, including any repairs, merges, splits,

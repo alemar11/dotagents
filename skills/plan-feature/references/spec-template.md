@@ -64,6 +64,12 @@ What user or system problem this solves.
 
 - delivery_mode: [verified `delivery_mode` row value].
 - delivery_mode_evidence: [verified option-row source and evidence].
+- project_topology: [verified `project_topology` row value].
+- repo_project_topology: [child repo durable topology for repo-scoped workspace partials, or not-applicable].
+- workspace_context: [multi-repo-workspace or not-applicable].
+- workspace_parent_source_ref: [parent/global Feature Spec ref or not-applicable].
+- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable].
+- workspace_child_source_refs: [complete repo-to-child Feature Spec mapping before issue generation, `unresolved-first-pass` during first-pass workspace child publication, or not-applicable outside workspace flows].
 - issue_mutation_authority: [verified `issue_mutation_authority` row value].
 - issue_mutation_authority_evidence: [verified independent option-row source and evidence].
 - pr_closeout: [verified `pr_closeout` row value].
@@ -73,7 +79,9 @@ What user or system problem this solves.
 - integration_proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
 - issue_inheritance: generated issues link this Feature Spec with `source_spec_ref`, copy
-  the effective `delivery_mode` and `pr_closeout` values as feature-level metadata,
+  the effective `delivery_mode`, feature/workspace `project_topology`, and
+  `pr_closeout` values as feature-level metadata, derive
+  `issue_project_topology` from `repo_project_topology` or target repo evidence,
   and carry issue-level ordering, dependencies, parallelization, closeout, and
   exceptions. The issue phase validates the generated issue graph before
   publication.

@@ -23,6 +23,8 @@ no_mutation_output: publish-commands
 local_mirror: not-requested
 local_mirror_path: not-applicable
 partial_output: withhold
+project_topology: single-repo
+workspace_context: not-applicable
 feature_slug: account-settings-export
 delivery_mode: pull-request
 issue_mutation_authority: pr-body-closeout-only
@@ -34,7 +36,7 @@ spec_body_fingerprint: sha256:7f4a9c21d003
 capture_mode: defer-to-caller
 capture_outcome: deferred
 option_resolution: see-canonical-run-option-rows-below
-option_rows_fingerprint: sha256:4f8179bf10138c6335fd3819265f93cf06f6b9c2bc3b6c53fcfd6aa6691d05d7
+option_rows_fingerprint: sha256:dbd1e1dfdbc18024f4468d86418c9f3a49dbac310519c2e8c7d19253652b579b
 domain_knowledge_delta:
   knowledge_delta: required
   decisions:
@@ -61,11 +63,13 @@ domain_knowledge_delta:
 | `run:local_mirror` | `run` | `local_mirror` | `not-requested` | `default` | `none` |
 | `run:local_mirror_path` | `run` | `local_mirror_path` | `not-applicable` | `default` | `none` |
 | `run:partial_output` | `run` | `partial_output` | `withhold` | `default` | `none` |
+| `run:project_topology` | `run` | `project_topology` | `single-repo` | `project-layout-config` | `project-memory/config/project-layout.md` |
+| `run:workspace_context` | `run` | `workspace_context` | `not-applicable` | `default` | `none` |
 | `run:delivery_mode` | `run` | `delivery_mode` | `pull-request` | `default` | `none` |
 | `run:issue_mutation_authority` | `run` | `issue_mutation_authority` | `pr-body-closeout-only` | `runtime-derived` | `run:tracker_backend+run:delivery_mode` |
 | `run:branch_name` | `run` | `branch_name` | `feature/account-settings-export` | `runtime-derived` | `run:delivery_mode+feature_slug` |
 | `run:pr_closeout` | `run` | `pr_closeout` | `merge-ready` | `default` | `run:delivery_mode` |
-| `run:pr_shape` | `run` | `pr_shape` | `single-pr` | `runtime-derived` | `current-repository` |
+| `run:pr_shape` | `run` | `pr_shape` | `single-pr` | `runtime-derived` | `affected_repos=current-repository` |
 
 ## Representative Emitted Issue
 
@@ -81,12 +85,13 @@ source_spec_ref: draft-spec:account-settings-export
 
 ## Option Resolution
 
-issue_option_rows_fingerprint: sha256:6a54f61a54106bc92b35849b6239456cbdb2e7ae0e74a05ccbd1334da58fa813
+issue_option_rows_fingerprint: sha256:b3ad1e12818f12a80d94ed0b67f798b0024b052877540ea4735df169518857e0
 
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
 | `issue:01:delivery_source` | `issue:01` | `delivery_source` | `feature-level-inherited` | `source-spec` | `draft-spec:account-settings-export` |
 | `issue:01:delivery_mode` | `issue:01` | `delivery_mode` | `pull-request` | `source-spec` | `run:delivery_mode` |
+| `issue:01:issue_project_topology` | `issue:01` | `issue_project_topology` | `single-repo` | `source-spec` | `run:project_topology` |
 | `issue:01:issue_mutation_authority` | `issue:01` | `issue_mutation_authority` | `pr-body-closeout-only` | `source-spec` | `run:issue_mutation_authority` |
 | `issue:01:pr_shape` | `issue:01` | `pr_shape` | `single-pr` | `source-spec` | `run:pr_shape` |
 | `issue:01:pr_closeout` | `issue:01` | `pr_closeout` | `merge-ready` | `source-spec` | `run:pr_closeout` |
@@ -99,7 +104,7 @@ issue_option_rows_fingerprint: sha256:6a54f61a54106bc92b35849b6239456cbdb2e7ae0e
 
 ## Representative Issue-Phase Handoff
 
-option_rows_fingerprint: sha256:8c223c75a49647c56336ca0beaa0c099a1d954e45eb8849d24d76b37559165c0
+option_rows_fingerprint: sha256:b4b87b07bf9740663e7e661ec08366b39674c8585422122689c6f93428fb3272
 issue_count: 1
 issue_refs: draft-issue:account-settings-export:01
 
@@ -114,12 +119,14 @@ issue_refs: draft-issue:account-settings-export:01
    `spec_body_fingerprint=sha256:7f4a9c21d003`, with
    the structured delivery handoff tuple
    `delivery_mode=pull-request`,
+   `project_topology=single-repo`,
    `issue_mutation_authority=pr-body-closeout-only`,
    `branch_name=feature/account-settings-export`,
    `pr_closeout=merge-ready`, and `pr_shape=single-pr`. When the delta is
    required, the Feature Spec body carries it under `## Domain Knowledge Handoff`.
 4. The issue phase returns hardened issue bodies plus draft issue publish commands.
    Every issue `## Delivery` and `## Orchestrator Handoff` projection carries
+   `project_topology: single-repo` and
    `branch_name: feature/account-settings-export`.
    Draft issue bodies may contain `source_spec_ref: draft-spec:account-settings-export`
    only because no hosted Feature Spec number exists yet. A required knowledge delta is
@@ -188,6 +195,7 @@ issue_refs: draft-issue:account-settings-export:01
   option, non-canonical field name, or enum value outside `options.md`.
 - A Feature Spec phase handoff, generated issue `## Delivery`, or generated issue
   `## Orchestrator Handoff` omits
+  `project_topology: single-repo` or
   `branch_name: feature/account-settings-export`.
 - Generated issues use a prose `source_spec_ref` such as the Feature Spec title when a stable
   draft ref is available.

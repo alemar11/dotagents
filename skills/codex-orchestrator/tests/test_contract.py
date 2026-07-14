@@ -466,6 +466,7 @@ class OrchestratorContractTests(unittest.TestCase):
             "app_thread_limit": ("unspecified", "default", "none"),
             "raw_worktree_fallback": ("forbidden", "default", "none"),
             "active_root_takeover_policy": ("owner-approval", "default", "none"),
+            "project_topology": ("single-repo", "project-layout-config", "project-memory/config/project-layout.md"),
         }
         scoped_values = {
             "source_mutation_authority": ("none", "default", "none"),
@@ -479,6 +480,7 @@ class OrchestratorContractTests(unittest.TestCase):
             "completion_proof_policy": ("live-required", "default", "none"),
             "delivery_mode": ("pull-request", "source-contract", "issue-1"),
             "delivery_source": ("feature-level-inherited", "source-contract", "issue-1"),
+            "workstream_project_topology": ("single-repo", "source-contract", "issue-1"),
             "branch_name": ("feature/example", "source-contract", "issue-1"),
             "current_pr_ref": ("owner/repo#123", "runtime-derived", "https://github.com/owner/repo/pull/123"),
             "scope_transfer_ref": ("not-applicable", "default", "none"),
@@ -1852,6 +1854,7 @@ class OrchestratorContractTests(unittest.TestCase):
         options = self.read("references/options.md")
         gates = self.read("references/gates.md")
         delivery = self.read("references/spec-backed-delivery.md")
+        skill = self.read("SKILL.md")
 
         self.assertIn("- pr_shape: <single-pr|per-repo-pr|none>", worker)
         self.assertIn("pr_shape=<single-pr|per-repo-pr|none>", ledger_template)
@@ -1871,6 +1874,16 @@ class OrchestratorContractTests(unittest.TestCase):
             "integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>",
             ledger_template,
         )
+        self.assertIn("`project_topology`", skill)
+        self.assertIn("`project_topology`", options)
+        self.assertIn(
+            "project_topology: single-repo|monorepo|multi-repo-workspace",
+            ledger_template,
+        )
+        self.assertIn(
+            "workstream_project_topology: single-repo|monorepo|multi-repo-workspace",
+            ledger_template,
+        )
         self.assertIn("delivery_source=<runtime-default|feature-level-inherited", ledger_template)
         self.assertIn("delivery_source_evidence=<scoped-option-row/source-ref|none>", ledger_template)
         self.assertIn("`temporary_source_execution`", options)
@@ -1883,6 +1896,41 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn("- temporary_source_execution: <forbidden|owner-approved>", worker)
         self.assertIn("- completion_proof_policy: <live-required|synthetic-accepted>", worker)
+
+    def test_multi_repo_workspace_flow_is_topology_gated(self) -> None:
+        skill = self.read("SKILL.md")
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        ledger_template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        gates = self.read("references/gates.md")
+        delivery = self.read("references/spec-backed-delivery.md")
+        workspace = self.read("references/multi-repo-workspace.md")
+
+        self.assertIn("`project_topology=multi-repo-workspace`", skill)
+        self.assertIn("`project_topology=multi-repo-workspace` or a registered source/handoff", options)
+        self.assertIn("`workspace_context=multi-repo-workspace`", skill)
+        self.assertIn("`workspace_context=multi-repo-workspace`", delivery)
+        self.assertIn("`workspace_feature_repos`", delivery)
+        self.assertIn("`workspace_child_source_refs`", delivery)
+        self.assertIn("`issue_project_topology`", delivery)
+        self.assertIn("must match `workspace_feature_repos`", delivery)
+        self.assertIn("use `not-applicable` only\nfor non-workspace handoffs", delivery)
+        self.assertIn("repo-scoped partial Feature Spec siblings", delivery)
+        self.assertIn("workstream_project_topology", options)
+        self.assertIn("workstream_project_topology", ledger_template)
+        self.assertIn("workstream_project_topology", recovery)
+        self.assertIn("Do not load it for ordinary `single-repo` or `monorepo`", workspace)
+        self.assertIn("parent/global Feature Specs", workspace)
+        self.assertIn("Repo-scoped partial Feature Specs are owned by the child repository", workspace)
+        self.assertIn(
+            "<workspace-parent>/.worktrees/<repo-name>/<spec-or-issue-slug>/",
+            workspace,
+        )
+        self.assertIn("outside any\ntracked Git checkout or ignored by the parent checkout", workspace)
+        self.assertIn("Do not dirty a parent coordination\ncheckout", workspace)
+        self.assertIn("`(repo, branch, worktree)` tuple", workspace)
+        self.assertIn("There is no separate workspace execution mode", worker)
         self.assertIn("- closeout_mode: <feature-pr-closes-issue|repo-pr-closes-issue|", worker)
         self.assertIn("- branch_name: <exact branch or not-applicable>", worker)
         self.assertIn("- scope_transfer_ref: <issue:<NN>|not-applicable>", worker)
@@ -1937,6 +1985,8 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertIn(value, delivery)
             self.assertIn(value, options)
         self.assertIn("- pr_shape: [verified `pr_shape` row value]", spec_template)
+        self.assertIn("- project_topology: [same feature/workspace graph value as the source Feature Spec]", issue_template)
+        self.assertIn("- issue_project_topology: [verified `issue_project_topology` row value]", issue_template)
         self.assertIn("- pr_closeout: [verified `pr_closeout` row value]", issue_template)
         self.assertIn(
             "Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-spec`",

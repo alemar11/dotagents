@@ -84,8 +84,9 @@ explicit authority. Authorized pull-request delivery defaults to
 
 `$plan-feature` owns Feature Spec and generated-issue publication before scheduling.
 After registration, the root owns authorized issue lifecycle and closeout. For
-workspace features, expand linked repo-scoped partial Feature Specs; no global Feature Spec is
-required. Register Markdown checklist items by stable path and heading.
+`project_topology=multi-repo-workspace`, expand linked repo-scoped partial
+Feature Specs; no global Feature Spec is required. Register Markdown checklist
+items by stable path and heading.
 
 ## Controller Loop
 
@@ -93,13 +94,17 @@ Run this deterministic loop:
 
 1. **CLAIM** — resolve canonical options, resolve the ledger, canonicalize repo
    realpaths, acquire or verify the active-root claim, and establish Goal mode
-   or its ledger fallback.
+   or its ledger fallback. Resolve `project_topology` from project memory, safe
+   repo evidence, or explicit owner input.
    On recovery, read and validate the compact recovery packet first; when fresh,
    load only its named active rows, gate rows, sources, and next action.
 2. **REGISTER** — snapshot authorized sources by stable id and preserve their
    criteria, constraints, authority, dependencies, proof, and closeout target.
 3. **ROUTE** — apply source routing, load only the selected references, choose
-   companion skills, and classify workstreams with ledger vocabulary.
+   companion skills, and classify workstreams with ledger vocabulary. Load
+   `references/multi-repo-workspace.md` only for
+   `project_topology=multi-repo-workspace` or a registered source/handoff with
+   `workspace_context=multi-repo-workspace`.
 4. **DISPATCH** — select one bounded wave; keep shared work in the root and load
    `references/worker.md` before any delegation.
 5. **INTEGRATE** — read current worker state, revalidate capabilities, accept or
@@ -147,7 +152,8 @@ blockers.
 ## Workers And Runtime Surfaces
 
 Resolve `delegation_mode`, `worker_surface`, `worker_limit`,
-`app_thread_consent`, `app_thread_limit`, and `raw_worktree_fallback` from
+`app_thread_consent`, `app_thread_limit`, `raw_worktree_fallback`, and
+`project_topology` from
 `references/options.md`. Defaults are `delegation_mode=auto`,
 `worker_surface=auto`, `app_thread_consent=not-requested`, and
 `raw_worktree_fallback=forbidden`. Visible user-owned App tasks require
@@ -235,6 +241,10 @@ artifacts by path/ref and fingerprint instead of repeating them. Use
   closeout hygiene.
 - `references/worker.md`: worker surfaces, tools, authorization, lifecycle,
   integration, and reports.
+- `references/multi-repo-workspace.md`: parent/child repo ownership,
+  child-worktree layout, derived serial/parallel dispatch, and cross-repo
+  integration/closeout for `project_topology=multi-repo-workspace` or
+  `workspace_context=multi-repo-workspace`.
 - `references/spec-backed-delivery.md`: Feature Spec graph, authorities, publication,
   issue mutation, review, and closeout.
 - `references/gates.md`: authorization, proof, review, integration, release,
