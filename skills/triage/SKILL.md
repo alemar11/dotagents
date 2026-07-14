@@ -61,7 +61,7 @@ and values directly.
 - In GitHub mode, use native GitHub Issue Type for `bug`, `feature`, or `task`
   whenever the repo's tracker configuration says issue types are available.
 - In local markdown mode, record `issue_type`, `workflow_state`, and
-  `source_prd_ref` as frontmatter-like lines near the top of the issue file.
+  `source_spec_ref` as frontmatter-like lines near the top of the issue file.
 - Before marking an issue `ready-for-agent`, load and run `$plan-harder` with
   `planning_mode=issue-hardening` and `output_surface=caller`, then embed or
   post the resulting agent brief.
@@ -143,7 +143,7 @@ For local markdown, use the configured local issue layout from
 Read only enough repo evidence to classify and route the issue:
 
 - issue title, body, comments, labels, type, state, and links,
-- related PRD or parent issue, when present,
+- related Feature Spec or parent issue, when present,
 - relevant code, tests, docs, ADRs, and domain context,
 - duplicate or superseding issues when clearly discoverable.
 
@@ -158,7 +158,7 @@ Use `bug` when the report describes incorrect existing behavior or a
 regression. Use `feature` when the issue asks for a new capability or product
 enhancement that still needs product framing. Use `task` when the issue is
 maintenance, cleanup, docs, refactoring, follow-up work, or an implementation
-subtask under an accepted PRD.
+subtask under an accepted Feature Spec.
 
 Use `ready-for-agent` only when the issue has:
 
@@ -226,8 +226,8 @@ For local markdown:
 - Preserve the original issue content.
 - Insert or update the `issue_type:` line.
 - Insert or update the `workflow_state:` line.
-- Preserve or add `source_prd_ref:` as reference data.
-- Read legacy `Type:`, `Status:`, `State:`, and `Source PRD:` aliases, but
+- Preserve or add `source_spec_ref:` as reference data.
+- Read legacy `Type:`, `Status:`, and `State:` aliases, but
   apply the header scope and precedence in `references/options.md`; normalize
   them to current fields only during an authorized issue mutation.
 - Append triage notes, questions, decisions, or the agent brief under the
