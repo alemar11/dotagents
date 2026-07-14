@@ -176,7 +176,7 @@ fingerprints here; load `recovery-validation.md` before resume or recovery.
 authorization_resolution: per-workstream
 worker_authorization: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release
 delegation_mode: auto|disabled|bounded
-worker_surface: auto|root-thread|cli-subagent|codex-app-thread
+worker_surface: auto|not-applicable|cli-subagent|codex-app-thread
 worker_limit: <positive integer|unbounded>
 app_thread_consent: not-requested|granted|denied
 app_thread_limit: <positive integer|unspecified>
@@ -248,7 +248,7 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | worker_surface=<auto|root-thread|cli-subagent|codex-app-thread>; actual_workstream_surface=<root-thread|cli-subagent|codex-app-thread>; authorization_state=<authorized-by-invocation|owner-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
+| Worker evidence | worker_surface=<auto|not-applicable|cli-subagent|codex-app-thread>; actual_workstream_surface=<root-session|cli-subagent|codex-app-thread>; authorization_state=<authorized-by-invocation|owner-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | parallelization=<independent|depends-on|blocks|root-integrated>; dependency_ids=<refs|none>; blocked_issue_ids=<refs|none>; dependency_reason=<reason|none>; dependency_proof=<evidence|pending|none> |

@@ -650,8 +650,40 @@ class OrchestratorContractTests(unittest.TestCase):
                 )
                 return projected.replace("## Workstreams", f"{registry}\n## Workstreams")
 
+            def with_root_session(
+                contents: str,
+                *,
+                workstream_id: str = "a",
+                worker_id: str = "root",
+            ) -> str:
+                marker = f"#### {workstream_id}:"
+                start = contents.index(marker)
+                next_heading = contents.find("\n#### ", start + len(marker))
+                next_bucket = contents.find("\n### ready-next", start + len(marker))
+                ends = [value for value in (next_heading, next_bucket) if value >= 0]
+                end = min(ends) if ends else len(contents)
+                block = contents[start:end]
+                source_row = "| Source | issue-1 |"
+                evidence_rows = (
+                    f"{source_row}\n"
+                    f"| Repo / surface | repo; root; worker={worker_id} |\n"
+                    "| Worker evidence | worker_surface=auto; "
+                    "actual_workstream_surface=root-session; status=root-owned-fallback |"
+                )
+                block = block.replace(source_row, evidence_rows, 1)
+                return contents[:start] + block + contents[end:]
+
             complete = run(complete_ids)
             self.assertEqual(complete.returncode, 0, complete.stderr)
+
+            root_session = run(complete_ids, with_root_session(ledger_fixture))
+            self.assertEqual(root_session.returncode, 0, root_session.stderr)
+
+            stale_worker_in_root_session = run(
+                complete_ids,
+                with_root_session(ledger_fixture, worker_id="stale-worker"),
+            )
+            self.assertNotEqual(stale_worker_in_root_session.returncode, 0)
 
             mismatched_packet_fingerprint = run(
                 complete_ids,
@@ -877,27 +909,100 @@ class OrchestratorContractTests(unittest.TestCase):
             )
             self.assertNotEqual(cli_surface_with_app_worker.returncode, 0)
 
-            root_surface_with_cli_worker = run(
+            disabled_fixture = ledger_fixture.replace(
+                row(
+                    "session",
+                    "delegation_mode",
+                    session_values["delegation_mode"],
+                ),
+                row(
+                    "session",
+                    "delegation_mode",
+                    ("disabled", "owner-instruction", "request-1"),
+                ),
+            ).replace(
+                row(
+                    "session",
+                    "worker_surface",
+                    session_values["worker_surface"],
+                ),
+                row(
+                    "session",
+                    "worker_surface",
+                    ("not-applicable", "runtime-capability", "no-delegation"),
+                ),
+            )
+            disabled = run(complete_ids, disabled_fixture)
+            self.assertEqual(disabled.returncode, 0, disabled.stderr)
+
+            legacy_auto_root_thread_normalized = ledger_fixture.replace(
+                row(
+                    "session",
+                    "delegation_mode",
+                    session_values["delegation_mode"],
+                ),
+                row(
+                    "session",
+                    "delegation_mode",
+                    (
+                        "disabled",
+                        "runtime-capability",
+                        "legacy-worker-surface=root-thread",
+                    ),
+                ),
+            ).replace(
+                row(
+                    "session",
+                    "worker_surface",
+                    session_values["worker_surface"],
+                ),
+                row(
+                    "session",
+                    "worker_surface",
+                    (
+                        "not-applicable",
+                        "legacy-migration",
+                        "legacy-worker-surface=root-thread",
+                    ),
+                ),
+            )
+            legacy_auto_root_thread = run(
+                complete_ids,
+                legacy_auto_root_thread_normalized,
+            )
+            self.assertEqual(
+                legacy_auto_root_thread.returncode,
+                0,
+                legacy_auto_root_thread.stderr,
+            )
+
+            auto_with_not_applicable_surface = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    row(
+                        "session",
+                        "worker_surface",
+                        session_values["worker_surface"],
+                    ),
+                    row(
+                        "session",
+                        "worker_surface",
+                        ("not-applicable", "runtime-capability", "no-delegation"),
+                    ),
+                ),
+            )
+            self.assertNotEqual(auto_with_not_applicable_surface.returncode, 0)
+
+            disabled_with_cli_worker = run(
                 complete_ids,
                 with_active_workers(
-                    ledger_fixture.replace(
-                        row(
-                            "session",
-                            "worker_surface",
-                            session_values["worker_surface"],
-                        ),
-                        row(
-                            "session",
-                            "worker_surface",
-                            ("root-thread", "runtime-capability", "no-delegation"),
-                        ),
-                    ),
+                    disabled_fixture,
                     [
                         "- worker_id=w1; actual_workstream_surface=cli-subagent; workstream_ids=a",
                     ],
                 ),
             )
-            self.assertNotEqual(root_surface_with_cli_worker.returncode, 0)
+            self.assertNotEqual(disabled_with_cli_worker.returncode, 0)
 
             unbounded_app_consent = run(
                 complete_ids,
@@ -1776,7 +1881,9 @@ class OrchestratorContractTests(unittest.TestCase):
         )
 
         legacy_none = self.row_containing(rows, "`delegated_worker_surface=none`")
-        self.assertIn("`worker_surface=root-thread`", legacy_none[1])
+        self.assertIn("`delegation_mode=disabled`", legacy_none[1])
+        self.assertIn("`worker_surface=not-applicable`", legacy_none[1])
+        self.assertIn("`worker_limit=unbounded`", legacy_none[1])
         self.assertNotIn("actual_workstream_surface", legacy_none[1])
 
         legacy_cli = self.row_containing(
@@ -1790,7 +1897,18 @@ class OrchestratorContractTests(unittest.TestCase):
             rows,
             "`actual_workstream_surface=no-delegation`",
         )
-        self.assertIn("`actual_workstream_surface=root-thread`", actual_root[1])
+        self.assertIn("`actual_workstream_surface=root-session`", actual_root[1])
+
+        legacy_root_surface = self.row_containing(rows, "`worker_surface=root-thread`")
+        self.assertIn("`delegation_mode=disabled`", legacy_root_surface[1])
+        self.assertIn("`worker_surface=not-applicable`", legacy_root_surface[1])
+        self.assertIn("`worker_limit=unbounded`", legacy_root_surface[1])
+
+        legacy_actual_root = self.row_containing(
+            rows,
+            "`actual_workstream_surface=root-thread`",
+        )
+        self.assertIn("`actual_workstream_surface=root-session`", legacy_actual_root[1])
 
         legacy_app_limit = self.row_containing(
             rows,
@@ -1952,9 +2070,13 @@ class OrchestratorContractTests(unittest.TestCase):
         worker = self.read("references/worker.md")
         ledger_template = self.read("references/ledger-template.md")
 
-        self.assertIn("- worker_surface: <auto|root-thread|codex-app-thread|cli-subagent>", worker)
-        self.assertIn("- actual_workstream_surface: <root-thread|codex-app-thread|cli-subagent>", worker)
-        self.assertIn("actual_workstream_surface=<root-thread|cli-subagent|codex-app-thread>", ledger_template)
+        self.assertIn(
+            "| `worker_surface` | `auto`, `not-applicable`, `cli-subagent`, `codex-app-thread` |",
+            worker,
+        )
+        self.assertIn("worker_surface=<auto|cli-subagent|codex-app-thread>", worker)
+        self.assertIn("- actual_workstream_surface: <root-session|codex-app-thread|cli-subagent>", worker)
+        self.assertIn("actual_workstream_surface=<root-session|cli-subagent|codex-app-thread>", ledger_template)
         for stale in ("requested_surface", "actual_surface"):
             self.assertNotIn(stale, worker)
             self.assertNotIn(stale, ledger_template)

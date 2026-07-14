@@ -24,8 +24,8 @@ behavior. Statuses and runtime evidence are not options.
 
 | Field | Allowed values | Default | Constraint |
 | --- | --- | --- | --- |
-| `delegation_mode` | `auto`, `disabled`, `bounded` | `auto` | `bounded` requires a positive `worker_limit`; `disabled` requires `worker_surface=root-thread`. |
-| `worker_surface` | `auto`, `root-thread`, `cli-subagent`, `codex-app-thread` | `auto` | `codex-app-thread` requires `app_thread_consent=granted`. |
+| `delegation_mode` | `auto`, `disabled`, `bounded` | `auto` | `bounded` requires a positive `worker_limit`; `disabled` requires `worker_surface=not-applicable`. |
+| `worker_surface` | `auto`, `not-applicable`, `cli-subagent`, `codex-app-thread` | `auto` | `not-applicable` requires `delegation_mode=disabled`; `codex-app-thread` requires `app_thread_consent=granted`. |
 | `app_thread_consent` | `not-requested`, `granted`, `denied` | `not-requested` | Consent applies only to visible user-owned App tasks. |
 | `raw_worktree_fallback` | `forbidden`, `owner-approved` | `forbidden` | Applies when the App cannot create the required managed worktree. |
 | `active_root_takeover_policy` | `owner-approval`, `stale-ledger-check` | `owner-approval` | Controls overlapping-root recovery for the session. |
@@ -131,8 +131,9 @@ Resolution sources are field- and value-specific:
 | Field/value | Allowed sources |
 | --- | --- |
 | `delegation_mode=auto`, `worker_surface=auto`, `app_thread_consent=not-requested`, `raw_worktree_fallback=forbidden`, or `active_root_takeover_policy=owner-approval` | `default`, `owner-instruction`, or `legacy-migration` |
-| `delegation_mode=disabled` or `bounded` | `owner-instruction`, or `legacy-migration` preserving owner evidence |
-| `worker_surface=root-thread` | `owner-instruction`, `runtime-capability`, or `legacy-migration` |
+| `delegation_mode=disabled` | `owner-instruction`, `runtime-capability`, or `legacy-migration` preserving the original restriction evidence |
+| `delegation_mode=bounded` | `owner-instruction`, or `legacy-migration` preserving owner evidence |
+| `worker_surface=not-applicable` | `owner-instruction`, `runtime-capability`, or `legacy-migration` |
 | `worker_surface=cli-subagent` or `codex-app-thread` | `owner-instruction`, or `legacy-migration` preserving owner evidence and required consent |
 | `app_thread_consent=granted` or `denied` | `owner-instruction`, or `legacy-migration` preserving owner evidence |
 | `raw_worktree_fallback=owner-approved` | `owner-instruction` |
@@ -221,13 +222,15 @@ unchanged.
 
 ## Cross-Field Validation
 
-- `delegation_mode=disabled` requires `worker_surface=root-thread` and no active
+- `delegation_mode=disabled` requires `worker_surface=not-applicable` and no active
   delegated worker.
 - `delegation_mode=bounded` requires `worker_limit` to be a positive integer.
   Both rows must preserve identical non-empty `owner-ref`, `scope-ref=session`,
   and `target-ref` evidence tokens.
 - Other `delegation_mode` values require `worker_limit=unbounded`.
-- `worker_surface=root-thread` requires zero active delegated workers.
+- `worker_surface=not-applicable` requires `delegation_mode=disabled` and zero
+  active delegated workers. Other surface values require delegation to remain
+  enabled.
   `worker_surface=cli-subagent` permits only active `cli-subagent` workers, and
   `worker_surface=codex-app-thread` permits only active `codex-app-thread`
   workers. `worker_surface=auto` may use either delegated surface only within
@@ -319,15 +322,17 @@ Read these older fields only for compatibility and rewrite them when touched:
 | Legacy field/value | Canonical replacement |
 | --- | --- |
 | `Session CLI subagents consented: authorized-by-invocation` | `delegation_mode=auto`; `worker_surface=auto` |
-| `Session CLI subagents consented: disabled` | `delegation_mode=disabled`; `worker_surface=root-thread` |
+| `Session CLI subagents consented: disabled` | `delegation_mode=disabled`; `worker_surface=not-applicable` |
 | `Session CLI subagents consented: limited` | `delegation_mode=bounded`; preserve the numeric `worker_limit` |
 | `Session Codex App threads consented: true; max=<positive integer>` | `app_thread_consent=granted`; preserve the numeric `app_thread_limit` |
 | `Session Codex App threads consented: true; max=unspecified` | `app_thread_consent=granted`; `app_thread_limit=1` from the legacy one-visible-worker default |
 | `Session Codex App threads consented: false; max=<n or unspecified>` | `app_thread_consent=denied`; `app_thread_limit=unspecified` |
-| `delegated_worker_surface=none` | `worker_surface=root-thread` |
+| `delegated_worker_surface=none` with any legacy `delegation_mode` | `delegation_mode=disabled`; `worker_surface=not-applicable`; `worker_limit=unbounded`; preserve the original owner or runtime-capability restriction evidence |
 | `delegated_worker_surface=cli-subagent` | `worker_surface=auto` for the invocation-authorized legacy default; use `worker_surface=cli-subagent` only when the legacy row preserves explicit owner selection evidence |
 | `delegated_worker_surface=codex-app-thread` | `worker_surface=codex-app-thread`; preserve legacy consent evidence |
-| `actual_workstream_surface=no-delegation` | `actual_workstream_surface=root-thread` |
+| `worker_surface=root-thread` with any legacy `delegation_mode` | `delegation_mode=disabled`; `worker_surface=not-applicable`; `worker_limit=unbounded`; preserve the original owner or runtime-capability restriction evidence |
+| `actual_workstream_surface=no-delegation` | `actual_workstream_surface=root-session` |
+| `actual_workstream_surface=root-thread` | `actual_workstream_surface=root-session` |
 | `actual_workstream_surface=cli-subagent` | Preserve on the matching workstream only when worker evidence exists |
 | `actual_workstream_surface=codex-app-thread` | Preserve on the matching workstream only when worker evidence exists |
 | `Takeover policy: owner-approval or stale-ledger-check` | `active_root_takeover_policy=<same canonical value>` in the session row |

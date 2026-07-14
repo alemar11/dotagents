@@ -250,7 +250,8 @@ On resume:
        }
        active && /^\| Worker evidence \|/ {
          surface=token_value(norm($3), "actual_workstream_surface")
-         if (workstream == "" || worker !~ /^[A-Za-z0-9:_-]+$/ || surface !~ /^(root-thread|cli-subagent|codex-app-thread)$/) exit 54
+         if (workstream == "" || worker !~ /^[A-Za-z0-9:_-]+$/ || surface !~ /^(root-session|cli-subagent|codex-app-thread)$/) exit 54
+         if (surface == "root-session" && worker != "root") exit 54
          print workstream "\t" worker "\t" surface
        }
      ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1
@@ -283,7 +284,7 @@ On resume:
          if (!(workstream in authoritative) || assigned_worker[workstream] != authoritative_worker[workstream] || assigned_surface[workstream] != authoritative_surface[workstream]) exit 54
        for (workstream in authoritative) {
          if (authoritative_surface[workstream] ~ /^(cli-subagent|codex-app-thread)$/ && !(workstream in assigned)) exit 54
-         if (authoritative_surface[workstream] == "root-thread" && workstream in assigned) exit 54
+         if (authoritative_surface[workstream] == "root-session" && workstream in assigned) exit 54
        }
      }
    ' || exit 54
@@ -374,7 +375,7 @@ On resume:
      }
      function allowed_value(field, value) {
        if (field == "delegation_mode") return matches(value, "auto|disabled|bounded")
-       if (field == "worker_surface") return matches(value, "auto|root-thread|cli-subagent|codex-app-thread")
+       if (field == "worker_surface") return matches(value, "auto|not-applicable|cli-subagent|codex-app-thread")
        if (field == "worker_limit") return matches(value, "unbounded|[1-9][0-9]*")
        if (field == "app_thread_consent") return matches(value, "not-requested|granted|denied")
        if (field == "app_thread_limit") return matches(value, "unspecified|[1-9][0-9]*")
@@ -407,10 +408,14 @@ On resume:
      function allowed_source(field, value, source) {
        if (field == "worker_limit") return value == "unbounded" ? matches(source, "default|owner-instruction|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
        if (field == "app_thread_limit") return value == "unspecified" ? matches(source, "default|owner-instruction|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
-       if (field == "delegation_mode") return value == "auto" ? matches(source, "default|owner-instruction|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
+       if (field == "delegation_mode") {
+         if (value == "auto") return matches(source, "default|owner-instruction|legacy-migration")
+         if (value == "disabled") return matches(source, "owner-instruction|runtime-capability|legacy-migration")
+         return matches(source, "owner-instruction|legacy-migration")
+       }
        if (field == "worker_surface") {
          if (value == "auto") return matches(source, "default|owner-instruction|legacy-migration")
-         if (value == "root-thread") return matches(source, "owner-instruction|runtime-capability|legacy-migration")
+         if (value == "not-applicable") return matches(source, "owner-instruction|runtime-capability|legacy-migration")
          return matches(source, "owner-instruction|legacy-migration")
        }
        if (field == "app_thread_consent") return value == "not-requested" ? matches(source, "default|owner-instruction|legacy-migration") : matches(source, "owner-instruction|legacy-migration")
@@ -505,9 +510,10 @@ On resume:
        for (scope_id in applicable_workstream_scope)
          for (field in expected_workstream)
            if (present[scope_id SUBSEP field] != 1) exit 45
-       if (resolved["session" SUBSEP "delegation_mode"] == "disabled" && resolved["session" SUBSEP "worker_surface"] != "root-thread") exit 48
+       if (resolved["session" SUBSEP "delegation_mode"] == "disabled" && resolved["session" SUBSEP "worker_surface"] != "not-applicable") exit 48
        if (resolved["session" SUBSEP "delegation_mode"] == "disabled" && active_delegated_count != 0) exit 48
-       if (resolved["session" SUBSEP "worker_surface"] == "root-thread" && active_delegated_count != 0) exit 48
+       if (resolved["session" SUBSEP "delegation_mode"] != "disabled" && resolved["session" SUBSEP "worker_surface"] == "not-applicable") exit 48
+       if (resolved["session" SUBSEP "worker_surface"] == "not-applicable" && active_delegated_count != 0) exit 48
        if (resolved["session" SUBSEP "worker_surface"] == "cli-subagent" && active_app_count != 0) exit 48
        if (resolved["session" SUBSEP "worker_surface"] == "codex-app-thread" && active_delegated_count != active_app_count) exit 48
        if (resolved["session" SUBSEP "delegation_mode"] != "bounded" && resolved["session" SUBSEP "worker_limit"] != "unbounded") exit 48

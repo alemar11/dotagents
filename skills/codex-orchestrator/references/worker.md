@@ -30,7 +30,7 @@ Session option fields:
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `delegation_mode` | `auto`, `disabled`, `bounded` | Whether the root may delegate and whether `worker_limit` bounds delegation. |
-| `worker_surface` | `auto`, `root-thread`, `cli-subagent`, `codex-app-thread` | Requested session surface. `codex-app-thread` is a separately created visible App task. |
+| `worker_surface` | `auto`, `not-applicable`, `cli-subagent`, `codex-app-thread` | Requested delegated-worker surface. Use `not-applicable` only when delegation is disabled; `codex-app-thread` is a separately created visible App task. |
 | `app_thread_consent` | `not-requested`, `granted`, `denied` | Session consent for visible App tasks. |
 | `raw_worktree_fallback` | `forbidden`, `owner-approved` | Whether an App session may fall back to a raw Git worktree after managed-worktree failure evidence. |
 
@@ -41,7 +41,7 @@ Execution fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `actual_workstream_surface` | `root-thread`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-thread` owner-facing as `root thread (no-delegation)`. Do not present internal subagents as separately created App tasks. |
+| `actual_workstream_surface` | `root-session`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-session` owner-facing as `current session`. Do not present internal subagents as separately created App tasks. |
 | `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `review-ready`, `ci-rerun-fix`, `release` | Capability flags; list every allowed action explicitly. `review-ready` also requires exact root-listed sub-actions. Merge and source closeout remain root-owned. |
 
 Worker report fields:
@@ -134,7 +134,7 @@ owner action.
 
 The root chooses the number of workers and split for each wave within
 `delegation_mode`, `worker_surface`, `worker_limit`, `app_thread_consent`, and
-`app_thread_limit`. It may still keep work in the root thread or stop for owner
+`app_thread_limit`. It may still keep work in the root session or stop for owner
 input when source, repo, dependency, gate, or tool state makes dispatch unsafe.
 There is no separate workspace execution mode; serial and parallel owner
 requests are resolved through these existing session fields plus the issue
@@ -159,12 +159,12 @@ phrase. If wording could resolve to more than one `worker_surface` or
 
 Do not spawn a `cli-subagent` when `worker_surface=codex-app-thread`. If the App
 surface is unavailable, require a new canonical selection or keep the work in
-`root-thread`; never infer a fallback from wording.
+`root-session`; never infer a fallback from wording.
 
 If Codex App thread tools are requested but unavailable, stop before dispatch
 and report the missing create/read/message thread surface. Do not silently
 downgrade to `cli-subagent`; ask for explicit fallback authorization or keep
-the work in the root thread.
+the work in the root session.
 
 ## Delegation Rules
 
@@ -176,7 +176,7 @@ the work in the root thread.
   file, contract, test, and validation boundaries.
 - In single repos and monorepos, keep shared contracts, dependencies, root
   config, migrations, generated snapshots, broad tests, conflict resolution,
-  and final integration in the root thread.
+  and final integration in the root session.
 - Stay in root when orchestration overhead dominates, work overlaps heavily, no
   inspectable surface exists, delegation is unauthorized, or remaining work is
   mostly gates, ledger updates, closeout, or publication decisions.
@@ -226,7 +226,7 @@ When visible App tasks may be useful and `app_thread_consent=not-requested`, ask
 for these fields rather than offering prose reply shapes:
 
 ```text
-worker_surface=<auto|root-thread|cli-subagent|codex-app-thread>
+worker_surface=<auto|cli-subagent|codex-app-thread>
 app_thread_consent=<granted|denied>
 app_thread_limit=<positive integer when granted>
 ```
@@ -268,14 +268,14 @@ and values; refs and proof stay in separate data columns:
 
 | wave | workstream | actual_workstream_surface | scope | parallelization | dependency_ids | blocked_issue_ids | dependency_reason | dependency_proof | worker_authorization | expected_output |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <wave> | <name/ref> | <root-thread|cli-subagent|codex-app-thread> | <repo/package/paths> | <independent|depends-on|blocks|root-integrated> | <refs|none> | <refs|none> | <reason|none> | <evidence|pending|none> | <modes and limits> | <patch|report|commit|pr> |
+| <wave> | <name/ref> | <root-session|cli-subagent|codex-app-thread> | <repo/package/paths> | <independent|depends-on|blocks|root-integrated> | <refs|none> | <refs|none> | <reason|none> | <evidence|pending|none> | <modes and limits> | <patch|report|commit|pr> |
 
 A workstream defines the implementation slice. It creates a worker only when
 `actual_workstream_surface` is `cli-subagent` or `codex-app-thread`;
-`root-thread` means the root orchestrator owns that slice directly.
+`root-session` means the root orchestrator owns that slice directly.
 
 For root-only work, do not write a prose alias such as `none; root-owned` in
-the owner-facing report. Use `actual_workstream_surface=root-thread`. If no
+the owner-facing report. Use `actual_workstream_surface=root-session`. If no
 automation will be created or updated, do not mention automation in the report
 unless it is relevant to a stop condition.
 
@@ -401,7 +401,7 @@ to overlapping scope, reconcile the worker with root-integrated state:
   fixtures, or docs;
 - either hand the worker to a current checkout, send a precise resync brief
   with the accepted root changes, create a fresh worker from the current root,
-  or keep the overlapping integration in the root thread;
+  or keep the overlapping integration in the root session;
 - do not ask a stale worker to keep editing overlapping files until the resync
   path is explicit in the ledger.
 
@@ -578,8 +578,8 @@ You are a Codex worker for the <portfolio> portfolio.
 Scope:
 - repository: <repo path or owner/repo>
 - workstream: <short name>
-- worker_surface: <auto|root-thread|codex-app-thread|cli-subagent>
-- actual_workstream_surface: <root-thread|codex-app-thread|cli-subagent>
+- worker_surface: <auto|not-applicable|codex-app-thread|cli-subagent>
+- actual_workstream_surface: <root-session|codex-app-thread|cli-subagent>
 - worker_id: <id or pending>
 - worker_title: <title or pending>
 - worker_evidence: authorization_state=<authorized-by-invocation|owner-consented|not-authorized>;
