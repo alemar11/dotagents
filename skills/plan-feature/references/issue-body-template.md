@@ -126,7 +126,7 @@ behavior; never use this section to justify a docs-only issue.]
   - Invoke `$project-memory` with `memory_slice=domain-memory` and
     `domain_operation=implementation-closeout` after the integrated behavior is
     proven. Project Memory must run its internal domain-modeling workflow;
-    reading `project-memory/agents/domain.md` or editing the targets directly
+    reading `project-memory/config/domain.md` or editing the targets directly
     is not a substitute.
 
 - Decisions:

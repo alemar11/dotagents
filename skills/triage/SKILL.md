@@ -42,14 +42,14 @@ Canonical triage states:
 requester answers, move or treat the issue as `needs-triage` again and
 re-evaluate it before it can become `ready-for-agent`.
 
-Use `project-memory/agents/triage-labels.md` to map these canonical names to
+Use `project-memory/config/triage-labels.md` to map these canonical names to
 GitHub issue types and labels. Local Markdown persists the canonical fields
 and values directly.
 
 ## Hard Requirements
 
-- Load `project-memory/agents/issue-tracker.md` and
-  `project-memory/agents/triage-labels.md` before mapped tracker mutations when
+- Load `project-memory/config/issue-tracker.md` and
+  `project-memory/config/triage-labels.md` before mapped tracker mutations when
   they exist.
 - Do not require broad project-memory setup merely to inspect or classify one
   named issue. If routing or mappings are missing, use the one-issue
@@ -106,9 +106,9 @@ or mappings are actually needed.
 
 Read when present and relevant:
 
-- `project-memory/agents/issue-tracker.md`
-- `project-memory/agents/triage-labels.md`
-- `project-memory/agents/domain.md` only when domain context affects the issue
+- `project-memory/config/issue-tracker.md`
+- `project-memory/config/triage-labels.md`
+- `project-memory/config/domain.md` only when domain context affects the issue
 - `CONTEXT.md` or `CONTEXT-MAP.md`, when relevant
 - existing issue templates or local tracker docs, when present
 
@@ -136,7 +136,7 @@ Request type and relationship fields when useful, but if the installed `gh`
 version rejects them, use the configured fallback from `triage-labels.md`.
 
 For local markdown, use the configured local issue layout from
-`project-memory/agents/issue-tracker.md` and `references/local-markdown.md`.
+`project-memory/config/issue-tracker.md` and `references/local-markdown.md`.
 
 ### 3. Gather evidence
 

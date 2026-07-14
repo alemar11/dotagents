@@ -1,6 +1,6 @@
 # Local Markdown Issues
 
-Use this format when `project-memory/agents/issue-tracker.md` says issues live
+Use this format when `project-memory/config/issue-tracker.md` says issues live
 as local markdown. Local issue roots may be repo-local `.scratch/<feature>/`
 folders or orchestrator workspace
 `projects/<project>/features/<feature>/` folders.

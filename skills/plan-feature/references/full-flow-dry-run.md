@@ -34,7 +34,7 @@ prd_body_fingerprint: sha256:7f4a9c21d003
 capture_mode: defer-to-caller
 capture_outcome: deferred
 option_resolution: see-canonical-run-option-rows-below
-option_rows_fingerprint: sha256:d634ac958acbafcb43916e5cb8fc883a90e778e0d0bb1c5ae3b3b7f22489f338
+option_rows_fingerprint: sha256:4f8179bf10138c6335fd3819265f93cf06f6b9c2bc3b6c53fcfd6aa6691d05d7
 domain_knowledge_delta:
   knowledge_delta: required
   decisions:
@@ -54,7 +54,7 @@ domain_knowledge_delta:
 | --- | --- | --- | --- | --- | --- |
 | `run:mode` | `run` | `mode` | `full-flow` | `owner-instruction` | `fixture-intent` |
 | `run:execution_profile` | `run` | `execution_profile` | `standard` | `default` | `none` |
-| `run:tracker_backend` | `run` | `tracker_backend` | `github` | `tracker-config` | `project-memory/agents/issue-tracker.md` |
+| `run:tracker_backend` | `run` | `tracker_backend` | `github` | `tracker-config` | `project-memory/config/issue-tracker.md` |
 | `run:effective_target` | `run` | `effective_target` | `draft-publish-commands` | `runtime-derived` | `run:no_mutation_override+run:no_mutation_output` |
 | `run:no_mutation_override` | `run` | `no_mutation_override` | `dry-run` | `owner-instruction` | `fixture-intent` |
 | `run:no_mutation_output` | `run` | `no_mutation_output` | `publish-commands` | `owner-instruction` | `fixture-intent` |
@@ -99,7 +99,7 @@ issue_option_rows_fingerprint: sha256:92b2748d73d29436dc88e2544f51cff216032a0a75
 
 ## Representative Issue-Phase Handoff
 
-option_rows_fingerprint: sha256:02437261e61ebd4cc50adc0c3d740e9f8d156ca7821ed26426fbbaffd4da26fe
+option_rows_fingerprint: sha256:21619b114c0e689b1b0f364620775abacc3603dcaa30881e83c406ef7518c471
 issue_count: 1
 issue_refs: draft-issue:account-settings-export:01
 

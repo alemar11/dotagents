@@ -11,9 +11,9 @@ Use `$project-memory` as the single public entry point for durable repository
 memory:
 
 - lean project-memory pointers in `AGENTS.md`;
-- tracker and delivery routing in `project-memory/agents/issue-tracker.md`;
-- issue type/state mappings in `project-memory/agents/triage-labels.md`;
-- domain layout in `project-memory/agents/domain.md`;
+- tracker and delivery routing in `project-memory/config/issue-tracker.md`;
+- issue type/state mappings in `project-memory/config/triage-labels.md`;
+- domain layout in `project-memory/config/domain.md`;
 - `CONTEXT.md`, domain docs, and ADRs under `project-memory/adr/`;
 - optional `TRANSLATION.md` when localization rules are real.
 
@@ -58,7 +58,7 @@ use `write_mode=apply` only when the selected scope has write authority.
   dedicated memory surfaces.
 - Load `references/domain-modeling.md` before creating, updating, reviewing, or
   reconciling `CONTEXT.md`, domain docs, or ADRs. Reading
-  `project-memory/agents/domain.md` is not equivalent.
+  `project-memory/config/domain.md` is not equivalent.
 - Seed durable memory only from strong repo evidence, committed behavior,
   accepted tracker decisions, final session evidence, or explicit user
   acceptance. Exclude tentative/rejected ideas, secrets, raw logs, and weak
@@ -141,7 +141,7 @@ recent same-repo evidence is strong enough to be durable.
 
 When `AGENTS.md` mixes concerns, keep operating rules there and route project
 purpose/vocabulary to `CONTEXT.md`, localization to `TRANSLATION.md`, tracker
-and layout settings to `project-memory/agents/*`, and accepted load-bearing
+and layout settings to `project-memory/config/*`, and accepted load-bearing
 decisions to ADRs.
 
 ### 3. Resolve Settings Or Delta

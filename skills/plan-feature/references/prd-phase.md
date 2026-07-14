@@ -62,9 +62,9 @@ drafting or write. Stop on a mismatch.
 
 For `lean-prd`, begin with only:
 
-- `project-memory/agents/issue-tracker.md`;
-- `project-memory/agents/triage-labels.md`;
-- the shape/ownership routing in `project-memory/agents/domain.md` and
+- `project-memory/config/issue-tracker.md`;
+- `project-memory/config/triage-labels.md`;
+- the shape/ownership routing in `project-memory/config/domain.md` and
   `CONTEXT-MAP.md` when either exists, without loading unrelated content;
 - the selected `CONTEXT.md` only when needed to resolve terminology or scope;
 - the supplied intent plus directly relevant source, tests, or product docs.
@@ -76,9 +76,9 @@ contradictory, or reveals multi-context/cross-repo ownership. Widen to
 
 For `standard`, inspect the current project context before drafting:
 
-- `project-memory/agents/issue-tracker.md`
-- `project-memory/agents/triage-labels.md`
-- `project-memory/agents/domain.md`
+- `project-memory/config/issue-tracker.md`
+- `project-memory/config/triage-labels.md`
+- `project-memory/config/domain.md`
 - `CONTEXT.md` or `CONTEXT-MAP.md`
 - `TRANSLATION.md`, when present for the selected context
 - `project-memory/adr/`
@@ -90,7 +90,7 @@ For `standard`, inspect the current project context before drafting:
 If setup files are missing, continue with repo evidence and say which project
 memory files were unavailable.
 
-If `CONTEXT-MAP.md` or `project-memory/agents/domain.md` indicates a
+If `CONTEXT-MAP.md` or `project-memory/config/domain.md` indicates a
 multi-context repo or monorepo, resolve the selected product/workspace context
 before writing:
 
@@ -209,8 +209,8 @@ or the generated implementation issues, not in the PRD content itself.
 
 ### 4. Choose Publication Target
 
-Read `project-memory/agents/issue-tracker.md` for the repo target and
-`project-memory/agents/triage-labels.md` for the mapped `feature` type.
+Read `project-memory/config/issue-tracker.md` for the repo target and
+`project-memory/config/triage-labels.md` for the mapped `feature` type.
 `references/options.md` solely owns effective-target and local-mirror option
 resolution. After that resolution, `$project-memory`'s
 `references/tracker-publishing.md` owns transient body transport, mirror-path

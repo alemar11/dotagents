@@ -44,7 +44,7 @@ Infer the repo from `git remote -v` unless this file records a specific target.
 Use `$gitstack:github-issues` to create, read, edit, comment on, label, type, attach, or
 close GitHub issues.
 
-Use `project-memory/agents/triage-labels.md` for type and label mappings. The
+Use `project-memory/config/triage-labels.md` for type and label mappings. The
 default GitHub issue types are:
 
 - `Bug` for `bug`
@@ -61,7 +61,7 @@ The default GitHub workflow-state labels are lowercase tracker values:
 
 If GitHub issue types are disabled or customized for the organization, record
 the actual available values or fallback label convention in
-`project-memory/agents/triage-labels.md`.
+`project-memory/config/triage-labels.md`.
 
 ## Delivery Defaults
 

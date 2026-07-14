@@ -2,7 +2,7 @@
 
 Use this reference when `$plan-feature` needs to
 write local artifacts, mutate a hosted tracker, or return draft publish
-commands. `project-memory/agents/issue-tracker.md` remains the repo-specific
+commands. `project-memory/config/issue-tracker.md` remains the repo-specific
 source of truth; this file defines the shared mechanics.
 
 ## Tracker Backend

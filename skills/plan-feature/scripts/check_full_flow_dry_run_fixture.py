@@ -15,7 +15,7 @@ REMOVED_ISSUE_PATH = "skills/to" + "-issues"
 LEGACY_WORKER_AUTH_KEY = "default" + "_worker_authorization"
 LEGACY_WORKER_AUTH_HEADING = "Worker " + "Authorization Defaults"
 LEGACY_DEFAULT_WORKER_AUTH = "Default worker " + "authorization"
-ORCHESTRATION_POLICY_PATH = "project-memory/agents/orchestration" + "-policy.md"
+ORCHESTRATION_POLICY_PATH = "project-memory/config/orchestration" + "-policy.md"
 STALE_NO_GATES_REMAIN = "no " + "gates remain"
 STALE_GATES_RESOLVED = "gates " + "resolved or deferred"
 STALE_REPO_PR_PLACEHOLDERS = "repo PR links " + "or placeholders"
@@ -202,7 +202,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "tracker_backend": (
                 "github",
                 "tracker-config",
-                "project-memory/agents/issue-tracker.md",
+                "project-memory/config/issue-tracker.md",
             ),
             "effective_target": (
                 "draft-publish-commands",
@@ -795,7 +795,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             self.assertIn(required_gate, plan_feature)
 
         self.assertIn("For `lean-prd`, begin with only", prd_phase)
-        self.assertIn("project-memory/agents/domain.md", prd_phase)
+        self.assertIn("project-memory/config/domain.md", prd_phase)
         self.assertIn("`CONTEXT-MAP.md` when either exists", prd_phase)
         self.assertIn("Widen to\n`standard`", prd_phase)
         self.assertIn("For `lean-issues`, read the durable PRD once", issue_phase)

@@ -92,7 +92,7 @@ values.
 
 Render the validated rows through `references/issue-body-template.md`.
 `issue_type` and `workflow_state` stay canonical in issue bodies;
-`project-memory/agents/triage-labels.md` maps them only at the GitHub boundary.
+`project-memory/config/triage-labels.md` maps them only at the GitHub boundary.
 Normalize touched legacy aliases to the canonical lower-kebab values.
 
 ## Workflow
@@ -112,8 +112,8 @@ Find or ask for the PRD source:
 
 Also inspect:
 
-- `project-memory/agents/issue-tracker.md`,
-- `project-memory/agents/triage-labels.md`,
+- `project-memory/config/issue-tracker.md`,
+- `project-memory/config/triage-labels.md`,
 - `CONTEXT.md` or `CONTEXT-MAP.md`,
 - `TRANSLATION.md`, when present for the selected context,
 - `project-memory/adr/`,
@@ -300,7 +300,7 @@ withhold failures.
 
 ### 5. Apply Issue Type And Triage State
 
-Read `project-memory/agents/triage-labels.md` and map canonical issue types
+Read `project-memory/config/triage-labels.md` and map canonical issue types
 and triage states to the repo's tracker values.
 
 - Use the canonical `task` type for generated implementation issues unless the
@@ -320,13 +320,13 @@ and triage states to the repo's tracker values.
 
 Canonical values are decision inputs, not necessarily tracker values. Before
 writing an issue file or calling `$gitstack:github-issues`, resolve the mapped tracker
-value from `project-memory/agents/triage-labels.md`. In default GitHub mode,
+value from `project-memory/config/triage-labels.md`. In default GitHub mode,
 `ready-for-agent` maps to the same lowercase label. In custom tracker setups,
 do not assume the canonical string is the label; read the mapping first.
 
 ### 6. Publish Or Return Issues
 
-Use `project-memory/agents/issue-tracker.md` for the target, and read
+Use `project-memory/config/issue-tracker.md` for the target, and read
 `$project-memory`'s `references/tracker-publishing.md` for shared
 effective-target, temporary body-file, and `source_prd_ref` rules:
 
