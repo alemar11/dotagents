@@ -1,7 +1,7 @@
 # Worker Reference
 
 Use this reference before creating, naming, messaging, steering, or closing
-Codex worker threads or subagents.
+Codex worker surfaces or subagents.
 
 ## Worker Fields
 
@@ -14,35 +14,37 @@ orchestrator. Do not read worker assignments, worker-count limits, dispatch
 flags, authorization ceilings, publication policy, issue mutation policy,
 Feature Spec-specific worker settings, or issue-specific worker settings from
 project-memory defaults, tracker templates, generated issues, or draft publish
-commands. If legacy project-memory
-worker-authorization setup appears, ignore it as stale, non-authoritative state.
+commands. Any project-memory worker-authorization setup is invalid,
+non-authoritative state.
 
-Product surface references: visible Codex App thread creation is documented in
+Product surface references: visible Codex App task creation is documented in
 <https://developers.openai.com/codex/app/features>, CLI/App subagents are
 documented in <https://developers.openai.com/codex/subagents>, and Codex
 instruction discovery is documented in
 <https://developers.openai.com/codex/guides/agents-md>.
-In the current Codex App surface, project-scoped visible-thread creation uses
-`codex_app.list_projects` before `codex_app.create_thread`.
+In the current Codex App surface, visible task creation uses `create_thread`.
+Use its managed worktree target when a dedicated checkout is required, then
+use the returned task identifier for later task operations. Search the current
+tool registry before relying on any optional project-selection argument.
 
 Session option fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `delegation_mode` | `auto`, `disabled`, `bounded` | Whether the root may delegate and whether `worker_limit` bounds delegation. |
-| `worker_surface` | `auto`, `not-applicable`, `cli-subagent`, `codex-app-thread` | Requested delegated-worker surface. Use `not-applicable` only when delegation is disabled; `codex-app-thread` is a separately created visible App task. |
-| `app_thread_consent` | `not-requested`, `granted`, `denied` | Session consent for visible App tasks. |
-| `raw_worktree_fallback` | `forbidden`, `owner-approved` | Whether an App session may fall back to a raw Git worktree after managed-worktree failure evidence. |
+| `work_delegation_policy` | `orchestrator-decides-for-each-implementation-workstream`, `run-all-work-in-current-orchestrator-session`, `orchestrator-decides-with-concurrent-worker-limit` | Whether work may be delegated and whether the authorized user sets a concurrency ceiling. |
+| `delegated_worker_visibility` | `orchestrator-decides-between-background-and-visible-workers`, `background-codex-subagents-only`, `visible-codex-app-tasks-only`, `not-applicable` | Which delegated worker types may be used. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | Permission for visible user-owned App tasks. |
+| `unmanaged_git_worktree_fallback_permission` | `not-granted`, `granted-by-authorized-user` | Permission for an unmanaged Git worktree after managed-worktree failure evidence. |
 
-`worker_limit` and `app_thread_limit` are numeric/data fields governed by
+`max_concurrent_delegated_workers` and `max_visible_app_tasks` are numeric/data fields governed by
 `options.md`, not prose or boolean option values.
 
 Execution fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `actual_workstream_surface` | `root-session`, `cli-subagent`, `codex-app-thread` | Where the workstream actually runs. Display `root-session` owner-facing as `current session`. Do not present internal subagents as separately created App tasks. |
-| `worker_authorization` | `inspect`, `implement`, `commit`, `push`, `pr`, `review-ready`, `ci-rerun-fix`, `release` | Capability flags; list every allowed action explicitly. `review-ready` also requires exact root-listed sub-actions. Merge and source closeout remain root-owned. |
+| `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` | Where the workstream actually runs. The current-session value works in both CLI and App. |
+| `worker_allowed_actions` | See the canonical list below | Independent action list. Merge and source closeout remain root-owned. |
 
 Worker report fields:
 
@@ -56,14 +58,14 @@ Integration fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `branch_expectation` | `feature-branch`, `repo-feature-branch`, `direct-commit-target`, `none` | Expected landing target. |
+| `branch_expectation` | `feature-branch`, `repository-feature-branch`, `named-target-branch`, `none` | Expected landing target. |
 | `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, `pending` | Root integration path. Replace `pending` before lifecycle closeout or record that no output was integrated. |
-| `caller_checkout_policy` | `preserve-current-branch`, `caller-checkout-approved`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
-| `publication_checkout` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, draft PR publication, and ready-for-review transition will run. |
+| `starting_checkout_branch_handling` | `keep-current-branch-checked-out`, `branch-switch-authorized`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
+| `result_checkout_path` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, draft PR publication, and ready-for-review transition will run. |
 
 In a Codex App session, `worker-worktree` and `integration-worktree` mean a
-worktree owned by a visible App thread whenever the root creates or allocates a
-new dedicated checkout. Record the App thread id with the checkout. This
+worktree owned by a visible App task whenever the root creates or allocates a
+new dedicated checkout. Record the returned App task identifier with the checkout. This
 binding does not apply in CLI-only sessions or to an existing owner-supplied
 checkout.
 
@@ -73,8 +75,10 @@ Search the current tool registry before dispatch or lifecycle operations; tool
 names are runtime-dependent. In the current surface, internal subagent
 operations map to `spawn_agent`, `list_agents`, `send_message`,
 `followup_task`, `interrupt_agent`, and `wait_agent`. Separately created App
-tasks map to `list_projects`, `create_thread`, `list_threads`, `read_thread`,
-`send_message_to_thread`, title/archive/pin, fork, and handoff/status tools.
+tasks map to `create_thread`, `list_threads`, `read_thread`,
+`send_message_to_thread`, `set_thread_title`, `set_thread_archived`,
+`set_thread_pinned`, `fork_thread`, and `handoff_thread` when those tools are
+available.
 
 Do not claim a resume or close operation when the runtime exposes only
 follow-up, interrupt, or archive. Read current state first, use the narrowest
@@ -83,10 +87,8 @@ worktree creation, starting state may be the project default, an existing named
 branch, or the current working tree when supported; a branch start argument
 selects an existing ref and does not name a new branch.
 
-Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-as legacy aliases. Treat older `push-pr` authorization as a legacy alias for
-`commit`, `push`, and `pr`, then rewrite touched values to the exact authorized
-subset.
+Lower-kebab-case values are canonical. Retired surface and capability values
+are invalid input; do not reinterpret or silently upgrade them.
 
 The canonical execution values are the worker-surface fields above. In the
 owner-facing execution report, `Execution mode` is only a display summary
@@ -107,7 +109,7 @@ external-mutation action. Record:
 - `codex_cli`: available, unavailable, or not-required;
 - `autoreview`: available, unavailable, or reroute-to-root, using
   `autoreview doctor --json` when applicable;
-- `checked_at`: timestamp plus the tool, thread metadata, or command that
+- `checked_at`: timestamp plus the tool, task metadata, or command that
   produced the evidence.
 
 Do not assume a fork inherits broader permissions than its parent. If a
@@ -118,7 +120,7 @@ scope, authority, and gates permit; otherwise record the blocker. Never copy
 credentials into a worker to manufacture capability.
 
 Automation creation, updates, and scheduling require a matching source- or
-workstream-scoped `automation_authority=explicit-owner-authorization` row and are
+workstream-scoped `scheduled_automation_change_permission=granted-by-authorized-user` row and are
 runtime-tool-dependent. Project memory does not store scheduled check timing
 and cannot supply that option.
 The ledger is the monitoring surface: record source status,
@@ -126,23 +128,24 @@ worker/workstream status, blockers, `Last Read`, and `Next Check` /
 `Next Scan/Check` there. The root may create, update, or schedule an automation
 only when the runtime exposes automation tooling and the matching scoped
 option-resolution row records
-`automation_authority=explicit-owner-authorization` with owner evidence naming
+`scheduled_automation_change_permission=granted-by-authorized-user` with owner evidence naming
 the exact automation target.
 If automation tooling is unavailable, do not imply anything was scheduled;
 draft the proposed automation instructions, schedule, and handoff text for
 owner action.
 
 The root chooses the number of workers and split for each wave within
-`delegation_mode`, `worker_surface`, `worker_limit`, `app_thread_consent`, and
-`app_thread_limit`. It may still keep work in the root session or stop for owner
+`work_delegation_policy`, `delegated_worker_visibility`, `max_concurrent_delegated_workers`, `visible_app_task_permission`, and
+`max_visible_app_tasks`. It may still keep work in the root session or stop for owner
 input when source, repo, dependency, gate, or tool state makes dispatch unsafe.
 There is no separate workspace execution mode; serial and parallel owner
 requests are resolved through these existing session fields plus the issue
 graph, dependency state, and repo/branch/worktree safety.
 
 When the current runtime is the Codex App and the root chooses a new dedicated
-worker, integration, or publication worktree, select `codex-app-thread` and
-create the thread with a worktree target before implementation. Do not run the
+worker, integration, or publication worktree, select
+`delegated_worker_visibility=visible-codex-app-tasks-only` and create the task
+with a worktree target before implementation. Do not run the
 implementation through CLI subagents in the caller checkout and move the
 integrated diff into a manually created worktree only for publication. If the
 App operation is missing, fails, or cannot represent the required starting
@@ -154,16 +157,18 @@ to a raw Git worktree. CLI-only sessions may use raw Git worktrees directly.
 Resolve session behavior from the canonical fields in `options.md`. Owner
 wording is evidence only: record it in the option-resolution row, normalize it
 to one value per field, and never compare downstream behavior against the
-phrase. If wording could resolve to more than one `worker_surface` or
-`delegation_mode`, ask for canonical field assignments before dispatch.
+phrase. If wording could resolve to more than one `delegated_worker_visibility` or
+`work_delegation_policy`, ask for canonical field assignments before dispatch.
 
-Do not spawn a `cli-subagent` when `worker_surface=codex-app-thread`. If the App
+Do not spawn a background Codex subagent when
+`delegated_worker_visibility=visible-codex-app-tasks-only`. If the App
 surface is unavailable, require a new canonical selection or keep the work in
-`root-session`; never infer a fallback from wording.
+`current-orchestrator-session`; never infer a fallback from wording.
 
-If Codex App thread tools are requested but unavailable, stop before dispatch
-and report the missing create/read/message thread surface. Do not silently
-downgrade to `cli-subagent`; ask for explicit fallback authorization or keep
+If Codex App task tools are requested but unavailable, stop before dispatch
+and report the missing create/read/message task surface. Do not silently
+downgrade to a background Codex subagent; ask for explicit fallback
+authorization or keep
 the work in the root session.
 
 ## Delegation Rules
@@ -185,21 +190,21 @@ the work in the root session.
   `parallelization=root-integrated` implementation in root; workers may inspect
   or prove only when root keeps integration ownership.
 - Workers may inspect, implement, test, and report only within their authorized
-  mode. They must not spawn sub-workers, create threads, manage chats, edit
+  mode. They must not spawn sub-workers, create tasks, manage tasks, edit
   ledgers, create active-root claims, decide takeover or handoff, choose branch
   strategy, mutate sources, or delegate their assignment.
 - Workers must preserve unrelated local changes and stage only authorized
   paths. Only the root creates, reuses, forks, assigns, renames, messages,
-  archives, closes, interrupts, or replaces worker threads.
+  archives, closes, interrupts, or replaces worker tasks.
 - When visible Codex App workers provide helper worktrees, preserve the caller
   checkout branch by default. Root-owned integration, validation, commit, push,
   and PR creation should run from the worker worktree or a dedicated integration
   worktree. Switching the caller checkout is allowed only when the scoped row
-  is `caller_checkout_policy=caller-checkout-approved`. An unavailable helper
+  is `starting_checkout_branch_handling=branch-switch-authorized`. An unavailable helper
   checkout does not change that value.
 - In the Codex App, if the root decides a new dedicated worktree is needed for
-  implementation, integration, or publication, create a visible App thread
-  with a worktree environment and bind the checkout to that thread in the
+  implementation, integration, or publication, create a visible App task
+  with a worktree environment and bind the checkout to that task in the
   ledger. Do not create an unowned raw Git worktree merely to preserve the
   caller checkout. This requirement does not apply in CLI-only sessions.
 
@@ -208,13 +213,13 @@ the work in the root session.
 Initialize every session with:
 
 ```text
-delegation_mode=auto
-worker_surface=auto
-worker_limit=unbounded
-app_thread_consent=not-requested
-app_thread_limit=unspecified
-raw_worktree_fallback=forbidden
-project_topology=<from project memory, safe repo evidence, or owner instruction>
+work_delegation_policy=orchestrator-decides-for-each-implementation-workstream
+delegated_worker_visibility=orchestrator-decides-between-background-and-visible-workers
+max_concurrent_delegated_workers=not-limited-by-authorized-user
+visible_app_task_permission=not-requested
+max_visible_app_tasks=not-applicable
+unmanaged_git_worktree_fallback_permission=not-granted
+repository_layout=<from project memory, safe repo evidence, or authorized-user instruction>
 ```
 
 These defaults authorize internal CLI subagent selection but not visible App
@@ -222,17 +227,17 @@ task creation, raw-worktree fallback, or automation mutation. If owner input
 changes a default, record the canonical assignment and its evidence in the
 ledger `## Option Resolution` table before dispatch.
 
-When visible App tasks may be useful and `app_thread_consent=not-requested`, ask
+When visible App tasks may be useful and `visible_app_task_permission=not-requested`, ask
 for these fields rather than offering prose reply shapes:
 
 ```text
-worker_surface=<auto|cli-subagent|codex-app-thread>
-app_thread_consent=<granted|denied>
-app_thread_limit=<positive integer when granted>
+delegated_worker_visibility=<orchestrator-decides-between-background-and-visible-workers|background-codex-subagents-only|visible-codex-app-tasks-only>
+visible_app_task_permission=<granted-by-authorized-user|denied-by-authorized-user>
+max_visible_app_tasks=<positive integer when permission is granted>
 ```
 
 Reject incomplete or conflicting combinations using `options.md`. A bare
-affirmation is not a value and cannot grant consent or a limit. While a required
+affirmation is not a value and cannot grant permission or a limit. While a required
 field is unresolved, continue only root-owned discovery, source registration,
 and wave shaping that does not create workers, edit implementation, mutate
 sources, commit, push, or publish.
@@ -266,23 +271,24 @@ Then use this compact decision table:
 Then include one row per workstream. Option fields keep their canonical names
 and values; refs and proof stay in separate data columns:
 
-| wave | workstream | actual_workstream_surface | scope | parallelization | dependency_ids | blocked_issue_ids | dependency_reason | dependency_proof | worker_authorization | expected_output |
+| wave | workstream | actual_execution_location | scope | parallelization | dependency_ids | blocked_issue_ids | dependency_reason | dependency_proof | worker_allowed_actions | expected_output |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <wave> | <name/ref> | <root-session|cli-subagent|codex-app-thread> | <repo/package/paths> | <independent|depends-on|blocks|root-integrated> | <refs|none> | <refs|none> | <reason|none> | <evidence|pending|none> | <modes and limits> | <patch|report|commit|pr> |
+| <wave> | <name/ref> | <current-orchestrator-session|background-codex-subagent|visible-codex-app-task> | <repo/package/paths> | <independent|depends-on|blocks|root-integrated> | <refs|none> | <refs|none> | <reason|none> | <evidence|pending|none> | <explicit action list> | <patch|report|commit|pull-request> |
 
 A workstream defines the implementation slice. It creates a worker only when
-`actual_workstream_surface` is `cli-subagent` or `codex-app-thread`;
-`root-session` means the root orchestrator owns that slice directly.
+`actual_execution_location` is `background-codex-subagent` or
+`visible-codex-app-task`;
+`current-orchestrator-session` means the root orchestrator owns that slice directly.
 
 For root-only work, do not write a prose alias such as `none; root-owned` in
-the owner-facing report. Use `actual_workstream_surface=root-session`. If no
+the owner-facing report. Use `actual_execution_location=current-orchestrator-session`. If no
 automation will be created or updated, do not mention automation in the report
 unless it is relevant to a stop condition.
 
 ## Recurring Feature Spec Automation
 
 For a recurring Feature Spec automation, require
-the Feature Spec-scoped `automation_authority=explicit-owner-authorization` row and
+the Feature Spec-scoped `scheduled_automation_change_permission=granted-by-authorized-user` row and
 carry that scoped row plus the canonical session option snapshot into every
 run. Ask no Feature Spec-specific worker-surface
 question unless a run lacks an applicable canonical field or would exceed its
@@ -291,7 +297,7 @@ recorded value.
 Process one Feature Spec at a time. If a Feature Spec stops as `blocked`, `needs-owner`, or
 `deferred`, record that Feature Spec's blocker and continue to the next unrelated
 eligible Feature Spec in a later run. Stop the automation queue only when the blocker is
-systemic, such as missing credentials, unavailable worker/thread tools, broken
+systemic, such as missing credentials, unavailable worker/task tools, broken
 tracker access, unsafe repository state shared by multiple Feature Specs, failing shared
 infrastructure, or another general condition that can affect multiple Feature Specs.
 
@@ -299,52 +305,41 @@ Each automation run starts and ends with the ledger: select the next Feature Spe
 `Next Scan/Check`, source status, dependencies, and blocker state, then write
 progress, blockers, proof, or the next check before stopping.
 
-## Delivery Mode Rules
+## Change Delivery Target Rules
 
-The root passes the effective runtime delivery plus its source. Use
-`local-only` for ad-hoc or legacy implementation without a Feature Spec delivery
-contract. Otherwise pass the Feature Spec-backed mode plus whether it is inherited from
-`source_spec_ref` or an issue-level override. `spec-backed-delivery.md` owns the full
-delivery/publication/issue-mutation authority model; workers only enforce the
-assignment they receive.
+The root passes the exact `change_delivery_target`, its
+`delivery_decision_origin`, `change_delivery_permission`, derived
+`delivery_allowed_actions`, and supporting branch or PR data. Ad hoc work
+defaults to `validated-changes-left-uncommitted`; Feature Spec-backed work
+inherits its exact target. Workers enforce only the actions they receive.
 
-For `pull-request`, the root also passes `pr_closeout`. Default it to
-`merge-ready`; use `draft-only` only when the option-resolution record contains
-owner or source-contract evidence. No-mutation, PR-shape, and merge-authority
-evidence cannot alter `pr_closeout`. A draft-only worker receives no
-`review-ready` authorization. If the canonical value later changes to
-`merge-ready`, the root may assign the ready-for-review sequence from the
-existing draft PR.
-
-The root also passes `codex_review_policy`. Use `required` by default for
-`merge-ready`, `skip` only with exact owner-scoped option evidence, and
-`not-applicable` for every other closeout. This runtime option is not inherited
-from Plan Feature or inferred from review availability. The root also passes
-the refreshed `current_pr_ref`; PR-scoped skip evidence is valid only while its
-immutable `pr-ref` equals that value.
-
-The root also passes `pr_shape`. Feature Spec-backed work inherits `single-pr` or
-`per-repo-pr`; ad hoc `local-only` and `direct-commit` work use `none`. Branch
-names, repository refs, and expected PR URLs remain separate data.
+`validated-draft-pull-request-published` stops after validated draft
+publication and never grants review actions.
+`pull-request-ready-for-merge-but-not-merged` may grant only the review actions
+required by `codex_review_requirement`. An explicit skip still permits
+`mark-pull-request-ready`, but not review request or polling. The refreshed
+`target_pull_request_ref` must continue to match any PR-scoped skip evidence.
 
 For generated implementation issues, the root also passes the validated
 `## Orchestrator Handoff` projection. Workers may use the handoff for scope,
 start rule, dependencies, validation, and closeout, but they must not treat it
-as worker authorization, publication authority, issue mutation authority, or
+as worker authorization, delivery permission, issue-update permission, or
 permission to change branch/PR strategy.
 
-| Mode | Worker handling |
+| `change_delivery_target` | Worker handling |
 | --- | --- |
-| `local-only` | Implement and validate within the assigned paths. Do not commit, push, create or transition a PR, request Codex review, mutate issues, merge, release, or deploy. Missing Feature Spec delivery metadata is expected, not a blocker. |
-| `pull-request` | Root owns the branch/PR shape, Codex review disposition, and merge-ready decision. In single-repo or monorepo work, workers provide patches, helper-worktree diffs, handoff, or reviewed commits unless their canonical `worker_authorization` set includes publication modes. In multi-repo work, repo-scoped workers may prepare their repo branch/PR only when `commit`, `push`, `pr`, and/or `review-ready` plus the exact `review_ready_actions` are present. |
-| `direct-commit` | Require the scoped delivery option row and ledger evidence to name the exact owner instruction and workstream, and require `branch_name` to equal the authorized target branch. |
+| `validated-changes-left-uncommitted` | Edit and validate only. Do not commit, push, create or transition a PR, request review, mutate issues, merge, release, or deploy. |
+| `local-commit-created-without-pushing` | Require `create-local-commit`; never include `push-target-branch` or PR actions. |
+| `changes-pushed-to-target-branch-without-pull-request` | Require the exact target branch plus `create-local-commit` and `push-target-branch`; never create a PR. |
+| `validated-draft-pull-request-published` | Root owns branch and PR count. Grant only the actions needed through draft PR publication. |
+| `pull-request-ready-for-merge-but-not-merged` | Root owns branch, PR count, review disposition, and the ready-for-merge decision. Grant only exact publication and review actions; never merge. |
 
-If assigned delivery mode conflicts with repo reality, stop and report
+If the assigned delivery target conflicts with repository reality, stop and report
 `needs-owner`; do not choose a new branch or PR strategy. Workers may commit,
 push, open a draft PR, mark a PR ready for review, or request Codex review only
 when the prompt names the exact repository, branch/refspec, PR shape, closeout
-target, corresponding authorization modes, and, for `review-ready`, exact
-sub-actions. `pr` is not a shortcut for commit, push, or `review-ready`.
+target, and corresponding explicit actions. A pull-request action is never a
+shortcut for commit, push, mark-ready, or review actions.
 
 ## Worker Status Vs Root Lifecycle
 
@@ -360,7 +355,7 @@ root-owned gates, and record the lifecycle decision in the ledger.
 
 ## Visible Thread Naming
 
-For visible Codex App worker threads, set the thread title immediately after
+For visible Codex App worker tasks, set the task title immediately after
 creation and whenever the material assignment changes:
 
 ```text
@@ -380,7 +375,7 @@ Keep names short and task-specific. Avoid status-only names such as `Worker 1`,
 
 Before sending a new instruction, changing a title, archiving, interrupting,
 closing, replacing, or handing off a worker, read its latest state with the
-available thread/subagent inspection tool. Base any steering message on the
+available task/subagent inspection tool. Base any steering message on the
 current worker status, files touched, blockers, validation, risks, and next
 check.
 
@@ -419,28 +414,30 @@ would be harder to reason about than replacement.
 The root orchestrator owns integration. Choose and record one integration path
 per worker output:
 
-- `handoff`: use `codex_app.handoff_thread` and read completion with
-  `codex_app.get_handoff_status`, or use the equivalent inspected worker
-  surface when the worker's checkout should become the integration checkout.
+- `handoff`: use `handoff_thread` when available, then inspect the returned
+  handoff state or re-read the task with the available status/read tool. Use
+  the equivalent inspected worker surface when its checkout should become the
+  integration checkout.
 - `worker-commit`: accept a worker-prepared commit or branch only when the
-  authorization modes include `commit` and the root has reviewed the diff.
+  exact `worker_allowed_actions` include `create-local-commit` and the root has
+  reviewed the diff.
 - `patch-apply`: apply a worker diff or patch in the explicitly named
   integration checkout, then inspect conflicts and rerun root gates. Prefer a
   worker worktree or dedicated integration worktree when one exists; use the
   caller checkout only when
-  `caller_checkout_policy=caller-checkout-approved`.
+  `starting_checkout_branch_handling=branch-switch-authorized`.
 - `manual-root`: reimplement or copy the relevant change in the explicitly
   named integration checkout when the worker output is partial, stale,
   conflicting, or easier to reproduce safely than to apply directly. Preserve
   the caller checkout unless
-  `caller_checkout_policy=caller-checkout-approved`.
+  `starting_checkout_branch_handling=branch-switch-authorized`.
 
 For every path, inspect the tracked diff, preserve unrelated local changes,
 exclude generated ignored artifacts, rerun the required root gates, and record
 the integration method, publication checkout, caller checkout disposition, and
 proof in the ledger. Do not commit, push, merge, close, release, or mutate
-external services unless the current authorization modes and gate state permit
-it.
+external services unless the current scoped permissions, worker actions, and
+gate state permit it.
 
 ## Generated Artifacts
 
@@ -458,12 +455,12 @@ status and diffs explicitly.
 ## Helper Worktrees
 
 In a Codex App session, a newly created helper worktree must be owned by a
-visible App worker thread. Create the thread through the App worktree target,
+visible App worker task. Create the task through the App worktree target,
 record its id/title/path, and use that managed checkout for the assigned work.
 If the App cannot create the required worktree, stop before `git worktree add`,
 report the exact limitation, and request explicit fallback authority. This rule
 does not apply in CLI-only sessions and does not require wrapping an existing
-owner-supplied checkout in a new thread.
+owner-supplied checkout in a new task.
 
 Treat Codex App worker worktrees and other worker checkouts as temporary helper
 surfaces by default, but not as disposable until closeout. A helper worktree may
@@ -488,8 +485,8 @@ status:
 - `retained-for-inspection`: output or artifacts are intentionally kept for
   owner/root review; record what remains and why.
 - `abandoned`: output was not used; record the reason and confirm there is no
-  required follow-up hidden only in the worker thread.
-- `handoff-pending`: the worker's checkout or thread is the intended next
+  required follow-up hidden only in the worker task.
+- `handoff-pending`: the worker's checkout or task is the intended next
   integration surface; record the pending action and owner decision needed.
 
 Do not remove or archive a worker before reading its latest state. Do not remove
@@ -498,77 +495,41 @@ or the only copy of evidence needed for a gate. Once all useful output is
 integrated or intentionally abandoned, remove or archive helper surfaces when
 that cleanup is safe and available, or record why they remain.
 
-## Authorization Modes
+## Worker Allowed Actions
 
-Record one or more authorization modes for the specific workstream. Modes are
-capability flags, not a cumulative ladder. The root derives them from the owner
-request, source item, linked `source_spec_ref`, publication authority, issue mutation
-authority, selected worker surface, dependency state, dirty-worktree state, and
-gates. If a worker may edit, commit, push, open a draft PR, mark it ready for
-review, and request Codex review, record `implement, commit, push, pr,
-review-ready` plus the `mark-ready` and `request-codex-review` sub-actions. If
-it may only open a PR from an already-pushed branch, record `pr` only.
+Record every permitted action independently for the exact workstream. Actions
+are not a cumulative ladder: `push-target-branch` does not permit a commit, and
+`create-or-update-pull-request` does not permit either one.
 
-- `inspect`: read-only investigation, issue/PR/CI inspection, repo scan, or
-  design review. It never permits file edits, staging, publication, or external
-  mutation; allowed paths and surfaces only bound where inspection may occur.
-- `implement`: local code/docs changes plus focused validation, but no staging,
-  commit, push, PR, merge, release, or external mutation. Allowed paths and
-  surfaces bound the edits but cannot grant another capability mode.
-- `commit`: may stage and create local commits for the assigned paths in the
-  exact repository and branch/worktree named by the root. It assumes edits are
-  separately allowed by `implement` or by explicit assignment text. It does not
-  permit push, PR creation/update, merge, release, or issue mutation. Commit
-  messages must not use GitHub closing keywords such as `closes`, `fixes`, or
-  `resolves` unless `closeout_mode=direct-commit-closes-issue` and the scoped
-  authorization evidence names that issue; use non-closing references such as
-  `Refs #123` when a reference is useful.
-- `push`: may push only the exact assigned branch or explicit refspec after the
-  required validation and publication-safety checks. It does not permit local
-  commits unless `commit` is also listed, and it does not permit PR
-  creation/update, PR-body closeout keywords, merge, release, or direct issue
-  mutation.
-- `pr`: may create or update the assigned draft PR for the exact branch and
-  closeout target after required validation and publication-safety checks. This
-  is the first mode that may place GitHub closing keywords such as `Closes #123`
-  in a PR body when the generated issue's closeout path calls for PR-body
-  closure. A worker must not add or remove the parent Feature Spec closing keyword; that
-  post-gate mutation and its closeout-head revalidation are root-owned. This
-  mode does not permit local commits or push unless those modes are also listed,
-  and it does not authorize ready-for-review transition, Codex review request,
-  merge, release, or direct issue mutation.
-- `review-ready`: umbrella capability for exact root-listed PR-review
-  sub-actions: `mark-ready`, `request-codex-review`, `poll-codex-review`, and
-  `post-root-supplied-disposition`. A worker may perform only the listed
-  sub-actions for the assigned PR. The root may list request or poll only when
-  `codex_review_policy=required`; `skip` permits `mark-ready` but makes request
-  and poll actions `not-applicable`. Before `request-codex-review`, run the
-  GitStack status check for the assigned head. If the result shows the assigned
-  head is stale, the root must refresh the assignment to the PR's current SHA
-  and the worker must rerun `reviews check` for that refreshed SHA. Request only
-  when that same-SHA check returns `not-requested` or `stale` with
-  `head_is_current=true`. Immediately before requesting, re-read the PR head and
-  stop if it changed or the ledger already records a request for that SHA. Root
-  retry or fresh-review wording cannot bypass the refreshed check or authorize
-  a second request for an unchanged head. Reuse `clean`/`findings` and poll
-  `acknowledged`/`pending`. Posting a disposition requires
-  root-supplied text and supporting evidence; evaluating Codex feedback,
-  deciding whether fixes are needed, and accepting residual risk remain
-  root-owned unless the root also explicitly lists the needed `implement`,
-  `commit`, or `push` modes. It does not permit code edits, commits, pushes,
-  asking Codex to fix issues with a cloud task, merge, release, or direct issue
-  mutation unless those modes or instructions are also explicitly listed.
-- `ci-rerun-fix`: rerun checks, inspect CI logs, and diagnose or verify a known
-  PR or branch when the root assignment names the failing checks. Any edits,
-  commits, or pushes for CI repair also require the corresponding `implement`,
-  `commit`, and `push` modes plus publication-safety gates.
-- `release`: tag, release, publish, or package promotion only with explicit
-  owner approval and the release gate satisfied.
+Canonical actions:
 
-Merge, direct issue closeout, labels, and root-authored discussion mutations
-are not worker modes. They remain root-owned actions with their own recorded
-authority. A legacy worker assignment containing `merge-close` is invalid;
-stop as `needs-owner` instead of executing or silently translating it.
+- `inspect-files`: read-only investigation within named paths or objects;
+- `edit-files`: change named files only;
+- `run-validation`: run the named local proof;
+- `create-local-commit`: stage authorized paths and create a local commit on
+  the named branch, without pushing;
+- `push-target-branch`: push only the named branch or exact refspec;
+- `create-or-update-pull-request`: create or update the named PR, including
+  authorized closing keywords in its body;
+- `mark-pull-request-ready`: transition the named draft PR to ready;
+- `request-codex-review`: request review only after the current-head preflight;
+- `poll-codex-review`: wait for or inspect the existing request on that head;
+- `post-root-provided-review-response`: post only root-supplied disposition text;
+- `rerun-ci`: rerun named checks and inspect their result;
+- `fix-ci-failure`: edit and validate the named CI repair scope;
+- `publish-release`: perform the exact authorized release operation.
+
+`create-local-commit` never permits closing keywords unless
+`issue_completion_method=final-commit-closing-keyword` and the independent
+issue-update permission names the same issue. `request-codex-review` and
+`poll-codex-review` are valid only with
+`codex_review_requirement=required-on-current-pull-request-head`. An explicit
+review skip may still allow `mark-pull-request-ready`.
+
+Merge, direct issue updates, labels, source closeout, and root-authored
+discussion mutations are not worker actions. They remain root-owned with their
+own permission rows. Any retired capability value is invalid and stops as
+`needs-owner`; never translate it silently.
 
 ## Prompt Template
 
@@ -578,11 +539,11 @@ You are a Codex worker for the <portfolio> portfolio.
 Scope:
 - repository: <repo path or owner/repo>
 - workstream: <short name>
-- worker_surface: <auto|not-applicable|codex-app-thread|cli-subagent>
-- actual_workstream_surface: <root-session|codex-app-thread|cli-subagent>
+- delegated_worker_visibility: <orchestrator-decides-between-background-and-visible-workers|not-applicable|visible-codex-app-tasks-only|background-codex-subagents-only>
+- actual_execution_location: <current-orchestrator-session|visible-codex-app-task|background-codex-subagent>
 - worker_id: <id or pending>
 - worker_title: <title or pending>
-- worker_evidence: authorization_state=<authorized-by-invocation|owner-consented|not-authorized>;
+- worker_evidence: authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
 - wave: <number>
@@ -591,31 +552,30 @@ Scope:
 - source_ref: <URL, path:line, heading, run id, or ledger item>
 - acceptance_criteria: <source-owned completion criteria>
 - closeout_target: <local acceptance criteria plus validation, issue close, PR reply, file checkbox/patch, CI rerun, or ledger status>
-- worker_authorization: <one or more of inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release>
-- review_ready_actions: <mark-ready|request-codex-review|poll-codex-review|post-root-supplied-disposition or not-applicable>
+- worker_allowed_actions: <one or more canonical actions from Worker Allowed Actions>
 - capability_snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh_auth=<available|unavailable|not-required>; codex_cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked_at=<time/evidence>
 - allowed_paths_or_surfaces: <paths, branches, PRs, issues, or commands>
-- delivery_mode: <local-only|pull-request|direct-commit>
-- delivery_source: <runtime-default|feature-level-inherited|issue-level-override|owner-instruction>
-- delivery_source_evidence: <source ref or authorization evidence>
-- scope_transfer_ref: <issue:<NN>|not-applicable>
-- issue_mutation_transfer_ref: <issue:<NN>|not-applicable>
-- temporary_source_execution: <forbidden|owner-approved>
-- completion_proof_policy: <live-required|synthetic-accepted>
+- change_delivery_target: <validated-changes-left-uncommitted|local-commit-created-without-pushing|changes-pushed-to-target-branch-without-pull-request|validated-draft-pull-request-published|pull-request-ready-for-merge-but-not-merged>
+- delivery_decision_origin: <safe-default-for-ad-hoc-work|inherited-from-feature-spec|overridden-by-implementation-issue|specified-by-authorized-user>
+- delivery_decision_origin_evidence: <source ref or authorization evidence>
+- delivery_permission_source_issue_ref: <issue:<NN>|not-applicable>
+- issue_update_permission_source_issue_ref: <issue:<NN>|not-applicable>
+- temporary_source_execution_permission: <not-granted|granted-by-authorized-user>
+- completion_evidence_policy: <require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>
 - orchestrator_handoff: <canonical handoff fields, or not-applicable for ad hoc work>
 - domain_closeout: <not-applicable|implementation-closeout>
 - domain_closeout_data: <exact decisions, target surfaces, evidence, and `$project-memory domain-memory` operation or none>
-- publication_authority: <none|explicit-owner-authorization|spec-backed-pull-request|blocked>
-- publication_authority_evidence: <option-resolution or source-contract evidence>
-- pr_closeout: <merge-ready|draft-only|not-applicable>
-- pr_closeout_evidence: <option-resolution evidence>
-- codex_review_policy: <required|skip|not-applicable>
-- codex_review_policy_evidence: <default or scoped owner-instruction evidence>
-- pr_shape: <single-pr|per-repo-pr|none>
-- closeout_mode: <feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>
-- issue_mutation_authority: <none|pr-body-closeout-only|explicit-direct-mutation>
+- change_delivery_permission: <not-required-for-uncommitted-changes|not-granted|granted-for-selected-target>
+- change_delivery_permission_evidence: <option-resolution or source-contract evidence>
+- delivery_gate_status: <ready|blocked|not-applicable>
+- delivery_allowed_actions: <derived canonical action list>
+- codex_review_requirement: <required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>
+- codex_review_requirement_evidence: <default or scoped authorized-user-instruction evidence>
+- pull_request_count_strategy: <one-pull-request-total|one-pull-request-per-repository|no-pull-request>
+- issue_completion_method: <feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion>
+- issue_update_permission: <no-issue-changes|pull-request-closing-keyword-only|direct-issue-updates-explicitly-authorized>
 - parent_spec_applicability: <required|deferred-vehicle|not-applicable>
-- parent_spec_applicability_reason: <whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>
+- parent_spec_applicability_reason: <whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-pull-request-target|other-reason>
 - parent_spec_closeout: <not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>
 - parent_spec_ref: <issue ref or none>
 - parent_closeout_vehicle: <PR ref, pending, or none>
@@ -632,19 +592,18 @@ Scope:
 - blocked_issue_ids: <source/workstream ids or none>
 - dependency_reason: <reason or none>
 - dependency_proof: <completed proof, pending, or none>
-- branch_expectation: <feature-branch|repo-feature-branch|direct-commit-target|none>
-- branch_name: <exact branch or not-applicable>
-- integration_mode: <single-repo-pr|repo-pr|direct-commit|not-applicable>
+- branch_expectation: <feature-branch|repository-feature-branch|named-target-branch|none>
+- target_branch_name: <exact branch or not-applicable>
 - integration_method: <handoff|worker-commit|patch-apply|manual-root|pending>
-- caller_checkout_policy: <preserve-current-branch|caller-checkout-approved|not-applicable>
-- publication_checkout: <worker-worktree path|integration-worktree path|caller-checkout path|not-applicable>
-- report_channel: this worker thread only
+- starting_checkout_branch_handling: <keep-current-branch-checked-out|branch-switch-authorized|not-applicable>
+- result_checkout_path: <worker-worktree path|integration-worktree path|caller-checkout path|not-applicable>
+- report_channel: this worker surface only
 - helper_checkout: <path or unknown>
 - next_ledger_check: <time/action or none>
 - forbidden_actions: no subdelegation, no ledger edits, no unrelated cleanup,
-  no worker/thread/chat management, no commit/push/PR/Codex-review
-  request/release unless this mode explicitly permits it; no merge or direct
-  source closeout under any worker mode; no duplicate Codex-review request when
+  no worker/task management, no commit/push/PR/Codex-review
+  request/release unless the exact action is listed; no merge or direct
+  source closeout under any worker action set; no duplicate Codex-review request when
   GitStack reports a terminal result or active request for the assigned head.
 
 Context:
@@ -657,7 +616,7 @@ Context:
 
 Execution:
 1. Inspect the current state before editing.
-2. Preserve unrelated worktree changes.
+2. Preserve unrelated uncommitted changes.
 3. If editing, run focused validation.
 4. Run or request autoreview when required by the gate.
 5. Stop and report if blocked by access, ambiguous owner intent, unsafe state,
@@ -669,10 +628,10 @@ Final report:
 - Source disposition: completed|partial|blocked|needs-owner|deferred|unchanged
 - Changes: files or external objects touched
 - Validation: commands run and outcomes
-- Delivery: runtime delivery, branch or PR used, closeout path, and PR links or
+- Delivery: selected delivery target, branch or PR used, closeout path, and PR links or
   `none`; include ready-for-review state, Codex review policy/state, publication
   checkout, and caller checkout disposition
-- Worker evidence: canonical `worker_surface`, `actual_workstream_surface`, and
+- Worker evidence: canonical `delegated_worker_visibility`, `actual_execution_location`, and
   `authorization_state`; worker id or session evidence; unavailable or failed
   tool evidence; fallback reason; and whether execution was parallel,
   sequential, root-owned, or simulated

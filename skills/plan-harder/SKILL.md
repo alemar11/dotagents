@@ -30,9 +30,9 @@ It also resolves one `output_surface`:
   closeout text on this surface. `planning_mode=full-plan` requires
   `output_surface=standalone`.
 
-Load `references/options.md` before resolving either field. Normalize legacy
-or natural-language input once and use only canonical field/value assignments
-in current handoffs and results.
+Load `references/options.md` before resolving either field. Resolve
+natural-language input to canonical field/value assignments and reject
+noncanonical structured input.
 
 Default to the smallest valid route:
 
@@ -254,6 +254,5 @@ Keep the brief small enough to paste into an issue body or issue comment.
 
 ## References
 
-- `references/options.md`: canonical option fields, values, and compatibility
-  normalization.
+- `references/options.md`: canonical option fields and values.
 - `references/templates.md`: full-plan and issue-hardening output templates.

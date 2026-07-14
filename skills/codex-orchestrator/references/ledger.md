@@ -3,7 +3,7 @@
 Use ledgers to persist portfolio scope, active workstreams, gate overrides, and
 orchestration state between Codex sessions.
 
-## Ledger Resolution And Current-Format Classification
+## Ledger Resolution And Validation
 
 1. An explicit user-provided ledger path wins.
 2. A named portfolio uses:
@@ -24,10 +24,10 @@ Classify an existing ledger from that file alone by parsing Markdown structure,
 not by substring search. Ignore headings inside backtick or tilde fenced code,
 including fences indented by up to three spaces, and normalize up to three
 leading spaces on ATX headings before structural comparison. Current-format
-ledgers use ATX headings only; any Setext underline syntax outside fences
-classifies the ledger as legacy. Keep current-format ledgers free of raw HTML:
+ledgers use ATX headings only; any Setext underline syntax outside fences is
+invalid. Keep current-format ledgers free of raw HTML:
 outside fences, any HTML comment marker or line whose first non-space character
-is `<` also classifies the ledger as legacy instead of treating raw-block
+is `<` is also invalid instead of treating raw-block
 contents as structure. Require the first non-blank line to be one non-empty
 `# <name> Maintainer Ledger` heading and allow no other level-1 heading. Before
 `## Scope`, require exactly one non-empty
@@ -42,9 +42,8 @@ nesting and order. Allow no other level-2 or level-3 heading in the ledger:
 `Packet version: 1`, `Option resolution refs:`, and
 `References to load next:` line. Text copied into `## Notes` never satisfies an
 earlier marker; an unfenced level-2 or level-3 heading there is unexpected or
-duplicate and triggers migration. A missing, duplicate, out-of-order, or
-wrongly nested marker—or a missing or invalid header field—classifies the
-ledger as legacy.
+duplicate. A missing, duplicate, out-of-order, or wrongly nested marker—or a
+missing or invalid header field—makes the ledger invalid.
 
 ```text
 ## Scope
@@ -80,9 +79,9 @@ The three Recovery Packet markers above may have packet data between them, but
 they must remain inside `## Recovery Packet` and in the displayed relative
 order.
 
-When the structure check fails, load `ledger-template.md` to migrate the
-ledger. Keep this lightweight marker set aligned with the template whenever the
-required format changes.
+When the structure check fails, stop as `needs-owner` and report the resolved
+ledger path plus missing, duplicate, out-of-order, or invalid markers. Do not
+load `ledger-template.md`, reinterpret fields, or reconstruct the ledger.
 
 If the resolved ledger file does not exist, load `ledger-template.md` and create
 it before discovery. Fill known fields, use `tbd` for unknown owner or
@@ -93,7 +92,7 @@ ledger that passes the marker check above.
 ## Ownership
 
 - The orchestrator reads and writes the ledger.
-- Worker threads do not edit ledgers.
+- Worker tasks and subagents do not edit ledgers.
 - Workers report status, proof, blockers, and next actions to the orchestrator.
 - Preserve historical notes that explain owner decisions, suppressions, and
   release state.
@@ -137,9 +136,9 @@ Use these ledger-owned values:
 
 - `ledger_status`: `active`, `paused`, `blocked`, `complete`, `released`, or
   `archived`; this describes the portfolio ledger as a whole.
-- `source_mutation_authority`: `none` means do not mutate the source item,
-  `propose` means draft the update without applying it, and `write` means apply
-  authorized source updates.
+- `tracked_work_item_update_permission`: `read-only` means do not mutate the
+  source item, `propose-updates-only` means draft the update without applying
+  it, and `apply-updates` means apply authorized source updates.
 - `resync_state`: `synced` means worker state matches root-integrated work,
   `needs-resync` means worker state must be reconciled, `replaced` means a new
   worker or root flow took over, and `root-owned` means root owns integration or
@@ -149,14 +148,15 @@ Use these ledger-owned values:
   `released` means closeout completed or a durable parent-closeout handoff
   transferred the remaining watch while the ledger stayed `paused`, and
   `takeover-recorded` means a new root explicitly recorded a takeover from a
-  stale or owner-approved prior root.
-- `active_root_takeover_policy`: `owner-approval` requires an explicit owner
-  decision, while `stale-ledger-check` permits takeover only after the recorded
+  stale prior root or after authorized-user approval.
+- `existing_orchestrator_session_takeover_policy`:
+  `ask-authorized-user-before-takeover` requires an explicit decision, while
+  `take-over-only-if-existing-ledger-is-stale` permits takeover only after the recorded
   stale-read note and takeover note are present.
-- `merge_authority`: `none` by default or
-  `explicit-owner-authorization` for the named PR or PR set.
-- `merge_policy`: `owner-approval` by default or
-  `automatic-after-gates` when the explicit merge instruction waives another
+- `pull_request_merge_permission`: `not-granted` by default or
+  `granted-for-named-pull-request` for the named PR or PR set.
+- `pull_request_merge_confirmation`: `ask-authorized-user-after-checks` by
+  default or `merge-automatically-after-checks` when the explicit merge instruction waives another
   checkpoint after gates pass.
 - `parent_closeout_watch`: `not-applicable`, `root-monitoring`,
   `owner-handoff`, `automation-handoff`, or `complete`. Owner and automation
@@ -176,15 +176,15 @@ Workstream state meanings are defined in `## Vocabulary`. Worker, publication,
 and gate values are owned by `worker.md`, `spec-backed-delivery.md`, and
 `gates.md`.
 Option fields and values follow `options.md`: snake_case fields and lower-kebab
-enum values. Treat older uppercase values, booleans, human labels, and
-hyphenated assignment keys as read aliases only; rewrite them when touched.
+enum values. Unknown or retired option fields and values are invalid runtime
+input and are never reinterpreted.
 
-## Creating Or Migrating A Ledger
+## Creating A Ledger
 
-Load `ledger-template.md` only when creating a ledger or when the marker check
-in `## Ledger Resolution And Current-Format Classification` classifies an
-existing ledger as legacy. Existing ledgers that pass that check do not load
-the template.
+Load `ledger-template.md` only when the resolved ledger does not exist. When the
+marker check in `## Ledger Resolution And Validation` rejects an existing
+ledger, stop; do not load the new-ledger template. Existing ledgers that pass
+the check continue without loading the template.
 
 ## Multi-Portfolio Use
 
@@ -209,10 +209,10 @@ roots in the active-root claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Owner-ready work still needing review, commit, push, PR, policy-required Codex PR review, root-owned parent Feature Spec PR-body closeout, merge, close, or release. Execute when authorized; otherwise reclassify with the missing decision/access. Feature Spec-backed `pull-request` publication authorizes initial draft PR creation and defaults `pr_closeout=merge-ready` plus `codex_review_policy=required`, so ready-for-review transition, the resolved review policy, and applicable parent Feature Spec closeout remain actionable after local gates. An owner-scoped `codex_review_policy=skip` makes review request/wait actions `not-applicable`, not blocked. `pr_closeout=draft-only` is valid only from its canonical option-resolution row and makes those downstream actions `not-applicable` rather than blocked. |
+| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute when authorized; otherwise record the missing permission or blocker. `pull-request-ready-for-merge-but-not-merged` keeps mark-ready, resolved review actions, and parent closeout actionable after local gates. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
-| `completed` | Required gates passed and the resolved delivery contract is satisfied. For ad-hoc `local-only` work, acceptance criteria plus validation are sufficient and publication fields are `none` or `not-applicable`. A default-branch GitHub whole Feature Spec closeout PR may report merge-ready with `parent_spec_closeout=armed`, proof, and an active or handed-off watch, but the parent Feature Spec source and portfolio ledger are not complete until the PR merges and the issue is verified closed. A non-default-base PR workstream may complete at merge-ready with `deferred-to-default-branch` only when the linked later vehicle remains `active` or `ready-next`; this never completes the parent Feature Spec or ledger. Authorized `draft-only` and other excluded workstreams record `not-applicable` with a reason. Otherwise record commits/PRs, validation, proof, source closeout, integration method, publication checkout, caller checkout disposition, lifecycle decision, and generated ignored artifact disposition. Blocked or pending required publication, closeout, or proof remains `active`, `ready-next`, `needs-owner`, `blocked`, or `deferred`. |
+| `completed` | Required gates passed and the exact `change_delivery_target` is proven. For `validated-changes-left-uncommitted`, acceptance plus validation are sufficient and commit/push/PR fields are not applicable. A default-branch GitHub whole Feature Spec closeout PR may report merge-ready with `parent_spec_closeout=armed`, proof, and an active or handed-off watch, but the parent source and portfolio ledger remain incomplete until merge and verified issue closure. A non-default-base PR workstream may reach its own target with `deferred-to-default-branch` only while the later closeout vehicle remains actionable. The draft-PR target records later lifecycle actions as not applicable. Otherwise record delivery proof, source closeout, publication checkout, caller-checkout disposition, lifecycle decision, and artifact disposition. Pending required delivery, closeout, or proof remains non-terminal. |
 | `deferred` | Residual work intentionally outside current closeout. Link the follow-up or proposed body; use only for real residual scope, blocked live proof, or owner-visible follow-up work. |
 | `released` | Release gate passed and actual product/package/version release, deploy, or tag proof is recorded. Ordinary implementation remains `completed` unless a release happened. |
 
@@ -228,20 +228,20 @@ Before marking a ledger `complete`, verify:
   `ready-next` action, `autonomous` candidate, due check, or root-owned
   closeout action.
 - Required gates are selected and passed through `gates.md`. For
-  `delivery_mode=pull-request` plus `pr_closeout=merge-ready`, project the
+  `change_delivery_target=pull-request-ready-for-merge-but-not-merged`, project the
   conditional canonical review and parent-closeout result into the gate matrix
   and workstream row; do not duplicate its algorithm here.
 - A parent Feature Spec is not complete while closeout is `armed`,
   `deferred-to-default-branch`, or awaiting an owner/automation handoff.
   Completion requires `parent_spec_closeout=closed`,
   `parent_closeout_watch=complete`, and post-merge proof that GitHub closed the
-  issue. Authorized `draft-only` and excluded workstreams record
+  issue. The draft-PR target and excluded workstreams record
   `not-applicable` with a reason.
 - `active` contains only rows with a real next check or root-owned action;
   `autonomous` and `ready-next` are empty or reclassified with the missing
   authority, decision, blocker, or follow-up.
-- Feature Spec-backed authorized publication records its real PR URL and resolved
-  terminal delivery state, or the exact blocker. Do not complete while an
+- Feature Spec-backed delivery records its real branch or PR proof and resolved
+  terminal target, or the exact blocker. Do not complete while an
   authorized commit, push, PR, review, disposition, or closeout action remains
   actionable.
 - `needs-owner`, `blocked`, and `deferred` rows contain their decision brief or
@@ -296,7 +296,7 @@ Before setting the ledger `complete`, run the reconciliation after the last
 source mutation and verify these invariants:
 
 - no closed source is described as open or pending in a current-state field;
-- no merged PR is described as draft, open, or merge-ready-only;
+- no merged PR is described as draft, open, or merely ready for merge;
 - no archived, integrated, abandoned, or handed-off worker remains active;
 - every fallback records its GitStack workflow, primary connector attempt,
   authenticated `gh` fallback, and authority reuse;
@@ -306,7 +306,7 @@ source mutation and verify these invariants:
   head/base/body history, and post-merge proof that the parent issue closed; no
   `armed` unmerged PR or `deferred-to-default-branch` vehicle remains
   outstanding;
-  every authorized `draft-only` or otherwise excluded workstream records
+  every draft-PR or otherwise excluded workstream records
   `not-applicable` with a reason;
 - the current gate matrix, workstream rows, bucket membership, wave report,
   root status, and final note agree.

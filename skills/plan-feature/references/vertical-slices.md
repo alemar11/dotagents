@@ -181,14 +181,15 @@ Mark an issue `ready-for-agent` only when it has:
   or monorepo,
 - affected repos and integration gates when the issue is an orchestrator
   workspace issue,
-- a durable `source_spec_ref` pointer and copied feature-level `delivery_mode`,
-  independently resolved `issue_mutation_authority`, and `pr_shape` metadata,
+- a durable `source_spec_ref` pointer and copied feature-level `change_delivery_target`,
+  independently resolved `issue_update_permission`, and `pull_request_count_strategy` metadata,
 - parallelization status, expected closeout path, and any delivery or
   integration exception,
 - a `## Orchestrator Handoff` section that restates the dispatchable source
-  Feature Spec, feature slug, `delivery_mode`, `issue_mutation_authority`, `pr_shape`, affected repos or product
-  scope, scope, start rule, dependencies, validation, closeout, and
-  `integration_mode`,
+  Feature Spec, feature slug, `change_delivery_target`,
+  `change_delivery_permission`, `issue_update_permission`,
+  `codex_review_requirement`, `pull_request_count_strategy`, affected repos or
+  product scope, scope, start rule, dependencies, validation, and closeout,
 - acceptance criteria,
 - validation steps,
 - implementation guidance enriched by `$plan-harder`,

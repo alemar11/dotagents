@@ -12,9 +12,9 @@ review:
 
 - setup flow: `fresh-setup`, `existing-project-bootstrap`, or
   `orchestrator-workspace` (runtime classification, not a stored key)
-- `project_topology`
+- `repository_layout`
 - `tracker_backend`
-- `delivery_mode`
+- `change_delivery_target`
 - `issue_type` mapping
 - `workflow_state` mapping
 - domain memory layout
@@ -25,10 +25,8 @@ review:
 Use `Unknown` only when a value is absent or ambiguous. If the user only asked
 to view current settings, stop after the summary.
 
-If existing setup files contain the legacy worker-authorization setup key,
-report it as stale orchestrator-owned state. Remove it from any touched
-`project-memory/config/*` file when that file is authorized for writing; do not
-offer it as an editable project-memory setting.
+Reject runtime-only worker configuration in project-memory setup files; those
+fields belong to Codex Orchestrator.
 
 ## Settings Editor
 
@@ -41,7 +39,7 @@ Editable sections:
 
 - `issue-tracker`
 - `project-layout`
-- `delivery-mode`
+- `delivery-target`
 - `issue-type-mapping`
 - `triage-state-mapping`
 - `domain-memory`
@@ -54,8 +52,12 @@ For each selected section, show the current value first, then `keep-current`
 and the relevant alternatives:
 
 - `issue-tracker`: `github` or `local`.
-- `project-layout`: `single-repo`, `monorepo`, or `multi-repo-workspace`.
-- `delivery-mode`: `pull-request` or `direct-commit`.
+- `project-layout`: `single-repository`, `monorepo`, or
+  `multi-repository-workspace`.
+- `delivery-target`: `local-commit-created-without-pushing`,
+  `changes-pushed-to-target-branch-without-pull-request`,
+  `validated-draft-pull-request-published`, or
+  `pull-request-ready-for-merge-but-not-merged`.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
   custom per canonical type.
 - `triage-state-mapping`: default GitHub lowercase labels, canonical local
@@ -80,18 +82,20 @@ through unrelated editable sections.
 
 - Default to GitHub for code repos with a GitHub remote; default to local
   markdown when no clear GitHub issue tracker exists.
-- Default `project_topology` from durable repo evidence: `single-repo` for one
+- Default `repository_layout` from durable repo evidence: `single-repository` for one
   Git repo and one primary context, `monorepo` for one Git repo with multiple
-  independently planned contexts, and `multi-repo-workspace` for a parent
+  independently planned contexts, and `multi-repository-workspace` for a parent
   coordination workspace with multiple child Git repos. Ask when evidence is
   contradictory.
 - For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
   mutation. Treat the no-mutation choice as current-run behavior, not durable
   issue-tracker configuration.
-- Default delivery mode to `pull-request`. In a single repo or monorepo this
-  means one feature branch and PR; in a multi-repo workspace every involved repo
-  uses the same branch name and opens its own PR. Use `direct-commit` only with
-  explicit authorization.
+- Default the delivery target to
+  `pull-request-ready-for-merge-but-not-merged`. In a single repository or
+  monorepo this means one feature branch and PR; in a multi-repository workspace
+  every involved repo uses the same branch name and opens its own PR. Every
+  commit-only, push-without-PR, or draft-PR target requires explicit
+  authorization.
 - Do not define durable worker assignments, worker-count limits, scheduled
   checks, publication policy, or issue mutation policy in project memory.
 - Default domain layout to `single-context` unless `CONTEXT-MAP.md`, repo
@@ -137,14 +141,13 @@ After direct write authority or separate affirmative confirmation:
 - Create `project-memory/config/` if needed.
 - Write or update the authorized setup files under `project-memory/config/`.
 - In review mode, update only files needed for separately confirmed changes.
-- Normalize any touched `issue-tracker.md` setup header to lower-snake-case
-  keys with backticked structured values. Remove legacy `tracker_mode`,
-  `tracker_writes`, `effective_target`, `local_artifact_writes`, and
-  `external_tracker_mutation` fields.
+- Require any touched `issue-tracker.md` setup header to use canonical
+  lower-snake-case keys with backticked structured values. Report unknown
+  fields as invalid instead of rewriting them.
 - Keep behavior-affecting setup fields in typed configuration tables with
   `Key`, `Type`, `Value`, `Allowed values`, and `Meaning` columns before
   explanatory prose.
-- Keep `project-layout.md` limited to `project_topology`. Do not store
+- Keep `project-layout.md` limited to `repository_layout`. Do not store
   source-root lists, worktree paths, worker surfaces, thread limits, or Codex
   App runtime state there.
 - Preserve custom prose outside known configuration tables. Report unknown

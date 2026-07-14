@@ -22,8 +22,10 @@ Do not implement the planned feature.
 
 Load `references/options.md` before resolving mode, target, delivery, or output
 behavior. Every selectable choice uses a snake_case field and a lower-kebab
-value from that registry. Natural-language instructions and legacy labels are
-evidence for resolving a field, never alternative option values. Record the
+value from that registry. Natural-language instructions are evidence for
+resolving a field, never alternative option values. Retired planning labels and
+fields are invalid input: active artifacts must pass a clean stale-vocabulary
+scan before this runtime consumes them. Record the
 canonical option-resolution rows once and pass only those values to phases,
 handoffs, templates, draft commands, and reports.
 
@@ -76,11 +78,12 @@ domain-closeout gates required by the selected mode.
 - Resolve and carry one planning identity: `feature_slug`, selected
   product/workspace/context when applicable, and `project_slug` for
   orchestrator workspaces.
-- Default `delivery_mode` to `pull-request`; use `direct-commit` only with
-  accepted option-resolution evidence. For pull requests, default
-  `pr_closeout` to `merge-ready`; use `draft-only` only when the canonical
-  option-resolution row selects it. Do not select it by comparing source prose
-  or from the separate `no_mutation_override` value.
+- Default `change_delivery_target` to
+  `pull-request-ready-for-merge-but-not-merged`. Use commit-only,
+  push-without-PR, or draft-PR targets only with accepted option-resolution
+  evidence. Resolve `change_delivery_permission`, `codex_review_requirement`,
+  and `pull_request_count_strategy` with the target; do not infer their values
+  from prose or from the separate `no_mutation_override` value.
 - Initialize every run with a structured `domain_knowledge_delta`:
   `knowledge_delta` (`none` or `required`) plus `decisions`,
   `target_surfaces`, `evidence`, and `unresolved` lists. Empty `decisions`,
@@ -109,7 +112,7 @@ domain-closeout gates required by the selected mode.
 - Keep worker surfaces, worker counts, publication authority, runtime issue
   mutation overrides, and other `$codex-orchestrator` session choices out of
   Feature Specs, generated issues, handoffs, local tracker files, and draft commands.
-  The independently resolved source-contract `issue_mutation_authority` and its
+  The independently resolved source-contract `issue_update_permission` and its
   scoped evidence are delivery metadata, not a worker/session grant, and must
   remain in Feature Specs and generated issue handoffs.
 - Snapshot each source or artifact in full at most once per unchanged
@@ -164,21 +167,24 @@ Resolve and record the canonical option snapshot from `references/options.md`:
 - `local_mirror` and its repo-relative `local_mirror_path` data when requested;
 - `feature_slug` and, when applicable, `product_slug`, `workspace_path`,
   `context_file`, and `project_slug`;
-- `project_topology`, `workspace_context`, `delivery_mode`,
-  `issue_mutation_authority`, `branch_name`, `pr_closeout`, and `pr_shape`
+- `repository_layout`, `workspace_context`, `change_delivery_target`,
+  `change_delivery_permission`, `issue_update_permission`,
+  `codex_review_requirement`, `target_branch_name`, and
+  `pull_request_count_strategy`
   using the registry defaults and scoped evidence.
 
 Phase handoffs use the snake_case fields `mode`, `execution_profile`, `tracker_backend`,
 `effective_target`, `no_mutation_override`, `no_mutation_output`,
-`local_mirror`, `local_mirror_path`, `partial_output`, `delivery_mode`,
-`issue_mutation_authority`, `branch_name`, `pr_closeout`, `pr_shape`, and
-`project_topology`, plus `repo_project_topology`, `workspace_context`,
+`local_mirror`, `local_mirror_path`, `partial_output`, `change_delivery_target`,
+`change_delivery_permission`, `issue_update_permission`,
+`codex_review_requirement`, `target_branch_name`, `pull_request_count_strategy`, and
+`repository_layout`, plus `child_repository_layout`, `workspace_context`,
 `workspace_parent_source_ref`, and `workspace_feature_repos` data fields, optional
 `workspace_child_source_refs` repo-to-Feature-Spec mapping data, keyed
 `option_resolution` rows, and the `option_rows_fingerprint` data field.
 
-For `mode=full-flow` with `project_topology=multi-repo-workspace` or
-`workspace_context=multi-repo-workspace`, do not force parent and child
+For `mode=full-flow` with `repository_layout=multi-repository-workspace` or
+`workspace_context=multi-repository-workspace`, do not force parent and child
 planning artifacts through one option snapshot. If an accepted parent/global
 Feature Spec is needed, run that parent artifact first and carry its
 `source_spec_ref`. Then run child repo partial planning only when all affected
@@ -189,17 +195,17 @@ per generated issue graph. Before publishing child partials, read or validate
 each affected child repo's `project-memory/config/project-layout.md` alongside
 its tracker config; stop when child topology cannot be established from that
 config, an existing child Feature Spec, or explicit owner-validated fallback.
-For combined workspace issue generation, the run-level `project_topology` row
-is `multi-repo-workspace` and represents the workspace graph snapshot, not any
+For combined workspace issue generation, the run-level `repository_layout` row
+is `multi-repository-workspace` and represents the workspace graph snapshot, not any
 child repo's durable topology. Child partial Feature Specs carry each child
 repo's durable topology as
-`repo_project_topology`; generated issues project that child value through
-per-issue `issue_project_topology` rows. The option fingerprint includes one
+`child_repository_layout`; generated issues project that child value through
+per-issue `issue_repository_layout` rows. The option fingerprint includes one
 workspace run row plus one issue-effective topology row per generated issue, so
 heterogeneous child topologies remain explicit without merging child run
 snapshots. Carry the
 parent/global `source_spec_ref`,
-`workspace_context=multi-repo-workspace`, `workspace_feature_repos`,
+`workspace_context=multi-repository-workspace`, `workspace_feature_repos`,
 `workspace_child_source_refs`, and cross-links as workspace context data. Use a
 two-pass child publication flow: first publish or draft every child partial to
 obtain stable refs using `workspace_child_source_refs=unresolved-first-pass`
@@ -288,8 +294,8 @@ Plan Feature never emits `capture_outcome=captured`.
 
 ## References
 
-- `references/options.md`: canonical option fields, values, defaults,
-  normalization, and legacy input migration.
+- `references/options.md`: canonical option fields, values, defaults, and the
+  strict input boundary.
 - `references/spec-phase.md`: Feature Spec handoff, drafting, publication, sanitization,
   and `source_spec_ref` rules.
 - `references/issue-phase.md`: issue splitting, hardening, graph validation,

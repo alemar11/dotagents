@@ -66,11 +66,10 @@ requests:
 
 Use `--dry-run` unless the user explicitly asked to post the discussion comment
 or a calling skill assignment names the exact PR, comment body, and posting
-authority. `$codex-orchestrator` may use resolved
-`publication_authority=spec-backed-pull-request` or
-`publication_authority=explicit-owner-authorization` with those actions named
-to post the top-level `@codex review` request and any required root-supplied PR
-discussion disposition for that assigned PR.
+authority. `$codex-orchestrator` may post the top-level `@codex review` request
+or root-supplied PR discussion disposition only when the exact action appears
+in `delivery_allowed_actions` or `worker_allowed_actions` and
+`change_delivery_permission=granted-for-selected-target` applies to that PR.
 
 ## Fallback Direct Commands
 

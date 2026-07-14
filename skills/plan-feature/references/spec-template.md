@@ -53,35 +53,37 @@ What user or system problem this solves.
 
 ## Product / Repository Scope
 
-- For single-repo Feature Specs: say `current repository` and name any relevant module
+- For single-repository Feature Specs: say `current repository` and name any relevant module
   or package.
 - For monorepo Feature Specs: selected product/workspace path, selected context file,
   and explicitly out-of-scope sibling workspaces when relevant.
 - For orchestrator workspace Feature Specs: affected repos, each repo's role, and any
   repo-local implementation notes.
 
-## Delivery Mode
+## Change Delivery Target
 
-- delivery_mode: [verified `delivery_mode` row value].
-- delivery_mode_evidence: [verified option-row source and evidence].
-- project_topology: [verified `project_topology` row value].
-- repo_project_topology: [child repo durable topology for repo-scoped workspace partials, or not-applicable].
-- workspace_context: [multi-repo-workspace or not-applicable].
+- change_delivery_target: [verified `change_delivery_target` row value].
+- change_delivery_target_evidence: [verified target option-row source and evidence].
+- change_delivery_permission: [verified `change_delivery_permission` row value].
+- change_delivery_permission_evidence: [verified `permission-source-ref`, scope, target, branch, and transfer evidence].
+- repository_layout: [verified `repository_layout` row value].
+- child_repository_layout: [child repo durable topology for repo-scoped workspace partials, or not-applicable].
+- workspace_context: [multi-repository-workspace or not-applicable].
 - workspace_parent_source_ref: [parent/global Feature Spec ref or not-applicable].
 - workspace_feature_repos: [complete feature-wide repo slug set or not-applicable].
 - workspace_child_source_refs: [complete repo-to-child Feature Spec mapping before issue generation, `unresolved-first-pass` during first-pass workspace child publication, or not-applicable outside workspace flows].
-- issue_mutation_authority: [verified `issue_mutation_authority` row value].
-- issue_mutation_authority_evidence: [verified independent option-row source and evidence].
-- pr_closeout: [verified `pr_closeout` row value].
-- pr_closeout_evidence: [verified option-row source and evidence].
-- branch_name: [verified exact branch data].
-- pr_shape: [verified `pr_shape` row value].
+- issue_update_permission: [verified `issue_update_permission` row value].
+- issue_update_permission_evidence: [verified independent option-row source and evidence].
+- codex_review_requirement: [verified `codex_review_requirement` row value].
+- target_branch_name: [verified exact branch data].
+- pull_request_count_strategy: [verified `pull_request_count_strategy` row value].
 - integration_proof: validation or cross-repo proof required before generated
   issues close or move to `issues/done/`.
 - issue_inheritance: generated issues link this Feature Spec with `source_spec_ref`, copy
-  the effective `delivery_mode`, feature/workspace `project_topology`, and
-  `pr_closeout` values as feature-level metadata, derive
-  `issue_project_topology` from `repo_project_topology` or target repo evidence,
+  the effective `change_delivery_target`, `change_delivery_permission`,
+  `codex_review_requirement`, feature/workspace `repository_layout`, and
+  `pull_request_count_strategy` values as feature-level metadata, derive
+  `issue_repository_layout` from `child_repository_layout` or target repo evidence,
   and carry issue-level ordering, dependencies, parallelization, closeout, and
   exceptions. The issue phase validates the generated issue graph before
   publication.
@@ -126,7 +128,7 @@ deferred handoff for the final implementation task, not completed capture.
 - Decisions:
   - Accepted durable term, rule, boundary, or decision.
 - Target surfaces:
-  - `current-repository/<repo-relative-path>` for single-repo work, or
+  - `current-repository/<repo-relative-path>` for single-repository work, or
     `<repo-slug>/<repo-relative-path>` for multi-repo context, project doc, or
     ADR destinations.
 - Evidence:

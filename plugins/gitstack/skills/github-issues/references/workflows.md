@@ -41,17 +41,8 @@ Direct user instructions such as create, publish, or open the issues resolve
 `mutation_mode=apply` for the requested `issue_operation` unless the same
 request supplies no-mutation evidence, which resolves `mutation_mode=dry-run`.
 
-Legacy tracker configs may still use:
-
-```md
-tracker_mode: github # github | local
-tracker_writes: prompt # disabled | prompt | auto
-```
-
-When present, `tracker_writes: disabled` resolves `mutation_mode=dry-run`,
-`tracker_writes: prompt` asks only if no create/publish/open instruction was
-provided, and `tracker_writes: auto` resolves `mutation_mode=apply` after the
-normal repository and duplicate checks.
+Reject tracker handoffs that do not use canonical `tracker_backend` and
+`effective_target` fields.
 
 ## Repository Context
 

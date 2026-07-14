@@ -60,47 +60,39 @@ these `gate_status` values in the ledger gate matrix:
 - `not-applicable`: gate does not apply, with a short recorded reason.
 
 `publication-safety` owns `push_policy`, `branch_target_guard`,
-`publication_checkout_guard`, `caller_checkout_guard`, `pr_diff_status`,
+`result_checkout_path_guard`, `caller_checkout_guard`, `pr_diff_status`,
 `ready_for_review_state`, and `post_push_verification` values.
-Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-as legacy aliases when reading existing artifacts. When updating an artifact
-that contains legacy aliases, rewrite touched structured values to
-lower-kebab-case.
+Lower-kebab-case values are canonical. Retired structured values are invalid;
+do not reinterpret them during gate evaluation.
 
 ### Authorization Gate
 
-Confirm the worker's requested action is covered by the current authorization
-modes. Stop for owner approval before push, PR, merge, close, release, external
+Confirm every requested worker action is present in `worker_allowed_actions`.
+Stop for authorized-user approval before push, PR, merge, close, release, external
 service mutation, destructive local changes, or broad scope changes.
-For worker assignments, `commit`, `push`, and `pr` are separate capability
-flags. Do not allow PR creation to imply commit or push, and do not allow push
-to imply local commit creation.
+`create-local-commit`, `push-target-branch`, and
+`create-or-update-pull-request` are independent. No action implies another.
 
-For Feature Spec-backed `pull-request` workflows,
-`publication_authority=spec-backed-pull-request` satisfies authorization for
-commit, push, initial draft PR creation, ready-for-review transition, Codex
-review, required discussion disposition, and the root-owned gated final PR-body
-parent Feature Spec closeout update after tests, integration checks, and `$autoreview`
-pass. Owner restrictions must first normalize to the scoped
-`publication_authority`, `delivery_mode`, `pr_closeout`, and worker capability
-rows; gates never reinterpret the restriction prose. Default
-`pr_closeout=merge-ready` and `codex_review_policy=required`. Set
-`pr_closeout=draft-only` or `codex_review_policy=skip` only from its canonical
-option-resolution row. PR-shape prose and
-`no_mutation_override=draft-output` cannot select it.
-Draft-only makes downstream ready/review/merge-ready
-gates `not-applicable` until the user removes the restriction. Record
-publication authority, `pr_closeout`, and `codex_review_policy` in the ledger.
+For Feature Spec-backed delivery,
+`change_delivery_permission=granted-for-selected-target` satisfies
+authorization only for `delivery_allowed_actions` derived from the exact
+target. The worker still receives an explicit subset. Gates never reinterpret
+restriction prose. `validated-draft-pull-request-published` makes downstream
+ready/review/merge-ready gates `not-applicable`.
+`pull-request-ready-for-merge-but-not-merged` defaults to
+`codex_review_requirement=required-on-current-pull-request-head`; select an
+explicit skip only from its scoped option row. Record the target, delivery
+permission, allowed actions, gate status, and review requirement in the ledger.
 This does not authorize merge, release, direct issue mutation, production
 deploy, or unrelated GitHub cleanup.
 
 ### Merge Authorization Gate
 
-Before an actual merge, require `merge_authority=explicit-owner-authorization`
-for the named PR or PR set. `merge_policy=owner-approval` requires a current
+Before an actual merge, require `pull_request_merge_permission=granted-for-named-pull-request`
+for the named PR or PR set. `pull_request_merge_confirmation=ask-authorized-user-after-checks` requires a current
 owner checkpoint after every other merge gate passes;
-`merge_policy=automatic-after-gates` permits the root to merge without another
-checkpoint only when that canonical scoped row and the matching merge-authority
+`pull_request_merge_confirmation=merge-automatically-after-checks` permits the root to merge without another
+checkpoint only when that canonical scoped row and the matching merge-permission
 row are valid for the named PR or PR set. Evidence text is recorded for audit
 but is never reparsed inside this gate. Finish, complete, deliver, ship, close
 out, and make merge-ready do not select either row.
@@ -109,7 +101,7 @@ Merge is root-owned. Workers cannot receive merge authority. Record the owner
 instruction and timestamp, exact PR/head, mergeability, current CI, latest-head
 review proof, unresolved-thread count, and merge result. When authority is
 missing or ambiguous, stop at merge-ready under `needs-owner`; do not infer it
-from publication or issue-mutation authority.
+from delivery or issue-update permission.
 
 ### Publication Safety Gate
 
@@ -119,8 +111,8 @@ Before push, draft PR publication, or ready-for-review transition, evaluate
 - `push_policy`: `no-push`, `explicit-refspec-only`, or `block-plain-push`.
 - `branch_target_guard`: `default-branch-blocked`,
   `protected-branch-blocked`, or `verified-feature-branch`.
-- `publication_checkout_guard`: `worker-worktree`, `integration-worktree`,
-  `caller-checkout-approved`, or `blocked`.
+- `result_checkout_path_guard`: `worker-worktree`, `integration-worktree`,
+  `branch-switch-authorized`, or `blocked`.
 - `caller_checkout_guard`: `preserved`, `policy-approved-switch`, or
   `not-applicable`.
 - `pr_diff_status`: `non-empty`, `empty`, or `not-checked`.
@@ -132,16 +124,18 @@ run from the recorded publication checkout, and verify the pushed branch or
 draft PR state after push. When worker or integration worktrees are available,
 the caller checkout should remain on its original branch; if the caller checkout
 was switched, the gate must reference the scoped
-`caller_checkout_policy=caller-checkout-approved` row. If the PR diff is empty,
+`starting_checkout_branch_handling=branch-switch-authorized` row. If the PR diff is empty,
 the publication checkout is not on the expected branch, or the target is the
-default/protected branch without a direct-commit row whose scoped evidence
-names that exact target, stop and record `blocked`.
+default/protected branch without a
+`changes-pushed-to-target-branch-without-pull-request` row whose scoped
+evidence names that exact target, stop and record `blocked`.
 
 In a Codex App session, `worker-worktree` or `integration-worktree` passes this
 gate for a newly created checkout only when the ledger records its owning App
-thread id. A newly created or allocated raw Git worktree requires recorded
-App-surface failure or unsuitability plus explicit owner fallback authority;
-otherwise set `publication_checkout_guard=blocked`. This additional guard does
+task id. A newly created or allocated raw Git worktree requires recorded
+App-surface failure or unsuitability plus
+`unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`;
+otherwise set `result_checkout_path_guard=blocked`. This additional guard does
 not apply in CLI-only sessions or to an existing owner-supplied checkout.
 
 ### Live Proof Gate
@@ -155,7 +149,7 @@ owner deferral.
 When live proof is blocked, record the exact blocker, the synthetic proof that
 was collected, and the owner decision or follow-up needed. Do not land,
 release, close, or mark complete on synthetic proof alone unless
-`completion_proof_policy=synthetic-accepted` for that workstream or the source
+`completion_evidence_policy=allow-simulated-evidence-by-authorized-user-exception` for that workstream or the source
 item is moved to `deferred` with an owner-visible follow-up.
 
 ### Closure Gate
@@ -164,27 +158,26 @@ Before closing any source item or moving work to `completed`, verify that the
 source acceptance criteria are satisfied by root-verifiable proof. If live proof
 is feasible but blocked by credentials, setup, service access, or missing
 hardware, do not treat the source item as fully complete unless the scoped row
-is `completion_proof_policy=synthetic-accepted`.
+is `completion_evidence_policy=allow-simulated-evidence-by-authorized-user-exception`.
 
-For implementation issues that include `## Delivery`, verify that closeout
-matches the recorded delivery mode and closeout path, and verify that direct
+For implementation issues that include `## Delivery`, verify that
+closeout matches the recorded target and completion method, and verify that direct
 dependencies or blocking relationships recorded in the issue are satisfied
 before declaring closure. Close through the relevant PR body by default. Use
-final-commit closure only for `closeout_mode=direct-commit-closes-issue` with
+final-commit closure only for `issue_completion_method=final-commit-closing-keyword` with
 the exact scoped authorization evidence. For local markdown sources, completion is
 the configured move to `issues/done/` after validation and proof; do not treat a
 commit alone as local issue closure.
 
-For Feature Spec-backed workflows with authorized pull-request delivery, do not declare
-the workstream `completed` while the expected PR remains uncreated. For
-`pr_closeout=merge-ready`, require the conditional Codex review and parent
-closeout gate below. For `pr_closeout=draft-only`, require validation and the
-expected draft PR, then record ready/review/merge-ready and parent closeout as
-`not-applicable` with reason `draft-only`. Direct issue mutation, merge, and
-release remain separately authorized actions.
+For either Feature Spec-backed PR target, do not declare the workstream
+`completed` while the expected PR remains uncreated. The merge-ready target
+requires the conditional Codex review and parent-closeout gate below. The draft
+target requires validation and the expected draft PR, then records downstream
+review, merge-ready, and parent closeout as `not-applicable`. Direct issue
+updates, merge, and release remain separately permissioned actions.
 
-For local markdown sources using `pull-request` delivery with
-`pr_closeout=merge-ready`, do not move the issue to
+For local Markdown sources using
+`pull-request-ready-for-merge-but-not-merged`, do not move the issue to
 `issues/done/` until local validation, real PR proof, required CI or integration
 proof, the resolved review policy, and any required review disposition are
 recorded. If any proof is
@@ -236,12 +229,12 @@ owner-ready next action.
 
 ### Codex PR Review And Parent Closeout Gate
 
-For `delivery_mode=pull-request` with `pr_closeout=merge-ready`, load
+For
+`change_delivery_target=pull-request-ready-for-merge-but-not-merged`, load
 `codex-review-closeout.md` and apply its complete current-head review and
-parent-closeout algorithm. For every other valid delivery/closeout combination,
-do not load that reference: record this gate `not-applicable` with reason
-`draft-only` when `pr_closeout=draft-only`, or
-`delivery-mode-not-pull-request` otherwise. Missing or contradictory values
+parent-closeout algorithm. For every other target, do not load that reference:
+record this gate `not-applicable` with reason
+`selected-delivery-target-does-not-require-merge-ready-review`. Missing or contradictory values
 remain a routing error rather than an inapplicable gate. Do not reproduce or
 reinterpret the conditional algorithm in another runtime document.
 
@@ -285,7 +278,7 @@ across repo boundaries before owner-ready status: shared API shape, version
 pinning, migration order, deploy order, fixtures, or an explicit integration
 test.
 
-For multi-repo `pull-request` delivery, also require the real repo PR links or
+For multi-repository PR delivery, also require the real repository PR links or
 equivalent integration proof promised by the Feature Spec or issue before declaring the
 cross-repo issue closed, merge-ready, or complete.
 

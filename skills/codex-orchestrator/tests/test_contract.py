@@ -210,20 +210,27 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertNotIn("github-plugin", ledger_template)
         self.assertIn("authority_reused=<authority", ledger_template)
 
-    def test_worker_capabilities_cannot_be_bypassed_by_allowed_surfaces(self) -> None:
+    def test_worker_actions_are_independent_and_non_cumulative(self) -> None:
         worker = self.read("references/worker.md")
+        action_section = worker.split("## Worker Allowed Actions", 1)[1].split(
+            "## Prompt Template", 1
+        )[0]
 
-        inspect_mode = next(
-            line for line in worker.splitlines() if line.startswith("- `inspect`:")
-        )
-        implement_mode = next(
-            line for line in worker.splitlines() if line.startswith("- `implement`:")
-        )
-        self.assertIn("read-only", inspect_mode)
-        self.assertIn("never permits", worker)
-        self.assertIn("cannot grant another capability mode", worker)
-        self.assertNotIn("unless explicitly listed in allowed surfaces", inspect_mode)
-        self.assertNotIn("unless explicitly listed in allowed surfaces", implement_mode)
+        for action in (
+            "inspect-files",
+            "edit-files",
+            "run-validation",
+            "create-local-commit",
+            "push-target-branch",
+            "create-or-update-pull-request",
+            "mark-pull-request-ready",
+            "request-codex-review",
+            "poll-codex-review",
+        ):
+            self.assertIn(f"`{action}`", action_section)
+        self.assertIn("Actions\nare not a cumulative ladder", worker)
+        self.assertIn("Merge, direct issue updates", action_section)
+        self.assertNotIn("`merge-pull-request`", action_section)
 
     def test_gate_selection_includes_follow_up_risk_and_access(self) -> None:
         gates = self.read("references/gates.md")
@@ -248,17 +255,12 @@ class OrchestratorContractTests(unittest.TestCase):
         delivery = self.read("references/spec-backed-delivery.md")
         gates = self.read("references/gates.md")
 
-        authorization_row = next(
-            line for line in worker.splitlines() if "`worker_authorization`" in line
-        )
-        prompt_modes = next(
-            line
-            for line in worker.splitlines()
-            if line.startswith("- worker_authorization:")
-        )
-        self.assertNotIn("merge-close", authorization_row)
-        self.assertNotIn("merge-close", prompt_modes)
-        self.assertIn("`merge_authority`: `none` is the default", delivery)
+        action_section = worker.split("## Worker Allowed Actions", 1)[1].split(
+            "## Prompt Template", 1
+        )[0]
+        self.assertNotIn("`merge-pull-request`", action_section)
+        self.assertIn("pull_request_merge_permission=not-granted", delivery)
+        self.assertIn("pull_request_merge_confirmation=ask-authorized-user-after-checks", delivery)
         self.assertIn("### Merge Authorization Gate", gates)
 
     def test_capability_and_reconciliation_contracts_are_required(self) -> None:
@@ -291,7 +293,7 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn("Do not load the template for an existing\nledger that passes", ledger)
 
-    def test_legacy_ledger_loads_template_for_migration(self) -> None:
+    def test_invalid_ledger_stops_before_new_template_loading(self) -> None:
         ledger = self.read("references/ledger.md")
         ledger_template = self.read("references/ledger-template.md")
         current = self.ledger_template_body().replace(
@@ -334,8 +336,12 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertFalse(self.is_current_ledger(contents))
         normalized_ledger = " ".join(ledger.split())
         self.assertIn("missing, duplicate, out-of-order, or wrongly nested marker", normalized_ledger)
-        self.assertIn("load `ledger-template.md` to migrate", normalized_ledger)
-        self.assertIn("marker check in `ledger.md` classifies", ledger_template)
+        self.assertIn("stop as `needs-owner`", normalized_ledger)
+        self.assertIn("do not\nload the new-ledger template", ledger)
+        self.assertIn(
+            "Never use it to reinterpret or overwrite an existing invalid ledger",
+            " ".join(ledger_template.split()),
+        )
 
     def test_missing_ledger_loads_template_for_creation(self) -> None:
         ledger = self.read("references/ledger.md")
@@ -362,7 +368,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("exactly one non-empty `Last updated:`", normalized_ledger)
         self.assertIn("Text copied into `## Notes` never satisfies", ledger)
         self.assertIn("any HTML comment marker", normalized_ledger)
-        self.assertIn("classifies the ledger as legacy", normalized_ledger)
+        self.assertIn("makes the ledger invalid", normalized_ledger)
         self.assertIn("normalize up to three leading spaces", normalized_ledger)
         self.assertIn("use ATX headings only", normalized_ledger)
         self.assertIn("any Setext underline syntax", normalized_ledger)
@@ -385,73 +391,34 @@ class OrchestratorContractTests(unittest.TestCase):
     def test_recovery_packet_is_compact_derived_and_freshness_gated(self) -> None:
         skill = self.read("SKILL.md")
         ledger_template = self.read("references/ledger-template.md")
-        efficiency = self.read("references/recovery-validation.md")
+        recovery = self.read("references/recovery-validation.md")
 
-        self.assertIn("## Recovery Packet", ledger_template)
-        self.assertIn("Projection fingerprint", ledger_template)
-        self.assertIn("Content fingerprint", ledger_template)
-        self.assertIn("Recovery packet content fingerprint", ledger_template)
-        self.assertIn("References to load next", ledger_template)
-        self.assertIn("Option resolution refs: session_rows=", ledger_template)
-        self.assertIn("rows_fingerprint=<sha256", ledger_template)
-        self.assertIn("Workstream checkpoints:", ledger_template)
-        self.assertIn("scope_transfer_ref=<issue:<NN>|not-applicable>", ledger_template)
-        self.assertIn("delivery_evidence_fingerprint=<sha256 or not-applicable>", ledger_template)
-        self.assertIn("issue_mutation_evidence_fingerprint=<sha256 or not-applicable>", ledger_template)
+        for marker in (
+            "## Recovery Packet",
+            "Projection fingerprint",
+            "Content fingerprint",
+            "Option resolution refs: session_rows=",
+            "rows_fingerprint=<sha256",
+            "Workstream checkpoints:",
+        ):
+            self.assertIn(marker, ledger_template)
         self.assertIn("compact derived projection, never\n  as authority", skill)
-        self.assertIn("Read only the ledger `## Recovery Packet`", efficiency)
-        self.assertIn("Recompute the packet's Projection fingerprint", efficiency)
-        self.assertIn("Recompute the packet Content fingerprint", efficiency)
-        self.assertIn("match both the packet value", efficiency)
-        self.assertIn("stored under authoritative\n   `## Active Root`", efficiency)
-        self.assertIn("require an exact match", efficiency)
-        self.assertIn("shasum -a 256", efficiency)
-        self.assertIn("checkpoint IDs to equal the complete current set", efficiency)
-        self.assertIn("in-scope registered source item IDs", efficiency)
-        self.assertIn("every current\n   `## Workstreams` status bucket", efficiency)
-        self.assertIn("Workstream checkpoint IDs to equal every authoritative workstream", efficiency)
-        self.assertIn("re-read that\n   generated issue's current `## Orchestrator Handoff`", efficiency)
-        self.assertIn("match `delivery_evidence_fingerprint`", efficiency)
-        self.assertIn("`issue_mutation_evidence_fingerprint`", efficiency)
-        self.assertIn("`scope_transfer_ref` and\n   `issue_mutation_transfer_ref` rows", efficiency)
-        self.assertIn("Require every listed `workstream_ids` assignment", efficiency)
-        self.assertIn("assigned_worker[workstream]", efficiency)
-        self.assertIn("reject missing or extra checkpoints", efficiency)
-        self.assertIn(
-            "exact\n   session and scoped `## Option Resolution` row IDs",
-            efficiency,
-        )
-        self.assertIn("require it to match `rows_fingerprint`", efficiency)
-        self.assertIn("PACKET_OPTION_ROWS_FINGERPRINT=", efficiency)
-        self.assertIn("COMPUTED_OPTION_ROWS_FINGERPRINT=", efficiency)
-        self.assertIn("row_id,scope_id,field,value,source,evidence", efficiency)
-        self.assertIn("LC_ALL=C sort", efficiency)
-        self.assertIn("shasum -a 256", efficiency)
-        self.assertIn('substr(value, 1, 1) == "`"', efficiency)
-        self.assertIn("OPTION_ROW_IDS=", efficiency)
-        self.assertIn("OPTION_SOURCE_SCOPE_IDS=", efficiency)
-        self.assertIn("OPTION_WORKSTREAM_SCOPE_IDS=", efficiency)
-        self.assertIn("derive discovery-source scope IDs", efficiency)
-        self.assertIn("Registered source-item\n   checkpoints are freshness evidence", efficiency)
-        self.assertIn("OPTION_SCOPE_IDS=", efficiency)
-        self.assertIn("if (is_applicable) {", efficiency)
-        self.assertIn("applicable[row_id]++", efficiency)
-        self.assertIn("expected_session", efficiency)
-        self.assertIn("expected_source", efficiency)
-        self.assertIn("expected_workstream", efficiency)
-        self.assertIn("allowed_value", efficiency)
-        self.assertIn("allowed_source", efficiency)
-        self.assertIn("!(row_id in selected)", efficiency)
-        self.assertIn("if (!(row_id in selected)) next", efficiency)
-        self.assertIn("repo checkpoint realpaths to equal the complete canonical", efficiency)
-        self.assertIn("from `## Scope` and `## Active Root`", efficiency)
-        self.assertIn("reject\n   missing or extra repos", efficiency)
-        self.assertIn("Projection fingerprint, which now binds that content fingerprint", efficiency)
-        self.assertIn("If any check differs, mark it `stale` or `invalid`", efficiency)
-        self.assertIn("do not mutate or dispatch\n   from it", efficiency)
-        self.assertIn("never bypasses claims,\ncapabilities, authority", efficiency)
+        self.assertIn("Read only the ledger `## Recovery Packet`", recovery)
+        self.assertIn("Recompute the packet Content fingerprint", recovery)
+        self.assertIn("Recompute the packet's Projection fingerprint", recovery)
+        self.assertIn("re-read that generated issue's\n   current `## Orchestrator Handoff`", recovery)
+        self.assertIn("OPTION_ROW_IDS=", recovery)
+        self.assertIn("OPTION_SOURCE_SCOPE_IDS=", recovery)
+        self.assertIn("OPTION_WORKSTREAM_SCOPE_IDS=", recovery)
+        self.assertIn("PACKET_OPTION_ROWS_FINGERPRINT=", recovery)
+        self.assertIn("COMPUTED_OPTION_ROWS_FINGERPRINT=", recovery)
+        self.assertIn("background-codex-subagent", recovery)
+        self.assertIn("visible-codex-app-task", recovery)
+        self.assertIn("Reject duplicate, omitted, extra, invalid", recovery)
+        self.assertIn("If any check differs, mark it `stale` or `invalid`", recovery)
+        self.assertIn("never bypasses claims,\ncapabilities, permissions", recovery)
 
-    def test_recovery_option_hash_rejects_omitted_applicable_row(self) -> None:
+    def test_recovery_option_hash_enforces_current_schema(self) -> None:
         efficiency = self.read("references/recovery-validation.md")
         marker = efficiency.index("OPTION_ROW_IDS=")
         block_start = efficiency.rfind("```bash", 0, marker) + len("```bash")
@@ -459,48 +426,137 @@ class OrchestratorContractTests(unittest.TestCase):
         script = efficiency[block_start:block_end].strip()
 
         session_values = {
-            "delegation_mode": ("auto", "default", "none"),
-            "worker_surface": ("auto", "default", "none"),
-            "worker_limit": ("unbounded", "default", "none"),
-            "app_thread_consent": ("not-requested", "default", "none"),
-            "app_thread_limit": ("unspecified", "default", "none"),
-            "raw_worktree_fallback": ("forbidden", "default", "none"),
-            "active_root_takeover_policy": ("owner-approval", "default", "none"),
-            "project_topology": ("single-repo", "project-layout-config", "project-memory/config/project-layout.md"),
+            "work_delegation_policy": (
+                "orchestrator-decides-for-each-implementation-workstream",
+                "default",
+                "none",
+            ),
+            "delegated_worker_visibility": (
+                "orchestrator-decides-between-background-and-visible-workers",
+                "default",
+                "none",
+            ),
+            "max_concurrent_delegated_workers": (
+                "not-limited-by-authorized-user",
+                "default",
+                "none",
+            ),
+            "visible_app_task_permission": ("not-requested", "default", "none"),
+            "max_visible_app_tasks": ("not-applicable", "default", "none"),
+            "unmanaged_git_worktree_fallback_permission": (
+                "not-granted",
+                "default",
+                "none",
+            ),
+            "existing_orchestrator_session_takeover_policy": (
+                "ask-authorized-user-before-takeover",
+                "default",
+                "none",
+            ),
+            "repository_layout": (
+                "single-repository",
+                "project-layout-config",
+                "project-memory/config/project-layout.md",
+            ),
         }
         scoped_values = {
-            "source_mutation_authority": ("none", "default", "none"),
-            "publication_authority": ("spec-backed-pull-request", "source-contract", "issue-1"),
-            "issue_mutation_authority": ("pr-body-closeout-only", "source-contract", "issue-1"),
-            "merge_authority": ("none", "default", "none"),
-            "merge_policy": ("owner-approval", "default", "none"),
-            "caller_checkout_policy": ("preserve-current-branch", "default", "none"),
-            "automation_authority": ("none", "default", "none"),
-            "temporary_source_execution": ("forbidden", "default", "none"),
-            "completion_proof_policy": ("live-required", "default", "none"),
-            "delivery_mode": ("pull-request", "source-contract", "issue-1"),
-            "delivery_source": ("feature-level-inherited", "source-contract", "issue-1"),
-            "workstream_project_topology": ("single-repo", "source-contract", "issue-1"),
-            "branch_name": ("feature/example", "source-contract", "issue-1"),
-            "current_pr_ref": ("owner/repo#123", "runtime-derived", "https://github.com/owner/repo/pull/123"),
-            "scope_transfer_ref": ("not-applicable", "default", "none"),
-            "issue_mutation_transfer_ref": ("not-applicable", "default", "none"),
-            "pr_closeout": ("merge-ready", "source-contract", "issue-1"),
-            "codex_review_policy": ("required", "default", "none"),
-            "pr_shape": ("single-pr", "source-contract", "issue-1"),
-            "closeout_mode": ("feature-pr-closes-issue", "source-contract", "issue-1"),
-            "integration_mode": ("single-repo-pr", "source-contract", "issue-1"),
+            "tracked_work_item_update_permission": ("read-only", "default", "none"),
+            "change_delivery_permission": (
+                "not-required-for-uncommitted-changes",
+                "default",
+                "none",
+            ),
+            "issue_update_permission": ("no-issue-changes", "default", "none"),
+            "pull_request_merge_permission": ("not-granted", "default", "none"),
+            "pull_request_merge_confirmation": (
+                "ask-authorized-user-after-checks",
+                "default",
+                "none",
+            ),
+            "starting_checkout_branch_handling": (
+                "keep-current-branch-checked-out",
+                "default",
+                "none",
+            ),
+            "scheduled_automation_change_permission": (
+                "not-granted",
+                "default",
+                "none",
+            ),
+            "temporary_source_execution_permission": (
+                "not-granted",
+                "default",
+                "none",
+            ),
+            "completion_evidence_policy": (
+                "require-live-system-evidence",
+                "default",
+                "none",
+            ),
+            "change_delivery_target": (
+                "validated-changes-left-uncommitted",
+                "default",
+                "none",
+            ),
+            "delivery_decision_origin": (
+                "safe-default-for-ad-hoc-work",
+                "default",
+                "none",
+            ),
+            "workstream_repository_layout": (
+                "single-repository",
+                "runtime-derived",
+                "none",
+            ),
+            "codex_review_requirement": (
+                "not-needed-for-selected-delivery-target",
+                "runtime-derived",
+                "none",
+            ),
+            "pull_request_count_strategy": (
+                "no-pull-request",
+                "runtime-derived",
+                "none",
+            ),
+            "issue_completion_method": (
+                "no-issue-completion",
+                "runtime-derived",
+                "none",
+            ),
+            "target_branch_name": (
+                "not-applicable",
+                "runtime-derived",
+                "none",
+            ),
+            "target_pull_request_ref": (
+                "not-applicable",
+                "runtime-derived",
+                "none",
+            ),
+            "delivery_permission_source_issue_ref": (
+                "not-applicable",
+                "runtime-derived",
+                "none",
+            ),
+            "issue_update_permission_source_issue_ref": (
+                "not-applicable",
+                "runtime-derived",
+                "none",
+            ),
         }
-        scopes = ("workstream:a", "workstream:b", "workstream:repo:123")
+        scopes = ("workstream:a", "workstream:b")
 
         def row(scope: str, field: str, triple: tuple[str, str, str]) -> str:
-            value, source, evidence = triple
+            value, source_name, evidence = triple
             return (
                 f"| `{scope}:{field}` | `{scope}` | `{field}` | `{value}` | "
-                f"`{source}` | `{evidence}` |"
+                f"`{source_name}` | `{evidence}` |"
             )
 
-        session_rows = [row("session", field, triple) for field, triple in session_values.items()]
+        session_rows = [
+            row("session", field, triple)
+            for field, triple in session_values.items()
+        ]
         scoped_rows = [
             row(scope, field, triple)
             for scope in scopes
@@ -534,15 +590,9 @@ class OrchestratorContractTests(unittest.TestCase):
                 "| --- | --- |",
                 "| Source | issue-1 |",
                 "",
-                "#### repo:123: Colon-scoped work",
-                "",
-                "| Field | Value |",
-                "| --- | --- |",
-                "| Source | issue-1 |",
-                "",
                 "### ready-next",
                 "",
-                "- workstream_id=b; source_id=issue-1; <next work>",
+                "- workstream_id=b; source_id=issue-1; next work",
                 "",
                 "## Wave Reports",
                 "",
@@ -562,9 +612,11 @@ class OrchestratorContractTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             ledger_path = Path(directory) / "ledger.md"
-            ledger_path.write_text(ledger_fixture, encoding="utf-8")
 
-            def run(selected: list[str], contents: str = ledger_fixture) -> subprocess.CompletedProcess[str]:
+            def run(
+                selected: list[str],
+                contents: str = ledger_fixture,
+            ) -> subprocess.CompletedProcess[str]:
                 selected_set = set(selected)
                 normalized_rows: list[list[str]] = []
                 for line in contents.split("## Discovery Sources", 1)[0].splitlines():
@@ -575,7 +627,9 @@ class OrchestratorContractTests(unittest.TestCase):
                         continue
                     normalized = [
                         cell[1:-1]
-                        if len(cell) >= 2 and cell.startswith("`") and cell.endswith("`")
+                        if len(cell) >= 2
+                        and cell.startswith("`")
+                        and cell.endswith("`")
                         else cell
                         for cell in cells
                     ]
@@ -583,9 +637,14 @@ class OrchestratorContractTests(unittest.TestCase):
                         normalized_rows.append(normalized)
                 serialized = "".join(
                     "\t".join(row_values) + "\n"
-                    for row_values in sorted(normalized_rows, key=lambda values: values[0])
+                    for row_values in sorted(
+                        normalized_rows,
+                        key=lambda values: values[0],
+                    )
                 )
-                packet_fingerprint = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+                packet_fingerprint = hashlib.sha256(
+                    serialized.encode("utf-8")
+                ).hexdigest()
                 configured_contents = contents.replace(
                     "rows_fingerprint=auto",
                     f"rows_fingerprint={packet_fingerprint}",
@@ -604,1052 +663,240 @@ class OrchestratorContractTests(unittest.TestCase):
                     text=True,
                 )
 
-            def with_active_workers(contents: str, rows: list[str]) -> str:
-                projected = contents
-                pattern = re.compile(
-                    r"^- worker_id=([A-Za-z0-9:_-]+); "
-                    r"actual_workstream_surface=(cli-subagent|codex-app-thread); "
-                    r"workstream_ids=([A-Za-z0-9,:_-]+)$"
-                )
-                for worker_row in rows:
-                    match = pattern.match(worker_row)
-                    if match is None:
-                        raise AssertionError(f"invalid worker fixture row: {worker_row}")
-                    worker_id, surface, assignments = match.groups()
-                    for workstream_id in assignments.split(","):
-                        marker = f"#### {workstream_id}:"
-                        start = projected.index(marker)
-                        next_heading = projected.find("\n#### ", start + len(marker))
-                        next_bucket = projected.find("\n### ready-next", start + len(marker))
-                        ends = [value for value in (next_heading, next_bucket) if value >= 0]
-                        end = min(ends) if ends else len(projected)
-                        block = projected[start:end]
-                        source_row = "| Source | issue-1 |"
-                        evidence_rows = (
-                            f"{source_row}\n"
-                            f"| Repo / surface | repo; {surface}; worker={worker_id} |\n"
-                            "| Worker evidence | worker_surface=auto; "
-                            f"actual_workstream_surface={surface}; status=used |"
-                        )
-                        block = block.replace(source_row, evidence_rows, 1)
-                        projected = projected[:start] + block + projected[end:]
-                registry = "\n".join(
-                    [
-                        "## Active Root",
-                        "",
-                        "Active workers:",
-                        *rows,
-                        "Takeover history:",
-                        "",
-                    ]
-                )
-                active_ids = sorted(pattern.match(worker_row).group(1) for worker_row in rows)
-                projected = projected.replace(
-                    "active_workers=none",
-                    f"active_workers={','.join(active_ids)}",
-                )
-                return projected.replace("## Workstreams", f"{registry}\n## Workstreams")
-
-            def with_root_session(
-                contents: str,
-                *,
-                workstream_id: str = "a",
-                worker_id: str = "root",
-            ) -> str:
-                marker = f"#### {workstream_id}:"
-                start = contents.index(marker)
-                next_heading = contents.find("\n#### ", start + len(marker))
-                next_bucket = contents.find("\n### ready-next", start + len(marker))
-                ends = [value for value in (next_heading, next_bucket) if value >= 0]
-                end = min(ends) if ends else len(contents)
-                block = contents[start:end]
-                source_row = "| Source | issue-1 |"
-                evidence_rows = (
-                    f"{source_row}\n"
-                    f"| Repo / surface | repo; root; worker={worker_id} |\n"
-                    "| Worker evidence | worker_surface=auto; "
-                    "actual_workstream_surface=root-session; status=root-owned-fallback |"
-                )
-                block = block.replace(source_row, evidence_rows, 1)
-                return contents[:start] + block + contents[end:]
-
             complete = run(complete_ids)
             self.assertEqual(complete.returncode, 0, complete.stderr)
 
-            root_session = run(complete_ids, with_root_session(ledger_fixture))
-            self.assertEqual(root_session.returncode, 0, root_session.stderr)
+            def with_session_values(
+                values: dict[str, tuple[str, str, str]],
+            ) -> str:
+                replacement = [
+                    row("session", field, triple)
+                    for field, triple in values.items()
+                ]
+                return ledger_fixture.replace(
+                    "\n".join(session_rows),
+                    "\n".join(replacement),
+                )
 
-            stale_worker_in_root_session = run(
-                complete_ids,
-                with_root_session(ledger_fixture, worker_id="stale-worker"),
+            delegated_limit_evidence = (
+                "permission-source-ref=authorized-user:request-1;"
+                "scope-ref=session;target-ref=delegated-workers"
             )
-            self.assertNotEqual(stale_worker_in_root_session.returncode, 0)
+            bounded_session = dict(session_values)
+            bounded_session.update(
+                {
+                    "work_delegation_policy": (
+                        "orchestrator-decides-with-concurrent-worker-limit",
+                        "authorized-user-instruction",
+                        delegated_limit_evidence,
+                    ),
+                    "max_concurrent_delegated_workers": (
+                        "2",
+                        "authorized-user-instruction",
+                        delegated_limit_evidence,
+                    ),
+                }
+            )
+            bounded = run(complete_ids, with_session_values(bounded_session))
+            self.assertEqual(bounded.returncode, 0, bounded.stderr)
 
-            mismatched_packet_fingerprint = run(
+            mismatched_bounded_session = dict(bounded_session)
+            mismatched_bounded_session["max_concurrent_delegated_workers"] = (
+                "2",
+                "authorized-user-instruction",
+                delegated_limit_evidence.replace("request-1", "request-2"),
+            )
+            mismatched_bounded = run(
+                complete_ids,
+                with_session_values(mismatched_bounded_session),
+            )
+            self.assertNotEqual(mismatched_bounded.returncode, 0)
+
+            visible_task_evidence = (
+                "permission-source-ref=authorized-user:request-3;"
+                "scope-ref=session;target-ref=visible-app-tasks"
+            )
+            visible_session = dict(session_values)
+            visible_session.update(
+                {
+                    "delegated_worker_visibility": (
+                        "visible-codex-app-tasks-only",
+                        "authorized-user-instruction",
+                        visible_task_evidence,
+                    ),
+                    "visible_app_task_permission": (
+                        "granted-by-authorized-user",
+                        "authorized-user-instruction",
+                        visible_task_evidence,
+                    ),
+                    "max_visible_app_tasks": (
+                        "2",
+                        "authorized-user-instruction",
+                        visible_task_evidence,
+                    ),
+                }
+            )
+            visible = run(complete_ids, with_session_values(visible_session))
+            self.assertEqual(visible.returncode, 0, visible.stderr)
+
+            mismatched_visible_session = dict(visible_session)
+            mismatched_visible_session["max_visible_app_tasks"] = (
+                "2",
+                "authorized-user-instruction",
+                visible_task_evidence.replace("request-3", "request-4"),
+            )
+            mismatched_visible = run(
+                complete_ids,
+                with_session_values(mismatched_visible_session),
+            )
+            self.assertNotEqual(mismatched_visible.returncode, 0)
+
+            def feature_spec_contract(scope: str) -> dict[str, tuple[str, str, str]]:
+                values = dict(scoped_values)
+                permission_evidence = (
+                    "permission-source-ref=feature-spec-default:demo;"
+                    f"scope-ref={scope};target-ref=issue:01;"
+                    "target-branch=feature/demo"
+                )
+                values.update(
+                    {
+                        "change_delivery_permission": (
+                            "granted-for-selected-target",
+                            "source-contract",
+                            permission_evidence,
+                        ),
+                        "issue_update_permission": (
+                            "pull-request-closing-keyword-only",
+                            "source-contract",
+                            permission_evidence,
+                        ),
+                        "change_delivery_target": (
+                            "pull-request-ready-for-merge-but-not-merged",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "delivery_decision_origin": (
+                            "inherited-from-feature-spec",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "codex_review_requirement": (
+                            "required-on-current-pull-request-head",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "pull_request_count_strategy": (
+                            "one-pull-request-total",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "issue_completion_method": (
+                            "feature-pull-request-closing-keyword",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "target_branch_name": (
+                            "feature/demo",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "target_pull_request_ref": (
+                            "pending",
+                            "runtime-derived",
+                            "none",
+                        ),
+                        "delivery_permission_source_issue_ref": (
+                            "issue:01",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                        "issue_update_permission_source_issue_ref": (
+                            "issue:01",
+                            "source-contract",
+                            "issue:01",
+                        ),
+                    }
+                )
+                return values
+
+            feature_spec_rows = [
+                row(scope, field, triple)
+                for scope in scopes
+                for field, triple in feature_spec_contract(scope).items()
+            ]
+            feature_spec_fixture = ledger_fixture.replace(
+                "\n".join(scoped_rows),
+                "\n".join(feature_spec_rows),
+            )
+            default_feature_spec = run(complete_ids, feature_spec_fixture)
+            self.assertEqual(
+                default_feature_spec.returncode,
+                0,
+                default_feature_spec.stderr,
+            )
+
+            missing_permission_source = run(
+                complete_ids,
+                feature_spec_fixture.replace(
+                    "permission-source-ref=feature-spec-default:demo;",
+                    "permission-source-ref=;",
+                    1,
+                ),
+            )
+            self.assertNotEqual(missing_permission_source.returncode, 0)
+
+            missing_id = "workstream:a:change_delivery_target"
+            missing_row = row(
+                "workstream:a",
+                "change_delivery_target",
+                scoped_values["change_delivery_target"],
+            )
+            omitted = run(
+                [row_id for row_id in complete_ids if row_id != missing_id],
+                ledger_fixture.replace(f"{missing_row}\n", ""),
+            )
+            self.assertNotEqual(omitted.returncode, 0)
+
+            duplicated = run(
+                complete_ids,
+                ledger_fixture.replace(missing_row, f"{missing_row}\n{missing_row}"),
+            )
+            self.assertNotEqual(duplicated.returncode, 0)
+
+            retired_value = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    missing_row,
+                    row(
+                        "workstream:a",
+                        "change_delivery_target",
+                        ("local-only", "default", "none"),
+                    ),
+                ),
+            )
+            self.assertNotEqual(retired_value.returncode, 0)
+
+            retired_field = run(
+                complete_ids,
+                ledger_fixture.replace(
+                    missing_row,
+                    row(
+                        "workstream:a",
+                        "delivery_mode",
+                        scoped_values["change_delivery_target"],
+                    ),
+                ),
+            )
+            self.assertNotEqual(retired_field.returncode, 0)
+
+            mismatched_fingerprint = run(
                 complete_ids,
                 ledger_fixture.replace(
                     "rows_fingerprint=auto",
                     f"rows_fingerprint={'0' * 64}",
                 ),
             )
-            self.assertNotEqual(mismatched_packet_fingerprint.returncode, 0)
-
-            inflated_default_worker_limit = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "session",
-                        "worker_limit",
-                        session_values["worker_limit"],
-                    ),
-                    row("session", "worker_limit", ("100", "default", "none")),
-                ),
-            )
-            self.assertNotEqual(inflated_default_worker_limit.returncode, 0)
-
-            positive_auto_worker_limit = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "session",
-                        "worker_limit",
-                        session_values["worker_limit"],
-                    ),
-                    row(
-                        "session",
-                        "worker_limit",
-                        (
-                            "2",
-                            "owner-instruction",
-                            "owner-ref=request-1;scope-ref=session;"
-                            "target-ref=delegation:workers",
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(positive_auto_worker_limit.returncode, 0)
-
-            inflated_default_app_limit = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "session",
-                        "app_thread_limit",
-                        session_values["app_thread_limit"],
-                    ),
-                    row("session", "app_thread_limit", ("100", "default", "none")),
-                ),
-            )
-            self.assertNotEqual(inflated_default_app_limit.returncode, 0)
-
-            bounded_evidence = (
-                "owner-ref=request-1;scope-ref=session;"
-                "target-ref=delegation:workers"
-            )
-            bounded_fixture = ledger_fixture.replace(
-                row(
-                    "session",
-                    "delegation_mode",
-                    session_values["delegation_mode"],
-                ),
-                row(
-                    "session",
-                    "delegation_mode",
-                    ("bounded", "owner-instruction", bounded_evidence),
-                ),
-            ).replace(
-                row(
-                    "session",
-                    "worker_limit",
-                    session_values["worker_limit"],
-                ),
-                row(
-                    "session",
-                    "worker_limit",
-                    ("2", "owner-instruction", bounded_evidence),
-                ),
-            )
-            bounded = run(complete_ids, bounded_fixture)
-            self.assertEqual(bounded.returncode, 0, bounded.stderr)
-
-            bounded_live_workers = with_active_workers(
-                bounded_fixture,
-                [
-                    "- worker_id=w1; actual_workstream_surface=cli-subagent; workstream_ids=a",
-                    "- worker_id=w2; actual_workstream_surface=cli-subagent; workstream_ids=repo:123",
-                ],
-            )
-            bounded_at_limit = run(complete_ids, bounded_live_workers)
-            self.assertEqual(bounded_at_limit.returncode, 0, bounded_at_limit.stderr)
-
-            bounded_over_limit = run(
-                complete_ids,
-                bounded_live_workers.replace(
-                    row(
-                        "session",
-                        "worker_limit",
-                        ("2", "owner-instruction", bounded_evidence),
-                    ),
-                    row(
-                        "session",
-                        "worker_limit",
-                        ("1", "owner-instruction", bounded_evidence),
-                    ),
-                ),
-            )
-            self.assertNotEqual(bounded_over_limit.returncode, 0)
-
-            mismatched_bounded_limit = run(
-                complete_ids,
-                bounded_fixture.replace(
-                    row(
-                        "session",
-                        "worker_limit",
-                        ("2", "owner-instruction", bounded_evidence),
-                    ),
-                    row(
-                        "session",
-                        "worker_limit",
-                        (
-                            "2",
-                            "owner-instruction",
-                            bounded_evidence.replace("request-1", "request-2"),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_bounded_limit.returncode, 0)
-
-            app_evidence = (
-                "owner-ref=request-1;scope-ref=session;"
-                "target-ref=visible-app-workers"
-            )
-            app_fixture = ledger_fixture.replace(
-                row(
-                    "session",
-                    "app_thread_consent",
-                    session_values["app_thread_consent"],
-                ),
-                row(
-                    "session",
-                    "app_thread_consent",
-                    ("granted", "owner-instruction", app_evidence),
-                ),
-            ).replace(
-                row(
-                    "session",
-                    "app_thread_limit",
-                    session_values["app_thread_limit"],
-                ),
-                row(
-                    "session",
-                    "app_thread_limit",
-                    ("1", "owner-instruction", app_evidence),
-                ),
-            )
-            app_threads = run(complete_ids, app_fixture)
-            self.assertEqual(app_threads.returncode, 0, app_threads.stderr)
-
-            one_app_worker = with_active_workers(
-                app_fixture,
-                [
-                    "- worker_id=app1; actual_workstream_surface=codex-app-thread; workstream_ids=a",
-                ],
-            )
-            app_at_limit = run(complete_ids, one_app_worker)
-            self.assertEqual(app_at_limit.returncode, 0, app_at_limit.stderr)
-
-            stale_packet_worker_ids = run(
-                complete_ids,
-                one_app_worker.replace("active_workers=app1", "active_workers=none"),
-            )
-            self.assertNotEqual(stale_packet_worker_ids.returncode, 0)
-
-            stale_worker_assignment = run(
-                complete_ids,
-                one_app_worker.replace("workstream_ids=a", "workstream_ids=b"),
-            )
-            self.assertNotEqual(stale_worker_assignment.returncode, 0)
-
-            mismatched_worker_surface_evidence = run(
-                complete_ids,
-                one_app_worker.replace(
-                    "actual_workstream_surface=codex-app-thread; status=used",
-                    "actual_workstream_surface=cli-subagent; status=used",
-                ),
-            )
-            self.assertNotEqual(mismatched_worker_surface_evidence.returncode, 0)
-
-            app_over_limit = run(
-                complete_ids,
-                with_active_workers(
-                    app_fixture,
-                    [
-                        "- worker_id=app1; actual_workstream_surface=codex-app-thread; workstream_ids=a",
-                        "- worker_id=app2; actual_workstream_surface=codex-app-thread; workstream_ids=repo:123",
-                    ],
-                ),
-            )
-            self.assertNotEqual(app_over_limit.returncode, 0)
-
-            cli_surface_with_app_worker = run(
-                complete_ids,
-                one_app_worker.replace(
-                    row(
-                        "session",
-                        "worker_surface",
-                        session_values["worker_surface"],
-                    ),
-                    row(
-                        "session",
-                        "worker_surface",
-                        ("cli-subagent", "owner-instruction", "request-1"),
-                    ),
-                ),
-            )
-            self.assertNotEqual(cli_surface_with_app_worker.returncode, 0)
-
-            disabled_fixture = ledger_fixture.replace(
-                row(
-                    "session",
-                    "delegation_mode",
-                    session_values["delegation_mode"],
-                ),
-                row(
-                    "session",
-                    "delegation_mode",
-                    ("disabled", "owner-instruction", "request-1"),
-                ),
-            ).replace(
-                row(
-                    "session",
-                    "worker_surface",
-                    session_values["worker_surface"],
-                ),
-                row(
-                    "session",
-                    "worker_surface",
-                    ("not-applicable", "runtime-capability", "no-delegation"),
-                ),
-            )
-            disabled = run(complete_ids, disabled_fixture)
-            self.assertEqual(disabled.returncode, 0, disabled.stderr)
-
-            legacy_auto_root_thread_normalized = ledger_fixture.replace(
-                row(
-                    "session",
-                    "delegation_mode",
-                    session_values["delegation_mode"],
-                ),
-                row(
-                    "session",
-                    "delegation_mode",
-                    (
-                        "disabled",
-                        "runtime-capability",
-                        "legacy-worker-surface=root-thread",
-                    ),
-                ),
-            ).replace(
-                row(
-                    "session",
-                    "worker_surface",
-                    session_values["worker_surface"],
-                ),
-                row(
-                    "session",
-                    "worker_surface",
-                    (
-                        "not-applicable",
-                        "legacy-migration",
-                        "legacy-worker-surface=root-thread",
-                    ),
-                ),
-            )
-            legacy_auto_root_thread = run(
-                complete_ids,
-                legacy_auto_root_thread_normalized,
-            )
-            self.assertEqual(
-                legacy_auto_root_thread.returncode,
-                0,
-                legacy_auto_root_thread.stderr,
-            )
-
-            auto_with_not_applicable_surface = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "session",
-                        "worker_surface",
-                        session_values["worker_surface"],
-                    ),
-                    row(
-                        "session",
-                        "worker_surface",
-                        ("not-applicable", "runtime-capability", "no-delegation"),
-                    ),
-                ),
-            )
-            self.assertNotEqual(auto_with_not_applicable_surface.returncode, 0)
-
-            disabled_with_cli_worker = run(
-                complete_ids,
-                with_active_workers(
-                    disabled_fixture,
-                    [
-                        "- worker_id=w1; actual_workstream_surface=cli-subagent; workstream_ids=a",
-                    ],
-                ),
-            )
-            self.assertNotEqual(disabled_with_cli_worker.returncode, 0)
-
-            unbounded_app_consent = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "session",
-                        "app_thread_consent",
-                        session_values["app_thread_consent"],
-                    ),
-                    row(
-                        "session",
-                        "app_thread_consent",
-                        ("granted", "owner-instruction", app_evidence),
-                    ),
-                ),
-            )
-            self.assertNotEqual(unbounded_app_consent.returncode, 0)
-
-            discovery_option_row = row(
-                "source:ds-001",
-                "source_mutation_authority",
-                ("none", "default", "none"),
-            )
-            discovery_source_row = (
-                "| ds-001 | github-issue | owner/repo | now | sha | "
-                "number | none | none |"
-            )
-            discovery_fixture = ledger_fixture.replace(
-                "\n## Discovery Sources",
-                f"\n{discovery_option_row}\n\n## Discovery Sources\n\n"
-                "| Source ID | Kind | Path/Query/URL | Last Checked | "
-                "Cursor/Fingerprint | Item Key Rule | "
-                "source_mutation_authority | Suppression Rule |\n"
-                "| --- | --- | --- | --- | --- | --- | --- | --- |\n"
-                + discovery_source_row,
-            )
-            discovery_scope = run(
-                [*complete_ids, "source:ds-001:source_mutation_authority"],
-                discovery_fixture,
-            )
-            self.assertEqual(discovery_scope.returncode, 0, discovery_scope.stderr)
-
-            unselected_discovery_scope = run(complete_ids, discovery_fixture)
-            self.assertNotEqual(unselected_discovery_scope.returncode, 0)
-
-            duplicate_discovery_scope = run(
-                [*complete_ids, "source:ds-001:source_mutation_authority"],
-                discovery_fixture.replace(
-                    discovery_source_row,
-                    f"{discovery_source_row}\n{discovery_source_row}",
-                ),
-            )
-            self.assertNotEqual(duplicate_discovery_scope.returncode, 0)
-
-            duplicate_workstream_scope = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    "- workstream_id=b; source_id=issue-1; <next work>",
-                    "- workstream_id=b; source_id=issue-1; <next work>\n"
-                    "- workstream_id=b; source_id=issue-1; <duplicate>",
-                ),
-            )
-            self.assertNotEqual(duplicate_workstream_scope.returncode, 0)
-
-            mismatched_app_limit = run(
-                complete_ids,
-                app_fixture.replace(
-                    row(
-                        "session",
-                        "app_thread_limit",
-                        ("1", "owner-instruction", app_evidence),
-                    ),
-                    row(
-                        "session",
-                        "app_thread_limit",
-                        (
-                            "1",
-                            "owner-instruction",
-                            app_evidence.replace("request-1", "request-2"),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_app_limit.returncode, 0)
-
-            special_branch = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "workstream:b",
-                        "branch_name",
-                        scoped_values["branch_name"],
-                    ),
-                    row(
-                        "workstream:b",
-                        "branch_name",
-                        ("_release", "source-contract", "issue-1"),
-                    ),
-                ),
-            )
-            self.assertEqual(special_branch.returncode, 0, special_branch.stderr)
-
-            omitted_scope = run(
-                [row_id for row_id in complete_ids if not row_id.startswith("workstream:repo:123:")]
-            )
-            self.assertNotEqual(omitted_scope.returncode, 0)
-
-            stale_scope_row = row(
-                "workstream:removed",
-                "merge_authority",
-                ("explicit-owner-authorization", "owner-instruction", "request-1"),
-            )
-            stale_scope = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    "\n## Discovery Sources",
-                    f"\n{stale_scope_row}\n\n## Discovery Sources",
-                ),
-            )
-            self.assertNotEqual(stale_scope.returncode, 0)
-
-            malformed_stale_scope = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    "\n## Discovery Sources",
-                    "\n| row_id | workstream:removed | merge_authority | "
-                    "explicit-owner-authorization | owner-instruction | "
-                    "owner-ref=request-1;scope-ref=workstream:removed;target-ref=pr-9 |"
-                    "\n\n## Discovery Sources",
-                ),
-            )
-            self.assertNotEqual(malformed_stale_scope.returncode, 0)
-
-            valid_branch_row = row(
-                "workstream:b",
-                "branch_name",
-                scoped_values["branch_name"],
-            )
-            extra_column = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    valid_branch_row,
-                    valid_branch_row[:-1] + " `unencoded|data` |",
-                ),
-            )
-            self.assertNotEqual(extra_column.returncode, 0)
-
-            missing_id = "workstream:b:publication_authority"
-            missing_row = row(
-                "workstream:b",
-                "publication_authority",
-                scoped_values["publication_authority"],
-            )
-            missing_from_both = run(
-                [row_id for row_id in complete_ids if row_id != missing_id],
-                ledger_fixture.replace(f"{missing_row}\n", ""),
-            )
-            self.assertNotEqual(missing_from_both.returncode, 0)
-
-            missing_session_id = "session:raw_worktree_fallback"
-            missing_session_row = row(
-                "session",
-                "raw_worktree_fallback",
-                session_values["raw_worktree_fallback"],
-            )
-            missing_required_session = run(
-                [row_id for row_id in complete_ids if row_id != missing_session_id],
-                ledger_fixture.replace(f"{missing_session_row}\n", ""),
-            )
-            self.assertNotEqual(missing_required_session.returncode, 0)
-
-            valid_publication = row(
-                "workstream:a",
-                "publication_authority",
-                scoped_values["publication_authority"],
-            )
-            invalid_publication = row(
-                "workstream:a",
-                "publication_authority",
-                ("spec-backed-pull-request", "default", "none"),
-            )
-            invalid_source = run(
-                complete_ids,
-                ledger_fixture.replace(valid_publication, invalid_publication),
-            )
-            self.assertNotEqual(invalid_source.returncode, 0)
-
-            empty_evidence_publication = row(
-                "workstream:a",
-                "publication_authority",
-                ("spec-backed-pull-request", "source-contract", ""),
-            )
-            empty_evidence = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    valid_publication,
-                    empty_evidence_publication,
-                ),
-            )
-            self.assertNotEqual(empty_evidence.returncode, 0)
-
-            required_review = row(
-                "workstream:a",
-                "codex_review_policy",
-                scoped_values["codex_review_policy"],
-            )
-            skip_evidence = (
-                "owner-ref=request-skip;scope-ref=workstream:a;"
-                "target-ref=workstream:a;pr-ref=not-applicable"
-            )
-            skipped_review = row(
-                "workstream:a",
-                "codex_review_policy",
-                ("skip", "owner-instruction", skip_evidence),
-            )
-            valid_skip = run(
-                complete_ids,
-                ledger_fixture.replace(required_review, skipped_review),
-            )
-            self.assertEqual(valid_skip.returncode, 0, valid_skip.stderr)
-
-            unscoped_skip = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    required_review,
-                    row(
-                        "workstream:a",
-                        "codex_review_policy",
-                        (
-                            "skip",
-                            "owner-instruction",
-                            skip_evidence.replace(
-                                "scope-ref=workstream:a",
-                                "scope-ref=workstream:b",
-                            ),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(unscoped_skip.returncode, 0)
-
-            mismatched_skip_target = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    required_review,
-                    row(
-                        "workstream:a",
-                        "codex_review_policy",
-                        (
-                            "skip",
-                            "owner-instruction",
-                            skip_evidence.replace(
-                                "target-ref=workstream:a",
-                                "target-ref=workstream:b",
-                            ),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_skip_target.returncode, 0)
-
-            pr_scoped_skip_evidence = skip_evidence.replace(
-                "pr-ref=not-applicable",
-                "pr-ref=owner/repo#123",
-            )
-            valid_pr_scoped_skip = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    required_review,
-                    row(
-                        "workstream:a",
-                        "codex_review_policy",
-                        ("skip", "owner-instruction", pr_scoped_skip_evidence),
-                    ),
-                ),
-            )
-            self.assertEqual(
-                valid_pr_scoped_skip.returncode,
-                0,
-                valid_pr_scoped_skip.stderr,
-            )
-
-            mismatched_pr_scoped_skip = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    required_review,
-                    row(
-                        "workstream:a",
-                        "codex_review_policy",
-                        (
-                            "skip",
-                            "owner-instruction",
-                            pr_scoped_skip_evidence.replace(
-                                "pr-ref=owner/repo#123",
-                                "pr-ref=owner/repo#999",
-                            ),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_pr_scoped_skip.returncode, 0)
-
-            malformed_pr_scoped_skip = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    required_review,
-                    row(
-                        "workstream:a",
-                        "codex_review_policy",
-                        (
-                            "skip",
-                            "owner-instruction",
-                            pr_scoped_skip_evidence.replace(
-                                "pr-ref=owner/repo#123",
-                                "pr-ref=pr:123",
-                            ),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(malformed_pr_scoped_skip.returncode, 0)
-
-            direct_evidence = (
-                "owner-ref=request-1;scope-ref=workstream:a;"
-                "target-ref=issue-1;target-branch=main"
-            )
-            direct_values = {
-                "publication_authority": (
-                    "explicit-owner-authorization",
-                    "owner-instruction",
-                    direct_evidence,
-                ),
-                "issue_mutation_authority": (
-                    "explicit-direct-mutation",
-                    "owner-instruction",
-                    direct_evidence,
-                ),
-                "delivery_mode": ("direct-commit", "owner-instruction", direct_evidence),
-                "delivery_source": ("owner-instruction", "owner-instruction", direct_evidence),
-                "branch_name": ("main", "owner-instruction", direct_evidence),
-                "current_pr_ref": ("not-applicable", "runtime-derived", "none"),
-                "pr_closeout": ("not-applicable", "runtime-derived", "none"),
-                "codex_review_policy": ("not-applicable", "runtime-derived", "none"),
-                "pr_shape": ("none", "runtime-derived", "none"),
-                "closeout_mode": (
-                    "direct-commit-closes-issue",
-                    "runtime-derived",
-                    "none",
-                ),
-                "integration_mode": ("direct-commit", "runtime-derived", "none"),
-            }
-            direct_fixture = ledger_fixture
-            for field, triple in direct_values.items():
-                direct_fixture = direct_fixture.replace(
-                    row("workstream:a", field, scoped_values[field]),
-                    row("workstream:a", field, triple),
-                )
-            direct_commit = run(complete_ids, direct_fixture)
-            self.assertEqual(direct_commit.returncode, 0, direct_commit.stderr)
-
-            runtime_default_direct = run(
-                complete_ids,
-                direct_fixture.replace(
-                    row(
-                        "workstream:a",
-                        "delivery_source",
-                        direct_values["delivery_source"],
-                    ),
-                    row(
-                        "workstream:a",
-                        "delivery_source",
-                        ("runtime-default", "default", "none"),
-                    ),
-                ),
-            )
-            self.assertNotEqual(runtime_default_direct.returncode, 0)
-
-            direct_without_issue_mutation = run(
-                complete_ids,
-                direct_fixture.replace(
-                    row(
-                        "workstream:a",
-                        "issue_mutation_authority",
-                        direct_values["issue_mutation_authority"],
-                    ),
-                    row(
-                        "workstream:a",
-                        "issue_mutation_authority",
-                        ("none", "default", "none"),
-                    ),
-                ),
-            )
-            self.assertNotEqual(direct_without_issue_mutation.returncode, 0)
-
-            mismatched_delivery_source_evidence = run(
-                complete_ids,
-                direct_fixture.replace(
-                    row(
-                        "workstream:a",
-                        "delivery_source",
-                        direct_values["delivery_source"],
-                    ),
-                    row(
-                        "workstream:a",
-                        "delivery_source",
-                        (
-                            "owner-instruction",
-                            "owner-instruction",
-                            direct_evidence.replace("target-ref=issue-1", "target-ref=issue-2"),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_delivery_source_evidence.returncode, 0)
-
-            issue_transfer_evidence = (
-                "owner-ref=request-1;scope-ref=issue:01;"
-                "target-ref=feature:example;target-branch=main;"
-                "scope-transfer-ref=run"
-            )
-            workstream_transfer_evidence = (
-                "owner-ref=request-1;scope-ref=workstream:a;"
-                "target-ref=feature:example;target-branch=main;"
-                "scope-transfer-ref=issue:01"
-            )
-            issue_mutation_transfer_evidence = (
-                "owner-ref=closeout-request-2;scope-ref=issue:01;"
-                "target-ref=feature:example;target-branch=main;"
-                "scope-transfer-ref=run"
-            )
-            workstream_issue_mutation_evidence = (
-                "owner-ref=closeout-request-2;scope-ref=workstream:a;"
-                "target-ref=feature:example;target-branch=main;"
-                "scope-transfer-ref=issue:01"
-            )
-            inherited_direct_values = {
-                "publication_authority": (
-                    "explicit-owner-authorization",
-                    "source-contract",
-                    workstream_transfer_evidence,
-                ),
-                "issue_mutation_authority": (
-                    "explicit-direct-mutation",
-                    "source-contract",
-                    workstream_issue_mutation_evidence,
-                ),
-                "delivery_mode": (
-                    "direct-commit",
-                    "source-contract",
-                    workstream_transfer_evidence,
-                ),
-                "delivery_source": (
-                    "feature-level-inherited",
-                    "source-contract",
-                    workstream_transfer_evidence,
-                ),
-                "branch_name": (
-                    "main",
-                    "source-contract",
-                    workstream_transfer_evidence,
-                ),
-                "current_pr_ref": ("not-applicable", "runtime-derived", "none"),
-                "scope_transfer_ref": (
-                    "issue:01",
-                    "source-contract",
-                    issue_transfer_evidence,
-                ),
-                "issue_mutation_transfer_ref": (
-                    "issue:01",
-                    "source-contract",
-                    issue_mutation_transfer_evidence,
-                ),
-                "pr_closeout": ("not-applicable", "runtime-derived", "none"),
-                "codex_review_policy": ("not-applicable", "runtime-derived", "none"),
-                "pr_shape": ("none", "runtime-derived", "none"),
-                "closeout_mode": (
-                    "direct-commit-closes-issue",
-                    "runtime-derived",
-                    "none",
-                ),
-                "integration_mode": ("direct-commit", "runtime-derived", "none"),
-            }
-            inherited_direct_fixture = ledger_fixture
-            for field, triple in inherited_direct_values.items():
-                inherited_direct_fixture = inherited_direct_fixture.replace(
-                    row("workstream:a", field, scoped_values[field]),
-                    row("workstream:a", field, triple),
-                )
-            inherited_direct = run(complete_ids, inherited_direct_fixture)
-            self.assertEqual(
-                inherited_direct.returncode,
-                0,
-                inherited_direct.stderr,
-            )
-
-            invented_transfer_evidence = run(
-                complete_ids,
-                inherited_direct_fixture.replace(
-                    issue_transfer_evidence,
-                    issue_transfer_evidence.replace(
-                        "target-ref=feature:example",
-                        "target-ref=feature:invented",
-                    ),
-                ),
-            )
-            self.assertNotEqual(invented_transfer_evidence.returncode, 0)
-
-            mismatched_transfer_ref = run(
-                complete_ids,
-                inherited_direct_fixture.replace(
-                    "scope-transfer-ref=issue:01",
-                    "scope-transfer-ref=issue:02",
-                ),
-            )
-            self.assertNotEqual(mismatched_transfer_ref.returncode, 0)
-
-            missing_branch_id = "workstream:a:branch_name"
-            direct_branch_row = row(
-                "workstream:a",
-                "branch_name",
-                direct_values["branch_name"],
-            )
-            missing_direct_branch = run(
-                [row_id for row_id in complete_ids if row_id != missing_branch_id],
-                direct_fixture.replace(f"{direct_branch_row}\n", ""),
-            )
-            self.assertNotEqual(missing_direct_branch.returncode, 0)
-
-            mismatched_direct_branch = run(
-                complete_ids,
-                direct_fixture.replace(
-                    direct_branch_row,
-                    row(
-                        "workstream:a",
-                        "branch_name",
-                        ("release", "owner-instruction", direct_evidence),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_direct_branch.returncode, 0)
-
-            missing_owner_ref = run(
-                complete_ids,
-                direct_fixture.replace(
-                    direct_evidence,
-                    "scope-ref=workstream:a;target-branch=main",
-                ),
-            )
-            self.assertNotEqual(missing_owner_ref.returncode, 0)
-
-            invalid_branch_evidence = run(
-                complete_ids,
-                direct_fixture.replace(
-                    direct_branch_row,
-                    row(
-                        "workstream:a",
-                        "branch_name",
-                        (
-                    "main",
-                    "owner-instruction",
-                    "owner-ref=request-2;scope-ref=workstream:a;"
-                    "target-ref=issue-1;target-branch=main",
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(invalid_branch_evidence.returncode, 0)
-
-            missing_publication_authority = run(
-                complete_ids,
-                direct_fixture.replace(
-                    row(
-                        "workstream:a",
-                        "publication_authority",
-                        direct_values["publication_authority"],
-                    ),
-                    row(
-                        "workstream:a",
-                        "publication_authority",
-                        ("none", "default", "none"),
-                    ),
-                ),
-            )
-            self.assertNotEqual(missing_publication_authority.returncode, 0)
-
-            mismatched_publication_target = run(
-                complete_ids,
-                direct_fixture.replace(
-                    row(
-                        "workstream:a",
-                        "publication_authority",
-                        direct_values["publication_authority"],
-                    ),
-                    row(
-                        "workstream:a",
-                        "publication_authority",
-                        (
-                            "explicit-owner-authorization",
-                            "owner-instruction",
-                            direct_evidence.replace(
-                                "target-ref=issue-1",
-                                "target-ref=issue-2",
-                            ),
-                        ),
-                    ),
-                ),
-            )
-            self.assertNotEqual(mismatched_publication_target.returncode, 0)
-
-            invalid_ref_evidence = direct_evidence.replace(
-                "target-branch=main",
-                "target-branch=feature..x",
-            )
-            invalid_ref_fixture = direct_fixture.replace(
-                direct_evidence,
-                invalid_ref_evidence,
-            ).replace(
-                row(
-                    "workstream:a",
-                    "branch_name",
-                    ("main", "owner-instruction", invalid_ref_evidence),
-                ),
-                row(
-                    "workstream:a",
-                    "branch_name",
-                    ("feature..x", "owner-instruction", invalid_ref_evidence),
-                ),
-            )
-            invalid_branch_ref = run(complete_ids, invalid_ref_fixture)
-            self.assertNotEqual(invalid_branch_ref.returncode, 0)
-
-            generic_merge_grant = run(
-                complete_ids,
-                ledger_fixture.replace(
-                    row(
-                        "workstream:a",
-                        "merge_authority",
-                        scoped_values["merge_authority"],
-                    ),
-                    row(
-                        "workstream:a",
-                        "merge_authority",
-                        ("explicit-owner-authorization", "owner-instruction", "request-1"),
-                    ),
-                ),
-            )
-            self.assertNotEqual(generic_merge_grant.returncode, 0)
+            self.assertNotEqual(mismatched_fingerprint.returncode, 0)
 
     def test_runtime_evidence_is_delta_based_and_metrics_are_exact_or_unavailable(self) -> None:
         skill = self.read("SKILL.md")
@@ -1689,6 +936,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("Load this reference only when resuming", recovery)
         self.assertIn("On resume, load `recovery-validation.md` first", efficiency)
 
+
     def test_option_registries_use_snake_fields_and_kebab_values(self) -> None:
         skill = self.read("SKILL.md")
         plan_skill = (ROOT / "skills/plan-feature/SKILL.md").read_text(
@@ -1699,90 +947,90 @@ class OrchestratorContractTests(unittest.TestCase):
 
         self.assertIn("references/options.md", skill)
         self.assertIn("references/options.md", plan_skill)
-        self.assertIn("sole owner\nof the exact six-column schema", options)
-        self.assertIn("encode a literal\n`|` in evidence data as `%7C`", options)
+        self.assertIn("This section owns the exact six-column schema", options)
+        self.assertIn("encode a literal `|` in evidence as `%7C`", options)
         self.assertNotIn("runtime-efficiency.md", options)
         self.assertIn("`options.md` owns the option-row schema", recovery)
 
         registries = (
-            (SKILL_ROOT / "references/options.md", "## Session Registry"),
-            (
-                SKILL_ROOT / "references/options.md",
-                "## Per-Workstream Authority And Delivery Registry",
-            ),
-            (ROOT / "skills/plan-feature/references/options.md", "## Registry"),
+            (SKILL_ROOT / "references/options.md", "## Primary Human Choices"),
+            (SKILL_ROOT / "references/options.md", "## Session Permissions And Context"),
+            (SKILL_ROOT / "references/options.md", "## Per-Workstream Permissions And Delivery"),
+            (ROOT / "skills/plan-feature/references/options.md", "## Run Registry"),
             (ROOT / "skills/plan-feature/references/options.md", "## Per-Issue Registry"),
         )
         for path, heading in registries:
-            relative = path.relative_to(SKILL_ROOT) if path.is_relative_to(SKILL_ROOT) else None
-            if relative is not None:
-                rows = self.table_rows(str(relative), heading)
-            else:
-                text = path.read_text(encoding="utf-8")
-                section = text.split(heading, 1)[1]
-                rows = []
-                for line in section.splitlines():
-                    if not line.startswith("|"):
-                        if rows:
-                            break
-                        continue
-                    cells = [cell.strip() for cell in line.strip("|").split("|")]
-                    if all(set(cell) <= {"-", ":", " "} for cell in cells):
-                        continue
-                    rows.append(cells)
-                rows = rows[1:]
-            for row in rows:
+            text = path.read_text(encoding="utf-8")
+            section = text.split(heading, 1)[1]
+            rows = []
+            for line in section.splitlines():
+                if not line.startswith("|"):
+                    if rows:
+                        break
+                    continue
+                cells = [cell.strip() for cell in line.strip("|").split("|")]
+                if all(set(cell) <= {"-", ":", " "} for cell in cells):
+                    continue
+                rows.append(cells)
+            for row in rows[1:]:
                 field = row[0].strip("`")
                 self.assertRegex(field, r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
                 for value in re.findall(r"`([^`]+)`", row[1]):
                     self.assertRegex(value, r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
-    def test_pr_closeout_branches_only_on_canonical_values(self) -> None:
+
+    def test_delivery_target_branches_only_on_canonical_values(self) -> None:
         gates = self.read("references/gates.md")
         rows = self.table_rows(
             "references/spec-backed-delivery.md",
-            "## Canonical PR Closeout Resolution",
+            "## Canonical Target Resolution",
         )
 
-        merge_ready = next(row for row in rows if row[:4] == [
-            "`pull-request`", "`spec-backed-pull-request`", "`merge-ready`", "`required`"
-        ])
-        self.assertIn("Codex review", merge_ready[5])
+        expected_targets = [
+            "validated-changes-left-uncommitted",
+            "local-commit-created-without-pushing",
+            "changes-pushed-to-target-branch-without-pull-request",
+            "validated-draft-pull-request-published",
+            "pull-request-ready-for-merge-but-not-merged",
+        ]
+        self.assertEqual([row[0].strip("`") for row in rows], expected_targets)
 
-        skip_review = next(row for row in rows if row[:4] == [
-            "`pull-request`", "`spec-backed-pull-request`", "`merge-ready`", "`skip`"
-        ])
-        self.assertIn("skip Codex review request/wait", skip_review[5])
-        self.assertIn("parent closeout", skip_review[5])
+        uncommitted = rows[0]
+        self.assertEqual(uncommitted[1], "`not-required-for-uncommitted-changes`")
+        self.assertEqual(uncommitted[2], "`no-pull-request`")
+        self.assertIn("no commit, push, or PR", uncommitted[4])
 
-        draft_only = next(row for row in rows if row[:4] == [
-            "`pull-request`", "`spec-backed-pull-request`", "`draft-only`", "`not-applicable`"
-        ])
-        self.assertIn("do not mark ready", draft_only[5])
-        self.assertNotIn(
-            "| `delivery_mode` | `no_mutation_override` |",
-            self.read("references/spec-backed-delivery.md"),
+        draft = rows[3]
+        self.assertEqual(draft[3], "`not-needed-for-selected-delivery-target`")
+        self.assertIn("do not mark ready or request review", draft[4])
+
+        merge_ready = rows[4]
+        self.assertIn("Required on current head or explicitly skipped", merge_ready[3])
+        self.assertIn("do not merge without separate permission", merge_ready[4])
+        self.assertIn(
+            "`change_delivery_target=pull-request-ready-for-merge-but-not-merged`",
+            gates,
         )
         self.assertIn(
-            "Draft-only makes downstream ready/review/merge-ready\n"
-            "gates `not-applicable`",
+            "`selected-delivery-target-does-not-require-merge-ready-review`",
             gates,
         )
 
-    def test_runtime_contract_has_no_phrase_choice_matrix(self) -> None:
+    def test_runtime_contract_uses_hard_cut_without_phrase_aliases(self) -> None:
         delivery = self.read("references/spec-backed-delivery.md")
         worker = self.read("references/worker.md")
+        options = self.read("references/options.md")
 
-        self.assertNotIn("## PR Closeout Resolution Matrix", delivery)
-        self.assertIn("## Canonical PR Closeout Resolution", delivery)
-        self.assertNotIn("keep the PR in draft", delivery)
-        self.assertNotIn("do not merge automatically", delivery)
-        self.assertNotIn("Session CLI subagents consented", worker)
-        self.assertNotIn("Session Codex App threads consented", worker)
-        self.assertIn("option-resolution row", delivery)
-        self.assertIn("Missing `pr_closeout` becomes `merge-ready` for", delivery)
+        self.assertIn("## Applicability And Hard Cut", delivery)
+        self.assertIn("Retired delivery", delivery)
+        self.assertIn("Do not normalize them at runtime", delivery)
+        self.assertIn("Retired surface and capability values\nare invalid input", worker)
+        self.assertIn("Retired orchestration\n  fields and values are invalid input", options)
+        self.assertNotIn("## Legacy Input Normalization", options)
+        self.assertNotIn("## Canonical PR Closeout Resolution", delivery)
 
-    def test_codex_review_policy_is_default_required_and_owner_scoped_skip(self) -> None:
+
+    def test_codex_review_requirement_is_target_scoped(self) -> None:
         options = self.read("references/options.md")
         delivery = self.read("references/spec-backed-delivery.md")
         gates = self.read("references/codex-review-closeout.md")
@@ -1791,141 +1039,76 @@ class OrchestratorContractTests(unittest.TestCase):
 
         rows = self.table_rows(
             "references/options.md",
-            "## Per-Workstream Authority And Delivery Registry",
+            "## Per-Workstream Permissions And Delivery",
         )
-        policy = self.row_containing(rows, "`codex_review_policy`")
-        self.assertIn("`required`", policy[1])
-        self.assertIn("`skip`", policy[1])
-        self.assertIn("`not-applicable`", policy[1])
-        self.assertIn("`required` for `pull-request`", policy[2])
-        self.assertIn("scoped owner-instruction evidence", policy[3])
-
+        requirement = self.row_containing(rows, "`codex_review_requirement`")
+        for value in (
+            "`required-on-current-pull-request-head`",
+            "`explicitly-skipped-by-authorized-user`",
+            "`not-needed-for-selected-delivery-target`",
+        ):
+            self.assertIn(value, requirement[1])
+        self.assertIn("Required only for a merge-ready pull request", requirement[2])
         self.assertIn(
-            "`codex_review_policy=skip` | `owner-instruction` preserving `owner-ref`, `scope-ref`, `target-ref`, and `pr-ref`",
+            "`codex_review_requirement=explicitly-skipped-by-authorized-user` requires",
             options,
         )
-        self.assertIn("Never infer `skip` from silence", delivery)
-        self.assertIn("do not post `@codex review`", gates)
         self.assertIn("Do not wait for pending or later feedback", gates)
         self.assertIn("codex_review=skipped", gates)
+        self.assertIn("A review skip bypasses only request and wait", delivery)
         self.assertIn(
-            "Merge-ready publication authority with either review policy",
-            delivery,
+            "codex_review_requirement=<required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>",
+            ledger_template,
         )
         self.assertIn(
-            "authorizes disposition comments for already-known actionable feedback when\n  `codex_review_policy=skip`",
-            delivery,
+            "- codex_review_requirement: <required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>",
+            worker,
         )
         self.assertIn(
-            "publication authority covers this disposition mutation for both `required` and `skip`",
-            " ".join(gates.split()),
+            "`request-codex-review` and\n`poll-codex-review` are valid only with",
+            worker,
         )
-        self.assertIn("codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked>", ledger_template)
-        self.assertIn("codex_review_policy: <required|skip|not-applicable>", worker)
-        self.assertIn("`skip` permits `mark-ready`", worker)
 
-        plan_feature_root = ROOT / "skills" / "plan-feature" / "references"
-        for path in (
-            plan_feature_root / "issue-body-template.md",
-            plan_feature_root / "issue-phase.md",
-        ):
-            self.assertNotIn("codex_review_policy", path.read_text())
-
-    def test_legacy_handoff_is_normalized_before_spec_routing(self) -> None:
+    def test_retired_handoff_fields_are_rejected_before_routing(self) -> None:
         skill = self.read("SKILL.md")
         delivery = self.read("references/spec-backed-delivery.md")
-        rows = self.table_rows(
-            "references/spec-backed-delivery.md",
-            "### Legacy Handoff Migration",
+
+        self.assertIn("reject retired vocabulary before registration", skill)
+        self.assertIn("Retired delivery", delivery)
+        self.assertIn("invalid. Do not normalize them at runtime", delivery)
+        self.assertIn(
+            "`repository_integration_method` and `pr_closeout` are not handoff fields",
+            delivery,
+        )
+        self.assertNotIn("### Legacy Handoff Migration", delivery)
+
+
+    def test_retired_worker_surface_aliases_are_rejected(self) -> None:
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        rows = self.table_rows("references/options.md", "## Derived Runtime Fields")
+
+        actual = self.row_containing(rows, "`actual_execution_location`")
+        for value in (
+            "`current-orchestrator-session`",
+            "`background-codex-subagent`",
+            "`visible-codex-app-task`",
+        ):
+            self.assertIn(value, actual[1])
+
+        self.assertNotIn("## Legacy Input Normalization", options)
+        self.assertIn("Retired orchestration\n  fields and values are invalid input", options)
+        self.assertIn("Retired surface and capability values\nare invalid input", worker)
+        self.assertIn(
+            "| `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` |",
+            worker,
+        )
+        self.assertIn(
+            "`run-all-work-in-current-orchestrator-session` requires\n"
+            "  `delegated_worker_visibility=not-applicable`",
+            options,
         )
 
-        self.assertIn("`source_spec_ref`", skill)
-        retired_source_label = "Source " + "Feature Spec"
-        self.assertNotIn(retired_source_label, skill)
-        self.assertNotIn(retired_source_label, delivery)
-
-        pr_shape = self.row_containing(rows, "`PR shape`")
-        self.assertEqual(pr_shape[1], "`pr_shape`")
-
-        depends_on = self.row_containing(rows, "`Start rule: depends-on <ids>`")
-        self.assertIn("`parallelization=depends-on`", depends_on[1])
-        self.assertIn("`dependency_ids`", depends_on[1])
-
-        domain_closeout = self.row_containing(rows, "`Domain closeout`")
-        self.assertIn("`domain_closeout`", domain_closeout[1])
-        self.assertIn("`domain_closeout_data`", domain_closeout[1])
-
-        omitted_integration = self.row_containing(
-            rows,
-            "`Integration mode: omitted`",
-        )
-        self.assertEqual(omitted_integration[1], "`integration_mode=not-applicable`")
-        legacy_feature_pr = self.row_containing(
-            rows,
-            "`Issue integration shape: feature-pr`",
-        )
-        self.assertEqual(legacy_feature_pr[1], "`integration_mode=single-repo-pr`")
-
-        self.assertIn("`merge-ready` for `pull-request`", delivery)
-        self.assertIn("`not-applicable` for `direct-commit`", delivery)
-        self.assertIn("derive `single-pr` for one-repo", delivery)
-        self.assertIn("`per-repo-pr` for multi-repo", delivery)
-        self.assertIn("If repo scope is ambiguous, stop as `needs-owner`", delivery)
-        self.assertIn("predates `integration_mode`", delivery)
-        self.assertIn("ordinary inherited case to `not-applicable`", delivery)
-
-    def test_legacy_none_worker_surface_normalizes_to_root(self) -> None:
-        rows = self.table_rows(
-            "references/options.md",
-            "## Legacy Input Normalization",
-        )
-
-        legacy_none = self.row_containing(rows, "`delegated_worker_surface=none`")
-        self.assertIn("`delegation_mode=disabled`", legacy_none[1])
-        self.assertIn("`worker_surface=not-applicable`", legacy_none[1])
-        self.assertIn("`worker_limit=unbounded`", legacy_none[1])
-        self.assertNotIn("actual_workstream_surface", legacy_none[1])
-
-        legacy_cli = self.row_containing(
-            rows,
-            "`delegated_worker_surface=cli-subagent`",
-        )
-        self.assertIn("`worker_surface=auto`", legacy_cli[1])
-        self.assertIn("explicit owner selection evidence", legacy_cli[1])
-
-        actual_root = self.row_containing(
-            rows,
-            "`actual_workstream_surface=no-delegation`",
-        )
-        self.assertIn("`actual_workstream_surface=root-session`", actual_root[1])
-
-        legacy_root_surface = self.row_containing(rows, "`worker_surface=root-thread`")
-        self.assertIn("`delegation_mode=disabled`", legacy_root_surface[1])
-        self.assertIn("`worker_surface=not-applicable`", legacy_root_surface[1])
-        self.assertIn("`worker_limit=unbounded`", legacy_root_surface[1])
-
-        legacy_actual_root = self.row_containing(
-            rows,
-            "`actual_workstream_surface=root-thread`",
-        )
-        self.assertIn("`actual_workstream_surface=root-session`", legacy_actual_root[1])
-
-        legacy_app_limit = self.row_containing(
-            rows,
-            "`Session Codex App threads consented: true; max=<positive integer>`",
-        )
-        self.assertIn("preserve the numeric `app_thread_limit`", legacy_app_limit[1])
-        legacy_app_default = self.row_containing(
-            rows,
-            "`Session Codex App threads consented: true; max=unspecified`",
-        )
-        self.assertIn("`app_thread_limit=1`", legacy_app_default[1])
-
-        takeover = self.row_containing(rows, "`Takeover policy:")
-        self.assertIn("`active_root_takeover_policy=", takeover[1])
-        ambiguous_merge = self.row_containing(rows, "Global or ambiguous")
-        self.assertIn("`merge_authority=none`", ambiguous_merge[1])
-        self.assertIn("`needs-owner`", ambiguous_merge[1])
 
     def test_mutation_and_merge_grants_require_owner_scoped_evidence(self) -> None:
         options = self.read("references/options.md")
@@ -1933,151 +1116,168 @@ class OrchestratorContractTests(unittest.TestCase):
         gates = self.read("references/gates.md")
 
         self.assertIn("## Resolution Source Constraints", options)
-        self.assertIn("Record exactly one row per Session Registry field", options)
-        self.assertIn("exactly one row per Per-Workstream Registry field", options)
+        self.assertIn("record exactly one row for every session field", options)
+        self.assertIn("record exactly one row for every per-workstream", options)
         self.assertIn(
-            "`merge_authority=explicit-owner-authorization` | `owner-instruction`",
+            "Every permission-bearing value requires non-empty `permission-source-ref`,\n"
+            "exact `scope-ref`, and non-empty `target-ref` tokens",
+            options,
+        )
+        self.assertIn("require `target-branch=<target_branch_name>`", options)
+        self.assertIn(
+            "`pull_request_merge_permission=granted-for-named-pull-request`",
             options,
         )
         self.assertIn(
-            "`publication_authority=explicit-owner-authorization` | `owner-instruction`, or `source-contract`",
+            "`change_delivery_permission=granted-for-selected-target`",
             options,
         )
         self.assertIn(
-            "`issue_mutation_authority=explicit-direct-mutation` | `owner-instruction`",
+            "`issue_update_permission=direct-issue-updates-explicitly-authorized`",
             options,
         )
-        self.assertIn("never grants mutation, publication", options)
-        self.assertIn("owner-instruction` naming the exact source/workstream target", options)
-        self.assertIn("`runtime-capability`, `runtime-derived`, or", ledger_template)
-        self.assertIn("automation_target=<source/workstream ref|none>", ledger_template)
-        self.assertIn("`raw_worktree_fallback=owner-approved`", ledger_template)
-        self.assertNotIn("owner explicitly authorized that fallback", ledger_template)
         self.assertIn(
-            "`delivery_mode=direct-commit` | `owner-instruction` naming the exact instruction, workstream scope, and target branch",
-            options,
+            "`runtime-capability`, or `runtime-derived`",
+            ledger_template,
+        )
+        self.assertIn(
+            "unmanaged_git_worktree_fallback_permission: not-granted|granted-by-authorized-user",
+            ledger_template,
         )
         active_root = ledger_template.split("## Active Root", 1)[1].split(
             "## Parent Closeout Watch", 1
         )[0]
         self.assertIn("Scoped merge option refs", active_root)
-        self.assertNotIn("merge_authority:", active_root)
-        self.assertNotIn("merge_policy:", active_root)
+        self.assertNotIn("pull_request_merge_permission:", active_root)
+        self.assertNotIn("pull_request_merge_confirmation:", active_root)
         self.assertIn("Evidence text is recorded for audit\nbut is never reparsed", gates)
-        self.assertNotIn("authorizing instruction explicitly says", gates)
 
-    def test_pr_shape_and_dependency_ids_reach_current_worker_contract(self) -> None:
+
+    def test_pr_count_and_dependency_ids_reach_current_worker_contract(self) -> None:
         worker = self.read("references/worker.md")
         ledger_template = self.read("references/ledger-template.md")
         options = self.read("references/options.md")
-        gates = self.read("references/gates.md")
-        delivery = self.read("references/spec-backed-delivery.md")
         skill = self.read("SKILL.md")
 
-        self.assertIn("- pr_shape: <single-pr|per-repo-pr|none>", worker)
-        self.assertIn("pr_shape=<single-pr|per-repo-pr|none>", ledger_template)
+        self.assertIn(
+            "- pull_request_count_strategy: <one-pull-request-total|one-pull-request-per-repository|no-pull-request>",
+            worker,
+        )
+        self.assertIn(
+            "pull_request_count_strategy: one-pull-request-total|one-pull-request-per-repository|no-pull-request",
+            ledger_template,
+        )
         self.assertIn("separately recorded `dependency_ids` entry", worker)
         self.assertNotIn("separately recorded `dependency_id` entry", worker)
         self.assertIn("| parallelization | dependency_ids |", worker)
-        self.assertNotIn("| Start rule |", worker)
-        self.assertNotIn("depends-on proof", worker)
         self.assertIn("- dependency_reason: <reason or none>", worker)
+        self.assertNotIn("repository_integration_method:", worker)
+        self.assertNotIn("repository_integration_method=", ledger_template)
+        self.assertIn("`repository_layout`", skill)
+        self.assertIn("`repository_layout`", options)
         self.assertIn(
-            "- integration_mode: <single-repo-pr|repo-pr|direct-commit|not-applicable>",
+            "repository_layout: single-repository|monorepo|multi-repository-workspace",
+            ledger_template,
+        )
+        self.assertIn(
+            "workstream_repository_layout: single-repository|monorepo|multi-repository-workspace",
+            ledger_template,
+        )
+        self.assertIn("`temporary_source_execution_permission`", options)
+        self.assertIn("`completion_evidence_policy`", options)
+        self.assertIn("`issue_completion_method`", options)
+        self.assertIn("`target_branch_name`: exact branch", options)
+        self.assertIn(
+            "- temporary_source_execution_permission: <not-granted|granted-by-authorized-user>",
             worker,
         )
-        self.assertNotIn("issue_integration_shape", worker)
-        self.assertIn("dependency_reason=<reason|none>", ledger_template)
         self.assertIn(
-            "integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>",
-            ledger_template,
+            "- completion_evidence_policy: <require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>",
+            worker,
         )
-        self.assertIn("`project_topology`", skill)
-        self.assertIn("`project_topology`", options)
-        self.assertIn(
-            "project_topology: single-repo|monorepo|multi-repo-workspace",
-            ledger_template,
-        )
-        self.assertIn(
-            "workstream_project_topology: single-repo|monorepo|multi-repo-workspace",
-            ledger_template,
-        )
-        self.assertIn("delivery_source=<runtime-default|feature-level-inherited", ledger_template)
-        self.assertIn("delivery_source_evidence=<scoped-option-row/source-ref|none>", ledger_template)
-        self.assertIn("`temporary_source_execution`", options)
-        self.assertIn("`completion_proof_policy`", options)
-        self.assertIn("`closeout_mode`", options)
-        self.assertIn("`branch_name` is required scoped data", options)
-        self.assertIn(
-            "scope-ref=<scope_id>;target-ref=<source-or-mutation-target>;target-branch=<branch_name>",
-            options,
-        )
-        self.assertIn("- temporary_source_execution: <forbidden|owner-approved>", worker)
-        self.assertIn("- completion_proof_policy: <live-required|synthetic-accepted>", worker)
 
-    def test_multi_repo_workspace_flow_is_topology_gated(self) -> None:
+
+    def test_multi_repo_workspace_flow_is_layout_gated(self) -> None:
         skill = self.read("SKILL.md")
         options = self.read("references/options.md")
         worker = self.read("references/worker.md")
         ledger_template = self.read("references/ledger-template.md")
-        recovery = self.read("references/recovery-validation.md")
         gates = self.read("references/gates.md")
         delivery = self.read("references/spec-backed-delivery.md")
         workspace = self.read("references/multi-repo-workspace.md")
 
-        self.assertIn("`project_topology=multi-repo-workspace`", skill)
-        self.assertIn("`project_topology=multi-repo-workspace` or a registered source/handoff", options)
-        self.assertIn("`workspace_context=multi-repo-workspace`", skill)
-        self.assertIn("`workspace_context=multi-repo-workspace`", delivery)
-        self.assertIn("`workspace_feature_repos`", delivery)
-        self.assertIn("`workspace_child_source_refs`", delivery)
-        self.assertIn("`issue_project_topology`", delivery)
-        self.assertIn("must match `workspace_feature_repos`", delivery)
-        self.assertIn("use `not-applicable` only\nfor non-workspace handoffs", delivery)
-        self.assertIn("repo-scoped partial Feature Spec siblings", delivery)
-        self.assertIn("workstream_project_topology", options)
-        self.assertIn("workstream_project_topology", ledger_template)
-        self.assertIn("workstream_project_topology", recovery)
-        self.assertIn("Do not load it for ordinary `single-repo` or `monorepo`", workspace)
+        self.assertIn("`repository_layout=multi-repository-workspace`", skill)
+        self.assertIn(
+            "`multi-repository-workspace` requires loading\n"
+            "  `references/multi-repo-workspace.md` before dispatch",
+            options,
+        )
+        self.assertIn(
+            "`repository_layout=multi-repository-workspace` or a\n"
+            "registered source/handoff has `workspace_context=multi-repository-workspace`",
+            workspace,
+        )
+        self.assertIn(
+            "Do not load it for ordinary `single-repository` or `monorepo`",
+            workspace,
+        )
         self.assertIn("parent/global Feature Specs", workspace)
         self.assertIn("Repo-scoped partial Feature Specs are owned by the child repository", workspace)
         self.assertIn(
             "<workspace-parent>/.worktrees/<repo-name>/<spec-or-issue-slug>/",
             workspace,
         )
-        self.assertIn("outside any\ntracked Git checkout or ignored by the parent checkout", workspace)
-        self.assertIn("Do not dirty a parent coordination\ncheckout", workspace)
         self.assertIn("`(repo, branch, worktree)` tuple", workspace)
         self.assertIn("There is no separate workspace execution mode", worker)
-        self.assertIn("- closeout_mode: <feature-pr-closes-issue|repo-pr-closes-issue|", worker)
-        self.assertIn("- branch_name: <exact branch or not-applicable>", worker)
-        self.assertIn("- scope_transfer_ref: <issue:<NN>|not-applicable>", worker)
-        self.assertIn("- issue_mutation_transfer_ref: <issue:<NN>|not-applicable>", worker)
-        self.assertIn("temporary_source_execution=<forbidden|owner-approved>", ledger_template)
-        self.assertIn("completion_proof_policy=<live-required|synthetic-accepted>", ledger_template)
-        self.assertIn("closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|", ledger_template)
-        self.assertIn("branch_name=<exact branch|not-applicable>", ledger_template)
-        self.assertIn("`completion_proof_policy=synthetic-accepted`", gates)
-        self.assertIn("`caller_checkout_policy=caller-checkout-approved`", gates)
-        self.assertNotIn("record the explicit approval that allowed it", gates)
-        self.assertIn("`temporary_source_execution=owner-approved`", delivery)
-        self.assertNotIn("owner explicitly authorizes temporary-source execution", delivery)
-        self.assertIn("`scope-transfer-ref=run`", delivery)
-        self.assertIn("changing only `scope-ref` to that workstream", delivery)
-        self.assertIn("A Feature Spec-backed scope transfer is valid only", options)
+        self.assertIn(
+            "`repository_layout`, `issue_repository_layout`, `workspace_context`",
+            delivery,
+        )
+        self.assertIn(
+            "repository_layout: single-repository|monorepo|multi-repository-workspace",
+            ledger_template,
+        )
+        self.assertIn(
+            "temporary_source_execution_permission=<not-granted|granted-by-authorized-user>",
+            ledger_template,
+        )
+        self.assertIn(
+            "completion_evidence_policy=<require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>",
+            ledger_template,
+        )
+        self.assertIn(
+            "`completion_evidence_policy=allow-simulated-evidence-by-authorized-user-exception`",
+            gates,
+        )
+        self.assertIn(
+            "`temporary_source_execution_permission=granted-by-authorized-user`",
+            delivery,
+        )
+        self.assertIn("`delivery_permission_source_issue_ref`", delivery)
+        self.assertIn("`issue_update_permission_source_issue_ref`", delivery)
 
-    def test_requested_and_actual_worker_surfaces_use_distinct_canonical_fields(self) -> None:
+
+    def test_requested_visibility_and_actual_execution_use_distinct_fields(self) -> None:
         worker = self.read("references/worker.md")
         ledger_template = self.read("references/ledger-template.md")
 
         self.assertIn(
-            "| `worker_surface` | `auto`, `not-applicable`, `cli-subagent`, `codex-app-thread` |",
+            "| `delegated_worker_visibility` | `orchestrator-decides-between-background-and-visible-workers`, `background-codex-subagents-only`, `visible-codex-app-tasks-only`, `not-applicable` |",
             worker,
         )
-        self.assertIn("worker_surface=<auto|cli-subagent|codex-app-thread>", worker)
-        self.assertIn("- actual_workstream_surface: <root-session|codex-app-thread|cli-subagent>", worker)
-        self.assertIn("actual_workstream_surface=<root-session|cli-subagent|codex-app-thread>", ledger_template)
-        for stale in ("requested_surface", "actual_surface"):
+        self.assertIn(
+            "| `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` |",
+            worker,
+        )
+        self.assertIn(
+            "delegated_worker_visibility=<orchestrator-decides-between-background-and-visible-workers|not-applicable|background-codex-subagents-only|visible-codex-app-tasks-only>",
+            ledger_template,
+        )
+        self.assertIn(
+            "actual_execution_location=<current-orchestrator-session|background-codex-subagent|visible-codex-app-task>",
+            ledger_template,
+        )
+        for stale in ("requested_surface", "actual_surface", "root-thread"):
             self.assertNotIn(stale, worker)
             self.assertNotIn(stale, ledger_template)
 
@@ -2091,7 +1291,8 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertNotIn(retired_suffix, delivery)
         self.assertNotIn("### Legacy Authority Migration", delivery)
 
-    def test_plan_feature_and_orchestrator_share_pr_closeout_contract(self) -> None:
+
+    def test_plan_feature_and_orchestrator_share_delivery_target_contract(self) -> None:
         delivery = self.read("references/spec-backed-delivery.md")
         options = (
             ROOT / "skills/plan-feature/references/options.md"
@@ -2103,23 +1304,36 @@ class OrchestratorContractTests(unittest.TestCase):
             ROOT / "skills/plan-feature/references/issue-body-template.md"
         ).read_text(encoding="utf-8")
 
-        for value in ("merge-ready", "draft-only"):
+        targets = (
+            "local-commit-created-without-pushing",
+            "changes-pushed-to-target-branch-without-pull-request",
+            "validated-draft-pull-request-published",
+            "pull-request-ready-for-merge-but-not-merged",
+        )
+        for value in targets:
             self.assertIn(value, delivery)
             self.assertIn(value, options)
-        self.assertIn("- pr_shape: [verified `pr_shape` row value]", spec_template)
-        self.assertIn("- project_topology: [same feature/workspace graph value as the source Feature Spec]", issue_template)
-        self.assertIn("- issue_project_topology: [verified `issue_project_topology` row value]", issue_template)
-        self.assertIn("- pr_closeout: [verified `pr_closeout` row value]", issue_template)
+        for template in (spec_template, issue_template):
+            self.assertIn("change_delivery_target", template)
+            self.assertIn("change_delivery_permission", template)
+            self.assertIn("codex_review_requirement", template)
+            self.assertIn("pull_request_count_strategy", template)
+            self.assertNotIn("pr_closeout:", template)
+            self.assertNotIn("repository_integration_method:", template)
         self.assertIn(
-            "Feature `pr_closeout=draft-only` | `owner-instruction`, or `source-spec`",
+            "- pull_request_count_strategy: [verified `pull_request_count_strategy` row value]",
+            spec_template,
+        )
+        self.assertIn(
+            "- issue_repository_layout: [verified `issue_repository_layout` row value]",
+            issue_template,
+        )
+        self.assertIn(
+            "`pull-request-ready-for-merge-but-not-merged`",
             options,
         )
         self.assertIn("do not resolve or override\noptions here", spec_template)
-        plan_skill = (ROOT / "skills/plan-feature/SKILL.md").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("canonical\n  option-resolution row selects it", plan_skill)
-        self.assertIn("separate `no_mutation_override` value", plan_skill)
+
 
     def test_codex_review_requests_are_idempotent_per_current_head(self) -> None:
         gates = self.read("references/codex-review-closeout.md")
@@ -2130,115 +1344,37 @@ class OrchestratorContractTests(unittest.TestCase):
             "### Codex Review Request Matrix",
         )
 
-        expected_rows = [
-            [
-                "GitStack `clean`",
-                "`head_is_current=true`",
-                "Reuse the result and pass the review-result portion of the gate.",
-                "No.",
-                "Record the terminal result and object for this head.",
-            ],
-            [
-                "GitStack `findings`",
-                "`head_is_current=true`",
-                "Evaluate and disposition findings; fix accepted findings before closeout.",
-                "No for this head.",
-                "Record findings and disposition; a fix may create a new head with a new preflight.",
-            ],
-            [
-                "GitStack `acknowledged` or `pending`",
-                "`head_is_current=true`",
-                "Run bounded `reviews wait` for the same head and preserve the existing request.",
-                "No.",
-                "Keep the existing request object and next poll.",
-            ],
-            [
-                "GitStack `stale`",
-                "Refresh the assigned SHA, rerun `reviews check`, require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA.",
-                "Post one request naming the proven current head.",
+        by_status = {row[0]: row for row in rows}
+        self.assertEqual(by_status["GitStack `clean`"][3], "No.")
+        self.assertEqual(by_status["GitStack `findings`"][3], "No for this head.")
+        self.assertEqual(
+            by_status["GitStack `acknowledged` or `pending`"][3],
+            "No.",
+        )
+        for status in ("GitStack `stale`", "GitStack `not-requested`"):
+            self.assertEqual(
+                by_status[status][3],
                 "Yes, exactly once for that SHA.",
-                "Record the request before polling.",
-            ],
-            [
-                "GitStack `not-requested`",
-                "Require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA.",
-                "Post one request naming the proven current head.",
-                "Yes, exactly once for that SHA.",
-                "Record the request before polling.",
-            ],
-            [
-                "GitStack API, authentication, or configuration error",
-                "Current head or request state is unproven.",
-                "Record the blocker and use the documented read-only fallback.",
-                "No.",
-                "Preserve any known request evidence; do not mutate from uncertainty.",
-            ],
-            [
-                "Verified terminal clean provider-authored comment not represented by GitStack",
-                "Authenticated provider plus unambiguous current-head SHA or prefix.",
-                "Record supplemental evidence and pass the review-result portion of the gate.",
-                "No.",
-                "Record the result kind, object, provider, and head.",
-            ],
-            [
-                "Verified terminal findings in a provider-authored comment not represented by GitStack",
-                "Authenticated provider plus unambiguous current-head SHA or prefix.",
-                "Record supplemental evidence and disposition findings.",
-                "No for this head.",
-                "Record findings and disposition.",
-            ],
-            [
-                "Terminal provider error for the current-head request",
-                "Existing request object and current head are recorded.",
-                "Record the error and follow recovery without another request for the unchanged head.",
-                "No.",
-                "Block or wait until a new head or external recovery exists.",
-            ],
-            [
-                "Unverified or human-authored comment claiming success",
-                "No verified result; use the GitStack status for the proven current head.",
-                "Ignore the comment and follow the matching GitStack row.",
-                "Only through a proven `stale` or `not-requested` row.",
-                "Record that the comment was rejected as evidence.",
-            ],
-        ]
-        self.assertEqual(rows, expected_rows)
-
+            )
+            self.assertIn("Post one request", by_status[status][2])
+        self.assertEqual(
+            by_status["GitStack API, authentication, or configuration error"][3],
+            "No.",
+        )
         self.assertIn(
-            "<plugin-root>/scripts/gitstack --json reviews check --provider codex "
-            "--repo <owner/repo> --pr <number> --head <current-sha>",
+            "`request-codex-review` is idempotent per PR head",
+            gates,
+        )
+        self.assertIn(
+            "A new\ncommit that changes the PR head invalidates the old result and permits exactly\none new request",
             gates,
         )
         self.assertIn("request_head=<sha|none>", ledger_template)
-        self.assertIn("result_kind=<formal-review|provider-comment|clean-reaction|none>", ledger_template)
         self.assertIn(
-            "authenticated Codex clean reaction that GitStack binds",
-            gates,
-        )
-        self.assertIn("reports as `clean` with\n  `head_is_current=true`", gates)
-        self.assertIn("worker must rerun `reviews check`", worker)
-        self.assertIn("for that refreshed SHA", worker)
-        self.assertIn(
-            "same-SHA check returns `not-requested` or `stale` with\n"
-            "  `head_is_current=true`",
+            "`request-codex-review` and\n`poll-codex-review` are valid only with",
             worker,
         )
-        self.assertIn("cannot bypass the refreshed check", worker)
-        self.assertIn("re-read the PR head and\n  stop if it changed", worker)
-        self.assertIn(
-            "Reuse `clean`/`findings` and poll\n"
-            "  `acknowledged`/`pending`",
-            worker,
-        )
-        self.assertIn(
-            "immediately re-read the PR head and verify\n"
-            "   it still equals the checked SHA",
-            gates,
-        )
-        self.assertIn(
-            "Reuse the request across `acknowledged`, `pending`, and timeouts",
-            " ".join(gates.split()),
-        )
+        self.assertIn("Actions\nare not a cumulative ladder", worker)
 
     def test_codex_review_wait_budget_is_total_capped_and_pr_scoped(self) -> None:
         gates = self.read("references/codex-review-closeout.md")
@@ -2394,14 +1530,13 @@ class OrchestratorContractTests(unittest.TestCase):
         )
         self.assertNotIn("wait_profile", options)
 
-    def test_parent_spec_closeout_follows_resolved_review_policy(self) -> None:
-        skill = self.read("SKILL.md")
+
+    def test_parent_spec_closeout_follows_resolved_review_requirement(self) -> None:
         delivery = self.read("references/spec-backed-delivery.md")
         gates = self.read("references/codex-review-closeout.md")
         gate_router = self.read("references/gates.md")
         ledger = self.read("references/ledger.md")
         ledger_template = self.read("references/ledger-template.md")
-        worker = self.read("references/worker.md")
         issue_phase = (
             ROOT / "skills/plan-feature/references/issue-phase.md"
         ).read_text(encoding="utf-8")
@@ -2411,9 +1546,6 @@ class OrchestratorContractTests(unittest.TestCase):
         tracker = (
             ROOT / "skills/project-memory/references/issue-tracker-github.md"
         ).read_text(encoding="utf-8")
-        normalized_skill = " ".join(skill.split())
-        normalized_gates = " ".join(gates.split())
-        normalized_gate_router = " ".join(gate_router.split())
 
         state_section = gates.split(
             "Use this closeout state order for merge-ready PR work:", 1
@@ -2440,117 +1572,28 @@ class OrchestratorContractTests(unittest.TestCase):
             states.index("parent-closeout-watch-established"),
             states.index("merge-ready-report"),
         )
-        self.assertIn("resolved review policy", normalized_skill)
         self.assertIn(
-            "For `delivery_mode=pull-request` with `pr_closeout=merge-ready`, load "
-            "`codex-review-closeout.md`",
-            normalized_gate_router,
+            "`change_delivery_target=pull-request-ready-for-merge-but-not-merged`",
+            gate_router,
         )
-        self.assertIn("do not load that reference", normalized_gate_router)
-        self.assertIn("reason `draft-only`", normalized_gate_router)
-        self.assertIn("`delivery-mode-not-pull-request`", normalized_gate_router)
+        self.assertIn("For every other target, do not load that reference", gate_router)
         self.assertIn("`Closes #<spec-number>`", gates)
         self.assertIn("`Closes owner/repo#<spec-number>`", gates)
-        self.assertIn("all Feature Spec closeout proof is satisfied", gates)
         self.assertIn(
             "parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>",
             ledger_template,
         )
-        self.assertIn(
-            "parent_spec_applicability=<required|deferred-vehicle|not-applicable>",
-            ledger_template,
-        )
-        self.assertIn("parent_spec_applicability_reason=", ledger_template)
-        self.assertIn("parent_closeout_head=<sha|none>", ledger_template)
-        self.assertIn("parent_closeout_base=<branch|none>", ledger_template)
-        self.assertIn("parent_closeout_vehicle=<pr-ref|pending|none>", ledger_template)
-        self.assertIn(
-            "parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>",
-            ledger_template,
-        )
-        self.assertIn("default_branch=<branch|none>", ledger_template)
-        self.assertIn("none of\nthose proof fields may be `none`", ledger_template)
-        self.assertIn("requires\n`parent_spec_closeout=not-applicable`", ledger_template)
-        closeout_hygiene = ledger.split("## Closeout Hygiene", 1)[1]
-        self.assertIn(
-            "conditional canonical review and parent-closeout result",
-            " ".join(closeout_hygiene.split()),
-        )
+        self.assertIn("`armed` is not terminal parent closure", gates)
         self.assertIn(
             "Completion requires `parent_spec_closeout=closed`",
-            " ".join(closeout_hygiene.split()),
-        )
-        self.assertIn(
-            "Authorized `draft-only` and excluded workstreams record",
-            closeout_hygiene,
-        )
-        self.assertIn("A worker must not add or remove the parent Feature Spec", worker)
-        self.assertIn("post-gate mutation", worker)
-        self.assertIn("Immediately before the root updates the PR body", gates)
-        self.assertIn("immediately before the merge-ready report", normalized_gates)
-        self.assertIn("`parent_spec_closeout=pending-review`", gates)
-        self.assertIn("`parent_spec_closeout=pending-closeout`", gates)
-        self.assertIn("current PR body after the body update", normalized_gates)
-        self.assertIn("live body or its fingerprint", normalized_gates)
-        self.assertIn(
-            "`merge_authority=explicit-owner-authorization`", gates
-        )
-        self.assertIn(
-            "required when `merge_authority=none`", gates
-        )
-        self.assertIn("real event-driven monitor", normalized_gates)
-        self.assertIn(
-            "record parent closeout as `not-applicable`", normalized_gates
-        )
-        self.assertIn(
-            "Reconcile the PR body before the policy-specific closeout gate", gates
-        )
-        self.assertIn(
-            "must remove it or replace it with a non-closing reference", gates
-        )
-        self.assertIn(
-            "A pre-existing keyword is never proof",
-            " ".join(gates.split()),
-        )
-        self.assertIn("current default branch", gates)
-        self.assertIn("require the PR base to match it", gates)
-        self.assertIn(
-            "select or create a linked later default-branch PR", normalized_gates
-        )
-        self.assertIn("current PR may report merge-ready", normalized_gates)
-        self.assertIn("state `deferred-to-default-branch`", ledger_template)
-        self.assertIn(
-            "Authorized `draft-only` and excluded workstreams record",
-            closeout_hygiene,
-        )
-        self.assertIn("`not-applicable` with a reason", closeout_hygiene)
-        self.assertIn(
-            "no `armed` unmerged PR or `deferred-to-default-branch` vehicle remains outstanding",
             " ".join(ledger.split()),
         )
-        self.assertIn("## Parent Closeout Watch", ledger_template)
         self.assertIn("A parent Feature Spec is not complete while closeout is `armed`", ledger)
-        self.assertIn("`parent_closeout_watch=complete`", ledger)
-        self.assertIn("`armed` is not terminal parent closure", gates)
-        self.assertIn("durable watch packet", gates)
-        self.assertIn("parent closeout to `closed`", gates)
-        self.assertIn("`armed` is a monitored pre-merge state", delivery)
-        self.assertIn(
-            "`parent_closeout_base` equals the current `default_branch`",
-            ledger_template,
-        )
         for producer in (issue_phase, issue_template, tracker):
             normalized = " ".join(producer.split())
-            self.assertIn("Do not add the parent Feature Spec", normalized)
-            self.assertIn("all Feature Spec closeout gates pass", normalized)
-            self.assertNotIn(
-                "unless the maintainer says the whole Feature Spec is complete", producer
-            )
-        for plan_producer in (issue_phase, issue_template):
-            normalized = " ".join(plan_producer.split())
             self.assertIn("root delivery orchestrator", normalized)
             self.assertIn("resolved review policy", normalized)
-        self.assertIn("root delivery orchestrator", " ".join(tracker.split()))
+            self.assertIn("all Feature Spec closeout gates pass", normalized)
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ Feature Specs and implementation issues for this repo live as GitHub issues. Use
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
 | `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs and implementation issues are written as GitHub issues. |
-| `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
+| `change_delivery_target` | enum | `pull-request-ready-for-merge-but-not-merged` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | Exact implementation stopping point. A local-only commit leaves the hosted issue open. |
 
 GitHub is the authoritative artifact store in this mode. Do not create or keep
 repo-local `planning/tmp/` Feature Spec/issue mirrors, `project-memory/features/` mirrors, or
@@ -65,10 +65,11 @@ the actual available values or fallback label convention in
 
 ## Delivery Defaults
 
-- Default `delivery_mode`: `pull-request`.
-- Branch naming: for `delivery_mode=pull-request`, default to
-  `feature/<feature-slug>`. For `delivery_mode=direct-commit`, use the exact
-  target branch carried by the scoped owner evidence.
+- Default `change_delivery_target`:
+  `pull-request-ready-for-merge-but-not-merged`.
+- Branch naming: PR targets default to `feature/<feature-slug>`.
+  `changes-pushed-to-target-branch-without-pull-request` uses the exact branch
+  carried by scoped authorized-user evidence.
 - PR shape: one draft PR for a single repo or monorepo feature. In multi-repo
   work, every involved repo uses the same branch name and opens its own PR.
   Generated implementation issues are scheduling units and normally close from
@@ -78,19 +79,17 @@ the actual available values or fallback label convention in
   issues; each one names its affected repo and links the siblings that define
   the same feature. No central repo, central issue, project label, or global
   Feature Spec is required as durable setup configuration.
-- Exceptions: `delivery_mode=direct-commit` requires
-  `source=owner-instruction` plus exact feature-scope and target-branch
+- Exceptions: `changes-pushed-to-target-branch-without-pull-request` requires
+  `source=authorized-user-instruction` plus exact feature-scope and target-branch
   evidence, or a `source-spec` row preserving that evidence. Final-commit issue
   closure additionally requires a separate
-  `issue_mutation_authority=explicit-direct-mutation` row whose owner evidence
+  `issue_update_permission=direct-issue-updates-explicitly-authorized` row whose
   explicitly authorizes that closeout for the same scope, target, and branch.
 
 ## Runtime Boundary
 
-- Tracker setup records artifact routing, delivery-mode defaults, and closeout
+- Tracker setup records artifact routing, delivery-target defaults, and closeout
   conventions only.
-- If an existing setup file contains the legacy worker-authorization setup key,
-  treat it as stale state and remove it when touching the file.
 
 ## Title Format
 
@@ -120,7 +119,7 @@ For feature planning:
   `<feature-slug>: <NN> <vertical outcome>`.
 - `$plan-feature` owns Feature Spec and generated issue body shape, including
   `source_spec_ref`, delivery metadata, partial Feature Spec links, and issue graph
-  validation. Retired source-reference labels are not read aliases.
+  validation. Source references must use the canonical `source_spec_ref` field.
 
 For triage:
 
@@ -136,11 +135,11 @@ For triage:
 
 When all acceptance criteria pass and validation is complete, close that
 implementation issue from the relevant PR body with a GitHub closing keyword
-such as `Closes #<issue-number>`. For the default `pull-request` delivery mode,
+such as `Closes #<issue-number>`. For either pull-request delivery target,
 the relevant feature or repo PR closes generated implementation issues.
 Final-commit closure is allowed only for
-`closeout_mode=direct-commit-closes-issue` with
-`issue_mutation_authority=explicit-direct-mutation` and exact separately scoped
+`issue_completion_method=final-commit-closing-keyword` with
+`issue_update_permission=direct-issue-updates-explicitly-authorized` and exact separately scoped
 authorization evidence. The issue closes when that authorized
 commit reaches the default branch.
 

@@ -40,8 +40,8 @@ Receive the verified run-level `option_resolution` rows and
 `option_rows_fingerprint` defined by `references/options.md`, plus:
 
 - the planning identity (`feature_slug` and any selected `product_slug`,
-  `workspace_path`, `context_file`, `project_slug`, `project_topology`,
-  `repo_project_topology`, `workspace_context`, `workspace_parent_source_ref`,
+  `workspace_path`, `context_file`, `project_slug`, `repository_layout`,
+  `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
   and `workspace_feature_repos`);
 - pending or existing `source_spec_ref` state and the
   `hosted_body_file_policy=transient-outside-repo` transport rule;
@@ -102,14 +102,14 @@ before writing:
 - `workspace_path`
 - `context_file`
 - `feature_slug`
-- `project_topology`
+- `repository_layout`
 
 Use identity values passed by `plan-feature` when present. Otherwise derive
 only those identity fields from project memory and repo evidence, asking when
 multiple contexts could plausibly own the feature.
 
 Do not resolve delivery or mutation options in this phase. Consume the complete
-verified delivery tuple and `branch_name` data from the run-level
+verified delivery tuple and `target_branch_name` data from the run-level
 `option_resolution` handoff, whose values, defaults, evidence, and cross-field
 rules are owned by `references/options.md`. If required rows are absent,
 contradictory, or fail their fingerprint, return to caller-owned option
@@ -123,25 +123,25 @@ Feature Spec.
 
 Use this model before writing or publishing a Feature Spec:
 
-When `workspace_context=multi-repo-workspace`, `project_topology` is the
-workspace graph topology and must use `multi-repo-workspace`. Repo-scoped child
-partials preserve the child repo's durable topology in `repo_project_topology`.
+When `workspace_context=multi-repository-workspace`, `repository_layout` is the
+workspace graph topology and must use `multi-repository-workspace`. Repo-scoped child
+partials preserve the child repo's durable topology in `child_repository_layout`.
 
 | Project topology | Tracker backend | Feature Spec target | Generated issue source |
 | --- | --- | --- | --- |
-| `single-repo` | `github` | One Feature Spec GitHub issue in the repo. | `source_spec_ref: #<number>` |
-| `single-repo` | `local` | `planning/features/<feature-slug>/SPEC.md` | `source_spec_ref: planning/features/<feature-slug>/SPEC.md` |
+| `single-repository` | `github` | One Feature Spec GitHub issue in the repo. | `source_spec_ref: #<number>` |
+| `single-repository` | `local` | `planning/features/<feature-slug>/SPEC.md` | `source_spec_ref: planning/features/<feature-slug>/SPEC.md` |
 | `monorepo` | `github` or `local` | One Feature Spec for the selected product/workspace context. | The selected Feature Spec issue/path plus product or workspace scope in each issue. |
-| `multi-repo-workspace` | Parent `github` or `local`; child tracker per affected repo | Parent/global Feature Spec only when it is the accepted source. Repo-scoped partial Feature Specs route through each affected child repo's tracker. | Each repo issue points at its repo partial Feature Spec and links sibling partial Feature Specs. |
+| `multi-repository-workspace` | Parent `github` or `local`; child tracker per affected repo | Parent/global Feature Spec only when it is the accepted source. Repo-scoped partial Feature Specs route through each affected child repo's tracker. | Each repo issue points at its repo partial Feature Spec and links sibling partial Feature Specs. |
 
 Do not invent a global Feature Spec for workspace features. Use one only when it is the
 accepted planning source; otherwise preserve the linked partial Feature Spec graph.
-For `multi-repo-workspace`, resolve `workspace_feature_repos` first, then read
+For `multi-repository-workspace`, resolve `workspace_feature_repos` first, then read
 each affected child repo's `project-memory/config/issue-tracker.md` and
 `project-memory/config/project-layout.md`, or accepted repo metadata that
 explicitly covers both tracker routing and durable topology, before publishing
 partial Feature Specs. Use the child layout config or accepted metadata as the
-source for `repo_project_topology`; if child topology is unavailable or
+source for `child_repository_layout`; if child topology is unavailable or
 contradictory, stop before child partial publication. A child repo with
 `tracker_backend=github` gets a repo-scoped GitHub Feature Spec issue in that
 child repository. A child repo with `tracker_backend=local` gets its configured
@@ -159,8 +159,8 @@ child partials to obtain stable refs, then update every child partial with the
 complete `workspace_child_source_refs` mapping and cross-links before issue
 generation. Parent `tracker_backend` controls only the parent/global
 coordination artifact, while child runs keep each child repo's durable
-topology as `repo_project_topology` and carry parent workspace context as
-`workspace_context=multi-repo-workspace`, `workspace_parent_source_ref`, and
+topology as `child_repository_layout` and carry parent workspace context as
+`workspace_context=multi-repository-workspace`, `workspace_parent_source_ref`, and
 source/ref data.
 
 ### 2. Confirm The Feature Spec Source
@@ -211,9 +211,10 @@ Keep the Feature Spec implementation-facing:
 - user workflow or system behavior,
 - selected planning identity: feature slug, product or project slug, workspace
   path, context file, and project topology when applicable,
-- delivery contract: `delivery_mode`, independently resolved
-  `issue_mutation_authority`, `project_topology`, `repo_project_topology`,
-  `pr_closeout`, `pr_shape`, branch data, and integration-proof expectations,
+- delivery contract: `change_delivery_target`, independently resolved
+  `change_delivery_permission`, `issue_update_permission`,
+  `codex_review_requirement`, `repository_layout`, `child_repository_layout`,
+  `pull_request_count_strategy`, branch data, and integration-proof expectations,
 - issue-splitting note: sequencing, dependencies, and startability are derived
   from generated implementation issues and validated by the issue phase,
 - data, permissions, API, or integration constraints when relevant,
@@ -282,7 +283,7 @@ including affected repos, cross-repo contracts, integration gates, and order
 when material. In every Feature Spec, render the verified delivery tuple through
 `references/spec-template.md`, including the resolved topology, repo/branch/PR shape, and
 integration proof. For child partials in a multi-repo workspace, include
-`workspace_context=multi-repo-workspace` and `workspace_parent_source_ref` in
+`workspace_context=multi-repository-workspace` and `workspace_parent_source_ref` in
 the Feature Spec body and phase handoff. Placeholders are expectations, not
 completion proof.
 
@@ -307,10 +308,13 @@ Return:
   execution-profile widening reason,
 - `option_rows_fingerprint`,
 - authoritative `feature_slug`,
-- the structured delivery handoff tuple: `delivery_mode`, `project_topology`,
-  `repo_project_topology`, `workspace_context`, `workspace_parent_source_ref`,
-  `workspace_feature_repos`, `issue_mutation_authority`, `issue_mutation_authority_evidence`,
-  `branch_name`, `pr_closeout`, and `pr_shape`,
+- the structured delivery handoff tuple: `change_delivery_target`, `repository_layout`,
+  `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
+  `workspace_feature_repos`, `change_delivery_permission`,
+  `change_delivery_permission_evidence`,
+  `issue_update_permission`, `issue_update_permission_evidence`,
+  `codex_review_requirement`, `target_branch_name`, and
+  `pull_request_count_strategy`,
 - `workspace_child_source_refs` mapping each `workspace_feature_repos` repo to
   its child partial Feature Spec ref only after the child partial artifact set
   exists. Keys are canonical repo slugs and must match

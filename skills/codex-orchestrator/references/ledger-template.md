@@ -1,8 +1,7 @@
 # Ledger Template
 
-Load this reference only when creating a new Codex Orchestrator ledger or when
-the marker check in `ledger.md` classifies an existing ledger as legacy. Do not
-load it for an existing ledger that passes that check.
+Load this reference only when creating a new Codex Orchestrator ledger. Never
+use it to reinterpret or overwrite an existing invalid ledger.
 
 ## Template
 
@@ -25,27 +24,27 @@ Out of scope:
 ## Option Resolution
 
 `options.md` owns the six-column row schema and `%7C` evidence encoding. The
-tables below project that contract into a newly created or migrated ledger.
+tables below project that contract into a newly created ledger.
 
 ### Session Rows
 
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
-| `session:<field>` | `session` | <Session Registry field from options.md> | <canonical value> | `default`, `owner-instruction`, `runtime-capability`, or `legacy-migration` | <instruction/tool ref or none> |
-| `session:project_topology` | `session` | `project_topology` | `single-repo`, `monorepo`, or `multi-repo-workspace` | `project-layout-config`, `runtime-derived`, `owner-instruction`, or `legacy-migration` | <project-layout path, repo evidence, instruction ref, or migrated source> |
-| `session:worker_limit` | `session` | `worker_limit` | <positive integer or `unbounded`> | `default` only for `unbounded`; otherwise `owner-instruction` or evidence-preserving `legacy-migration` | <matching bounded-delegation owner evidence or none> |
-| `session:app_thread_limit` | `session` | `app_thread_limit` | <positive integer or `unspecified`> | `default` only for `unspecified`; otherwise `owner-instruction` or evidence-preserving `legacy-migration` | <matching App-thread-consent owner evidence or none> |
+| `session:<field>` | `session` | <Session Registry field from options.md> | <canonical value> | `default`, `authorized-user-instruction`, `runtime-capability`, `runtime-derived`, or `project-layout-config` | <instruction/tool ref or none> |
+| `session:repository_layout` | `session` | `repository_layout` | `single-repository`, `monorepo`, or `multi-repository-workspace` | `project-layout-config`, `runtime-derived`, or `authorized-user-instruction` | <project-layout path, repo evidence, or instruction ref> |
+| `session:max_concurrent_delegated_workers` | `session` | `max_concurrent_delegated_workers` | <positive integer, `not-limited-by-authorized-user`, or `not-applicable`> | `default` only for the unrestricted value; otherwise `authorized-user-instruction` or `runtime-derived` | <matching policy evidence or none> |
+| `session:max_visible_app_tasks` | `session` | `max_visible_app_tasks` | <positive integer or `not-applicable`> | `authorized-user-instruction`, `default`, or `runtime-derived` | <matching App-task-permission evidence or none> |
 
 ### Scoped Rows
 
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
-| `source:<Source ID>:source_mutation_authority` | `source:<Source ID>` | `source_mutation_authority` | <canonical value> | `default`, `owner-instruction`, `runtime-capability`, or `legacy-migration` | <instruction/source/tool ref or none> |
-| `<scope_id>:<field>` | `workstream:<id>` | <Per-Workstream Registry field from options.md> | <canonical value> | `default`, `owner-instruction`, `source-contract`, `runtime-capability`, `runtime-derived`, or `legacy-migration` | <instruction/source/tool ref or none> |
+| `source:<Source ID>:tracked_work_item_update_permission` | `source:<Source ID>` | `tracked_work_item_update_permission` | <canonical value> | `default`, `authorized-user-instruction`, or `runtime-capability` | <instruction/source/tool ref or none> |
+| `<scope_id>:<field>` | `workstream:<id>` | <Per-Workstream Registry field from options.md> | <canonical value> | `default`, `authorized-user-instruction`, `source-contract`, `runtime-capability`, or `runtime-derived` | <instruction/source/tool ref or none> |
 
 Every applicable source row must be projected into its corresponding
 discovery-source row, and every workstream row into its workstream ledger row.
-Discovery sources carry only `source_mutation_authority`; full authority and
+Discovery sources carry only `tracked_work_item_update_permission`; full authority and
 delivery options begin at workstream registration. Never reuse another scope's
 authority or delivery value. Keep every `row_id` unique across both option
 tables, restrict row IDs to `[A-Za-z0-9:_-]+` with no commas, and encode a
@@ -53,25 +52,25 @@ literal `|` in evidence data as `%7C`.
 
 ## Discovery Sources
 
-| Source ID | Kind | Path/Query/URL | Last Checked | Cursor/Fingerprint | Item Key Rule | source_mutation_authority | Suppression Rule |
+| Source ID | Kind | Path/Query/URL | Last Checked | Cursor/Fingerprint | Item Key Rule | tracked_work_item_update_permission | Suppression Rule |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| ds-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | none, propose, or write | <owner/date/reason/source fingerprint> |
+| ds-001 | markdown, github-issue, github-pr, ci, todo, ledger | <path/query/url> | <time> | <etag/sha/cursor/checksum> | <stable id rule> | read-only, propose-updates-only, or apply-updates | <owner/date/reason/source fingerprint> |
 
-`source_mutation_authority` uses the canonical option values.
+`tracked_work_item_update_permission` uses the canonical option values.
 
 ## Active Root
 
 Status: claimed|stale|released|takeover-recorded
-Root ID: <thread id, session id, or root descriptor>
-Root surface: codex-app-thread|cli|unknown
+Root ID: <task id, session id, or root descriptor>
+Root surface: codex-app-task|cli|unknown
 Goal mode: active|unavailable|not-applicable
 Goal objective: <goal text or ledger fallback objective>
 Goal fallback reason: <none or why /goal/runtime goal tool was unavailable>
 Started: <YYYY-MM-DD HH:MM TZ>
 Last Progress Read: <YYYY-MM-DD HH:MM TZ>
 Next Root Check: <YYYY-MM-DD HH:MM TZ or none>
-active_root_takeover_policy: owner-approval|stale-ledger-check
-Scoped merge option refs: <exact workstream merge_authority/merge_policy row_ids or none>
+existing_orchestrator_session_takeover_policy: ask-authorized-user-before-takeover|take-over-only-if-existing-ledger-is-stale
+Scoped merge option refs: <exact workstream pull_request_merge_permission/pull_request_merge_confirmation row_ids or none>
 parent_closeout_watch: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
 Parent closeout watch evidence: <ledger section/fingerprint plus owner-visible handoff or automation id, or none>
 Claimed repo realpaths:
@@ -79,7 +78,7 @@ Claimed repo realpaths:
 Claimed source ids:
 - <source id/ref>
 Active workers:
-- worker_id=<stable id>; actual_workstream_surface=<cli-subagent|codex-app-thread>; workstream_ids=<comma-separated ids>
+- worker_id=<stable id>; actual_execution_location=<background-codex-subagent|visible-codex-app-task>; workstream_ids=<comma-separated ids>
 - none
 Recovery packet content fingerprint: <sha256 from recovery-validation.md or none>
 Takeover history:
@@ -115,7 +114,7 @@ row and deadline for each new head.
 Status: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
 Parent Feature Spec: <issue ref or none>
 Closeout PR: <PR ref or pending>
-Review policy: <required|skip|not-applicable>
+Review policy: <required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>
 Armed head: <closeout-qualified SHA or none>
 Closeout base: <branch or none>
 Current default branch: <branch or none>
@@ -157,7 +156,7 @@ Repo checkpoints:
 Source checkpoints:
 - <registered source item id from Workstreams>; fingerprint=<etag/sha/checksum/head>; state=<ledger state>
 Workstream checkpoints:
-- <workstream id>; source=<registered source item id>; state=<ledger state>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; delivery_evidence_fingerprint=<sha256 or not-applicable>; issue_mutation_evidence_fingerprint=<sha256 or not-applicable>
+- <workstream id>; source=<registered source item id>; state=<ledger state>; delivery_permission_source_issue_ref=<issue:<NN>|not-applicable>; issue_update_permission_source_issue_ref=<issue:<NN>|not-applicable>; delivery_evidence_fingerprint=<sha256 or not-applicable>; issue_mutation_evidence_fingerprint=<sha256 or not-applicable>
 Required gates:
 - <source/workstream>; <gate>=<status>; evidence=<path/ref/hash or pending>
 Proof index:
@@ -174,21 +173,20 @@ fingerprints here; load `recovery-validation.md` before resume or recovery.
 ## Worker And Delivery References
 
 authorization_resolution: per-workstream
-worker_authorization: inspect|implement|commit|push|pr|review-ready|ci-rerun-fix|release
-delegation_mode: auto|disabled|bounded
-worker_surface: auto|not-applicable|cli-subagent|codex-app-thread
-worker_limit: <positive integer|unbounded>
-app_thread_consent: not-requested|granted|denied
-app_thread_limit: <positive integer|unspecified>
-raw_worktree_fallback: forbidden|owner-approved
-project_topology: single-repo|monorepo|multi-repo-workspace
-workstream_project_topology: single-repo|monorepo|multi-repo-workspace
-pr_shape: single-pr|per-repo-pr|none
-branch_name: <exact branch|not-applicable>
-scope_transfer_ref: <issue:<NN>|not-applicable>
-issue_mutation_transfer_ref: <issue:<NN>|not-applicable>
-closeout_mode: feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable
-integration_mode: single-repo-pr|repo-pr|direct-commit|not-applicable
+worker_allowed_actions: <explicit action list from worker.md>
+work_delegation_policy: orchestrator-decides-for-each-implementation-workstream|run-all-work-in-current-orchestrator-session|orchestrator-decides-with-concurrent-worker-limit
+delegated_worker_visibility: orchestrator-decides-between-background-and-visible-workers|not-applicable|background-codex-subagents-only|visible-codex-app-tasks-only
+max_concurrent_delegated_workers: <positive integer|not-limited-by-authorized-user|not-applicable>
+visible_app_task_permission: not-requested|granted-by-authorized-user|denied-by-authorized-user
+max_visible_app_tasks: <positive integer|not-applicable>
+unmanaged_git_worktree_fallback_permission: not-granted|granted-by-authorized-user
+repository_layout: single-repository|monorepo|multi-repository-workspace
+workstream_repository_layout: single-repository|monorepo|multi-repository-workspace
+pull_request_count_strategy: one-pull-request-total|one-pull-request-per-repository|no-pull-request
+target_branch_name: <exact branch|not-applicable>
+delivery_permission_source_issue_ref: <issue:<NN>|not-applicable>
+issue_update_permission_source_issue_ref: <issue:<NN>|not-applicable>
+issue_completion_method: feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion
 subdelegation: forbidden
 worker_ledger_mutation: forbidden
 worker_lifecycle_owner: root
@@ -198,8 +196,8 @@ GitHub workflow skill: <gitstack skill or none>
 GitHub primary transport: connector
 GitHub fallback: fallback_status=<unused|used>; transport=<none|gh>; reason=<none|connector-unavailable|capability-unsupported|transport-failure>; operation=<operation or none>; evidence=<failure or none>; authority_reused=<authority or none>; result=<result or none>
 
-Worker fields follow `worker.md`. Delivery, publication, and issue-mutation
-authority follow `spec-backed-delivery.md`. Gates follow `gates.md`. Keep only
+Worker fields follow `worker.md`. Delivery and issue-update permissions follow
+`spec-backed-delivery.md`. Gates follow `gates.md`. Keep only
 the current session summary here; put full source contracts in Feature Specs, generated
 issues, owner requests, or the linked references.
 
@@ -247,15 +245,15 @@ Use one compact block per active workstream:
 | Field | Value |
 | --- | --- |
 | Source | <source id/ref and closeout target> |
-| Repo / surface | <repo>; <root|cli-subagent|codex-app-thread>; worker=<id or root> |
-| Worker evidence | worker_surface=<auto|not-applicable|cli-subagent|codex-app-thread>; actual_workstream_surface=<root-session|cli-subagent|codex-app-thread>; authorization_state=<authorized-by-invocation|owner-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
+| Repo / execution location | <repo>; <current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; worker=<id or root> |
+| Worker evidence | delegated_worker_visibility=<orchestrator-decides-between-background-and-visible-workers|not-applicable|background-codex-subagents-only|visible-codex-app-tasks-only>; actual_execution_location=<current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | parallelization=<independent|depends-on|blocks|root-integrated>; dependency_ids=<refs|none>; blocked_issue_ids=<refs|none>; dependency_reason=<reason|none>; dependency_proof=<evidence|pending|none> |
-| Delivery | delivery_mode=<local-only|pull-request|direct-commit>; delivery_source=<runtime-default|feature-level-inherited|issue-level-override|owner-instruction>; delivery_source_evidence=<scoped-option-row/source-ref|none>; branch_name=<exact branch|not-applicable>; current_pr_ref=<owner/repo#number|pending|not-applicable>; scope_transfer_ref=<issue:<NN>|not-applicable>; issue_mutation_transfer_ref=<issue:<NN>|not-applicable>; temporary_source_execution=<forbidden|owner-approved>; completion_proof_policy=<live-required|synthetic-accepted>; pr_shape=<single-pr|per-repo-pr|none>; closeout_mode=<feature-pr-closes-issue|repo-pr-closes-issue|direct-commit-closes-issue|local-done-move-after-proof|not-applicable>; integration_mode=<single-repo-pr|repo-pr|direct-commit|not-applicable>; publication_authority=<none|explicit-owner-authorization|spec-backed-pull-request|blocked>; pr_closeout=<merge-ready|draft-only|not-applicable>; codex_review_policy=<required|skip|not-applicable>; issue_mutation_authority=<none|pr-body-closeout-only|explicit-direct-mutation>; automation_authority=<none|explicit-owner-authorization>; automation_target=<source/workstream ref|none>; parent_spec_applicability=<required|deferred-vehicle|not-applicable>; parent_spec_applicability_reason=<whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-only|other-reason>; parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_spec_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; merge_authority=<none|explicit-owner-authorization>; merge_policy=<owner-approval|automatic-after-gates>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
+| Delivery | change_delivery_target=<validated-changes-left-uncommitted|local-commit-created-without-pushing|changes-pushed-to-target-branch-without-pull-request|validated-draft-pull-request-published|pull-request-ready-for-merge-but-not-merged>; delivery_decision_origin=<safe-default-for-ad-hoc-work|inherited-from-feature-spec|overridden-by-implementation-issue|specified-by-authorized-user>; delivery_decision_origin_evidence=<scoped-option-row/source-ref|none>; target_branch_name=<exact branch|not-applicable>; target_pull_request_ref=<owner/repo#number|pending|not-applicable>; delivery_permission_source_issue_ref=<issue:<NN>|not-applicable>; issue_update_permission_source_issue_ref=<issue:<NN>|not-applicable>; temporary_source_execution_permission=<not-granted|granted-by-authorized-user>; completion_evidence_policy=<require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>; pull_request_count_strategy=<one-pull-request-total|one-pull-request-per-repository|no-pull-request>; issue_completion_method=<feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion>; change_delivery_permission=<not-required-for-uncommitted-changes|not-granted|granted-for-selected-target>; delivery_gate_status=<ready|blocked|not-applicable>; delivery_allowed_actions=<canonical action list>; codex_review_requirement=<required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>; issue_update_permission=<no-issue-changes|pull-request-closing-keyword-only|direct-issue-updates-explicitly-authorized>; scheduled_automation_change_permission=<not-granted|granted-by-authorized-user>; automation_target=<source/workstream ref|none>; parent_spec_applicability=<required|deferred-vehicle|not-applicable>; parent_spec_applicability_reason=<whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-pull-request-target|other-reason>; parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_spec_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; pull_request_merge_permission=<not-granted|granted-for-named-pull-request>; pull_request_merge_confirmation=<ask-authorized-user-after-checks|merge-automatically-after-checks>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
 | Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; wait_record=<pr-ref@head|none|not-applicable>; wait_profile_pr=<pr-ref|none|not-applicable>; wait_profile=<standard|extended|not-applicable>; wait_budget_minutes=<15|30|not-applicable>; wait_started_at=<timestamp|none|not-applicable>; wait_deadline=<timestamp|none|not-applicable>; wait_elapsed_seconds=<number|none|not-applicable>; wait_state=<not-started|active|monitoring-required|terminal|not-applicable>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | workflow_skill=<gitstack skill>; primary_transport=connector; operation=<operation>; fallback=<unused|gh>; fallback_reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority_reused=<authority> |
-| Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; publication_checkout=<checkout or not-applicable>; caller_checkout_policy=<policy> |
+| Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; result_checkout_path=<checkout or not-applicable>; starting_checkout_branch_handling=<policy> |
 | Gates / proof | <required gates and current proof target> |
 
 For every active row, `parent_spec_applicability=required` requires a parent ref
@@ -264,14 +262,14 @@ and one of `pending-review`, `pending-closeout`, `armed`, or `blocked`.
 state `deferred-to-default-branch`, and a linked later default-branch
 `parent_closeout_vehicle` or `pending` vehicle-selection action in `ready-next`.
 `parent_spec_closeout=armed` is valid only when `parent_closeout_head` equals the
-current closeout-qualified SHA (reviewed for `required`, fully validated for
-`skip`), `parent_closeout_base` equals the current `default_branch`,
+current closeout-qualified SHA (reviewed for the required path, fully validated
+for the explicit-skip path), `parent_closeout_base` equals the current `default_branch`,
 and `pr_body_evidence` proves the parent closing keyword is present; none of
 those proof fields may be `none`.
 An unmerged `armed` row also requires `parent_closeout_watch=root-monitoring`,
 `owner-handoff`, or `automation-handoff` with matching watch evidence.
 `root-monitoring` additionally requires explicit merge authority and the root as
-the designated merger; `merge_authority=none` requires `owner-handoff`, while
+the designated merger; `pull_request_merge_permission=not-granted` requires `owner-handoff`, while
 `automation-handoff` requires an explicitly authorized event-driven monitor.
 `parent_spec_applicability=not-applicable` requires
 `parent_spec_closeout=not-applicable` plus a concrete applicability reason.
@@ -326,35 +324,35 @@ Reconciliation must reject unsupported `armed` or unjustified
 ## Wave Reports
 
 Record the canonical startup option snapshot before dispatch:
-`delegation_mode`, `worker_surface`, `worker_limit`, `app_thread_consent`,
-`app_thread_limit`, `raw_worktree_fallback`, and
-`active_root_takeover_policy`, with their option-resolution evidence. In a
+`work_delegation_policy`, `delegated_worker_visibility`, `max_concurrent_delegated_workers`, `visible_app_task_permission`,
+`max_visible_app_tasks`, `unmanaged_git_worktree_fallback_permission`, and
+`existing_orchestrator_session_takeover_policy`, with their option-resolution evidence. In a
 Codex App session, also record the App
-thread id/title for every newly created worker, integration, or publication
+task id/title for every newly created worker, integration, or publication
 worktree. Record each non-blocking execution report with its source items,
 canonical worker surface, orchestrator-chosen split for the current wave,
-authorization modes, delivery path, stop conditions, and any owner-authorized
+worker action lists, delivery target, stop conditions, and any owner-authorized
 option changes.
 
 The execution report is not an approval prompt. Continue later waves while they
-stay inside the recorded source items, canonical option snapshot, authorization
-modes, delivery path, and stop conditions. If a required option is unresolved
+stay inside the recorded source items, canonical option snapshot, worker
+actions, delivery target, and stop conditions. If a required option is unresolved
 or a wave would exceed its recorded limit, planned work may remain in the
 ledger, but dispatch must not start until the canonical option row is valid.
 
 Do not record a newly created raw Git worktree as the publication checkout in a
-Codex App session unless App thread/worktree creation was reported as missing,
+Codex App session unless App task/worktree creation was reported as missing,
 failed, or unsuitable and the session row is
-`raw_worktree_fallback=owner-approved`. Keep the managed-worktree failure as
+`unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`. Keep the managed-worktree failure as
 runtime evidence only. This restriction does not apply in CLI-only sessions.
 
 | Wave | Started | Finished | Sources Scanned | Items Processed | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <reported; startup baseline; worker split; authorization modes; delivery path; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| 1 | <time> | <time> | <source ids> | <count> | <reported; startup baseline; worker split; action lists; delivery target; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
-Record worker evidence every time the requested or available worker surface and
-actual worker surface differ. Include `worker_surface`,
-`actual_workstream_surface`, the relevant canonical authorization or consent
+Record worker evidence every time selected or available worker visibility and
+`actual_execution_location` differ. Include `delegated_worker_visibility`,
+`actual_execution_location`, the relevant canonical authorization or permission
 field, tool or session id when one exists, fallback reason, and whether
 execution was parallel, sequential, root-owned, or simulated.
 

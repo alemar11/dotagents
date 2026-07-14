@@ -21,16 +21,16 @@ memory:
 Use the smallest requested `memory_slice`. Tracker routing does not require
 domain or localization work, and domain updates do not require tracker setup.
 
-Load `references/options.md` before resolving any branch. Normalize natural
-language and legacy fields once, then use only canonical field/value
-assignments in current handoffs and reports.
+Load `references/options.md` before resolving any branch. Resolve natural
+language directly to canonical field/value assignments and reject noncanonical
+structured fields in current handoffs and reports.
 
 ## Operations And Shape
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | Tracker backend, delivery mode, issue-type mapping, and triage-state mapping. |
-| `project-layout` | Durable project topology: `single-repo`, `monorepo`, or `multi-repo-workspace`. |
+| `tracker-routing` | Tracker backend, delivery target, issue-type mapping, and triage-state mapping. |
+| `project-layout` | Durable project topology: `single-repository`, `monorepo`, or `multi-repository-workspace`. |
 | `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
@@ -89,21 +89,21 @@ Behavior-affecting setup uses human-first Markdown tables with
 | Key | Values | Owner |
 | --- | --- | --- |
 | `tracker_backend` | `github`, `local` | `issue-tracker.md` |
-| `delivery_mode` | `pull-request`, `direct-commit` | `issue-tracker.md`, Feature Specs, generated issues |
-| `project_topology` | `single-repo`, `monorepo`, `multi-repo-workspace` | `project-layout.md` |
+| `change_delivery_target` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | `issue-tracker.md`, Feature Specs, generated issues |
+| `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | `project-layout.md` |
 
-Treat uppercase kebab values as read aliases and normalize touched values.
+Retired delivery and repository-layout values are invalid input. Project-memory
+configuration must already use this schema before the runtime consumes it.
 Do not add durable keys for Codex runtime workspace shape, source-root lists,
 worktree paths, setup flow, GitHub repo, coordination repo, workers,
 publication/issue-mutation authority, scheduled checks, or current-run
 no-mutation intent. Use prose, planning artifacts, or the orchestrator ledger
 for those concerns.
 
-`references/setup-workflow.md` owns the settings editor, legacy-key migration,
-table normalization, draft checklist, pointer block, and completion report.
-When touching `issue-tracker.md`, require `tracker_backend` and `delivery_mode`,
-preserve useful prose, and remove runtime-only/legacy table rows unless their
-meaning is deliberately retained as prose.
+`references/setup-workflow.md` owns the settings editor, canonical table
+validation, draft checklist, pointer block, and completion report.
+When touching `issue-tracker.md`, require `tracker_backend` and `change_delivery_target`,
+preserve useful prose, and reject runtime-only or unknown table rows.
 
 ## Reference Loading Matrix
 
@@ -165,7 +165,7 @@ named targets, and write authority instead of unrelated setup.
 Before writing, show intended files and meaningful before/after values. Follow
 the loading matrix and existing local formats. In custom tracker workflows,
 preserve the described conventions while keeping the structured table limited
-to `tracker_backend` and `delivery_mode`.
+to `tracker_backend` and `change_delivery_target`.
 
 ### 5. Write And Verify Authorized Memory
 
@@ -194,9 +194,9 @@ weak session evidence plainly.
 
 ## Reference Responsibilities
 
-- `options.md`: canonical option fields, values, and legacy normalization.
+- `options.md`: canonical option fields and values.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
-- `project-layout.md`: durable `project_topology` configuration and topology
+- `project-layout.md`: durable `repository_layout` configuration and topology
   detection boundaries.
 - `issue-tracker-*.md`, `tracker-publishing.md`, `triage-labels.md`: tracker,
   artifact, type/state, source-ref, and completion contracts.

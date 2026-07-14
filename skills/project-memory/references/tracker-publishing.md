@@ -22,20 +22,9 @@ By default, `tracker_backend` is the write authority for planning artifacts:
 dry-run, temp, and rehearsal behavior is current-run policy, not a durable
 issue-tracker configuration row.
 
-For legacy tracker configs, map old fields before acting:
-
-- `tracker_mode=github` or `tracker_mode=orchestrator-github` maps to
-  `tracker_backend=github`.
-- `tracker_mode=local`, `tracker_mode=local-markdown`, or
-  `tracker_mode=orchestrator-local` maps to `tracker_backend=local`.
-- A legacy `effective_target=local-dry-run` with no preserved mutation reason
-  maps to `no_mutation_override=dry-run` plus
-  `no_mutation_output=local-artifacts`. Preserve a more specific canonical
-  legacy reason when one exists.
-- A legacy `effective_target=draft-publish-commands` with no preserved mutation
-  reason maps to `no_mutation_override=draft-output` plus
-  `no_mutation_output=publish-commands`. Preserve a more specific canonical
-  legacy reason when one exists.
+Reject tracker configuration that does not provide a canonical
+`tracker_backend`. Run-scoped non-mutation behavior must arrive through the
+current Plan Feature fields; do not infer it from obsolete setup keys.
 
 Hosted body-file inputs are temporary transport files. They must live outside
 the repo and be removed after mutation unless the resolved Plan Feature option
@@ -79,7 +68,7 @@ Do not dispatch implementation workers from a `draft-spec:<...>` source as if it
 were a durable Feature Spec. A dry-run orchestrator may inspect the graph, but real
 implementation scheduling requires a hosted Feature Spec number, a local Feature Spec path, or an
 exact scoped Orchestrator row with
-`temporary_source_execution=owner-approved`. That row does not grant
+`temporary_source_execution_permission=granted-by-authorized-user`. That row does not grant
 publication or issue mutation.
 
 ## Phase Ownership
@@ -91,8 +80,8 @@ publication or issue mutation.
   replacement of draft Feature Spec refs in hosted publish commands.
 - `$plan-feature` owns passing the same `tracker_backend`, `effective_target`,
   `no_mutation_override`, `no_mutation_output`, `local_mirror`,
-  `local_mirror_path`, planning identity, `delivery_mode`,
-  `issue_mutation_authority`, and
+  `local_mirror_path`, planning identity, `change_delivery_target`,
+  `change_delivery_permission`, `issue_update_permission`, and
   `source_spec_ref` through the full planning pipeline and its phase modes, with
   the verified `option_rows_fingerprint` for each current row set.
 - `$codex-orchestrator` may consume generated issues only after `source_spec_ref`
@@ -105,6 +94,5 @@ publication or issue mutation.
 | `github` | Feature Spec GitHub issue, linked partial Feature Spec issues for multi-repo work, or Feature Spec body plus draft command | GitHub sub-issues under the Feature Spec, linked repo issues for multi-repo work, or issue bodies plus draft commands |
 | `local` | `planning/features/<feature-slug>/SPEC.md` or `orchestration/<project-slug>/features/<feature-slug>/SPEC.md` for local workspace parents | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` or `orchestration/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` for local workspace parents |
 
-Lower-kebab-case values are canonical. Treat older uppercase kebab-case values
-and legacy tracker modes as aliases when reading existing artifacts, and rewrite
-touched structured values to lower-kebab-case.
+Lower-kebab-case values are canonical. Reject noncanonical values instead of
+rewriting them.

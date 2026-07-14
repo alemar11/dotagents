@@ -1,6 +1,6 @@
 ---
 name: codex-orchestrator
-description: Explicitly coordinate Codex source graphs, workers, gates, ledgers, and authorized merge-ready closeout.
+description: Explicitly coordinate Codex source graphs, workers, gates, ledgers, and authorized delivery closeout.
 ---
 
 # Codex Orchestrator
@@ -29,23 +29,25 @@ implementation, validation, and report.
 - Resolve `references/ledger.md` before implementation, worker creation, or
   source mutation. Stop as `needs-owner` when another live root claims an
   overlapping repo realpath or source id.
-- Workers never become roots: no ledger edits, subdelegation, worker/thread
+- Workers never become roots: no ledger edits, subdelegation, worker/task
   management, takeover/handoff decisions, source mutation, branch/PR strategy,
   merge, or closeout decisions.
-- The root resolves worker authorization per workstream. Capability modes are
-  explicit and non-cumulative; allowed paths or surfaces can narrow a mode but
-  never grant another one.
+- The root resolves `worker_allowed_actions` per workstream. Actions are
+  explicit, independent, and non-cumulative; allowed paths can narrow an action
+  but never grant another one.
 - Keep shared contracts, integration, gate decisions, publication decisions,
   and closeout in the root. A worker may execute exact authorized publication
   operations without acquiring those decisions.
 - Treat worker status as evidence, not lifecycle or source closeout. Read the
   latest worker state before steering or lifecycle changes.
-- Preserve user-owned dirty worktrees. Preserve the caller checkout unless the
-  scoped option row is `caller_checkout_policy=caller-checkout-approved`.
+- Preserve user-owned uncommitted changes. Preserve the caller checkout unless
+  the scoped option row is
+  `starting_checkout_branch_handling=branch-switch-authorized`.
 - In the Codex App, every newly created dedicated worker, integration, or
   publication worktree must belong to a visible App task created for that
   worktree. If that surface is unavailable, require
-  `raw_worktree_fallback=owner-approved` before a raw Git worktree fallback.
+  `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`
+  before an unmanaged Git worktree fallback.
   CLI-only sessions are exempt.
 - Read-only discovery never grants GitHub, release, automation, or other
   external mutation authority.
@@ -72,19 +74,20 @@ acceptance and closure authority.
 | --- | --- |
 | Rough intent without durable Feature Spec and issues | Run `$plan-feature` `full-flow` before implementation scheduling. |
 | Durable Feature Spec without generated issues | Run `$plan-feature` `issues-from-existing-spec` unless inspect-only. |
-| Feature Spec-backed issue, linked partial Feature Spec, `source_spec_ref`, or `## Orchestrator Handoff` | Load `references/spec-backed-delivery.md`; normalize supported legacy fields before registration. |
+| Feature Spec-backed issue, linked partial Feature Spec, `source_spec_ref`, or `## Orchestrator Handoff` | Load `references/spec-backed-delivery.md`; reject retired vocabulary before registration. |
 | Generated issue with valid handoff | Register directly; the handoff is its canonical dispatch projection. |
 | Generated issue without valid handoff | Inspect or regenerate through `$plan-feature`; implement only with explicit ad-hoc authority. |
-| PR, review, CI failure, bug, checklist, plan, TODO, implementation request, or legacy issue | Register directly with `local-only` delivery, publication/issue mutation `none`, and local acceptance plus validation closeout. |
+| PR, review, CI failure, bug, checklist, plan, TODO, implementation request, or other non-Feature-Spec issue | Register directly with `change_delivery_target=validated-changes-left-uncommitted`, `change_delivery_permission=not-required-for-uncommitted-changes`, `issue_update_permission=no-issue-changes`, and local acceptance plus validation closeout. |
 
-For ad-hoc and legacy sources, missing publication metadata is not a blocker.
+For ad-hoc sources, missing publication metadata is not a blocker.
 Commit, push, PR, issue mutation, merge, release, and deployment require
-explicit authority. Authorized pull-request delivery defaults to
-`pr_closeout=merge-ready` but never authorizes merge.
+explicit permission. Authorized Feature Spec delivery defaults to
+`change_delivery_target=pull-request-ready-for-merge-but-not-merged`, which
+never authorizes merge.
 
 `$plan-feature` owns Feature Spec and generated-issue publication before scheduling.
 After registration, the root owns authorized issue lifecycle and closeout. For
-`project_topology=multi-repo-workspace`, expand linked repo-scoped partial
+`repository_layout=multi-repository-workspace`, expand linked repo-scoped partial
 Feature Specs; no global Feature Spec is required. Register Markdown checklist
 items by stable path and heading.
 
@@ -94,7 +97,7 @@ Run this deterministic loop:
 
 1. **CLAIM** — resolve canonical options, resolve the ledger, canonicalize repo
    realpaths, acquire or verify the active-root claim, and establish Goal mode
-   or its ledger fallback. Resolve `project_topology` from project memory, safe
+   or its ledger fallback. Resolve `repository_layout` from project memory, safe
    repo evidence, or explicit owner input.
    On recovery, read and validate the compact recovery packet first; when fresh,
    load only its named active rows, gate rows, sources, and next action.
@@ -103,8 +106,8 @@ Run this deterministic loop:
 3. **ROUTE** — apply source routing, load only the selected references, choose
    companion skills, and classify workstreams with ledger vocabulary. Load
    `references/multi-repo-workspace.md` only for
-   `project_topology=multi-repo-workspace` or a registered source/handoff with
-   `workspace_context=multi-repo-workspace`.
+   `repository_layout=multi-repository-workspace` or a registered source/handoff
+   with `workspace_context=multi-repository-workspace`.
 4. **DISPATCH** — select one bounded wave; keep shared work in the root and load
    `references/worker.md` before any delegation.
 5. **INTEGRATE** — read current worker state, revalidate capabilities, accept or
@@ -134,7 +137,8 @@ implementation/publication:
 
 ```text
 Complete <portfolio/source scope> through validated closeout and, when
-authorized for pull-request delivery, merge-ready PR state. Continue until
+authorized for `pull-request-ready-for-merge-but-not-merged`, that exact
+delivery target. Continue until
 completion or a real gate/blocker stops progress.
 ```
 
@@ -151,16 +155,19 @@ blockers.
 
 ## Workers And Runtime Surfaces
 
-Resolve `delegation_mode`, `worker_surface`, `worker_limit`,
-`app_thread_consent`, `app_thread_limit`, `raw_worktree_fallback`, and
-`project_topology` from
-`references/options.md`. Defaults are `delegation_mode=auto`,
-`worker_surface=auto`, `app_thread_consent=not-requested`, and
-`raw_worktree_fallback=forbidden`. Visible user-owned App tasks require
-`app_thread_consent=granted` and a positive `app_thread_limit`.
+Resolve `work_delegation_policy`, `delegated_worker_visibility`,
+`max_concurrent_delegated_workers`, `visible_app_task_permission`,
+`max_visible_app_tasks`, `unmanaged_git_worktree_fallback_permission`, and
+`repository_layout` from `references/options.md`. Defaults are
+`work_delegation_policy=orchestrator-decides-for-each-implementation-workstream`,
+`delegated_worker_visibility=orchestrator-decides-between-background-and-visible-workers`,
+`visible_app_task_permission=not-requested`, and
+`unmanaged_git_worktree_fallback_permission=not-granted`. Visible user-owned App
+tasks require `visible_app_task_permission=granted-by-authorized-user` and a
+positive `max_visible_app_tasks`.
 
 Load `references/worker.md` before delegation. It owns current tool mapping,
-surface wording, consent, capability snapshots, authorization modes, prompts,
+surface wording, permission, capability snapshots, worker actions, prompts,
 execution reports, resync, integration, artifacts, and lifecycle. Do not copy
 session worker choices into Feature Specs, issues, project memory, or handoffs.
 
@@ -168,7 +175,7 @@ When the App root chooses a new dedicated worktree, create the visible App task
 with that worktree before implementation and keep the work in its managed
 surface. Input wording may supply option-resolution evidence, but the root must
 persist the resolved fields before creating a worker. It must never carry the
-wording itself as a worker-surface, consent, or limit value.
+wording itself as a worker-visibility, permission, or limit value.
 
 At worker create, reuse, resume-equivalent, or fork—and before any network or
 external mutation—record the capability snapshot required by `worker.md`. A
@@ -178,27 +185,31 @@ nonexistent resume, close, or scheduling action.
 
 ## Delivery, Gates, And Closeout
 
-For Feature Spec-backed sources, load `references/spec-backed-delivery.md` before
-scheduling or publication. It owns separate delivery, publication, PR
-closeout, issue mutation, and merge authorities. For ad-hoc/legacy sources,
-local acceptance plus validation completes `local-only` work; publication is a
-later explicit authority change.
+For Feature Spec-backed sources, load `references/spec-backed-delivery.md`
+before scheduling or delivery. It owns the selected delivery target, delivery
+permission, issue updates, review requirement, and merge permission. For ad hoc
+sources, local acceptance plus validation completes
+`validated-changes-left-uncommitted`; any later commit, push, or PR requires a
+new exact delivery target and permission row.
 
 Load `references/gates.md` before owner-ready, issue-closed, merge-ready,
 release-ready, or final status. It owns gate selection and conditionally routes
-`pull-request` plus `merge-ready` work through the canonical current-head Codex
-review and parent Feature Spec closeout algorithm. Apply its resolved review policy;
-pull-request delivery defaults to
-`pr_closeout=merge-ready` and `codex_review_policy=required`; an exact scoped
-owner instruction may select `skip`, which bypasses only review request/wait.
-Use `draft-only` only from its canonical option-resolution row. Parent closeout
-is root-owned, `armed` is not actual closure, and neither the parent Feature Spec nor the
-ledger completes before merge and verified issue closure.
+`pull-request-ready-for-merge-but-not-merged` through the canonical current-head
+Codex review and parent Feature Spec closeout algorithm. Its review default is
+`codex_review_requirement=required-on-current-pull-request-head`; an exact
+scoped authorized-user instruction may select
+`explicitly-skipped-by-authorized-user`, which bypasses only the review request
+and wait. `validated-draft-pull-request-published` never enters that route.
+Parent closeout is root-owned, `armed` is not actual closure, and neither the
+parent Feature Spec nor the ledger completes before merge and verified issue
+closure.
 
 Merge is root-owned and unavailable by default. Set
-`merge_authority=explicit-owner-authorization` only for an explicit instruction
-to merge/land the named PR or PR set. Use `automatic-after-gates` only when the
-same instruction waives another checkpoint; otherwise use `owner-approval`.
+`pull_request_merge_permission=granted-for-named-pull-request` only for an
+explicit instruction to merge or land the named PR or PR set. Use
+`pull_request_merge_confirmation=merge-automatically-after-checks` only when
+the same instruction waives another checkpoint; otherwise use
+`ask-authorized-user-after-checks`.
 
 Target-repo `AGENTS.md` changes, source comments/labels/direct closure, merge,
 release, and deployment each require matching authority.
@@ -236,15 +247,15 @@ artifacts by path/ref and fingerprint instead of repeating them. Use
 ## References
 
 - `references/options.md`: canonical option fields, values, defaults,
-  normalization, cross-field validation, and legacy input migration.
+  cross-field validation, and the strict input boundary.
 - `references/ledger.md`: ledger resolution, claims, state, wave records, and
   closeout hygiene.
 - `references/worker.md`: worker surfaces, tools, authorization, lifecycle,
   integration, and reports.
 - `references/multi-repo-workspace.md`: parent/child repo ownership,
   child-worktree layout, derived serial/parallel dispatch, and cross-repo
-  integration/closeout for `project_topology=multi-repo-workspace` or
-  `workspace_context=multi-repo-workspace`.
+  integration/closeout for `repository_layout=multi-repository-workspace` or
+  `workspace_context=multi-repository-workspace`.
 - `references/spec-backed-delivery.md`: Feature Spec graph, authorities, publication,
   issue mutation, review, and closeout.
 - `references/gates.md`: authorization, proof, review, integration, release,

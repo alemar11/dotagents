@@ -37,12 +37,12 @@ class ProjectMemoryContractTests(unittest.TestCase):
         )
 
         self.assertIn("`project-layout`", options)
-        self.assertIn("`project_topology`", skill)
-        self.assertIn("`project_topology`", setup)
-        for value in ("`single-repo`", "`monorepo`", "`multi-repo-workspace`"):
+        self.assertIn("`repository_layout`", skill)
+        self.assertIn("`repository_layout`", setup)
+        for value in ("`single-repository`", "`monorepo`", "`multi-repository-workspace`"):
             self.assertIn(value, layout)
             self.assertIn(value, skill)
-        self.assertIn("Keep `project-layout.md` limited to `project_topology`", setup)
+        self.assertIn("Keep `project-layout.md` limited to `repository_layout`", setup)
         self.assertIn("`tracker_backend`", skill)
         self.assertIn("Keep tracker routing in `project-memory/config/issue-tracker.md`", layout)
 

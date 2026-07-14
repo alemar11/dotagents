@@ -12,14 +12,14 @@ configuration table:
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `project_topology` | enum | `<value>` | `single-repo`, `monorepo`, `multi-repo-workspace` | Durable project layout used by planning and orchestration workflows. |
+| `repository_layout` | enum | `<value>` | `single-repository`, `monorepo`, `multi-repository-workspace` | Durable project layout used by planning and orchestration workflows. |
 
 Canonical values:
 
-- `single-repo`: one `.git` repository and one primary project/context.
+- `single-repository`: one `.git` repository and one primary project/context.
 - `monorepo`: one `.git` repository with multiple independently planned
   internal projects, packages, products, or contexts.
-- `multi-repo-workspace`: a parent coordination workspace with multiple child
+- `multi-repository-workspace`: a parent coordination workspace with multiple child
   `.git` repositories.
 
 ## Detection
@@ -27,13 +27,13 @@ Canonical values:
 Use repo evidence first, then explicit owner instruction. Prefer `Unknown` and
 ask when evidence is contradictory.
 
-- Select `single-repo` when the current project has one Git repository and no
+- Select `single-repository` when the current project has one Git repository and no
   strong evidence of multiple independently planned internal contexts.
 - Select `monorepo` when one Git repository contains multiple internal
   projects or packages that can be planned separately, such as workspace
   manifests, multiple app/package roots, `CONTEXT-MAP.md`, or established
   project-memory multi-context layout.
-- Select `multi-repo-workspace` when the current root coordinates multiple
+- Select `multi-repository-workspace` when the current root coordinates multiple
   child Git repositories, especially when the parent root is not itself the
   implementation repository or when child repos keep their own project memory,
   branches, validation, commits, and PRs.
@@ -43,7 +43,7 @@ ask when evidence is contradictory.
 - Do not store child source-root lists, Git remotes, worktree paths, thread
   IDs, worker limits, worker surfaces, dispatch state, scheduled checks, or
   publication authority here.
-- Do not treat `multi-repo-workspace` as a Codex-owned workspace schema. Local
+- Do not treat `multi-repository-workspace` as a Codex-owned workspace schema. Local
   descriptors such as `sources.json` remain probe or project documentation
   unless a current Codex product contract proves otherwise.
 - Keep tracker routing in `project-memory/config/issue-tracker.md`; topology
@@ -53,9 +53,9 @@ ask when evidence is contradictory.
 
 ## Consumers
 
-- `$plan-feature` reads `project_topology` when planning identity, Feature Spec
-  scope, `pr_shape`, or workspace routing depends on repo layout.
-- `$codex-orchestrator` reads `project_topology` during routing to choose the
-  lean single-repo/monorepo path or the multi-repo workspace reference.
+- `$plan-feature` reads `repository_layout` when planning identity, Feature Spec
+  scope, `pull_request_count_strategy`, or workspace routing depends on repo layout.
+- `$codex-orchestrator` reads `repository_layout` during routing to choose the
+  lean single-repository/monorepo path or the multi-repo workspace reference.
 - `$project-memory full-setup` creates this file when setup authority covers
   project layout. Direct layout-only updates use `memory_slice=project-layout`.

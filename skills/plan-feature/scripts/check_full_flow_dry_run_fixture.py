@@ -47,10 +47,50 @@ def read_repo(relative: str) -> str:
 
 
 def option_row_evidence_is_valid(rows: list[list[str]]) -> bool:
-    return all(
-        source == "default" or evidence not in {"", "none"}
-        for _, _, _, _, source, evidence in rows
-    )
+    for _, scope, field, value, source, evidence in rows:
+        if source != "default" and evidence in {"", "none"}:
+            return False
+        permission_bearing = (
+            field == "change_delivery_permission"
+            and value == "granted-for-selected-target"
+        ) or (
+            field == "issue_update_permission"
+            and value
+            in {
+                "pull-request-closing-keyword-only",
+                "direct-issue-updates-explicitly-authorized",
+            }
+        )
+        if not permission_bearing:
+            continue
+        if source not in {
+            "default",
+            "source-spec",
+            "authorized-user-instruction",
+        }:
+            return False
+        tokens = dict(
+            token.split("=", 1)
+            for token in evidence.split(";")
+            if "=" in token
+        )
+        permission_ref = tokens.get("permission-source-ref", "")
+        if (
+            not permission_ref
+            or tokens.get("scope-ref") != scope
+            or not tokens.get("target-ref")
+            or not tokens.get("target-branch")
+        ):
+            return False
+        if source == "default" and not permission_ref.startswith(
+            "feature-spec-default:"
+        ):
+            return False
+        if source == "authorized-user-instruction" and not permission_ref.startswith(
+            "authorized-user:"
+        ):
+            return False
+    return True
 
 
 def parse_option_rows(section: str) -> list[list[str]]:
@@ -131,13 +171,13 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         child_specs = {
             "api": {
                 "source_spec_ref": "https://github.com/example/api/issues/10",
-                "project_topology": "multi-repo-workspace",
-                "repo_project_topology": "single-repo",
+                "repository_layout": "multi-repository-workspace",
+                "child_repository_layout": "single-repository",
             },
             "web": {
                 "source_spec_ref": "https://github.com/example/web/issues/20",
-                "project_topology": "multi-repo-workspace",
-                "repo_project_topology": "monorepo",
+                "repository_layout": "multi-repository-workspace",
+                "child_repository_layout": "monorepo",
             },
         }
         workspace_child_source_refs = {
@@ -146,10 +186,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertEqual(set(workspace_child_source_refs), set(workspace_feature_repos))
         for child_spec in child_specs.values():
-            self.assertEqual("multi-repo-workspace", child_spec["project_topology"])
+            self.assertEqual("multi-repository-workspace", child_spec["repository_layout"])
             self.assertIn(
-                child_spec["repo_project_topology"],
-                {"single-repo", "monorepo", "multi-repo-workspace"},
+                child_spec["child_repository_layout"],
+                {"single-repository", "monorepo", "multi-repository-workspace"},
             )
 
         def build_issue(
@@ -165,7 +205,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
                     "issue_id": issue_id,
                     "target_repos": target_repos,
                     "source_spec_ref": workspace_child_source_refs[repo],
-                    "issue_project_topology": child_specs[repo]["repo_project_topology"],
+                    "issue_repository_layout": child_specs[repo]["child_repository_layout"],
                     "workspace_child_source_refs": workspace_child_source_refs,
                 }
             if parent_source_ref == "not-applicable":
@@ -174,7 +214,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
                 "issue_id": issue_id,
                 "target_repos": target_repos,
                 "source_spec_ref": parent_source_ref,
-                "issue_project_topology": "multi-repo-workspace",
+                "issue_repository_layout": "multi-repository-workspace",
                 "workspace_child_source_refs": workspace_child_source_refs,
             }
 
@@ -184,32 +224,32 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             build_issue("03", ("api", "web"), "orchestration/platform/features/auth/SPEC.md"),
         ]
 
-        self.assertEqual("single-repo", issues[0]["issue_project_topology"])
-        self.assertEqual("monorepo", issues[1]["issue_project_topology"])
-        self.assertEqual("multi-repo-workspace", issues[2]["issue_project_topology"])
+        self.assertEqual("single-repository", issues[0]["issue_repository_layout"])
+        self.assertEqual("monorepo", issues[1]["issue_repository_layout"])
+        self.assertEqual("multi-repository-workspace", issues[2]["issue_repository_layout"])
         with self.assertRaisesRegex(ValueError, "workspace-level source"):
             build_issue("04", ("api", "web"), "not-applicable")
 
         ledger_workstreams = {
             issue["issue_id"]: {
                 "source_spec_ref": issue["source_spec_ref"],
-                "workstream_project_topology": issue["issue_project_topology"],
+                "workstream_repository_layout": issue["issue_repository_layout"],
                 "workspace_child_source_refs": issue["workspace_child_source_refs"],
             }
             for issue in issues
         }
 
         self.assertEqual(
-            "single-repo",
-            ledger_workstreams["01"]["workstream_project_topology"],
+            "single-repository",
+            ledger_workstreams["01"]["workstream_repository_layout"],
         )
         self.assertEqual(
             "monorepo",
-            ledger_workstreams["02"]["workstream_project_topology"],
+            ledger_workstreams["02"]["workstream_repository_layout"],
         )
         self.assertEqual(
-            "multi-repo-workspace",
-            ledger_workstreams["03"]["workstream_project_topology"],
+            "multi-repository-workspace",
+            ledger_workstreams["03"]["workstream_repository_layout"],
         )
         for workstream in ledger_workstreams.values():
             self.assertEqual(
@@ -237,13 +277,23 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("no_mutation_output: publish-commands", fixture)
         self.assertIn("option_rows_fingerprint: sha256:", fixture)
         self.assertIn("local_mirror_path: not-applicable", fixture)
-        self.assertIn("branch_name: feature/account-settings-export", fixture)
+        self.assertIn("target_branch_name: feature/account-settings-export", fixture)
         self.assertIn("the structured delivery handoff tuple", fixture)
-        self.assertIn("`delivery_mode=pull-request`", fixture)
-        self.assertIn("`branch_name=feature/account-settings-export`", fixture)
-        self.assertIn("`pr_closeout=merge-ready`", fixture)
-        self.assertIn("`pr_shape=single-pr`", fixture)
-        self.assertIn("`project_topology: single-repo` and\n   `branch_name: feature/account-settings-export`", fixture)
+        self.assertIn(
+            "`change_delivery_target=pull-request-ready-for-merge-but-not-merged`",
+            fixture,
+        )
+        self.assertIn(
+            "`change_delivery_permission=granted-for-selected-target`",
+            fixture,
+        )
+        self.assertIn("`target_branch_name=feature/account-settings-export`", fixture)
+        self.assertIn(
+            "`codex_review_requirement=required-on-current-pull-request-head`",
+            fixture,
+        )
+        self.assertIn("`pull_request_count_strategy=one-pull-request-total`", fixture)
+        self.assertIn("`repository_layout: single-repository` and\n   `target_branch_name: feature/account-settings-export`", fixture)
         self.assertIn("source_spec_ref: draft-spec:account-settings-export", fixture)
         self.assertIn("spec_body_fingerprint: sha256:7f4a9c21d003", fixture)
         self.assertIn("capture_mode: defer-to-caller", fixture)
@@ -273,13 +323,14 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "local_mirror",
             "local_mirror_path",
             "partial_output",
-            "project_topology",
+            "repository_layout",
             "workspace_context",
-            "delivery_mode",
-            "issue_mutation_authority",
-            "branch_name",
-            "pr_closeout",
-            "pr_shape",
+            "change_delivery_target",
+            "change_delivery_permission",
+            "issue_update_permission",
+            "codex_review_requirement",
+            "target_branch_name",
+            "pull_request_count_strategy",
         }
         self.assertEqual(len(option_rows), len(expected_run_fields))
         self.assertEqual({row[2] for row in option_rows}, expected_run_fields)
@@ -290,7 +341,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertTrue(all(row[1] == "run" for row in option_rows))
         self.assertTrue(option_row_evidence_is_valid(option_rows))
         expected_run_contract = {
-            "mode": ("full-flow", "owner-instruction", "fixture-intent"),
+            "mode": ("full-flow", "authorized-user-instruction", "fixture-intent"),
             "execution_profile": ("standard", "default", "none"),
             "tracker_backend": (
                 "github",
@@ -304,36 +355,49 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             ),
             "no_mutation_override": (
                 "dry-run",
-                "owner-instruction",
+                "authorized-user-instruction",
                 "fixture-intent",
             ),
             "no_mutation_output": (
                 "publish-commands",
-                "owner-instruction",
+                "authorized-user-instruction",
                 "fixture-intent",
             ),
             "local_mirror": ("not-requested", "default", "none"),
             "local_mirror_path": ("not-applicable", "default", "none"),
             "partial_output": ("withhold", "default", "none"),
-            "project_topology": (
-                "single-repo",
+            "repository_layout": (
+                "single-repository",
                 "project-layout-config",
                 "project-memory/config/project-layout.md",
             ),
             "workspace_context": ("not-applicable", "default", "none"),
-            "delivery_mode": ("pull-request", "default", "none"),
-            "issue_mutation_authority": (
-                "pr-body-closeout-only",
-                "runtime-derived",
-                "run:tracker_backend+run:delivery_mode",
+            "change_delivery_target": (
+                "pull-request-ready-for-merge-but-not-merged",
+                "default",
+                "none",
             ),
-            "branch_name": (
+            "change_delivery_permission": (
+                "granted-for-selected-target",
+                "default",
+                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export",
+            ),
+            "issue_update_permission": (
+                "pull-request-closing-keyword-only",
+                "default",
+                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export",
+            ),
+            "target_branch_name": (
                 "feature/account-settings-export",
                 "runtime-derived",
-                "run:delivery_mode+feature_slug",
+                "run:change_delivery_target+feature_slug",
             ),
-            "pr_closeout": ("merge-ready", "default", "run:delivery_mode"),
-            "pr_shape": ("single-pr", "runtime-derived", "affected_repos=current-repository"),
+            "codex_review_requirement": (
+                "required-on-current-pull-request-head",
+                "default",
+                "run:change_delivery_target",
+            ),
+            "pull_request_count_strategy": ("one-pull-request-total", "runtime-derived", "affected_repos=current-repository"),
         }
         self.assertEqual(
             {row[2]: (row[3], row[4], row[5]) for row in option_rows},
@@ -362,17 +426,17 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         )
         issue_rows = parse_option_rows(issue_section)
         expected_issue_fields = {
-            "delivery_source",
-            "delivery_mode",
-            "issue_project_topology",
-            "issue_mutation_authority",
-            "pr_shape",
-            "pr_closeout",
+            "delivery_decision_origin",
+            "change_delivery_target",
+            "change_delivery_permission",
+            "issue_repository_layout",
+            "issue_update_permission",
+            "codex_review_requirement",
+            "pull_request_count_strategy",
             "parallelization",
-            "closeout_mode",
-            "integration_mode",
+            "issue_completion_method",
             "domain_closeout",
-            "branch_name",
+            "target_branch_name",
         }
         issue_row_ids = [row[0] for row in issue_rows]
         self.assertEqual(len(issue_rows), len(expected_issue_fields))
@@ -385,44 +449,52 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertTrue(all(row[1] == "issue:01" for row in issue_rows))
         self.assertTrue(option_row_evidence_is_valid(issue_rows))
         expected_issue_contract = {
-            "delivery_source": (
-                "feature-level-inherited",
+            "delivery_decision_origin": (
+                "inherited-from-feature-spec",
                 "source-spec",
                 "draft-spec:account-settings-export",
             ),
-            "delivery_mode": ("pull-request", "source-spec", "run:delivery_mode"),
-            "issue_project_topology": ("single-repo", "source-spec", "run:project_topology"),
-            "issue_mutation_authority": (
-                "pr-body-closeout-only",
+            "change_delivery_target": (
+                "pull-request-ready-for-merge-but-not-merged",
                 "source-spec",
-                "run:issue_mutation_authority",
+                "run:change_delivery_target",
             ),
-            "pr_shape": ("single-pr", "source-spec", "run:pr_shape"),
-            "pr_closeout": ("merge-ready", "source-spec", "run:pr_closeout"),
+            "change_delivery_permission": (
+                "granted-for-selected-target",
+                "source-spec",
+                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run",
+            ),
+            "issue_repository_layout": ("single-repository", "source-spec", "run:repository_layout"),
+            "issue_update_permission": (
+                "pull-request-closing-keyword-only",
+                "source-spec",
+                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run",
+            ),
+            "pull_request_count_strategy": ("one-pull-request-total", "source-spec", "run:pull_request_count_strategy"),
+            "codex_review_requirement": (
+                "required-on-current-pull-request-head",
+                "source-spec",
+                "run:codex_review_requirement",
+            ),
             "parallelization": (
                 "independent",
                 "runtime-derived",
                 "issue-graph:01",
             ),
-            "closeout_mode": (
-                "feature-pr-closes-issue",
+            "issue_completion_method": (
+                "feature-pull-request-closing-keyword",
                 "runtime-derived",
-                "run:tracker_backend+issue:01:pr_shape",
-            ),
-            "integration_mode": (
-                "single-repo-pr",
-                "runtime-derived",
-                "run:delivery_mode+current-repository",
+                "run:tracker_backend+issue:01:pull_request_count_strategy",
             ),
             "domain_closeout": (
                 "implementation-closeout",
                 "runtime-derived",
                 "domain_knowledge_delta+issue-graph:01",
             ),
-            "branch_name": (
+            "target_branch_name": (
                 "feature/account-settings-export",
                 "source-spec",
-                "run:branch_name",
+                "run:target_branch_name",
             ),
         }
         self.assertEqual(
@@ -473,16 +545,33 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("repeatedly emitted between phases", fixture)
 
     def test_non_default_option_sources_reject_empty_or_none_evidence(self) -> None:
-        base = [["run:mode", "run", "mode", "full-flow", "owner-instruction", "request-1"]]
+        base = [["run:mode", "run", "mode", "full-flow", "authorized-user-instruction", "request-1"]]
         self.assertTrue(option_row_evidence_is_valid(base))
         for invalid in ("", "none"):
             with self.subTest(evidence=invalid):
                 row = [base[0][:-1] + [invalid]]
                 self.assertFalse(option_row_evidence_is_valid(row))
 
+        default_permission = [[
+            "run:change_delivery_permission",
+            "run",
+            "change_delivery_permission",
+            "granted-for-selected-target",
+            "default",
+            "none",
+        ]]
+        self.assertFalse(option_row_evidence_is_valid(default_permission))
+        default_permission[0][-1] = (
+            "permission-source-ref=feature-spec-default:demo;scope-ref=run;"
+            "target-ref=draft-spec:demo;target-branch=feature/demo"
+        )
+        self.assertTrue(option_row_evidence_is_valid(default_permission))
+        runtime_derived_permission = [list(default_permission[0])]
+        runtime_derived_permission[0][4] = "runtime-derived"
+        self.assertFalse(option_row_evidence_is_valid(runtime_derived_permission))
+
         options = read("plan-feature/references/options.md")
-        self.assertIn("whose `source` is not `default`", options)
-        self.assertIn("neither empty nor `none`", options)
+        self.assertIn("Every non-default\nsource requires non-empty evidence", options)
 
     def test_shared_contract_documents_draft_publish_handoff(self) -> None:
         contract = read("project-memory/references/tracker-publishing.md")
@@ -494,7 +583,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("`no_mutation_override=dry-run`", contract)
         self.assertIn("`no_mutation_override=draft-output`", contract)
         self.assertIn("Do not dispatch implementation workers", contract)
-        self.assertIn("`temporary_source_execution=owner-approved`", contract)
+        self.assertIn(
+            "`temporary_source_execution_permission=granted-by-authorized-user`",
+            contract,
+        )
         self.assertNotIn("explicit owner decision to use the full Feature Spec body", contract)
 
     def test_project_memory_does_not_own_orchestration_policy_setup(self) -> None:
@@ -513,14 +605,28 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Session Option Resolution", worker)
         self.assertNotIn("policy-auto-dispatched", worker)
         self.assertNotIn("policy-auto-dispatched", ledger)
-        self.assertIn("`delegation_mode` | `auto`, `disabled`, `bounded`", orchestrator_options)
         self.assertIn(
-            "`app_thread_consent` | `not-requested`, `granted`, `denied`",
+            "`orchestrator-decides-for-each-implementation-workstream`, "
+            "`run-all-work-in-current-orchestrator-session`, "
+            "`orchestrator-decides-with-concurrent-worker-limit`",
             orchestrator_options,
         )
-        self.assertIn("delegation_mode: auto|disabled|bounded", ledger_template)
         self.assertIn(
-            "app_thread_consent: not-requested|granted|denied", ledger_template
+            "`visible_app_task_permission` | `not-requested`, "
+            "`granted-by-authorized-user`, `denied-by-authorized-user`",
+            orchestrator_options,
+        )
+        self.assertIn(
+            "work_delegation_policy: "
+            "orchestrator-decides-for-each-implementation-workstream|"
+            "run-all-work-in-current-orchestrator-session|"
+            "orchestrator-decides-with-concurrent-worker-limit",
+            ledger_template,
+        )
+        self.assertIn(
+            "visible_app_task_permission: "
+            "not-requested|granted-by-authorized-user|denied-by-authorized-user",
+            ledger_template,
         )
         self.assertIn("## Wave Reports", ledger_template)
         self.assertIn("Execution Report", ledger_template)
@@ -543,9 +649,9 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
                 self.assertIn("`source_spec_ref`", contents)
                 self.assertNotIn("Source " + "Feature Spec", contents)
                 if relative.endswith("issue-tracker-local.md"):
-                    self.assertIn("read-only legacy", normalized)
+                    self.assertIn("must use canonical", normalized)
                 else:
-                    self.assertIn("Retired source-reference labels are not read aliases", contents)
+                    self.assertIn("canonical `source_spec_ref` field", contents)
                 self.assertNotIn("current request explicitly asks for dry-run", contents)
                 self.assertNotIn("current-run no-mutation override is active", contents)
                 for field in RUNTIME_POLICY_FIELDS:
@@ -553,7 +659,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         github_contract = read("project-memory/references/issue-tracker-github.md")
         self.assertIn("`source_spec_ref`, delivery metadata", github_contract)
-        self.assertIn("Retired source-reference labels are not read aliases", github_contract)
+        self.assertIn("canonical `source_spec_ref` field", github_contract)
         self.assertIn("`local_mirror=requested`", github_contract)
         self.assertNotIn("explicitly asks to keep a local mirror", github_contract)
 
@@ -582,18 +688,21 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("references/full-flow-dry-run.md", plan_feature)
         self.assertIn("`tracker_backend`", plan_feature)
         self.assertIn("keyed\n`option_resolution` rows", plan_feature)
-        self.assertIn("`project_topology`", plan_feature)
-        self.assertIn("`repo_project_topology`", plan_feature)
+        self.assertIn("`repository_layout`", plan_feature)
+        self.assertIn("`child_repository_layout`", plan_feature)
         self.assertIn("run only `$project-memory project-layout`\nbefore recording the option snapshot", plan_feature)
-        self.assertIn("`branch_name`, `pr_closeout`, and `pr_shape`", plan_feature)
+        self.assertIn(
+            "`codex_review_requirement`, `target_branch_name`, and",
+            plan_feature,
+        )
         self.assertIn("Keep worker surfaces, worker counts", plan_feature)
         self.assertIn("run child repo partial planning only when all affected child repos share one effective child `tracker_backend`", normalized_plan_feature)
         self.assertIn("when child backends are mixed", plan_feature)
         self.assertIn("two-pass child publication flow", plan_feature)
-        self.assertIn("the run-level `project_topology` row is `multi-repo-workspace`", normalized_plan_feature)
-        self.assertIn("per-issue `issue_project_topology`", plan_feature)
+        self.assertIn("the run-level `repository_layout` row is `multi-repository-workspace`", normalized_plan_feature)
+        self.assertIn("per-issue `issue_repository_layout`", plan_feature)
         self.assertIn("each affected child repo's `project-memory/config/project-layout.md`", plan_feature)
-        self.assertIn("`workspace_context=multi-repo-workspace`", plan_feature)
+        self.assertIn("`workspace_context=multi-repository-workspace`", plan_feature)
         self.assertIn("`workspace_child_source_refs` repo-to-Feature-Spec mapping", plan_feature)
         self.assertIn("`workspace_child_source_refs=unresolved-first-pass`", plan_feature)
         self.assertIn("Invoke the issue phase only after the required child partial Feature Spec refs", plan_feature)
@@ -614,65 +723,71 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("tracker-publishing.md", spec_phase)
         self.assertIn("## Feature Spec Target Model", spec_phase)
         self.assertIn("planning/features/<feature-slug>/SPEC.md", spec_phase)
-        self.assertIn("When `workspace_context=multi-repo-workspace`", spec_phase)
+        self.assertIn("When `workspace_context=multi-repository-workspace`", spec_phase)
         self.assertIn("Feature Spec body fingerprint", spec_phase)
         self.assertIn("Feature Spec planning-artifact publication", spec_phase)
         self.assertIn("tracker_backend` is the planning-artifact write authority", spec_phase)
         self.assertIn("affected child repo's `project-memory/config/issue-tracker.md`", spec_phase)
         self.assertIn("`project-memory/config/project-layout.md`", spec_phase)
-        self.assertIn("source for `repo_project_topology`", spec_phase)
+        self.assertIn("source for `child_repository_layout`", spec_phase)
         self.assertIn("one\noption-resolution run may publish only one artifact set", spec_phase)
         self.assertIn("then publish child repo partials in\nchild run(s) that cite the parent `source_spec_ref`", spec_phase)
         self.assertIn("All affected child repos\nin one generated issue graph must share the same effective child backend", spec_phase)
         self.assertIn("child\nbackends are mixed", spec_phase)
         self.assertIn("two-pass child publication flow", spec_phase)
-        self.assertIn("`workspace_context=multi-repo-workspace`", spec_phase)
+        self.assertIn("`workspace_context=multi-repository-workspace`", spec_phase)
         self.assertIn("Parent `tracker_backend` controls only the parent/global", spec_phase)
         self.assertIn("`effective_target=configured-tracker`", spec_phase)
         self.assertIn("`local_mirror=requested`", spec_phase)
         self.assertIn("validated `local_mirror_path`", spec_phase)
         self.assertIn("`local_mirror_path`", issue_phase)
-        self.assertIn("`branch_name`", spec_phase)
-        self.assertIn("`branch_name`", issue_phase)
+        self.assertIn("`target_branch_name`", spec_phase)
+        self.assertIn("`target_branch_name`", issue_phase)
         self.assertIn("For `effective_target=local-dry-run`", spec_phase)
-        self.assertIn("exact instruction, feature scope, and authorized target branch", options)
-        self.assertIn("the structured delivery handoff tuple: `delivery_mode`,", spec_phase)
-        self.assertIn("`project_topology`", spec_phase)
-        self.assertIn("`repo_project_topology`", spec_phase)
+        self.assertIn(
+            "Commit or push targets require exact\nauthorized-user evidence naming the branch",
+            options,
+        )
+        self.assertIn("the structured delivery handoff tuple: `change_delivery_target`,", spec_phase)
+        self.assertIn("`repository_layout`", spec_phase)
+        self.assertIn("`child_repository_layout`", spec_phase)
         self.assertIn("`workspace_context`, `workspace_parent_source_ref`", spec_phase)
         self.assertIn("`workspace_child_source_refs` mapping each `workspace_feature_repos` repo", spec_phase)
         self.assertIn("Keys are canonical repo slugs and must match\n  `workspace_feature_repos`", spec_phase)
         self.assertIn("workspace_child_source_refs=unresolved-first-pass", normalized_spec_phase)
-        self.assertIn("`issue_mutation_authority`, `issue_mutation_authority_evidence`", spec_phase)
-        self.assertNotIn("- Project topology: verified `project_topology` row value.", spec_template)
-        self.assertIn("- project_topology: [verified `project_topology` row value]", spec_template)
-        self.assertIn("- repo_project_topology: [child repo durable topology", spec_template)
-        self.assertIn("- workspace_context: [multi-repo-workspace or not-applicable].", spec_template)
+        self.assertIn("`issue_update_permission`, `issue_update_permission_evidence`", spec_phase)
+        self.assertNotIn("- Project topology: verified `repository_layout` row value.", spec_template)
+        self.assertIn("- repository_layout: [verified `repository_layout` row value]", spec_template)
+        self.assertIn("- child_repository_layout: [child repo durable topology", spec_template)
+        self.assertIn("- workspace_context: [multi-repository-workspace or not-applicable].", spec_template)
         self.assertIn("- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable].", spec_template)
         self.assertIn("- workspace_child_source_refs: [complete repo-to-child Feature Spec mapping", spec_template)
         self.assertIn("`unresolved-first-pass` during first-pass workspace child publication", spec_template)
         self.assertIn("Never choose an individual child partial as the primary source", issue_phase)
-        self.assertIn("- branch_name: [verified exact branch data]", spec_template)
-        self.assertIn("must equal the exact target branch in the scoped owner evidence", normalized_options)
-        self.assertIn("separate `branch_name` data must equal the exact target", options)
-        self.assertIn("- branch_name: [verified exact branch data]", issue_template)
-        self.assertIn("- branch_name: [same effective branch data as `## Delivery`]", issue_template)
-        self.assertIn("scope-transfer-ref=run", options)
+        self.assertIn("- target_branch_name: [verified exact branch data]", spec_template)
+        self.assertIn("branch mutations also require `target-branch=<target_branch_name>`", normalized_options)
+        self.assertIn("- target_branch_name: [verified exact branch data]", issue_template)
+        self.assertIn("- target_branch_name: [same effective branch data as `## Delivery`]", issue_template)
         self.assertIn(
-            "- issue_mutation_authority: [verified `issue_mutation_authority` row value]",
+            "- change_delivery_permission: [verified `change_delivery_permission` row value]",
             issue_template,
         )
-        self.assertIn("`issue_mutation_authority=explicit-direct-mutation`", issue_phase)
+        self.assertIn(
+            "- codex_review_requirement: [verified `codex_review_requirement` row value]",
+            issue_template,
+        )
+        self.assertIn(
+            "- issue_update_permission: [verified `issue_update_permission` row value]",
+            issue_template,
+        )
+        self.assertIn("`issue_update_permission=direct-issue-updates-explicitly-authorized`", issue_phase)
         self.assertIn("Do not resolve delivery or mutation options in this phase", spec_phase)
-        self.assertNotIn("Resolve the Feature Spec `delivery_mode`", spec_phase)
-        self.assertIn("direct-commit publication authority alone is insufficient", normalized_options)
-        self.assertIn("delivery\nauthority alone cannot select it", options)
-        self.assertIn("`scope-ref=issue:<NN>`", options)
-        self.assertIn("preserves the Feature Spec owner, `target-ref`", options)
-        self.assertIn("preserves the Feature Spec owner, `target-ref`, and target branch verbatim", options)
-        self.assertIn("`closeout_mode=direct-commit-closes-issue`,\n  `issue_mutation_authority=explicit-direct-mutation`", issue_template)
-        self.assertNotIn("`direct-commit` or another explicit authorization", issue_template)
-        self.assertNotIn("`direct-commit` or another explicit authorization", issue_phase)
+        self.assertNotIn("Resolve the Feature Spec `change_delivery_target`", spec_phase)
+        self.assertIn("delivery permission alone is insufficient", normalized_options)
+        self.assertIn("Retired planning and delivery fields are invalid input", options)
+        self.assertIn("`issue_completion_method=final-commit-closing-keyword`,\n  `issue_update_permission=direct-issue-updates-explicitly-authorized`", issue_template)
+        self.assertNotIn("repository_integration_method", issue_template)
+        self.assertNotIn("repository_integration_method", issue_phase)
         self.assertIn("label the ref\nnon-executable", issue_phase)
         for identity_field in (
             "feature_slug",
@@ -684,7 +799,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             self.assertIn(f"`{identity_field}`", issue_phase)
         self.assertNotIn("run explicitly requested no-mutation output", spec_phase)
         self.assertNotIn("explicitly asked for a local mirror", spec_phase)
-        self.assertIn("## Effective Target Resolution", options)
+        self.assertIn("## Effective Planning-Artifact Target", options)
         self.assertIn("## Per-Issue Registry", options)
         self.assertIn("sole owner of option values", issue_phase)
         self.assertIn("sole owner of option values", normalized_spec_phase)
@@ -710,33 +825,34 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         )
         for duplicated_schema in (
             "tracker_backend: <github|local>",
-            "delivery_mode: <pull-request|direct-commit>",
-            "pr_shape: <single-pr|per-repo-pr|none>",
+            "change_delivery_target: <pull-request|direct-commit>",
+            "pull_request_count_strategy: <one-pull-request-total|one-pull-request-per-repository|none>",
         ):
             self.assertNotIn(duplicated_schema, spec_phase)
             self.assertNotIn(duplicated_schema, issue_phase)
-        self.assertIn("Records the issue-effective value", options)
-        self.assertIn("complete effective delivery", options)
-        self.assertIn("## Row Serialization And Fingerprint", options)
-        self.assertIn("Record exactly one row per Run Registry field", options)
-        self.assertIn("plus issue-effective `branch_name`", options)
+        self.assertIn("Records the issue-effective stopping point", options)
+        self.assertIn("Every issue records its effective delivery tuple", options)
+        self.assertIn("## Resolution Record", options)
+        self.assertIn("Record one six-column row per run field", options)
+        self.assertIn("plus issue-effective `target_branch_name`", options)
         self.assertIn(
-            "owner-ref=<ref>;scope-ref=<run-or-issue-scope>;target-ref=<feature-or-source-ref>;target-branch=<branch_name>",
+            "Permission-bearing values require\n`permission-source-ref`, exact `scope-ref`, and `target-ref`",
             options,
         )
-        self.assertIn("row_id`, `scope_id`, `field`, `value`, `source`, and", options)
+        self.assertIn(
+            "Canonicalize all rows with columns `row_id`, `scope_id`, `field`, `value`,",
+            options,
+        )
         self.assertIn("option_rows_fingerprint: sha256:", options)
-        self.assertIn("issue_option_rows_fingerprint: sha256:", options)
+        self.assertIn("emits\n`issue_option_rows_fingerprint`", options)
         self.assertIn("`issue:<NN>:<field>`", options)
         self.assertIn("`local-artifacts` | `local-dry-run`", options)
-        self.assertIn("`closeout_mode=local-done-move-after-proof`", options)
-        self.assertIn("`closeout_mode=direct-commit-closes-issue`", options)
-        self.assertIn("after the issue graph exists and\nbefore emitting", options)
-        self.assertIn("`parallelization=depends-on` requires", options)
-        self.assertIn("one or more `dependency_ids`", options)
-        self.assertIn("atomically resolves", options)
-        self.assertIn("Any non-`none` registry value", options)
-        self.assertIn("Reject any other combination", options)
+        self.assertIn("`issue_completion_method=move-local-issue-to-done-after-proof`", options)
+        self.assertIn("`issue_completion_method=final-commit-closing-keyword`", options)
+        self.assertIn("Resolve these fields after the issue graph exists", options)
+        self.assertIn("`depends-on` requires dependency ids only", options)
+        self.assertIn("An issue target override atomically re-resolves", options)
+        self.assertIn("Reject every other combination", options)
         self.assertIn("tracker-publishing.md", issue_phase)
         self.assertIn("Do not add worker authorization defaults", issue_phase)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_phase)
@@ -745,7 +861,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("atomically resolves the", issue_phase)
         self.assertIn("complete delivery tuple", issue_phase)
         self.assertIn("Do not hardcode another default\ndelivery tuple", issue_phase)
-        self.assertNotIn("- delivery_mode: pull-request", issue_phase)
+        self.assertNotIn("- change_delivery_target: pull-request", issue_phase)
         self.assertIn("`partial_output=allow-non-agent-ready`", issue_phase)
         self.assertNotIn("explicitly requested partial backlog output", issue_phase)
         self.assertNotIn("unless it explicitly permits partial output", issue_phase)
@@ -763,10 +879,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("For root-owned\n  integration or domain-closeout issues spanning multiple repos", issue_phase)
         self.assertIn("Never choose an individual child partial as the primary source", issue_phase)
         self.assertIn("do not choose one child repo's durable topology as the run-level\n  value", issue_phase)
-        self.assertIn("for root-owned issues spanning multiple repos, use\n  `multi-repo-workspace`", issue_phase)
+        self.assertIn("for root-owned issues spanning multiple repos, use\n  `multi-repository-workspace`", issue_phase)
         self.assertNotIn("# <feature-slug>: <NN> <vertical outcome>", issue_phase)
         self.assertIn("# Feature Spec: [Feature Name]", spec_template)
-        self.assertIn("## Delivery Mode", spec_template)
+        self.assertIn("## Change Delivery Target", spec_template)
         self.assertIn("## Domain Knowledge Handoff", spec_template)
         self.assertIn("# <feature-slug>: <NN> <vertical outcome>", issue_template)
         self.assertIn("issue_type: [canonical bug | feature | task]", issue_template)
@@ -783,33 +899,41 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertNotIn("\nStatus: [mapped triage state", issue_template)
         self.assertNotIn("\ntype:", issue_template)
         self.assertNotIn("\nstatus:", issue_template)
-        self.assertNotIn("Project Topology: [verified inherited `project_topology` row value]", issue_template)
-        self.assertIn("- project_topology: [same feature/workspace graph value as the source Feature Spec]", issue_template)
-        self.assertIn("- issue_project_topology: [verified `issue_project_topology` row value]", issue_template)
-        self.assertIn("- workspace_context: [multi-repo-workspace or not-applicable]", issue_template)
+        self.assertNotIn("Project Topology: [verified inherited `repository_layout` row value]", issue_template)
+        self.assertIn("- repository_layout: [same feature/workspace graph value as the source Feature Spec]", issue_template)
+        self.assertIn("- issue_repository_layout: [verified `issue_repository_layout` row value]", issue_template)
+        self.assertIn(
+            "- change_delivery_permission_evidence: [verified permission-source, scope, target, branch, and transfer evidence]",
+            issue_template,
+        )
+        self.assertIn("- workspace_context: [multi-repository-workspace or not-applicable]", issue_template)
         self.assertIn("- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable]", issue_template)
         self.assertIn("- workspace_child_source_refs: [complete repo-to-Feature-Spec-ref mapping", issue_template)
-        self.assertIn("- pr_shape: [verified `pr_shape` row value]", issue_template)
+        self.assertIn("- pull_request_count_strategy: [verified `pull_request_count_strategy` row value]", issue_template)
         self.assertIn("sole owner of delivery, scheduling, closeout", issue_template)
         self.assertIn("without resolving or defaulting them here", issue_template)
         for duplicated_schema in (
             "[pull-request | direct-commit]",
-            "[single-pr | per-repo-pr | none]",
+            "[one-pull-request-total | one-pull-request-per-repository | none]",
             "[merge-ready | draft-only | not-applicable]",
             "[independent | depends-on | blocks | root-integrated]",
         ):
             self.assertNotIn(duplicated_schema, issue_template)
         self.assertIn(
-            "- issue_project_topology: [same issue-effective value as `## Delivery`]",
+            "- issue_repository_layout: [same issue-effective value as `## Delivery`]",
             issue_template,
         )
         self.assertIn(
-            "- pr_shape: [same effective value as `## Delivery`]",
+            "- pull_request_count_strategy: [same effective value as `## Delivery`]",
+            issue_template,
+        )
+        self.assertIn(
+            "- change_delivery_permission_evidence: [same evidence as `## Delivery`]",
             issue_template,
         )
         self.assertIn("## Orchestrator Handoff", issue_template)
         self.assertIn("## Domain Knowledge Closeout", issue_template)
-        self.assertIn("Do not include worker authorization modes", issue_template)
+        self.assertIn("Do not include worker action grants", issue_template)
         self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_template)
         self.assertIn("source_spec_ref: [path, issue number, or stable draft ref;", issue_template)
         self.assertIn("draft refs are valid", issue_template)
@@ -823,22 +947,19 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("orchestrator closeout", vertical_slices)
         self.assertIn("## Orchestrator Handoff", vertical_slices)
         self.assertIn("draft-spec:<...>", spec_delivery)
-        self.assertIn("canonical issue-level dispatch contract", spec_delivery)
-        self.assertIn("`delivery_source_evidence`", spec_delivery)
-        self.assertIn("resolved per workstream", spec_delivery)
-        self.assertIn("source lifecycle and closeout mutations are orchestrator-owned", spec_delivery)
-        self.assertIn(
-            "expected branches and real PR links replace Feature Spec placeholders",
-            spec_delivery,
-        )
-        self.assertIn("direct-commit` proves delivery", spec_delivery)
-        self.assertIn("issues/done/", spec_delivery)
+        self.assertIn("A generated issue's `## Orchestrator Handoff` must contain", spec_delivery)
+        self.assertIn("`delivery_decision_origin_evidence`", spec_delivery)
+        self.assertIn("for the exact workstream", spec_delivery)
+        self.assertIn("The root owns target selection, delivery permission", spec_delivery)
+        self.assertIn("Real PR refs replace placeholders before completion", spec_delivery)
+        self.assertIn("Named remote branch contains the validated commit", spec_delivery)
+        self.assertIn("Local Markdown issues use `move-local-issue-to-done-after-proof`", spec_delivery)
         self.assertIn("Validation Commands", issue_phase)
         self.assertIn("equivalent fallback", issue_phase)
-        self.assertIn("local-done-move-after-proof", options)
-        self.assertIn("- closeout_mode: [verified `closeout_mode` row value]", issue_template)
+        self.assertIn("move-local-issue-to-done-after-proof", options)
+        self.assertIn("- issue_completion_method: [verified `issue_completion_method` row value]", issue_template)
         self.assertIn("Fallback:", issue_template)
-        self.assertIn("commit/proof is recorded", issue_template)
+        self.assertIn("non-uncommitted delivery target has live proof", issue_template)
 
     def test_plan_feature_defers_domain_capture_to_final_integration_task(self) -> None:
         plan_feature = read("plan-feature/SKILL.md")
@@ -1084,8 +1205,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
 
         self.assertIn("authorization_resolution: per-workstream", ledger_template)
         self.assertIn("per workstream and session", worker)
-        self.assertIn("The root resolves worker authorization per workstream", orchestrator)
-        self.assertIn("worker_authorization:", worker)
+        self.assertIn("The root resolves `worker_allowed_actions` per workstream", orchestrator)
+        self.assertIn("worker_allowed_actions:", worker)
         self.assertIn("Worker evidence", ledger_template)
         self.assertIn("Worker evidence", worker)
         self.assertIn(

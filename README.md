@@ -57,7 +57,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
-| `codex-orchestrator` | Explicitly coordinate source graphs, workers, gates, ledgers, and authorized merge-ready closeout. |
+| `codex-orchestrator` | Explicitly coordinate source graphs, workers, gates, ledgers, and authorized delivery closeout. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |

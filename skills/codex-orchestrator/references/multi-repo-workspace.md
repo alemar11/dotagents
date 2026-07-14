@@ -1,8 +1,8 @@
 # Multi-Repo Workspace Flow
 
-Load this reference only when `project_topology=multi-repo-workspace` or a
-registered source/handoff has `workspace_context=multi-repo-workspace`.
-Do not load it for ordinary `single-repo` or `monorepo` work.
+Load this reference only when `repository_layout=multi-repository-workspace` or a
+registered source/handoff has `workspace_context=multi-repository-workspace`.
+Do not load it for ordinary `single-repository` or `monorepo` work.
 
 ## Ownership Model
 
@@ -41,11 +41,13 @@ branch, and project memory. Worker implementation runs in the helper worktree.
 
 Execution ordering is derived, not separately configured:
 
-- Default behavior is `delegation_mode=auto` plus graph-shaped waves.
+- Default behavior is `work_delegation_policy=orchestrator-decides-for-each-implementation-workstream` plus graph-shaped waves.
 - A serial owner request means dispatch one workstream at a time, or use
-  `delegation_mode=disabled` when worker separation is unnecessary.
-- A parallel owner request means use existing bounded delegation, worker
-  limits, App-thread consent, and graph-shaped waves.
+  `work_delegation_policy=run-all-work-in-current-orchestrator-session` when worker separation is unnecessary.
+- A parallel authorized-user request means apply the resolved
+  `work_delegation_policy`, `max_concurrent_delegated_workers`,
+  `visible_app_task_permission`, and `max_visible_app_tasks` values to
+  graph-shaped waves.
 - Dependencies, dirty worktrees, overlapping path sets, missing authority, and
   repo/branch/worktree conflicts override requested parallelism.
 

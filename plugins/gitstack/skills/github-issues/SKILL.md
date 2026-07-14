@@ -55,9 +55,9 @@ This skill only handles GitHub Issues.
 - Treat direct user instructions such as create, publish, or open the issue as
   mutation authority for the requested GitHub issue operation unless the same
   request explicitly says dry run, draft only, local only, or do not mutate.
-- Normalize those phrases once to `mutation_mode=apply|dry-run`, and resolve
-  one canonical `issue_operation` from the shared option registry. Resolve
-  compact and legacy tracker policy through `references/workflows.md`.
+- Resolve those phrases to `mutation_mode=apply|dry-run` and one canonical
+  `issue_operation` from the shared option registry. Reject noncanonical
+  structured tracker policy.
 - Do not create new label taxonomy unless the repo's tracker configuration or
   user explicitly asks for it.
 
@@ -67,9 +67,8 @@ This skill only handles GitHub Issues.
    - current checkout repo,
    - explicit `--repo <owner>/<repo>`,
    - or a target repository supplied by the user or calling workflow.
-2. Resolve `mutation_mode` from the user request or calling workflow handoff,
-   using `references/workflows.md` for legacy tracker fields. Default to
-   `dry-run` when mutation authority is absent.
+2. Resolve `mutation_mode` from the user request or canonical calling workflow
+   handoff. Default to `dry-run` when mutation authority is absent.
 3. If `mutation_mode=dry-run`, return draft issue bodies and exact `gh`
    commands without mutating GitHub.
 4. If the evidence requires a user decision before publishing, ask, then store

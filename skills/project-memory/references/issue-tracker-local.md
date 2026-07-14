@@ -9,10 +9,10 @@ files under each `planning/features/<feature-slug>/` subtree. The
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
 | `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs and implementation issues are written as local Markdown files. |
-| `delivery_mode` | enum | `pull-request` | `pull-request`, `direct-commit` | Implementation publishes from a feature branch and opens a PR. In multi-repo work, every involved repo uses the same branch name and opens its own PR. |
+| `change_delivery_target` | enum | `pull-request-ready-for-merge-but-not-merged` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | Exact implementation stopping point. Merge is never implied. |
 
-Durable local tracker artifacts must not live under `planning/tmp/`,
-legacy `.scratch/`, or `project-memory/features/`. Keep `project-memory/` for
+Durable local tracker artifacts must live under `planning/features/`, not
+`planning/tmp/`, `.scratch/`, or `project-memory/features/`. Keep `project-memory/` for
 routing, domain, and ADR memory. Keep `planning/tmp/` for dry-run output,
 rehearsal files, temporary body files, fingerprints, and comparison snapshots
 that are safe to delete after the run.
@@ -48,9 +48,8 @@ durable issue-tracker configuration.
 - Comments and conversation history append under a `## Comments` heading
 - `$plan-feature` owns Feature Spec and generated issue body shape, including
   `source_spec_ref`, delivery metadata, partial Feature Spec links, and issue graph
-  validation. `Type:`, `Status:`, and `State:` are read-only legacy aliases until
-  an authorized issue mutation normalizes them; retired source-reference labels
-  are not read aliases.
+  validation. Local issue metadata must use canonical `issue_type`,
+  `workflow_state`, and `source_spec_ref` fields.
 - In multi-context repos or monorepos, feature slugs must include the accepted
   product or workspace slug when needed to avoid collisions, for example
   `customer-portal-weekly-digest` instead of `weekly-digest`.
@@ -59,35 +58,39 @@ durable issue-tracker configuration.
 
 ## Delivery Defaults
 
-- Default `delivery_mode`: `pull-request`.
-- Branch naming: for `delivery_mode=pull-request`, default to
-  `feature/<feature-slug>`. For `delivery_mode=direct-commit`, use the exact
-  target branch carried by the scoped owner evidence.
+- Default `change_delivery_target`:
+  `pull-request-ready-for-merge-but-not-merged`.
+- Branch naming: for either pull-request target, default to
+  `feature/<feature-slug>`. Commit-only and push-without-PR targets use the exact
+  branch carried by scoped authorized-user evidence.
 - PR shape: one draft PR for a single repo or monorepo feature when the work is
   later published. In multi-repo work, every involved repo uses the same branch
   name and opens its own PR. Local issue files are scheduling units and move to
   `issues/done/` only after validation and the configured proof are complete.
-- Direct-commit shape: `direct-commit` is delivery proof, not the local issue
-  lifecycle. Implement on the current branch, validate, commit, record the
-  commit/proof in the issue or ledger, then move the local issue file to
+- Commit-only shape: `local-commit-created-without-pushing` is delivery proof,
+  not the local issue lifecycle. Implement on the named branch, validate,
+  commit without pushing, record proof, then move the local issue to
+  `issues/done/`.
+- Push-without-PR shape:
+  `changes-pushed-to-target-branch-without-pull-request` validates, commits,
+  pushes the named branch, records proof, then moves the local issue to
   `issues/done/`.
 - Multi-repo Feature Spec shape: use a single Feature Spec only when that is the accepted
   planning source. Otherwise use linked repo-scoped partial Feature Specs or generated
   issue files; each one names its affected repo and links the siblings that
   define the same feature. A global Feature Spec is not required as durable setup
   configuration.
-- Exceptions: `delivery_mode=direct-commit` requires
-  `source=owner-instruction` plus exact feature-scope and target-branch
+- Exceptions: either non-PR target requires
+  `source=authorized-user-instruction` plus exact feature-scope and target-branch
   evidence, or a `source-spec` row preserving that evidence.
-- Local issue completion uses `issue_mutation_authority=none`; delivery proof
+- Local issue completion uses `issue_update_permission=no-issue-changes`;
+  delivery proof
   never grants a hosted-style final-commit closure.
 
 ## Runtime Boundary
 
-- Tracker setup records artifact routing, delivery-mode defaults, and closeout
+- Tracker setup records artifact routing, delivery-target defaults, and closeout
   conventions only.
-- If an existing setup file contains the legacy worker-authorization setup key,
-  treat it as stale state and remove it when touching the file.
 
 Implementation issues created from a Feature Spec usually use `issue_type: task`. Feature Spec
 files do not need `issue_type:` or `workflow_state:` lines unless the repo
@@ -101,11 +104,12 @@ When all acceptance criteria pass and validation is complete, move the issue
 file from `planning/features/<feature-slug>/issues/<NN>-<slug>.md` to
 `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`.
 
-For `delivery_mode: direct-commit`, commit on the authorized current branch and
-record the commit/proof before moving the issue file. Use
-`local-done-move-after-proof` as the local markdown closeout mode even when the
-delivery mode is `direct-commit`; `direct-commit-closes-issue` is not a local
-markdown lifecycle signal.
+For `change_delivery_target: local-commit-created-without-pushing`, commit on
+the authorized branch without pushing and record proof before moving the issue
+file. For `changes-pushed-to-target-branch-without-pull-request`, additionally
+record remote-branch proof. Use
+`issue_completion_method=move-local-issue-to-done-after-proof` for both; a
+hosted final-commit closing keyword is not a local Markdown lifecycle signal.
 
 Do not delete completed issue files. Do not add a `done` status; the
 `done/` folder is the completion signal, while `workflow_state:` remains the
@@ -120,7 +124,7 @@ Create or update the durable Feature Spec or issue file under
 `effective_target=local-dry-run`, return bodies and either the would-be durable
 target path or a clearly temporary `planning/tmp/<feature-slug>/...` draft
 path without writing local tracker files. Never use a `planning/tmp/` or
-legacy `.scratch/` path as a durable `source_spec_ref` or `ready-for-agent`
+`.scratch/` path as a durable `source_spec_ref` or `ready-for-agent`
 issue location.
 
 ## When a skill says "fetch the relevant issue"

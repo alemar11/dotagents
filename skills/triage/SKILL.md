@@ -227,9 +227,8 @@ For local markdown:
 - Insert or update the `issue_type:` line.
 - Insert or update the `workflow_state:` line.
 - Preserve or add `source_spec_ref:` as reference data.
-- Read legacy `Type:`, `Status:`, and `State:` aliases, but
-  apply the header scope and precedence in `references/options.md`; normalize
-  them to current fields only during an authorized issue mutation.
+- Reject aliases and conflicting duplicate canonical fields according to
+  `references/options.md`.
 - Append triage notes, questions, decisions, or the agent brief under the
   headings in `references/local-markdown.md`.
 - Preserve orchestrator workspace fields such as affected repos, integration
@@ -251,7 +250,7 @@ Return:
 
 ## References
 
-- `references/options.md`: canonical classification fields and local legacy
-  normalization.
+- `references/options.md`: canonical classification fields and local metadata
+  validation.
 - `references/agent-brief.md`: template for `ready-for-agent` handoff notes.
 - `references/local-markdown.md`: local markdown issue format and update rules.

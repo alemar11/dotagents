@@ -1,33 +1,34 @@
 # Codex Review And Parent Closeout
 
-Load this reference only when `delivery_mode=pull-request` and
-`pr_closeout=merge-ready`. `gates.md` owns this route and all gate selection;
+Load this reference only when
+`change_delivery_target=pull-request-ready-for-merge-but-not-merged`.
+`gates.md` owns this route and all gate selection;
 this file owns the resulting current-head review, wait, feedback disposition,
 parent Feature Spec closeout, watch, and post-merge algorithm.
 
 ## Codex PR Review Gate
 
-For `pull-request` delivery with `pr_closeout=merge-ready`, resolve
-`codex_review_policy` per workstream before declaring the PR merge-ready or the
-workstream complete. The default `required` value requires a verified terminal
-Codex result for the current head. An exact scoped owner instruction may select
-`skip`; that bypasses only the Codex request and wait, not local `$autoreview`,
+For `pull-request-ready-for-merge-but-not-merged`, resolve
+`codex_review_requirement` per workstream before declaring the PR merge-ready or the
+workstream complete. The default
+`required-on-current-pull-request-head` value requires a verified terminal
+Codex result for the current head. An exact scoped authorized-user instruction
+may select `explicitly-skipped-by-authorized-user`; that bypasses only the Codex request and wait, not local `$autoreview`,
 CI, validation, Feature Spec acceptance, integration, domain closeout, or parent-closeout
-head checks. For `pr_closeout=draft-only`, record the policy and this gate as
-`not-applicable` with the explicit user instruction or structured Feature Spec field. If
-that restriction is removed, resume this sequence at ready-for-review with the
-newly resolved review policy.
+head checks. Other delivery targets never load this reference.
 
-When `codex_review_policy=skip`:
+When `codex_review_requirement=explicitly-skipped-by-authorized-user`:
 
-1. Record the exact owner instruction and its `owner-ref`, workstream
-   `scope-ref`, and workstream `target-ref` in `## Option Resolution`, with both
+1. Record the exact authorized-user instruction as
+   `permission-source-ref=authorized-user:<instruction-ref>`, plus workstream
+   `scope-ref` and workstream `target-ref` in `## Option Resolution`, with both
    scoped refs equal to the current workstream. Record `pr-ref=not-applicable`
    for a workstream-scoped instruction. For a PR-scoped instruction, preserve
    its immutable canonical `<owner>/<repo>#<number>` as `pr-ref`, resolve it to
    every current workstream mapped to that PR, and require it to equal each
-   refreshed `current_pr_ref` before every skip-path action. If the live PR
-   changes, invalidate the skip row and reset the policy to `required` unless
+   refreshed `target_pull_request_ref` before every skip-path action. If the live PR
+   changes, invalidate the skip row and reset the policy to
+   `required-on-current-pull-request-head` unless
    the owner provides a new exact instruction.
 2. Mark the PR ready after local gates pass, but do not post `@codex review`, run
    a wait, poll an active request, or treat review unavailability as a blocker.
@@ -67,7 +68,7 @@ disposition.
 
 ### Codex Review Request Matrix
 
-When `codex_review_policy=required`, run this preflight before every
+When `codex_review_requirement=required-on-current-pull-request-head`, run this preflight before every
 `@codex review` mutation:
 
 | Status or evidence | Required freshness | Required action | May post another request? | Ledger consequence |
@@ -92,7 +93,7 @@ retry instructions cannot override unchanged-head idempotency.
 
 ### Codex Review Wait Budget
 
-For `codex_review_policy=required`, use only a 15-minute standard or 30-minute
+For `codex_review_requirement=required-on-current-pull-request-head`, use only a 15-minute standard or 30-minute
 extended total active-wait budget per PR head. These budgets are timeout
 deadlines for bounded `reviews wait`, not polling intervals, and are derived
 runtime state rather than selectable options. The ledger's
@@ -151,7 +152,7 @@ are projections and must never initialize or extend an independent window.
    is never completion evidence; only an unpollable check, provider error, or
    missing required access may become blocked.
 
-For `codex_review_policy=skip` or an otherwise inapplicable review gate, record
+For `codex_review_requirement=explicitly-skipped-by-authorized-user` or an otherwise inapplicable review gate, record
 the wait-profile PR identity, profile, budget, timestamps, elapsed time, and state as
 `not-applicable`; do not start or resume a waiter.
 
@@ -162,26 +163,27 @@ the wait-profile PR identity, profile, budget, timestamps, elapsed time, and sta
    contains the parent Feature Spec closing keyword while parent closeout is not `armed`
    with the same closeout-qualified SHA and recorded PR-body evidence, the root
    must remove it or replace it with a non-closing reference and record
-   `pending-review` for `required` or `pending-closeout` for `skip`. If the
+   `pending-review` for `required-on-current-pull-request-head` or
+   `pending-closeout` for `explicitly-skipped-by-authorized-user`. If the
    authorized root cannot disarm it, record `blocked` and stop before
    merge-ready. A pre-existing keyword is never proof that the root's post-gate
    mutation occurred.
 3. If the PR is still draft, mark it ready for review with `gh pr ready <pr>`
    or an equivalent authorized GitHub action, then record the non-draft state.
-4. When `codex_review_policy=required`, run GitStack
+4. When `codex_review_requirement=required-on-current-pull-request-head`, run GitStack
    using the exact `reviews check` command above with the current head. Apply
    the returned status and the matrix before posting anything. Use an
    authenticated connector read only for supplemental terminal-comment
-   evidence or the documented checker fallback. For `skip`, record this step as
+   evidence or the documented checker fallback. For an explicit skip, record this step as
    `not-applicable` and continue to feedback disposition without checking or
    polling review status.
-5. Only when `codex_review_policy=required` and the matrix permits it,
+5. Only when `codex_review_requirement=required-on-current-pull-request-head` and the matrix permits it,
    immediately re-read the PR head and verify
    it still equals the checked SHA and the ledger has no request object for that
    SHA. Then post exactly one top-level PR comment. The official trigger is
    exactly `@codex review`; name the current head and add a short focus only when
    useful. Record the request object and head before any other action.
-6. When `codex_review_policy=required`, run bounded GitStack
+6. When `codex_review_requirement=required-on-current-pull-request-head`, run bounded GitStack
    `reviews wait` against the same head using the Codex Review
    Wait Budget contract above. Reuse the request across `acknowledged`,
    `pending`, and timeouts; never post another request merely because the wait
@@ -192,16 +194,16 @@ the wait-profile PR identity, profile, budget, timestamps, elapsed time, and sta
    it remains pollable, not as blocked. For `skip`, record this step as
    `not-applicable` and do not wait.
 7. Evaluate the feedback required by the resolved policy: all current-head Codex
-   feedback for `required`, or only already-known actionable Codex feedback for
-   `skip`. Fix accepted actionable findings, rerun the relevant tests,
+   feedback for the required path, or only already-known actionable Codex
+   feedback for the explicit-skip path. Fix accepted actionable findings, rerun the relevant tests,
    `$autoreview`, CI, and review-thread checks, then push the update. For
-   `required`, run the request matrix for the new head when the diff materially
-   changed; for `skip`, revalidate the new head without requesting review.
+   the required path, run the request matrix for the new head when the diff materially
+   changed; for the explicit-skip path, revalidate the new head without requesting review.
 8. For findings judged non-actionable, not applicable, or intentionally
    deferred, post a PR discussion update with the disposition, evidence, and
    validation so the discussion is not left silent. Merge-ready Feature Spec-backed
-   publication authority covers this disposition mutation for both `required`
-   and `skip`; otherwise require separate comment authority or record the
+   delivery permission covers this disposition mutation for both review paths;
+   otherwise require separate comment permission or record the
    disposition only in the ledger and keep external comment mutation pending.
    If Codex reports no
    findings, or every finding is fully addressed by commits plus validation,
@@ -212,14 +214,14 @@ Use this closeout state order for merge-ready PR work:
 
 1. `draft-pr-published`
 2. `ready-for-review`
-3. `codex-review-policy-resolved` (`required` or owner-scoped `skip`)
-4. `current-head-review-preflight` (`required`) or `not-applicable` (`skip`)
-5. `codex-review-requested-or-reused` (`required`) or `not-applicable` (`skip`)
-6. `current-head-terminal-result-received` (`required`) or `not-applicable` (`skip`)
+3. `codex-review-policy-resolved` (required or explicitly skipped)
+4. `current-head-review-preflight` (required path) or `not-applicable` (skip path)
+5. `codex-review-requested-or-reused` (required path) or `not-applicable` (skip path)
+6. `current-head-terminal-result-received` (required path) or `not-applicable` (skip path)
 7. `known-review-feedback-dispositioned` (required feedback, already-known skipped feedback, or `not-applicable`)
 8. `fixes-validated-and-pushed`
 9. `post-fix-ci-current`
-10. `closeout-head-current` (reviewed SHA for `required`; fully validated current SHA for `skip`)
+10. `closeout-head-current` (reviewed SHA for the required path; fully validated current SHA for the skip path)
 11. `parent-spec-closeout-resolved` (`armed`, `deferred-to-default-branch`, or `not-applicable`)
 12. `post-closeout-head-current` (`pass` for `armed`; otherwise `not-applicable` with reason)
 13. `parent-closeout-watch-established` (`root-monitoring`, `owner-handoff`, `automation-handoff`, or `not-applicable`)
@@ -232,13 +234,13 @@ publication checkout, a fix is committed but unpushed, checks are pending for
 the pushed fix, a policy-required fresh current-head Codex result is pending
 after a material diff change, or known PR review threads remain unresolved
 without an explicit disposition. Poll an existing current-head request instead
-of posting again only when `codex_review_policy=required`.
+of posting again only when `codex_review_requirement=required-on-current-pull-request-head`.
 
-For `codex_review_policy=required`, this gate passes only when the PR is
+For `codex_review_requirement=required-on-current-pull-request-head`, this gate passes only when the PR is
 non-draft, a verified terminal Codex result exists for the current PR head,
 actionable feedback is fixed or explicitly dispositioned, and the PR discussion
 was updated or explicitly marked `no-update-needed`. For
-`codex_review_policy=skip`, it passes when the PR is non-draft, scoped owner
+`codex_review_requirement=explicitly-skipped-by-authorized-user`, it passes when the PR is non-draft, scoped owner
 evidence is recorded, no request/wait remains actionable, and any already-known
 actionable feedback is fixed or explicitly dispositioned. In both paths, no
 required check may block human merge. Neither path authorizes merging the PR.
@@ -266,8 +268,8 @@ PRs, local-tracker PRs, and workstreams without a parent GitHub Feature Spec, re
 parent closeout as `not-applicable` and continue.
 
 Immediately before the root updates the PR body, re-read the PR head and require
-it to equal the closeout-qualified SHA: the reviewed SHA for `required`, or the
-fully validated current SHA for `skip`; also re-read the current default branch and
+it to equal the closeout-qualified SHA: the reviewed SHA for the required path,
+or the fully validated current SHA for the skip path; also re-read the current default branch and
 require the PR base to match it. Re-read the head, current default branch, PR
 base, and current PR body after the body update and immediately before the
 merge-ready report. Require the live body or its fingerprint to match the
@@ -275,7 +277,8 @@ recorded closeout evidence and contain exactly the intended parent closer. If
 the head differs, do not add the parent keyword, or remove/replace an
 already-added parent closing keyword with a non-closing reference, set
 `parent_spec_closeout=pending-review` and return to current-head review preflight
-for `required`; for `skip`, set `parent_spec_closeout=pending-closeout`, rerun the
+for the required path; for the skip path, set
+`parent_spec_closeout=pending-closeout`, rerun the
 affected validation and current CI for the new head, and do not request review.
 If the default branch or PR base no longer matches, disarm the keyword
 and record `deferred-to-default-branch` until a linked default-branch closeout
@@ -290,20 +293,20 @@ closeout-vehicle cycle.
 releasing the active root, establish exactly one parent closeout watch:
 
 - `root-monitoring`: use only when
-  `merge_authority=explicit-owner-authorization` and the root is the designated
+  `pull_request_merge_permission=granted-for-named-pull-request` and the root is the designated
   merger. Keep the root claim active through the root-controlled merge and
   actual Feature Spec closure check. Immediately before merge, re-read the PR head, base,
   current default branch, and live body fingerprint; on any mismatch disarm the
   parent closer and stop the merge for the matching review/revalidation or
   closeout cycle;
-- `owner-handoff`: required when `merge_authority=none` or another actor will
+- `owner-handoff`: required when `pull_request_merge_permission=not-granted` or another actor will
   merge. Move the unmerged parent closeout to `needs-owner`, keep the ledger
   `paused`, and record an owner-visible handoff that requires rechecking the PR
   head, base, current default branch, and body fingerprint immediately before
   merge; on any mismatch the owner must not merge and must return the work to
   the orchestrator for policy-specific disarm and review/revalidation;
 - `automation-handoff`: use only when the matching scoped row is
-  `automation_authority=explicit-owner-authorization` for a real event-driven
+  `scheduled_automation_change_permission=granted-by-authorized-user` for a real event-driven
   monitor that can observe head, base/default-branch, and PR-body
   mutations before merge, block the merge or disarm the closer on mismatch, and
   verify post-merge issue state. Record its id, event triggers, last successful
@@ -323,4 +326,4 @@ After merge, verify that the merged head/base and closing keyword still match
 the armed evidence and that GitHub actually closed the parent Feature Spec. Only then set
 the watch to `complete` and parent closeout to `closed`. If the PR merged but the issue
 remains open, record `needs-owner`; direct closure still requires
-`explicit-direct-mutation`.
+`direct-issue-updates-explicitly-authorized`.

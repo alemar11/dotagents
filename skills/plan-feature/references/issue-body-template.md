@@ -24,7 +24,7 @@ only in non-mutating output before hosted mutation]
 Affected Repos: [issue-local target repo slugs for workspace issues; otherwise omit]
 
 Product Scope: [for monorepos, workspace path and selected context file; for
-single-repo issues, `current repository`; for workspace issues, use
+single-repository issues, `current repository`; for workspace issues, use
 `Affected Repos`]
 
 ## Option Resolution
@@ -34,48 +34,51 @@ below]
 
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
-| `issue:<NN>:<field>` | `issue:<NN>` | [Per-Issue Registry field or `branch_name`] | [verified value or data] | [verified canonical source] | [verified portable evidence or `none` only when allowed] |
+| `issue:<NN>:<field>` | `issue:<NN>` | [Per-Issue Registry field or `target_branch_name`] | [verified value or data] | [verified canonical source] | [verified portable evidence or `none` only when allowed] |
 
 Expand the row above into exactly one row for every Per-Issue Registry field
-plus the issue-effective `branch_name` row. Preserve the verified six-column
+plus the issue-effective `target_branch_name` row. Preserve the verified six-column
 cells; do not infer or omit row metadata here.
 
 ## Delivery
 
-- delivery_mode: [verified `delivery_mode` row value]
-- delivery_source: [verified `delivery_source` row value]
-- delivery_source_evidence: [verified delivery evidence data]
-- project_topology: [same feature/workspace graph value as the source Feature Spec]
-- issue_project_topology: [verified `issue_project_topology` row value]
-- issue_mutation_authority: [verified `issue_mutation_authority` row value]
-- issue_mutation_authority_evidence: [verified independent mutation evidence data]
-- branch_name: [verified exact branch data]
-- pr_shape: [verified `pr_shape` row value]
-- pr_closeout: [verified `pr_closeout` row value]
+- change_delivery_target: [verified `change_delivery_target` row value]
+- change_delivery_permission: [verified `change_delivery_permission` row value]
+- change_delivery_permission_evidence: [verified permission-source, scope, target, branch, and transfer evidence]
+- delivery_decision_origin: [verified `delivery_decision_origin` row value]
+- delivery_decision_origin_evidence: [verified delivery evidence data]
+- repository_layout: [same feature/workspace graph value as the source Feature Spec]
+- issue_repository_layout: [verified `issue_repository_layout` row value]
+- issue_update_permission: [verified `issue_update_permission` row value]
+- issue_update_permission_evidence: [verified independent mutation evidence data]
+- codex_review_requirement: [verified `codex_review_requirement` row value]
+- target_branch_name: [verified exact branch data]
+- pull_request_count_strategy: [verified `pull_request_count_strategy` row value]
 - parallelization: [verified `parallelization` row value]
 - dependency_ids: [issue ids or none]
 - blocked_issue_ids: [issue ids or none]
-- closeout_mode: [verified `closeout_mode` row value]
-- integration_mode: [verified `integration_mode` row value]
+- issue_completion_method: [verified `issue_completion_method` row value]
 
 ## Orchestrator Handoff
 
 - source_spec_ref: [same value as the header `source_spec_ref` line]
 - feature_slug: [authoritative lowercase feature slug]
-- delivery_mode: [same effective value as `## Delivery`]
-- delivery_source: [same canonical value as `## Delivery`]
-- delivery_source_evidence: [same evidence as `## Delivery`]
-- project_topology: [same feature/workspace graph value as the source Feature Spec]
-- issue_project_topology: [same issue-effective value as `## Delivery`]
-- workspace_context: [multi-repo-workspace or not-applicable]
+- change_delivery_target: [same effective value as `## Delivery`]
+- change_delivery_permission: [same effective value as `## Delivery`]
+- change_delivery_permission_evidence: [same evidence as `## Delivery`]
+- delivery_decision_origin: [same canonical value as `## Delivery`]
+- delivery_decision_origin_evidence: [same evidence as `## Delivery`]
+- repository_layout: [same feature/workspace graph value as the source Feature Spec]
+- issue_repository_layout: [same issue-effective value as `## Delivery`]
+- workspace_context: [multi-repository-workspace or not-applicable]
 - workspace_parent_source_ref: [parent/global Feature Spec ref or not-applicable]
 - workspace_feature_repos: [complete feature-wide repo slug set or not-applicable]
 - workspace_child_source_refs: [complete repo-to-Feature-Spec-ref mapping for `workspace_feature_repos`, or not-applicable]
-- issue_mutation_authority: [same effective value as `## Delivery`]
-- issue_mutation_authority_evidence: [same evidence as `## Delivery`]
-- branch_name: [same effective branch data as `## Delivery`]
-- pr_shape: [same effective value as `## Delivery`]
-- pr_closeout: [same effective value as `## Delivery`]
+- issue_update_permission: [same effective value as `## Delivery`]
+- issue_update_permission_evidence: [same evidence as `## Delivery`]
+- codex_review_requirement: [same effective value as `## Delivery`]
+- target_branch_name: [same effective branch data as `## Delivery`]
+- pull_request_count_strategy: [same effective value as `## Delivery`]
 - affected_repos_or_product_scope: [repo slugs, workspace path, or current
   repository]
 - scope:
@@ -90,12 +93,11 @@ cells; do not infer or omit row metadata here.
   decisions, target surfaces, evidence, `memory_slice=domain-memory`, and
   `domain_operation=implementation-closeout` required by
   `## Domain Knowledge Closeout` below]
-- closeout_mode: [same verified value as `## Delivery`]
-- integration_mode: [same effective value as `## Delivery`]
+- issue_completion_method: [same verified value as `## Delivery`]
 
-Do not include worker authorization modes, worker surfaces, worker counts,
+Do not include worker action grants, worker surfaces, worker counts,
 checkpoint approval, publication authority, or orchestration session settings
-in this section. The source-contract `issue_mutation_authority` does not grant a
+in this section. The source-contract `issue_update_permission` does not grant a
 worker permission; `$codex-orchestrator` validates and projects it after
 registering the issue as a workstream.
 
@@ -178,21 +180,22 @@ sections.]
 When all acceptance criteria pass and validation is complete:
 
 - GitHub: close this implementation issue from the relevant PR body, following
-  `closeout_mode`. Use `Closes #<this-issue-number>` only when the PR lives in the
+  `issue_completion_method`. Use `Closes #<this-issue-number>` only when the PR lives in the
   same GitHub repository as the issue. For orchestrator or cross-repo closeout
   where the PR repository differs from the issue repository, use
   `Closes owner/repo#<this-issue-number>` only when that cross-repo closing path
   is intended and supported; otherwise use non-closing links and record the
   coordination closeout action separately. Final-commit closure requires
-  `closeout_mode=direct-commit-closes-issue`,
-  `issue_mutation_authority=explicit-direct-mutation`, and its exact scoped
+  `issue_completion_method=final-commit-closing-keyword`,
+  `issue_update_permission=direct-issue-updates-explicitly-authorized`, and its exact scoped
   authorization evidence. Do not add the parent Feature Spec closing keyword from an individual child
   issue. For a whole Feature Spec final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
   only after its resolved review policy and all Feature Spec closeout gates pass.
 - Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
-  `issues/done/` on demand after validation and, for `direct-commit`, after the
-  commit/proof is recorded. For orchestrator workspace issues, move it only
+  `issues/done/` on demand after validation and after the selected
+  non-uncommitted delivery target has live proof. For orchestrator workspace
+  issues, move it only
   after cross-repo integration proof is recorded. Do not delete the file or add
   a `done` status.
 

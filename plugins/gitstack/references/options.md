@@ -29,16 +29,17 @@ issue, PR, release, label, or relationship reference in a separate field.
 | `push-only` | `commit_operation=push-only` |
 | `dry run`, `draft only`, `local only`, or `do not mutate` | `mutation_mode=dry-run` |
 | Explicit create, edit, publish, post, close, or reopen instruction for an exact target | `mutation_mode=apply` plus the matching operation |
-| Legacy review state `not_requested` | `review_state=not-requested` |
 
-Normalize legacy or natural-language inputs once. Emit only canonical values.
+Resolve natural-language instructions to canonical values. Structured callers
+must use the registry directly; reject unknown fields or values.
 Factual envelope fields such as `ok: true`, GitHub API fields, CLI flags, and
 other externally owned syntax are not option values and remain unchanged.
 
 ## Caller-owned authorization
 
 GitStack does not own planning or orchestration authority. When Codex
-Orchestrator calls GitHub Review Threads, the accepted current values are
-`publication_authority=spec-backed-pull-request` and
-`publication_authority=explicit-owner-authorization`, scoped to the exact PR
-actions in the handoff. The caller remains the source of truth for that field.
+Orchestrator calls GitHub Review Threads, require
+`change_delivery_permission=granted-for-selected-target`, the exact PR target,
+and the requested operation in `delivery_allowed_actions` or
+`worker_allowed_actions`. The caller remains the source of truth for those
+fields.

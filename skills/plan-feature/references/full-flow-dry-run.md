@@ -23,20 +23,21 @@ no_mutation_output: publish-commands
 local_mirror: not-requested
 local_mirror_path: not-applicable
 partial_output: withhold
-project_topology: single-repo
+repository_layout: single-repository
 workspace_context: not-applicable
 feature_slug: account-settings-export
-delivery_mode: pull-request
-issue_mutation_authority: pr-body-closeout-only
-branch_name: feature/account-settings-export
-pr_closeout: merge-ready
-pr_shape: single-pr
+change_delivery_target: pull-request-ready-for-merge-but-not-merged
+change_delivery_permission: granted-for-selected-target
+issue_update_permission: pull-request-closing-keyword-only
+codex_review_requirement: required-on-current-pull-request-head
+target_branch_name: feature/account-settings-export
+pull_request_count_strategy: one-pull-request-total
 source_spec_ref: draft-spec:account-settings-export
 spec_body_fingerprint: sha256:7f4a9c21d003
 capture_mode: defer-to-caller
 capture_outcome: deferred
 option_resolution: see-canonical-run-option-rows-below
-option_rows_fingerprint: sha256:dbd1e1dfdbc18024f4468d86418c9f3a49dbac310519c2e8c7d19253652b579b
+option_rows_fingerprint: sha256:99f7ff308ad9038ec8a158876a1438758f4c8878c6e424729c0a0bc06abff4a7
 domain_knowledge_delta:
   knowledge_delta: required
   decisions:
@@ -54,22 +55,23 @@ domain_knowledge_delta:
 
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
-| `run:mode` | `run` | `mode` | `full-flow` | `owner-instruction` | `fixture-intent` |
+| `run:mode` | `run` | `mode` | `full-flow` | `authorized-user-instruction` | `fixture-intent` |
 | `run:execution_profile` | `run` | `execution_profile` | `standard` | `default` | `none` |
 | `run:tracker_backend` | `run` | `tracker_backend` | `github` | `tracker-config` | `project-memory/config/issue-tracker.md` |
 | `run:effective_target` | `run` | `effective_target` | `draft-publish-commands` | `runtime-derived` | `run:no_mutation_override+run:no_mutation_output` |
-| `run:no_mutation_override` | `run` | `no_mutation_override` | `dry-run` | `owner-instruction` | `fixture-intent` |
-| `run:no_mutation_output` | `run` | `no_mutation_output` | `publish-commands` | `owner-instruction` | `fixture-intent` |
+| `run:no_mutation_override` | `run` | `no_mutation_override` | `dry-run` | `authorized-user-instruction` | `fixture-intent` |
+| `run:no_mutation_output` | `run` | `no_mutation_output` | `publish-commands` | `authorized-user-instruction` | `fixture-intent` |
 | `run:local_mirror` | `run` | `local_mirror` | `not-requested` | `default` | `none` |
 | `run:local_mirror_path` | `run` | `local_mirror_path` | `not-applicable` | `default` | `none` |
 | `run:partial_output` | `run` | `partial_output` | `withhold` | `default` | `none` |
-| `run:project_topology` | `run` | `project_topology` | `single-repo` | `project-layout-config` | `project-memory/config/project-layout.md` |
+| `run:repository_layout` | `run` | `repository_layout` | `single-repository` | `project-layout-config` | `project-memory/config/project-layout.md` |
 | `run:workspace_context` | `run` | `workspace_context` | `not-applicable` | `default` | `none` |
-| `run:delivery_mode` | `run` | `delivery_mode` | `pull-request` | `default` | `none` |
-| `run:issue_mutation_authority` | `run` | `issue_mutation_authority` | `pr-body-closeout-only` | `runtime-derived` | `run:tracker_backend+run:delivery_mode` |
-| `run:branch_name` | `run` | `branch_name` | `feature/account-settings-export` | `runtime-derived` | `run:delivery_mode+feature_slug` |
-| `run:pr_closeout` | `run` | `pr_closeout` | `merge-ready` | `default` | `run:delivery_mode` |
-| `run:pr_shape` | `run` | `pr_shape` | `single-pr` | `runtime-derived` | `affected_repos=current-repository` |
+| `run:change_delivery_target` | `run` | `change_delivery_target` | `pull-request-ready-for-merge-but-not-merged` | `default` | `none` |
+| `run:change_delivery_permission` | `run` | `change_delivery_permission` | `granted-for-selected-target` | `default` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export` |
+| `run:issue_update_permission` | `run` | `issue_update_permission` | `pull-request-closing-keyword-only` | `default` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export` |
+| `run:codex_review_requirement` | `run` | `codex_review_requirement` | `required-on-current-pull-request-head` | `default` | `run:change_delivery_target` |
+| `run:target_branch_name` | `run` | `target_branch_name` | `feature/account-settings-export` | `runtime-derived` | `run:change_delivery_target+feature_slug` |
+| `run:pull_request_count_strategy` | `run` | `pull_request_count_strategy` | `one-pull-request-total` | `runtime-derived` | `affected_repos=current-repository` |
 
 ## Representative Emitted Issue
 
@@ -85,26 +87,26 @@ source_spec_ref: draft-spec:account-settings-export
 
 ## Option Resolution
 
-issue_option_rows_fingerprint: sha256:b3ad1e12818f12a80d94ed0b67f798b0024b052877540ea4735df169518857e0
+issue_option_rows_fingerprint: sha256:0e11ce282652a7a9f3725fa45a6e30220df157a0d46ee4154cf1d31c57649563
 
 | row_id | scope_id | field | value | source | evidence |
 | --- | --- | --- | --- | --- | --- |
-| `issue:01:delivery_source` | `issue:01` | `delivery_source` | `feature-level-inherited` | `source-spec` | `draft-spec:account-settings-export` |
-| `issue:01:delivery_mode` | `issue:01` | `delivery_mode` | `pull-request` | `source-spec` | `run:delivery_mode` |
-| `issue:01:issue_project_topology` | `issue:01` | `issue_project_topology` | `single-repo` | `source-spec` | `run:project_topology` |
-| `issue:01:issue_mutation_authority` | `issue:01` | `issue_mutation_authority` | `pr-body-closeout-only` | `source-spec` | `run:issue_mutation_authority` |
-| `issue:01:pr_shape` | `issue:01` | `pr_shape` | `single-pr` | `source-spec` | `run:pr_shape` |
-| `issue:01:pr_closeout` | `issue:01` | `pr_closeout` | `merge-ready` | `source-spec` | `run:pr_closeout` |
+| `issue:01:delivery_decision_origin` | `issue:01` | `delivery_decision_origin` | `inherited-from-feature-spec` | `source-spec` | `draft-spec:account-settings-export` |
+| `issue:01:change_delivery_target` | `issue:01` | `change_delivery_target` | `pull-request-ready-for-merge-but-not-merged` | `source-spec` | `run:change_delivery_target` |
+| `issue:01:change_delivery_permission` | `issue:01` | `change_delivery_permission` | `granted-for-selected-target` | `source-spec` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run` |
+| `issue:01:issue_repository_layout` | `issue:01` | `issue_repository_layout` | `single-repository` | `source-spec` | `run:repository_layout` |
+| `issue:01:issue_update_permission` | `issue:01` | `issue_update_permission` | `pull-request-closing-keyword-only` | `source-spec` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run` |
+| `issue:01:codex_review_requirement` | `issue:01` | `codex_review_requirement` | `required-on-current-pull-request-head` | `source-spec` | `run:codex_review_requirement` |
+| `issue:01:pull_request_count_strategy` | `issue:01` | `pull_request_count_strategy` | `one-pull-request-total` | `source-spec` | `run:pull_request_count_strategy` |
 | `issue:01:parallelization` | `issue:01` | `parallelization` | `independent` | `runtime-derived` | `issue-graph:01` |
-| `issue:01:closeout_mode` | `issue:01` | `closeout_mode` | `feature-pr-closes-issue` | `runtime-derived` | `run:tracker_backend+issue:01:pr_shape` |
-| `issue:01:integration_mode` | `issue:01` | `integration_mode` | `single-repo-pr` | `runtime-derived` | `run:delivery_mode+current-repository` |
+| `issue:01:issue_completion_method` | `issue:01` | `issue_completion_method` | `feature-pull-request-closing-keyword` | `runtime-derived` | `run:tracker_backend+issue:01:pull_request_count_strategy` |
 | `issue:01:domain_closeout` | `issue:01` | `domain_closeout` | `implementation-closeout` | `runtime-derived` | `domain_knowledge_delta+issue-graph:01` |
-| `issue:01:branch_name` | `issue:01` | `branch_name` | `feature/account-settings-export` | `source-spec` | `run:branch_name` |
+| `issue:01:target_branch_name` | `issue:01` | `target_branch_name` | `feature/account-settings-export` | `source-spec` | `run:target_branch_name` |
 ```
 
 ## Representative Issue-Phase Handoff
 
-option_rows_fingerprint: sha256:b4b87b07bf9740663e7e661ec08366b39674c8585422122689c6f93428fb3272
+option_rows_fingerprint: sha256:8c03de3025fe18cabf269a8d011da37972cdc54a371c90bc7c7c5986684e48c0
 issue_count: 1
 issue_refs: draft-issue:account-settings-export:01
 
@@ -118,16 +120,18 @@ issue_refs: draft-issue:account-settings-export:01
    `source_spec_ref=draft-spec:account-settings-export`, and
    `spec_body_fingerprint=sha256:7f4a9c21d003`, with
    the structured delivery handoff tuple
-   `delivery_mode=pull-request`,
-   `project_topology=single-repo`,
-   `issue_mutation_authority=pr-body-closeout-only`,
-   `branch_name=feature/account-settings-export`,
-   `pr_closeout=merge-ready`, and `pr_shape=single-pr`. When the delta is
+   `change_delivery_target=pull-request-ready-for-merge-but-not-merged`,
+   `change_delivery_permission=granted-for-selected-target`,
+   `repository_layout=single-repository`,
+   `issue_update_permission=pull-request-closing-keyword-only`,
+   `codex_review_requirement=required-on-current-pull-request-head`,
+   `target_branch_name=feature/account-settings-export`, and
+   `pull_request_count_strategy=one-pull-request-total`. When the delta is
    required, the Feature Spec body carries it under `## Domain Knowledge Handoff`.
 4. The issue phase returns hardened issue bodies plus draft issue publish commands.
    Every issue `## Delivery` and `## Orchestrator Handoff` projection carries
-   `project_topology: single-repo` and
-   `branch_name: feature/account-settings-export`.
+   `repository_layout: single-repository` and
+   `target_branch_name: feature/account-settings-export`.
    Draft issue bodies may contain `source_spec_ref: draft-spec:account-settings-export`
    only because no hosted Feature Spec number exists yet. A required knowledge delta is
    assigned to the last integration task, which depends on every terminal
@@ -190,13 +194,13 @@ issue_refs: draft-issue:account-settings-export:01
 - Draft Feature Specs, generated issues, or draft publish commands include orchestration
   session values such as worker surfaces, worker counts, checkpoint approval,
   or publication authority. The canonical source-contract
-  `issue_mutation_authority` is allowed and must remain independently resolved.
+  `issue_update_permission` is allowed and must remain independently resolved.
 - A phase handoff or generated structured field uses a prose choice, boolean
   option, non-canonical field name, or enum value outside `options.md`.
 - A Feature Spec phase handoff, generated issue `## Delivery`, or generated issue
   `## Orchestrator Handoff` omits
-  `project_topology: single-repo` or
-  `branch_name: feature/account-settings-export`.
+  `repository_layout: single-repository` or
+  `target_branch_name: feature/account-settings-export`.
 - Generated issues use a prose `source_spec_ref` such as the Feature Spec title when a stable
   draft ref is available.
 - A required `domain_knowledge_delta` is omitted, captured during planning, or

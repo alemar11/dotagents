@@ -9,9 +9,8 @@ Grill Me With Context, and planning callers.
 - Option field names use snake_case.
 - Enum values use lower-kebab-case. A one-word lowercase value already
   satisfies this rule.
-- Natural-language requests, positional invocation words, and legacy labels
-  are selection evidence only. Normalize them once and emit only canonical
-  field/value assignments in current handoffs and reports.
+- Natural-language requests and positional invocation words are selection
+  evidence only. Resolve them directly to canonical field/value assignments.
 - Paths, decisions, evidence, refs, reasons, and unresolved questions are data,
   not option values.
 
@@ -24,7 +23,7 @@ Grill Me With Context, and planning callers.
 | `execution_context` | `current-project`, `fresh-setup`, `existing-project-bootstrap`, `orchestrator-workspace` | `current-project` | Describes the evidence and layout context; it does not grant writes. |
 | `write_mode` | `apply`, `propose` | Derived from scoped authority | Inspect-only, review-only, dry-run, and proposal requests select `propose`. |
 | `capture_mode` | `inline`, `defer-to-caller` | `inline` for direct Grill Me With Context invocation | Selects whether the composed grilling workflow may capture now or must return a delta. |
-| `knowledge_delta` | `required`, `none` | Derived from accepted durable knowledge | Replaces the legacy nested `status` field. |
+| `knowledge_delta` | `required`, `none` | Derived from accepted durable knowledge | Whether accepted durable knowledge must be captured. |
 | `capture_outcome` | `captured`, `deferred`, `no-durable-change` | Derived at closeout | Explanations, destinations, and deferral reasons remain separate data. |
 
 `capture_mode`, `knowledge_delta`, and `capture_outcome` apply only to
@@ -49,10 +48,7 @@ omit these fields rather than inventing a `not-applicable` value.
 - `capture_mode=defer-to-caller` permits only `capture_outcome=deferred` or
   `capture_outcome=no-durable-change`.
 
-## Legacy Input Normalization
+## Input Validation
 
-Accept legacy `slice` and `operation` fields as input evidence and normalize
-them to `memory_slice` and `domain_operation`. Accept
-`domain_knowledge_delta.status=required|none` as legacy input and normalize it
-to `domain_knowledge_delta.knowledge_delta`. Do not emit those legacy field
-names in current structured results.
+Structured callers must use the fields and values in this registry. Reject
+unknown fields or values instead of translating them.

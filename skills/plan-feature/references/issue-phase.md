@@ -38,7 +38,7 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 - Do not add worker authorization defaults, worker capability modes, worker
   surfaces or counts, checkpoint approval, publication permission, runtime
   mutation overrides, or other orchestration session settings to planning
-  artifacts. Preserve source-contract `issue_mutation_authority` and its
+  artifacts. Preserve source-contract `issue_update_permission` and its
   evidence as delivery metadata, not worker permission.
 
 ## Boundaries
@@ -59,13 +59,13 @@ Receive the verified run-level `option_resolution` rows and
 `option_rows_fingerprint` defined by `references/options.md`, plus:
 
 - the planning identity (`feature_slug` and any selected `product_slug`,
-  `workspace_path`, `context_file`, `project_slug`, `project_topology`,
-  `repo_project_topology`, `workspace_context`, `workspace_parent_source_ref`,
+  `workspace_path`, `context_file`, `project_slug`, `repository_layout`,
+  `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
   `workspace_feature_repos`, and issue target repos);
 - the resolved `source_spec_ref` and draft fingerprint when applicable;
 - `workspace_child_source_refs`, mapping each feature-wide repo to its
   repo-scoped partial Feature Spec ref when
-  `workspace_context=multi-repo-workspace`. Keys are canonical repo slugs and
+  `workspace_context=multi-repository-workspace`. Keys are canonical repo slugs and
   must match `workspace_feature_repos`; each generated issue's target repos
   must be a non-empty subset of `workspace_feature_repos`;
 - `capture_outcome` and the structured `domain_knowledge_delta`;
@@ -73,7 +73,7 @@ Receive the verified run-level `option_resolution` rows and
 
 Verify the incoming run-row `option_rows_fingerprint` before splitting. Every
 issue adds exactly one row per Per-Issue Registry field plus its effective
-`branch_name` data row. After the issue graph and every `issue:<NN>` row are final, recompute the
+`target_branch_name` data row. After the issue graph and every `issue:<NN>` row are final, recompute the
 fingerprint over the complete run-plus-issue row set and carry that value in the
 phase publication handoff and completion output, not in individual issue
 bodies.
@@ -83,9 +83,9 @@ Validate `capture_outcome=deferred` when
 `capture_outcome=no-durable-change` when `knowledge_delta=none`. Preserve a
 non-empty `unresolved` list independently as planning blockers. For
 `mode=issues-from-existing-spec`, reconstruct the pair from the Feature Spec's canonical
-Domain Knowledge Handoff when the explicit phase handoff is unavailable; a
-legacy Feature Spec with a handoff resolves to `required` plus `deferred`, while no
-handoff resolves to `none` plus `no-durable-change`. Never invent
+Domain Knowledge Handoff when the explicit phase handoff is unavailable; an
+existing canonical Feature Spec with a handoff resolves to `required` plus
+`deferred`, while no handoff resolves to `none` plus `no-durable-change`. Never invent
 `capture_outcome=captured` in Plan Feature.
 
 ## Structured Issue Values
@@ -100,7 +100,8 @@ values.
 Render the validated rows through `references/issue-body-template.md`.
 `issue_type` and `workflow_state` stay canonical in issue bodies;
 `project-memory/config/triage-labels.md` maps them only at the GitHub boundary.
-Normalize touched legacy aliases to the canonical lower-kebab values.
+Reject retired planning aliases before splitting; do not normalize them in the
+issue phase.
 
 ## Workflow
 
@@ -152,21 +153,21 @@ Resolve and carry the planning identity before splitting:
   then title-derived fallback only when no accepted path exists.
 - For multi-context repos or monorepos: `product_slug`, `workspace_path`, and
   `context_file`.
-- `project_topology`: use the Feature Spec handoff value first, then
+- `repository_layout`: use the Feature Spec handoff value first, then
   `project-memory/config/project-layout.md`, then safe repo evidence.
   For a workspace issue graph spanning multiple child partials, the handoff
-  must use `project_topology=multi-repo-workspace` as the workspace graph
+  must use `repository_layout=multi-repository-workspace` as the workspace graph
   snapshot; do not choose one child repo's durable topology as the run-level
   value. Record child repo topology only in each issue's
-  `issue_project_topology` row.
+  `issue_repository_layout` row.
 - `workspace_context`: use the Feature Spec handoff value first; when absent,
-  derive `multi-repo-workspace` from `project_topology=multi-repo-workspace`,
+  derive `multi-repository-workspace` from `repository_layout=multi-repository-workspace`,
   linked repo-scoped partial Feature Spec siblings, or parent/global source
   evidence; otherwise default to `not-applicable`.
 - `workspace_parent_source_ref`: use the Feature Spec handoff value first;
   default to `not-applicable` when absent.
-- For `project_topology=multi-repo-workspace` or
-  `workspace_context=multi-repo-workspace`: `project_slug` or
+- For `repository_layout=multi-repository-workspace` or
+  `workspace_context=multi-repository-workspace`: `project_slug` or
   `workspace_parent_source_ref`, plus affected repos, are required.
 - `source_spec_ref`: use the durable Feature Spec issue number, local Feature Spec path, or stable
   draft ref passed by the Feature Spec phase or existing durable Feature Spec source. In
@@ -183,12 +184,12 @@ Resolve and carry the planning identity before splitting:
   For `draft-publish-commands`, include the replacement step required before
   hosted mutation; for `local-dry-run`, label it non-executable.
 
-Receive the complete verified feature delivery tuple and `branch_name` data
+Receive the complete verified feature delivery tuple and `target_branch_name` data
 from the Feature Spec handoff. Do not infer, default, or reinterpret those fields here.
-When a legacy Feature Spec lacks canonical rows, apply only the one-time legacy
-normalization in `references/options.md`, record the migrated rows and evidence,
-and then continue from that verified snapshot. Missing, contradictory, or
-unauthorized rows block splitting.
+When a Feature Spec lacks canonical rows or contains retired vocabulary, stop
+before splitting. Consume it only after the active artifact is canonical and a
+stale-vocabulary scan is clean.
+Missing, contradictory, or unauthorized rows block splitting.
 
 If a multi-context local Markdown repo lacks an accepted product/context or the
 feature slug can collide with another product according to tracker conventions,
@@ -208,7 +209,7 @@ numbering.
 
 Before hardening, validate the generated issue graph from the proposed issue
 list, carrying the verified feature delivery tuple, including
-the issue-effective `issue_project_topology`, into each issue:
+the issue-effective `issue_repository_layout`, into each issue:
 
 - ordered issue map with `<NN>` and short intent.
 - dependency graph plus `blocks` / `depends-on` intent.
@@ -225,12 +226,12 @@ the issue-effective `issue_project_topology`, into each issue:
 - repo-level boundaries and integration proof requirements for orchestrator
   work.
 - issue-level topology: use the repo-scoped Feature Spec or target repo
-  `repo_project_topology`; for root-owned issues spanning multiple repos, use
-  `multi-repo-workspace` when `workspace_context=multi-repo-workspace`; fall
+  `child_repository_layout`; for root-owned issues spanning multiple repos, use
+  `multi-repository-workspace` when `workspace_context=multi-repository-workspace`; fall
   back to the run-level value only when the issue is neither repo-scoped nor
   workspace-spanning.
-- generated issue bodies keep `project_topology` equal to the source Feature
-  Spec's feature/workspace graph value and emit `issue_project_topology` as the
+- generated issue bodies keep `repository_layout` equal to the source Feature
+  Spec's feature/workspace graph value and emit `issue_repository_layout` as the
   issue-effective workstream topology used by Orchestrator.
 - Treat the issue bodies as the durable ordering contract for scheduling and
   worker-routing. Do not persist a separate scheduling artifact.
@@ -271,12 +272,14 @@ Every issue should:
 - include product/workspace/context scope for monorepo work, or affected repos
   and integration gates for orchestrator work,
 - include a durable `source_spec_ref` pointer, copied feature-level
-  `delivery_mode`, `pr_shape`, issue-level parallelization, dependencies,
+  `change_delivery_target`, `pull_request_count_strategy`, issue-level parallelization, dependencies,
   closeout, and any delivery or integration exception,
 - include a `## Orchestrator Handoff` section that restates the dispatchable
-  source Feature Spec, feature slug, `delivery_mode`, `pr_shape`, affected repos or
-  product scope, scope, start rule, dependencies, validation, closeout, and
-  `integration_mode`,
+  source Feature Spec, feature slug, `change_delivery_target`,
+  `change_delivery_permission`, `change_delivery_permission_evidence`,
+  `codex_review_requirement`,
+  `pull_request_count_strategy`, affected repos or product scope, scope, start
+  rule, dependencies, validation, and closeout,
 - have clear non-goals,
 - include acceptance criteria and validation,
 - list dependencies on earlier issues only when truly needed,
@@ -416,8 +419,8 @@ When GitHub issue types are available, create or update each implementation
 issue with the mapped `task` type, usually `Task`. If issue types are disabled
 or unsupported, publish without a type and keep the mapped state labels.
 
-For orchestrator workspace issues, include `project_topology`,
-`issue_project_topology`, `workspace_context=multi-repo-workspace`,
+For orchestrator workspace issues, include `repository_layout`,
+`issue_repository_layout`, `workspace_context=multi-repository-workspace`,
 `workspace_parent_source_ref` when a parent/global source exists, affected
 repos, cross-repo contract notes, integration gates by name or link, repo-local
 PR or implementation issue links when they exist, expected repo PR slots or
@@ -434,7 +437,7 @@ handoff may repeat structured data from `## Delivery`, `## Validation`,
 without inferring from loose prose. It must not contain worker authorization,
 publication authority, runtime issue-mutation overrides, or orchestration
 session settings. It must carry the independently resolved source-contract
-`issue_mutation_authority` and evidence required by the delivery tuple; those
+`issue_update_permission` and evidence required by the delivery tuple; those
 fields do not authorize a worker.
 
 When a final domain owner exists, publish or write it last, attach it to the
@@ -472,9 +475,9 @@ delivery tuple in this phase.
 Every published or returned issue must state its completion path:
 
 - GitHub: close the implementation issue from the relevant PR body with a
-  closing keyword, following `closeout_mode`. Final-commit closure requires
-  `closeout_mode=direct-commit-closes-issue`,
-  `issue_mutation_authority=explicit-direct-mutation`, and its exact scoped
+  closing keyword, following `issue_completion_method`. Final-commit closure requires
+  `issue_completion_method=final-commit-closing-keyword`,
+  `issue_update_permission=direct-issue-updates-explicitly-authorized`, and its exact scoped
   authorization evidence. Do not add the parent Feature Spec closing keyword from an individual child
   issue. For a whole Feature Spec final feature
   or integration PR, the root delivery orchestrator adds that parent keyword
