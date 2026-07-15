@@ -2,6 +2,6 @@ interface:
   display_name: "Codex Orchestrator"
   short_description: "Explicitly coordinate source graphs, workers, gates, ledgers, and delivery closeout."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $codex-orchestrator only for explicit orchestration. Claim and reconcile the ledger, establish Goal mode or its fallback, route sources, dispatch bounded workers with exact actions, apply root-owned gates, and continue until completion or a real blocker. Feature Spec delivery defaults to pull-request-ready-for-merge-but-not-merged with one verified Codex review per head; an exact authorized-user-scoped workstream may skip that review without skipping other closeout gates. Never merge without separate permission."
+  default_prompt: "Use $codex-orchestrator only for explicit orchestration. Claim and reconcile the ledger, establish Goal mode or its fallback, route sources, dispatch bounded workers with exact actions, and continue until completion or a real blocker. When visible Codex threads are explicitly enabled, create exactly one thread per Feature Spec and keep the root orchestration-only while that thread owns implementation, review polling, fixes, CI, and PR closeout through merge-ready. Feature Spec delivery defaults to pull-request-ready-for-merge-but-not-merged with one verified Codex review per head; an exact authorized-user-scoped workstream may skip that review without skipping other closeout gates. Never merge without separate permission."
 policy:
   allow_implicit_invocation: false

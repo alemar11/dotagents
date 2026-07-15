@@ -166,14 +166,22 @@ For every target except uncommitted changes, a missing delivery grant yields
 
 ### Pull Request Ready For Merge But Not Merged
 
-- Open as draft initially, complete validation and publication safety, then
-  mark ready.
+- Open as draft initially and keep it draft through required current-head Codex
+  review, feedback disposition, fix validation, and current CI. Mark it ready
+  only after that exact head has a verified terminal review with no unresolved
+  actionable feedback, or after an explicit review skip and all remaining gates
+  pass.
 - Apply `codex_review_requirement` to the current PR head.
 - Load `gates.md`; it alone routes current-head Codex review and parent Feature
   Spec closeout through `codex-review-closeout.md`.
 - The Feature Spec source contract may grant commit, push, PR publication,
   mark-ready, review request/poll, required discussion disposition, and parent
   closing-keyword update after gates. It never grants merge.
+- When `visible_app_task_permission=granted-by-authorized-user`, the single
+  visible thread assigned to the Feature Spec must execute all of those actions
+  and every intervening implementation, integration, validation, review, fix,
+  and CI step. The root monitors and steers that thread but must not execute or
+  poll the PR lifecycle itself.
 - A review skip bypasses only request and wait. All other validation,
   discussion, CI, integration, and parent-closeout gates remain.
 
@@ -196,8 +204,10 @@ from the PR's existence.
 - GitHub PR targets use `feature-pull-request-closing-keyword` for one final
   feature PR or `repository-pull-request-closing-keyword` for per-repository
   PRs.
-- The parent Feature Spec closing keyword is root-owned and may be added only
-  after the applicable whole-feature gates pass.
+- The parent Feature Spec closing keyword may be added only after the applicable
+  whole-feature gates pass. In mandatory visible Feature Spec thread mode, the
+  assigned thread owns that pre-merge PR-body mutation; otherwise it remains
+  root-owned.
 - GitHub push-without-PR delivery uses `final-commit-closing-keyword` only with
   its independent issue-update permission.
 - Local Markdown issues use `move-local-issue-to-done-after-proof` after target,
@@ -225,7 +235,10 @@ return `needs-owner` for merge.
 
 1. Read the Feature Spec or issue directly. Reject retired field names or
    values before registration.
-2. Verify the required handoff fields and row fingerprint.
+2. Verify the required handoff fields and row fingerprint. Resolve the exact
+   canonical Feature Spec ref and title from the source, apply the ledger title
+   transport, and persist `feature_spec_ref` plus `feature_spec_title` scoped
+   data; never infer them from generic issue permission transfers.
 3. Verify repository layout and workspace child refs; load
    `multi-repo-workspace.md` when applicable.
 4. Resolve the exact delivery target, permission, origin, branch, PR count,
@@ -261,13 +274,17 @@ closeout as not applicable.
 ## Worker Boundary
 
 The root owns target selection, delivery permission, branch and PR strategy,
-review disposition, source and parent closeout, merge decisions, and final
-status. Workers execute only the canonical actions explicitly listed in their
-prompt.
+merge decisions, ledger state, final source closeout, and final status. Outside
+mandatory visible Feature Spec thread mode, it also owns integration, review
+disposition, and parent-closeout execution. In mandatory mode, the assigned
+thread owns the complete already-decided implementation and pre-merge delivery
+sequence through merge-ready, including all PRs when the Spec spans multiple
+repositories.
 
 Workers never infer permission from the handoff, choose another branch, create
-independent feature PRs, add/remove the parent closing keyword, merge, close
-issues directly, or mutate the ledger.
+independent feature PRs, merge, close issues directly, or mutate the ledger.
+Only the assigned visible Feature Spec thread may add or remove its authorized
+parent closing keyword, disposition its review, and mark its PRs ready.
 
 ## Ad Hoc Sources
 

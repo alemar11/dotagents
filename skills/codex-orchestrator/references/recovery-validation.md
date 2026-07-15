@@ -46,6 +46,11 @@ On resume:
    every status bucket: active `#### <workstream-id>:` headings plus each
    non-active `workstream_id=<stable-id>` prefix. Reject a missing, extra, or
    duplicate workstream checkpoint even when its source checkpoint is present.
+   Re-read each workstream's source/handoff and require its canonical
+   `feature_spec_ref` plus transport-encoded `feature_spec_title` to match the
+   checkpoint and scoped option rows; use `not-applicable` for both on ad-hoc
+   work. Never infer Feature Spec backing from generic delivery- or
+   issue-permission transfer refs.
    For each checkpoint with a non-`not-applicable`
    `delivery_permission_source_issue_ref` or
    `issue_update_permission_source_issue_ref`, re-read that generated issue's
@@ -64,9 +69,41 @@ On resume:
    exact ID set to match the packet. Require every listed `workstream_ids`
    assignment to exist in the authoritative active workstream bucket and to
    match that workstream's `worker=<id>` and `actual_execution_location`
-   evidence. Count `background-codex-subagent` and `visible-codex-app-task`
-   workers against `max_concurrent_delegated_workers`; count only visible App
-   tasks against `max_visible_app_tasks`.
+   evidence. Require explicit visible-App-task permission whenever any active worker uses
+   `visible-codex-app-task`. When that permission is granted, also validate the
+   complete `## Feature Spec Thread Registry`: every implementation-eligible
+   Feature Spec dispatched in the current active wave has exactly one row and
+   one active visible thread; the live
+   thread title equals the exact Feature Spec title after decoding the ledger
+   title transport defined in `ledger-template.md`; every active child
+   workstream, repository, and PR for that Spec maps to that thread; one thread
+   never maps to multiple Specs; and neither root nor a background-only worker
+   owns implementation or review. Reject `root-owned-fallback` for those
+   actions. Thread scheduling is otherwise derived from dependencies and live
+   runtime capacity rather than ledger limits.
+   Require `Next Root Check: action=<value>; target=<value>; due_at=<value>`
+   under Active Root to match the Recovery Packet `next_action`, `next_target`,
+   and `next_due_at` exactly and to satisfy `ledger.md`'s action predicate
+   against the current thread registry.
+   Independently validate every `## Codex Review Wait Registry` row against all
+   mapped active-workstream projections: one row per PR head, exact deadline,
+   wait state, observation fingerprint, and transition timestamp, with no
+   terminal/non-terminal contradiction. Elapsed wall time and poll attempts
+   are not persisted state and cannot make a packet fresh.
+   Before running the shell validation below, use the current Codex App
+   `list_threads`/`read_thread` equivalents for every registry thread. Reject a
+   missing, archived, unreadable, or replaced id; require the live title,
+   project/worktree repository set, and latest reported PR set to match the
+   registry and active workstreams. Build `LIVE_THREAD_EVIDENCE_ROWS` only from
+   those current tool results, never from ledger values, with one tab-separated
+   row per thread:
+
+   ```text
+   <thread-id>\t<transport-encoded-live-title>\tactive\t<comma-separated-repo-refs>\t<comma-separated-pr-refs>\t<tool-result-ref/fingerprint>
+   ```
+
+   If the live thread inspection surface is unavailable, the packet cannot be
+   `fresh`; stop before resumed mutation or dispatch.
 6. If every check matches, mark the packet `fresh`. Load the packet's exact
    session and scoped `## Option Resolution` row IDs, recompute their canonical
    rows fingerprint, and require it to match `rows_fingerprint`. Derive
@@ -168,24 +205,88 @@ On resume:
          for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
          return ""
        }
+       function encoded_title(value, transport) {
+         transport=value; gsub(/%(25|7C|3B|3D)/, "", transport)
+         return transport !~ /[%|;=]/
+       }
+       function emit_workstream() {
+         if (workstream == "") return
+         if (worker !~ /^[A-Za-z0-9:_-]+$/ || location !~ /^(current-orchestrator-session|background-codex-subagent|visible-codex-app-task)$/ || repo_ref == "" || pr_ref == "") exit 54
+         if (location == "current-orchestrator-session" && worker != "root") exit 54
+         print workstream "\t" worker "\t" location "\t" feature_spec_ref "\t" feature_spec_title "\t" thread_assignment "\t" repo_ref "\t" pr_ref
+         workstream=""
+       }
+       /^## Workstreams$/ { workstreams=1; next }
+       workstreams && /^### active$/ { active=1; next }
+       active && /^### / { emit_workstream(); exit }
+       active && /^#### [A-Za-z0-9:_-]+: / {
+         emit_workstream()
+         workstream=$0; sub(/^#### /, "", workstream); sub(/: .*/, "", workstream)
+         worker=""; location=""; repo_ref=""; pr_ref=""; feature_spec_ref=""; feature_spec_title=""; thread_assignment=""; next
+       }
+       active && /^\| Feature Spec thread \|/ {
+         value=norm($3)
+         feature_spec_ref=token_value(value, "feature_spec_ref")
+         feature_spec_title=token_value(value, "feature_spec_title")
+         thread_assignment=token_value(value, "feature_spec_thread_assignment")
+         if (feature_spec_title != "" && feature_spec_title != "not-applicable" && !encoded_title(feature_spec_title)) exit 57
+         next
+       }
+       active && /^\| Repo \/ execution location \|/ {
+         value=norm($3); worker=token_value(value, "worker")
+         split(value, repo_parts, ";"); repo_ref=norm(repo_parts[1]); next
+       }
+       active && /^\| Worker evidence \|/ {
+         location=token_value(norm($3), "actual_execution_location")
+         next
+       }
+       active && /^\| Delivery \|/ { pr_ref=token_value(norm($3), "target_pull_request_ref"); next }
+       END { emit_workstream() }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1
+   )" || exit 54
+   ACTIVE_WORKSTREAM_IDS="$(
+     awk '
        /^## Workstreams$/ { workstreams=1; next }
        workstreams && /^### active$/ { active=1; next }
        active && /^### / { exit }
        active && /^#### [A-Za-z0-9:_-]+: / {
-         workstream=$0; sub(/^#### /, "", workstream); sub(/: .*/, "", workstream); worker=""; next
+         id=$0; sub(/^#### /, "", id); sub(/: .*/, "", id); print id
        }
-       active && /^\| Repo \/ execution location \|/ { worker=token_value(norm($3), "worker"); next }
-       active && /^\| Worker evidence \|/ {
-         location=token_value(norm($3), "actual_execution_location")
-         if (workstream == "" || worker !~ /^[A-Za-z0-9:_-]+$/ || location !~ /^(current-orchestrator-session|background-codex-subagent|visible-codex-app-task)$/) exit 54
-         if (location == "current-orchestrator-session" && worker != "root") exit 54
-         print workstream "\t" worker "\t" location
+     ' "$ledger" | LC_ALL=C sort | awk 'seen[$0]++ { exit 54 } { print }' | paste -sd, -
+   )" || exit 54
+   PARSED_ACTIVE_WORKSTREAM_IDS="$(printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' 'NF { print $1 }' | LC_ALL=C sort | paste -sd, -)"
+   [ "$ACTIVE_WORKSTREAM_IDS" = "$PARSED_ACTIVE_WORKSTREAM_IDS" ] || exit 54
+   FEATURE_SPEC_THREAD_ROWS="$(
+     awk -F '|' '
+       function norm(value) {
+         gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+         if (length(value) >= 2 && substr(value, 1, 1) == "`" && substr(value, length(value), 1) == "`") value=substr(value, 2, length(value) - 2)
+         return value
+       }
+       function encoded_title(value, transport) {
+         transport=value; gsub(/%(25|7C|3B|3D)/, "", transport)
+         return transport !~ /[%|;=]/
+       }
+       /^## Feature Spec Thread Registry$/ { registry=1; next }
+       registry && /^## / { exit }
+       registry && /^\|/ {
+         if (NF != 16) exit 57
+         ref=norm($2); title=norm($3); thread=norm($4); live_title=norm($5)
+         workstreams=norm($6); repos=norm($7); prs=norm($8); lifecycle=norm($9); poll_owner=norm($10)
+         state=norm($11); drift=norm($13); thread_evidence=norm($15)
+         if (ref == "feature_spec_ref") next
+         if (ref ~ /^:?-+:?$/) next
+         if (ref == "" || title == "" || !encoded_title(title) || !encoded_title(live_title) || thread !~ /^[A-Za-z0-9:_-]+$/ || live_title != title || workstreams == "" || repos == "" || prs == "" || lifecycle != "visible-feature-spec-thread" || poll_owner != "visible-feature-spec-thread" || thread_evidence == "" || thread_evidence == "none") exit 57
+         if (state !~ /^(created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|blocked|needs-owner|replaced)$/ || drift == "") exit 57
+         print thread "\t" ref "\t" title "\t" workstreams "\t" repos "\t" prs "\t" state "\t" drift "\t" thread_evidence
        }
      ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1
-   )" || exit 54
+   )" || exit 57
    {
      printf '%s\n' "$ACTIVE_WORKER_ROWS" | awk -F '\t' 'NF { print "worker\t" $0 }'
      printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' 'NF { print "workstream\t" $0 }'
+     printf '%s\n' "$FEATURE_SPEC_THREAD_ROWS" | awk -F '\t' 'NF { print "registry\t" $0 }'
+     printf '%s\n' "$LIVE_THREAD_EVIDENCE_ROWS" | awk -F '\t' 'NF { print "live\t" $0 }'
    } | awk -F '\t' '
      $1 == "worker" {
        worker=$2; location=$3; count=split($4, workstreams, ",")
@@ -199,6 +300,42 @@ On resume:
      $1 == "workstream" {
        workstream=$2; if (authoritative[workstream]++) exit 54
        authoritative_worker[workstream]=$3; authoritative_location[workstream]=$4
+       authoritative_spec_ref[workstream]=$5; authoritative_spec_title[workstream]=$6; authoritative_thread_assignment[workstream]=$7
+       authoritative_repo[workstream]=$8; authoritative_pr[workstream]=$9
+       next
+     }
+     $1 == "registry" {
+       thread=$2; ref=$3; title=$4
+       if (registry_thread[thread]++ || registry_ref[ref]++) exit 57
+       registry_thread_ref[thread]=ref; registry_thread_title[thread]=title
+       registry_thread_state[thread]=$8; registry_thread_drift[thread]=$9; registry_thread_evidence[thread]=$10
+       count=split($5, workstreams, ",")
+       for (i=1; i <= count; i++) {
+         workstream=workstreams[i]
+         if (workstream !~ /^[A-Za-z0-9:_-]+$/ || registry_workstream[workstream]++) exit 57
+         registry_worker_for_workstream[workstream]=thread
+         registry_ref_for_workstream[workstream]=ref
+         registry_title_for_workstream[workstream]=title
+       }
+       count=split($6, repos, ",")
+       for (i=1; i <= count; i++) {
+         repo=repos[i]; if (repo == "" || registry_repo[thread SUBSEP repo]++) exit 57
+       }
+       count=split($7, prs, ",")
+       for (i=1; i <= count; i++) {
+         pr=prs[i]; if (pr == "" || registry_pr[thread SUBSEP pr]++) exit 57
+       }
+       next
+     }
+     $1 == "live" {
+       thread=$2; title=$3; state=$4
+       if (live_thread[thread]++ || thread !~ /^[A-Za-z0-9:_-]+$/ || title == "" || state != "active" || $5 == "" || $6 == "" || $7 == "") exit 58
+       live_title[thread]=title; live_evidence[thread]=$7
+       count=split($5, repos, ",")
+       for (i=1; i <= count; i++) { repo=repos[i]; if (repo == "" || live_repo[thread SUBSEP repo]++) exit 58 }
+       count=split($6, prs, ",")
+       for (i=1; i <= count; i++) { pr=prs[i]; if (pr == "" || live_pr[thread SUBSEP pr]++) exit 58 }
+       next
      }
      END {
        for (workstream in assigned)
@@ -206,10 +343,150 @@ On resume:
        for (workstream in authoritative) {
          if (authoritative_location[workstream] ~ /^(background-codex-subagent|visible-codex-app-task)$/ && !(workstream in assigned)) exit 54
          if (authoritative_location[workstream] == "current-orchestrator-session" && workstream in assigned) exit 54
+         if (authoritative_thread_assignment[workstream] == "required") {
+           if (authoritative_location[workstream] != "visible-codex-app-task" || !(workstream in registry_workstream)) exit 57
+           if (authoritative_worker[workstream] != registry_worker_for_workstream[workstream] || authoritative_spec_ref[workstream] != registry_ref_for_workstream[workstream] || authoritative_spec_title[workstream] != registry_title_for_workstream[workstream]) exit 57
+         } else if (workstream in registry_workstream) exit 57
        }
+       for (workstream in registry_workstream)
+         if (!(workstream in authoritative) || assigned_worker[workstream] != registry_worker_for_workstream[workstream] || assigned_location[workstream] != "visible-codex-app-task") exit 57
+         else {
+           thread=registry_worker_for_workstream[workstream]
+           repo_key=thread SUBSEP authoritative_repo[workstream]
+           pr_key=thread SUBSEP authoritative_pr[workstream]
+           if (!(repo_key in registry_repo) || !(pr_key in registry_pr)) exit 57
+           active_registry_repo[repo_key]=1; active_registry_pr[pr_key]=1
+         }
+       for (key in registry_repo) if (!(key in active_registry_repo) || !(key in live_repo)) exit 57
+       for (key in registry_pr) if (!(key in active_registry_pr) || !(key in live_pr)) exit 57
+       for (key in live_repo) if (!(key in registry_repo)) exit 58
+       for (key in live_pr) if (!(key in registry_pr)) exit 58
+       for (thread in registry_thread)
+         if (!(thread in live_thread) || live_title[thread] != registry_thread_title[thread] || live_evidence[thread] != registry_thread_evidence[thread]) exit 58
+       for (thread in live_thread) if (!(thread in registry_thread)) exit 58
      }
-   ' || exit 54
-   ACTIVE_DELEGATED_WORKER_COUNT="$(printf '%s\n' "$ACTIVE_WORKER_ROWS" | awk 'NF { count++ } END { print count + 0 }')"
+   ' || exit $?
+   ROOT_NEXT_ACTION="$(
+     awk '
+       /^## Active Root$/ { root=1; next }
+       /^## Codex Review Wait Registry$/ { exit }
+       root && /^Next Root Check: / {
+         rows++
+         value=$0; sub(/^Next Root Check: /, "", value)
+         count=split(value, parts, "; "); action=""; target=""; due=""
+         for (i=1; i <= count; i++) {
+           if (parts[i] ~ /^action=/) { action=parts[i]; sub(/^action=/, "", action) }
+           if (parts[i] ~ /^target=/) { target=parts[i]; sub(/^target=/, "", target) }
+           if (parts[i] ~ /^due_at=/) { due=parts[i]; sub(/^due_at=/, "", due) }
+         }
+         if (action !~ /^(monitor-thread|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none)$/ || target !~ /^([A-Za-z0-9:_.#\/@-]+|none)$/ || due !~ /^([A-Za-z0-9:_.+\/@-]+|none)$/) exit 59
+         print action "\t" target "\t" due
+       }
+       END { if (rows != 1) exit 59 }
+     ' "$ledger"
+   )" || exit 59
+   PACKET_NEXT_ACTION="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       /^## Recovery Packet$/ { packet=1; next }
+       /^## Worker And Delivery References$/ { exit }
+       packet && /^Current wave: / {
+         rows++; count=split($0, parts, ";"); action=""; target=""; due=""
+         for (i=1; i <= count; i++) {
+           item=norm(parts[i])
+           if (item ~ /^next_action=/) { action=item; sub(/^next_action=/, "", action) }
+           if (item ~ /^next_target=/) { target=item; sub(/^next_target=/, "", target) }
+           if (item ~ /^next_due_at=/) { due=item; sub(/^next_due_at=/, "", due) }
+         }
+         if (action == "" || target == "" || due == "") exit 59
+         print action "\t" target "\t" due
+       }
+       END { if (rows != 1) exit 59 }
+     ' "$ledger"
+   )" || exit 59
+   [ "$ROOT_NEXT_ACTION" = "$PACKET_NEXT_ACTION" ] || exit 59
+   IFS=$'\t' read -r ROOT_NEXT_ACTION_NAME ROOT_NEXT_ACTION_TARGET ROOT_NEXT_ACTION_DUE <<< "$ROOT_NEXT_ACTION"
+   printf '%s\n' "$FEATURE_SPEC_THREAD_ROWS" | awk -F '\t' -v action="$ROOT_NEXT_ACTION_NAME" -v target="$ROOT_NEXT_ACTION_TARGET" -v due="$ROOT_NEXT_ACTION_DUE" '
+     NF {
+       thread[$1]=1; ref[$2]=1; state[$1]=$7; drift[$1]=$8
+     }
+     END {
+       if (action == "none") exit target == "none" && due == "none" ? 0 : 59
+       if (target == "none" || due == "none") exit 59
+       if (action == "monitor-thread") {
+         if (!(target in thread) || drift[target] != "none" || state[target] ~ /^(merge-ready|blocked|needs-owner|replaced)$/) exit 59
+         exit 0
+       }
+       if (action == "send-correction") {
+         if (!(target in thread) || drift[target] == "none" || state[target] ~ /^(merge-ready|blocked|needs-owner|replaced)$/) exit 59
+         exit 0
+       }
+       if (action == "dispatch-feature-spec") exit target in ref ? 59 : 0
+       if (action == "reconcile-feature-spec") exit target in ref ? 0 : 59
+       if (action == "owner-action") exit 0
+       exit 59
+     }
+   ' || exit 59
+   REVIEW_WAIT_ROWS="$(
+     awk -F '|' '
+       function norm(value) {
+         gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+         if (length(value) >= 2 && substr(value, 1, 1) == "`" && substr(value, length(value), 1) == "`") value=substr(value, 2, length(value) - 2)
+         return value
+       }
+       /^## Codex Review Wait Registry$/ { waits=1; next }
+       waits && /^## / { exit }
+       waits && /^\|/ {
+         if (NF != 13) exit 60
+         record=norm($2); pr=norm($3); head=norm($4); request=norm($5); profile=norm($6); budget=norm($7)
+         started=norm($8); deadline=norm($9); state=norm($10); fingerprint=norm($11); transitioned=norm($12)
+         if (record == "wait_record" || record ~ /^:?-+:?$/) next
+         if (record == "" || pr == "" || head == "" || request == "" || profile !~ /^(standard|extended)$/ || budget !~ /^(15|30)$/ || started == "" || deadline == "" || state !~ /^(active|monitoring-required|terminal)$/ || fingerprint !~ /^[0-9a-f]{64}$/ || transitioned == "") exit 60
+         print record "\t" pr "\t" head "\t" request "\t" profile "\t" budget "\t" started "\t" deadline "\t" state "\t" fingerprint "\t" transitioned
+       }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1 | awk -F '\t' 'seen[$1]++ { exit 60 } { print }'
+   )" || exit 60
+   ACTIVE_REVIEW_PROJECTIONS="$(
+     awk -F '|' '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Workstreams$/ { workstreams=1; next }
+       workstreams && /^### active$/ { active=1; next }
+       active && /^### / { exit }
+       active && /^#### [A-Za-z0-9:_-]+: / { workstream=$0; sub(/^#### /, "", workstream); sub(/: .*/, "", workstream); next }
+       active && /^\| Codex review evidence \|/ {
+         value=norm($3)
+         print workstream "\t" token_value(value, "wait_record") "\t" token_value(value, "wait_profile_pr") "\t" token_value(value, "request_head") "\t" token_value(value, "request_object") "\t" token_value(value, "wait_profile") "\t" token_value(value, "wait_budget_minutes") "\t" token_value(value, "wait_started_at") "\t" token_value(value, "wait_deadline") "\t" token_value(value, "wait_state") "\t" token_value(value, "observation_fingerprint") "\t" token_value(value, "last_transition_at") "\t" token_value(value, "checker_status") "\t" token_value(value, "terminal")
+       }
+     ' "$ledger"
+   )" || exit 60
+   {
+     printf '%s\n' "$REVIEW_WAIT_ROWS" | awk -F '\t' 'NF { print "wait\t" $0 }'
+     printf '%s\n' "$ACTIVE_REVIEW_PROJECTIONS" | awk -F '\t' 'NF { print "projection\t" $0 }'
+   } | awk -F '\t' '
+     $1 == "wait" {
+       record=$2; wait_seen[record]++
+       wait_pr[record]=$3; wait_head[record]=$4; wait_request[record]=$5; wait_profile[record]=$6; wait_budget[record]=$7
+       wait_started[record]=$8; wait_deadline[record]=$9; wait_state[record]=$10; wait_fingerprint[record]=$11; wait_transition[record]=$12
+       next
+     }
+     $1 == "projection" {
+       workstream=$2; record=$3; pr=$4; head=$5; request=$6; profile=$7; budget=$8; started=$9; deadline=$10
+       state=$11; fingerprint=$12; transition=$13; checker=$14; terminal=$15
+       if (record == "none" || record == "not-applicable" || record == "") next
+       if (!(record in wait_seen) || pr != wait_pr[record] || head != wait_head[record] || request != wait_request[record] || profile != wait_profile[record] || budget != wait_budget[record] || started != wait_started[record] || deadline != wait_deadline[record] || state != wait_state[record] || fingerprint != wait_fingerprint[record] || transition != wait_transition[record]) exit 60
+       if (wait_state[record] == "terminal") {
+         if (checker !~ /^(clean|findings|error)$/ || terminal != checker) exit 60
+       } else if (checker !~ /^(acknowledged|pending)$/ || terminal != "none") exit 60
+       referenced_wait[record]++
+       next
+     }
+     END { for (record in wait_seen) if (!(record in referenced_wait)) exit 60 }
+   ' || exit 60
    ACTIVE_APP_WORKER_COUNT="$(printf '%s\n' "$ACTIVE_WORKER_ROWS" | awk -F '\t' '$2 == "visible-codex-app-task" { count++ } END { print count + 0 }')"
    OPTION_BRANCH_NAMES="$(
      awk -F '|' -v scopes="$OPTION_SCOPE_IDS" '
@@ -229,12 +506,12 @@ On resume:
      [ "$target_branch_name" = "not-applicable" ] || git check-ref-format --branch "$target_branch_name" >/dev/null 2>&1 || exit 50
    done < <(printf '%s\n' "$OPTION_BRANCH_NAMES")
    COMPUTED_OPTION_ROWS_FINGERPRINT="$(
-     awk -F '|' -v wanted="$OPTION_ROW_IDS" -v scopes="$OPTION_SCOPE_IDS" -v active_delegated_count="$ACTIVE_DELEGATED_WORKER_COUNT" -v active_app_count="$ACTIVE_APP_WORKER_COUNT" '
+     awk -F '|' -v wanted="$OPTION_ROW_IDS" -v scopes="$OPTION_SCOPE_IDS" -v active_app_count="$ACTIVE_APP_WORKER_COUNT" -v active_workstreams="$ACTIVE_WORKSTREAM_ROWS" '
        BEGIN {
-         split("work_delegation_policy delegated_worker_visibility max_concurrent_delegated_workers visible_app_task_permission max_visible_app_tasks unmanaged_git_worktree_fallback_permission existing_orchestrator_session_takeover_policy repository_layout", fields, " ")
+         split("visible_app_task_permission unmanaged_git_worktree_fallback_permission existing_orchestrator_session_takeover_policy repository_layout", fields, " ")
          for (i in fields) expected_session[fields[i]]=1
          expected_source["tracked_work_item_update_permission"]=1
-         split("tracked_work_item_update_permission change_delivery_permission issue_update_permission pull_request_merge_permission pull_request_merge_confirmation starting_checkout_branch_handling scheduled_automation_change_permission temporary_source_execution_permission completion_evidence_policy change_delivery_target delivery_decision_origin workstream_repository_layout codex_review_requirement pull_request_count_strategy issue_completion_method target_branch_name target_pull_request_ref delivery_permission_source_issue_ref issue_update_permission_source_issue_ref", fields, " ")
+         split("tracked_work_item_update_permission change_delivery_permission issue_update_permission pull_request_merge_permission pull_request_merge_confirmation starting_checkout_branch_handling scheduled_automation_change_permission temporary_source_execution_permission completion_evidence_policy change_delivery_target delivery_decision_origin workstream_repository_layout codex_review_requirement pull_request_count_strategy issue_completion_method feature_spec_ref feature_spec_title target_branch_name target_pull_request_ref delivery_permission_source_issue_ref issue_update_permission_source_issue_ref", fields, " ")
          for (i in fields) expected_workstream[fields[i]]=1
          count=split(wanted, ids, ",")
          for (i=1; i <= count; i++) if (ids[i] != "") { requested[ids[i]]++; selected[ids[i]]=1 }
@@ -246,6 +523,17 @@ On resume:
            else if (scope_ids[i] ~ /^workstream:/) applicable_workstream_scope[scope_ids[i]]=1
            else invalid=45
          }
+         active_count=split(active_workstreams, active_lines, "\n")
+         for (i=1; i <= active_count; i++) {
+           if (active_lines[i] == "") continue
+           field_count=split(active_lines[i], active_fields, "\t")
+           if (field_count < 8) { invalid=57; continue }
+           active_scope="workstream:" active_fields[1]
+           active_location[active_scope]=active_fields[3]
+           active_spec_ref[active_scope]=active_fields[4]
+           active_spec_title[active_scope]=active_fields[5]
+           active_thread_assignment[active_scope]=active_fields[6]
+         }
        }
        function norm(value) {
          gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
@@ -253,19 +541,14 @@ On resume:
          return value
        }
        function matches(value, choices) { return value ~ ("^(" choices ")$") }
+       function encoded_title(value, transport) {
+         transport=value; gsub(/%(25|7C|3B|3D)/, "", transport)
+         return transport !~ /[%|;=]/
+       }
        function token_value(evidence, key, count, parts, i, prefix) {
          count=split(evidence, parts, ";"); prefix=key "="
          for (i=1; i <= count; i++) if (substr(parts[i], 1, length(prefix)) == prefix) return substr(parts[i], length(prefix) + 1)
          return ""
-       }
-       function permission_binding_matches(left, right, permission_ref, scope_ref, target_ref) {
-         permission_ref=token_value(left, "permission-source-ref")
-         scope_ref=token_value(left, "scope-ref")
-         target_ref=token_value(left, "target-ref")
-         return permission_ref != "" && scope_ref != "" && target_ref != "" &&
-           token_value(right, "permission-source-ref") == permission_ref &&
-           token_value(right, "scope-ref") == scope_ref &&
-           token_value(right, "target-ref") == target_ref
        }
        function permission_bearing(field, value) {
          if (field == "visible_app_task_permission" && value == "granted-by-authorized-user") return 1
@@ -279,17 +562,12 @@ On resume:
          if (field == "scheduled_automation_change_permission" && value == "granted-by-authorized-user") return 1
          if (field == "temporary_source_execution_permission" && value == "granted-by-authorized-user") return 1
          if (field == "completion_evidence_policy" && value == "allow-simulated-evidence-by-authorized-user-exception") return 1
-         if (field == "work_delegation_policy" && value == "orchestrator-decides-with-concurrent-worker-limit") return 1
          if (field == "delivery_decision_origin" && matches(value, "overridden-by-implementation-issue|specified-by-authorized-user")) return 1
          if (field == "codex_review_requirement" && value == "explicitly-skipped-by-authorized-user") return 1
          return 0
        }
        function allowed_value(field, value) {
-         if (field == "work_delegation_policy") return matches(value, "orchestrator-decides-for-each-implementation-workstream|run-all-work-in-current-orchestrator-session|orchestrator-decides-with-concurrent-worker-limit")
-         if (field == "delegated_worker_visibility") return matches(value, "orchestrator-decides-between-background-and-visible-workers|background-codex-subagents-only|visible-codex-app-tasks-only|not-applicable")
-         if (field == "max_concurrent_delegated_workers") return matches(value, "not-limited-by-authorized-user|not-applicable|[1-9][0-9]*")
          if (field == "visible_app_task_permission") return matches(value, "not-requested|granted-by-authorized-user|denied-by-authorized-user")
-         if (field == "max_visible_app_tasks") return matches(value, "not-applicable|[1-9][0-9]*")
          if (field == "unmanaged_git_worktree_fallback_permission") return matches(value, "not-granted|granted-by-authorized-user")
          if (field == "existing_orchestrator_session_takeover_policy") return matches(value, "ask-authorized-user-before-takeover|take-over-only-if-existing-ledger-is-stale")
          if (field == "repository_layout" || field == "workstream_repository_layout") return matches(value, "single-repository|monorepo|multi-repository-workspace")
@@ -306,6 +584,8 @@ On resume:
          if (field == "codex_review_requirement") return matches(value, "required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target")
          if (field == "pull_request_count_strategy") return matches(value, "one-pull-request-total|one-pull-request-per-repository|no-pull-request")
          if (field == "issue_completion_method") return matches(value, "feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion")
+         if (field == "feature_spec_ref") return value == "not-applicable" || value != ""
+         if (field == "feature_spec_title") return value == "not-applicable" || (value != "" && encoded_title(value))
          if (field == "target_branch_name") return value == "not-applicable" || value != ""
          if (field == "target_pull_request_ref") return matches(value, "not-applicable|pending|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*")
          if (field == "delivery_permission_source_issue_ref" || field == "issue_update_permission_source_issue_ref") return matches(value, "not-applicable|issue:[A-Za-z0-9:_-]+")
@@ -314,13 +594,6 @@ On resume:
        function allowed_source(field, value, source) {
          if (field == "repository_layout") return matches(source, "project-layout-config|runtime-derived|authorized-user-instruction")
          if (field == "workstream_repository_layout") return matches(source, "source-contract|runtime-derived|authorized-user-instruction")
-         if (field == "max_concurrent_delegated_workers") {
-           if (value == "not-limited-by-authorized-user") return matches(source, "default|authorized-user-instruction")
-           if (value == "not-applicable") return matches(source, "default|runtime-derived|runtime-capability")
-           return source == "authorized-user-instruction"
-         }
-         if (field == "max_visible_app_tasks") return value == "not-applicable" ? matches(source, "default|runtime-derived|runtime-capability") : source == "authorized-user-instruction"
-         if (field == "work_delegation_policy" || field == "delegated_worker_visibility") return matches(source, "default|authorized-user-instruction|runtime-capability")
          if (field == "visible_app_task_permission") return value == "not-requested" ? source == "default" : source == "authorized-user-instruction"
          if (field == "unmanaged_git_worktree_fallback_permission") return value == "not-granted" ? matches(source, "default|runtime-capability") : source == "authorized-user-instruction"
          if (field == "existing_orchestrator_session_takeover_policy") return value == "ask-authorized-user-before-takeover" ? source == "default" : source == "authorized-user-instruction"
@@ -354,6 +627,7 @@ On resume:
            return matches(source, "default|runtime-derived|source-contract")
          }
          if (field == "pull_request_count_strategy" || field == "issue_completion_method") return matches(source, "source-contract|runtime-derived|default")
+         if (field == "feature_spec_ref" || field == "feature_spec_title") return value == "not-applicable" ? matches(source, "default|runtime-derived") : source == "source-contract"
          return 0
        }
        /^## Option Resolution$/ { options=1; next }
@@ -401,24 +675,8 @@ On resume:
          for (scope_id in applicable_source_scope) for (field in expected_source) if (present[scope_id SUBSEP field] != 1) exit 45
          for (scope_id in applicable_workstream_scope) for (field in expected_workstream) if (present[scope_id SUBSEP field] != 1) exit 45
 
-         policy=resolved["session" SUBSEP "work_delegation_policy"]
-         visibility=resolved["session" SUBSEP "delegated_worker_visibility"]
-         concurrency_limit=resolved["session" SUBSEP "max_concurrent_delegated_workers"]
          app_permission=resolved["session" SUBSEP "visible_app_task_permission"]
-         app_limit=resolved["session" SUBSEP "max_visible_app_tasks"]
-         if (policy == "run-all-work-in-current-orchestrator-session" && (visibility != "not-applicable" || concurrency_limit != "not-applicable" || active_delegated_count != 0)) exit 48
-         if (policy == "orchestrator-decides-for-each-implementation-workstream" && concurrency_limit != "not-limited-by-authorized-user") exit 48
-         if (policy == "orchestrator-decides-with-concurrent-worker-limit") {
-           if (concurrency_limit !~ /^[1-9][0-9]*$/ || active_delegated_count > concurrency_limit + 0) exit 48
-           if (!permission_binding_matches(row_evidence["session" SUBSEP "work_delegation_policy"], row_evidence["session" SUBSEP "max_concurrent_delegated_workers"])) exit 49
-         }
-         if (visibility == "not-applicable" && policy != "run-all-work-in-current-orchestrator-session") exit 48
-         if (visibility == "background-codex-subagents-only" && active_app_count != 0) exit 48
-         if (visibility == "visible-codex-app-tasks-only" && active_delegated_count != active_app_count) exit 48
-         if (app_permission != "granted-by-authorized-user" && (app_limit != "not-applicable" || active_app_count != 0)) exit 48
-         if (app_permission == "granted-by-authorized-user" && (app_limit !~ /^[1-9][0-9]*$/ || active_app_count > app_limit + 0)) exit 48
-         if (app_permission == "granted-by-authorized-user" && !permission_binding_matches(row_evidence["session" SUBSEP "visible_app_task_permission"], row_evidence["session" SUBSEP "max_visible_app_tasks"])) exit 49
-         if (visibility == "visible-codex-app-tasks-only" && app_permission != "granted-by-authorized-user") exit 48
+         if (app_permission != "granted-by-authorized-user" && active_app_count != 0) exit 48
 
          for (scope_id in applicable_workstream_scope) {
            delivery=resolved[scope_id SUBSEP "change_delivery_target"]
@@ -434,6 +692,15 @@ On resume:
            origin=resolved[scope_id SUBSEP "delivery_decision_origin"]
            delivery_transfer=resolved[scope_id SUBSEP "delivery_permission_source_issue_ref"]
            issue_transfer=resolved[scope_id SUBSEP "issue_update_permission_source_issue_ref"]
+           canonical_spec_ref=resolved[scope_id SUBSEP "feature_spec_ref"]
+           canonical_spec_title=resolved[scope_id SUBSEP "feature_spec_title"]
+
+           if ((canonical_spec_ref == "not-applicable") != (canonical_spec_title == "not-applicable")) exit 57
+           if (scope_id in active_location && (active_spec_ref[scope_id] != canonical_spec_ref || active_spec_title[scope_id] != canonical_spec_title)) exit 57
+           feature_spec_backed=(canonical_spec_ref != "not-applicable")
+           if (app_permission == "granted-by-authorized-user" && feature_spec_backed && scope_id in active_location) {
+             if (active_location[scope_id] != "visible-codex-app-task" || active_thread_assignment[scope_id] != "required" || active_spec_ref[scope_id] == "" || active_spec_ref[scope_id] == "not-applicable" || active_spec_title[scope_id] == "" || active_spec_title[scope_id] == "not-applicable") exit 57
+           }
 
            if (resolved[scope_id SUBSEP "pull_request_merge_confirmation"] == "merge-automatically-after-checks" && resolved[scope_id SUBSEP "pull_request_merge_permission"] != "granted-for-named-pull-request") exit 48
            if (delivery == "validated-changes-left-uncommitted") {

@@ -19,31 +19,47 @@ not options.
 
 ## Primary Human Choices
 
-These three fields are the normal user-facing decision surface.
+The delivery target is the normal per-workstream user-facing choice. Visible
+Codex App task consent is the independent session permission below.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `work_delegation_policy` | `orchestrator-decides-for-each-implementation-workstream`, `run-all-work-in-current-orchestrator-session`, `orchestrator-decides-with-concurrent-worker-limit` | `orchestrator-decides-for-each-implementation-workstream` | Whether work may be delegated and whether the authorized user sets a concurrency ceiling. |
-| `delegated_worker_visibility` | `orchestrator-decides-between-background-and-visible-workers`, `background-codex-subagents-only`, `visible-codex-app-tasks-only`, `not-applicable` | `orchestrator-decides-between-background-and-visible-workers` | Which delegated worker types may be used. `not-applicable` is valid only when all work stays in the current orchestrator session. |
 | `change_delivery_target` | `validated-changes-left-uncommitted`, `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | `validated-changes-left-uncommitted` for ad hoc work; `pull-request-ready-for-merge-but-not-merged` for Feature Spec-backed work | The observable stopping point for the workstream. Merge is never implied. |
 
-`max_concurrent_delegated_workers` is data, not an enum. Use a positive integer
-with `orchestrator-decides-with-concurrent-worker-limit`,
-`not-limited-by-authorized-user` with unrestricted orchestrator choice, and
-`not-applicable` when all work stays in the current orchestrator session.
+Worker surface, count, per-wave parallelism, and serial or parallel sequencing
+are derived runtime decisions, not options or user-provided data. When visible
+threads are not enabled, the orchestrator chooses them from the work graph,
+ownership boundaries, safety, tool availability, and live runtime capacity.
+When visible threads are enabled, the visible-thread count is exactly the
+number of implementation-eligible Feature Specs in the dispatched waves; only their start order and
+serial or parallel scheduling remain derived. The root and every spawned Codex
+thread may create internal background subagents within their assigned scope.
 
 ## Session Permissions And Context
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Permission to create visible user-owned Codex App tasks. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Explicit consent for visible Codex App tasks. The granted value selects mandatory one-thread-per-Feature-Spec execution. |
 | `unmanaged_git_worktree_fallback_permission` | `not-granted`, `granted-by-authorized-user` | `not-granted` | Permission to use an unmanaged Git worktree when the App cannot create the required managed worktree. |
 | `existing_orchestrator_session_takeover_policy` | `ask-authorized-user-before-takeover`, `take-over-only-if-existing-ledger-is-stale` | `ask-authorized-user-before-takeover` | Recovery policy when another orchestrator session claims overlapping scope. |
 | `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From project memory or safe repository evidence | Durable repository layout. This is derived context, not an execution-order preference. |
 
-`max_visible_app_tasks` is data. Use a positive integer only with
-`visible_app_task_permission=granted-by-authorized-user`; otherwise use
-`not-applicable`.
+`visible_app_task_permission=granted-by-authorized-user` both authorizes the
+surface and requires its use for Feature Spec implementation. Map every
+implementation-eligible Feature Spec to exactly one active visible thread,
+group all generated issues and affected repositories for that Spec into that
+thread, and title it with the exact Feature Spec title. The thread owns the
+entire selected delivery target through merge-ready; the root does not perform
+implementation, integration, validation, Codex-review request or polling,
+feedback fixes, CI repair, PR mutation, or ready transition for that Spec.
+Background Codex subagents are already authorized by orchestrator invocation
+and require no separate session option.
+
+Here, `implementation-eligible` means a Feature Spec whose start/dependency
+gates passed and whose implementation is selected for dispatch in the current
+wave. Queued, dependency-blocked, or capacity-deferred Specs receive their one
+thread when their dispatch wave starts; serial scheduling does not require
+creating every future thread in advance.
 
 ## Per-Workstream Permissions And Delivery
 
@@ -69,6 +85,11 @@ or evidence from one workstream never applies to another by inheritance.
 
 The following are required scoped data rather than enum options:
 
+- `feature_spec_ref`: canonical Feature Spec URL/path/ref, or
+  `not-applicable` for a non-Feature-Spec workstream.
+- `feature_spec_title`: title transport from `ledger-template.md` for the exact
+  canonical Feature Spec title, or `not-applicable` with the ref. Decode only
+  when setting or comparing a live title.
 - `target_branch_name`: exact branch, or `not-applicable` only for
   `validated-changes-left-uncommitted`.
 - `target_pull_request_ref`: canonical `<owner>/<repo>#<number>`, `pending` for
@@ -90,6 +111,7 @@ options:
 | `delivery_gate_status` | `ready`, `blocked`, `not-applicable` | Required data, permission, and proof for the selected delivery target. |
 | `delivery_allowed_actions` | Canonical action list | `change_delivery_target` plus its valid permission row. |
 | `worker_allowed_actions` | Canonical action list from `worker.md` | Exact worker assignment; actions are independent and non-cumulative. |
+| `feature_spec_thread_assignment` | One exact Feature Spec ref and title mapped to one visible thread id, or `not-applicable` | Required runtime mapping when visible task permission is granted; never a user option. |
 
 `delivery_allowed_actions` derives as follows:
 
@@ -99,7 +121,7 @@ options:
 | `local-commit-created-without-pushing` | `edit-files`, `run-validation`, `create-local-commit` |
 | `changes-pushed-to-target-branch-without-pull-request` | `edit-files`, `run-validation`, `create-local-commit`, `push-target-branch` |
 | `validated-draft-pull-request-published` | `edit-files`, `run-validation`, `create-local-commit`, `push-target-branch`, `create-or-update-pull-request` |
-| `pull-request-ready-for-merge-but-not-merged` | Draft-PR actions plus `mark-pull-request-ready`, and the review actions required by `codex_review_requirement` |
+| `pull-request-ready-for-merge-but-not-merged` | Draft-PR actions plus the review actions required by `codex_review_requirement`, then `mark-pull-request-ready` only after the current-head review policy and remaining gates pass |
 
 ## Discovery Source Registry
 
@@ -139,16 +161,10 @@ capability may restrict a value; it never grants mutation permission.
 ## Resolution Source Constraints
 
 - Safe defaults may select only:
-  - `orchestrator-decides-for-each-implementation-workstream`;
-  - `orchestrator-decides-between-background-and-visible-workers`;
   - `visible_app_task_permission=not-requested`;
   - every `not-granted`, `read-only`, `no-*`, or live-evidence value;
   - `validated-changes-left-uncommitted` for ad hoc work; and
   - `safe-default-for-ad-hoc-work`.
-- A positive concurrency or visible-task limit requires matching
-  `authorized-user-instruction` evidence on both the policy and limit rows.
-  Both rows must preserve the same `permission-source-ref`, `scope-ref`, and
-  `target-ref` tokens.
 - `visible_app_task_permission=granted-by-authorized-user` and
   `denied-by-authorized-user` require authorized-user evidence.
 - Every `granted-*`, `apply-updates`, branch-switch, automated-merge,
@@ -173,16 +189,24 @@ capability may restrict a value; it never grants mutation permission.
 
 ## Cross-Field Validation
 
-- `run-all-work-in-current-orchestrator-session` requires
-  `delegated_worker_visibility=not-applicable`,
-  `max_concurrent_delegated_workers=not-applicable`, and zero delegated workers.
-- `orchestrator-decides-with-concurrent-worker-limit` requires a positive
-  `max_concurrent_delegated_workers`; unrestricted orchestrator choice requires
-  `not-limited-by-authorized-user`.
-- `visible-codex-app-tasks-only` requires
-  `visible_app_task_permission=granted-by-authorized-user` and a positive
-  `max_visible_app_tasks`. Other permission values require
-  `max_visible_app_tasks=not-applicable`.
+- Every visible Codex App task requires
+  `visible_app_task_permission=granted-by-authorized-user`.
+- With `visible_app_task_permission=granted-by-authorized-user`, every
+  implementation-eligible Feature Spec requires exactly one active visible
+  thread titled with that Spec's exact title. One thread must not own multiple
+  Feature Specs, and one Feature Spec must not be split across multiple active
+  visible threads. Multiple generated issues or repository PRs for one Spec
+  remain owned by its single thread.
+- In that granted mode, no Feature Spec implementation or review work may use
+  `actual_execution_location=current-orchestrator-session` or a
+  background-only worker. If the visible thread surface is unavailable or an
+  assigned thread fails, steer, resume-equivalent, or replace the visible
+  thread for the same Spec; otherwise stop as `needs-owner` or blocked. Never
+  fall back to root implementation or review.
+- `feature_spec_ref` and `feature_spec_title` must both be `not-applicable` or
+  both be concrete. Re-read Feature Spec source/handoff evidence before
+  dispatch or recovery and reject a row whose pair does not match it. Generic
+  issue permission-transfer refs do not establish Feature Spec backing.
 - An unmanaged Git worktree fallback in the App requires
   `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`.
 - `multi-repository-workspace` requires loading

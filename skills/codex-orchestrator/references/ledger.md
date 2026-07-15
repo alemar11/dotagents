@@ -53,6 +53,7 @@ missing or invalid header field—makes the ledger invalid.
 ## Discovery Sources
 ## Active Root
 ## Codex Review Wait Registry
+## Feature Spec Thread Registry
 ## Parent Closeout Watch
 ## Recovery Packet
 Packet version: 1
@@ -94,14 +95,95 @@ ledger that passes the marker check above.
 - The orchestrator reads and writes the ledger.
 - Worker tasks and subagents do not edit ledgers.
 - Workers report status, proof, blockers, and next actions to the orchestrator.
+- When `visible_app_task_permission=granted-by-authorized-user`, the ledger
+  groups every implementation-eligible Feature Spec and all of its child
+  workstreams under exactly one visible thread. The root records and monitors
+  that mapping but does not execute implementation, integration, validation,
+  PR mutation, Codex-review request/polling, feedback or CI fixes, or mark-ready
+  work for those Specs.
 - Preserve historical notes that explain owner decisions, suppressions, and
   release state.
 - The orchestrator records worker lifecycle decisions: `integrated`,
   `retained-for-inspection`, `abandoned`, or `handoff-pending`.
 
+## Controller State Reconciliation
+
+Keep one authoritative owner for each current-state fact:
+
+- `## Active Root` owns the root claim and root action;
+- `## Feature Spec Thread Registry` owns visible-thread identity, Feature Spec
+  assignment, lifecycle state, and drift;
+- `## Workstreams` owns work state, delivery state, and the projection of its
+  assigned thread and review wait;
+- `## Codex Review Wait Registry` owns review timing, stable observations, and
+  wait transitions; and
+- `## Recovery Packet`, active-worker lists, wave reports, and commentary are
+  derived projections, never independent authorities.
+
+Reconcile in one deterministic controller pass. Read the authoritative
+sections into one in-memory snapshot, derive all dependent projections from
+that snapshot, verify the invariants below, and apply the changed current-state
+sections as one ledger patch. Append historical notes only after the current
+projection agrees. Do not patch an active-worker list, workstream, wait row,
+recovery field, or next action independently and leave the ledger split across
+controller cycles.
+
+The stable GitStack `observation_fingerprint` is the review transition key.
+Persist the first observation, then update review rows, transition timestamps,
+recovery fingerprints, notes, metrics, and owner commentary only when the
+fingerprint, checker/wait state, request head/object, terminal evidence, or
+deadline tier changes. Unchanged intermediate waiter observations are no-ops:
+do not rewrite the ledger, advance `Last Progress Read` or
+`last_transition_at`, append a progress note, or emit progress commentary
+merely because another poll occurred. When a complete bounded waiter exits by
+timeout with the same fingerprint, the controller may perform one scheduling
+write for the next `due_at`; update only Active Root plus its Recovery Packet
+projection and do not present that scheduling write as work progress.
+Elapsed time is derived from the persisted start/deadline timestamps only when
+reporting and is never persisted as mutable controller state.
+
+`Next Root Check` is structured as
+`action=<value>; target=<value>; due_at=<value>` and must equal the Recovery
+Packet `next_action`, `next_target`, and `next_due_at`. Use RFC 3339 timestamps,
+`now`, a delimiter-safe event ref, or `none`; do not persist a mutable countdown.
+Allowed actions are
+`monitor-thread`, `send-correction`, `dispatch-feature-spec`,
+`reconcile-feature-spec`, `owner-action`, and `none`:
+
+- `monitor-thread` targets one active registry thread with `drift=none`;
+- `send-correction` targets one active registry thread with non-`none` drift;
+- `dispatch-feature-spec` targets an eligible Feature Spec not yet active in
+  the registry;
+- `reconcile-feature-spec` targets an existing registry Feature Spec ref;
+- `owner-action` targets a recorded owner-decision ref; and
+- `none` requires `target=none` and `due_at=none`; every other action requires
+  a non-`none` due value.
+
+Root actions never contain implementation, review request, review polling,
+feedback-fix, CI-fix, PR mutation, or mark-ready work in mandatory visible
+Feature Spec thread mode. A stale or unstructured root action makes the
+current projection invalid; repair it before dispatch, recovery, or closeout.
+
+Reject a controller snapshot when any of these invariants fails:
+
+- in mandatory visible Feature Spec thread mode, Active Root visible workers
+  are not exactly the active registry thread assignments, or Recovery Packet
+  `active_workers` is not the complete Active Root worker set;
+- a registry thread, active workstream thread assignment, or recovery thread
+  mapping disagrees about Feature Spec identity or lifecycle owner;
+- a terminal wait row coexists with an active/pending workstream review
+  projection, or a non-terminal wait row coexists with terminal evidence;
+- workstreams sharing a PR head disagree with the single wait row, observation
+  fingerprint, deadline, or transition timestamp;
+- a root owns implementation or review for a mandatory visible-thread Feature
+  Spec; or
+- Active Root and Recovery Packet next action/target projections differ or
+  violate the action predicates above.
+
 ## Active Root Claims
 
-Before creating workers, starting root-owned implementation, or mutating source
+Before creating workers, starting root-owned implementation outside mandatory
+Feature Spec thread mode, or mutating source
 state, the root orchestrator verifies that no live root already claims the same
 portfolio, repo realpath, or source id. The ledger is an advisory coordination
 record, not a filesystem or database lock. Treat it as the owner-visible record
@@ -139,10 +221,13 @@ Use these ledger-owned values:
 - `tracked_work_item_update_permission`: `read-only` means do not mutate the
   source item, `propose-updates-only` means draft the update without applying
   it, and `apply-updates` means apply authorized source updates.
-- `resync_state`: `synced` means worker state matches root-integrated work,
+- `resync_state`: `synced` means worker state matches accepted integrated work,
   `needs-resync` means worker state must be reconciled, `replaced` means a new
-  worker or root flow took over, and `root-owned` means root owns integration or
-  follow-up.
+  worker took over or, outside mandatory mode, a root flow took over, and
+  `root-owned` means root owns integration or
+  follow-up outside mandatory Feature Spec thread mode. `root-owned` is invalid
+  for implementation or review of a Feature Spec whose visible-thread mode is
+  active.
 - `active_root_status`: `claimed` means this root currently owns the portfolio
   source graph, `stale` means the claim missed the recorded ledger check window,
   `released` means closeout completed or a durable parent-closeout handoff
@@ -207,9 +292,9 @@ roots in the active-root claim and in `## Notes`.
 | State | Meaning and required record |
 | --- | --- |
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
-| `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or authorized. Ledger cannot be `complete` while actionable items remain. |
+| `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or safe. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute when authorized; otherwise record the missing permission or blocker. `pull-request-ready-for-merge-but-not-merged` keeps mark-ready, resolved review actions, and parent closeout actionable after local gates. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
+| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute in the owning surface when authorized; otherwise record the missing permission or blocker. In mandatory visible Feature Spec thread mode, implementation and review actions stay assigned to that Spec's thread and never become root actions. `pull-request-ready-for-merge-but-not-merged` keeps required review actions actionable while the PR is draft, then mark-ready and parent closeout actionable after the current-head review policy and remaining gates pass. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
 | `completed` | Required gates passed and the exact `change_delivery_target` is proven. For `validated-changes-left-uncommitted`, acceptance plus validation are sufficient and commit/push/PR fields are not applicable. A default-branch GitHub whole Feature Spec closeout PR may report merge-ready with `parent_spec_closeout=armed`, proof, and an active or handed-off watch, but the parent source and portfolio ledger remain incomplete until merge and verified issue closure. A non-default-base PR workstream may reach its own target with `deferred-to-default-branch` only while the later closeout vehicle remains actionable. The draft-PR target records later lifecycle actions as not applicable. Otherwise record delivery proof, source closeout, publication checkout, caller-checkout disposition, lifecycle decision, and artifact disposition. Pending required delivery, closeout, or proof remains non-terminal. |
@@ -237,7 +322,7 @@ Before marking a ledger `complete`, verify:
   `parent_closeout_watch=complete`, and post-merge proof that GitHub closed the
   issue. The draft-PR target and excluded workstreams record
   `not-applicable` with a reason.
-- `active` contains only rows with a real next check or root-owned action;
+- `active` contains only rows with a real next check, assigned-thread action, or root-owned action outside mandatory Feature Spec implementation/review;
   `autonomous` and `ready-next` are empty or reclassified with the missing
   authority, decision, blocker, or follow-up.
 - Feature Spec-backed delivery records its real branch or PR proof and resolved
@@ -281,16 +366,19 @@ snapshot against the ledger:
 Reconciliation updates the current projection instead of appending a new claim
 that contradicts stale current fields. Preserve historical `## Notes`, but
 replace outdated source snapshots, gate rows, workstream delivery values,
-active-worker lists, and current next actions. For every reconciliation, append
-one dated note and record this compact result:
+active-worker lists, and current next actions in the same deterministic patch.
+When the authoritative source or controller state changed, append one dated
+note and record this compact result. If the snapshot is unchanged, perform no
+ledger write and emit no synthetic progress row:
 
 | Checked At | Sources Re-read | Current Projection Updated | Stale Values Removed | Remaining Actionable | Result |
 | --- | --- | --- | --- | --- | --- |
 | <time> | <source ids/URLs> | <sections/rows> | <values or none> | <count and refs> | pass|blocked |
 
-After recording the result, refresh the recovery packet from the reconciled
-projection and record only its changed sections and new fingerprint in normal
-progress output.
+After recording a real transition, refresh the recovery packet from the
+reconciled projection and record only its changed sections and new fingerprint
+in normal progress output. Poll attempts, elapsed wall time, and repeated
+unchanged observations are not transitions.
 
 Before setting the ledger `complete`, run the reconciliation after the last
 source mutation and verify these invariants:

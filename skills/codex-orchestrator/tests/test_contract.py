@@ -20,6 +20,7 @@ CURRENT_LEDGER_HEADINGS = (
     "## Discovery Sources",
     "## Active Root",
     "## Codex Review Wait Registry",
+    "## Feature Spec Thread Registry",
     "## Parent Closeout Watch",
     "## Recovery Packet",
     "## Worker And Delivery References",
@@ -426,23 +427,7 @@ class OrchestratorContractTests(unittest.TestCase):
         script = efficiency[block_start:block_end].strip()
 
         session_values = {
-            "work_delegation_policy": (
-                "orchestrator-decides-for-each-implementation-workstream",
-                "default",
-                "none",
-            ),
-            "delegated_worker_visibility": (
-                "orchestrator-decides-between-background-and-visible-workers",
-                "default",
-                "none",
-            ),
-            "max_concurrent_delegated_workers": (
-                "not-limited-by-authorized-user",
-                "default",
-                "none",
-            ),
             "visible_app_task_permission": ("not-requested", "default", "none"),
-            "max_visible_app_tasks": ("not-applicable", "default", "none"),
             "unmanaged_git_worktree_fallback_permission": (
                 "not-granted",
                 "default",
@@ -523,6 +508,16 @@ class OrchestratorContractTests(unittest.TestCase):
                 "runtime-derived",
                 "none",
             ),
+            "feature_spec_ref": (
+                "not-applicable",
+                "runtime-derived",
+                "none",
+            ),
+            "feature_spec_title": (
+                "not-applicable",
+                "runtime-derived",
+                "none",
+            ),
             "target_branch_name": (
                 "not-applicable",
                 "runtime-derived",
@@ -580,6 +575,15 @@ class OrchestratorContractTests(unittest.TestCase):
                 "",
                 "## Discovery Sources",
                 "",
+                "## Active Root",
+                "",
+                "Next Root Check: action=none; target=none; due_at=none",
+                "Active workers:",
+                "- none",
+                "Takeover history:",
+                "",
+                "## Codex Review Wait Registry",
+                "",
                 "## Workstreams",
                 "",
                 "### active",
@@ -589,6 +593,14 @@ class OrchestratorContractTests(unittest.TestCase):
                 "| Field | Value |",
                 "| --- | --- |",
                 "| Source | issue-1 |",
+                "| Feature Spec thread | feature_spec_ref=not-applicable; "
+                "feature_spec_title=not-applicable; "
+                "feature_spec_thread_assignment=not-applicable |",
+                "| Repo / execution location | repo; "
+                "current-orchestrator-session; worker=root |",
+                "| Worker evidence | "
+                "actual_execution_location=current-orchestrator-session |",
+                "| Delivery | target_pull_request_ref=not-applicable |",
                 "",
                 "### ready-next",
                 "",
@@ -599,6 +611,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 "## Recovery Packet",
                 "",
                 "Root: root-1; claim=claimed; goal=test; active_workers=none; parent_closeout_watch=not-applicable",
+                "Current wave: idle; current_workstreams=a,b; next_action=none; next_target=none; next_due_at=none",
                 "Option resolution refs: session_rows=fixture; scoped_rows=fixture; rows_fingerprint=auto",
                 "",
                 "## Worker And Delivery References",
@@ -616,6 +629,7 @@ class OrchestratorContractTests(unittest.TestCase):
             def run(
                 selected: list[str],
                 contents: str = ledger_fixture,
+                live_thread_evidence: str = "",
             ) -> subprocess.CompletedProcess[str]:
                 selected_set = set(selected)
                 normalized_rows: list[list[str]] = []
@@ -655,7 +669,11 @@ class OrchestratorContractTests(unittest.TestCase):
                     f"OPTION_ROW_IDS={shlex.quote(','.join(selected))}",
                     script,
                 )
-                configured = f"ledger={shlex.quote(str(ledger_path))}\n{configured}"
+                configured = (
+                    f"ledger={shlex.quote(str(ledger_path))}\n"
+                    f"LIVE_THREAD_EVIDENCE_ROWS={shlex.quote(live_thread_evidence)}\n"
+                    f"{configured}"
+                )
                 return subprocess.run(
                     ["bash", "-c", configured],
                     check=False,
@@ -678,40 +696,6 @@ class OrchestratorContractTests(unittest.TestCase):
                     "\n".join(replacement),
                 )
 
-            delegated_limit_evidence = (
-                "permission-source-ref=authorized-user:request-1;"
-                "scope-ref=session;target-ref=delegated-workers"
-            )
-            bounded_session = dict(session_values)
-            bounded_session.update(
-                {
-                    "work_delegation_policy": (
-                        "orchestrator-decides-with-concurrent-worker-limit",
-                        "authorized-user-instruction",
-                        delegated_limit_evidence,
-                    ),
-                    "max_concurrent_delegated_workers": (
-                        "2",
-                        "authorized-user-instruction",
-                        delegated_limit_evidence,
-                    ),
-                }
-            )
-            bounded = run(complete_ids, with_session_values(bounded_session))
-            self.assertEqual(bounded.returncode, 0, bounded.stderr)
-
-            mismatched_bounded_session = dict(bounded_session)
-            mismatched_bounded_session["max_concurrent_delegated_workers"] = (
-                "2",
-                "authorized-user-instruction",
-                delegated_limit_evidence.replace("request-1", "request-2"),
-            )
-            mismatched_bounded = run(
-                complete_ids,
-                with_session_values(mismatched_bounded_session),
-            )
-            self.assertNotEqual(mismatched_bounded.returncode, 0)
-
             visible_task_evidence = (
                 "permission-source-ref=authorized-user:request-3;"
                 "scope-ref=session;target-ref=visible-app-tasks"
@@ -719,18 +703,8 @@ class OrchestratorContractTests(unittest.TestCase):
             visible_session = dict(session_values)
             visible_session.update(
                 {
-                    "delegated_worker_visibility": (
-                        "visible-codex-app-tasks-only",
-                        "authorized-user-instruction",
-                        visible_task_evidence,
-                    ),
                     "visible_app_task_permission": (
                         "granted-by-authorized-user",
-                        "authorized-user-instruction",
-                        visible_task_evidence,
-                    ),
-                    "max_visible_app_tasks": (
-                        "2",
                         "authorized-user-instruction",
                         visible_task_evidence,
                     ),
@@ -739,17 +713,61 @@ class OrchestratorContractTests(unittest.TestCase):
             visible = run(complete_ids, with_session_values(visible_session))
             self.assertEqual(visible.returncode, 0, visible.stderr)
 
-            mismatched_visible_session = dict(visible_session)
-            mismatched_visible_session["max_visible_app_tasks"] = (
-                "2",
-                "authorized-user-instruction",
-                visible_task_evidence.replace("request-3", "request-4"),
-            )
-            mismatched_visible = run(
+            def with_visible_worker(contents: str) -> str:
+                configured = contents.replace(
+                    "Active workers:\n"
+                    "- none\n"
+                    "Takeover history:",
+                    "Active workers:\n"
+                    "- worker_id=worker-1; "
+                    "actual_execution_location=visible-codex-app-task; "
+                    "workstream_ids=a\n"
+                    "Takeover history:",
+                )
+                configured = configured.replace(
+                    "| Repo / execution location | repo; "
+                    "current-orchestrator-session; worker=root |\n"
+                    "| Worker evidence | "
+                    "actual_execution_location=current-orchestrator-session |",
+                    "| Repo / execution location | repo; "
+                    "visible-codex-app-task; worker=worker-1 |\n"
+                    "| Worker evidence | "
+                    "actual_execution_location=visible-codex-app-task |",
+                )
+                return configured.replace(
+                    "active_workers=none",
+                    "active_workers=worker-1",
+                )
+
+            visible_without_consent = run(
                 complete_ids,
-                with_session_values(mismatched_visible_session),
+                with_visible_worker(ledger_fixture),
             )
-            self.assertNotEqual(mismatched_visible.returncode, 0)
+            self.assertNotEqual(visible_without_consent.returncode, 0)
+            visible_with_consent = run(
+                complete_ids,
+                with_visible_worker(with_session_values(visible_session)),
+            )
+            self.assertEqual(
+                visible_with_consent.returncode,
+                0,
+                visible_with_consent.stderr,
+            )
+
+            retired_session_fields = {
+                "work_delegation_policy": "orchestrator-decides-for-each-implementation-workstream",
+                "delegated_worker_visibility": "background-codex-subagents-only",
+                "max_concurrent_delegated_workers": "2",
+                "max_visible_app_tasks": "2",
+            }
+            for field, value in retired_session_fields.items():
+                stale_row = row("session", field, (value, "default", "none"))
+                stale_contents = ledger_fixture.replace(
+                    "\n".join(session_rows),
+                    "\n".join([*session_rows, stale_row]),
+                )
+                stale = run(complete_ids, stale_contents)
+                self.assertNotEqual(stale.returncode, 0, field)
 
             def feature_spec_contract(scope: str) -> dict[str, tuple[str, str, str]]:
                 values = dict(scoped_values)
@@ -795,6 +813,16 @@ class OrchestratorContractTests(unittest.TestCase):
                             "source-contract",
                             "issue:01",
                         ),
+                        "feature_spec_ref": (
+                            "spec:demo",
+                            "source-contract",
+                            "issue:01#source_spec_ref",
+                        ),
+                        "feature_spec_title": (
+                            "Feature Spec: Demo",
+                            "source-contract",
+                            "issue:01#source_spec_ref",
+                        ),
                         "target_branch_name": (
                             "feature/demo",
                             "source-contract",
@@ -827,6 +855,16 @@ class OrchestratorContractTests(unittest.TestCase):
             feature_spec_fixture = ledger_fixture.replace(
                 "\n".join(scoped_rows),
                 "\n".join(feature_spec_rows),
+            ).replace(
+                "| Feature Spec thread | feature_spec_ref=not-applicable; "
+                "feature_spec_title=not-applicable; "
+                "feature_spec_thread_assignment=not-applicable |",
+                "| Feature Spec thread | feature_spec_ref=spec:demo; "
+                "feature_spec_title=Feature Spec: Demo; "
+                "feature_spec_thread_assignment=not-applicable |",
+            ).replace(
+                "| Delivery | target_pull_request_ref=not-applicable |",
+                "| Delivery | target_pull_request_ref=pending |",
             )
             default_feature_spec = run(complete_ids, feature_spec_fixture)
             self.assertEqual(
@@ -834,6 +872,219 @@ class OrchestratorContractTests(unittest.TestCase):
                 0,
                 default_feature_spec.stderr,
             )
+
+            visible_feature_spec_fixture = feature_spec_fixture.replace(
+                "\n".join(session_rows),
+                "\n".join(
+                    row("session", field, triple)
+                    for field, triple in visible_session.items()
+                ),
+            )
+            root_owned_feature_spec = visible_feature_spec_fixture
+            root_takeover = run(complete_ids, root_owned_feature_spec)
+            self.assertNotEqual(root_takeover.returncode, 0)
+
+            visible_feature_thread = visible_feature_spec_fixture.replace(
+                "## Workstreams",
+                "## Feature Spec Thread Registry\n\n"
+                "| feature_spec_ref | feature_spec_title | visible_thread_id | "
+                "live_thread_title | workstream_ids | repository_refs | "
+                "pull_request_refs | lifecycle_owner | codex_review_poll_owner | "
+                "state | last_read | drift | corrective_message_evidence | "
+                "thread_state_evidence |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+                "| spec:demo | Feature Spec: Demo | worker-1 | "
+                "Feature Spec: Demo | a | repo | pending | "
+                "visible-feature-spec-thread | visible-feature-spec-thread | "
+                "implementing | now | none | none | thread-read:worker-1@abc |\n\n"
+                "## Workstreams",
+            )
+            visible_feature_thread = visible_feature_thread.replace(
+                "Active workers:\n"
+                "- none\n"
+                "Takeover history:",
+                "Active workers:\n"
+                "- worker_id=worker-1; "
+                "actual_execution_location=visible-codex-app-task; "
+                "workstream_ids=a\n"
+                "Takeover history:",
+            )
+            visible_feature_thread = visible_feature_thread.replace(
+                "| Feature Spec thread | feature_spec_ref=spec:demo; "
+                "feature_spec_title=Feature Spec: Demo; "
+                "feature_spec_thread_assignment=not-applicable |\n"
+                "| Repo / execution location | repo; "
+                "current-orchestrator-session; worker=root |\n"
+                "| Worker evidence | "
+                "actual_execution_location=current-orchestrator-session |",
+                "| Feature Spec thread | feature_spec_ref=spec:demo; "
+                "feature_spec_title=Feature Spec: Demo; "
+                "feature_spec_thread_assignment=required |\n"
+                "| Repo / execution location | repo; "
+                "visible-codex-app-task; worker=worker-1 |\n"
+                "| Worker evidence | "
+                "actual_execution_location=visible-codex-app-task |",
+            ).replace("active_workers=none", "active_workers=worker-1")
+            live_demo = (
+                "worker-1\tFeature Spec: Demo\tactive\trepo\tpending\t"
+                "thread-read:worker-1@abc"
+            )
+            assigned_feature_thread = run(
+                complete_ids,
+                visible_feature_thread,
+                live_demo,
+            )
+            self.assertEqual(
+                assigned_feature_thread.returncode,
+                0,
+                assigned_feature_thread.stderr,
+            )
+            missing_live_thread = run(complete_ids, visible_feature_thread)
+            self.assertNotEqual(missing_live_thread.returncode, 0)
+            live_repo_drift = run(
+                complete_ids,
+                visible_feature_thread,
+                "worker-1\tFeature Spec: Demo\tactive\tother-repo\tpending\t"
+                "thread-read:worker-1@abc",
+            )
+            self.assertNotEqual(live_repo_drift.returncode, 0)
+            encoded_title_thread = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "Feature Spec: Demo",
+                    "Feature Spec: Import %7C Export",
+                ),
+                "worker-1\tFeature Spec: Import %7C Export\tactive\trepo\tpending\t"
+                "thread-read:worker-1@abc",
+            )
+            self.assertEqual(
+                encoded_title_thread.returncode,
+                0,
+                encoded_title_thread.stderr,
+            )
+            unencoded_title_thread = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "Feature Spec: Demo",
+                    "Feature Spec: Import | Export",
+                ),
+                "worker-1\tFeature Spec: Import | Export\tactive\trepo\tpending\t"
+                "thread-read:worker-1@abc",
+            )
+            self.assertNotEqual(unencoded_title_thread.returncode, 0)
+            title_drift = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "| spec:demo | Feature Spec: Demo | worker-1 | "
+                    "Feature Spec: Demo |",
+                    "| spec:demo | Feature Spec: Demo | worker-1 | "
+                    "Wrong title |",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(title_drift.returncode, 0)
+            root_review_polling = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "visible-feature-spec-thread | visible-feature-spec-thread | "
+                    "implementing",
+                    "visible-feature-spec-thread | root | implementing",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(root_review_polling.returncode, 0)
+
+            monitored_feature_thread = visible_feature_thread.replace(
+                "Next Root Check: action=none; target=none; due_at=none",
+                "Next Root Check: action=monitor-thread; target=worker-1; due_at=now",
+            ).replace(
+                "next_action=none; next_target=none; next_due_at=none",
+                "next_action=monitor-thread; next_target=worker-1; next_due_at=now",
+            )
+            monitored = run(complete_ids, monitored_feature_thread, live_demo)
+            self.assertEqual(monitored.returncode, 0, monitored.stderr)
+            split_brain_action = run(
+                complete_ids,
+                monitored_feature_thread.replace(
+                    "next_action=monitor-thread; next_target=worker-1; next_due_at=now",
+                    "next_action=none; next_target=none; next_due_at=none",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(split_brain_action.returncode, 0)
+            correction_without_drift = run(
+                complete_ids,
+                monitored_feature_thread.replace(
+                    "action=monitor-thread; target=worker-1",
+                    "action=send-correction; target=worker-1",
+                ).replace(
+                    "next_action=monitor-thread; next_target=worker-1; next_due_at=now",
+                    "next_action=send-correction; next_target=worker-1; next_due_at=now",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(correction_without_drift.returncode, 0)
+
+            observation = "a" * 64
+            terminal_wait_fixture = ledger_fixture.replace(
+                "## Codex Review Wait Registry\n\n",
+                "## Codex Review Wait Registry\n\n"
+                "| wait_record | wait_profile_pr | request_head | request_object | "
+                "wait_profile | wait_budget_minutes | wait_started_at | "
+                "wait_deadline | wait_state | observation_fingerprint | "
+                "last_transition_at |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+                f"| owner/repo#1@abc123 | owner/repo#1 | abc123 | comment:1 | "
+                f"standard | 15 | t0 | t1 | terminal | {observation} | t2 |\n\n",
+            ).replace(
+                "| Delivery | target_pull_request_ref=not-applicable |",
+                "| Delivery | target_pull_request_ref=not-applicable |\n"
+                "| Codex review evidence | request_head=abc123; "
+                "request_object=comment:1; checker_status=clean; "
+                "wait_record=owner/repo#1@abc123; wait_profile_pr=owner/repo#1; "
+                "wait_profile=standard; wait_budget_minutes=15; "
+                "wait_started_at=t0; wait_deadline=t1; wait_state=terminal; "
+                f"observation_fingerprint={observation}; "
+                "last_transition_at=t2; terminal=clean |",
+            )
+            terminal_wait = run(complete_ids, terminal_wait_fixture)
+            self.assertEqual(terminal_wait.returncode, 0, terminal_wait.stderr)
+            contradictory_wait = run(
+                complete_ids,
+                terminal_wait_fixture.replace(
+                    "checker_status=clean;",
+                    "checker_status=pending;",
+                ).replace(
+                    "wait_state=terminal;",
+                    "wait_state=active;",
+                ).replace("last_transition_at=t2; terminal=clean", "last_transition_at=t2; terminal=none"),
+            )
+            self.assertNotEqual(contradictory_wait.returncode, 0)
+            mismatched_terminal_outcome = run(
+                complete_ids,
+                terminal_wait_fixture.replace(
+                    "last_transition_at=t2; terminal=clean",
+                    "last_transition_at=t2; terminal=findings",
+                ),
+            )
+            self.assertNotEqual(mismatched_terminal_outcome.returncode, 0)
+            orphaned_wait = run(
+                complete_ids,
+                re.sub(
+                    r"\n\| Codex review evidence \|[^\n]+\|",
+                    "",
+                    terminal_wait_fixture,
+                ),
+            )
+            self.assertNotEqual(orphaned_wait.returncode, 0)
+            deadline_drift = run(
+                complete_ids,
+                terminal_wait_fixture.replace(
+                    "wait_started_at=t0; wait_deadline=t1;",
+                    "wait_started_at=t0; wait_deadline=t9;",
+                ),
+            )
+            self.assertNotEqual(deadline_drift.returncode, 0)
 
             missing_permission_source = run(
                 complete_ids,
@@ -1053,7 +1304,10 @@ class OrchestratorContractTests(unittest.TestCase):
             "`codex_review_requirement=explicitly-skipped-by-authorized-user` requires",
             options,
         )
-        self.assertIn("Do not wait for pending or later feedback", gates)
+        self.assertIn(
+            "Do not wait for pending or later feedback",
+            " ".join(gates.split()),
+        )
         self.assertIn("codex_review=skipped", gates)
         self.assertIn("A review skip bypasses only request and wait", delivery)
         self.assertIn(
@@ -1086,6 +1340,9 @@ class OrchestratorContractTests(unittest.TestCase):
     def test_retired_worker_surface_aliases_are_rejected(self) -> None:
         options = self.read("references/options.md")
         worker = self.read("references/worker.md")
+        ledger_template = self.read("references/ledger-template.md")
+        skill = self.read("SKILL.md")
+        recovery = self.read("references/recovery-validation.md")
         rows = self.table_rows("references/options.md", "## Derived Runtime Fields")
 
         actual = self.row_containing(rows, "`actual_execution_location`")
@@ -1103,11 +1360,17 @@ class OrchestratorContractTests(unittest.TestCase):
             "| `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` |",
             worker,
         )
-        self.assertIn(
-            "`run-all-work-in-current-orchestrator-session` requires\n"
-            "  `delegated_worker_visibility=not-applicable`",
-            options,
-        )
+        for retired in (
+            "work_delegation_policy",
+            "delegated_worker_visibility",
+            "max_concurrent_delegated_workers",
+            "max_visible_app_tasks",
+        ):
+            self.assertNotIn(retired, options)
+            self.assertNotIn(retired, worker)
+            self.assertNotIn(retired, ledger_template)
+            self.assertNotIn(retired, recovery)
+            self.assertNotIn(retired, skill)
 
 
     def test_mutation_and_merge_grants_require_owner_scoped_evidence(self) -> None:
@@ -1228,7 +1491,10 @@ class OrchestratorContractTests(unittest.TestCase):
             workspace,
         )
         self.assertIn("`(repo, branch, worktree)` tuple", workspace)
-        self.assertIn("There is no separate workspace execution mode", worker)
+        self.assertIn(
+            "There is no separate workspace execution mode",
+            " ".join(worker.split()),
+        )
         self.assertIn(
             "`repository_layout`, `issue_repository_layout`, `workspace_context`",
             delivery,
@@ -1257,12 +1523,14 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("`issue_update_permission_source_issue_ref`", delivery)
 
 
-    def test_requested_visibility_and_actual_execution_use_distinct_fields(self) -> None:
+    def test_visible_task_consent_is_distinct_from_actual_execution(self) -> None:
+        options = self.read("references/options.md")
         worker = self.read("references/worker.md")
         ledger_template = self.read("references/ledger-template.md")
+        skill = self.read("SKILL.md")
 
         self.assertIn(
-            "| `delegated_worker_visibility` | `orchestrator-decides-between-background-and-visible-workers`, `background-codex-subagents-only`, `visible-codex-app-tasks-only`, `not-applicable` |",
+            "| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` |",
             worker,
         )
         self.assertIn(
@@ -1270,16 +1538,144 @@ class OrchestratorContractTests(unittest.TestCase):
             worker,
         )
         self.assertIn(
-            "delegated_worker_visibility=<orchestrator-decides-between-background-and-visible-workers|not-applicable|background-codex-subagents-only|visible-codex-app-tasks-only>",
+            "visible_app_task_permission=<not-requested|granted-by-authorized-user|denied-by-authorized-user>",
             ledger_template,
         )
         self.assertIn(
             "actual_execution_location=<current-orchestrator-session|background-codex-subagent|visible-codex-app-task>",
             ledger_template,
         )
+        self.assertIn(
+            "internal_subdelegation: allowed-within-assigned-scope",
+            ledger_template,
+        )
+        self.assertIn(
+            "They may create and manage internal background subagents",
+            worker,
+        )
+        self.assertIn(
+            "The root and every spawned Codex thread may create internal "
+            "background subagents",
+            " ".join(options.split()),
+        )
+        self.assertIn(
+            "Any worker may create and manage internal background subagents "
+            "within its assigned scope and action set",
+            " ".join(skill.split()),
+        )
         for stale in ("requested_surface", "actual_surface", "root-thread"):
             self.assertNotIn(stale, worker)
             self.assertNotIn(stale, ledger_template)
+
+    def test_granted_visible_threads_are_mandatory_one_per_feature_spec(self) -> None:
+        skill = self.read("SKILL.md")
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        gates = self.read("references/gates.md")
+        closeout = self.read("references/codex-review-closeout.md")
+        ledger_template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        multi_repo = self.read("references/multi-repo-workspace.md")
+
+        normalized = {
+            name: " ".join(value.split())
+            for name, value in {
+                "skill": skill,
+                "options": options,
+                "worker": worker,
+                "gates": gates,
+                "closeout": closeout,
+                "ledger": ledger_template,
+                "recovery": recovery,
+                "multi_repo": multi_repo,
+            }.items()
+        }
+
+        self.assertIn(
+            "exactly one visible thread per implementation-eligible Feature Spec",
+            normalized["skill"],
+        )
+        self.assertIn(
+            "both authorizes the surface and requires its use for Feature Spec implementation",
+            normalized["options"],
+        )
+        self.assertIn(
+            "Create exactly one active visible Codex App thread for each implementation-eligible Feature Spec",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "title it with the exact Feature Spec title",
+            normalized["options"],
+        )
+        self.assertIn(
+            "Do not split one Feature Spec across multiple active visible threads",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "do not reuse one visible thread for multiple Feature Specs",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "A multi-repository Spec still has one thread",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "create one visible thread per Feature Spec, not per repository",
+            normalized["multi_repo"],
+        )
+
+        self.assertIn(
+            "The root is orchestration-only",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "must not invoke the review check/wait workflow, poll the PR review, fix findings, mutate the PR, or mark it ready",
+            normalized["closeout"],
+        )
+        self.assertIn(
+            "assigned thread is the algorithm's execution and polling owner",
+            normalized["gates"],
+        )
+        self.assertIn(
+            "Never fall back to root-owned or background-only implementation",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "Inside mandatory mode, that value still means the work must integrate as one unit, but the assigned Feature Spec thread is the integration surface",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "root_implementation_fallback: <forbidden|not-applicable>",
+            worker,
+        )
+
+        self.assertIn("## Feature Spec Thread Registry", ledger_template)
+        self.assertIn("encode `%` as `%25`, then `|` as `%7C`", ledger_template)
+        self.assertIn("`feature_spec_ref`: canonical Feature Spec", options)
+        self.assertIn("`feature_spec_title`: title transport", options)
+        self.assertIn("codex_review_poll_owner", ledger_template)
+        self.assertIn("corrective_message_evidence", ledger_template)
+        self.assertIn("thread_state_evidence", ledger_template)
+        self.assertIn(
+            "complete `## Feature Spec Thread Registry`",
+            recovery,
+        )
+        self.assertIn(
+            'feature_spec_backed=(canonical_spec_ref != "not-applicable")',
+            recovery,
+        )
+        self.assertNotIn(
+            'feature_spec_backed=(matches(origin',
+            recovery,
+        )
+        self.assertIn(
+            "Without visible-task consent, the viable App default is root or background subagent execution inside an existing owner-supplied checkout",
+            normalized["worker"],
+        )
+        self.assertIn("LIVE_THREAD_EVIDENCE_ROWS", recovery)
+        self.assertIn("`list_threads`/`read_thread` equivalents", recovery)
+        self.assertIn("`post-review-disposition`", worker)
+        self.assertNotIn("post-root-provided-review-response", worker)
 
     def test_retired_publication_authority_aliases_are_not_supported(self) -> None:
         ledger_template = self.read("references/ledger-template.md")
@@ -1365,6 +1761,11 @@ class OrchestratorContractTests(unittest.TestCase):
             "`request-codex-review` is idempotent per PR head",
             gates,
         )
+        self.assertIn("provider-authored terminal comments", gates)
+        self.assertIn(
+            "A normal `acknowledged` or `pending` result never activates the fallback",
+            gates,
+        )
         self.assertIn(
             "A new\ncommit that changes the PR head invalidates the old result and permits exactly\none new request",
             gates,
@@ -1375,6 +1776,73 @@ class OrchestratorContractTests(unittest.TestCase):
             worker,
         )
         self.assertIn("Actions\nare not a cumulative ladder", worker)
+
+    def test_required_codex_review_keeps_pr_draft_until_current_head_is_dispositioned(
+        self,
+    ) -> None:
+        closeout = self.read("references/codex-review-closeout.md")
+        delivery = self.read("references/spec-backed-delivery.md")
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        normalized_closeout = " ".join(closeout.split())
+        normalized_delivery = " ".join(delivery.split())
+        normalized_options = " ".join(options.split())
+        normalized_worker = " ".join(worker.split())
+
+        state_section = closeout.split(
+            "Use this closeout state order for merge-ready PR work:", 1
+        )[1].split("Do not final-answer", 1)[0]
+        states = [
+            match.group(1)
+            for line in state_section.splitlines()
+            if (match := re.match(r"\d+\. `([^`]+)`", line))
+        ]
+
+        self.assertLess(
+            states.index("codex-review-requested-or-reused"),
+            states.index("ready-for-review"),
+        )
+        self.assertLess(
+            states.index("current-head-terminal-result-received"),
+            states.index("ready-for-review"),
+        )
+        self.assertLess(
+            states.index("closeout-head-current"),
+            states.index("ready-for-review"),
+        )
+        self.assertLess(
+            states.index("ready-for-review"),
+            states.index("post-ready-head-and-ci-current"),
+        )
+        self.assertIn(
+            "keep it draft through the policy-specific review",
+            normalized_closeout,
+        )
+        self.assertIn(
+            "This flow uses the manual top-level PR-comment trigger `@codex review`. Automatic reviews are a separate repository setting",
+            normalized_closeout,
+        )
+        self.assertIn(
+            "Never mark a draft PR ready while required review is pending",
+            normalized_closeout,
+        )
+        self.assertIn(
+            "verified terminal current-head Codex result, fully dispositioned "
+            "feedback, and no unresolved actionable findings",
+            normalized_closeout,
+        )
+        self.assertIn(
+            "keep it draft through required current-head Codex review",
+            normalized_delivery,
+        )
+        self.assertIn(
+            "then `mark-pull-request-ready` only after",
+            normalized_options,
+        )
+        self.assertIn(
+            "keep the PR draft while request and polling actions run",
+            normalized_worker,
+        )
 
     def test_codex_review_wait_budget_is_total_capped_and_pr_scoped(self) -> None:
         gates = self.read("references/codex-review-closeout.md")
@@ -1523,11 +1991,26 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("wait_record=<pr-ref@head|none|not-applicable>", ledger_template)
         self.assertIn("wait_started_at=<timestamp|none|not-applicable>", ledger_template)
         self.assertIn("wait_deadline=<timestamp|none|not-applicable>", ledger_template)
-        self.assertIn("wait_elapsed_seconds=<number|none|not-applicable>", ledger_template)
+        self.assertIn(
+            "observation_fingerprint=<sha256|none|not-applicable>",
+            ledger_template,
+        )
+        self.assertIn(
+            "last_transition_at=<timestamp|none|not-applicable>",
+            ledger_template,
+        )
+        self.assertNotIn("wait_elapsed_seconds", ledger_template)
         self.assertIn(
             "wait_state=<not-started|active|monitoring-required|terminal|not-applicable>",
             ledger_template,
         )
+        self.assertIn("single bounded waiter", wait_contract)
+        self.assertIn("do not replace it with a caller loop", wait_contract.lower())
+        self.assertIn(
+            "Repeated polls\nwith the same fingerprint inside one bounded waiter perform no ledger write",
+            wait_contract,
+        )
+        self.assertIn("write the next scheduled\n`due_at` once", wait_contract)
         self.assertNotIn("wait_profile", options)
 
 

@@ -13,10 +13,14 @@ owner invokes `$codex-orchestrator` or asks to run Codex Orchestrator. Do not
 auto-select it for ordinary implementation, planning, triage, GitHub, commit,
 PR, or multi-repo requests.
 
-The root owns source routing, the active-root claim, Goal mode or ledger
-fallback, worker lifecycle, integration, gates, publication decisions, source
-closeout, and final status. Workers own only their assigned inspection,
-implementation, validation, and report.
+The root always owns source routing, the active-root claim, Goal mode or ledger
+fallback, worker lifecycle, permission and strategy decisions, ledger state,
+source closeout, and final status. Execution ownership depends on the resolved
+worker mode. When visible Codex threads are not enabled, workers own only their
+assigned inspection, implementation, validation, and report. When
+`visible_app_task_permission=granted-by-authorized-user`, exactly one visible
+thread owns each implementation-eligible Feature Spec through its complete
+merge-ready PR lifecycle; the root becomes orchestration-only for that work.
 
 ## Non-Negotiable Invariants
 
@@ -29,15 +33,25 @@ implementation, validation, and report.
 - Resolve `references/ledger.md` before implementation, worker creation, or
   source mutation. Stop as `needs-owner` when another live root claims an
   overlapping repo realpath or source id.
-- Workers never become roots: no ledger edits, subdelegation, worker/task
-  management, takeover/handoff decisions, source mutation, branch/PR strategy,
-  merge, or closeout decisions.
+- Workers never become roots: no ledger edits, visible App task or sibling/root
+  worker management, takeover/handoff decisions, source mutation, branch/PR
+  strategy decisions, merge decisions, or final source closeout. An assigned
+  visible Feature Spec thread does own the already-decided implementation,
+  integration, validation, publication, Codex-review request and polling,
+  feedback disposition and fixes, CI, parent-closing-keyword preparation, and
+  ready transition required for its selected delivery target. Any worker may
+  create and manage internal background subagents within its assigned scope and
+  action set; those subagents inherit the same authority ceiling and report
+  through their parent.
 - The root resolves `worker_allowed_actions` per workstream. Actions are
   explicit, independent, and non-cumulative; allowed paths can narrow an action
   but never grant another one.
-- Keep shared contracts, integration, gate decisions, publication decisions,
-  and closeout in the root. A worker may execute exact authorized publication
-  operations without acquiring those decisions.
+- Keep shared contracts, permission and strategy decisions, merge, ledger
+  closeout, and final source status in the root. Outside mandatory visible
+  Feature Spec thread mode, also keep integration and gate decisions in the
+  root. Inside that mode, the assigned thread executes the complete decided
+  delivery and gate sequence while the root only monitors and reconciles its
+  evidence.
 - Treat worker status as evidence, not lifecycle or source closeout. Read the
   latest worker state before steering or lifecycle changes.
 - Preserve user-owned uncommitted changes. Preserve the caller checkout unless
@@ -48,6 +62,8 @@ implementation, validation, and report.
   worktree. If that surface is unavailable, require
   `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`
   before an unmanaged Git worktree fallback.
+  Without visible consent, App root/background work stays in an existing
+  owner-supplied checkout unless the owner grants one of those checkout paths.
   CLI-only sessions are exempt.
 - Read-only discovery never grants GitHub, release, automation, or other
   external mutation authority.
@@ -108,12 +124,20 @@ Run this deterministic loop:
    `references/multi-repo-workspace.md` only for
    `repository_layout=multi-repository-workspace` or a registered source/handoff
    with `workspace_context=multi-repository-workspace`.
-4. **DISPATCH** — select one bounded wave; keep shared work in the root and load
-   `references/worker.md` before any delegation.
+4. **DISPATCH** — select one bounded wave and load `references/worker.md` before
+   any delegation. In mandatory visible Feature Spec thread mode, create or
+   resume the single assigned thread for each eligible Feature Spec; never keep
+   that Spec's implementation or review work in the root.
 5. **INTEGRATE** — read current worker state, revalidate capabilities, accept or
-   reject output, rerun root-owned proof, and record lifecycle decisions.
-6. **GATE** — apply `references/gates.md`, focused validation, `$autoreview` for
-   non-trivial edits, and only authorized publication/source mutations. Use
+   reject reported evidence, and record lifecycle decisions. In mandatory
+   visible Feature Spec thread mode, the assigned thread integrates its own
+   work; the root must not apply, copy, reimplement, validate, or repair it.
+6. **GATE** — apply `references/gates.md`. Outside mandatory visible Feature
+   Spec thread mode, run focused validation, `$autoreview` for non-trivial
+   edits, and authorized publication/source mutations in the owning execution
+   surface. Inside that mode, require the assigned thread to execute every
+   implementation and PR gate through merge-ready while the root monitors its
+   evidence and sends corrective messages when it drifts. Use
    status, diff stat/name lists, and focused hunks during iteration; read the
    complete relevant diff only for review/publication or a failing gate.
 7. **RECONCILE** — rescan due sources, replace stale projections, record the
@@ -155,27 +179,33 @@ blockers.
 
 ## Workers And Runtime Surfaces
 
-Resolve `work_delegation_policy`, `delegated_worker_visibility`,
-`max_concurrent_delegated_workers`, `visible_app_task_permission`,
-`max_visible_app_tasks`, `unmanaged_git_worktree_fallback_permission`, and
-`repository_layout` from `references/options.md`. Defaults are
-`work_delegation_policy=orchestrator-decides-for-each-implementation-workstream`,
-`delegated_worker_visibility=orchestrator-decides-between-background-and-visible-workers`,
+Resolve `visible_app_task_permission`, `unmanaged_git_worktree_fallback_permission`,
+and `repository_layout` from `references/options.md`. Defaults are
 `visible_app_task_permission=not-requested`, and
 `unmanaged_git_worktree_fallback_permission=not-granted`. Visible user-owned App
-tasks require `visible_app_task_permission=granted-by-authorized-user` and a
-positive `max_visible_app_tasks`.
+tasks require `visible_app_task_permission=granted-by-authorized-user`. That
+value selects mandatory visible Feature Spec thread mode: create exactly one
+visible thread per implementation-eligible Feature Spec, title it with the
+exact Feature Spec title, and keep all of that Spec's issue, repo, PR,
+Codex-review, CI, and merge-readiness work in that thread. The root chooses only
+when those threads start and whether they run serially or in parallel from
+dependencies and live capacity. The root and every spawned Codex thread may
+use internal background subagents within their assigned scope; no user
+worker-count or topology option exists.
 
 Load `references/worker.md` before delegation. It owns current tool mapping,
 surface wording, permission, capability snapshots, worker actions, prompts,
 execution reports, resync, integration, artifacts, and lifecycle. Do not copy
 session worker choices into Feature Specs, issues, project memory, or handoffs.
 
-When the App root chooses a new dedicated worktree, create the visible App task
-with that worktree before implementation and keep the work in its managed
-surface. Input wording may supply option-resolution evidence, but the root must
-persist the resolved fields before creating a worker. It must never carry the
-wording itself as a worker-visibility, permission, or limit value.
+When mandatory visible Feature Spec thread mode is selected, create the thread
+and its managed worktree before implementation. If the visible create/read/
+message surface cannot represent the assignment, stop or replace the visible
+thread; never fall back to root-owned or background-only implementation,
+integration, validation, review, or review polling for that Feature Spec. Input
+wording may supply option-resolution evidence, but the root must persist the
+resolved fields before creating a visible worker. It must never carry the
+wording itself as a worker permission, count, topology, or scheduling value.
 
 At worker create, reuse, resume-equivalent, or fork—and before any network or
 external mutation—record the capability snapshot required by `worker.md`. A
@@ -200,9 +230,12 @@ Codex review and parent Feature Spec closeout algorithm. Its review default is
 scoped authorized-user instruction may select
 `explicitly-skipped-by-authorized-user`, which bypasses only the review request
 and wait. `validated-draft-pull-request-published` never enters that route.
-Parent closeout is root-owned, `armed` is not actual closure, and neither the
-parent Feature Spec nor the ledger completes before merge and verified issue
-closure.
+In mandatory visible Feature Spec thread mode, the assigned thread owns the
+pre-merge parent-closeout mutation and proof required for its PR to become
+merge-ready. The root owns the ledger watch, any authorized merge, post-merge
+verification, and final source closeout. `armed` is not actual closure, and
+neither the parent Feature Spec nor the ledger completes before merge and
+verified issue closure.
 
 Merge is root-owned and unavailable by default. Set
 `pull_request_merge_permission=granted-for-named-pull-request` only for an

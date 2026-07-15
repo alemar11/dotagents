@@ -605,29 +605,38 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("## Session Option Resolution", worker)
         self.assertNotIn("policy-auto-dispatched", worker)
         self.assertNotIn("policy-auto-dispatched", ledger)
-        self.assertIn(
-            "`orchestrator-decides-for-each-implementation-workstream`, "
-            "`run-all-work-in-current-orchestrator-session`, "
-            "`orchestrator-decides-with-concurrent-worker-limit`",
-            orchestrator_options,
-        )
+        for retired in (
+            "work_delegation_policy",
+            "delegated_worker_visibility",
+            "max_concurrent_delegated_workers",
+            "max_visible_app_tasks",
+        ):
+            self.assertNotIn(retired, orchestrator_options)
+            self.assertNotIn(retired, ledger_template)
         self.assertIn(
             "`visible_app_task_permission` | `not-requested`, "
             "`granted-by-authorized-user`, `denied-by-authorized-user`",
             orchestrator_options,
         )
         self.assertIn(
-            "work_delegation_policy: "
-            "orchestrator-decides-for-each-implementation-workstream|"
-            "run-all-work-in-current-orchestrator-session|"
-            "orchestrator-decides-with-concurrent-worker-limit",
-            ledger_template,
-        )
-        self.assertIn(
             "visible_app_task_permission: "
             "not-requested|granted-by-authorized-user|denied-by-authorized-user",
             ledger_template,
         )
+        self.assertIn(
+            "internal_subdelegation: allowed-within-assigned-scope",
+            ledger_template,
+        )
+        self.assertIn("## Feature Spec Thread Registry", ledger_template)
+        self.assertIn(
+            "both authorizes the surface and requires its use for Feature Spec implementation",
+            " ".join(orchestrator_options.split()),
+        )
+        self.assertIn(
+            "exactly one active visible Codex App thread for each",
+            " ".join(worker.split()),
+        )
+        self.assertIn("codex_review_poll_owner", ledger_template)
         self.assertIn("## Wave Reports", ledger_template)
         self.assertIn("Execution Report", ledger_template)
         self.assertNotIn("## Wave Checkpoints", ledger)
@@ -1204,6 +1213,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("worker_allowed_actions:", worker)
         self.assertIn("Worker evidence", ledger_template)
         self.assertIn("Worker evidence", worker)
+        self.assertIn("feature_spec_thread_assignment", worker)
+        self.assertIn("root_implementation_fallback", worker)
         self.assertIn(
             "parallelism=<parallel|sequential|root-owned|simulated>",
             ledger_template,
