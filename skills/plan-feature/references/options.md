@@ -53,6 +53,67 @@ current Feature Spec value; `repository_layout=multi-repository-workspace`;
 linked parent/global or sibling-partial evidence; safe project-memory evidence;
 otherwise `not-applicable`. A contradiction stops as `needs-owner`.
 
+## Feature Dependency Contract
+
+Every newly produced Feature Spec contains a `## Feature Dependencies` table.
+This table is the sole owner of authored cross-Feature-Spec edges and uses
+exactly these columns:
+
+| Field | Allowed values | Default | Notes |
+| --- | --- | --- | --- |
+| `upstream_feature_spec_ref` | A durable hosted or local Feature Spec ref; a `draft-spec:<...>` ref only in non-mutating output | None | Required and unique per downstream Feature Spec; it cannot reference the downstream Feature Spec itself. |
+| `dependency_start_condition` | `upstream-merged`, `upstream-merge-ready-head` | `upstream-merged` per authored edge | Persist the resolved value in every data row. The second value is an explicit early-stacking request, not a general permission to bypass dependencies. |
+| `dependency_reason` | Non-empty portable text | None | Explain the concrete capability, contract, or implementation result required from the upstream Feature Spec. |
+
+The start condition describes the upstream Feature Spec's implementation
+delivery, not whether its planning issue is open or closed.
+`upstream-merged` requires the upstream implementation PR to be merged into its
+intended base with integration proof. `upstream-merge-ready-head` permits the
+downstream to start only from the upstream PR's verified current merge-ready
+head; a stale or merely draft head does not satisfy it.
+
+An empty table body means the Feature Spec has no authored cross-Spec edges.
+A legacy Feature Spec without this section is read as having no authored
+cross-Spec edges; absence never implies an edge from prose and never permits
+`upstream-merge-ready-head`. The Feature Spec phase adds the section when it
+creates or intentionally updates a Feature Spec, but the issue phase does not
+rewrite a legacy source merely to add it.
+
+Before returning, publishing, updating, or splitting a Feature Spec:
+
+- resolve every ref to one Feature Spec in the current planning scope; accept
+  `#<number>` only when the owning repository is unambiguous, otherwise require
+  a hosted URL or repo-qualified durable local path;
+- reject missing, duplicate, unresolved, or self refs and non-empty rows with
+  missing reasons;
+- normalize edges from upstream to downstream and validate the reachable
+  Feature Spec graph is acyclic; unresolved graph nodes block output rather
+  than being inferred from titles or prose;
+- keep these edges separate from generated issue `dependency_ids` and
+  `blocked_issue_ids`, which identify issues inside one Feature Spec only.
+
+`upstream-merge-ready-head` is valid as an authored early-stack edge only when
+these static conditions are proven from the two source contracts:
+
+- each Feature Spec resolves to exactly one repository and both resolve to the
+  same canonical repository;
+- both use
+  `change_delivery_target=pull-request-ready-for-merge-but-not-merged`;
+- a multi-repository scope, unequal repository, or ambiguous scope rejects the
+  authored early-stack condition. Do not silently rewrite it; require the owner
+  to select `upstream-merged` or repair the invalid source contract.
+
+Planning does not require the upstream PR to be merge-ready or merged already;
+the condition describes a future dispatch gate. At runtime, Orchestrator may
+start from an unmerged head only when exactly one early-stack upstream remains
+unmerged, every other direct and transitive dependency is merged, and the
+current unmerged stack contains exactly the upstream and downstream Specs.
+Otherwise it waits without treating the authored graph as invalid.
+
+Early-stack validation authorizes only using the verified upstream merge-ready
+PR head as the downstream starting point. It does not authorize merging,
+closing, retargeting, or bypassing review on either pull request.
+
 ## Per-Issue Registry
 
 Resolve these fields after the issue graph exists and before emitting an issue

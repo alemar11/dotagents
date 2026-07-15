@@ -42,7 +42,8 @@ Receive the verified run-level `option_resolution` rows and
 - the planning identity (`feature_slug` and any selected `product_slug`,
   `workspace_path`, `context_file`, `project_slug`, `repository_layout`,
   `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
-  and `workspace_feature_repos`);
+  and `workspace_feature_repos`), plus the authored `feature_dependencies`
+  rows defined by `references/options.md`;
 - pending or existing `source_spec_ref` state and the
   `hosted_body_file_policy=transient-outside-repo` transport rule;
 - `capture_mode=defer-to-caller`, `capture_outcome`, and the structured
@@ -181,6 +182,25 @@ the Feature Spec. Prefer defaults when the repo or project memory already implie
 Use `references/spec-template.md` unless the repo has a stronger local Feature Spec
 format.
 
+Create the mandatory `## Feature Dependencies` section before publication.
+Render exactly the canonical columns from `references/options.md`; use an
+empty table body when no cross-Spec edge is authored. For every edge, resolve
+the default `dependency_start_condition=upstream-merged`, require a non-empty
+portable `dependency_reason`, resolve the upstream ref, and validate the
+reachable upstream-to-downstream graph is acyclic. Do not infer edges from
+Issue-Splitting Notes, prose ordering, implementation issue IDs, branch names,
+or similar titles.
+
+Accept `dependency_start_condition=upstream-merge-ready-head` only when the
+static authoring contract in `references/options.md` passes: each edge connects
+two Feature Specs in the same single repository and both select the merge-ready
+PR delivery target. Reject multi-repo, ambiguous, or unequal-repo cases instead
+of weakening the edge. Do not require current merge-ready or merged runtime
+state during planning; Orchestrator owns the one-unmerged-upstream, all-other-
+dependencies-merged, and maximum-unmerged-depth-two dispatch gates. This is
+planning metadata only and grants no merge, close, retarget, or review-bypass
+authority.
+
 Before returning, writing, or publishing the Feature Spec, sanitize every source and
 evidence reference that came from local filesystem inspection. Published Feature Specs
 must not include developer-machine absolute paths such as `/Users/<name>/...`,
@@ -315,6 +335,8 @@ Return:
   `issue_update_permission`, `issue_update_permission_evidence`,
   `codex_review_requirement`, `target_branch_name`, and
   `pull_request_count_strategy`,
+- the validated `feature_dependencies` rows plus ref-resolution and acyclicity
+  evidence, or `none` for an empty table,
 - `workspace_child_source_refs` mapping each `workspace_feature_repos` repo to
   its child partial Feature Spec ref only after the child partial artifact set
   exists. Keys are canonical repo slugs and must match
@@ -337,6 +359,11 @@ Return:
   `## Domain Knowledge Handoff`,
 - whether it is ready for the issue phase to create generated implementation
   issues.
+
+When reading a legacy Feature Spec during an intentional update, a missing
+`## Feature Dependencies` section means zero authored cross-Spec edges and no
+early-stack permission. Add the mandatory empty section to the updated output;
+never recover dependency edges from prose.
 
 ## Evidence And Phase Metrics
 

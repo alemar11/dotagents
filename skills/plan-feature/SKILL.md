@@ -109,6 +109,13 @@ domain-closeout gates required by the selected mode.
 - Carry a durable `source_spec_ref` into every generated issue. A
   `draft-spec:<...>` ref is inspection-only until replaced by a hosted Feature Spec
   number or durable local path.
+- Keep authored cross-Feature-Spec ordering exclusively in each Feature Spec's
+  mandatory `## Feature Dependencies` table. Resolve every authored edge to a
+  canonical start condition, validate its ref and the full acyclic Feature Spec
+  graph, and treat a legacy Feature Spec with no such section as having no
+  authored cross-Spec edges and no early-stacking permission. Generated issue
+  `dependency_ids` and `blocked_issue_ids` remain intra-Spec only; the issue
+  phase preserves but never copies or reinterprets Feature Spec edges.
 - Keep worker surfaces, worker counts, publication authority, runtime issue
   mutation overrides, and other `$codex-orchestrator` session choices out of
   Feature Specs, generated issues, handoffs, local tracker files, and draft commands.
@@ -241,7 +248,8 @@ Skip only when `issues-from-existing-spec` uses an unchanged durable Feature Spe
 Otherwise load `references/spec-phase.md` and its required template, then pass
 the resolved mode, execution profile, target, no-mutation override, planning
 identity, delivery values, partial-output value, option-resolution evidence,
-source-ref state, and domain delta. A `lean-spec` run reads only the phase's
+source-ref state, authored Feature Spec dependency rows, and domain delta. A
+`lean-spec` run reads only the phase's
 minimum evidence set unless a gate forces widening.
 
 Require a durable local/hosted `source_spec_ref`, or a deterministic
@@ -254,7 +262,8 @@ material blocker back through clarification. Stop here for `spec-only`.
 Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 `references/vertical-slices.md`. Pass the same identity, delivery, source-ref,
 target, `capture_outcome`, domain-delta, partial-output, option-resolution,
-workspace child source mapping, and execution-profile fields. A `lean-issues` run still hardens and validates every
+workspace child source mapping, verified Feature Spec dependency graph, and
+execution-profile fields. A `lean-issues` run still hardens and validates every
 issue separately; it only narrows discovery and uses delta evidence between
 issue passes.
 

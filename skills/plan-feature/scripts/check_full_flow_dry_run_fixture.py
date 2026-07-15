@@ -165,7 +165,274 @@ def iter_active_text_files() -> list[Path]:
     return sorted(set(files))
 
 
+MERGE_READY_DELIVERY = "pull-request-ready-for-merge-but-not-merged"
+FEATURE_DEPENDENCY_STARTS = {
+    "upstream-merged",
+    "upstream-merge-ready-head",
+}
+
+
+def validate_feature_dependency_fixture(
+    specs: dict[str, dict[str, object]],
+    downstream_ref: str,
+) -> dict[str, object]:
+    """Executable fixture for the authored cross-Feature-Spec contract."""
+
+    if downstream_ref not in specs:
+        raise ValueError("downstream Feature Spec ref must resolve")
+
+    graph: dict[str, list[str]] = {ref: [] for ref in specs}
+    normalized: dict[str, list[dict[str, str]]] = {}
+    legacy_refs: set[str] = set()
+
+    for ref, spec in specs.items():
+        raw_dependencies = spec.get("dependencies")
+        if raw_dependencies is None:
+            legacy_refs.add(ref)
+            dependencies: list[dict[str, str]] = []
+        else:
+            dependencies = list(raw_dependencies)  # type: ignore[arg-type]
+
+        seen_upstreams: set[str] = set()
+        normalized[ref] = []
+        for edge in dependencies:
+            upstream_ref = edge.get("upstream_feature_spec_ref", "")
+            start = edge.get("dependency_start_condition") or "upstream-merged"
+            reason = edge.get("dependency_reason", "").strip()
+            if not upstream_ref or upstream_ref not in specs:
+                raise ValueError("upstream Feature Spec ref must resolve")
+            if upstream_ref == ref:
+                raise ValueError("Feature Spec cannot depend on itself")
+            if upstream_ref in seen_upstreams:
+                raise ValueError("duplicate upstream Feature Spec ref")
+            if start not in FEATURE_DEPENDENCY_STARTS:
+                raise ValueError("invalid dependency start condition")
+            if not reason:
+                raise ValueError("dependency reason is required")
+            seen_upstreams.add(upstream_ref)
+            graph[upstream_ref].append(ref)
+            normalized[ref].append(
+                {
+                    "upstream_feature_spec_ref": upstream_ref,
+                    "dependency_start_condition": start,
+                    "dependency_reason": reason,
+                }
+            )
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(ref: str) -> None:
+        if ref in visiting:
+            raise ValueError("Feature Spec graph must be acyclic")
+        if ref in visited:
+            return
+        visiting.add(ref)
+        for downstream in graph[ref]:
+            visit(downstream)
+        visiting.remove(ref)
+        visited.add(ref)
+
+    for ref in specs:
+        visit(ref)
+
+    downstream_edges = normalized[downstream_ref]
+    early_edges = [
+        edge
+        for edge in downstream_edges
+        if edge["dependency_start_condition"] == "upstream-merge-ready-head"
+    ]
+    if not early_edges:
+        return {
+            "early_stack_edge_static_eligible": False,
+            "legacy_missing_section": downstream_ref in legacy_refs,
+            "dependencies": normalized[downstream_ref],
+        }
+    if downstream_ref in legacy_refs:
+        raise ValueError("legacy Feature Spec cannot request early stacking")
+    downstream = specs[downstream_ref]
+    downstream_repos = tuple(downstream.get("repositories", ()))
+    for edge in early_edges:
+        early_upstream = edge["upstream_feature_spec_ref"]
+        upstream = specs[early_upstream]
+        upstream_repos = tuple(upstream.get("repositories", ()))
+        if (
+            len(downstream_repos) != 1
+            or len(upstream_repos) != 1
+            or downstream_repos != upstream_repos
+        ):
+            raise ValueError("early stacking requires the same single repository")
+        if (
+            downstream.get("change_delivery_target") != MERGE_READY_DELIVERY
+            or upstream.get("change_delivery_target") != MERGE_READY_DELIVERY
+        ):
+            raise ValueError("both Feature Specs require merge-ready PR delivery")
+    return {
+        "early_stack_edge_static_eligible": True,
+        "legacy_missing_section": False,
+        "upstream_feature_spec_refs": [
+            edge["upstream_feature_spec_ref"] for edge in early_edges
+        ],
+        "dependencies": downstream_edges,
+    }
+
+
 class FullFlowDryRunFixtureTests(unittest.TestCase):
+    def test_feature_dependency_contract_and_early_stack_fixture(self) -> None:
+        specs: dict[str, dict[str, object]] = {
+            "spec:a": {
+                "dependencies": [],
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+            "spec:b": {
+                "dependencies": [
+                    {
+                        "upstream_feature_spec_ref": "spec:a",
+                        "dependency_start_condition": "upstream-merge-ready-head",
+                        "dependency_reason": "Needs the API introduced by spec:a.",
+                    }
+                ],
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+        }
+
+        result = validate_feature_dependency_fixture(specs, "spec:b")
+
+        self.assertTrue(result["early_stack_edge_static_eligible"])
+        self.assertEqual(["spec:a"], result["upstream_feature_spec_refs"])
+
+    def test_feature_dependency_default_and_legacy_fixture(self) -> None:
+        specs: dict[str, dict[str, object]] = {
+            "spec:a": {
+                "dependencies": [],
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+            "spec:default": {
+                "dependencies": [
+                    {
+                        "upstream_feature_spec_ref": "spec:a",
+                        "dependency_reason": "Needs the upstream contract.",
+                    }
+                ],
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+            "spec:legacy": {
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+        }
+
+        default_result = validate_feature_dependency_fixture(specs, "spec:default")
+        legacy_result = validate_feature_dependency_fixture(specs, "spec:legacy")
+
+        self.assertEqual(
+            "upstream-merged",
+            default_result["dependencies"][0]["dependency_start_condition"],
+        )
+        self.assertFalse(default_result["early_stack_edge_static_eligible"])
+        self.assertTrue(legacy_result["legacy_missing_section"])
+        self.assertEqual([], legacy_result["dependencies"])
+
+    def test_feature_dependency_fixture_rejects_invalid_graphs(self) -> None:
+        base: dict[str, dict[str, object]] = {
+            "spec:a": {
+                "dependencies": [],
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+            "spec:b": {
+                "dependencies": [
+                    {
+                        "upstream_feature_spec_ref": "spec:a",
+                        "dependency_start_condition": "upstream-merge-ready-head",
+                        "dependency_reason": "Needs spec:a.",
+                    }
+                ],
+                "repositories": ("repo",),
+                "change_delivery_target": MERGE_READY_DELIVERY,
+            },
+        }
+
+        invalid_ref = {ref: dict(spec) for ref, spec in base.items()}
+        invalid_ref["spec:b"]["dependencies"] = [
+            {
+                "upstream_feature_spec_ref": "spec:missing",
+                "dependency_start_condition": "upstream-merged",
+                "dependency_reason": "Missing source.",
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "ref must resolve"):
+            validate_feature_dependency_fixture(invalid_ref, "spec:b")
+
+        cycle = {ref: dict(spec) for ref, spec in base.items()}
+        cycle["spec:a"]["dependencies"] = [
+            {
+                "upstream_feature_spec_ref": "spec:b",
+                "dependency_start_condition": "upstream-merged",
+                "dependency_reason": "Creates a cycle.",
+            }
+        ]
+        with self.assertRaisesRegex(ValueError, "acyclic"):
+            validate_feature_dependency_fixture(cycle, "spec:b")
+
+        multi_repo = {ref: dict(spec) for ref, spec in base.items()}
+        multi_repo["spec:b"]["repositories"] = ("repo", "other")
+        with self.assertRaisesRegex(ValueError, "same single repository"):
+            validate_feature_dependency_fixture(multi_repo, "spec:b")
+
+        deep_authored_graph = {ref: dict(spec) for ref, spec in base.items()}
+        deep_authored_graph["spec:root"] = {
+            "dependencies": [],
+            "repositories": ("repo",),
+            "change_delivery_target": MERGE_READY_DELIVERY,
+        }
+        deep_authored_graph["spec:a"] = {
+            **deep_authored_graph["spec:a"],
+            "dependencies": [
+                {
+                    "upstream_feature_spec_ref": "spec:root",
+                    "dependency_start_condition": "upstream-merge-ready-head",
+                    "dependency_reason": "Runtime must serialize the live stack.",
+                }
+            ],
+        }
+        deep_result = validate_feature_dependency_fixture(
+            deep_authored_graph,
+            "spec:b",
+        )
+        self.assertTrue(deep_result["early_stack_edge_static_eligible"])
+        self.assertEqual(["spec:a"], deep_result["upstream_feature_spec_refs"])
+
+    def test_feature_dependency_contract_is_projected_without_issue_edges(self) -> None:
+        plan_feature = read("plan-feature/SKILL.md")
+        options = read("plan-feature/references/options.md")
+        spec_template = read("plan-feature/references/spec-template.md")
+        spec_phase = read("plan-feature/references/spec-phase.md")
+        issue_phase = read("plan-feature/references/issue-phase.md")
+
+        self.assertIn("## Feature Dependencies", spec_template)
+        self.assertIn(
+            "| upstream_feature_spec_ref | dependency_start_condition | dependency_reason |",
+            spec_template,
+        )
+        self.assertIn("`upstream-merged`, `upstream-merge-ready-head`", options)
+        self.assertIn("maximum-unmerged-depth-two dispatch gates", spec_phase)
+        self.assertIn("same canonical repository", options)
+        self.assertIn(
+            "validate the\nreachable upstream-to-downstream graph is acyclic",
+            spec_phase,
+        )
+        self.assertIn("legacy Feature Spec with no such section", plan_feature)
+        self.assertIn("cannot\nrequest early stacking", issue_phase)
+        self.assertIn(
+            "Never copy an\n`upstream_feature_spec_ref` into `dependency_ids`",
+            issue_phase,
+        )
+
     def test_multi_repo_workspace_topology_propagation_fixture(self) -> None:
         workspace_feature_repos = ("api", "web")
         child_specs = {

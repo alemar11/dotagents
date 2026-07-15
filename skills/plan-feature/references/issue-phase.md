@@ -24,6 +24,9 @@ issue must be hardened with `$plan-harder` before it is returned or published.
 - Treat the final hardened issue bodies as the execution graph. Validate IDs,
   direct edges, acyclicity, startability, and integration proof; never persist a
   separate scheduling artifact.
+- Preserve the Feature Spec's validated cross-Spec dependency graph without
+  copying or reinterpreting it. Feature Spec refs never become generated issue
+  `dependency_ids`, `blocked_issue_ids`, or Orchestrator Handoff fields.
 - A required domain delta has exactly one final integration owner, never a
   docs-only task, and requires `$project-memory` with
   `memory_slice=domain-memory` and
@@ -63,6 +66,8 @@ Receive the verified run-level `option_resolution` rows and
   `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
   `workspace_feature_repos`, and issue target repos);
 - the resolved `source_spec_ref` and draft fingerprint when applicable;
+- the verified `feature_dependencies` rows plus ref-resolution and acyclicity
+  evidence from the Feature Spec phase when available;
 - `workspace_child_source_refs`, mapping each feature-wide repo to its
   repo-scoped partial Feature Spec ref when
   `workspace_context=multi-repository-workspace`. Keys are canonical repo slugs and
@@ -102,6 +107,22 @@ Render the validated rows through `references/issue-body-template.md`.
 `project-memory/config/triage-labels.md` maps them only at the GitHub boundary.
 Reject retired planning aliases before splitting; do not normalize them in the
 issue phase.
+
+Before splitting, validate the source Feature Spec's `## Feature Dependencies`
+table against `references/options.md`, including ref resolution and the acyclic
+upstream-to-downstream graph. In `issues-from-existing-spec`, perform this
+validation directly because no Feature Spec phase may have run. A legacy
+Feature Spec with no section has zero authored cross-Spec edges and cannot
+request early stacking; preserve that meaning without rewriting the artifact.
+If a section is present, preserve its rows exactly in the phase handoff.
+
+Cross-Spec and intra-Spec graphs have separate owners. Never copy an
+`upstream_feature_spec_ref` into `dependency_ids` or `blocked_issue_ids`, never
+turn a Feature Spec edge into a generated issue edge, and never infer a
+cross-Spec edge from issue ordering. Generated issue dependencies continue to
+use only IDs (`01`, `02`, ...) from the current Feature Spec. The source
+`source_spec_ref` lets Orchestrator read the owning Feature Spec dependency
+contract at dispatch time.
 
 ## Workflow
 

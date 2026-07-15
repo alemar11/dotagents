@@ -88,6 +88,12 @@ What user or system problem this solves.
   exceptions. The issue phase validates the generated issue graph before
   publication.
 
+## Feature Dependencies
+
+| upstream_feature_spec_ref | dependency_start_condition | dependency_reason |
+| --- | --- | --- |
+| [durable Feature Spec ref] | [upstream-merged or upstream-merge-ready-head] | [concrete non-empty reason] |
+
 ## Cross-Repo Contracts
 
 Include only when multiple repositories or packages must remain compatible:
@@ -138,3 +144,9 @@ deferred handoff for the final implementation task, not completed capture.
   - Update the target surfaces after implementation and verify they describe
     the integrated behavior that actually landed.
 ```
+
+The `## Feature Dependencies` section is mandatory for every newly produced
+Feature Spec. Emit exactly one data row per authored upstream edge. When there
+are no edges, retain the heading and table header but omit the placeholder data
+row. Resolve the default `upstream-merged` value before rendering a row; never
+persist a blank start condition.
