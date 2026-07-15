@@ -2798,6 +2798,12 @@ class OrchestratorContractTests(unittest.TestCase):
             ledger_template,
         )
         self.assertIn(
+            "evaluate whether bounded internal background subagents would "
+            "materially help this assignment; use them when useful, otherwise "
+            "proceed directly",
+            " ".join(worker.split()),
+        )
+        self.assertIn(
             "They may create and manage internal background subagents",
             worker,
         )

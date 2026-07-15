@@ -830,8 +830,10 @@ Scope:
 - worker_evidence: authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
-- internal_subdelegation: allowed-within-assigned-scope; report nested subagent ids,
-  scopes, outcomes, and parallel or sequential topology
+- internal_subdelegation: allowed-within-assigned-scope; evaluate whether bounded
+  internal background subagents would materially help this assignment; use them
+  when useful, otherwise proceed directly; report nested subagent ids, scopes,
+  outcomes, and parallel or sequential topology
 - wave: <number>
 - objective: <one concrete outcome>
 - source_id: <stable source id>
