@@ -12,7 +12,7 @@ branch on the resolved value.
 | `mutation_mode` | `apply`, `dry-run` | `dry-run` | Whether an authorized GitHub operation executes or only returns a preview. |
 | `issue_operation` | `create`, `edit`, `set-type`, `remove-type`, `create-label`, `add-label`, `remove-label`, `comment`, `attach-parent`, `remove-parent`, `add-sub-issue`, `remove-sub-issue`, `close`, `reopen` | none | The one issue lifecycle operation being requested. |
 | `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | none | The local Git operation owned by Git Commit. |
-| `review_state` | `not-requested`, `acknowledged`, `pending`, `clean`, `findings`, `stale` | none | The current-head automated-review state returned by `gitstack reviews`. |
+| `review_state` | `not-requested`, `acknowledged`, `pending`, `clean`, `findings`, `stale`, `error` | none | The current-head automated-review state returned by `gitstack reviews`; `error` is terminal provider failure evidence, distinct from an API/configuration error envelope. |
 | `release_operation` | `inspect`, `create-tag`, `draft`, `publish`, `upload-asset`, `delete` | `inspect` | The requested tag or GitHub Release lifecycle operation. |
 | `refactor_disposition` | `required`, `optional`, `not-required` | `not-required` | Whether a deep review recommends a larger refactor. |
 

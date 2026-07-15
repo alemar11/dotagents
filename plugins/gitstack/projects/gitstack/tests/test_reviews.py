@@ -34,16 +34,25 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "3.0.1")
+        self.assertEqual(stdout.getvalue().strip(), "3.0.2")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "3.0.1")
+        self.assertEqual(payload["version"], "3.0.2")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
+
+    def test_shared_option_registry_includes_terminal_error_state(self) -> None:
+        options = (
+            Path(__file__).resolve().parents[3] / "references" / "options.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "`not-requested`, `acknowledged`, `pending`, `clean`, `findings`, `stale`, `error`",
+            options,
+        )
 
     def test_positive_int(self) -> None:
         self.assertEqual(cli.positive_int("12", "pr"), 12)
@@ -75,7 +84,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "3.0.1")
+        self.assertEqual(payload["version"], "3.0.2")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -140,7 +149,7 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "3.0.1")
+        self.assertEqual(payload["version"], "3.0.2")
         self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
 
     def test_review_reply_uses_pr_scoped_endpoint(self) -> None:
@@ -236,6 +245,277 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(payload["review_state"], "acknowledged")
         self.assertTrue(payload["request"]["acknowledged"])
 
+    def test_check_codex_detects_terminal_clean_conversation_comment(self) -> None:
+        head = "f5dc037d8d3978df85a6e59f68ebad38e75953b0"
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        result = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": (
+                "Codex Review: Didn't find any major issues. Keep it up!\n\n"
+                "**Reviewed commit:** `f5dc037d8d`"
+            ),
+            "created_at": "2026-07-15T13:12:20Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[request, result]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "clean")
+        self.assertEqual(payload["evidence"]["kind"], "provider-comment")
+        self.assertEqual(payload["evidence"]["object_id"], 100)
+        self.assertEqual(payload["terminal_comment"]["reviewed_head"], "f5dc037d8d")
+        self.assertRegex(payload["observation_fingerprint"], r"^[0-9a-f]{64}$")
+
+    def test_check_codex_detects_terminal_findings_conversation_comment(self) -> None:
+        head = "a" * 40
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        result = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: Found issues to address.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[request, result]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "findings")
+        self.assertEqual(payload["evidence"]["kind"], "provider-comment")
+
+    def test_check_codex_detects_terminal_error_conversation_comment(self) -> None:
+        head = "a" * 40
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        result = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: Review failed because the service encountered an error.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[request, result]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "error")
+        self.assertEqual(payload["evidence"]["kind"], "provider-comment")
+
+    def test_check_codex_ignores_authenticated_nonterminal_status_comment(self) -> None:
+        head = "a" * 40
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        status = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: Review is still in progress.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[request, status]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "pending")
+        self.assertEqual(payload["terminal_comment"]["count"], 0)
+
+    def test_check_codex_rejects_terminal_result_after_overlapping_same_head_requests(self) -> None:
+        head = "a" * 40
+        first_request = {
+            "id": 98,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        second_request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        result = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: No findings.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:02:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(
+                comments=[first_request, second_request, result]
+            ),
+        ):
+            with self.assertRaises(cli.ReviewError) as raised:
+                cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(raised.exception.code, "ambiguous_review_evidence")
+
+    def test_check_codex_allows_sequential_completed_same_head_requests(self) -> None:
+        head = "a" * 40
+        first_request = {
+            "id": 97,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        first_result = {
+            "id": 98,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: No findings.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:00:30Z",
+        }
+        second_request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        second_result = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: No findings.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:02:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(
+                comments=[
+                    first_request,
+                    first_result,
+                    second_request,
+                    second_result,
+                ]
+            ),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "clean")
+        self.assertEqual(payload["terminal_comment"]["count"], 1)
+        self.assertEqual(payload["terminal_comment"]["latest_id"], 100)
+
+    def test_check_codex_keeps_new_request_pending_after_older_formal_review(self) -> None:
+        head = "a" * 40
+        old_review = {
+            "id": 97,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "commit_id": head,
+            "submitted_at": "2026-07-15T13:00:30Z",
+        }
+        new_request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(
+                reviews=[old_review],
+                comments=[new_request],
+            ),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "pending")
+        self.assertEqual(payload["review"]["count"], 0)
+        self.assertEqual(payload["review"]["latest_id"], None)
+
+    def test_check_codex_ignores_terminal_comment_before_latest_request(self) -> None:
+        head = "a" * 40
+        result = {
+            "id": 98,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: No findings.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T12:59:00Z",
+        }
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[result, request]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "pending")
+        self.assertEqual(payload["terminal_comment"]["count"], 0)
+
+    def test_check_codex_ignores_spoofed_terminal_comment(self) -> None:
+        head = "a" * 40
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        spoof = {
+            "id": 100,
+            "user": {"login": "human-reviewer"},
+            "body": f"Codex Review: No findings.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:01:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[request, spoof]),
+        ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(payload["review_state"], "pending")
+
+    def test_check_codex_rejects_conflicting_terminal_evidence(self) -> None:
+        head = "a" * 40
+        request = {
+            "id": 99,
+            "body": f"@codex review {head[:8]}",
+            "created_at": "2026-07-15T13:00:00Z",
+        }
+        review = {
+            "id": 7,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "commit_id": head,
+            "submitted_at": "2026-07-15T13:01:00Z",
+        }
+        result = {
+            "id": 100,
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: Found issues to address.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:02:00Z",
+        }
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(reviews=[review], comments=[request, result]),
+        ):
+            with self.assertRaises(cli.ReviewError) as raised:
+                cli.check_automated_review("owner/repo", 12, "codex", head)
+
+        self.assertEqual(raised.exception.code, "ambiguous_review_evidence")
+
     def test_check_codex_emits_canonical_not_requested_state(self) -> None:
         head = "c" * 40
         with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
@@ -316,6 +596,62 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 124)
         self.assertTrue(payload["timed_out"])
+
+    def test_wait_counts_only_changed_observations_as_transitions(self) -> None:
+        pending = {
+            "review_state": "pending",
+            "repo": "owner/repo",
+            "pr": 12,
+            "observation_fingerprint": "a" * 64,
+        }
+        clean = {
+            "review_state": "clean",
+            "repo": "owner/repo",
+            "pr": 12,
+            "observation_fingerprint": "b" * 64,
+        }
+        with mock.patch.object(
+            cli,
+            "check_automated_review",
+            side_effect=[pending, pending, clean],
+        ), mock.patch.object(
+            cli.time,
+            "monotonic",
+            side_effect=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        ), mock.patch.object(cli.time, "sleep") as sleep:
+            payload, exit_code = cli.wait_for_automated_review(
+                "owner/repo", 12, "codex", None, 10, 1, 2
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(payload["attempts"], 3)
+        self.assertEqual(payload["state_transitions"], 2)
+        self.assertEqual(payload["unchanged_attempts"], 1)
+        self.assertEqual(sleep.call_count, 2)
+
+    def test_wait_stops_immediately_on_terminal_provider_error(self) -> None:
+        error = {
+            "review_state": "error",
+            "repo": "owner/repo",
+            "pr": 12,
+            "observation_fingerprint": "a" * 64,
+        }
+        with mock.patch.object(
+            cli,
+            "check_automated_review",
+            return_value=error,
+        ), mock.patch.object(
+            cli.time,
+            "monotonic",
+            side_effect=[0.0, 0.0],
+        ), mock.patch.object(cli.time, "sleep") as sleep:
+            payload, exit_code = cli.wait_for_automated_review(
+                "owner/repo", 12, "codex", None, 10, 1, 2
+            )
+
+        self.assertEqual(exit_code, 4)
+        self.assertEqual(payload["attempts"], 1)
+        sleep.assert_not_called()
 
     def test_check_maps_api_failures_to_exit_four(self) -> None:
         stdout = io.StringIO()

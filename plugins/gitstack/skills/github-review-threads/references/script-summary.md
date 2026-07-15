@@ -47,13 +47,21 @@ The script does not write configuration files.
 ## Automated Review State
 
 Both `check` and `wait` return `data.provider`, `data.review_state`, `data.head`,
-`data.current_head`, `data.head_is_current`, plus review and request evidence.
-States are `not-requested`, `acknowledged`, `pending`, `clean`, `findings`, and
-`stale`.
+`data.current_head`, `data.head_is_current`, `data.observation_fingerprint`,
+plus normalized review, request, terminal-comment, and selected terminal
+evidence. States are `not-requested`, `acknowledged`, `pending`, `clean`,
+`findings`, `stale`, and `error`. `error` is terminal provider-authored failure
+evidence for the requested head, distinct from a GitStack API/configuration
+error envelope. Terminal evidence may be a formal review, an
+authenticated provider-authored top-level comment posted after the matching
+request and naming the reviewed head, or a clean provider reaction. Conflicting
+terminal outcomes, or a terminal comment that cannot be correlated across
+overlapping requests for the same head, return `ambiguous_review_evidence` with
+exit code `4`.
 
 Exit codes are stable: `0` for clean, `1` for findings, `2` for
-not-requested/acknowledged/pending, `3` for stale review evidence, `4` for an
-API or configuration failure, `64` for invalid arguments, and `124` when
+not-requested/acknowledged/pending, `3` for stale review evidence, `4` for a
+terminal provider error or API/configuration failure, `64` for invalid arguments, and `124` when
 `wait` times out. JSON envelopes remain valid for nonzero review-state exits.
 
 `wait` accepts `--timeout`, `--interval`, and `--max-interval` durations using
@@ -61,6 +69,9 @@ seconds, minutes, or hours, such as `30s`, `15m`, or `1h`.
 `--head` accepts a full hexadecimal commit SHA or an unambiguous prefix of at
 least seven characters. Review-request comments must include that SHA or prefix
 for acknowledgement and reaction evidence to count toward the target head.
+`wait` also returns `attempts`, `state_transitions`, and `unchanged_attempts`.
+The observation fingerprint excludes those counters and elapsed time, so
+callers can suppress unchanged ledger and progress updates.
 
 ## Discussion Comments
 

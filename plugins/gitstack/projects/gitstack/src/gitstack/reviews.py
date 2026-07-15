@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -15,6 +16,19 @@ from typing import Any
 from . import __version__ as VERSION
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
+CODEX_TERMINAL_PREFIX = re.compile(r"(?im)^\s*Codex Review\s*:")
+CODEX_CLEAN_RESULT = re.compile(
+    r"(?i)(?:did(?:n['’]t| not) find any major issues|no major issues|no issues found|no findings|looks good)"
+)
+CODEX_ERROR_RESULT = re.compile(
+    r"(?i)(?:unable to (?:complete|perform|review)|could(?:n['’]t| not) (?:complete|perform|review)|review (?:failed|errored)|encountered an error)"
+)
+CODEX_FINDINGS_RESULT = re.compile(
+    r"(?im)(?:found\s+(?:\d+\s+|some\s+|the following\s+)?(?:issues?|findings?)|(?:issues?|findings?)\s+to\s+address|actionable\s+(?:issue|finding)|^\s*(?:[-*]\s*|#{1,6}\s*)?\[P[0-3]\])"
+)
+REVIEWED_COMMIT = re.compile(
+    r"(?im)^\s*\*{0,2}Reviewed commit\s*:\s*\*{0,2}\s*`?([0-9a-f]{7,40})`?"
+)
 REVIEW_EXIT_CODES = {
     "clean": 0,
     "findings": 1,
@@ -22,6 +36,7 @@ REVIEW_EXIT_CODES = {
     "acknowledged": 2,
     "pending": 2,
     "stale": 3,
+    "error": 4,
 }
 
 
@@ -180,6 +195,44 @@ def review_request_matches(comment: dict[str, Any], provider: str, head: str) ->
     return any(sha_matches(token, head) for token in tokens)
 
 
+def provider_terminal_comment(
+    comment: dict[str, Any],
+    provider: str,
+    head: str,
+) -> dict[str, Any] | None:
+    if not authored_by(comment, provider):
+        return None
+    body = str(comment.get("body") or "")
+    if provider != "codex" or not CODEX_TERMINAL_PREFIX.search(body):
+        return None
+    created_at = str(comment.get("created_at") or "")
+    if not created_at:
+        return None
+    match = REVIEWED_COMMIT.search(body)
+    reviewed_head = match.group(1).lower() if match else ""
+    if not reviewed_head or not sha_matches(reviewed_head, head):
+        return None
+    if CODEX_ERROR_RESULT.search(body):
+        outcome = "error"
+    elif CODEX_FINDINGS_RESULT.search(body):
+        outcome = "findings"
+    elif CODEX_CLEAN_RESULT.search(body):
+        outcome = "clean"
+    else:
+        return None
+    return {
+        "comment_id": comment.get("id"),
+        "created_at": created_at,
+        "reviewed_head": reviewed_head,
+        "outcome": outcome,
+    }
+
+
+def stable_observation_fingerprint(payload: dict[str, Any]) -> str:
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def provider_reactions(repo: str, comment_id: int, provider: str) -> set[str]:
     reactions = gh_api_paginated_list(f"repos/{repo}/issues/comments/{comment_id}/reactions")
     return {
@@ -218,28 +271,140 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
         if review_request_matches(item, provider, head)
     ]
     latest_request = max(requests, key=lambda item: str(item.get("created_at") or ""), default=None)
+    request_created_at = str(latest_request.get("created_at") or "") if latest_request else ""
+    current_request_reviews = [
+        item
+        for item in head_reviews
+        if not request_created_at or str(item.get("submitted_at") or "") > request_created_at
+    ]
+    current_request_findings = [
+        item
+        for item in head_findings
+        if not request_created_at or str(item.get("created_at") or "") > request_created_at
+    ]
+    latest_formal_review = max(
+        current_request_reviews,
+        key=lambda item: str(item.get("submitted_at") or ""),
+        default=None,
+    )
     reactions: set[str] = set()
     if latest_request and latest_request.get("id"):
         reactions = provider_reactions(repo, int(latest_request["id"]), provider)
 
+    all_terminal_comments = [
+        result
+        for item in conversation
+        if (
+            result := provider_terminal_comment(
+                item,
+                provider,
+                head,
+            )
+        )
+        is not None
+    ]
+    terminal_comments = [
+        result
+        for result in all_terminal_comments
+        if request_created_at and str(result.get("created_at") or "") > request_created_at
+    ]
+    latest_terminal_comment = max(
+        terminal_comments,
+        key=lambda item: str(item.get("created_at") or ""),
+        default=None,
+    )
+    if latest_terminal_comment and len(requests) > 1:
+        ordered_requests = sorted(requests, key=lambda item: str(item.get("created_at") or ""))
+        for previous_request, next_request in zip(ordered_requests, ordered_requests[1:]):
+            previous_at = str(previous_request.get("created_at") or "")
+            next_at = str(next_request.get("created_at") or "")
+            completed_before_next = any(
+                previous_at < str(result.get("created_at") or "") < next_at
+                for result in all_terminal_comments
+            ) or any(
+                previous_at < str(review.get("submitted_at") or "") < next_at
+                for review in head_reviews
+            )
+            if not previous_at or not next_at or not completed_before_next:
+                raise ReviewError(
+                    "A terminal Codex result cannot be correlated across overlapping requests for the same PR head.",
+                    code="ambiguous_review_evidence",
+                    exit_code=4,
+                )
+
     head_is_current = sha_matches(current_head, head)
+    formal_outcome = (
+        "findings"
+        if current_request_findings
+        else ("clean" if current_request_reviews else None)
+    )
+    terminal_outcomes = {
+        outcome
+        for outcome in (
+            formal_outcome,
+            *(str(result.get("outcome") or "") for result in terminal_comments),
+            "clean" if "+1" in reactions else None,
+        )
+        if outcome
+    }
+    if head_is_current and len(terminal_outcomes) > 1:
+        raise ReviewError(
+            "Conflicting terminal Codex review evidence exists for the current PR head.",
+            code="ambiguous_review_evidence",
+            exit_code=4,
+        )
+
+    evidence: dict[str, Any] = {
+        "kind": "none",
+        "object_id": None,
+        "created_at": None,
+        "outcome": None,
+        "head": head,
+    }
     if not head_is_current:
         status = "stale"
-    elif head_reviews:
-        status = "findings" if head_findings else "clean"
+    elif latest_terminal_comment:
+        status = str(latest_terminal_comment["outcome"])
+        evidence = {
+            "kind": "provider-comment",
+            "object_id": latest_terminal_comment.get("comment_id"),
+            "created_at": latest_terminal_comment.get("created_at"),
+            "outcome": status,
+            "head": latest_terminal_comment.get("reviewed_head"),
+        }
+    elif latest_formal_review:
+        status = str(formal_outcome)
+        evidence = {
+            "kind": "formal-review",
+            "object_id": latest_formal_review.get("id"),
+            "created_at": latest_formal_review.get("submitted_at"),
+            "outcome": status,
+            "head": latest_formal_review.get("commit_id"),
+        }
     elif "+1" in reactions:
         status = "clean"
+        evidence = {
+            "kind": "clean-reaction",
+            "object_id": latest_request.get("id") if latest_request else None,
+            "created_at": latest_request.get("created_at") if latest_request else None,
+            "outcome": status,
+            "head": head,
+        }
     elif latest_request:
         status = "acknowledged" if "eyes" in reactions else "pending"
     elif provider_reviews or any(
-        provider == "codex" and re.search(r"(?i)@codex\s+review\b", str(item.get("body") or ""))
+        provider == "codex"
+        and (
+            re.search(r"(?i)@codex\s+review\b", str(item.get("body") or ""))
+            or CODEX_TERMINAL_PREFIX.search(str(item.get("body") or ""))
+        )
         for item in conversation
     ):
         status = "stale"
     else:
         status = "not-requested"
 
-    return {
+    payload = {
         "repo": repo,
         "pr": pr,
         "provider": provider,
@@ -248,10 +413,10 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
         "current_head": current_head,
         "head_is_current": head_is_current,
         "review": {
-            "count": len(head_reviews),
-            "latest_id": head_reviews[-1].get("id") if head_reviews else None,
-            "submitted_at": head_reviews[-1].get("submitted_at") if head_reviews else None,
-            "findings": len(head_findings),
+            "count": len(current_request_reviews),
+            "latest_id": latest_formal_review.get("id") if latest_formal_review else None,
+            "submitted_at": latest_formal_review.get("submitted_at") if latest_formal_review else None,
+            "findings": len(current_request_findings),
         },
         "request": {
             "comment_id": latest_request.get("id") if latest_request else None,
@@ -259,7 +424,17 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
             "acknowledged": "eyes" in reactions,
             "clean_reaction": "+1" in reactions,
         },
+        "terminal_comment": {
+            "count": len(terminal_comments),
+            "latest_id": latest_terminal_comment.get("comment_id") if latest_terminal_comment else None,
+            "created_at": latest_terminal_comment.get("created_at") if latest_terminal_comment else None,
+            "reviewed_head": latest_terminal_comment.get("reviewed_head") if latest_terminal_comment else None,
+            "outcome": latest_terminal_comment.get("outcome") if latest_terminal_comment else None,
+        },
+        "evidence": evidence,
     }
+    payload["observation_fingerprint"] = stable_observation_fingerprint(payload)
+    return payload
 
 
 def wait_for_automated_review(
@@ -274,13 +449,24 @@ def wait_for_automated_review(
     started = time.monotonic()
     interval = initial_interval
     attempts = 0
+    transitions = 0
+    unchanged_attempts = 0
+    previous_fingerprint: str | None = None
     while True:
         attempts += 1
         payload = check_automated_review(repo, pr, provider, expected_head)
+        fingerprint = str(payload.get("observation_fingerprint") or "")
+        if previous_fingerprint is None or fingerprint != previous_fingerprint:
+            transitions += 1
+        else:
+            unchanged_attempts += 1
+        previous_fingerprint = fingerprint
         payload["attempts"] = attempts
+        payload["state_transitions"] = transitions
+        payload["unchanged_attempts"] = unchanged_attempts
         payload["elapsed_seconds"] = round(time.monotonic() - started, 3)
         status = str(payload["review_state"])
-        if status in {"clean", "findings", "not-requested", "stale"}:
+        if status in {"clean", "findings", "not-requested", "stale", "error"}:
             return payload, REVIEW_EXIT_CODES[status]
         remaining = timeout - (time.monotonic() - started)
         if remaining <= 0:

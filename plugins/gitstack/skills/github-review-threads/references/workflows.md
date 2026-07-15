@@ -13,16 +13,28 @@ wait. Always pass the intended PR head SHA when freshness matters:
 `check` reads once. `wait` polls with bounded backoff until it sees `clean` or
 `findings`, detects `not-requested` or `stale`, or reaches its timeout. The
 current provider adapter is `codex`; provider-specific bot identities,
-acknowledgements, clean reactions, and review formats belong to the CLI rather
-than this workflow.
+acknowledgements, formal reviews, inline findings, authenticated top-level
+terminal comments, clean reactions, and current-head matching belong to the
+CLI rather than this workflow. A terminal comment counts only when it follows
+the matching request, names the expected reviewed commit, and comes from the
+authenticated provider identity. Conflicting terminal outcomes or overlapping
+requests for the same head that prevent safe result correlation return an API
+error rather than an arbitrary result.
+
+The returned `observation_fingerprint` covers normalized review and request
+evidence but excludes attempts and elapsed time. A caller may persist the
+first observation and later transitions, but must not rewrite control state or
+emit progress for an unchanged fingerprint. Use one bounded `wait`; do not
+build a manual `check` plus shell-sleep loop around it.
 
 After fixing and pushing findings, post a fresh review request and run the
 check or wait against the new SHA. Include at least the first seven characters
 of that SHA in the review-request comment so the CLI can bind acknowledgement
 or clean-reaction evidence to the intended head; a plain request without a SHA
-is reported as stale until a submitted review supplies commit evidence. A timed-out wait returns exit code `124` and
-the last observed state; a calling orchestrator decides whether to schedule a
-later heartbeat.
+is reported as stale until a submitted review supplies commit evidence. A
+timed-out wait returns exit code `124`, the last observed state, attempt count,
+transition count, and unchanged-attempt count; a calling orchestrator decides
+whether to schedule a later heartbeat.
 
 ## List Review Context
 

@@ -32,7 +32,9 @@ Resolve `<plugin-root>` as two directories above the directory containing this
 ```
 
 The CLI uses `gh`, emits stable JSON envelopes, and writes no implicit config.
-It cannot invoke connector tools.
+It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
+inline findings, authenticated top-level terminal result comments, and clean
+reactions into one current-head state and one stable observation fingerprint.
 
 ## Workflow
 
@@ -41,7 +43,9 @@ It cannot invoke connector tools.
    For an automated-review request, capture the intended head SHA and use
    `reviews check --provider <provider>` for a one-shot read or bounded
    `reviews wait --provider <provider>` when the caller should remain active.
-   Never accept review evidence from an older head.
+   Never accept review evidence from an older head. Reuse the returned
+   `observation_fingerprint`; unchanged observations are not state transitions
+   and must not cause caller-side ledger writes or progress messages.
 2. Group duplicates and classify feedback as actionable, already addressed,
    informational, obsolete, or requiring a user decision.
 3. Present or honor the selected actionable set. Do not silently implement
@@ -60,7 +64,8 @@ It cannot invoke connector tools.
 8. After pushing a review fix, request a fresh automated review when required
    and check or wait against the new head SHA. If a bounded wait times out and
    continued monitoring is authorized, return the pending state to the caller;
-   scheduling or heartbeat ownership remains with that caller.
+   scheduling or heartbeat ownership remains with that caller. Callers must use
+   the bounded waiter instead of wrapping one-shot checks in manual sleep loops.
 
 For `$codex-orchestrator`, require
 `change_delivery_permission=granted-for-selected-target`, the exact PR target,
