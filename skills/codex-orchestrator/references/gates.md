@@ -31,7 +31,7 @@ URLs, timestamps, and owner decisions.
 
 Root-verifiable does not mean root-executed. When
 `visible_app_task_permission=granted-by-authorized-user`, the assigned visible
-Feature Spec thread executes implementation, integration, validation,
+Feature Spec task executes implementation, integration, validation,
 publication, Codex-review request and polling, review/CI fixes, and every
 pre-merge gate through ready. The root only monitors, steers drift, and
 reconciles evidence; it never reruns those gates itself for that Spec.
@@ -239,8 +239,8 @@ owner-ready next action.
 For
 `change_delivery_target=pull-request-ready-for-merge-but-not-merged`, load
 `codex-review-closeout.md` and apply its complete current-head review and
-parent-closeout algorithm. In mandatory visible Feature Spec thread mode, the
-assigned thread is the algorithm's execution and polling owner; the root must
+parent-closeout algorithm. In mandatory visible Feature Spec task mode, the
+assigned task is the algorithm's execution and polling owner; the root must
 not call the review check/wait workflow for it. For every other target, do not load that reference:
 record this gate `not-applicable` with reason
 `selected-delivery-target-does-not-require-merge-ready-review`. Missing or contradictory values

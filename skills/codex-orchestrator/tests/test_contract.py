@@ -20,7 +20,7 @@ CURRENT_LEDGER_HEADINGS = (
     "## Discovery Sources",
     "## Active Root",
     "## Codex Review Wait Registry",
-    "## Feature Spec Thread Registry",
+    "## Feature Spec Task Registry",
     "## Parent Closeout Watch",
     "## Recovery Packet",
     "## Worker And Delivery References",
@@ -593,15 +593,15 @@ class OrchestratorContractTests(unittest.TestCase):
                 "| Field | Value |",
                 "| --- | --- |",
                 "| Source | issue-1 |",
-                "| Feature Spec thread | feature_spec_ref=not-applicable; "
+                "| Feature Spec task | feature_spec_ref=not-applicable; "
                 "feature_spec_title=not-applicable; "
-                "feature_spec_thread_assignment=not-applicable; "
-                "thread_goal_mode=not-applicable; "
-                "thread_goal_status=not-applicable; "
-                "thread_goal_dispatch_objective_sha256=not-applicable; "
-                "thread_goal_reported_objective_sha256=not-applicable; "
-                "thread_goal_evidence=not-applicable; "
-                "thread_goal_missing_tool=not-applicable |",
+                "feature_spec_task_assignment=not-applicable; "
+                "task_goal_mode=not-applicable; "
+                "task_goal_status=not-applicable; "
+                "task_goal_dispatch_objective_sha256=not-applicable; "
+                "task_goal_reported_objective_sha256=not-applicable; "
+                "task_goal_evidence=not-applicable; "
+                "task_goal_missing_tool=not-applicable |",
                 "| Repo / execution location | repo; "
                 "current-orchestrator-session; worker=root |",
                 "| Worker evidence | "
@@ -635,7 +635,7 @@ class OrchestratorContractTests(unittest.TestCase):
             def run(
                 selected: list[str],
                 contents: str = ledger_fixture,
-                live_thread_evidence: str = "",
+                live_task_evidence: str = "",
             ) -> subprocess.CompletedProcess[str]:
                 selected_set = set(selected)
                 normalized_rows: list[list[str]] = []
@@ -677,7 +677,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 )
                 configured = (
                     f"ledger={shlex.quote(str(ledger_path))}\n"
-                    f"LIVE_THREAD_EVIDENCE_ROWS={shlex.quote(live_thread_evidence)}\n"
+                    f"LIVE_TASK_EVIDENCE_ROWS={shlex.quote(live_task_evidence)}\n"
                     f"{configured}"
                 )
                 return subprocess.run(
@@ -741,22 +741,22 @@ class OrchestratorContractTests(unittest.TestCase):
                     "actual_execution_location=visible-codex-app-task |",
                 )
                 configured = configured.replace(
-                    "feature_spec_thread_assignment=not-applicable; "
-                    "thread_goal_mode=not-applicable; "
-                    "thread_goal_status=not-applicable; "
-                    "thread_goal_dispatch_objective_sha256=not-applicable; "
-                    "thread_goal_reported_objective_sha256=not-applicable; "
-                    "thread_goal_evidence=not-applicable; "
-                    "thread_goal_missing_tool=not-applicable |",
-                    "feature_spec_thread_assignment=not-applicable; "
-                    "thread_goal_mode=active; "
-                    "thread_goal_status=active; "
-                    "thread_goal_dispatch_objective_sha256="
+                    "feature_spec_task_assignment=not-applicable; "
+                    "task_goal_mode=not-applicable; "
+                    "task_goal_status=not-applicable; "
+                    "task_goal_dispatch_objective_sha256=not-applicable; "
+                    "task_goal_reported_objective_sha256=not-applicable; "
+                    "task_goal_evidence=not-applicable; "
+                    "task_goal_missing_tool=not-applicable |",
+                    "feature_spec_task_assignment=not-applicable; "
+                    "task_goal_mode=active; "
+                    "task_goal_status=active; "
+                    "task_goal_dispatch_objective_sha256="
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
-                    "thread_goal_reported_objective_sha256="
+                    "task_goal_reported_objective_sha256="
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
-                    "thread_goal_evidence=goal-read:worker-1@goal-ad-hoc; "
-                    "thread_goal_missing_tool=not-applicable |",
+                    "task_goal_evidence=goal-read:worker-1@goal-ad-hoc; "
+                    "task_goal_missing_tool=not-applicable |",
                 )
                 return configured.replace(
                     "active_workers=none",
@@ -795,8 +795,8 @@ class OrchestratorContractTests(unittest.TestCase):
             terminal_ad_hoc_goal = run(
                 complete_ids,
                 with_visible_worker(with_session_values(visible_session)).replace(
-                    "thread_goal_status=active;",
-                    "thread_goal_status=complete;",
+                    "task_goal_status=active;",
+                    "task_goal_status=complete;",
                 ),
                 live_ad_hoc_active.replace(
                     "active\tactive\t",
@@ -807,19 +807,19 @@ class OrchestratorContractTests(unittest.TestCase):
             pending_visible_goal_contents = with_visible_worker(
                 with_session_values(visible_session)
             ).replace(
-                    "thread_goal_mode=active; thread_goal_status=active; "
-                    "thread_goal_dispatch_objective_sha256="
+                    "task_goal_mode=active; task_goal_status=active; "
+                    "task_goal_dispatch_objective_sha256="
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
-                    "thread_goal_reported_objective_sha256="
+                    "task_goal_reported_objective_sha256="
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
-                    "thread_goal_evidence=goal-read:worker-1@goal-ad-hoc; "
-                    "thread_goal_missing_tool=not-applicable",
-                    "thread_goal_mode=pending; thread_goal_status=pending; "
-                    "thread_goal_dispatch_objective_sha256="
+                    "task_goal_evidence=goal-read:worker-1@goal-ad-hoc; "
+                    "task_goal_missing_tool=not-applicable",
+                    "task_goal_mode=pending; task_goal_status=pending; "
+                    "task_goal_dispatch_objective_sha256="
                     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
-                    "thread_goal_reported_objective_sha256=pending; "
-                    "thread_goal_evidence=thread-message:worker-1; "
-                    "thread_goal_missing_tool=not-applicable",
+                    "task_goal_reported_objective_sha256=pending; "
+                    "task_goal_evidence=thread-message:worker-1; "
+                    "task_goal_missing_tool=not-applicable",
                 )
             pending_visible_goal = run(
                 complete_ids,
@@ -831,11 +831,11 @@ class OrchestratorContractTests(unittest.TestCase):
                 complete_ids,
                 pending_visible_goal_contents.replace(
                     "Next Root Check: action=none; target=none; due_at=none",
-                    "Next Root Check: action=monitor-thread; "
+                    "Next Root Check: action=monitor-task; "
                     "target=worker-1; due_at=now",
                 ).replace(
                     "next_action=none; next_target=none; next_due_at=none",
-                    "next_action=monitor-thread; next_target=worker-1; "
+                    "next_action=monitor-task; next_target=worker-1; "
                     "next_due_at=now",
                 ),
                 live_ad_hoc_pending,
@@ -948,24 +948,24 @@ class OrchestratorContractTests(unittest.TestCase):
                 "\n".join(scoped_rows),
                 "\n".join(feature_spec_rows),
             ).replace(
-                "| Feature Spec thread | feature_spec_ref=not-applicable; "
+                "| Feature Spec task | feature_spec_ref=not-applicable; "
                 "feature_spec_title=not-applicable; "
-                "feature_spec_thread_assignment=not-applicable; "
-                "thread_goal_mode=not-applicable; "
-                "thread_goal_status=not-applicable; "
-                "thread_goal_dispatch_objective_sha256=not-applicable; "
-                "thread_goal_reported_objective_sha256=not-applicable; "
-                "thread_goal_evidence=not-applicable; "
-                "thread_goal_missing_tool=not-applicable |",
-                "| Feature Spec thread | feature_spec_ref=spec:demo; "
+                "feature_spec_task_assignment=not-applicable; "
+                "task_goal_mode=not-applicable; "
+                "task_goal_status=not-applicable; "
+                "task_goal_dispatch_objective_sha256=not-applicable; "
+                "task_goal_reported_objective_sha256=not-applicable; "
+                "task_goal_evidence=not-applicable; "
+                "task_goal_missing_tool=not-applicable |",
+                "| Feature Spec task | feature_spec_ref=spec:demo; "
                 "feature_spec_title=Feature Spec: Demo; "
-                "feature_spec_thread_assignment=not-applicable; "
-                "thread_goal_mode=not-applicable; "
-                "thread_goal_status=not-applicable; "
-                "thread_goal_dispatch_objective_sha256=not-applicable; "
-                "thread_goal_reported_objective_sha256=not-applicable; "
-                "thread_goal_evidence=not-applicable; "
-                "thread_goal_missing_tool=not-applicable |",
+                "feature_spec_task_assignment=not-applicable; "
+                "task_goal_mode=not-applicable; "
+                "task_goal_status=not-applicable; "
+                "task_goal_dispatch_objective_sha256=not-applicable; "
+                "task_goal_reported_objective_sha256=not-applicable; "
+                "task_goal_evidence=not-applicable; "
+                "task_goal_missing_tool=not-applicable |",
             ).replace(
                 "| Delivery | target_pull_request_ref=not-applicable |",
                 "| Delivery | target_pull_request_ref=pending |",
@@ -988,21 +988,21 @@ class OrchestratorContractTests(unittest.TestCase):
             root_takeover = run(complete_ids, root_owned_feature_spec)
             self.assertNotEqual(root_takeover.returncode, 0)
 
-            visible_feature_thread = visible_feature_spec_fixture.replace(
+            visible_feature_task = visible_feature_spec_fixture.replace(
                 "## Workstreams",
-                "## Feature Spec Thread Registry\n\n"
-                "| feature_spec_ref | feature_spec_title | visible_thread_id | "
-                "live_thread_title | workstream_ids | repository_refs | "
+                "## Feature Spec Task Registry\n\n"
+                "| feature_spec_ref | feature_spec_title | visible_task_id | "
+                "live_task_title | workstream_ids | repository_refs | "
                 "pull_request_refs | lifecycle_owner | codex_review_poll_owner | "
                 "state | last_read | drift | corrective_message_evidence | "
-                "thread_state_evidence | thread_goal_mode | thread_goal_status | "
-                "thread_goal_dispatch_objective_sha256 | "
-                "thread_goal_reported_objective_sha256 | thread_goal_evidence | "
-                "thread_goal_missing_tool |\n"
+                "task_state_evidence | task_goal_mode | task_goal_status | "
+                "task_goal_dispatch_objective_sha256 | "
+                "task_goal_reported_objective_sha256 | task_goal_evidence | "
+                "task_goal_missing_tool |\n"
                 "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
                 "| spec:demo | Feature Spec: Demo | worker-1 | "
                 "Feature Spec: Demo | a | repo | pending | "
-                "visible-feature-spec-thread | visible-feature-spec-thread | "
+                "visible-feature-spec-task | visible-feature-spec-task | "
                 "implementing | now | none | none | thread-read:worker-1@abc | "
                 "active | active | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
@@ -1010,7 +1010,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 "goal-read:worker-1@goal-abc | not-applicable |\n\n"
                 "## Workstreams",
             )
-            visible_feature_thread = visible_feature_thread.replace(
+            visible_feature_task = visible_feature_task.replace(
                 "Active workers:\n"
                 "- none\n"
                 "Takeover history:",
@@ -1020,31 +1020,31 @@ class OrchestratorContractTests(unittest.TestCase):
                 "workstream_ids=a\n"
                 "Takeover history:",
             )
-            visible_feature_thread = visible_feature_thread.replace(
-                "| Feature Spec thread | feature_spec_ref=spec:demo; "
+            visible_feature_task = visible_feature_task.replace(
+                "| Feature Spec task | feature_spec_ref=spec:demo; "
                 "feature_spec_title=Feature Spec: Demo; "
-                "feature_spec_thread_assignment=not-applicable; "
-                "thread_goal_mode=not-applicable; "
-                "thread_goal_status=not-applicable; "
-                "thread_goal_dispatch_objective_sha256=not-applicable; "
-                "thread_goal_reported_objective_sha256=not-applicable; "
-                "thread_goal_evidence=not-applicable; "
-                "thread_goal_missing_tool=not-applicable |\n"
+                "feature_spec_task_assignment=not-applicable; "
+                "task_goal_mode=not-applicable; "
+                "task_goal_status=not-applicable; "
+                "task_goal_dispatch_objective_sha256=not-applicable; "
+                "task_goal_reported_objective_sha256=not-applicable; "
+                "task_goal_evidence=not-applicable; "
+                "task_goal_missing_tool=not-applicable |\n"
                 "| Repo / execution location | repo; "
                 "current-orchestrator-session; worker=root |\n"
                 "| Worker evidence | "
                 "actual_execution_location=current-orchestrator-session |",
-                "| Feature Spec thread | feature_spec_ref=spec:demo; "
+                "| Feature Spec task | feature_spec_ref=spec:demo; "
                 "feature_spec_title=Feature Spec: Demo; "
-                "feature_spec_thread_assignment=required; "
-                "thread_goal_mode=active; "
-                "thread_goal_status=active; "
-                "thread_goal_dispatch_objective_sha256="
+                "feature_spec_task_assignment=required; "
+                "task_goal_mode=active; "
+                "task_goal_status=active; "
+                "task_goal_dispatch_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_reported_objective_sha256="
+                "task_goal_reported_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_evidence=goal-read:worker-1@goal-abc; "
-                "thread_goal_missing_tool=not-applicable |\n"
+                "task_goal_evidence=goal-read:worker-1@goal-abc; "
+                "task_goal_missing_tool=not-applicable |\n"
                 "| Repo / execution location | repo; "
                 "visible-codex-app-task; worker=worker-1 |\n"
                 "| Worker evidence | "
@@ -1061,7 +1061,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 "worker-1\tFeature Spec: Demo\tactive\trepo\tpending\t"
                 "pending\tpending\t"
                 "pending\t"
-                "goal-create-message:worker-1\tnot-applicable\t"
+                "thread-message:worker-1\tnot-applicable\t"
                 "thread-read:worker-1@abc"
             )
             live_demo_unavailable = (
@@ -1071,21 +1071,21 @@ class OrchestratorContractTests(unittest.TestCase):
                 "thread-read:worker-1@goal-unavailable\truntime-goal-tool\t"
                 "thread-read:worker-1@abc"
             )
-            assigned_feature_thread = run(
+            assigned_feature_task = run(
                 complete_ids,
-                visible_feature_thread,
+                visible_feature_task,
                 live_demo,
             )
             self.assertEqual(
-                assigned_feature_thread.returncode,
+                assigned_feature_task.returncode,
                 0,
-                assigned_feature_thread.stderr,
+                assigned_feature_task.stderr,
             )
-            missing_live_thread = run(complete_ids, visible_feature_thread)
-            self.assertNotEqual(missing_live_thread.returncode, 0)
+            missing_live_task = run(complete_ids, visible_feature_task)
+            self.assertNotEqual(missing_live_task.returncode, 0)
             live_repo_drift = run(
                 complete_ids,
-                visible_feature_thread,
+                visible_feature_task,
                 "worker-1\tFeature Spec: Demo\tactive\tother-repo\tpending\t"
                 "active\tactive\t"
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t"
@@ -1093,9 +1093,9 @@ class OrchestratorContractTests(unittest.TestCase):
                 "thread-read:worker-1@abc",
             )
             self.assertNotEqual(live_repo_drift.returncode, 0)
-            encoded_title_thread = run(
+            encoded_title_task = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "Feature Spec: Demo",
                     "Feature Spec: Import %7C Export",
                 ),
@@ -1106,13 +1106,13 @@ class OrchestratorContractTests(unittest.TestCase):
                 "thread-read:worker-1@abc",
             )
             self.assertEqual(
-                encoded_title_thread.returncode,
+                encoded_title_task.returncode,
                 0,
-                encoded_title_thread.stderr,
+                encoded_title_task.stderr,
             )
-            unencoded_title_thread = run(
+            unencoded_title_task = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "Feature Spec: Demo",
                     "Feature Spec: Import | Export",
                 ),
@@ -1122,10 +1122,10 @@ class OrchestratorContractTests(unittest.TestCase):
                 "goal-read:worker-1@goal-abc\tnot-applicable\t"
                 "thread-read:worker-1@abc",
             )
-            self.assertNotEqual(unencoded_title_thread.returncode, 0)
+            self.assertNotEqual(unencoded_title_task.returncode, 0)
             title_drift = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "| spec:demo | Feature Spec: Demo | worker-1 | "
                     "Feature Spec: Demo |",
                     "| spec:demo | Feature Spec: Demo | worker-1 | "
@@ -1136,10 +1136,10 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertNotEqual(title_drift.returncode, 0)
             root_review_polling = run(
                 complete_ids,
-                visible_feature_thread.replace(
-                    "visible-feature-spec-thread | visible-feature-spec-thread | "
+                visible_feature_task.replace(
+                    "visible-feature-spec-task | visible-feature-spec-task | "
                     "implementing",
-                    "visible-feature-spec-thread | root | implementing",
+                    "visible-feature-spec-task | root | implementing",
                 ),
                 live_demo,
             )
@@ -1147,7 +1147,7 @@ class OrchestratorContractTests(unittest.TestCase):
 
             pending_goal_after_dispatch = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "active | active | "
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
@@ -1155,12 +1155,12 @@ class OrchestratorContractTests(unittest.TestCase):
                     "pending | pending | "
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                     "pending | "
-                    "goal-create-message:worker-1 | not-applicable",
+                    "thread-message:worker-1 | not-applicable",
                 ),
                 live_demo,
             )
             self.assertNotEqual(pending_goal_after_dispatch.returncode, 0)
-            recoverable_created_pending_goal = visible_feature_thread.replace(
+            recoverable_created_pending_goal = visible_feature_task.replace(
                 "implementing | now | none | none |",
                 "created | now | none | none |",
             ).replace(
@@ -1171,28 +1171,28 @@ class OrchestratorContractTests(unittest.TestCase):
                 "pending | pending | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                 "pending | "
-                "goal-create-message:worker-1 | not-applicable",
+                "thread-message:worker-1 | not-applicable",
             ).replace(
-                "thread_goal_mode=active; thread_goal_status=active; "
-                "thread_goal_dispatch_objective_sha256="
+                "task_goal_mode=active; task_goal_status=active; "
+                "task_goal_dispatch_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_reported_objective_sha256="
+                "task_goal_reported_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_evidence=goal-read:worker-1@goal-abc; "
-                "thread_goal_missing_tool=not-applicable",
-                "thread_goal_mode=pending; thread_goal_status=pending; "
-                "thread_goal_dispatch_objective_sha256="
+                "task_goal_evidence=goal-read:worker-1@goal-abc; "
+                "task_goal_missing_tool=not-applicable",
+                "task_goal_mode=pending; task_goal_status=pending; "
+                "task_goal_dispatch_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_reported_objective_sha256=pending; "
-                "thread_goal_evidence=goal-create-message:worker-1; "
-                "thread_goal_missing_tool=not-applicable",
+                "task_goal_reported_objective_sha256=pending; "
+                "task_goal_evidence=thread-message:worker-1; "
+                "task_goal_missing_tool=not-applicable",
             ).replace(
                 "Next Root Check: action=none; target=none; due_at=none",
-                "Next Root Check: action=monitor-thread; target=worker-1; "
+                "Next Root Check: action=monitor-task; target=worker-1; "
                 "due_at=now",
             ).replace(
                 "next_action=none; next_target=none; next_due_at=none",
-                "next_action=monitor-thread; next_target=worker-1; "
+                "next_action=monitor-task; next_target=worker-1; "
                 "next_due_at=now",
             )
             recovered_created_pending_goal = run(
@@ -1207,14 +1207,14 @@ class OrchestratorContractTests(unittest.TestCase):
             )
             missing_goal_evidence = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "goal-read:worker-1@goal-abc",
                     "none",
                 ),
                 live_demo,
             )
             self.assertNotEqual(missing_goal_evidence.returncode, 0)
-            unavailable_goal = visible_feature_thread.replace(
+            unavailable_goal = visible_feature_task.replace(
                 "active | active | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
@@ -1224,21 +1224,21 @@ class OrchestratorContractTests(unittest.TestCase):
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                 "thread-read:worker-1@goal-unavailable | runtime-goal-tool",
             ).replace(
-                "thread_goal_mode=active; thread_goal_status=active; "
-                "thread_goal_dispatch_objective_sha256="
+                "task_goal_mode=active; task_goal_status=active; "
+                "task_goal_dispatch_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_reported_objective_sha256="
+                "task_goal_reported_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_evidence=goal-read:worker-1@goal-abc; "
-                "thread_goal_missing_tool=not-applicable",
-                "thread_goal_mode=unavailable; "
-                "thread_goal_status=not-applicable; "
-                "thread_goal_dispatch_objective_sha256="
+                "task_goal_evidence=goal-read:worker-1@goal-abc; "
+                "task_goal_missing_tool=not-applicable",
+                "task_goal_mode=unavailable; "
+                "task_goal_status=not-applicable; "
+                "task_goal_dispatch_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_reported_objective_sha256="
+                "task_goal_reported_objective_sha256="
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                "thread_goal_evidence=thread-read:worker-1@goal-unavailable; "
-                "thread_goal_missing_tool=runtime-goal-tool",
+                "task_goal_evidence=thread-read:worker-1@goal-unavailable; "
+                "task_goal_missing_tool=runtime-goal-tool",
             )
             accepted_unavailable_goal = run(
                 complete_ids,
@@ -1273,7 +1273,7 @@ class OrchestratorContractTests(unittest.TestCase):
             )
             invalid_goal_objective_fingerprint = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                     "bad-fingerprint",
                 ),
@@ -1285,7 +1285,7 @@ class OrchestratorContractTests(unittest.TestCase):
             )
             live_goal_objective_mismatch = run(
                 complete_ids,
-                visible_feature_thread,
+                visible_feature_task,
                 live_demo.replace(
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -1294,7 +1294,7 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertNotEqual(live_goal_objective_mismatch.returncode, 0)
             dispatch_and_reported_goal_mismatch = run(
                 complete_ids,
-                visible_feature_thread.replace(
+                visible_feature_task.replace(
                     "active | active | "
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
@@ -1302,13 +1302,13 @@ class OrchestratorContractTests(unittest.TestCase):
                     "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd | "
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
                 ).replace(
-                    "thread_goal_dispatch_objective_sha256="
+                    "task_goal_dispatch_objective_sha256="
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
-                    "thread_goal_reported_objective_sha256="
+                    "task_goal_reported_objective_sha256="
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;",
-                    "thread_goal_dispatch_objective_sha256="
+                    "task_goal_dispatch_objective_sha256="
                     "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd; "
-                    "thread_goal_reported_objective_sha256="
+                    "task_goal_reported_objective_sha256="
                     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;",
                 ),
                 live_demo,
@@ -1317,14 +1317,14 @@ class OrchestratorContractTests(unittest.TestCase):
                 dispatch_and_reported_goal_mismatch.returncode,
                 0,
             )
-            contradictory_complete_goal = visible_feature_thread.replace(
+            contradictory_complete_goal = visible_feature_task.replace(
                 "active | active | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
                 "active | complete | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
             ).replace(
-                "thread_goal_mode=active; thread_goal_status=active;",
-                "thread_goal_mode=active; thread_goal_status=complete;",
+                "task_goal_mode=active; task_goal_status=active;",
+                "task_goal_mode=active; task_goal_status=complete;",
             )
             live_demo_complete = live_demo.replace(
                 "active\tactive\t",
@@ -1350,19 +1350,19 @@ class OrchestratorContractTests(unittest.TestCase):
                 accepted_terminal_goal.stderr,
             )
 
-            monitored_feature_thread = visible_feature_thread.replace(
+            monitored_feature_task = visible_feature_task.replace(
                 "Next Root Check: action=none; target=none; due_at=none",
-                "Next Root Check: action=monitor-thread; target=worker-1; due_at=now",
+                "Next Root Check: action=monitor-task; target=worker-1; due_at=now",
             ).replace(
                 "next_action=none; next_target=none; next_due_at=none",
-                "next_action=monitor-thread; next_target=worker-1; next_due_at=now",
+                "next_action=monitor-task; next_target=worker-1; next_due_at=now",
             )
-            monitored = run(complete_ids, monitored_feature_thread, live_demo)
+            monitored = run(complete_ids, monitored_feature_task, live_demo)
             self.assertEqual(monitored.returncode, 0, monitored.stderr)
             split_brain_action = run(
                 complete_ids,
-                monitored_feature_thread.replace(
-                    "next_action=monitor-thread; next_target=worker-1; next_due_at=now",
+                monitored_feature_task.replace(
+                    "next_action=monitor-task; next_target=worker-1; next_due_at=now",
                     "next_action=none; next_target=none; next_due_at=none",
                 ),
                 live_demo,
@@ -1370,11 +1370,11 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertNotEqual(split_brain_action.returncode, 0)
             correction_without_drift = run(
                 complete_ids,
-                monitored_feature_thread.replace(
-                    "action=monitor-thread; target=worker-1",
+                monitored_feature_task.replace(
+                    "action=monitor-task; target=worker-1",
                     "action=send-correction; target=worker-1",
                 ).replace(
-                    "next_action=monitor-thread; next_target=worker-1; next_due_at=now",
+                    "next_action=monitor-task; next_target=worker-1; next_due_at=now",
                     "next_action=send-correction; next_target=worker-1; next_due_at=now",
                 ),
                 live_demo,
@@ -1910,7 +1910,7 @@ class OrchestratorContractTests(unittest.TestCase):
             worker,
         )
         self.assertIn(
-            "The root and every spawned Codex thread may create internal "
+            "The root and every spawned Codex App task may create internal "
             "background subagents",
             " ".join(options.split()),
         )
@@ -1919,11 +1919,35 @@ class OrchestratorContractTests(unittest.TestCase):
             "within its assigned scope and action set",
             " ".join(skill.split()),
         )
+        self.assertIn(
+            'Treat owner wording such as "Codex thread" or "Codex threads" '
+            "as visible Codex App tasks",
+            " ".join(skill.split()),
+        )
+        for tool_name in (
+            "create_thread",
+            "list_threads",
+            "read_thread",
+            "send_message_to_thread",
+            "set_thread_title",
+        ):
+            self.assertIn(f"`{tool_name}`", worker)
+        for stale_contract_term in (
+            "Feature Spec Thread Registry",
+            "feature_spec_thread_assignment",
+            "visible_thread_id",
+            "thread_goal_",
+            "visible-feature-spec-thread",
+            "monitor-thread",
+        ):
+            self.assertNotIn(stale_contract_term, skill)
+            self.assertNotIn(stale_contract_term, worker)
+            self.assertNotIn(stale_contract_term, ledger_template)
         for stale in ("requested_surface", "actual_surface", "root-thread"):
             self.assertNotIn(stale, worker)
             self.assertNotIn(stale, ledger_template)
 
-    def test_granted_visible_threads_are_mandatory_one_per_feature_spec(self) -> None:
+    def test_granted_visible_tasks_are_mandatory_one_per_feature_spec(self) -> None:
         skill = self.read("SKILL.md")
         options = self.read("references/options.md")
         worker = self.read("references/worker.md")
@@ -1948,7 +1972,7 @@ class OrchestratorContractTests(unittest.TestCase):
         }
 
         self.assertIn(
-            "exactly one visible thread per implementation-eligible Feature Spec",
+            "exactly one visible task per implementation-eligible Feature Spec",
             normalized["skill"],
         )
         self.assertIn(
@@ -1956,7 +1980,7 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized["options"],
         )
         self.assertIn(
-            "Create exactly one active visible Codex App thread for each implementation-eligible Feature Spec",
+            "Create exactly one active visible Codex App task for each implementation-eligible Feature Spec",
             normalized["worker"],
         )
         self.assertIn(
@@ -1964,23 +1988,23 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized["options"],
         )
         self.assertIn(
-            "Do not split one Feature Spec across multiple active visible threads",
+            "Do not split one Feature Spec across multiple active visible tasks",
             normalized["worker"],
         )
         self.assertIn(
-            "do not reuse one visible thread for multiple Feature Specs",
+            "do not reuse one visible task for multiple Feature Specs",
             normalized["worker"],
         )
         self.assertIn(
-            "A multi-repository Spec still has one thread",
+            "A multi-repository Spec still has one task",
             normalized["worker"],
         )
         self.assertIn(
-            "Every visible Codex App thread created by the orchestrator must establish its own assignment-scoped Goal before it starts",
+            "Every visible Codex App task created by the orchestrator must establish its own assignment-scoped Goal before it starts",
             normalized["worker"],
         )
         self.assertIn(
-            "The root cannot create or complete a Goal on another thread's behalf",
+            "The root cannot create or complete a Goal on another task's behalf",
             normalized["worker"],
         )
         self.assertIn(
@@ -1988,7 +2012,7 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized["worker"],
         )
         self.assertIn(
-            "create one visible thread per Feature Spec, not per repository",
+            "create one visible task per Feature Spec, not per repository",
             normalized["multi_repo"],
         )
 
@@ -2001,7 +2025,7 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized["closeout"],
         )
         self.assertIn(
-            "assigned thread is the algorithm's execution and polling owner",
+            "assigned task is the algorithm's execution and polling owner",
             normalized["gates"],
         )
         self.assertIn(
@@ -2009,7 +2033,7 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized["worker"],
         )
         self.assertIn(
-            "Inside mandatory mode, that value still means the work must integrate as one unit, but the assigned Feature Spec thread is the integration surface",
+            "Inside mandatory mode, that value still means the work must integrate as one unit, but the assigned Feature Spec task is the integration surface",
             normalized["worker"],
         )
         self.assertIn(
@@ -2017,21 +2041,21 @@ class OrchestratorContractTests(unittest.TestCase):
             worker,
         )
 
-        self.assertIn("## Feature Spec Thread Registry", ledger_template)
+        self.assertIn("## Feature Spec Task Registry", ledger_template)
         self.assertIn("encode `%` as `%25`, then `|` as `%7C`", ledger_template)
         self.assertIn("`feature_spec_ref`: canonical Feature Spec", options)
         self.assertIn("`feature_spec_title`: title transport", options)
         self.assertIn("codex_review_poll_owner", ledger_template)
         self.assertIn("corrective_message_evidence", ledger_template)
-        self.assertIn("thread_state_evidence", ledger_template)
-        self.assertIn("thread_goal_mode", ledger_template)
-        self.assertIn("thread_goal_status", ledger_template)
-        self.assertIn("thread_goal_dispatch_objective_sha256", ledger_template)
-        self.assertIn("thread_goal_reported_objective_sha256", ledger_template)
-        self.assertIn("thread_goal_evidence", ledger_template)
-        self.assertIn("thread_goal_missing_tool", ledger_template)
+        self.assertIn("task_state_evidence", ledger_template)
+        self.assertIn("task_goal_mode", ledger_template)
+        self.assertIn("task_goal_status", ledger_template)
+        self.assertIn("task_goal_dispatch_objective_sha256", ledger_template)
+        self.assertIn("task_goal_reported_objective_sha256", ledger_template)
+        self.assertIn("task_goal_evidence", ledger_template)
+        self.assertIn("task_goal_missing_tool", ledger_template)
         self.assertIn(
-            "complete `## Feature Spec Thread Registry`",
+            "complete `## Feature Spec Task Registry`",
             recovery,
         )
         self.assertIn(
@@ -2046,7 +2070,7 @@ class OrchestratorContractTests(unittest.TestCase):
             "Without visible-task consent, the viable App default is root or background subagent execution inside an existing owner-supplied checkout",
             normalized["worker"],
         )
-        self.assertIn("LIVE_THREAD_EVIDENCE_ROWS", recovery)
+        self.assertIn("LIVE_TASK_EVIDENCE_ROWS", recovery)
         self.assertIn("`list_threads`/`read_thread` equivalents", recovery)
         self.assertIn("`post-review-disposition`", worker)
         self.assertNotIn("post-root-provided-review-response", worker)

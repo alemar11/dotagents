@@ -9,19 +9,19 @@ parent Feature Spec closeout, watch, and post-merge algorithm.
 ## Execution Owner
 
 When `visible_app_task_permission=granted-by-authorized-user`, the single
-visible thread assigned to the Feature Spec executes this entire algorithm
+visible task assigned to the Feature Spec executes this entire algorithm
 through `merge-ready-report`, including every GitStack `reviews check` and
 `reviews wait`, review request, feedback disposition and fix, validation and CI
 cycle, PR-body closeout mutation, and ready transition. The root only reads the
-thread, compares its reported state with the ledger and expected state order,
+task through `read_thread`, compares its reported state with the ledger and expected state order,
 sends corrective messages on drift, and reconciles final evidence. It must not
 invoke the review check/wait workflow, poll the PR review, fix findings, mutate
 the PR, or mark it ready for that Spec.
 
-If the assigned thread fails or loses required capability, the root may steer,
-resume-equivalent, or replace it with one visible thread for the same Feature
+If the assigned task fails or loses required capability, the root may steer,
+resume-equivalent, or replace it with one visible task for the same Feature
 Spec. It must not fall back to root-owned or background-only review closeout.
-Outside mandatory visible Feature Spec thread mode, the root may execute this
+Outside mandatory visible Feature Spec task mode, the root may execute this
 algorithm directly or assign its explicit actions to a capable worker.
 
 ## Codex PR Review Gate
@@ -190,9 +190,9 @@ controller state.
 5. If the current request is still `acknowledged` or `pending` at the extended
    deadline, rerun the current-head check, preserve the request, set
    `wait_state=monitoring-required`, and stop the continuous waiter. Keep the
-   action `ready-next`. In mandatory visible Feature Spec thread mode, the
-   assigned thread remains the polling owner and resumes bounded polling at the
-   next check while the root monitors only that thread's progress. Outside that
+   action `ready-next`. In mandatory visible Feature Spec task mode, the
+   assigned task remains the polling owner and resumes bounded polling at the
+   next check while the root monitors only that task's progress. Outside that
    mode, use root monitoring, owner handoff, or an explicitly authorized
    automation handoff. A still-pollable review is not a blocker and is never
    completion evidence; only an unpollable check, provider error, or missing

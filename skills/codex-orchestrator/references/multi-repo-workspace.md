@@ -41,15 +41,15 @@ branch, and project memory. Worker implementation runs in the helper worktree.
 
 Execution ordering is derived, not separately configured:
 
-- Without mandatory visible Feature Spec thread mode, the orchestrator chooses
+- Without mandatory visible Feature Spec task mode, the orchestrator chooses
   the worker surface, worker count, recursive internal subagent topology, and
   serial or parallel split for each graph-shaped wave from ownership
   boundaries, worktree safety, and live tool capacity.
 - With `visible_app_task_permission=granted-by-authorized-user`, create one
-  visible thread per Feature Spec, not per repository. That thread owns every
+  visible task per Feature Spec, not per repository. That task owns every
   child-repo implementation and every repo-specific PR required by the Spec.
-  The orchestrator still derives thread start order and serial or parallel
-  scheduling, while each thread derives its internal subagent topology.
+  The orchestrator still derives task start order and serial or parallel
+  scheduling, while each task derives its internal subagent topology.
 - Dependencies, dirty worktrees, overlapping path sets, missing authority, and
   repo/branch/worktree conflicts override requested parallelism.
 
@@ -73,9 +73,9 @@ from the assigned Git worktree. Record:
 - proof that the original child checkout stayed clean unless explicitly
   authorized otherwise.
 
-For mandatory Feature Spec thread mode, record one thread id and exact Feature
+For mandatory Feature Spec task mode, record one task id and exact Feature
 Spec title across all child repo/worktree rows for that Spec. Do not create one
-visible thread per child repository, and do not split review polling for the
+visible task per child repository, and do not split review polling for the
 Spec's PRs back into the root.
 
 If native child-root worker binding becomes available, treat it as a
@@ -88,7 +88,7 @@ memory, dependency, or closeout contracts.
   dispatching dependent work.
 - Outside mandatory mode, root-owned integration gates run after the relevant
   child worker wave completes. In mandatory mode, the assigned Feature Spec
-  thread executes cross-repo integration, validation, PR review polling, fixes,
+  task executes cross-repo integration, validation, PR review polling, fixes,
   and merge-ready closeout; the root reconciles its proof read-only.
 - Child issues close through their child tracker and delivery rules.
 - Parent local issues move to `issues/done/` only after child proof and

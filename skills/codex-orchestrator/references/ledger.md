@@ -53,7 +53,7 @@ missing or invalid header field—makes the ledger invalid.
 ## Discovery Sources
 ## Active Root
 ## Codex Review Wait Registry
-## Feature Spec Thread Registry
+## Feature Spec Task Registry
 ## Parent Closeout Watch
 ## Recovery Packet
 Packet version: 1
@@ -97,13 +97,13 @@ ledger that passes the marker check above.
 - Workers report status, proof, blockers, and next actions to the orchestrator.
 - When `visible_app_task_permission=granted-by-authorized-user`, the ledger
   groups every implementation-eligible Feature Spec and all of its child
-  workstreams under exactly one visible thread. The root records and monitors
+  workstreams under exactly one visible task. The root records and monitors
   that mapping but does not execute implementation, integration, validation,
   PR mutation, Codex-review request/polling, feedback or CI fixes, or mark-ready
   work for those Specs.
-- Each orchestrator-created visible thread owns its assignment-scoped Goal.
+- Each orchestrator-created visible task owns its assignment-scoped Goal.
   The root records and monitors the reported Goal state but never creates,
-  updates, or completes that Goal on the thread's behalf.
+  updates, or completes that Goal on the task's behalf.
 - Preserve historical notes that explain owner decisions, suppressions, and
   release state.
 - The orchestrator records worker lifecycle decisions: `integrated`,
@@ -114,10 +114,10 @@ ledger that passes the marker check above.
 Keep one authoritative owner for each current-state fact:
 
 - `## Active Root` owns the root claim and root action;
-- `## Feature Spec Thread Registry` owns visible-thread identity, Feature Spec
-  assignment, lifecycle state, thread Goal projection, and drift;
+- `## Feature Spec Task Registry` owns visible-task identity, Feature Spec
+  assignment, lifecycle state, task Goal projection, and drift;
 - `## Workstreams` owns work state, delivery state, and the projection of its
-  assigned thread and review wait;
+  assigned task and review wait;
 - `## Codex Review Wait Registry` owns review timing, stable observations, and
   wait transitions; and
 - `## Recovery Packet`, active-worker lists, wave reports, and commentary are
@@ -150,13 +150,13 @@ reporting and is never persisted as mutable controller state.
 Packet `next_action`, `next_target`, and `next_due_at`. Use RFC 3339 timestamps,
 `now`, a delimiter-safe event ref, or `none`; do not persist a mutable countdown.
 Allowed actions are
-`monitor-thread`, `send-correction`, `dispatch-feature-spec`,
+`monitor-task`, `send-correction`, `dispatch-feature-spec`,
 `reconcile-feature-spec`, `owner-action`, and `none`:
 
-- `monitor-thread` targets one active visible thread with `drift=none` when it
-  has a registry row; a created thread whose Goal is pending must use this
+- `monitor-task` targets one active visible task with `drift=none` when it
+  has a registry row; a created task whose Goal is pending must use this
   action until Goal establishment resolves;
-- `send-correction` targets one active registry thread with non-`none` drift;
+- `send-correction` targets one active registry task with non-`none` drift;
 - `dispatch-feature-spec` targets an eligible Feature Spec not yet active in
   the registry;
 - `reconcile-feature-spec` targets an existing registry Feature Spec ref;
@@ -166,17 +166,17 @@ Allowed actions are
 
 Root actions never contain implementation, review request, review polling,
 feedback-fix, CI-fix, PR mutation, or mark-ready work in mandatory visible
-Feature Spec thread mode. A stale or unstructured root action makes the
+Feature Spec task mode. A stale or unstructured root action makes the
 current projection invalid; repair it before dispatch, recovery, or closeout.
 
 Reject a controller snapshot when any of these invariants fails:
 
-- in mandatory visible Feature Spec thread mode, Active Root visible workers
-  are not exactly the active registry thread assignments, or Recovery Packet
+- in mandatory visible Feature Spec task mode, Active Root visible workers
+  are not exactly the active registry task assignments, or Recovery Packet
   `active_workers` is not the complete Active Root worker set;
-- a registry thread, active workstream thread assignment, or recovery thread
+- a registry task, active workstream task assignment, or recovery task
   mapping disagrees about Feature Spec identity or lifecycle owner;
-- a visible thread advances beyond `created` while its Goal is pending, a
+- a visible task advances beyond `created` while its Goal is pending, a
   pending Goal has a non-monitor next action, its
   Goal state lacks root-readable evidence, or its Goal fallback does not name
   the unavailable runtime surface and exact objective;
@@ -185,9 +185,9 @@ Reject a controller snapshot when any of these invariants fails:
 - workstreams sharing a PR head disagree with the single wait row, observation
   fingerprint, deadline, or transition timestamp;
 - a complete Goal lacks `merge-ready` or `target-complete` lifecycle state, a
-  blocked Goal lacks `blocked` or `needs-owner`, or live thread Goal evidence
+  blocked Goal lacks `blocked` or `needs-owner`, or live task Goal evidence
   differs from the authoritative dispatch objective/state;
-- a root owns implementation or review for a mandatory visible-thread Feature
+- a root owns implementation or review for a mandatory visible-task Feature
   Spec; or
 - Active Root and Recovery Packet next action/target projections differ or
   violate the action predicates above.
@@ -195,7 +195,7 @@ Reject a controller snapshot when any of these invariants fails:
 ## Active Root Claims
 
 Before creating workers, starting root-owned implementation outside mandatory
-Feature Spec thread mode, or mutating source
+Feature Spec task mode, or mutating source
 state, the root orchestrator verifies that no live root already claims the same
 portfolio, repo realpath, or source id. The ledger is an advisory coordination
 record, not a filesystem or database lock. Treat it as the owner-visible record
@@ -237,8 +237,8 @@ Use these ledger-owned values:
   `needs-resync` means worker state must be reconciled, `replaced` means a new
   worker took over or, outside mandatory mode, a root flow took over, and
   `root-owned` means root owns integration or
-  follow-up outside mandatory Feature Spec thread mode. `root-owned` is invalid
-  for implementation or review of a Feature Spec whose visible-thread mode is
+  follow-up outside mandatory Feature Spec task mode. `root-owned` is invalid
+  for implementation or review of a Feature Spec whose visible-task mode is
   active.
 - `active_root_status`: `claimed` means this root currently owns the portfolio
   source graph, `stale` means the claim missed the recorded ledger check window,
@@ -306,7 +306,7 @@ roots in the active-root claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or safe. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute in the owning surface when authorized; otherwise record the missing permission or blocker. In mandatory visible Feature Spec thread mode, implementation and review actions stay assigned to that Spec's thread and never become root actions. `pull-request-ready-for-merge-but-not-merged` keeps required review actions actionable while the PR is draft, then mark-ready and parent closeout actionable after the current-head review policy and remaining gates pass. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
+| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute in the owning surface when authorized; otherwise record the missing permission or blocker. In mandatory visible Feature Spec task mode, implementation and review actions stay assigned to that Spec's task and never become root actions. `pull-request-ready-for-merge-but-not-merged` keeps required review actions actionable while the PR is draft, then mark-ready and parent closeout actionable after the current-head review policy and remaining gates pass. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
 | `completed` | Required gates passed and the exact `change_delivery_target` is proven. For `validated-changes-left-uncommitted`, acceptance plus validation are sufficient and commit/push/PR fields are not applicable. A default-branch GitHub whole Feature Spec closeout PR may report merge-ready with `parent_spec_closeout=armed`, proof, and an active or handed-off watch, but the parent source and portfolio ledger remain incomplete until merge and verified issue closure. A non-default-base PR workstream may reach its own target with `deferred-to-default-branch` only while the later closeout vehicle remains actionable. The draft-PR target records later lifecycle actions as not applicable. Otherwise record delivery proof, source closeout, publication checkout, caller-checkout disposition, lifecycle decision, and artifact disposition. Pending required delivery, closeout, or proof remains non-terminal. |
@@ -334,7 +334,7 @@ Before marking a ledger `complete`, verify:
   `parent_closeout_watch=complete`, and post-merge proof that GitHub closed the
   issue. The draft-PR target and excluded workstreams record
   `not-applicable` with a reason.
-- `active` contains only rows with a real next check, assigned-thread action, or root-owned action outside mandatory Feature Spec implementation/review;
+- `active` contains only rows with a real next check, assigned-task action, or root-owned action outside mandatory Feature Spec implementation/review;
   `autonomous` and `ready-next` are empty or reclassified with the missing
   authority, decision, blocker, or follow-up.
 - Feature Spec-backed delivery records its real branch or PR proof and resolved

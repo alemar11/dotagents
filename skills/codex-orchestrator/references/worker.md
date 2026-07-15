@@ -31,14 +31,14 @@ Session option fields:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | Explicit consent; the granted value selects mandatory one-visible-thread-per-Feature-Spec execution. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | Explicit consent; the granted value selects mandatory one-visible-task-per-Feature-Spec execution. |
 | `unmanaged_git_worktree_fallback_permission` | `not-granted`, `granted-by-authorized-user` | Permission for an unmanaged Git worktree after managed-worktree failure evidence. |
 
 Worker surface, count, per-wave parallelism, and serial or parallel sequencing
 are orchestrator-derived runtime decisions governed by `options.md`, not
-session options or user-provided numeric fields. The granted visible-thread
+session options or user-provided numeric fields. The granted visible-task
 mode is the exception to free surface/count selection: surface is visible and
-the count is exactly one active thread per implementation-eligible Feature
+the count is exactly one active task per implementation-eligible Feature
 Spec.
 
 Execution fields:
@@ -46,18 +46,18 @@ Execution fields:
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` | Where the workstream actually runs. The current-session value works in both CLI and App. |
-| `worker_allowed_actions` | See the canonical list below | Independent action list. Merge and final source closeout remain root-owned; an assigned visible Feature Spec thread may own every pre-merge delivery action. |
+| `worker_allowed_actions` | See the canonical list below | Independent action list. Merge and final source closeout remain root-owned; an assigned visible Feature Spec task may own every pre-merge delivery action. |
 
-Visible-thread Goal fields are derived runtime state, never session options:
+Visible-task Goal fields are derived runtime state, never session options:
 
 | Field | Values | Meaning |
 | --- | --- | --- |
-| `thread_goal_mode` | `pending`, `active`, `unavailable`, `not-applicable` | Goal establishment state for an orchestrator-created visible thread. `unavailable` is valid only when the runtime exposes no Goal tool; background workers use `not-applicable`. |
-| `thread_goal_status` | `pending`, `active`, `complete`, `blocked`, `not-applicable` | Current thread-owned Goal status. `not-applicable` accompanies unavailable Goal mode or a non-visible worker. |
-| `thread_goal_dispatch_objective_sha256` | 64 lowercase hex characters or `not-applicable` | Root-owned fingerprint of the exact objective sent at dispatch. |
-| `thread_goal_reported_objective_sha256` | 64 lowercase hex characters, `pending`, or `not-applicable` | Thread-reported fingerprint of the objective it established or repeated as fallback. |
-| `thread_goal_evidence` | Tool/thread result ref or `not-applicable` | Root-readable Goal, dispatch, or current-thread result. |
-| `thread_goal_missing_tool` | `runtime-goal-tool`, `not-applicable` | Exact missing surface for the unavailable fallback. |
+| `task_goal_mode` | `pending`, `active`, `unavailable`, `not-applicable` | Goal establishment state for an orchestrator-created visible task. `unavailable` is valid only when the runtime exposes no Goal tool; background workers use `not-applicable`. |
+| `task_goal_status` | `pending`, `active`, `complete`, `blocked`, `not-applicable` | Current task-owned Goal status. `not-applicable` accompanies unavailable Goal mode or a non-visible worker. |
+| `task_goal_dispatch_objective_sha256` | 64 lowercase hex characters or `not-applicable` | Root-owned fingerprint of the exact objective sent at dispatch. |
+| `task_goal_reported_objective_sha256` | 64 lowercase hex characters, `pending`, or `not-applicable` | Task-reported fingerprint of the objective it established or repeated as fallback. |
+| `task_goal_evidence` | Goal tool or task result ref, or `not-applicable` | Root-readable Goal, dispatch, or current task result. |
+| `task_goal_missing_tool` | `runtime-goal-tool`, `not-applicable` | Exact missing surface for the unavailable fallback. |
 
 Worker report fields:
 
@@ -72,7 +72,7 @@ Integration fields:
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `branch_expectation` | `feature-branch`, `repository-feature-branch`, `named-target-branch`, `none` | Expected landing target. |
-| `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, `pending` | Integration path. `manual-root` is invalid in mandatory Feature Spec thread mode. Replace `pending` before lifecycle closeout or record that no output was integrated. |
+| `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, `pending` | Integration path. `manual-root` is invalid in mandatory Feature Spec task mode. Replace `pending` before lifecycle closeout or record that no output was integrated. |
 | `starting_checkout_branch_handling` | `keep-current-branch-checked-out`, `branch-switch-authorized`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
 | `result_checkout_path` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, draft PR publication, and ready-for-review transition will run. |
 
@@ -91,12 +91,12 @@ operations map to `spawn_agent`, `list_agents`, `send_message`,
 tasks map to `create_thread`, `list_threads`, `read_thread`,
 `send_message_to_thread`, `set_thread_title`, `set_thread_archived`,
 `set_thread_pinned`, `fork_thread`, and `handoff_thread` when those tools are
-available. Goal operations run inside the owning thread and currently map to
+available. Goal operations run inside the owning task and currently map to
 `create_goal`, `get_goal`, and `update_goal` when exposed. The `/goal` command
 is the user-facing equivalent, not a command for the root to type remotely.
 
-The root and each spawned Codex thread may use the internal subagent lifecycle
-exposed in that thread. This nested use does not authorize the worker to create
+The root and each spawned Codex App task may use the internal subagent lifecycle
+exposed in that task. This nested use does not authorize the worker to create
 or manage visible App tasks.
 
 Do not claim a resume or close operation when the runtime exposes only
@@ -114,20 +114,20 @@ owner-facing execution report, `Execution mode` is only a display summary
 inferred from the selected surfaces and worker split; do not treat it as a
 separate enum or source of truth.
 
-## Visible Thread Goal Contract
+## Visible Task Goal Contract
 
-Every visible Codex App thread created by the orchestrator must establish its
+Every visible Codex App task created by the orchestrator must establish its
 own assignment-scoped Goal before it starts inspection, implementation, or
-review work. This is automatic behavior derived from visible-thread creation,
+review work. This is automatic behavior derived from visible-task creation,
 not a user-configurable option. Internal background subagents are exempt and
-remain accountable through their parent thread. The owner's explicit
-`$codex-orchestrator` invocation authorizes this per-thread Goal creation as
+remain accountable through their parent task. The owner's explicit
+`$codex-orchestrator` invocation authorizes this per-task Goal creation as
 part of the selected orchestration workflow.
 
-The root includes this exact behavior in the initial thread prompt. The thread
+The root includes this exact behavior in the initial task prompt. The task
 searches its current runtime tool registry, then uses `get_goal` to reuse a
 matching active Goal or `create_goal` to establish one in its own context. The
-root cannot create or complete a Goal on another thread's behalf. Use this
+root cannot create or complete a Goal on another task's behalf. Use this
 objective shape:
 
 ```text
@@ -136,83 +136,88 @@ Complete <exact Feature Spec title or assigned workstream> through
 Continue until that terminal target is achieved or a real blocker stops work.
 ```
 
-After the thread reports the Goal tool result, the root reads the thread,
+After the task reports the Goal tool result, the root reads the task with
+`read_thread`,
 compares the reported objective fingerprint with the hash of the exact prompt
-objective, and records all five `thread_goal_*` evidence fields in the ledger.
-Do not advance a visible thread beyond `created` while its Goal state is
-`pending`. A resumed thread reuses its matching active Goal. If it has a
-different unfinished Goal, treat that as drift and stop or replace the thread;
-do not overwrite it. A replacement thread creates a new Goal.
+objective, and records all five `task_goal_*` evidence fields in the ledger.
+Do not advance a visible task beyond `created` while its Goal state is
+`pending`. A resumed task reuses its matching active Goal. If it has a
+different unfinished Goal, treat that as drift and stop or replace the task;
+do not overwrite it. A replacement task creates a new Goal.
 
-The owning thread updates its Goal and marks it complete only after the exact
+The owning task updates its Goal and marks it complete only after the exact
 assigned delivery target and gates are satisfied. It may mark the Goal blocked
 only under the runtime Goal tool's own blocked-state contract. The root
-monitors and records those transitions but never updates the thread's Goal.
+monitors and records those transitions but never updates the task's Goal.
 Record `target-complete` for a completed non-merge-ready delivery target; use
 `merge-ready` for the default merge-ready target.
 
-Use `thread_goal_mode=unavailable` only when the current thread runtime exposes
-no Goal tool after registry inspection. In that case, the thread repeats the
+Use `task_goal_mode=unavailable` only when the current task runtime exposes
+no Goal tool after registry inspection. In that case, the task repeats the
 exact objective in its report with the missing-tool evidence, the root records
-`thread_goal_status=not-applicable`, and work may continue. An exposed Goal tool
+`task_goal_status=not-applicable`, and work may continue. An exposed Goal tool
 that rejects or fails the operation is not the unavailable fallback: report
-the failure and stop or replace the thread according to its lifecycle rules.
+the failure and stop or replace the task according to its lifecycle rules.
 
-Before thread creation, the root computes
-`thread_goal_dispatch_objective_sha256` from the exact prompt objective; the
-thread never supplies or rewrites that field. The thread reports
-`thread_goal_reported_objective_sha256`, and the root requires exact equality
+Before task creation, the root computes
+`task_goal_dispatch_objective_sha256` from the exact prompt objective; the
+task never supplies or rewrites that field. The task reports
+`task_goal_reported_objective_sha256`, and the root requires exact equality
 before accepting active or unavailable Goal mode. Pending creation uses
-`pending` for the reported hash and the initial thread-message ref as evidence.
-For an active Goal, `thread_goal_evidence` identifies the Goal tool or thread
-result and `thread_goal_missing_tool=not-applicable`. The unavailable fallback
-requires a current thread-read ref plus
-`thread_goal_missing_tool=runtime-goal-tool`. Background workers use
+`pending` for the reported hash and the existing technical
+`thread-message:` or `goal-create-message:` evidence prefix. The unavailable
+fallback uses `thread-read:`. These persisted evidence prefixes map to the
+`create_thread`/`send_message_to_thread` and `read_thread` tool boundary; they
+are not user-facing orchestration terminology.
+For an active Goal, `task_goal_evidence` identifies the Goal tool or task
+result and `task_goal_missing_tool=not-applicable`. The unavailable fallback
+requires a current `thread-read:` evidence ref from `read_thread` plus
+`task_goal_missing_tool=runtime-goal-tool`. Background workers use
 `not-applicable` for both hashes and the remaining evidence fields.
 
-## Mandatory Feature Spec Thread Mode
+## Mandatory Feature Spec Task Mode
 
 When `visible_app_task_permission=granted-by-authorized-user`, apply all of
 these rules as one execution contract:
 
-- Create exactly one active visible Codex App thread for each
+- Create exactly one active visible Codex App task for each
   implementation-eligible Feature Spec selected for dispatch in the current
-  wave. A queued or dependency-blocked Spec receives its thread when its wave
+  wave. A queued or dependency-blocked Spec receives its task when its wave
   starts. Use the canonical Feature Spec ref as the stable assignment key and
-  set the thread title to the exact Feature Spec title immediately after
+  set the task title to the exact Feature Spec title immediately after
   creation. Send the exact assignment and terminal delivery target, then
-  require the thread to establish its own Goal and report evidence before
+  require the task to establish its own Goal and report evidence before
   implementation starts.
 - Assign every generated issue, affected repository, implementation change,
   integration step, validation run, commit, push, draft PR, Codex-review
   request and poll, feedback disposition and fix, CI repair, parent-closing-
   keyword preparation, and ready transition for that Feature Spec to its one
-  thread. A multi-repository Spec still has one thread and may produce one PR
+  task. A multi-repository Spec still has one task and may produce one PR
   per repository.
-- Do not split one Feature Spec across multiple active visible threads and do
-  not reuse one visible thread for multiple Feature Specs. The root may choose
+- Do not split one Feature Spec across multiple active visible tasks and do
+  not reuse one visible task for multiple Feature Specs. The root may choose
   serial or parallel starts from the dependency graph and live capacity, but
   it may not change the one-to-one mapping.
 - The root is orchestration-only: register and group sources, resolve authority
-  and strategy, create/title/read/message/replace/archive threads, maintain the
+  and strategy, create/title/read/message/replace/archive tasks, maintain the
   ledger, reconcile read-only evidence, and report status. It must not edit,
   integrate, validate, commit, push, mutate the PR, request or poll Codex
   review, disposition review feedback, fix review or CI failures, run the
   review closeout workflow, or mark the PR ready for these Specs.
-- The assigned thread may create and manage any internal background subagent
+- The assigned task may create and manage any internal background subagent
   topology it finds useful within the inherited scope and action ceiling. It
   remains accountable for integrating those results and reporting their ids,
   scopes, outcomes, and serial or parallel topology to the root.
-- If a thread drifts from the selected target or closeout sequence, read its
+- If a task drifts from the selected target or closeout sequence, read its
   latest state and send a precise corrective message naming the mismatch,
   expected next state, and preserved authority. If it is stale or fails,
-  resume-equivalent or replace it with another visible thread for the same
-  Feature Spec after recording lifecycle evidence. Keep only one active thread
+  resume-equivalent or replace it with another visible task for the same
+  Feature Spec after recording lifecycle evidence. Keep only one active task
   for the Spec. Never fall back to root-owned or background-only
   implementation, integration, validation, or review; stop as `needs-owner` or
   blocked when no visible replacement can safely continue.
-- A mandatory Feature Spec thread may not use `autoreview=reroute-to-root`;
-  replace the thread or record the unavailable gate as a blocker.
+- A mandatory Feature Spec task may not use `autoreview=reroute-to-root`;
+  replace the task or record the unavailable gate as a blocker.
 
 ## Capability Snapshots
 
@@ -235,8 +240,8 @@ Do not assume a fork inherits broader permissions than its parent. If a
 snapshot changes or an operation fails with permission, network,
 authentication, or state-storage evidence, refresh the snapshot once and stop
 retrying that operation in the worker. Route it to a capable root when current
-scope, authority, and gates permit only outside mandatory Feature Spec thread
-mode. In mandatory mode, steer or replace the assigned visible thread and stop
+scope, authority, and gates permit only outside mandatory Feature Spec task
+mode. In mandatory mode, steer or replace the assigned visible task and stop
 if no capable visible replacement exists; the root must not take over the
 implementation or review action. Never copy credentials into a worker to
 manufacture capability.
@@ -256,11 +261,11 @@ If automation tooling is unavailable, do not imply anything was scheduled;
 draft the proposed automation instructions, schedule, and handoff text for
 owner action.
 
-Outside mandatory Feature Spec thread mode, the root chooses the worker
+Outside mandatory Feature Spec task mode, the root chooses the worker
 surface, number of workers, and serial or parallel split for each wave within
 `visible_app_task_permission`, live runtime capacity, and the work graph. In
-mandatory mode, the surface and one-thread-per-Spec count are fixed; the root
-chooses only serial or parallel scheduling. Each spawned Codex thread may
+mandatory mode, the surface and one-task-per-Spec count are fixed; the root
+chooses only serial or parallel scheduling. Each spawned Codex App task may
 choose its own internal background subagent topology within its assigned scope.
 There is no separate workspace execution mode, delegation toggle, worker-count
 field, visibility selector, or parallelism option.
@@ -280,7 +285,7 @@ subagent execution inside an existing owner-supplied checkout with non-
 overlapping path ownership; do not create a new dedicated worktree. If safe
 isolation requires a new checkout, ask for visible-task consent or the exact
 raw-worktree fallback permission before dispatch. This checkout rule never
-permits Feature Spec implementation to bypass mandatory visible thread mode
+permits Feature Spec implementation to bypass mandatory visible task mode
 after consent is granted.
 
 ## Session Option Resolution
@@ -292,37 +297,37 @@ phrase.
 
 If visible App task tools were authorized but are unavailable, record the
 missing create/read/message surface. For Feature Spec implementation, stop
-before dispatch or preserve the existing assigned visible thread for later
+before dispatch or preserve the existing assigned visible task for later
 recovery; do not reshape that work into background Codex subagents or root-owned
 execution. A raw Git worktree still requires
 `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`, but
 that permission changes only checkout management and never waives the required
-visible thread.
+visible task.
 
 ## Delegation Rules
 
-- In mandatory Feature Spec thread mode, group by canonical Feature Spec ref,
+- In mandatory Feature Spec task mode, group by canonical Feature Spec ref,
   not repository, package, issue, or path. One Spec gets one active visible
-  thread even when it spans multiple repositories or generated issues.
+  task even when it spans multiple repositories or generated issues.
 - Outside that mode, create one worker per independent ownership boundary:
   repository, package, service, path set, or tightly scoped workstream.
   Repository boundaries are the default isolation heuristic, not a quota.
 - Outside that mode, multi-repo work may use one active worker per affected
   repo per wave when the file, contract, test, and validation boundaries are
-  clean. Mandatory mode keeps all repos for one Spec under its assigned thread.
+  clean. Mandatory mode keeps all repos for one Spec under its assigned task.
 - Outside mandatory mode, shared contracts, dependencies, root config,
   migrations, generated snapshots, broad tests, conflict resolution, and final
   integration may stay in the root session. In mandatory mode, the assigned
-  thread owns those implementation surfaces for its Spec.
+  task owns those implementation surfaces for its Spec.
 - Never keep implementation or review in the root while mandatory mode is
-  active. Work that cannot safely run in its assigned visible thread remains
+  active. Work that cannot safely run in its assigned visible task remains
   undispatched or blocked.
 - Do not assign implementation with `parallelization=depends-on` until root
   verifies every separately recorded `dependency_ids` entry. Outside mandatory
-  Feature Spec thread mode, keep `parallelization=root-integrated`
+  Feature Spec task mode, keep `parallelization=root-integrated`
   implementation in root; workers may inspect or prove only when root keeps
   integration ownership. Inside mandatory mode, that value still means the
-  work must integrate as one unit, but the assigned Feature Spec thread is the
+  work must integrate as one unit, but the assigned Feature Spec task is the
   integration surface and the root remains orchestration-only.
 - Workers may inspect, implement, test, and report only within their authorized
   mode. They may create and manage internal background subagents within the
@@ -333,10 +338,10 @@ visible thread.
   to the root.
 - Workers must preserve unrelated local changes and stage only authorized
   paths. Only the root creates, reuses, forks, assigns, renames, messages,
-  archives, or replaces visible App tasks. Each thread owns the lifecycle of its
+  archives, or replaces visible App tasks. Each task owns the lifecycle of its
   internal subagents.
 - When visible Codex App workers provide helper worktrees, preserve the caller
-  checkout branch by default. In mandatory mode, thread-owned integration,
+  checkout branch by default. In mandatory mode, task-owned integration,
   validation, commit, push, and PR creation run from its managed worktree. In
   other modes, root-owned publication may use the worker worktree or a dedicated
   integration worktree. Switching the caller checkout is allowed only when the scoped row
@@ -475,8 +480,8 @@ permission to change branch/PR strategy.
 | `validated-changes-left-uncommitted` | Edit and validate only. Do not commit, push, create or transition a PR, request review, mutate issues, merge, release, or deploy. |
 | `local-commit-created-without-pushing` | Require `create-local-commit`; never include `push-target-branch` or PR actions. |
 | `changes-pushed-to-target-branch-without-pull-request` | Require the exact target branch plus `create-local-commit` and `push-target-branch`; never create a PR. |
-| `validated-draft-pull-request-published` | Root decides branch and PR count. In mandatory mode, the assigned Feature Spec thread executes through draft PR publication. |
-| `pull-request-ready-for-merge-but-not-merged` | Root decides branch, PR count, and permission. In mandatory mode, the assigned Feature Spec thread executes publication, review request and polling, disposition and fixes, CI, parent-closeout preparation, and mark-ready; never merge. |
+| `validated-draft-pull-request-published` | Root decides branch and PR count. In mandatory mode, the assigned Feature Spec task executes through draft PR publication. |
+| `pull-request-ready-for-merge-but-not-merged` | Root decides branch, PR count, and permission. In mandatory mode, the assigned Feature Spec task executes publication, review request and polling, disposition and fixes, CI, parent-closeout preparation, and mark-ready; never merge. |
 
 If the assigned delivery target conflicts with repository reality, stop and report
 `needs-owner`; do not choose a new branch or PR strategy. Workers may commit,
@@ -496,16 +501,16 @@ Workers report execution status. The root orchestrator decides lifecycle:
 Do not equate a worker saying `done` with the workstream being complete. The
 root still reads the latest state and records the lifecycle decision. Outside
 mandatory mode it also chooses an integration path and reruns root-owned gates.
-Inside mandatory mode it reconciles the thread's current proof read-only and
-steers the thread to finish any missing integration or gate; it never performs
+Inside mandatory mode it reconciles the task's current proof read-only and
+steers the task to finish any missing integration or gate; it never performs
 that work itself.
-For an assigned visible Feature Spec thread, `done` or `ready-for-review` is not
+For an assigned visible Feature Spec task, `done` or `ready-for-review` is not
 terminal until every PR for the Spec is non-draft and the selected merge-ready
 target plus required closeout evidence is reached.
 
-## Visible Thread Naming
+## Visible Task Naming
 
-In mandatory Feature Spec thread mode, set the visible thread title immediately
+In mandatory Feature Spec task mode, set the visible task title immediately
 after creation to the exact canonical Feature Spec title, including its
 `Feature Spec: ` prefix when that is the source title:
 
@@ -513,13 +518,13 @@ after creation to the exact canonical Feature Spec title, including its
 <exact Feature Spec title>
 ```
 
-Do not rename that thread for phase or status changes and do not reuse it for
+Do not rename that task for phase or status changes and do not reuse it for
 another Spec. Outside mandatory mode, use `<Project>: <short current task>` for
 any explicitly authorized visible ad hoc worker. Avoid status-only names such
 as `Worker 1`, `Active`, or `Needs review`. Record the Feature Spec ref, exact
-source title, worker id, and current thread title in the ledger. Use the title
+source title, worker id, and current task title in the ledger. Use the title
 transport encoding from `ledger-template.md` only inside ledger table/token
-fields; decode it before setting or comparing the actual App thread title.
+fields; decode it before setting or comparing the actual App task title.
 
 ## Read-Before-Steer
 
@@ -547,7 +552,7 @@ to overlapping scope, reconcile the worker with root-integrated state:
 - either hand the worker to a current checkout, send a precise resync brief
   with the accepted root changes, or create a fresh worker from the current
   root. Keeping overlapping integration in the root is allowed only outside
-  mandatory Feature Spec thread mode;
+  mandatory Feature Spec task mode;
 - do not ask a stale worker to keep editing overlapping files until the resync
   path is explicit in the ledger.
 
@@ -562,7 +567,7 @@ would be harder to reason about than replacement.
 
 ## Worker Output Integration
 
-Outside mandatory Feature Spec thread mode, the root orchestrator owns
+Outside mandatory Feature Spec task mode, the root orchestrator owns
 integration and chooses one path per worker output:
 
 - `handoff`: use `handoff_thread` when available, then inspect the returned
@@ -583,18 +588,18 @@ integration and chooses one path per worker output:
   the caller checkout unless
   `starting_checkout_branch_handling=branch-switch-authorized`.
 
-In mandatory Feature Spec thread mode, the assigned thread owns integration in
+In mandatory Feature Spec task mode, the assigned task owns integration in
 its managed checkout and may use `handoff`, `worker-commit`, or `patch-apply`
 internally for its nested subagents. `manual-root` is forbidden. The root reads
 the resulting Git/PR/proof state and either accepts the evidence or sends the
-thread a corrective message; it never applies, copies, reimplements, validates,
+task a corrective message; it never applies, copies, reimplements, validates,
 or publishes the change itself.
 
 For every path, the owning execution surface inspects the tracked diff,
 preserves unrelated local changes, excludes generated ignored artifacts, and
 runs the required gates. The root records the integration method, publication
 checkout, caller checkout disposition, and proof in the ledger; in mandatory
-mode it does so from thread evidence without rerunning the work. Do not commit,
+mode it does so from task evidence without rerunning the work. Do not commit,
 push, merge, close, release, or mutate external services unless the current
 scoped permissions, worker actions, and gate state permit it.
 
@@ -641,7 +646,7 @@ status:
 
 - `integrated`: output was accepted into the chosen integration checkout and
   required gates passed. In mandatory mode those gates were executed by the
-  assigned thread and reconciled read-only by the root. The worker can then be
+  assigned task and reconciled read-only by the root. The worker can then be
   archived or its helper worktree removed.
 - `retained-for-inspection`: output or artifacts are intentionally kept for
   owner/root review; record what remains and why.
@@ -676,7 +681,7 @@ Canonical actions:
 - `request-codex-review`: request review only after the current-head preflight;
 - `poll-codex-review`: run the one bounded GitStack waiter for the existing
   request on that head; never implement caller-owned check/sleep polling;
-- `post-review-disposition`: post the assigned thread's evidence-backed
+- `post-review-disposition`: post the assigned task's evidence-backed
   disposition for feedback on its current PR and head;
 - `rerun-ci`: rerun named checks and inspect their result;
 - `fix-ci-failure`: edit and validate the named CI repair scope;
@@ -694,8 +699,8 @@ waiter attempts are not worker progress and must not trigger repeated reports.
 Merge, direct issue updates, labels, and final source closeout are not worker
 actions. They remain root-owned with their own permission rows. In mandatory
 mode, `post-review-disposition` and authorized parent-closing-keyword changes
-are part of the assigned thread's pre-merge PR closeout; the root must not post
-them for the thread. Any retired capability value is invalid and stops as
+are part of the assigned task's pre-merge PR closeout; the root must not post
+them for the task. Any retired capability value is invalid and stops as
 `needs-owner`; never translate it silently.
 
 ## Prompt Template
@@ -709,21 +714,21 @@ Scope:
 - workstream_ids: <all generated issue/workstream ids for this Feature Spec, or one bounded id>
 - feature_spec_ref: <canonical Feature Spec URL/path/ref or not-applicable>
 - feature_spec_title: <exact canonical Feature Spec title or not-applicable>
-- feature_spec_thread_assignment: <required|not-applicable>
-- lifecycle_owner: <visible-feature-spec-thread|bounded-worker>
-- codex_review_poll_owner: <visible-feature-spec-thread|assigned-worker|not-applicable>
+- feature_spec_task_assignment: <required|not-applicable>
+- lifecycle_owner: <visible-feature-spec-task|bounded-worker>
+- codex_review_poll_owner: <visible-feature-spec-task|assigned-worker|not-applicable>
 - root_implementation_fallback: <forbidden|not-applicable>
 - visible_app_task_permission: <not-requested|granted-by-authorized-user|denied-by-authorized-user>
 - actual_execution_location: <current-orchestrator-session|visible-codex-app-task|background-codex-subagent>
 - worker_id: <id or pending>
 - worker_title: <title or pending>
-- thread_goal_objective: <exact assignment-scoped outcome through the selected delivery target>
-- thread_goal_mode: <pending|active|unavailable|not-applicable>
-- thread_goal_status: <pending|active|complete|blocked|not-applicable>
-- thread_goal_dispatch_objective_sha256: <root-computed 64-lowercase-hex or not-applicable>
-- thread_goal_reported_objective_sha256: <thread-reported 64-lowercase-hex, pending, or not-applicable>
-- thread_goal_evidence: <goal tool/thread result ref or not-applicable>
-- thread_goal_missing_tool: <runtime-goal-tool|not-applicable>
+- task_goal_objective: <exact assignment-scoped outcome through the selected delivery target>
+- task_goal_mode: <pending|active|unavailable|not-applicable>
+- task_goal_status: <pending|active|complete|blocked|not-applicable>
+- task_goal_dispatch_objective_sha256: <root-computed 64-lowercase-hex or not-applicable>
+- task_goal_reported_objective_sha256: <task-reported 64-lowercase-hex, pending, or not-applicable>
+- task_goal_evidence: <goal tool/task result ref or not-applicable>
+- task_goal_missing_tool: <runtime-goal-tool|not-applicable>
 - worker_evidence: authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
@@ -799,8 +804,8 @@ Context:
 - Known root-integrated changes since assignment: <bullets or none>
 
 Execution:
-1. If this is a visible Codex thread, establish or resume the exact
-   `thread_goal_objective` with the runtime Goal tool before doing assigned
+1. If this is a visible Codex App task, establish or resume the exact
+   `task_goal_objective` with the runtime Goal tool before doing assigned
    work. Report its state and evidence; if no Goal tool exists, report the exact
    objective and unavailable-tool fallback instead.
 2. Inspect the current state before editing.
@@ -819,8 +824,8 @@ Final report:
 - Delivery: selected delivery target, branch or PR used, closeout path, and PR links or
   `none`; include ready-for-review state, Codex review policy/state, publication
   checkout, and caller checkout disposition
-- Feature Spec thread: exact Feature Spec ref/title, visible thread id/title,
-  lifecycle ownership, thread Goal objective/mode/status/evidence, PR refs,
+- Feature Spec task: exact Feature Spec ref/title, visible task id/title,
+  lifecycle ownership, task Goal objective/mode/status/evidence, PR refs,
   Codex-review polling state, drift corrections, and whether the selected
   target is fully reached
 - Worker evidence: canonical `visible_app_task_permission`, `actual_execution_location`, and

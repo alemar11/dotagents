@@ -627,13 +627,13 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "internal_subdelegation: allowed-within-assigned-scope",
             ledger_template,
         )
-        self.assertIn("## Feature Spec Thread Registry", ledger_template)
+        self.assertIn("## Feature Spec Task Registry", ledger_template)
         self.assertIn(
             "both authorizes the surface and requires its use for Feature Spec implementation",
             " ".join(orchestrator_options.split()),
         )
         self.assertIn(
-            "exactly one active visible Codex App thread for each",
+            "exactly one active visible Codex App task for each",
             " ".join(worker.split()),
         )
         self.assertIn("codex_review_poll_owner", ledger_template)
@@ -1213,7 +1213,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("worker_allowed_actions:", worker)
         self.assertIn("Worker evidence", ledger_template)
         self.assertIn("Worker evidence", worker)
-        self.assertIn("feature_spec_thread_assignment", worker)
+        self.assertIn("feature_spec_task_assignment", worker)
         self.assertIn("root_implementation_fallback", worker)
         self.assertIn(
             "parallelism=<parallel|sequential|root-owned|simulated>",

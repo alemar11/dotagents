@@ -66,7 +66,7 @@ Goal objective: <goal text or ledger fallback objective>
 Goal fallback reason: <none or why /goal/runtime goal tool was unavailable>
 Started: <YYYY-MM-DD HH:MM TZ>
 Last Progress Read: <YYYY-MM-DD HH:MM TZ>
-Next Root Check: action=<monitor-thread|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none>; target=<visible-thread-id|feature-spec-ref|owner-decision-ref|none>; due_at=<RFC3339|now|event-ref|none>
+Next Root Check: action=<monitor-task|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none>; target=<visible-task-id|feature-spec-ref|owner-decision-ref|none>; due_at=<RFC3339|now|event-ref|none>
 existing_orchestrator_session_takeover_policy: ask-authorized-user-before-takeover|take-over-only-if-existing-ledger-is-stale
 Scoped merge option refs: <exact workstream pull_request_merge_permission/pull_request_merge_confirmation row_ids or none>
 parent_closeout_watch: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
@@ -114,36 +114,36 @@ GitStack review observation fingerprint; update the row and
 tier changes. Derive elapsed time from `wait_started_at` and the current clock
 for reports only; it is not persisted controller state.
 
-## Feature Spec Thread Registry
+## Feature Spec Task Registry
 
 This derived registry is required when
 `visible_app_task_permission=granted-by-authorized-user`. Keep exactly one row
 per implementation-eligible Feature Spec selected for dispatch in the current
-wave and exactly one active visible thread per row. Queued, dependency-blocked,
+wave and exactly one active visible task per row. Queued, dependency-blocked,
 or capacity-deferred Specs enter the registry when their dispatch wave starts.
 Multiple generated issues, repositories, worktrees, and PRs for the same Spec
-remain in that row. The exact source title is also the required live thread
-title. Every row also owns the current thread Goal projection. Keep
-`thread_goal_mode=pending` only while `state=created`; do not start assigned
-work until the thread reports `active` or an exact unavailable-tool fallback.
-The thread, not the root, owns Goal updates and completion. A recovery packet
-may preserve `created`/`pending`, but its next action must monitor that thread
+remain in that row. The exact source title is also the required live task
+title. Every row also owns the current task Goal projection. Keep
+`task_goal_mode=pending` only while `state=created`; do not start assigned
+work until the task reports `active` or an exact unavailable-tool fallback.
+The task, not the root, owns Goal updates and completion. A recovery packet
+may preserve `created`/`pending`, but its next action must monitor that task
 and must not resume assigned work.
 
 Ledger transport encodes title delimiters without changing the title itself:
 encode `%` as `%25`, then `|` as `%7C`, `;` as `%3B`, and `=` as `%3D` in
-`feature_spec_title` and `live_thread_title` cells or token values. Decode those
+`feature_spec_title` and `live_task_title` cells or token values. Decode those
 sequences in reverse order (`%3D`, `%3B`, `%7C`, then `%25`) before setting or
-comparing the visible thread title. Bare delimiter characters are invalid in
+comparing the visible task title. Bare delimiter characters are invalid in
 the stored title fields.
 
-| feature_spec_ref | feature_spec_title | visible_thread_id | live_thread_title | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | codex_review_poll_owner | state | last_read | drift | corrective_message_evidence | thread_state_evidence | thread_goal_mode | thread_goal_status | thread_goal_dispatch_objective_sha256 | thread_goal_reported_objective_sha256 | thread_goal_evidence | thread_goal_missing_tool |
+| feature_spec_ref | feature_spec_title | visible_task_id | live_task_title | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | codex_review_poll_owner | state | last_read | drift | corrective_message_evidence | task_state_evidence | task_goal_mode | task_goal_status | task_goal_dispatch_objective_sha256 | task_goal_reported_objective_sha256 | task_goal_evidence | task_goal_missing_tool |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <canonical ref> | <transport-encoded exact canonical title> | <thread id> | <transport-encoded exact canonical title> | <comma-separated ids> | <comma-separated repo refs> | <comma-separated PR refs or pending> | visible-feature-spec-thread | visible-feature-spec-thread | <created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced> | <time> | <none|description> | <message ref or none> | <current list/read-thread tool ref and fingerprint> | <pending|active|unavailable> | <pending|active|complete|blocked|not-applicable> | <root-computed 64-lowercase-hex> | <thread-reported 64-lowercase-hex or pending> | <goal tool, initial message, or current thread-read ref> | <runtime-goal-tool|not-applicable> |
+| <canonical ref> | <transport-encoded exact canonical title> | <task id> | <transport-encoded exact canonical title> | <comma-separated ids> | <comma-separated repo refs> | <comma-separated PR refs or pending> | visible-feature-spec-task | visible-feature-spec-task | <created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced> | <time> | <none|description> | <message ref or none> | <current `list_threads`/`read_thread` tool ref and fingerprint> | <pending|active|unavailable> | <pending|active|complete|blocked|not-applicable> | <root-computed 64-lowercase-hex> | <task-reported 64-lowercase-hex or pending> | <goal tool, technical `thread-message:`/`goal-create-message:`, or current `thread-read:` ref> | <runtime-goal-tool|not-applicable> |
 
-Reject duplicate Feature Spec refs, one thread id mapped to multiple Feature
+Reject duplicate Feature Spec refs, one task id mapped to multiple Feature
 Specs, a live title that differs from the exact Feature Spec title, a
-Feature-Spec-backed active workstream assigned outside its registry thread, or
+Feature-Spec-backed active workstream assigned outside its registry task, or
 a `current-orchestrator-session`/background-only implementation or review row.
 A non-`created` row with a pending Goal, an active Goal mode with an
 inapplicable status, an unavailable Goal mode without an exact fallback, or a
@@ -152,8 +152,8 @@ Use `target-complete` when a selected non-merge-ready delivery target is fully
 reached. An active Goal may be `complete` only with `merge-ready` or
 `target-complete`, and a Goal may be `blocked` only with `blocked` or
 `needs-owner` lifecycle state.
-A replacement first records the prior thread lifecycle, leaves only one active
-thread for the Spec, and updates this row without changing the Spec key.
+A replacement first records the prior task lifecycle, leaves only one active
+task for the Spec, and updates this row without changing the Spec key.
 
 ## Parent Closeout Watch
 
@@ -195,8 +195,8 @@ Updated: <YYYY-MM-DD HH:MM TZ>
 Projection fingerprint: <sha256 of ledger content before Notes, excluding this Recovery Packet, using recovery-validation.md canonical extraction>
 Content fingerprint: <sha256 of packet derived fields, excluding status/timestamps/fingerprints, also recorded under Active Root>
 Root: <root id>; claim=<status>; goal=<objective ref>; active_workers=<unique comma-separated worker ids or none>; parent_closeout_watch=<status/ref>
-Feature Spec threads: <feature-spec-ref>=<visible-thread-id>, or none
-Current wave: <wave id/status>; current_workstreams=<ids>; next_action=<monitor-thread|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none>; next_target=<visible-thread-id|feature-spec-ref|owner-decision-ref|none>; next_due_at=<RFC3339|now|event-ref|none>
+Feature Spec tasks: <feature-spec-ref>=<visible-task-id>, or none
+Current wave: <wave id/status>; current_workstreams=<ids>; next_action=<monitor-task|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none>; next_target=<visible-task-id|feature-spec-ref|owner-decision-ref|none>; next_due_at=<RFC3339|now|event-ref|none>
 Option resolution refs: session_rows=<unique comma-separated exact row_ids>; scoped_rows=<unique comma-separated exact current source/workstream row_ids or empty>; rows_fingerprint=<sha256 of exactly the referenced row union using recovery-validation.md>
 Repo checkpoints:
 - <repo realpath>; head=<sha>; worktree=<stable fingerprint of status --short>; branch=<name or detached>
@@ -222,7 +222,7 @@ fingerprints here; load `recovery-validation.md` before resume or recovery.
 authorization_resolution: per-workstream
 worker_allowed_actions: <explicit action list from worker.md>
 visible_app_task_permission: not-requested|granted-by-authorized-user|denied-by-authorized-user
-feature_spec_thread_assignment: required|not-applicable
+feature_spec_task_assignment: required|not-applicable
 unmanaged_git_worktree_fallback_permission: not-granted|granted-by-authorized-user
 repository_layout: single-repository|monorepo|multi-repository-workspace
 workstream_repository_layout: single-repository|monorepo|multi-repository-workspace
@@ -234,8 +234,8 @@ issue_completion_method: feature-pull-request-closing-keyword|repository-pull-re
 internal_subdelegation: allowed-within-assigned-scope
 worker_ledger_mutation: forbidden
 visible_worker_lifecycle_owner: root
-internal_subagent_lifecycle_owner: parent-thread
-Visible Feature Spec thread title format: <exact canonical Feature Spec title>
+internal_subagent_lifecycle_owner: parent-task
+Visible Feature Spec task title format: <exact canonical Feature Spec title>
 Root capability snapshot: filesystem=<profile/evidence>; network=<available|restricted|unknown>; gh_auth=<available|unavailable|not-required>; codex_cli=<available|unavailable|not-required>; autoreview=<available|unavailable|reroute-to-root>; checked_at=<time/evidence>
 GitHub workflow skill: <gitstack skill or none>
 GitHub primary transport: connector
@@ -290,7 +290,7 @@ Use one compact block per active workstream:
 | Field | Value |
 | --- | --- |
 | Source | <source id/ref and closeout target> |
-| Feature Spec thread | feature_spec_ref=<canonical ref|not-applicable>; feature_spec_title=<transport-encoded exact canonical title|not-applicable>; feature_spec_thread_assignment=<required|not-applicable>; visible_thread_id=<id|not-applicable>; lifecycle_owner=<visible-feature-spec-thread|bounded-worker|root>; codex_review_poll_owner=<visible-feature-spec-thread|assigned-worker|not-applicable>; root_implementation_fallback=<forbidden|not-applicable>; thread_goal_mode=<pending|active|unavailable|not-applicable>; thread_goal_status=<pending|active|complete|blocked|not-applicable>; thread_goal_dispatch_objective_sha256=<root-computed 64-lowercase-hex|not-applicable>; thread_goal_reported_objective_sha256=<thread-reported 64-lowercase-hex|pending|not-applicable>; thread_goal_evidence=<tool/thread ref|not-applicable>; thread_goal_missing_tool=<runtime-goal-tool|not-applicable> |
+| Feature Spec task | feature_spec_ref=<canonical ref|not-applicable>; feature_spec_title=<transport-encoded exact canonical title|not-applicable>; feature_spec_task_assignment=<required|not-applicable>; visible_task_id=<id|not-applicable>; lifecycle_owner=<visible-feature-spec-task|bounded-worker|root>; codex_review_poll_owner=<visible-feature-spec-task|assigned-worker|not-applicable>; root_implementation_fallback=<forbidden|not-applicable>; task_goal_mode=<pending|active|unavailable|not-applicable>; task_goal_status=<pending|active|complete|blocked|not-applicable>; task_goal_dispatch_objective_sha256=<root-computed 64-lowercase-hex|not-applicable>; task_goal_reported_objective_sha256=<task-reported 64-lowercase-hex|pending|not-applicable>; task_goal_evidence=<goal tool/task ref|not-applicable>; task_goal_missing_tool=<runtime-goal-tool|not-applicable> |
 | Repo / execution location | <repo>; <current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; worker=<id or root> |
 | Worker evidence | visible_app_task_permission=<not-requested|granted-by-authorized-user|denied-by-authorized-user>; actual_execution_location=<current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; nested_subagents=<ids/scopes/outcomes/topology|none>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
@@ -359,7 +359,7 @@ Reconciliation must reject unsupported `armed` or unjustified
   source closeout target and whether it was
   updated/closed, publication checkout, caller checkout disposition>
   - <worker id/title, integration method, publication checkout, caller checkout
-  disposition, Feature Spec thread ref/id/exact title and review-poll ownership
+  disposition, Feature Spec task ref/id/exact title and review-poll ownership
   when applicable, worker lifecycle decision, generated ignored artifacts
   removed/retained/left in helper worktree>
 
@@ -382,10 +382,10 @@ option changes.
 
 When visible task permission is granted, each wave report must also map every
 implementation-eligible Feature Spec ref and exact title to its one visible
-thread id, list all child workstream and repository/PR refs under that mapping,
-name `visible-feature-spec-thread` as lifecycle and review-poll owner, and prove
-the root did no implementation or review work. Include each thread's Goal
-mode/status/evidence and prove no work began while its Goal was pending. Thread
+task id, list all child workstream and repository/PR refs under that mapping,
+name `visible-feature-spec-task` as lifecycle and review-poll owner, and prove
+the root did no implementation or review work. Include each task's Goal
+mode/status/evidence and prove no work began while its Goal was pending. Task
 count is derived from the Feature Spec set; do not record a user cap.
 
 The execution report is not an approval prompt. Continue later waves while they

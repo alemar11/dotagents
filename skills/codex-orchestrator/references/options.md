@@ -28,27 +28,27 @@ Codex App task consent is the independent session permission below.
 
 Worker surface, count, per-wave parallelism, and serial or parallel sequencing
 are derived runtime decisions, not options or user-provided data. When visible
-threads are not enabled, the orchestrator chooses them from the work graph,
+tasks are not enabled, the orchestrator chooses worker surfaces from the work graph,
 ownership boundaries, safety, tool availability, and live runtime capacity.
-When visible threads are enabled, the visible-thread count is exactly the
+When visible tasks are enabled, the visible-task count is exactly the
 number of implementation-eligible Feature Specs in the dispatched waves; only their start order and
 serial or parallel scheduling remain derived. The root and every spawned Codex
-thread may create internal background subagents within their assigned scope.
+App task may create internal background subagents within their assigned scope.
 
 ## Session Permissions And Context
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Explicit consent for visible Codex App tasks. The granted value selects mandatory one-thread-per-Feature-Spec execution. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Explicit consent for visible Codex App tasks. The granted value selects mandatory one-task-per-Feature-Spec execution. |
 | `unmanaged_git_worktree_fallback_permission` | `not-granted`, `granted-by-authorized-user` | `not-granted` | Permission to use an unmanaged Git worktree when the App cannot create the required managed worktree. |
 | `existing_orchestrator_session_takeover_policy` | `ask-authorized-user-before-takeover`, `take-over-only-if-existing-ledger-is-stale` | `ask-authorized-user-before-takeover` | Recovery policy when another orchestrator session claims overlapping scope. |
 | `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From project memory or safe repository evidence | Durable repository layout. This is derived context, not an execution-order preference. |
 
 `visible_app_task_permission=granted-by-authorized-user` both authorizes the
 surface and requires its use for Feature Spec implementation. Map every
-implementation-eligible Feature Spec to exactly one active visible thread,
+implementation-eligible Feature Spec to exactly one active visible task,
 group all generated issues and affected repositories for that Spec into that
-thread, and title it with the exact Feature Spec title. The thread owns the
+task, and title it with the exact Feature Spec title. The task owns the
 entire selected delivery target through merge-ready; the root does not perform
 implementation, integration, validation, Codex-review request or polling,
 feedback fixes, CI repair, PR mutation, or ready transition for that Spec.
@@ -58,8 +58,8 @@ and require no separate session option.
 Here, `implementation-eligible` means a Feature Spec whose start/dependency
 gates passed and whose implementation is selected for dispatch in the current
 wave. Queued, dependency-blocked, or capacity-deferred Specs receive their one
-thread when their dispatch wave starts; serial scheduling does not require
-creating every future thread in advance.
+task when their dispatch wave starts; serial scheduling does not require
+creating every future task in advance.
 
 ## Per-Workstream Permissions And Delivery
 
@@ -111,7 +111,7 @@ options:
 | `delivery_gate_status` | `ready`, `blocked`, `not-applicable` | Required data, permission, and proof for the selected delivery target. |
 | `delivery_allowed_actions` | Canonical action list | `change_delivery_target` plus its valid permission row. |
 | `worker_allowed_actions` | Canonical action list from `worker.md` | Exact worker assignment; actions are independent and non-cumulative. |
-| `feature_spec_thread_assignment` | One exact Feature Spec ref and title mapped to one visible thread id, or `not-applicable` | Required runtime mapping when visible task permission is granted; never a user option. |
+| `feature_spec_task_assignment` | One exact Feature Spec ref and title mapped to one visible task id, or `not-applicable` | Required runtime mapping when visible task permission is granted; never a user option. |
 
 `delivery_allowed_actions` derives as follows:
 
@@ -193,21 +193,21 @@ capability may restrict a value; it never grants mutation permission.
   `visible_app_task_permission=granted-by-authorized-user`.
 - With `visible_app_task_permission=granted-by-authorized-user`, every
   implementation-eligible Feature Spec requires exactly one active visible
-  thread titled with that Spec's exact title. One thread must not own multiple
+  task titled with that Spec's exact title. One task must not own multiple
   Feature Specs, and one Feature Spec must not be split across multiple active
-  visible threads. Multiple generated issues or repository PRs for one Spec
-  remain owned by its single thread.
-- Every orchestrator-created visible thread must establish its own
+  visible tasks. Multiple generated issues or repository PRs for one Spec
+  remain owned by its single task.
+- Every orchestrator-created visible task must establish its own
   assignment-scoped Goal before work starts. This is derived runtime behavior,
   not a session option or worker-count/topology choice. The root verifies the
-  thread-reported Goal state and records an exact objective fallback only when
-  that thread runtime exposes no Goal tool. Internal background subagents do
+  task-reported Goal state and records an exact objective fallback only when
+  that task runtime exposes no Goal tool. Internal background subagents do
   not require independent Goals.
 - In that granted mode, no Feature Spec implementation or review work may use
   `actual_execution_location=current-orchestrator-session` or a
-  background-only worker. If the visible thread surface is unavailable or an
-  assigned thread fails, steer, resume-equivalent, or replace the visible
-  thread for the same Spec; otherwise stop as `needs-owner` or blocked. Never
+  background-only worker. If the visible task surface is unavailable or an
+  assigned task fails, steer, resume-equivalent, or replace the visible
+  task for the same Spec; otherwise stop as `needs-owner` or blocked. Never
   fall back to root implementation or review.
 - `feature_spec_ref` and `feature_spec_title` must both be `not-applicable` or
   both be concrete. Re-read Feature Spec source/handoff evidence before
