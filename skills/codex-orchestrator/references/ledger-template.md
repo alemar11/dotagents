@@ -123,7 +123,12 @@ wave and exactly one active visible thread per row. Queued, dependency-blocked,
 or capacity-deferred Specs enter the registry when their dispatch wave starts.
 Multiple generated issues, repositories, worktrees, and PRs for the same Spec
 remain in that row. The exact source title is also the required live thread
-title.
+title. Every row also owns the current thread Goal projection. Keep
+`thread_goal_mode=pending` only while `state=created`; do not start assigned
+work until the thread reports `active` or an exact unavailable-tool fallback.
+The thread, not the root, owns Goal updates and completion. A recovery packet
+may preserve `created`/`pending`, but its next action must monitor that thread
+and must not resume assigned work.
 
 Ledger transport encodes title delimiters without changing the title itself:
 encode `%` as `%25`, then `|` as `%7C`, `;` as `%3B`, and `=` as `%3D` in
@@ -132,14 +137,21 @@ sequences in reverse order (`%3D`, `%3B`, `%7C`, then `%25`) before setting or
 comparing the visible thread title. Bare delimiter characters are invalid in
 the stored title fields.
 
-| feature_spec_ref | feature_spec_title | visible_thread_id | live_thread_title | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | codex_review_poll_owner | state | last_read | drift | corrective_message_evidence | thread_state_evidence |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <canonical ref> | <transport-encoded exact canonical title> | <thread id> | <transport-encoded exact canonical title> | <comma-separated ids> | <comma-separated repo refs> | <comma-separated PR refs or pending> | visible-feature-spec-thread | visible-feature-spec-thread | <created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|blocked|needs-owner|replaced> | <time> | <none|description> | <message ref or none> | <current list/read-thread tool ref and fingerprint> |
+| feature_spec_ref | feature_spec_title | visible_thread_id | live_thread_title | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | codex_review_poll_owner | state | last_read | drift | corrective_message_evidence | thread_state_evidence | thread_goal_mode | thread_goal_status | thread_goal_dispatch_objective_sha256 | thread_goal_reported_objective_sha256 | thread_goal_evidence | thread_goal_missing_tool |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <canonical ref> | <transport-encoded exact canonical title> | <thread id> | <transport-encoded exact canonical title> | <comma-separated ids> | <comma-separated repo refs> | <comma-separated PR refs or pending> | visible-feature-spec-thread | visible-feature-spec-thread | <created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced> | <time> | <none|description> | <message ref or none> | <current list/read-thread tool ref and fingerprint> | <pending|active|unavailable> | <pending|active|complete|blocked|not-applicable> | <root-computed 64-lowercase-hex> | <thread-reported 64-lowercase-hex or pending> | <goal tool, initial message, or current thread-read ref> | <runtime-goal-tool|not-applicable> |
 
 Reject duplicate Feature Spec refs, one thread id mapped to multiple Feature
 Specs, a live title that differs from the exact Feature Spec title, a
 Feature-Spec-backed active workstream assigned outside its registry thread, or
 a `current-orchestrator-session`/background-only implementation or review row.
+A non-`created` row with a pending Goal, an active Goal mode with an
+inapplicable status, an unavailable Goal mode without an exact fallback, or a
+root-owned Goal update is also invalid.
+Use `target-complete` when a selected non-merge-ready delivery target is fully
+reached. An active Goal may be `complete` only with `merge-ready` or
+`target-complete`, and a Goal may be `blocked` only with `blocked` or
+`needs-owner` lifecycle state.
 A replacement first records the prior thread lifecycle, leaves only one active
 thread for the Spec, and updates this row without changing the Spec key.
 
@@ -278,7 +290,7 @@ Use one compact block per active workstream:
 | Field | Value |
 | --- | --- |
 | Source | <source id/ref and closeout target> |
-| Feature Spec thread | feature_spec_ref=<canonical ref|not-applicable>; feature_spec_title=<transport-encoded exact canonical title|not-applicable>; feature_spec_thread_assignment=<required|not-applicable>; visible_thread_id=<id|not-applicable>; lifecycle_owner=<visible-feature-spec-thread|bounded-worker|root>; codex_review_poll_owner=<visible-feature-spec-thread|assigned-worker|not-applicable>; root_implementation_fallback=<forbidden|not-applicable> |
+| Feature Spec thread | feature_spec_ref=<canonical ref|not-applicable>; feature_spec_title=<transport-encoded exact canonical title|not-applicable>; feature_spec_thread_assignment=<required|not-applicable>; visible_thread_id=<id|not-applicable>; lifecycle_owner=<visible-feature-spec-thread|bounded-worker|root>; codex_review_poll_owner=<visible-feature-spec-thread|assigned-worker|not-applicable>; root_implementation_fallback=<forbidden|not-applicable>; thread_goal_mode=<pending|active|unavailable|not-applicable>; thread_goal_status=<pending|active|complete|blocked|not-applicable>; thread_goal_dispatch_objective_sha256=<root-computed 64-lowercase-hex|not-applicable>; thread_goal_reported_objective_sha256=<thread-reported 64-lowercase-hex|pending|not-applicable>; thread_goal_evidence=<tool/thread ref|not-applicable>; thread_goal_missing_tool=<runtime-goal-tool|not-applicable> |
 | Repo / execution location | <repo>; <current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; worker=<id or root> |
 | Worker evidence | visible_app_task_permission=<not-requested|granted-by-authorized-user|denied-by-authorized-user>; actual_execution_location=<current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; nested_subagents=<ids/scopes/outcomes/topology|none>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
@@ -372,8 +384,9 @@ When visible task permission is granted, each wave report must also map every
 implementation-eligible Feature Spec ref and exact title to its one visible
 thread id, list all child workstream and repository/PR refs under that mapping,
 name `visible-feature-spec-thread` as lifecycle and review-poll owner, and prove
-the root did no implementation or review work. Thread count is derived from the
-Feature Spec set; do not record a user cap.
+the root did no implementation or review work. Include each thread's Goal
+mode/status/evidence and prove no work began while its Goal was pending. Thread
+count is derived from the Feature Spec set; do not record a user cap.
 
 The execution report is not an approval prompt. Continue later waves while they
 stay inside the recorded source items, canonical option snapshot, worker

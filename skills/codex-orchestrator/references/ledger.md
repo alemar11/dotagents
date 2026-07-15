@@ -101,6 +101,9 @@ ledger that passes the marker check above.
   that mapping but does not execute implementation, integration, validation,
   PR mutation, Codex-review request/polling, feedback or CI fixes, or mark-ready
   work for those Specs.
+- Each orchestrator-created visible thread owns its assignment-scoped Goal.
+  The root records and monitors the reported Goal state but never creates,
+  updates, or completes that Goal on the thread's behalf.
 - Preserve historical notes that explain owner decisions, suppressions, and
   release state.
 - The orchestrator records worker lifecycle decisions: `integrated`,
@@ -112,7 +115,7 @@ Keep one authoritative owner for each current-state fact:
 
 - `## Active Root` owns the root claim and root action;
 - `## Feature Spec Thread Registry` owns visible-thread identity, Feature Spec
-  assignment, lifecycle state, and drift;
+  assignment, lifecycle state, thread Goal projection, and drift;
 - `## Workstreams` owns work state, delivery state, and the projection of its
   assigned thread and review wait;
 - `## Codex Review Wait Registry` owns review timing, stable observations, and
@@ -150,7 +153,9 @@ Allowed actions are
 `monitor-thread`, `send-correction`, `dispatch-feature-spec`,
 `reconcile-feature-spec`, `owner-action`, and `none`:
 
-- `monitor-thread` targets one active registry thread with `drift=none`;
+- `monitor-thread` targets one active visible thread with `drift=none` when it
+  has a registry row; a created thread whose Goal is pending must use this
+  action until Goal establishment resolves;
 - `send-correction` targets one active registry thread with non-`none` drift;
 - `dispatch-feature-spec` targets an eligible Feature Spec not yet active in
   the registry;
@@ -171,10 +176,17 @@ Reject a controller snapshot when any of these invariants fails:
   `active_workers` is not the complete Active Root worker set;
 - a registry thread, active workstream thread assignment, or recovery thread
   mapping disagrees about Feature Spec identity or lifecycle owner;
+- a visible thread advances beyond `created` while its Goal is pending, a
+  pending Goal has a non-monitor next action, its
+  Goal state lacks root-readable evidence, or its Goal fallback does not name
+  the unavailable runtime surface and exact objective;
 - a terminal wait row coexists with an active/pending workstream review
   projection, or a non-terminal wait row coexists with terminal evidence;
 - workstreams sharing a PR head disagree with the single wait row, observation
   fingerprint, deadline, or transition timestamp;
+- a complete Goal lacks `merge-ready` or `target-complete` lifecycle state, a
+  blocked Goal lacks `blocked` or `needs-owner`, or live thread Goal evidence
+  differs from the authoritative dispatch objective/state;
 - a root owns implementation or review for a mandatory visible-thread Feature
   Spec; or
 - Active Root and Recovery Packet next action/target projections differ or

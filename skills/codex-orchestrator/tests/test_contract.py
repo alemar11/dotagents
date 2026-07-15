@@ -595,7 +595,13 @@ class OrchestratorContractTests(unittest.TestCase):
                 "| Source | issue-1 |",
                 "| Feature Spec thread | feature_spec_ref=not-applicable; "
                 "feature_spec_title=not-applicable; "
-                "feature_spec_thread_assignment=not-applicable |",
+                "feature_spec_thread_assignment=not-applicable; "
+                "thread_goal_mode=not-applicable; "
+                "thread_goal_status=not-applicable; "
+                "thread_goal_dispatch_objective_sha256=not-applicable; "
+                "thread_goal_reported_objective_sha256=not-applicable; "
+                "thread_goal_evidence=not-applicable; "
+                "thread_goal_missing_tool=not-applicable |",
                 "| Repo / execution location | repo; "
                 "current-orchestrator-session; worker=root |",
                 "| Worker evidence | "
@@ -734,6 +740,24 @@ class OrchestratorContractTests(unittest.TestCase):
                     "| Worker evidence | "
                     "actual_execution_location=visible-codex-app-task |",
                 )
+                configured = configured.replace(
+                    "feature_spec_thread_assignment=not-applicable; "
+                    "thread_goal_mode=not-applicable; "
+                    "thread_goal_status=not-applicable; "
+                    "thread_goal_dispatch_objective_sha256=not-applicable; "
+                    "thread_goal_reported_objective_sha256=not-applicable; "
+                    "thread_goal_evidence=not-applicable; "
+                    "thread_goal_missing_tool=not-applicable |",
+                    "feature_spec_thread_assignment=not-applicable; "
+                    "thread_goal_mode=active; "
+                    "thread_goal_status=active; "
+                    "thread_goal_dispatch_objective_sha256="
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
+                    "thread_goal_reported_objective_sha256="
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
+                    "thread_goal_evidence=goal-read:worker-1@goal-ad-hoc; "
+                    "thread_goal_missing_tool=not-applicable |",
+                )
                 return configured.replace(
                     "active_workers=none",
                     "active_workers=worker-1",
@@ -744,14 +768,82 @@ class OrchestratorContractTests(unittest.TestCase):
                 with_visible_worker(ledger_fixture),
             )
             self.assertNotEqual(visible_without_consent.returncode, 0)
+            live_ad_hoc_active = (
+                "worker-1\tDemo: Ad hoc\tactive\trepo\tnot-applicable\t"
+                "active\tactive\t"
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\t"
+                "goal-read:worker-1@goal-ad-hoc\tnot-applicable\t"
+                "thread-read:worker-1@ad-hoc"
+            )
+            live_ad_hoc_pending = (
+                "worker-1\tDemo: Ad hoc\tactive\trepo\tnot-applicable\t"
+                "pending\tpending\t"
+                "pending\t"
+                "thread-message:worker-1\tnot-applicable\t"
+                "thread-read:worker-1@ad-hoc"
+            )
             visible_with_consent = run(
                 complete_ids,
                 with_visible_worker(with_session_values(visible_session)),
+                live_ad_hoc_active,
             )
             self.assertEqual(
                 visible_with_consent.returncode,
                 0,
                 visible_with_consent.stderr,
+            )
+            terminal_ad_hoc_goal = run(
+                complete_ids,
+                with_visible_worker(with_session_values(visible_session)).replace(
+                    "thread_goal_status=active;",
+                    "thread_goal_status=complete;",
+                ),
+                live_ad_hoc_active.replace(
+                    "active\tactive\t",
+                    "active\tcomplete\t",
+                ),
+            )
+            self.assertNotEqual(terminal_ad_hoc_goal.returncode, 0)
+            pending_visible_goal_contents = with_visible_worker(
+                with_session_values(visible_session)
+            ).replace(
+                    "thread_goal_mode=active; thread_goal_status=active; "
+                    "thread_goal_dispatch_objective_sha256="
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
+                    "thread_goal_reported_objective_sha256="
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
+                    "thread_goal_evidence=goal-read:worker-1@goal-ad-hoc; "
+                    "thread_goal_missing_tool=not-applicable",
+                    "thread_goal_mode=pending; thread_goal_status=pending; "
+                    "thread_goal_dispatch_objective_sha256="
+                    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; "
+                    "thread_goal_reported_objective_sha256=pending; "
+                    "thread_goal_evidence=thread-message:worker-1; "
+                    "thread_goal_missing_tool=not-applicable",
+                )
+            pending_visible_goal = run(
+                complete_ids,
+                pending_visible_goal_contents,
+                live_ad_hoc_pending,
+            )
+            self.assertNotEqual(pending_visible_goal.returncode, 0)
+            monitored_pending_visible_goal = run(
+                complete_ids,
+                pending_visible_goal_contents.replace(
+                    "Next Root Check: action=none; target=none; due_at=none",
+                    "Next Root Check: action=monitor-thread; "
+                    "target=worker-1; due_at=now",
+                ).replace(
+                    "next_action=none; next_target=none; next_due_at=none",
+                    "next_action=monitor-thread; next_target=worker-1; "
+                    "next_due_at=now",
+                ),
+                live_ad_hoc_pending,
+            )
+            self.assertEqual(
+                monitored_pending_visible_goal.returncode,
+                0,
+                monitored_pending_visible_goal.stderr,
             )
 
             retired_session_fields = {
@@ -858,10 +950,22 @@ class OrchestratorContractTests(unittest.TestCase):
             ).replace(
                 "| Feature Spec thread | feature_spec_ref=not-applicable; "
                 "feature_spec_title=not-applicable; "
-                "feature_spec_thread_assignment=not-applicable |",
+                "feature_spec_thread_assignment=not-applicable; "
+                "thread_goal_mode=not-applicable; "
+                "thread_goal_status=not-applicable; "
+                "thread_goal_dispatch_objective_sha256=not-applicable; "
+                "thread_goal_reported_objective_sha256=not-applicable; "
+                "thread_goal_evidence=not-applicable; "
+                "thread_goal_missing_tool=not-applicable |",
                 "| Feature Spec thread | feature_spec_ref=spec:demo; "
                 "feature_spec_title=Feature Spec: Demo; "
-                "feature_spec_thread_assignment=not-applicable |",
+                "feature_spec_thread_assignment=not-applicable; "
+                "thread_goal_mode=not-applicable; "
+                "thread_goal_status=not-applicable; "
+                "thread_goal_dispatch_objective_sha256=not-applicable; "
+                "thread_goal_reported_objective_sha256=not-applicable; "
+                "thread_goal_evidence=not-applicable; "
+                "thread_goal_missing_tool=not-applicable |",
             ).replace(
                 "| Delivery | target_pull_request_ref=not-applicable |",
                 "| Delivery | target_pull_request_ref=pending |",
@@ -891,12 +995,19 @@ class OrchestratorContractTests(unittest.TestCase):
                 "live_thread_title | workstream_ids | repository_refs | "
                 "pull_request_refs | lifecycle_owner | codex_review_poll_owner | "
                 "state | last_read | drift | corrective_message_evidence | "
-                "thread_state_evidence |\n"
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+                "thread_state_evidence | thread_goal_mode | thread_goal_status | "
+                "thread_goal_dispatch_objective_sha256 | "
+                "thread_goal_reported_objective_sha256 | thread_goal_evidence | "
+                "thread_goal_missing_tool |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
                 "| spec:demo | Feature Spec: Demo | worker-1 | "
                 "Feature Spec: Demo | a | repo | pending | "
                 "visible-feature-spec-thread | visible-feature-spec-thread | "
-                "implementing | now | none | none | thread-read:worker-1@abc |\n\n"
+                "implementing | now | none | none | thread-read:worker-1@abc | "
+                "active | active | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "goal-read:worker-1@goal-abc | not-applicable |\n\n"
                 "## Workstreams",
             )
             visible_feature_thread = visible_feature_thread.replace(
@@ -912,14 +1023,28 @@ class OrchestratorContractTests(unittest.TestCase):
             visible_feature_thread = visible_feature_thread.replace(
                 "| Feature Spec thread | feature_spec_ref=spec:demo; "
                 "feature_spec_title=Feature Spec: Demo; "
-                "feature_spec_thread_assignment=not-applicable |\n"
+                "feature_spec_thread_assignment=not-applicable; "
+                "thread_goal_mode=not-applicable; "
+                "thread_goal_status=not-applicable; "
+                "thread_goal_dispatch_objective_sha256=not-applicable; "
+                "thread_goal_reported_objective_sha256=not-applicable; "
+                "thread_goal_evidence=not-applicable; "
+                "thread_goal_missing_tool=not-applicable |\n"
                 "| Repo / execution location | repo; "
                 "current-orchestrator-session; worker=root |\n"
                 "| Worker evidence | "
                 "actual_execution_location=current-orchestrator-session |",
                 "| Feature Spec thread | feature_spec_ref=spec:demo; "
                 "feature_spec_title=Feature Spec: Demo; "
-                "feature_spec_thread_assignment=required |\n"
+                "feature_spec_thread_assignment=required; "
+                "thread_goal_mode=active; "
+                "thread_goal_status=active; "
+                "thread_goal_dispatch_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_reported_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_evidence=goal-read:worker-1@goal-abc; "
+                "thread_goal_missing_tool=not-applicable |\n"
                 "| Repo / execution location | repo; "
                 "visible-codex-app-task; worker=worker-1 |\n"
                 "| Worker evidence | "
@@ -927,6 +1052,23 @@ class OrchestratorContractTests(unittest.TestCase):
             ).replace("active_workers=none", "active_workers=worker-1")
             live_demo = (
                 "worker-1\tFeature Spec: Demo\tactive\trepo\tpending\t"
+                "active\tactive\t"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t"
+                "goal-read:worker-1@goal-abc\tnot-applicable\t"
+                "thread-read:worker-1@abc"
+            )
+            live_demo_pending = (
+                "worker-1\tFeature Spec: Demo\tactive\trepo\tpending\t"
+                "pending\tpending\t"
+                "pending\t"
+                "goal-create-message:worker-1\tnot-applicable\t"
+                "thread-read:worker-1@abc"
+            )
+            live_demo_unavailable = (
+                "worker-1\tFeature Spec: Demo\tactive\trepo\tpending\t"
+                "unavailable\tnot-applicable\t"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t"
+                "thread-read:worker-1@goal-unavailable\truntime-goal-tool\t"
                 "thread-read:worker-1@abc"
             )
             assigned_feature_thread = run(
@@ -945,6 +1087,9 @@ class OrchestratorContractTests(unittest.TestCase):
                 complete_ids,
                 visible_feature_thread,
                 "worker-1\tFeature Spec: Demo\tactive\tother-repo\tpending\t"
+                "active\tactive\t"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t"
+                "goal-read:worker-1@goal-abc\tnot-applicable\t"
                 "thread-read:worker-1@abc",
             )
             self.assertNotEqual(live_repo_drift.returncode, 0)
@@ -955,6 +1100,9 @@ class OrchestratorContractTests(unittest.TestCase):
                     "Feature Spec: Import %7C Export",
                 ),
                 "worker-1\tFeature Spec: Import %7C Export\tactive\trepo\tpending\t"
+                "active\tactive\t"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t"
+                "goal-read:worker-1@goal-abc\tnot-applicable\t"
                 "thread-read:worker-1@abc",
             )
             self.assertEqual(
@@ -969,6 +1117,9 @@ class OrchestratorContractTests(unittest.TestCase):
                     "Feature Spec: Import | Export",
                 ),
                 "worker-1\tFeature Spec: Import | Export\tactive\trepo\tpending\t"
+                "active\tactive\t"
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t"
+                "goal-read:worker-1@goal-abc\tnot-applicable\t"
                 "thread-read:worker-1@abc",
             )
             self.assertNotEqual(unencoded_title_thread.returncode, 0)
@@ -993,6 +1144,211 @@ class OrchestratorContractTests(unittest.TestCase):
                 live_demo,
             )
             self.assertNotEqual(root_review_polling.returncode, 0)
+
+            pending_goal_after_dispatch = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "active | active | "
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                    "goal-read:worker-1@goal-abc | not-applicable",
+                    "pending | pending | "
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                    "pending | "
+                    "goal-create-message:worker-1 | not-applicable",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(pending_goal_after_dispatch.returncode, 0)
+            recoverable_created_pending_goal = visible_feature_thread.replace(
+                "implementing | now | none | none |",
+                "created | now | none | none |",
+            ).replace(
+                "active | active | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "goal-read:worker-1@goal-abc | not-applicable",
+                "pending | pending | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "pending | "
+                "goal-create-message:worker-1 | not-applicable",
+            ).replace(
+                "thread_goal_mode=active; thread_goal_status=active; "
+                "thread_goal_dispatch_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_reported_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_evidence=goal-read:worker-1@goal-abc; "
+                "thread_goal_missing_tool=not-applicable",
+                "thread_goal_mode=pending; thread_goal_status=pending; "
+                "thread_goal_dispatch_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_reported_objective_sha256=pending; "
+                "thread_goal_evidence=goal-create-message:worker-1; "
+                "thread_goal_missing_tool=not-applicable",
+            ).replace(
+                "Next Root Check: action=none; target=none; due_at=none",
+                "Next Root Check: action=monitor-thread; target=worker-1; "
+                "due_at=now",
+            ).replace(
+                "next_action=none; next_target=none; next_due_at=none",
+                "next_action=monitor-thread; next_target=worker-1; "
+                "next_due_at=now",
+            )
+            recovered_created_pending_goal = run(
+                complete_ids,
+                recoverable_created_pending_goal,
+                live_demo_pending,
+            )
+            self.assertEqual(
+                recovered_created_pending_goal.returncode,
+                0,
+                recovered_created_pending_goal.stderr,
+            )
+            missing_goal_evidence = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "goal-read:worker-1@goal-abc",
+                    "none",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(missing_goal_evidence.returncode, 0)
+            unavailable_goal = visible_feature_thread.replace(
+                "active | active | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "goal-read:worker-1@goal-abc | not-applicable",
+                "unavailable | not-applicable | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                "thread-read:worker-1@goal-unavailable | runtime-goal-tool",
+            ).replace(
+                "thread_goal_mode=active; thread_goal_status=active; "
+                "thread_goal_dispatch_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_reported_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_evidence=goal-read:worker-1@goal-abc; "
+                "thread_goal_missing_tool=not-applicable",
+                "thread_goal_mode=unavailable; "
+                "thread_goal_status=not-applicable; "
+                "thread_goal_dispatch_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_reported_objective_sha256="
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                "thread_goal_evidence=thread-read:worker-1@goal-unavailable; "
+                "thread_goal_missing_tool=runtime-goal-tool",
+            )
+            accepted_unavailable_goal = run(
+                complete_ids,
+                unavailable_goal,
+                live_demo_unavailable,
+            )
+            self.assertEqual(
+                accepted_unavailable_goal.returncode,
+                0,
+                accepted_unavailable_goal.stderr,
+            )
+            incomplete_unavailable_goal = run(
+                complete_ids,
+                unavailable_goal.replace(
+                    "runtime-goal-tool",
+                    "not-applicable",
+                ),
+                live_demo_unavailable,
+            )
+            self.assertNotEqual(incomplete_unavailable_goal.returncode, 0)
+            stale_unavailable_goal_evidence = run(
+                complete_ids,
+                unavailable_goal.replace(
+                    "thread-read:worker-1@goal-unavailable",
+                    "pending",
+                ),
+                live_demo_unavailable,
+            )
+            self.assertNotEqual(
+                stale_unavailable_goal_evidence.returncode,
+                0,
+            )
+            invalid_goal_objective_fingerprint = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "bad-fingerprint",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(
+                invalid_goal_objective_fingerprint.returncode,
+                0,
+            )
+            live_goal_objective_mismatch = run(
+                complete_ids,
+                visible_feature_thread,
+                live_demo.replace(
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                ),
+            )
+            self.assertNotEqual(live_goal_objective_mismatch.returncode, 0)
+            dispatch_and_reported_goal_mismatch = run(
+                complete_ids,
+                visible_feature_thread.replace(
+                    "active | active | "
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
+                    "active | active | "
+                    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd | "
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
+                ).replace(
+                    "thread_goal_dispatch_objective_sha256="
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; "
+                    "thread_goal_reported_objective_sha256="
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;",
+                    "thread_goal_dispatch_objective_sha256="
+                    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd; "
+                    "thread_goal_reported_objective_sha256="
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa;",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(
+                dispatch_and_reported_goal_mismatch.returncode,
+                0,
+            )
+            contradictory_complete_goal = visible_feature_thread.replace(
+                "active | active | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
+                "active | complete | "
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
+            ).replace(
+                "thread_goal_mode=active; thread_goal_status=active;",
+                "thread_goal_mode=active; thread_goal_status=complete;",
+            )
+            live_demo_complete = live_demo.replace(
+                "active\tactive\t",
+                "active\tcomplete\t",
+            )
+            rejected_early_complete_goal = run(
+                complete_ids,
+                contradictory_complete_goal,
+                live_demo_complete,
+            )
+            self.assertNotEqual(rejected_early_complete_goal.returncode, 0)
+            accepted_terminal_goal = run(
+                complete_ids,
+                contradictory_complete_goal.replace(
+                    "implementing | now | none | none |",
+                    "target-complete | now | none | none |",
+                ),
+                live_demo_complete,
+            )
+            self.assertEqual(
+                accepted_terminal_goal.returncode,
+                0,
+                accepted_terminal_goal.stderr,
+            )
 
             monitored_feature_thread = visible_feature_thread.replace(
                 "Next Root Check: action=none; target=none; due_at=none",
@@ -1620,6 +1976,18 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized["worker"],
         )
         self.assertIn(
+            "Every visible Codex App thread created by the orchestrator must establish its own assignment-scoped Goal before it starts",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "The root cannot create or complete a Goal on another thread's behalf",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "Internal background subagents are exempt",
+            normalized["worker"],
+        )
+        self.assertIn(
             "create one visible thread per Feature Spec, not per repository",
             normalized["multi_repo"],
         )
@@ -1656,6 +2024,12 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("codex_review_poll_owner", ledger_template)
         self.assertIn("corrective_message_evidence", ledger_template)
         self.assertIn("thread_state_evidence", ledger_template)
+        self.assertIn("thread_goal_mode", ledger_template)
+        self.assertIn("thread_goal_status", ledger_template)
+        self.assertIn("thread_goal_dispatch_objective_sha256", ledger_template)
+        self.assertIn("thread_goal_reported_objective_sha256", ledger_template)
+        self.assertIn("thread_goal_evidence", ledger_template)
+        self.assertIn("thread_goal_missing_tool", ledger_template)
         self.assertIn(
             "complete `## Feature Spec Thread Registry`",
             recovery,

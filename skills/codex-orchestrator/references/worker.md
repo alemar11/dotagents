@@ -48,6 +48,17 @@ Execution fields:
 | `actual_execution_location` | `current-orchestrator-session`, `background-codex-subagent`, `visible-codex-app-task` | Where the workstream actually runs. The current-session value works in both CLI and App. |
 | `worker_allowed_actions` | See the canonical list below | Independent action list. Merge and final source closeout remain root-owned; an assigned visible Feature Spec thread may own every pre-merge delivery action. |
 
+Visible-thread Goal fields are derived runtime state, never session options:
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `thread_goal_mode` | `pending`, `active`, `unavailable`, `not-applicable` | Goal establishment state for an orchestrator-created visible thread. `unavailable` is valid only when the runtime exposes no Goal tool; background workers use `not-applicable`. |
+| `thread_goal_status` | `pending`, `active`, `complete`, `blocked`, `not-applicable` | Current thread-owned Goal status. `not-applicable` accompanies unavailable Goal mode or a non-visible worker. |
+| `thread_goal_dispatch_objective_sha256` | 64 lowercase hex characters or `not-applicable` | Root-owned fingerprint of the exact objective sent at dispatch. |
+| `thread_goal_reported_objective_sha256` | 64 lowercase hex characters, `pending`, or `not-applicable` | Thread-reported fingerprint of the objective it established or repeated as fallback. |
+| `thread_goal_evidence` | Tool/thread result ref or `not-applicable` | Root-readable Goal, dispatch, or current-thread result. |
+| `thread_goal_missing_tool` | `runtime-goal-tool`, `not-applicable` | Exact missing surface for the unavailable fallback. |
+
 Worker report fields:
 
 | Field | Values | Meaning |
@@ -80,7 +91,9 @@ operations map to `spawn_agent`, `list_agents`, `send_message`,
 tasks map to `create_thread`, `list_threads`, `read_thread`,
 `send_message_to_thread`, `set_thread_title`, `set_thread_archived`,
 `set_thread_pinned`, `fork_thread`, and `handoff_thread` when those tools are
-available.
+available. Goal operations run inside the owning thread and currently map to
+`create_goal`, `get_goal`, and `update_goal` when exposed. The `/goal` command
+is the user-facing equivalent, not a command for the root to type remotely.
 
 The root and each spawned Codex thread may use the internal subagent lifecycle
 exposed in that thread. This nested use does not authorize the worker to create
@@ -101,6 +114,62 @@ owner-facing execution report, `Execution mode` is only a display summary
 inferred from the selected surfaces and worker split; do not treat it as a
 separate enum or source of truth.
 
+## Visible Thread Goal Contract
+
+Every visible Codex App thread created by the orchestrator must establish its
+own assignment-scoped Goal before it starts inspection, implementation, or
+review work. This is automatic behavior derived from visible-thread creation,
+not a user-configurable option. Internal background subagents are exempt and
+remain accountable through their parent thread. The owner's explicit
+`$codex-orchestrator` invocation authorizes this per-thread Goal creation as
+part of the selected orchestration workflow.
+
+The root includes this exact behavior in the initial thread prompt. The thread
+searches its current runtime tool registry, then uses `get_goal` to reuse a
+matching active Goal or `create_goal` to establish one in its own context. The
+root cannot create or complete a Goal on another thread's behalf. Use this
+objective shape:
+
+```text
+Complete <exact Feature Spec title or assigned workstream> through
+<change_delivery_target> and every assigned validation and closeout gate.
+Continue until that terminal target is achieved or a real blocker stops work.
+```
+
+After the thread reports the Goal tool result, the root reads the thread,
+compares the reported objective fingerprint with the hash of the exact prompt
+objective, and records all five `thread_goal_*` evidence fields in the ledger.
+Do not advance a visible thread beyond `created` while its Goal state is
+`pending`. A resumed thread reuses its matching active Goal. If it has a
+different unfinished Goal, treat that as drift and stop or replace the thread;
+do not overwrite it. A replacement thread creates a new Goal.
+
+The owning thread updates its Goal and marks it complete only after the exact
+assigned delivery target and gates are satisfied. It may mark the Goal blocked
+only under the runtime Goal tool's own blocked-state contract. The root
+monitors and records those transitions but never updates the thread's Goal.
+Record `target-complete` for a completed non-merge-ready delivery target; use
+`merge-ready` for the default merge-ready target.
+
+Use `thread_goal_mode=unavailable` only when the current thread runtime exposes
+no Goal tool after registry inspection. In that case, the thread repeats the
+exact objective in its report with the missing-tool evidence, the root records
+`thread_goal_status=not-applicable`, and work may continue. An exposed Goal tool
+that rejects or fails the operation is not the unavailable fallback: report
+the failure and stop or replace the thread according to its lifecycle rules.
+
+Before thread creation, the root computes
+`thread_goal_dispatch_objective_sha256` from the exact prompt objective; the
+thread never supplies or rewrites that field. The thread reports
+`thread_goal_reported_objective_sha256`, and the root requires exact equality
+before accepting active or unavailable Goal mode. Pending creation uses
+`pending` for the reported hash and the initial thread-message ref as evidence.
+For an active Goal, `thread_goal_evidence` identifies the Goal tool or thread
+result and `thread_goal_missing_tool=not-applicable`. The unavailable fallback
+requires a current thread-read ref plus
+`thread_goal_missing_tool=runtime-goal-tool`. Background workers use
+`not-applicable` for both hashes and the remaining evidence fields.
+
 ## Mandatory Feature Spec Thread Mode
 
 When `visible_app_task_permission=granted-by-authorized-user`, apply all of
@@ -111,7 +180,9 @@ these rules as one execution contract:
   wave. A queued or dependency-blocked Spec receives its thread when its wave
   starts. Use the canonical Feature Spec ref as the stable assignment key and
   set the thread title to the exact Feature Spec title immediately after
-  creation.
+  creation. Send the exact assignment and terminal delivery target, then
+  require the thread to establish its own Goal and report evidence before
+  implementation starts.
 - Assign every generated issue, affected repository, implementation change,
   integration step, validation run, commit, push, draft PR, Codex-review
   request and poll, feedback disposition and fix, CI repair, parent-closing-
@@ -646,6 +717,13 @@ Scope:
 - actual_execution_location: <current-orchestrator-session|visible-codex-app-task|background-codex-subagent>
 - worker_id: <id or pending>
 - worker_title: <title or pending>
+- thread_goal_objective: <exact assignment-scoped outcome through the selected delivery target>
+- thread_goal_mode: <pending|active|unavailable|not-applicable>
+- thread_goal_status: <pending|active|complete|blocked|not-applicable>
+- thread_goal_dispatch_objective_sha256: <root-computed 64-lowercase-hex or not-applicable>
+- thread_goal_reported_objective_sha256: <thread-reported 64-lowercase-hex, pending, or not-applicable>
+- thread_goal_evidence: <goal tool/thread result ref or not-applicable>
+- thread_goal_missing_tool: <runtime-goal-tool|not-applicable>
 - worker_evidence: authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>;
   status=<used|unavailable|attempt-failed|root-owned-fallback>;
   evidence=<tool/session/failure>; parallelism=<parallel|sequential|root-owned|simulated>
@@ -721,11 +799,15 @@ Context:
 - Known root-integrated changes since assignment: <bullets or none>
 
 Execution:
-1. Inspect the current state before editing.
-2. Preserve unrelated uncommitted changes.
-3. If editing, run focused validation.
-4. Run or request autoreview when required by the gate.
-5. Stop and report if blocked by access, ambiguous owner intent, unsafe state,
+1. If this is a visible Codex thread, establish or resume the exact
+   `thread_goal_objective` with the runtime Goal tool before doing assigned
+   work. Report its state and evidence; if no Goal tool exists, report the exact
+   objective and unavailable-tool fallback instead.
+2. Inspect the current state before editing.
+3. Preserve unrelated uncommitted changes.
+4. If editing, run focused validation.
+5. Run or request autoreview when required by the gate.
+6. Stop and report if blocked by access, ambiguous owner intent, unsafe state,
    missing dependency, worker-reported risk, or a gate that cannot be
    satisfied.
 
@@ -738,8 +820,9 @@ Final report:
   `none`; include ready-for-review state, Codex review policy/state, publication
   checkout, and caller checkout disposition
 - Feature Spec thread: exact Feature Spec ref/title, visible thread id/title,
-  lifecycle ownership, PR refs, Codex-review polling state, drift corrections,
-  and whether the selected target is fully reached
+  lifecycle ownership, thread Goal objective/mode/status/evidence, PR refs,
+  Codex-review polling state, drift corrections, and whether the selected
+  target is fully reached
 - Worker evidence: canonical `visible_app_task_permission`, `actual_execution_location`, and
   `authorization_state`; worker id or session evidence; unavailable or failed
   tool evidence; nested subagent ids/scopes/outcomes; fallback reason; and

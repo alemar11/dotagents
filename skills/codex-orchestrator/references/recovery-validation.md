@@ -78,9 +78,12 @@ On resume:
    title transport defined in `ledger-template.md`; every active child
    workstream, repository, and PR for that Spec maps to that thread; one thread
    never maps to multiple Specs; and neither root nor a background-only worker
-   owns implementation or review. Reject `root-owned-fallback` for those
-   actions. Thread scheduling is otherwise derived from dependencies and live
-   runtime capacity rather than ledger limits.
+   owns implementation or review. Require root-readable thread Goal evidence,
+   reject any non-`created` row whose Goal is still pending, and require an
+   exact objective plus missing-tool evidence for the unavailable fallback.
+   Reject `root-owned-fallback` for implementation or review. Thread
+   scheduling is otherwise derived from dependencies and live runtime capacity
+   rather than ledger limits.
    Require `Next Root Check: action=<value>; target=<value>; due_at=<value>`
    under Active Root to match the Recovery Packet `next_action`, `next_target`,
    and `next_due_at` exactly and to satisfy `ledger.md`'s action predicate
@@ -91,15 +94,17 @@ On resume:
    terminal/non-terminal contradiction. Elapsed wall time and poll attempts
    are not persisted state and cannot make a packet fresh.
    Before running the shell validation below, use the current Codex App
-   `list_threads`/`read_thread` equivalents for every registry thread. Reject a
+   `list_threads`/`read_thread` equivalents for every active visible thread,
+   including visible ad-hoc workers. Reject a
    missing, archived, unreadable, or replaced id; require the live title,
-   project/worktree repository set, and latest reported PR set to match the
-   registry and active workstreams. Build `LIVE_THREAD_EVIDENCE_ROWS` only from
+   project/worktree repository set, latest reported PR set, and reported Goal
+   objective/state to match the registry and active workstreams. Build
+   `LIVE_THREAD_EVIDENCE_ROWS` only from
    those current tool results, never from ledger values, with one tab-separated
    row per thread:
 
    ```text
-   <thread-id>\t<transport-encoded-live-title>\tactive\t<comma-separated-repo-refs>\t<comma-separated-pr-refs>\t<tool-result-ref/fingerprint>
+   <thread-id>\t<transport-encoded-live-title>\tactive\t<comma-separated-repo-refs>\t<comma-separated-pr-refs>\t<thread-goal-mode>\t<thread-goal-status>\t<thread-goal-reported-objective-sha256-or-pending>\t<thread-goal-evidence>\t<thread-goal-missing-tool>\t<tool-result-ref/fingerprint>
    ```
 
    If the live thread inspection surface is unavailable, the packet cannot be
@@ -209,11 +214,26 @@ On resume:
          transport=value; gsub(/%(25|7C|3B|3D)/, "", transport)
          return transport !~ /[%|;=]/
        }
+       function valid_hash(value) { return length(value) == 64 && value ~ /^[0-9a-f]+$/ }
+       function valid_goal(mode, status, dispatch_hash, reported_hash, evidence, missing_tool, allow_terminal) {
+         if (!valid_hash(dispatch_hash) || evidence == "" || evidence == "none" || evidence == "not-applicable") return 0
+         if (mode == "pending") return status == "pending" && reported_hash == "pending" && missing_tool == "not-applicable" && evidence ~ /^(thread-message|goal-create-message):/
+         if (!valid_hash(reported_hash) || reported_hash != dispatch_hash) return 0
+         if (mode == "active") {
+           if (missing_tool != "not-applicable") return 0
+           return allow_terminal ? status ~ /^(active|complete|blocked)$/ : status == "active"
+         }
+         if (mode == "unavailable") return status == "not-applicable" && missing_tool == "runtime-goal-tool" && evidence ~ /^thread-read:/
+         return 0
+       }
        function emit_workstream() {
          if (workstream == "") return
          if (worker !~ /^[A-Za-z0-9:_-]+$/ || location !~ /^(current-orchestrator-session|background-codex-subagent|visible-codex-app-task)$/ || repo_ref == "" || pr_ref == "") exit 54
          if (location == "current-orchestrator-session" && worker != "root") exit 54
-         print workstream "\t" worker "\t" location "\t" feature_spec_ref "\t" feature_spec_title "\t" thread_assignment "\t" repo_ref "\t" pr_ref
+         if (location == "visible-codex-app-task") {
+           if (!valid_goal(goal_mode, goal_status, goal_dispatch_objective_sha256, goal_reported_objective_sha256, goal_evidence, goal_missing_tool, thread_assignment == "required")) exit 57
+         } else if (goal_mode != "not-applicable" || goal_status != "not-applicable" || goal_dispatch_objective_sha256 != "not-applicable" || goal_reported_objective_sha256 != "not-applicable" || goal_evidence != "not-applicable" || goal_missing_tool != "not-applicable") exit 57
+         print workstream "\t" worker "\t" location "\t" feature_spec_ref "\t" feature_spec_title "\t" thread_assignment "\t" repo_ref "\t" pr_ref "\t" goal_mode "\t" goal_status "\t" goal_dispatch_objective_sha256 "\t" goal_reported_objective_sha256 "\t" goal_evidence "\t" goal_missing_tool
          workstream=""
        }
        /^## Workstreams$/ { workstreams=1; next }
@@ -222,13 +242,19 @@ On resume:
        active && /^#### [A-Za-z0-9:_-]+: / {
          emit_workstream()
          workstream=$0; sub(/^#### /, "", workstream); sub(/: .*/, "", workstream)
-         worker=""; location=""; repo_ref=""; pr_ref=""; feature_spec_ref=""; feature_spec_title=""; thread_assignment=""; next
+         worker=""; location=""; repo_ref=""; pr_ref=""; feature_spec_ref=""; feature_spec_title=""; thread_assignment=""; goal_mode=""; goal_status=""; goal_dispatch_objective_sha256=""; goal_reported_objective_sha256=""; goal_evidence=""; goal_missing_tool=""; next
        }
        active && /^\| Feature Spec thread \|/ {
          value=norm($3)
          feature_spec_ref=token_value(value, "feature_spec_ref")
          feature_spec_title=token_value(value, "feature_spec_title")
          thread_assignment=token_value(value, "feature_spec_thread_assignment")
+         goal_mode=token_value(value, "thread_goal_mode")
+         goal_status=token_value(value, "thread_goal_status")
+         goal_dispatch_objective_sha256=token_value(value, "thread_goal_dispatch_objective_sha256")
+         goal_reported_objective_sha256=token_value(value, "thread_goal_reported_objective_sha256")
+         goal_evidence=token_value(value, "thread_goal_evidence")
+         goal_missing_tool=token_value(value, "thread_goal_missing_tool")
          if (feature_spec_title != "" && feature_spec_title != "not-applicable" && !encoded_title(feature_spec_title)) exit 57
          next
        }
@@ -267,18 +293,28 @@ On resume:
          transport=value; gsub(/%(25|7C|3B|3D)/, "", transport)
          return transport !~ /[%|;=]/
        }
+       function valid_hash(value) { return length(value) == 64 && value ~ /^[0-9a-f]+$/ }
        /^## Feature Spec Thread Registry$/ { registry=1; next }
        registry && /^## / { exit }
        registry && /^\|/ {
-         if (NF != 16) exit 57
+         if (NF != 22) exit 57
          ref=norm($2); title=norm($3); thread=norm($4); live_title=norm($5)
          workstreams=norm($6); repos=norm($7); prs=norm($8); lifecycle=norm($9); poll_owner=norm($10)
          state=norm($11); drift=norm($13); thread_evidence=norm($15)
+         goal_mode=norm($16); goal_status=norm($17); goal_dispatch_objective_sha256=norm($18); goal_reported_objective_sha256=norm($19); goal_evidence=norm($20); goal_missing_tool=norm($21)
          if (ref == "feature_spec_ref") next
          if (ref ~ /^:?-+:?$/) next
-         if (ref == "" || title == "" || !encoded_title(title) || !encoded_title(live_title) || thread !~ /^[A-Za-z0-9:_-]+$/ || live_title != title || workstreams == "" || repos == "" || prs == "" || lifecycle != "visible-feature-spec-thread" || poll_owner != "visible-feature-spec-thread" || thread_evidence == "" || thread_evidence == "none") exit 57
-         if (state !~ /^(created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|blocked|needs-owner|replaced)$/ || drift == "") exit 57
-         print thread "\t" ref "\t" title "\t" workstreams "\t" repos "\t" prs "\t" state "\t" drift "\t" thread_evidence
+         if (ref == "" || title == "" || !encoded_title(title) || !encoded_title(live_title) || thread !~ /^[A-Za-z0-9:_-]+$/ || live_title != title || workstreams == "" || repos == "" || prs == "" || lifecycle != "visible-feature-spec-thread" || poll_owner != "visible-feature-spec-thread" || thread_evidence == "" || thread_evidence == "none" || goal_evidence == "" || goal_evidence == "none" || goal_evidence == "not-applicable" || !valid_hash(goal_dispatch_objective_sha256)) exit 57
+         if (state !~ /^(created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced)$/ || drift == "") exit 57
+         if (goal_mode !~ /^(pending|active|unavailable)$/ || goal_status !~ /^(pending|active|complete|blocked|not-applicable)$/) exit 57
+         if (goal_mode == "pending" && (goal_status != "pending" || state != "created" || goal_reported_objective_sha256 != "pending" || goal_missing_tool != "not-applicable" || goal_evidence !~ /^(thread-message|goal-create-message):/)) exit 57
+         if (goal_mode != "pending" && (!valid_hash(goal_reported_objective_sha256) || goal_reported_objective_sha256 != goal_dispatch_objective_sha256)) exit 57
+         if (goal_mode == "active" && (goal_status !~ /^(active|complete|blocked)$/ || goal_missing_tool != "not-applicable")) exit 57
+         if (goal_mode == "unavailable" && (goal_status != "not-applicable" || goal_missing_tool != "runtime-goal-tool" || goal_evidence !~ /^thread-read:/)) exit 57
+         if (goal_status == "complete" && state !~ /^(merge-ready|target-complete)$/) exit 57
+         if (state ~ /^(merge-ready|target-complete)$/ && goal_mode == "active" && goal_status != "complete") exit 57
+         if (goal_status == "blocked" && state !~ /^(blocked|needs-owner)$/) exit 57
+         print thread "\t" ref "\t" title "\t" workstreams "\t" repos "\t" prs "\t" state "\t" drift "\t" thread_evidence "\t" goal_mode "\t" goal_status "\t" goal_dispatch_objective_sha256 "\t" goal_reported_objective_sha256 "\t" goal_evidence "\t" goal_missing_tool
        }
      ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1
    )" || exit 57
@@ -290,6 +326,7 @@ On resume:
    } | awk -F '\t' '
      $1 == "worker" {
        worker=$2; location=$3; count=split($4, workstreams, ",")
+       if (location == "visible-codex-app-task") active_visible_worker[worker]=1
        for (i=1; i <= count; i++) {
          workstream=workstreams[i]
          if (workstream !~ /^[A-Za-z0-9:_-]+$/ || assigned[workstream]++) exit 54
@@ -302,6 +339,7 @@ On resume:
        authoritative_worker[workstream]=$3; authoritative_location[workstream]=$4
        authoritative_spec_ref[workstream]=$5; authoritative_spec_title[workstream]=$6; authoritative_thread_assignment[workstream]=$7
        authoritative_repo[workstream]=$8; authoritative_pr[workstream]=$9
+       authoritative_goal_mode[workstream]=$10; authoritative_goal_status[workstream]=$11; authoritative_goal_dispatch_objective_sha256[workstream]=$12; authoritative_goal_reported_objective_sha256[workstream]=$13; authoritative_goal_evidence[workstream]=$14; authoritative_goal_missing_tool[workstream]=$15
        next
      }
      $1 == "registry" {
@@ -309,6 +347,7 @@ On resume:
        if (registry_thread[thread]++ || registry_ref[ref]++) exit 57
        registry_thread_ref[thread]=ref; registry_thread_title[thread]=title
        registry_thread_state[thread]=$8; registry_thread_drift[thread]=$9; registry_thread_evidence[thread]=$10
+       registry_thread_goal_mode[thread]=$11; registry_thread_goal_status[thread]=$12; registry_thread_goal_dispatch_objective_sha256[thread]=$13; registry_thread_goal_reported_objective_sha256[thread]=$14; registry_thread_goal_evidence[thread]=$15; registry_thread_goal_missing_tool[thread]=$16
        count=split($5, workstreams, ",")
        for (i=1; i <= count; i++) {
          workstream=workstreams[i]
@@ -329,8 +368,10 @@ On resume:
      }
      $1 == "live" {
        thread=$2; title=$3; state=$4
-       if (live_thread[thread]++ || thread !~ /^[A-Za-z0-9:_-]+$/ || title == "" || state != "active" || $5 == "" || $6 == "" || $7 == "") exit 58
-       live_title[thread]=title; live_evidence[thread]=$7
+       reported_hash=$9
+       if (live_thread[thread]++ || thread !~ /^[A-Za-z0-9:_-]+$/ || title == "" || state != "active" || $5 == "" || $6 == "" || $7 == "" || $8 == "" || $10 == "" || $11 == "" || $12 == "") exit 58
+       if (($7 == "pending" && reported_hash != "pending") || ($7 != "pending" && (length(reported_hash) != 64 || reported_hash !~ /^[0-9a-f]+$/))) exit 58
+       live_title[thread]=title; live_goal_mode[thread]=$7; live_goal_status[thread]=$8; live_goal_reported_objective_sha256[thread]=reported_hash; live_goal_evidence[thread]=$10; live_goal_missing_tool[thread]=$11; live_evidence[thread]=$12
        count=split($5, repos, ",")
        for (i=1; i <= count; i++) { repo=repos[i]; if (repo == "" || live_repo[thread SUBSEP repo]++) exit 58 }
        count=split($6, prs, ",")
@@ -346,7 +387,15 @@ On resume:
          if (authoritative_thread_assignment[workstream] == "required") {
            if (authoritative_location[workstream] != "visible-codex-app-task" || !(workstream in registry_workstream)) exit 57
            if (authoritative_worker[workstream] != registry_worker_for_workstream[workstream] || authoritative_spec_ref[workstream] != registry_ref_for_workstream[workstream] || authoritative_spec_title[workstream] != registry_title_for_workstream[workstream]) exit 57
+           thread=authoritative_worker[workstream]
+           if (authoritative_goal_mode[workstream] != registry_thread_goal_mode[thread] || authoritative_goal_status[workstream] != registry_thread_goal_status[thread] || authoritative_goal_dispatch_objective_sha256[workstream] != registry_thread_goal_dispatch_objective_sha256[thread] || authoritative_goal_reported_objective_sha256[workstream] != registry_thread_goal_reported_objective_sha256[thread] || authoritative_goal_evidence[workstream] != registry_thread_goal_evidence[thread] || authoritative_goal_missing_tool[workstream] != registry_thread_goal_missing_tool[thread]) exit 57
          } else if (workstream in registry_workstream) exit 57
+         if (authoritative_location[workstream] == "visible-codex-app-task") {
+           thread=authoritative_worker[workstream]
+           if (live_goal_mode[thread] != authoritative_goal_mode[workstream] || live_goal_status[thread] != authoritative_goal_status[workstream] || live_goal_reported_objective_sha256[thread] != authoritative_goal_reported_objective_sha256[workstream] || live_goal_evidence[thread] != authoritative_goal_evidence[workstream] || live_goal_missing_tool[thread] != authoritative_goal_missing_tool[workstream]) exit 58
+           active_visible_repo[thread SUBSEP authoritative_repo[workstream]]=1
+           active_visible_pr[thread SUBSEP authoritative_pr[workstream]]=1
+         }
        }
        for (workstream in registry_workstream)
          if (!(workstream in authoritative) || assigned_worker[workstream] != registry_worker_for_workstream[workstream] || assigned_location[workstream] != "visible-codex-app-task") exit 57
@@ -359,11 +408,14 @@ On resume:
          }
        for (key in registry_repo) if (!(key in active_registry_repo) || !(key in live_repo)) exit 57
        for (key in registry_pr) if (!(key in active_registry_pr) || !(key in live_pr)) exit 57
-       for (key in live_repo) if (!(key in registry_repo)) exit 58
-       for (key in live_pr) if (!(key in registry_pr)) exit 58
        for (thread in registry_thread)
-         if (!(thread in live_thread) || live_title[thread] != registry_thread_title[thread] || live_evidence[thread] != registry_thread_evidence[thread]) exit 58
-       for (thread in live_thread) if (!(thread in registry_thread)) exit 58
+         if (!(thread in live_thread) || live_title[thread] != registry_thread_title[thread] || live_evidence[thread] != registry_thread_evidence[thread] || live_goal_mode[thread] != registry_thread_goal_mode[thread] || live_goal_status[thread] != registry_thread_goal_status[thread] || live_goal_reported_objective_sha256[thread] != registry_thread_goal_reported_objective_sha256[thread] || live_goal_evidence[thread] != registry_thread_goal_evidence[thread] || live_goal_missing_tool[thread] != registry_thread_goal_missing_tool[thread]) exit 58
+       for (thread in active_visible_worker) if (!(thread in live_thread)) exit 58
+       for (thread in live_thread) if (!(thread in active_visible_worker)) exit 58
+       for (key in active_visible_repo) if (!(key in live_repo)) exit 58
+       for (key in live_repo) if (!(key in active_visible_repo)) exit 58
+       for (key in active_visible_pr) if (!(key in live_pr)) exit 58
+       for (key in live_pr) if (!(key in active_visible_pr)) exit 58
      }
    ' || exit $?
    ROOT_NEXT_ACTION="$(
@@ -406,15 +458,28 @@ On resume:
    )" || exit 59
    [ "$ROOT_NEXT_ACTION" = "$PACKET_NEXT_ACTION" ] || exit 59
    IFS=$'\t' read -r ROOT_NEXT_ACTION_NAME ROOT_NEXT_ACTION_TARGET ROOT_NEXT_ACTION_DUE <<< "$ROOT_NEXT_ACTION"
-   printf '%s\n' "$FEATURE_SPEC_THREAD_ROWS" | awk -F '\t' -v action="$ROOT_NEXT_ACTION_NAME" -v target="$ROOT_NEXT_ACTION_TARGET" -v due="$ROOT_NEXT_ACTION_DUE" '
-     NF {
-       thread[$1]=1; ref[$2]=1; state[$1]=$7; drift[$1]=$8
+   {
+     printf '%s\n' "$FEATURE_SPEC_THREAD_ROWS" | awk -F '\t' 'NF { print "registry\t" $1 "\t" $2 "\t" $7 "\t" $8 "\t" $10 }'
+     printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' '$3 == "visible-codex-app-task" { print "visible\t" $2 "\tnot-applicable\tactive\tnone\t" $9 }'
+   } | awk -F '\t' -v action="$ROOT_NEXT_ACTION_NAME" -v target="$ROOT_NEXT_ACTION_TARGET" -v due="$ROOT_NEXT_ACTION_DUE" '
+     $1 == "registry" {
+       thread[$2]=1; ref[$3]=1; state[$2]=$4; drift[$2]=$5
+       if ($6 == "pending") pending[$2]=1
+       next
+     }
+     $1 == "visible" {
+       visible[$2]=1
+       if ($6 == "pending") pending[$2]=1
+       next
      }
      END {
-       if (action == "none") exit target == "none" && due == "none" ? 0 : 59
+       if (action == "none") {
+         for (id in pending) exit 59
+         exit target == "none" && due == "none" ? 0 : 59
+       }
        if (target == "none" || due == "none") exit 59
        if (action == "monitor-thread") {
-         if (!(target in thread) || drift[target] != "none" || state[target] ~ /^(merge-ready|blocked|needs-owner|replaced)$/) exit 59
+         if (!(target in visible) || (target in thread && (drift[target] != "none" || state[target] ~ /^(merge-ready|target-complete|blocked|needs-owner|replaced)$/))) exit 59
          exit 0
        }
        if (action == "send-correction") {

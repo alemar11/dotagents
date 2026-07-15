@@ -197,6 +197,12 @@ capability may restrict a value; it never grants mutation permission.
   Feature Specs, and one Feature Spec must not be split across multiple active
   visible threads. Multiple generated issues or repository PRs for one Spec
   remain owned by its single thread.
+- Every orchestrator-created visible thread must establish its own
+  assignment-scoped Goal before work starts. This is derived runtime behavior,
+  not a session option or worker-count/topology choice. The root verifies the
+  thread-reported Goal state and records an exact objective fallback only when
+  that thread runtime exposes no Goal tool. Internal background subagents do
+  not require independent Goals.
 - In that granted mode, no Feature Spec implementation or review work may use
   `actual_execution_location=current-orchestrator-session` or a
   background-only worker. If the visible thread surface is unavailable or an

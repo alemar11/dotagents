@@ -13,11 +13,13 @@ owner invokes `$codex-orchestrator` or asks to run Codex Orchestrator. Do not
 auto-select it for ordinary implementation, planning, triage, GitHub, commit,
 PR, or multi-repo requests.
 
-The root always owns source routing, the active-root claim, Goal mode or ledger
-fallback, worker lifecycle, permission and strategy decisions, ledger state,
-source closeout, and final status. Execution ownership depends on the resolved
-worker mode. When visible Codex threads are not enabled, workers own only their
-assigned inspection, implementation, validation, and report. When
+The root always owns source routing, the active-root claim, its root Goal mode
+or ledger fallback, worker lifecycle, permission and strategy decisions,
+ledger state, source closeout, and final status. Every visible Codex thread the
+root creates owns a separate assignment-scoped Goal or recorded runtime
+fallback. Execution ownership depends on the resolved worker mode. When visible
+Codex threads are not enabled, workers own only their assigned inspection,
+implementation, validation, and report. When
 `visible_app_task_permission=granted-by-authorized-user`, exactly one visible
 thread owns each implementation-eligible Feature Spec through its complete
 merge-ready PR lifecycle; the root becomes orchestration-only for that work.
@@ -43,6 +45,12 @@ merge-ready PR lifecycle; the root becomes orchestration-only for that work.
   create and manage internal background subagents within its assigned scope and
   action set; those subagents inherit the same authority ceiling and report
   through their parent.
+- Every orchestrator-created visible Codex thread must establish or resume its
+  own assignment-scoped Goal before starting work. The root supplies the exact
+  objective and terminal delivery target, verifies thread-reported Goal
+  evidence, and records a fallback only when the runtime Goal tool is absent.
+  This is an automatic worker invariant, not a user option, and it does not
+  apply to internal background subagents.
 - The root resolves `worker_allowed_actions` per workstream. Actions are
   explicit, independent, and non-cumulative; allowed paths can narrow an action
   but never grant another one.
@@ -125,9 +133,11 @@ Run this deterministic loop:
    `repository_layout=multi-repository-workspace` or a registered source/handoff
    with `workspace_context=multi-repository-workspace`.
 4. **DISPATCH** — select one bounded wave and load `references/worker.md` before
-   any delegation. In mandatory visible Feature Spec thread mode, create or
-   resume the single assigned thread for each eligible Feature Spec; never keep
-   that Spec's implementation or review work in the root.
+   any delegation. For every created or resumed visible thread, require its
+   assignment-scoped Goal or unavailable-tool fallback before work starts. In
+   mandatory visible Feature Spec thread mode, create or resume the single
+   assigned thread for each eligible Feature Spec; never keep that Spec's
+   implementation or review work in the root.
 5. **INTEGRATE** — read current worker state, revalidate capabilities, accept or
    reject reported evidence, and record lifecycle decisions. In mandatory
    visible Feature Spec thread mode, the assigned thread integrates its own
@@ -170,6 +180,18 @@ Use Goal mode when available. Otherwise record the objective and fallback
 reason in the active-root ledger section. Goal mode never expands scope or
 bypasses authority, gates, owner decisions, or source closeout.
 
+The root Goal coordinates the portfolio; it never substitutes for a visible
+thread's own Goal. Each orchestrator-created visible thread must use the
+runtime Goal tool in its own context before implementation, with an objective
+derived from its exact assignment and selected delivery target. The root sends
+that instruction in the initial prompt and verifies the thread's reported Goal
+state before advancing it beyond `created`. A resumed thread reuses its
+matching active Goal; a replacement thread creates a new one. The thread marks
+its Goal complete only after its assigned terminal target and gates are
+actually satisfied. When the runtime exposes no Goal tool, the thread records
+the same objective plus the unavailability reason as its fallback and may
+continue. Internal background subagents do not require independent Goals.
+
 Real blockers include missing owner decisions, credentials/access,
 unsafe/contradictory contracts, failed required gates, unresolved dependency
 proof, unavailable required tools, unpollable external checks, or missing
@@ -199,10 +221,12 @@ execution reports, resync, integration, artifacts, and lifecycle. Do not copy
 session worker choices into Feature Specs, issues, project memory, or handoffs.
 
 When mandatory visible Feature Spec thread mode is selected, create the thread
-and its managed worktree before implementation. If the visible create/read/
-message surface cannot represent the assignment, stop or replace the visible
-thread; never fall back to root-owned or background-only implementation,
-integration, validation, review, or review polling for that Feature Spec. Input
+and its managed worktree before implementation, title it, then require and
+verify its thread-owned Goal or unavailable-tool fallback. If the visible
+create/read/message surface cannot represent the assignment, stop or replace
+the visible thread; never fall back to root-owned or background-only
+implementation, integration, validation, review, or review polling for that
+Feature Spec. Input
 wording may supply option-resolution evidence, but the root must persist the
 resolved fields before creating a visible worker. It must never carry the
 wording itself as a worker permission, count, topology, or scheduling value.
