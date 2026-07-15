@@ -120,13 +120,10 @@ surfaces when they exist.
 - Do not reintroduce separate narrow Router, Start, or CLI skill directories
   unless a maintainer deliberately changes the reusable-skill packaging model.
 
-## Deliverable
-
-Report:
+## Branch Report Additions
 
 - Which upstream TanStack Intent surfaces were checked
 - Which TanStack `latest` docs surfaces were checked
 - Whether new first-party coverage was found
-- Which local files changed, if any
-- Which checks were executed
-- Why each persistent change was needed
+
+Add these items to the common final report owned by `release-checklist.md`.

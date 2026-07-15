@@ -87,13 +87,10 @@ skill against the upstream `tanstack-skills/tanstack-skills` plugin tree.
 - Keep `README.md`, `SKILL.md`, and `agents/openai.yaml` aligned whenever
   product coverage changes.
 
-## Deliverable
-
-Report:
+## Branch Report Additions
 
 - Which upstream product plugins were compared
 - Which upstream bundle aliases were intentionally ignored
 - Which TanStack-owned docs were checked
-- Which local files changed, if any
-- Which consistency checks were executed
-- Why each persistent change was needed
+
+Add these items to the common final report owned by `release-checklist.md`.

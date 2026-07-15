@@ -38,7 +38,7 @@ When adding or changing skill metadata:
    removed, renamed, or materially repositioned.
 6. Update `AGENTS.md` only when the change adds durable repository guidance.
 7. Run `references/metadata-sync.md` and a focused check from
-   `references/doc-consistency.md`.
+   `references/skill-health.md`.
 
 For project maintainer skills, place the skill under `.agents/skills/` instead of `skills/`.
 

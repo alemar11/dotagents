@@ -51,12 +51,10 @@ When a read-only verification is requested:
   stale local link, or upstream drift that changes how the skill should point to
   the bundled source.
 
-## Deliverable
-
-Report:
+## Branch Report Additions
 
 - Whether the bundled source file was stale
 - Whether a refresh occurred
-- Which `skills/swift-api-design/references/*.md` files changed
-- Which checks were executed
-- Why each persistent change was needed
+- Which `skills/swift-api-design/references/*.md` routes changed
+
+Add these items to the common final report owned by `release-checklist.md`.

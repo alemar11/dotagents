@@ -77,6 +77,8 @@ changing Git history.
 - Why changed: `<rationale per target>`; use `not applicable` when
   `change_state=no-change`
 - Runtime evidence: `<sessions/logs/tests used>` or `not applicable`
+- Health evidence: `<size band, representative path, escalation, and applicable validation>`
+  or `not applicable`
 - Artifacts/install state: `<versions, fingerprints, cache/reinstall proof>` or `not applicable`
 - Findings: `<blocking and warning items>`
 - Follow-ups: `<deferred work>`

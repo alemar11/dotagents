@@ -53,8 +53,8 @@ Do not keep aliases or duplicate compatibility surfaces for retired packages.
 - Do not delete the old surface until replacement discovery and validation
   evidence are available in the same rollout.
 
-## Output
+## Branch Report Additions
 
-Report the lifecycle map, hard-cut boundary, moved and retired surfaces,
-version/artifact/install evidence, stale-reference scan, commit split, and final
-result.
+Add the lifecycle map, hard-cut boundary, moved and retired surfaces,
+version/artifact/install evidence, stale-reference scan, and recommended commit
+split to the common final report owned by `release-checklist.md`.

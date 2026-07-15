@@ -17,8 +17,8 @@ maintenance request needs to be routed to a concrete task.
    - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short
      descriptions, and README one-liners in metadata drift and prompt-budget
      checks.
-   - Finish with audit and release-style reporting when the scope is broader
-     than metadata-only alignment.
+   - Finish with skill-health and release-style reporting when the scope is
+     broader than metadata-only alignment.
 2. `harden workflow family`
    - Use representative sessions, logs, tests, or live failures to repair a
      connected skill/plugin workflow.
@@ -30,9 +30,13 @@ maintenance request needs to be routed to a concrete task.
    - Use `$skill-creator` or `$plugin-creator` first for substantial reshapes,
      then return here for repo integration, stale-surface cleanup, validation,
      versioning, install/cache checks, and release reporting.
-4. `audit consistency`
-   - Run structure, rules, and reference checks across the repo or the touched
-     skills.
+4. `audit skill health`
+   - Run a read-only health audit across the repo or the touched packages,
+     covering structural and policy integrity, metadata and discovery,
+     entrypoint size, reference routing, representative invoked-path cost, and
+     applicable validation evidence.
+   - Treat prompt size as diagnostic and invoke `$skill-audit` only when health
+     signals require deeper prompt-quality, overlap, or runtime evidence.
 5. `review instruction density`
    - Inspect one or more existing skills or plugins and identify where the same
      runtime behavior can be achieved with fewer instructions.

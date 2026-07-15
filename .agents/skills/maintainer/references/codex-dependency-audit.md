@@ -34,7 +34,8 @@ Use this playbook when the user asks to audit which skills are Codex-dependent v
 5. For Codex-dependent skills, tighten wording so the exact required Codex tool/runtime contract is named plainly instead of vaguely.
 6. For portable skills, rewrite Codex-only helper mentions so they stay explicitly optional and keep a generic fallback.
 7. Run `metadata-sync.md` if any repo-facing descriptions changed.
-8. Run the relevant checks from `doc-consistency.md` and finish with `release-checklist.md`.
+8. Run the relevant checks from `skill-health.md` and finish with
+   `release-checklist.md`.
 
 ## Quality Gates
 - `AGENTS.md` accurately lists the current Codex-dependent skills when that inventory changes.
@@ -43,11 +44,7 @@ Use this playbook when the user asks to audit which skills are Codex-dependent v
 - `result=pass` with `change_state=no-change` is valid when the inventory and
   wording are already correct.
 
-## Reporting Contract
-- Scope covered
-- Skills audited
-- Classification result per skill
-- Files changed
-- Why changed
-- Result
-- Any deferred follow-up
+## Branch Report Additions
+
+Add the audited skills and classification result per skill to the common final
+report owned by `release-checklist.md`.

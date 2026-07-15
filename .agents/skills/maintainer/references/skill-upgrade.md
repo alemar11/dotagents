@@ -39,7 +39,7 @@ or more existing skills or plugins.
    - moving dense guidance into `references/` when that improves maintainability
 3. Apply minimal, meaningful edits that preserve each target's current intent.
 4. Run a focused sync pass using `references/metadata-sync.md` for the touched skills, plugins, and any directly coupled docs.
-5. Run a focused consistency pass using the relevant checks from `references/doc-consistency.md`:
+5. Run a focused health pass using `references/skill-health.md`:
    - required files still exist
    - referenced scripts/docs exist
    - no contradictory instructions were introduced
@@ -47,16 +47,6 @@ or more existing skills or plugins.
 6. Select the applicable lanes from `references/validation-matrix.md`, finish
    with `references/release-checklist.md`, and report canonical `result` and
    `change_state` values.
-
-## Parallel Subagent Pattern
-- Use internal subagents when the active runtime policy permits and the split materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
-- Safe split for an upgrade request:
-  - one explorer subagent reviews the target package (`SKILL.md`, `.codex-plugin/plugin.json`, `references/*.md`, `scripts/*`, `projects/*`)
-  - one explorer subagent reviews directly coupled metadata/docs (`agents/openai.yaml`, `.agents/plugins/marketplace.json`, `README.md`, `AGENTS.md`)
-- If edits are substantial and write scopes are disjoint, convert that split into worker ownership:
-  - worker 1 owns the target package
-  - worker 2 owns the coupled repo docs
-- Keep upgrade-goal selection, final wording choices, and edit integration in the main agent.
 
 ## Quality Gates
 - Each upgraded target has a concrete rationale; avoid cosmetic rewrites with no practical gain.
@@ -67,11 +57,7 @@ or more existing skills or plugins.
 - Return `result=pass` and `change_state=no-change` when no meaningful
   improvement is needed after inspection.
 
-## Reporting Contract
-- Scope covered
-- Checks executed
-- Files changed
-- Why changed
-- Result
-- Findings
-- Any deferred follow-up
+## Branch Report Additions
+
+Add the target packages, concrete upgrade goals, and target-by-target rationale
+to the common final report owned by `references/release-checklist.md`.

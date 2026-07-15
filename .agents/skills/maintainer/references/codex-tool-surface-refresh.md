@@ -69,14 +69,10 @@ workers to a live task, or update unrelated skills.
 - Keep runtime skills self-contained; do not mention this Maintainer playbook
   from runtime `SKILL.md` files.
 
-## Reporting
+## Branch Report Additions
 
-Report:
-
-- Scope checked
-- Tool registry queries or commands used
 - Current subagent creation and lifecycle surface
 - Current Codex App thread creation and lifecycle surface
-- `change_state=changed` with the changed `codex-orchestrator` files, or
-  `change_state=no-change`
 - Any runtime-dependent uncertainty that should be rechecked in Codex App or CLI
+
+Add these items to the common final report owned by `release-checklist.md`.

@@ -56,8 +56,8 @@ connected skills or plugins.
   estimate a completion metric.
 - Efficiency changes must not weaken authority, safety, validation, or closeout.
 
-## Output
+## Branch Report Additions
 
-Report the evidence used, ownership matrix, accepted findings, target packages,
-contract and regression changes, selected validation lanes, deferred findings,
-and final result.
+Add the evidence used, ownership matrix, accepted findings, contract and
+regression changes, and deferred findings to the common final report owned by
+`release-checklist.md`.

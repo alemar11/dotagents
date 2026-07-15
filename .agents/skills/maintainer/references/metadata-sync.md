@@ -40,15 +40,6 @@ when a brand-new skill scaffold is needed.
 4. Reconcile README lists so added, removed, or renamed skills are reflected.
 5. Confirm descriptions remain one-line and user-facing in README/openai metadata.
 
-## Parallel Subagent Pattern
-- Use internal subagents when the active runtime policy permits and independent inspection materially improves speed or quality. Ask only when runtime policy requires it or for visible user-owned Codex App threads.
-- After manifest enumeration, spawn multiple explorer subagents for independent inspection slices:
-  - one for `SKILL.md` frontmatter and trigger wording
-  - one for `agents/openai.yaml` display text and prompt alignment
-  - one for `README.md` entries and install-prompt references
-- Integrate findings and apply wording updates in one local pass so the final language stays coherent.
-- Do not split overlapping edits in the same paragraph or list across multiple worker subagents.
-
 ## Quality Gates
 - Every listed skill has both `SKILL.md` and `agents/openai.yaml`.
 - No stale skill names remain in README/install prompts.

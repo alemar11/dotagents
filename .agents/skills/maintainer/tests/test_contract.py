@@ -159,7 +159,7 @@ class MaintainerContractTests(unittest.TestCase):
         self.assertIn("only when the user explicitly invokes it", agents)
         self.assertIn("During an explicit `$maintainer` run", agents)
         self.assertIn("only when it was explicitly invoked", agents)
-        self.assertIn("Manually maintain and re-engineer repo skills and plugins", readme)
+        self.assertIn("Manually audit, maintain, and re-engineer repo skills and plugins", readme)
         maintainer_routes = [
             line for line in agents.splitlines() if "$maintainer" in line
         ]
@@ -173,14 +173,19 @@ class MaintainerContractTests(unittest.TestCase):
         missing = sorted(name for name in references if not (SKILL_ROOT / "references" / name).is_file())
         self.assertEqual(missing, [])
 
-    def test_router_and_menu_expose_new_tasks(self) -> None:
+    def test_router_and_menu_expose_maintenance_routes(self) -> None:
         router = read("references/maintenance-router.md")
         menu = read("references/task-menu.md")
-        for term in ("workflow-hardening", "package-lifecycle"):
+        for term in ("audit", "workflow-hardening", "package-lifecycle"):
             self.assertIn(term, router)
-        self.assertLess(router.index("classify as `workflow-hardening`"), router.index("use `skill-upgrade.md`"))
-        self.assertLess(router.index("classify as `package-lifecycle`"), router.index("use `skill-upgrade.md`"))
-        for task in ("harden workflow family", "migrate or retire package"):
+        self.assertIn("`audit` | Skill/repo health", router)
+        self.assertIn("`workflow-hardening` | Sessions, logs, tests", router)
+        self.assertIn("`package-lifecycle` | Merge, rename, move", router)
+        for task in (
+            "audit skill health",
+            "harden workflow family",
+            "migrate or retire package",
+        ):
             self.assertIn(task, menu)
 
     def test_generic_maintenance_cannot_expand_strategically(self) -> None:
@@ -240,7 +245,7 @@ class MaintainerContractTests(unittest.TestCase):
 
     def test_instruction_density_is_a_pre_mutation_mixed_route_gate(self) -> None:
         router = read("references/maintenance-router.md")
-        mixed = router.partition("If a request mixes categories")[2]
+        mixed = router.partition("## Mixed Requests")[2].partition("## Task Isolation")[0]
         density = mixed.index("`instruction-density`")
         hardening = mixed.index("`workflow-hardening`")
         lifecycle = mixed.index("`package-lifecycle`")
@@ -248,7 +253,84 @@ class MaintainerContractTests(unittest.TestCase):
         self.assertLess(density, hardening)
         self.assertLess(density, lifecycle)
         self.assertLess(density, maintain)
-        self.assertIn("stop before any mutation", mixed)
+        self.assertIn("stop for approval before mutation", mixed)
+
+    def test_health_route_is_holistic_read_only_and_size_is_diagnostic(self) -> None:
+        skill = read("SKILL.md")
+        menu = read("references/task-menu.md")
+        health = read("references/skill-health.md")
+        normalized = " ".join(health.split())
+
+        self.assertIn("references/skill-health.md", skill)
+        self.assertIn("audit skill health", menu)
+        for area in (
+            "structural and policy integrity",
+            "metadata and discovery",
+            "entrypoint size",
+            "reference routing",
+            "representative invoked-path cost",
+            "applicable validation evidence",
+        ):
+            self.assertIn(area, " ".join(menu.split()))
+        self.assertIn("A direct `audit` request is read-only", normalized)
+        for band in ("`normal`", "`review`", "`high-density`", "`over-guideline`"):
+            self.assertIn(band, health)
+        self.assertIn("Size alone is diagnostic and never produces `result=fail`", normalized)
+        self.assertIn("broken active pointers", normalized)
+        self.assertIn("unsafe or behavior-breaking policy contradictions", normalized)
+        self.assertIn("failed required validation", normalized)
+
+    def test_health_escalates_to_skill_audit_only_on_diagnostic_signals(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        health = " ".join(read("references/skill-health.md").split())
+
+        self.assertIn("Use `$skill-audit` read-only", skill)
+        self.assertIn("Invoke `$skill-audit` read-only when any of these signals is present", health)
+        for signal in (
+            "entrypoint band is not `normal`",
+            "description or duplicate candidates appear",
+            "instruction sprawl",
+            "writing-quality problems",
+            "runtime behavior",
+            "representative session evidence",
+        ):
+            self.assertIn(signal, health)
+
+    def test_run_maintenance_consumes_only_safe_health_findings(self) -> None:
+        runbook = " ".join(read("references/run-maintenance.md").split())
+        health = " ".join(read("references/skill-health.md").split())
+
+        self.assertIn("Run `skill-health.md` read-only", runbook)
+        self.assertIn("Rerun `skill-health.md`", runbook)
+        self.assertIn("may apply only safe, low-ambiguity findings", health)
+        self.assertIn("defer strategic or behavior-sensitive changes", health)
+
+    def test_router_and_release_checklist_own_shared_behavior(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        router = read("references/maintenance-router.md")
+        checklist = read("references/release-checklist.md")
+        references = list((SKILL_ROOT / "references").glob("*.md"))
+
+        self.assertIn("It owns request routing, mixed-route order, task isolation, delegation", skill)
+        self.assertIn("## Delegation", router)
+        self.assertIn("## Final Report", checklist)
+        self.assertIn("Health evidence", checklist)
+        for path in references:
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("## Parallel Subagent Pattern", text, path.name)
+            self.assertNotIn("## Reporting Contract", text, path.name)
+
+    def test_retired_health_route_has_no_compatibility_alias(self) -> None:
+        maintenance_docs = [SKILL_ROOT / "SKILL.md"]
+        maintenance_docs.extend((SKILL_ROOT / "references").glob("*.md"))
+        combined = "\n".join(path.read_text(encoding="utf-8") for path in maintenance_docs)
+        retired_reference = "doc-" + "consistency.md"
+        retired_task = "audit " + "consistency"
+
+        self.assertNotIn(retired_reference, combined)
+        self.assertNotIn(retired_task, combined)
+        self.assertFalse((SKILL_ROOT / "references" / retired_reference).exists())
+        self.assertTrue((SKILL_ROOT / "references" / "skill-health.md").is_file())
 
     def test_lifecycle_commit_split_is_authority_gated(self) -> None:
         lifecycle = " ".join(read("references/package-lifecycle.md").split())

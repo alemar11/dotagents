@@ -32,10 +32,10 @@ When a read-only verification is requested:
 - Treat `assets/DocCDocumentation.docc` as the source of truth and keep `references/*.md` thin, task-oriented routing layers.
 - Update fast-path markdown only when there is a meaningful gap, stale local link, or upstream drift that changes routing.
 
-## Deliverable
-Report:
+## Branch Report Additions
+
 - Whether the bundled asset tree was stale
 - Whether a refresh occurred
-- Which `skills/swift-docc/references/*.md` files changed
-- Which checks were executed
-- Why each persistent change was needed
+- Which `skills/swift-docc/references/*.md` routes changed
+
+Add these items to the common final report owned by `release-checklist.md`.

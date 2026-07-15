@@ -29,12 +29,13 @@ or other default maintenance requests.
    - repo-local plugins under `plugins/*`
    - project-local maintainer skills under `.agents/skills/*`
    - related `README.md` and `AGENTS.md` entries
-2. Inspect for actionable drift and shortlist the packages with clear, maintainable improvements.
+2. Run `skill-health.md` read-only, then shortlist packages with clear,
+   maintainable improvements from its findings.
    - Include stale Codex-dependency inventory or ambiguous Codex-tool wording in this inspection.
    - Include `SKILL.md` frontmatter descriptions, `agents/openai.yaml` short descriptions, and README one-liners when they are too long, duplicated, or misaligned.
 3. For each shortlisted target, apply a targeted upgrade using the rules from `skill-upgrade.md`.
 4. Run `metadata-sync.md` for the touched skills, plugins, and coupled repo docs.
-5. Run the relevant checks from `doc-consistency.md` across touched areas and repo-level reference drift.
+5. Rerun `skill-health.md` across touched areas and repo-level reference drift.
 6. Finish with `release-checklist.md` and report canonical `result` and
    `change_state` values.
 
@@ -46,11 +47,7 @@ or other default maintenance requests.
 - Return `result=pass` and `change_state=no-change` when no low-ambiguity
   improvements are found.
 
-## Reporting Contract
-- Scope covered
-- Packages inspected
-- Packages changed
-- Checks executed
-- Why each changed target was updated
-- Result
-- Any deferred follow-up
+## Branch Report Additions
+
+Add the packages inspected, packages changed, and target-by-target rationale to
+the common final report owned by `release-checklist.md`.

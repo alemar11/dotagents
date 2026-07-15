@@ -41,14 +41,19 @@ asks for compaction opportunities before refactoring.
    - metadata or repo-doc alignment
    - description selection value and prompt-budget pressure
    - optional-tool or portability boundary
-4. Classify every candidate:
+4. Measure entrypoint size and representative invoked-path cost using
+   `skill-health.md`. When the entrypoint is outside `normal`, descriptions or
+   overlaps are suspect, instruction sprawl is visible, or runtime behavior is
+   in question, invoke `$skill-audit` read-only for deeper evidence. Treat size
+   as diagnostic, never as a standalone failure.
+5. Classify every candidate:
    - `safe trim`: remove redundant wording without changing behavior
    - `move to reference`: keep behavior but route dense detail out of `SKILL.md`
    - `behavior-risk`: compaction could weaken a trigger, guardrail, or contract
    - `leave as-is`: verbosity is load-bearing or cheaper than indirection
-5. Recommend the smallest refactor that preserves behavior. Prefer a scoped
+6. Recommend the smallest refactor that preserves behavior. Prefer a scoped
    section rewrite or reference extraction over a whole-file rewrite.
-6. Stop after the proposal. Ask for explicit approval before applying any
+7. Stop after the proposal. Ask for explicit approval before applying any
    compaction refactor. Treat approved follow-up refactors as targeted
    maintenance using `skill-upgrade.md`.
 
@@ -70,5 +75,5 @@ Report:
   only when the reference remains discoverable from the entrypoint.
 - Update `agents/openai.yaml`, `README.md`, or `AGENTS.md` only when the wording
   or durable repo guidance actually changes.
-- Run the focused checks from `doc-consistency.md` and finish with
+- Run the focused checks from `skill-health.md` and finish with
   `release-checklist.md` for any approved edit pass.
