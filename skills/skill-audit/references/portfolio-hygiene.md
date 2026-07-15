@@ -27,6 +27,22 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
 
 - `budget`: prompt-inventory pressure. Treat this as a prioritization signal,
   not a deletion trigger by itself.
+- `entrypoint_policy`: the estimator and diagnostic thresholds used for each
+  activated `SKILL.md`. The estimator is `ceil(UTF-8 bytes / 4)` and is not a
+  tokenizer-exact measurement.
+- `entrypoint_candidates`: activated entrypoints outside the `normal` band.
+  Interpret the bands as follows:
+
+  | Band | Entrypoint signal |
+  | --- | --- |
+  | `normal` | At most 2,500 estimated tokens and fewer than 500 lines. |
+  | `review` | 2,501-4,000 estimated tokens. |
+  | `high-density` | 4,001-5,000 estimated tokens. |
+  | `over-guideline` | More than 5,000 estimated tokens or at least 500 lines. |
+
+  Size alone is diagnostic and never makes a skill fail health checks. Use
+  `references/writing-style-review.md` to identify duplicated, stale,
+  branch-specific, or misplaced content before recommending a change.
 - `description_candidates`: long descriptions that may be worth tightening
   while preserving trigger nouns. Use `references/writing-style-review.md`
   when the audit needs to explain the description problem precisely.
@@ -48,6 +64,11 @@ scripts/portfolio-health --json scan --root ~/.codex/skills --root ~/.agents/ski
   usage evidence.
 - When usage evidence affects a recommendation, state whether it is
   session-confirmed, summary-only, or heuristic-only.
+- Separate `catalog_cost` (always-visible inventory descriptions),
+  `entrypoint_cost` (the activated `SKILL.md`), and `invoked_path_cost`
+  (`SKILL.md` plus references required by one representative branch). Do not
+  sum every file in a package or claim savings from moving text behind a
+  pointer that every branch must still follow.
 
 ## CLI Maintenance
 

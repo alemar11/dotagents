@@ -18,10 +18,21 @@ from pathlib import Path
 from typing import Any
 
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 LIVE_LINE_RE = re.compile(r"^\s*-\s+([^:]+(?::[^:]+)?):\s*(.*?)\s+\(file:\s*(.*?)\)\s*$")
 FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
 SKILL_ROOT_RE = re.compile(r"^\s*-\s+`([^`]+)`\s*=\s*`([^`]+)`")
+ENTRYPOINT_BYTES_PER_TOKEN = 4
+ENTRYPOINT_REVIEW_TOKENS = 2_500
+ENTRYPOINT_HIGH_DENSITY_TOKENS = 4_000
+ENTRYPOINT_GUIDELINE_TOKENS = 5_000
+ENTRYPOINT_GUIDELINE_LINES = 500
+ENTRYPOINT_BAND_ORDER = {
+    "normal": 0,
+    "review": 1,
+    "high-density": 2,
+    "over-guideline": 3,
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +45,30 @@ class SkillRecord:
     body_hash: str
     body_bytes: int
     description_bytes: int
+    entrypoint_tokens_estimate: int
+    entrypoint_lines: int
+    entrypoint_size_band: str
+
+
+def entrypoint_size_band(tokens: int, lines: int) -> str:
+    if tokens > ENTRYPOINT_GUIDELINE_TOKENS or lines >= ENTRYPOINT_GUIDELINE_LINES:
+        return "over-guideline"
+    if tokens > ENTRYPOINT_HIGH_DENSITY_TOKENS:
+        return "high-density"
+    if tokens > ENTRYPOINT_REVIEW_TOKENS:
+        return "review"
+    return "normal"
+
+
+def entrypoint_policy() -> dict[str, Any]:
+    return {
+        "estimator": f"ceil(utf8_bytes/{ENTRYPOINT_BYTES_PER_TOKEN})",
+        "normal_max_tokens": ENTRYPOINT_REVIEW_TOKENS,
+        "review_max_tokens": ENTRYPOINT_HIGH_DENSITY_TOKENS,
+        "high_density_max_tokens": ENTRYPOINT_GUIDELINE_TOKENS,
+        "over_guideline_min_lines": ENTRYPOINT_GUIDELINE_LINES,
+        "size_alone_fails_health": False,
+    }
 
 
 def default_roots() -> list[Path]:
@@ -97,6 +132,9 @@ def read_skill(path: Path, source: str, *, name: str | None = None, description:
     parsed_name, parsed_description = parse_frontmatter(text, path.parent.name)
     skill_name = name or parsed_name
     skill_description = description if description is not None else parsed_description
+    body_bytes = len(text.encode("utf-8", errors="replace"))
+    entrypoint_tokens = math.ceil(body_bytes / ENTRYPOINT_BYTES_PER_TOKEN)
+    entrypoint_lines = len(text.splitlines())
     return SkillRecord(
         name=skill_name,
         description=" ".join(skill_description.split()),
@@ -104,8 +142,11 @@ def read_skill(path: Path, source: str, *, name: str | None = None, description:
         realpath=realpath,
         source=source,
         body_hash=hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest(),
-        body_bytes=len(text.encode("utf-8", errors="replace")),
+        body_bytes=body_bytes,
         description_bytes=len(skill_description.encode("utf-8", errors="replace")),
+        entrypoint_tokens_estimate=entrypoint_tokens,
+        entrypoint_lines=entrypoint_lines,
+        entrypoint_size_band=entrypoint_size_band(entrypoint_tokens, entrypoint_lines),
     )
 
 
@@ -365,6 +406,25 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         key=lambda item: item["description_bytes"],
         reverse=True,
     )
+    entrypoints = sorted(
+        [
+            {
+                "name": record.name,
+                "path": record.path,
+                "entrypoint_tokens_estimate": record.entrypoint_tokens_estimate,
+                "entrypoint_lines": record.entrypoint_lines,
+                "entrypoint_size_band": record.entrypoint_size_band,
+            }
+            for record in records
+            if record.entrypoint_size_band != "normal"
+        ],
+        key=lambda item: (
+            ENTRYPOINT_BAND_ORDER[item["entrypoint_size_band"]],
+            item["entrypoint_tokens_estimate"],
+            item["entrypoint_lines"],
+        ),
+        reverse=True,
+    )
     unused = sorted(
         [
             {
@@ -394,6 +454,8 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "inventory_tokens_estimate": inventory_tokens,
             "budget_used_percent": round((inventory_tokens / budget_tokens) * 100, 2) if budget_tokens else None,
         },
+        "entrypoint_policy": entrypoint_policy(),
+        "entrypoint_candidates": entrypoints[: args.limit],
         "description_candidates": descriptions[: args.limit],
         "duplicates": duplicate_groups(records),
         "unused_candidates": unused[: args.limit],
@@ -407,6 +469,9 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                 "source": record.source,
                 "body_bytes": record.body_bytes,
                 "description_bytes": record.description_bytes,
+                "entrypoint_tokens_estimate": record.entrypoint_tokens_estimate,
+                "entrypoint_lines": record.entrypoint_lines,
+                "entrypoint_size_band": record.entrypoint_size_band,
                 "usage": usage.get(record.name, {}),
             }
             for record in records
@@ -443,6 +508,15 @@ def print_text(report: dict[str, Any]) -> None:
     if not report["description_candidates"]:
         print("- none")
 
+    print("\n## Entrypoint candidates")
+    for item in report["entrypoint_candidates"]:
+        print(
+            "- {name} ({entrypoint_size_band}, ~{entrypoint_tokens_estimate} tokens, "
+            "{entrypoint_lines} lines): {path}".format(**item)
+        )
+    if not report["entrypoint_candidates"]:
+        print("- none")
+
     print("\n## Duplicates")
     any_duplicate = False
     for kind, groups in report["duplicates"].items():
@@ -472,7 +546,7 @@ def print_text(report: dict[str, Any]) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Audit skill portfolio health signals: inventory budget, duplicate skills, descriptions, and recent usage evidence."
+        description="Audit skill portfolio health signals: inventory budget, entrypoint size, duplicate skills, descriptions, and recent usage evidence."
     )
     parser.add_argument("command", nargs="?", choices=["scan", "doctor"], default="scan")
     parser.add_argument("--version", action="version", version=f"%(prog)s {VERSION}")

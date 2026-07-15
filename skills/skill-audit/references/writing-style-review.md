@@ -35,7 +35,7 @@ versioning, asset, and cache findings in `references/plugins.md`.
 - Directly relevant `references/*` files only when needed to test whether
   branch-specific material is disclosed cleanly.
 - `scripts/portfolio-health` output for portfolio-level prompt-budget,
-  duplicate, or long-description claims.
+  entrypoint-size, duplicate, or long-description claims.
 - Memory, git history, or raw session evidence when the finding claims observed
   runtime behavior, missed invocation, premature completion, or low value.
 
@@ -58,11 +58,20 @@ versioning, asset, and cache findings in `references/plugins.md`.
      pointer in `references/*`.
    - Flag pointers that are too vague for the agent to know when to open the
      referenced file.
+   - Keep a concept's definition, rules, and caveats together unless a branch
+     predicate clearly earns disclosure into a separate reference.
+   - Estimate one representative invoked path as `SKILL.md` plus the references
+     that branch must load. Do not use total package size as the active cost.
 4. Check step quality.
    - For ordered workflows, verify that each step has a checkable completion
      criterion.
    - Prefer criteria that demand the relevant evidence, validation, or output
      shape over vague states such as "understand" or "review".
+   - Treat premature completion as a runtime claim: require representative
+     session, trace, or reproducible evidence before saying later steps caused
+     the agent to rush the current one.
+   - Recommend splitting by sequence only when that evidence shows later phases
+     distract from satisfying the current phase's completion criterion.
 5. Check pruning signals.
    - Flag repeated meanings as duplication, not just repeated words.
    - Flag stale or no-longer-relevant guidance as sediment.
@@ -99,6 +108,8 @@ clearer:
   load without enough independent invocation value.
 - `owner-boundary-mix`: skill, plugin, and repo-doc responsibilities are
   blended in one surface.
+- `premature-completion-risk`: representative evidence shows later visible
+  phases drawing execution away from an unfinished current phase.
 
 ## Output
 
@@ -123,5 +134,7 @@ recommended fix clearer.
   update in the audit roadmap instead.
 - Do not call a skill bloated from line count alone; identify the duplicated,
   stale, branch-specific, or misplaced material creating the load.
+- Do not turn leading-word vocabulary, negation avoidance, or an external
+  glossary into health requirements.
 - Do not recommend a split, merge, disable, or new skill without the normal
   `skill-audit` ownership and evidence checks.

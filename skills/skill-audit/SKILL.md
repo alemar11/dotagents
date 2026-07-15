@@ -95,9 +95,9 @@ scripts/portfolio-health --json doctor
 scripts/portfolio-health scan --months 3
 ```
 
-Use `references/portfolio-hygiene.md` to interpret its inventory, duplicate,
-prompt-budget, root, and heuristic usage signals. No recent usage alone is not
-enough to delete, disable, or rewrite a surface.
+Use `references/portfolio-hygiene.md` to interpret its inventory, entrypoint,
+duplicate, prompt-budget, root, and heuristic usage signals. No recent usage
+alone is enough to delete, disable, or rewrite a surface.
 
 ## Output Expectations
 
