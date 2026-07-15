@@ -49,7 +49,10 @@ Execution ordering is derived, not separately configured:
 - Without mandatory visible Feature Spec task mode, the orchestrator chooses
   the worker surface, worker count, recursive internal subagent topology, and
   serial or parallel split for each graph-shaped wave from ownership
-  boundaries, worktree safety, and live tool capacity.
+  boundaries, worktree safety, and live tool capacity. The run-wide ceiling is
+  three nonterminal Feature Spec executions across all repositories and worker
+  surfaces, not three per repository; nested subagents stay within their parent
+  Spec slot.
 - With `visible_app_task_permission=granted-by-authorized-user`, create one
   visible task per Feature Spec, not per repository. That task owns every
   child-repo implementation and every repo-specific PR required by the Spec.
@@ -71,6 +74,12 @@ Serial caller-checkout mode is stricter: it permits only one active Feature
 Spec task across the workspace even when its child repos or paths do not
 overlap. Different Feature Specs must not share a target branch name within the
 same child repo.
+
+The `upstream-merge-ready-head` stack is a same-single-repository flow and is
+invalid for `multi-repository-workspace` workstreams, partial Specs spanning
+repositories, or any downstream Spec with more than one unmerged upstream.
+Keep those dependency edges blocked until their ordinary cross-repo integration
+proof passes; do not approximate the stack by selecting one child PR as a base.
 
 ## Codex App Workers
 

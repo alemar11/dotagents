@@ -109,18 +109,34 @@ On resume:
    owns implementation or review. Require root-readable task Goal evidence,
    reject any non-`created` row whose Goal is still pending, and require an
    exact objective plus missing-tool evidence for the unavailable fallback.
-   Reject `root-owned-fallback` for implementation or review. Task
-   scheduling is otherwise derived from dependencies and live runtime capacity
-   rather than ledger limits.
+   Reject `root-owned-fallback` for implementation or review. Count unique
+   nonterminal Feature Spec executions across all current root, background, and
+   visible-task surfaces and reject more than three. Live `blocked` and
+   `needs-owner` tasks consume a slot; released `merge-ready`,
+   `target-complete`, and `replaced` tasks do not. In serial caller-checkout
+   mode, reject more than one. Task scheduling within that hard cap is derived
+   from authored dependencies and live runtime capacity.
+   Parse the `Feature Spec dependency rows:` marker independently from the task
+   table. Current acquired-root recovery with Feature Spec task-registry rows
+   requires exactly one marker. Released history and legacy ledgers whose task
+   registry is absent or empty may predate it; they cannot
+   introduce a current dependency edge without reconciliation.
+   Reject duplicate, cyclic, self-referential, or noncanonical edges, stack
+   depth greater than two, a cross-repository early stack, more than one
+   unresolved `upstream-merge-ready-head` edge for one downstream Spec, a Spec
+   that is both ends of two unresolved early edges, or a
+   state whose required upstream/downstream evidence is absent or stale.
    Require `Next Root Check: action=<value>; target=<value>; due_at=<value>`
    under Active Root to match the Recovery Packet `next_action`, `next_target`,
    and `next_due_at` exactly and to satisfy `ledger.md`'s action predicate
    against the current task registry.
    Independently validate every `## Codex Review Wait Registry` row against all
-   mapped active-workstream projections: one row per PR head, exact deadline,
-   wait state, observation fingerprint, and transition timestamp, with no
-   terminal/non-terminal contradiction. Elapsed wall time and poll attempts
-   are not persisted state and cannot make a packet fresh.
+   mapped active-workstream projections: one row per PR, head, base-ref, and
+   merge-base revision; exact deadline, wait state, observation fingerprint,
+   and transition timestamp; and matching terminal result head, base ref, and
+   merge base. A changed base ref or merge base invalidates prior evidence even
+   when the head is unchanged. Elapsed wall time and poll attempts are not
+   persisted state and cannot make a packet fresh.
    Before running the shell validation below, use the current Codex App
    `list_threads`/`read_thread` equivalents for every active visible task,
    including visible ad-hoc workers. Reject a
@@ -135,8 +151,29 @@ On resume:
    <task-id>\t<transport-encoded-live-title>\tactive\t<comma-separated-repo-refs>\t<comma-separated-pr-refs>\t<task-goal-mode>\t<task-goal-status>\t<task-goal-reported-objective-sha256-or-pending>\t<task-goal-evidence>\t<task-goal-missing-tool>\t<tool-result-ref/fingerprint>
    ```
 
-   If the live task inspection surface is unavailable, the packet cannot be
-   `fresh`; stop before resumed mutation or dispatch.
+   Re-read every current Feature Spec dependency row from its authored Feature
+   Spec plus live task and PR state. Reapply `stacked-feature-specs.md`, then
+   build `LIVE_FEATURE_SPEC_DEPENDENCY_ROWS` from those tool results, never from
+   ledger values. Its tab-separated fields exactly match the dependency table
+   from downstream ref through evidence fingerprint. The final fingerprint is
+   SHA-256 over the canonical authored edge and all state-specific live facts,
+   including upstream PR state and review revision and, when B exists, its task,
+   branch, PR head/base/draft state, CI, and reconciliation state. Supply a row
+   for every mutable dependency and for a satisfied edge whose downstream task
+   or workstream remains active. A released satisfied edge may instead rely on
+   its immutable completion fingerprint.
+
+   Re-read every active Codex review wait with GitStack and current PR data,
+   then build `LIVE_REVIEW_REVISION_ROWS` with one row per wait:
+
+   ```text
+   <pr-ref>\t<head-sha>\t<base-ref>\t<merge-base-sha>\t<recomputed-observation-fingerprint>\t<tool-result-ref/fingerprint>
+   ```
+
+   A ledger projection is not live evidence for either input. If the required
+   Feature Spec, PR, GitStack, or task inspection surface is unavailable, the
+   packet cannot be `fresh`.
+
 6. If every check matches, mark the packet `fresh`. Load the packet's exact
    session and scoped `## Option Resolution` row IDs, recompute their canonical
    rows fingerprint, and require it to match `rows_fingerprint`. Derive
@@ -343,6 +380,7 @@ On resume:
        }
        function valid_hash(value) { return length(value) == 64 && value ~ /^[0-9a-f]+$/ }
        /^## Feature Spec Task Registry$/ { registry=1; next }
+       registry && /^Feature Spec dependency rows:$/ { exit }
        registry && /^## / { exit }
        registry && /^\|/ {
          if (NF != 22) exit 57
@@ -353,7 +391,7 @@ On resume:
          if (ref == "feature_spec_ref") next
          if (ref ~ /^:?-+:?$/) next
          if (ref == "" || title == "" || !encoded_title(title) || !encoded_title(live_title) || task !~ /^[A-Za-z0-9:_-]+$/ || live_title != title || workstreams == "" || repos == "" || prs == "" || lifecycle != "visible-feature-spec-task" || poll_owner != "visible-feature-spec-task" || task_evidence == "" || task_evidence == "none" || goal_evidence == "" || goal_evidence == "none" || goal_evidence == "not-applicable" || !valid_hash(goal_dispatch_objective_sha256)) exit 57
-         if (state !~ /^(created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced)$/ || drift == "") exit 57
+         if (state !~ /^(created|implementing|validating|draft-pr|review-polling|fixing-review|ci|awaiting-upstream-merge|resyncing|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced)$/ || drift == "") exit 57
          if (goal_mode !~ /^(pending|active|unavailable)$/ || goal_status !~ /^(pending|active|complete|blocked|not-applicable)$/) exit 57
          if (goal_mode == "pending" && (goal_status != "pending" || state != "created" || goal_reported_objective_sha256 != "pending" || goal_missing_tool != "not-applicable" || goal_evidence !~ /^(thread-message|goal-create-message):/)) exit 57
          if (goal_mode != "pending" && (!valid_hash(goal_reported_objective_sha256) || goal_reported_objective_sha256 != goal_dispatch_objective_sha256)) exit 57
@@ -472,6 +510,191 @@ On resume:
        for (key in live_pr) if (!(key in active_visible_pr)) exit 58
      }
    ' || exit $?
+   FEATURE_SPEC_DEPENDENCY_MARKER_COUNT="$(
+     awk '
+       /^## Feature Spec Task Registry$/ { registry=1; next }
+       registry && /^## / { exit }
+       registry && /^Feature Spec dependency rows:$/ { markers++ }
+       END { if (markers > 1) exit 65; print markers + 0 }
+     ' "$ledger"
+   )" || exit 65
+   FEATURE_SPEC_DEPENDENCY_ROWS="$(
+     awk -F '|' '
+       function norm(value) {
+         gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+         if (length(value) >= 2 && substr(value, 1, 1) == "`" && substr(value, length(value), 1) == "`") value=substr(value, 2, length(value) - 2)
+         return value
+       }
+       function valid_ref(value) { return value ~ /^[A-Za-z0-9:_.#\/@%+-]+$/ }
+       function valid_repo(value) { return value ~ /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/ }
+       function valid_sha(value) { return value ~ /^[0-9a-f]{7,64}$/ }
+       function valid_hash(value) { return value ~ /^[0-9a-f]{64}$/ }
+       function valid_branch(value) { return value != "pending" && value !~ /[[:space:]|]/ }
+       function valid_pr(value, repo, prefix, number) {
+         prefix=repo "#"
+         if (substr(value, 1, length(prefix)) != prefix) return 0
+         number=substr(value, length(prefix) + 1)
+         return number ~ /^[0-9]+$/
+       }
+       /^## Feature Spec Task Registry$/ { registry=1; next }
+       registry && /^Feature Spec dependency rows:$/ { dependencies=1; next }
+       registry && /^## / { exit }
+       dependencies && /^### / { exit }
+       dependencies && /^\|/ {
+         if (NF != 17) exit 65
+         downstream=norm($2); upstream=norm($3); repo=norm($4); condition=norm($5); state=norm($6); depth=norm($7)
+         upstream_pr=norm($8); upstream_branch=norm($9); upstream_head=norm($10); upstream_base=norm($11); upstream_merge_base=norm($12)
+         downstream_worker=norm($13); downstream_branch=norm($14); downstream_pr=norm($15); evidence=norm($16)
+         if (downstream == "downstream_feature_spec_ref" || downstream ~ /^:?-+:?$/) next
+         if (!valid_ref(downstream) || !valid_ref(upstream) || downstream == upstream || !valid_repo(repo) || condition !~ /^(upstream-merged|upstream-merge-ready-head)$/ || state !~ /^(waiting-upstream|stack-active|awaiting-upstream-merge|resync-required|satisfied|blocked)$/ || depth !~ /^(1|2)$/ || !valid_hash(evidence)) exit 65
+         edge=downstream SUBSEP upstream
+         if (seen_edge[edge]++) exit 65
+         if (!(downstream in node_seen)) { node_seen[downstream]=1; nodes[++node_count]=downstream }
+         if (!(upstream in node_seen)) { node_seen[upstream]=1; nodes[++node_count]=upstream }
+         edges[upstream SUBSEP downstream]=1
+         if (condition == "upstream-merged") {
+           if (depth != "1" || state ~ /^(stack-active|awaiting-upstream-merge|resync-required)$/) exit 65
+         } else {
+           if (depth != "2") exit 65
+           if (state != "satisfied") {
+             if (++unresolved_early[downstream] > 1) exit 65
+             unresolved_early_downstream[downstream]=1
+             unresolved_early_upstream[upstream]=1
+           }
+         }
+         if (upstream_pr != "pending" && !valid_pr(upstream_pr, repo)) exit 65
+         if (upstream_branch != "pending" && !valid_branch(upstream_branch)) exit 65
+         if (upstream_head != "pending" && !valid_sha(upstream_head)) exit 65
+         if (upstream_base != "pending" && !valid_branch(upstream_base)) exit 65
+         if (upstream_merge_base != "pending" && !valid_sha(upstream_merge_base)) exit 65
+         if (downstream_worker != "pending" && downstream_worker !~ /^[A-Za-z0-9:_-]+$/) exit 65
+         if (downstream_branch != "pending" && !valid_branch(downstream_branch)) exit 65
+         if (downstream_pr != "pending" && !valid_pr(downstream_pr, repo)) exit 65
+         upstream_concrete=(valid_pr(upstream_pr, repo) && valid_branch(upstream_branch) && valid_sha(upstream_head) && valid_branch(upstream_base) && valid_sha(upstream_merge_base))
+         downstream_worker_concrete=(downstream_worker != "pending" && downstream_worker ~ /^[A-Za-z0-9:_-]+$/)
+         downstream_branch_concrete=valid_branch(downstream_branch)
+         downstream_pr_concrete=valid_pr(downstream_pr, repo)
+         if (state == "waiting-upstream" || state == "blocked") {
+           # The current live projection fingerprint above is sufficient while
+           # branch and PR fields legitimately remain pending.
+         } else if (condition == "upstream-merged" && state == "satisfied") {
+           if (!upstream_concrete) exit 65
+         } else {
+           if (!upstream_concrete || !downstream_worker_concrete || !downstream_branch_concrete) exit 65
+           if (state != "stack-active" && !downstream_pr_concrete) exit 65
+           if (state == "stack-active" && downstream_pr != "pending" && !downstream_pr_concrete) exit 65
+         }
+         print downstream "\t" upstream "\t" repo "\t" condition "\t" state "\t" depth "\t" upstream_pr "\t" upstream_branch "\t" upstream_head "\t" upstream_base "\t" upstream_merge_base "\t" downstream_worker "\t" downstream_branch "\t" downstream_pr "\t" evidence
+       }
+       END {
+         for (node in unresolved_early_downstream)
+           if (node in unresolved_early_upstream) exit 65
+         for (k=1; k <= node_count; k++)
+           for (i=1; i <= node_count; i++)
+             for (j=1; j <= node_count; j++)
+               if (edges[nodes[i] SUBSEP nodes[k]] && edges[nodes[k] SUBSEP nodes[j]]) edges[nodes[i] SUBSEP nodes[j]]=1
+         for (i=1; i <= node_count; i++) if (edges[nodes[i] SUBSEP nodes[i]]) exit 65
+       }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1 -k2,2
+   )" || exit 65
+   {
+     printf '%s\n' "$FEATURE_SPEC_DEPENDENCY_ROWS" | awk -F '\t' 'NF { print "dependency\t" $0 }'
+     printf '%s\n' "${LIVE_FEATURE_SPEC_DEPENDENCY_ROWS:-}" | awk -F '\t' 'NF { if (NF != 15) exit 65; print "live-dependency\t" $0 }'
+     printf '%s\n' "$FEATURE_SPEC_TASK_ROWS" | awk -F '\t' 'NF { print "registry\t" $0 }'
+     printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' 'NF { print "workstream\t" $0 }'
+   } | awk -F '\t' '
+     $1 == "registry" {
+       task_by_ref[$3]=$2; repos_by_ref[$3]=$6; task_state_by_ref[$3]=$8
+       next
+     }
+     $1 == "workstream" {
+       ref=$5
+       if (ref == "" || ref == "not-applicable") next
+       active_ref[ref]=1; worker_by_ref[ref SUBSEP $3]=1
+       repo_count=split($8, repos, ",")
+       for (i=1; i <= repo_count; i++) {
+         current_repo=repos[i]
+         if (!(ref in repo_by_ref)) repo_by_ref[ref]=current_repo
+         else if (repo_by_ref[ref] != current_repo) multi_repo[ref]=1
+       }
+       next
+     }
+     $1 == "dependency" {
+       rows++
+       downstream[rows]=$2; upstream[rows]=$3; edge_repo[rows]=$4; condition[rows]=$5; state[rows]=$6; worker[rows]=$13
+       key=$2 SUBSEP $3; dependency_key[rows]=key
+       dependency_row[key]=$2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7 "\t" $8 "\t" $9 "\t" $10 "\t" $11 "\t" $12 "\t" $13 "\t" $14 "\t" $15 "\t" $16
+       next
+     }
+     $1 == "live-dependency" {
+       key=$2 SUBSEP $3
+       if (live_dependency_seen[key]++) exit 65
+       live_dependency_row[key]=$2 "\t" $3 "\t" $4 "\t" $5 "\t" $6 "\t" $7 "\t" $8 "\t" $9 "\t" $10 "\t" $11 "\t" $12 "\t" $13 "\t" $14 "\t" $15 "\t" $16
+       next
+     }
+     END {
+       for (row=1; row <= rows; row++) {
+         down=downstream[row]; up=upstream[row]; expected_repo=edge_repo[row]; key=dependency_key[row]
+         active_downstream=(down in task_by_ref || down in active_ref)
+         if (state[row] != "satisfied" || active_downstream) {
+           if (!(key in live_dependency_row) || live_dependency_row[key] != dependency_row[key]) exit 65
+         } else if (key in live_dependency_row && live_dependency_row[key] != dependency_row[key]) exit 65
+         if (condition[row] == "upstream-merge-ready-head") {
+           if ((down in repos_by_ref && repos_by_ref[down] != expected_repo) || (up in repos_by_ref && repos_by_ref[up] != expected_repo)) exit 65
+           if ((down in repo_by_ref && repo_by_ref[down] != expected_repo) || (up in repo_by_ref && repo_by_ref[up] != expected_repo) || multi_repo[down] || multi_repo[up]) exit 65
+           if (state[row] == "waiting-upstream" && active_downstream) exit 65
+           if (state[row] ~ /^(stack-active|awaiting-upstream-merge|resync-required)$/) {
+             if (!(down in task_by_ref) || task_by_ref[down] != worker[row]) exit 65
+           }
+           if (state[row] == "blocked" && (down in task_by_ref) && task_state_by_ref[down] !~ /^(blocked|needs-owner)$/) exit 65
+           if (state[row] == "blocked" && (down in active_ref) && !(down in task_by_ref)) exit 65
+           if (state[row] == "satisfied" && active_downstream) {
+             if (!(down in task_by_ref) || task_by_ref[down] != worker[row]) exit 65
+           }
+           task_state=task_state_by_ref[down]
+           if (state[row] == "stack-active" && task_state !~ /^(created|implementing|validating|draft-pr|ci)$/) exit 65
+           if (state[row] == "awaiting-upstream-merge" && task_state != "awaiting-upstream-merge") exit 65
+           if (state[row] == "resync-required" && task_state !~ /^(awaiting-upstream-merge|resyncing)$/) exit 65
+           if (state[row] == "satisfied" && (down in task_by_ref) && task_state !~ /^(validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete)$/) exit 65
+         }
+       }
+       for (key in live_dependency_row) if (!(key in dependency_row)) exit 65
+     }
+   ' || exit 65
+   ACTIVE_FEATURE_SPEC_TASK_COUNT="$(
+     {
+       printf '%s\n' "$FEATURE_SPEC_TASK_ROWS" | awk -F '\t' 'NF { print "registry\t" $2 "\t" $7 }'
+       printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' 'NF { print "workstream\t" $4 }'
+     } | awk -F '\t' '
+       $1 == "registry" {
+         if ($3 ~ /^(merge-ready|target-complete|replaced)$/) terminal[$2]=1
+         else registry_live[$2]=1
+         next
+       }
+       $1 == "workstream" && $2 != "" && $2 != "not-applicable" { workstream_live[$2]=1 }
+       END {
+         for (ref in registry_live) live[ref]=1
+         for (ref in workstream_live) if (!(ref in terminal)) live[ref]=1
+         for (ref in live) count++
+         if (count > 3) exit 64
+         print count + 0
+       }
+     '
+   )" || exit 64
+   CURRENT_FEATURE_SPEC_REGISTRY_COUNT="$(printf '%s\n' "$FEATURE_SPEC_TASK_ROWS" | awk -F '\t' 'NF { refs[$2]=1 } END { for (ref in refs) count++; print count + 0 }')"
+   if [ "$CURRENT_FEATURE_SPEC_REGISTRY_COUNT" -gt 0 ] && [ "$FEATURE_SPEC_DEPENDENCY_MARKER_COUNT" -ne 1 ]; then exit 65; fi
+   NEXT_ACTION_CHECKOUT_STRATEGY="$(
+     awk '
+       /^## Active Root$/ { root=1; next }
+       /^## Codex Review Wait Registry$/ { exit }
+       root && /^Implementation checkout strategy: / {
+         rows++; value=$0; sub(/^Implementation checkout strategy: /, "", value)
+         if (value !~ /^(managed-worktree-per-feature-spec|serial-caller-checkout-branches)$/) exit 56
+         print value
+       }
+       END { if (rows != 1) exit 56 }
+     ' "$ledger"
+   )" || exit 56
    ROOT_NEXT_ACTION="$(
      awk '
        /^## Active Root$/ { root=1; next }
@@ -515,7 +738,7 @@ On resume:
    {
      printf '%s\n' "$FEATURE_SPEC_TASK_ROWS" | awk -F '\t' 'NF { print "registry\t" $1 "\t" $2 "\t" $7 "\t" $8 "\t" $10 }'
      printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' '$3 == "visible-codex-app-task" { print "visible\t" $2 "\tnot-applicable\tactive\tnone\t" $9 }'
-   } | awk -F '\t' -v action="$ROOT_NEXT_ACTION_NAME" -v target="$ROOT_NEXT_ACTION_TARGET" -v due="$ROOT_NEXT_ACTION_DUE" '
+   } | awk -F '\t' -v action="$ROOT_NEXT_ACTION_NAME" -v target="$ROOT_NEXT_ACTION_TARGET" -v due="$ROOT_NEXT_ACTION_DUE" -v active_spec_task_count="$ACTIVE_FEATURE_SPEC_TASK_COUNT" -v checkout_strategy="$NEXT_ACTION_CHECKOUT_STRATEGY" '
      $1 == "registry" {
        task[$2]=1; ref[$3]=1; state[$2]=$4; drift[$2]=$5
        if ($6 == "pending") pending[$2]=1
@@ -540,7 +763,7 @@ On resume:
          if (!(target in task) || drift[target] == "none" || state[target] ~ /^(merge-ready|blocked|needs-owner|replaced)$/) exit 59
          exit 0
        }
-       if (action == "dispatch-feature-spec") exit target in ref ? 59 : 0
+       if (action == "dispatch-feature-spec") exit (target in ref || active_spec_task_count >= 3 || (checkout_strategy == "serial-caller-checkout-branches" && active_spec_task_count >= 1)) ? 59 : 0
        if (action == "reconcile-feature-spec") exit target in ref ? 0 : 59
        if (action == "owner-action") exit 0
        exit 59
@@ -556,15 +779,36 @@ On resume:
        /^## Codex Review Wait Registry$/ { waits=1; next }
        waits && /^## / { exit }
        waits && /^\|/ {
-         if (NF != 13) exit 60
-         record=norm($2); pr=norm($3); head=norm($4); request=norm($5); profile=norm($6); budget=norm($7)
-         started=norm($8); deadline=norm($9); state=norm($10); fingerprint=norm($11); transitioned=norm($12)
+         if (NF != 15) exit 60
+         record=norm($2); pr=norm($3); head=norm($4); base=norm($5); merge_base=norm($6); request=norm($7); profile=norm($8); budget=norm($9)
+         started=norm($10); deadline=norm($11); state=norm($12); fingerprint=norm($13); transitioned=norm($14)
          if (record == "wait_record" || record ~ /^:?-+:?$/) next
-         if (record == "" || pr == "" || head == "" || request == "" || profile !~ /^(standard|extended)$/ || budget !~ /^(15|30)$/ || started == "" || deadline == "" || state !~ /^(active|monitoring-required|terminal)$/ || fingerprint !~ /^[0-9a-f]{64}$/ || transitioned == "") exit 60
-         print record "\t" pr "\t" head "\t" request "\t" profile "\t" budget "\t" started "\t" deadline "\t" state "\t" fingerprint "\t" transitioned
+         if (record != pr "@" head "@" base "@" merge_base || pr == "" || head !~ /^[0-9a-f]{7,64}$/ || base == "" || base ~ /[[:space:]|]/ || merge_base !~ /^[0-9a-f]{7,64}$/ || request == "" || profile !~ /^(standard|extended)$/ || budget !~ /^(15|30)$/ || started == "" || deadline == "" || state !~ /^(active|monitoring-required|terminal)$/ || fingerprint !~ /^[0-9a-f]{64}$/ || transitioned == "") exit 60
+         print record "\t" pr "\t" head "\t" base "\t" merge_base "\t" request "\t" profile "\t" budget "\t" started "\t" deadline "\t" state "\t" fingerprint "\t" transitioned
        }
      ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1 | awk -F '\t' 'seen[$1]++ { exit 60 } { print }'
    )" || exit 60
+   {
+     printf '%s\n' "$REVIEW_WAIT_ROWS" | awk -F '\t' 'NF { print "wait\t" $0 }'
+     printf '%s\n' "${LIVE_REVIEW_REVISION_ROWS:-}" | awk -F '\t' 'NF { if (NF != 6) exit 60; print "live\t" $0 }'
+   } | awk -F '\t' '
+     $1 == "wait" {
+       key=$3 "@" $4 "@" $5 "@" $6
+       if (wait[key]++) exit 60
+       wait_fingerprint[key]=$13
+       next
+     }
+     $1 == "live" {
+       key=$2 "@" $3 "@" $4 "@" $5
+       if (live[key]++ || $2 == "" || $3 !~ /^[0-9a-f]{7,64}$/ || $4 == "" || $4 ~ /[[:space:]|]/ || $5 !~ /^[0-9a-f]{7,64}$/ || $6 !~ /^[0-9a-f]{64}$/ || $7 == "") exit 60
+       live_fingerprint[key]=$6
+       next
+     }
+     END {
+       for (key in wait) if (!(key in live) || wait_fingerprint[key] != live_fingerprint[key]) exit 60
+       for (key in live) if (!(key in wait)) exit 60
+     }
+   ' || exit 60
    ACTIVE_REVIEW_PROJECTIONS="$(
      awk -F '|' '
        function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
@@ -579,7 +823,7 @@ On resume:
        active && /^#### [A-Za-z0-9:_-]+: / { workstream=$0; sub(/^#### /, "", workstream); sub(/: .*/, "", workstream); next }
        active && /^\| Codex review evidence \|/ {
          value=norm($3)
-         print workstream "\t" token_value(value, "wait_record") "\t" token_value(value, "wait_profile_pr") "\t" token_value(value, "request_head") "\t" token_value(value, "request_object") "\t" token_value(value, "wait_profile") "\t" token_value(value, "wait_budget_minutes") "\t" token_value(value, "wait_started_at") "\t" token_value(value, "wait_deadline") "\t" token_value(value, "wait_state") "\t" token_value(value, "observation_fingerprint") "\t" token_value(value, "last_transition_at") "\t" token_value(value, "checker_status") "\t" token_value(value, "terminal")
+         print workstream "\t" token_value(value, "wait_record") "\t" token_value(value, "wait_profile_pr") "\t" token_value(value, "request_head") "\t" token_value(value, "request_base_ref") "\t" token_value(value, "request_merge_base") "\t" token_value(value, "request_object") "\t" token_value(value, "wait_profile") "\t" token_value(value, "wait_budget_minutes") "\t" token_value(value, "wait_started_at") "\t" token_value(value, "wait_deadline") "\t" token_value(value, "wait_state") "\t" token_value(value, "observation_fingerprint") "\t" token_value(value, "last_transition_at") "\t" token_value(value, "checker_status") "\t" token_value(value, "terminal") "\t" token_value(value, "result_head") "\t" token_value(value, "result_base_ref") "\t" token_value(value, "result_merge_base")
        }
      ' "$ledger"
    )" || exit 60
@@ -589,18 +833,19 @@ On resume:
    } | awk -F '\t' '
      $1 == "wait" {
        record=$2; wait_seen[record]++
-       wait_pr[record]=$3; wait_head[record]=$4; wait_request[record]=$5; wait_profile[record]=$6; wait_budget[record]=$7
-       wait_started[record]=$8; wait_deadline[record]=$9; wait_state[record]=$10; wait_fingerprint[record]=$11; wait_transition[record]=$12
+       wait_pr[record]=$3; wait_head[record]=$4; wait_base[record]=$5; wait_merge_base[record]=$6; wait_request[record]=$7; wait_profile[record]=$8; wait_budget[record]=$9
+       wait_started[record]=$10; wait_deadline[record]=$11; wait_state[record]=$12; wait_fingerprint[record]=$13; wait_transition[record]=$14
        next
      }
      $1 == "projection" {
-       workstream=$2; record=$3; pr=$4; head=$5; request=$6; profile=$7; budget=$8; started=$9; deadline=$10
-       state=$11; fingerprint=$12; transition=$13; checker=$14; terminal=$15
+       workstream=$2; record=$3; pr=$4; head=$5; base=$6; merge_base=$7; request=$8; profile=$9; budget=$10; started=$11; deadline=$12
+       state=$13; fingerprint=$14; transition=$15; checker=$16; terminal=$17; result_head=$18; result_base=$19; result_merge_base=$20
        if (record == "none" || record == "not-applicable" || record == "") next
-       if (!(record in wait_seen) || pr != wait_pr[record] || head != wait_head[record] || request != wait_request[record] || profile != wait_profile[record] || budget != wait_budget[record] || started != wait_started[record] || deadline != wait_deadline[record] || state != wait_state[record] || fingerprint != wait_fingerprint[record] || transition != wait_transition[record]) exit 60
+       if (!(record in wait_seen) || pr != wait_pr[record] || head != wait_head[record] || base != wait_base[record] || merge_base != wait_merge_base[record] || request != wait_request[record] || profile != wait_profile[record] || budget != wait_budget[record] || started != wait_started[record] || deadline != wait_deadline[record] || state != wait_state[record] || fingerprint != wait_fingerprint[record] || transition != wait_transition[record]) exit 60
        if (wait_state[record] == "terminal") {
          if (checker !~ /^(clean|findings|error)$/ || terminal != checker) exit 60
-       } else if (checker !~ /^(acknowledged|pending)$/ || terminal != "none") exit 60
+         if (result_head != head || result_base != base || result_merge_base != merge_base) exit 60
+       } else if (checker !~ /^(acknowledged|pending)$/ || terminal != "none" || result_head != "none" || result_base != "none" || result_merge_base != "none") exit 60
        referenced_wait[record]++
        next
      }
@@ -649,6 +894,7 @@ On resume:
      ' "$ledger"
    )" || exit 56
    [ "$ROOT_CHECKOUT_STRATEGY" = "$PACKET_CHECKOUT_STRATEGY" ] || exit 56
+   if [ "$ROOT_CHECKOUT_STRATEGY" = "serial-caller-checkout-branches" ] && [ "$ACTIVE_FEATURE_SPEC_TASK_COUNT" -gt 1 ]; then exit 64; fi
    ROOT_SERIAL_LANE="$(
      awk '
        function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }

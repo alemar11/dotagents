@@ -29,18 +29,24 @@ authorized user explicitly requests no worktrees.
 | `change_delivery_target` | `validated-changes-left-uncommitted`, `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | `validated-changes-left-uncommitted` for ad hoc work; `pull-request-ready-for-merge-but-not-merged` for Feature Spec-backed work | The observable stopping point for the workstream. Merge is never implied. |
 
 Worker surface, count, per-wave parallelism, and serial or parallel sequencing
-are derived runtime decisions, not options or user-provided data. When visible
-tasks are not enabled, the orchestrator chooses worker surfaces from the work graph,
-ownership boundaries, safety, tool availability, and live runtime capacity.
-When visible tasks are enabled, the visible-task count is exactly the
-number of implementation-eligible Feature Specs in the dispatched waves. With
+are derived runtime decisions, not options or user-provided data. The hard
+runtime ceiling is three concurrent nonterminal Feature Spec executions across
+all worker surfaces. The root chooses one through three eligible Specs per wave
+from dependencies, ownership boundaries, checkout safety, tool availability,
+and live runtime capacity; those inputs may reduce the count but never raise the
+ceiling. When visible tasks are not enabled, the orchestrator chooses the
+worker surfaces for those selected Specs. When visible tasks are enabled, the
+visible-task count is exactly the number of implementation-eligible Feature
+Specs selected in the dispatched waves, with no more than three nonterminal
+tasks active at once. With
 `implementation_checkout_strategy=managed-worktree-per-feature-spec`, start
 order and serial or parallel scheduling remain derived. With
 `implementation_checkout_strategy=serial-caller-checkout-branches`, scheduling
 is derived as strictly serial across Feature Specs because every task mutates
 the same caller checkout. The root and every spawned Codex App task may create
 internal background subagents within their assigned scope, subject to the
-selected checkout strategy's mutation-safety rules.
+selected checkout strategy's mutation-safety rules. Nested subagents do not
+consume additional Feature Spec execution slots.
 
 ## Session Permissions And Context
 
@@ -120,7 +126,7 @@ or evidence from one workstream never applies to another by inheritance.
 | `completion_evidence_policy` | `require-live-system-evidence`, `allow-simulated-evidence-by-authorized-user-exception` | `require-live-system-evidence` | Whether explicitly accepted simulated proof may replace unavailable live proof. |
 | `delivery_decision_origin` | `safe-default-for-ad-hoc-work`, `inherited-from-feature-spec`, `overridden-by-implementation-issue`, `specified-by-authorized-user` | `safe-default-for-ad-hoc-work` for ad hoc work | Where the selected delivery target came from. Evidence remains separate data. |
 | `workstream_repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From the registered issue or session layout | Repository layout for this workstream. |
-| `codex_review_requirement` | `required-on-current-pull-request-head`, `explicitly-skipped-by-authorized-user`, `not-needed-for-selected-delivery-target` | Required only for a merge-ready pull request | Whether the current pull-request head requires Codex review. |
+| `codex_review_requirement` | `required-on-current-pull-request-head`, `explicitly-skipped-by-authorized-user`, `not-needed-for-selected-delivery-target` | Required only for a merge-ready pull request | Whether the current pull-request revision requires Codex review. The revision identity includes the head SHA, base ref, and merge-base SHA. |
 | `pull_request_count_strategy` | `one-pull-request-total`, `one-pull-request-per-repository`, `no-pull-request` | Derived from target and repository layout | Number of pull requests used by the workstream. |
 | `issue_completion_method` | `feature-pull-request-closing-keyword`, `repository-pull-request-closing-keyword`, `final-commit-closing-keyword`, `move-local-issue-to-done-after-proof`, `no-issue-completion` | Derived from tracker, target, and source contract | How the tracked issue reaches its terminal state. |
 
@@ -156,6 +162,7 @@ options:
 | `delivery_allowed_actions` | Canonical action list | `change_delivery_target` plus its valid permission row. |
 | `worker_allowed_actions` | Canonical action list from `worker.md` | Exact worker assignment; actions are independent and non-cumulative. |
 | `feature_spec_task_assignment` | One exact Feature Spec ref and title mapped to one visible task id, or `not-applicable` | Required runtime mapping when visible task permission is granted; never a user option. |
+| `feature_spec_task_cap` | Exact integer `3` | Hard runtime invariant for concurrent nonterminal Feature Spec executions; never a user option. |
 
 `delivery_allowed_actions` derives as follows:
 
@@ -165,7 +172,7 @@ options:
 | `local-commit-created-without-pushing` | `edit-files`, `run-validation`, `create-local-commit` |
 | `changes-pushed-to-target-branch-without-pull-request` | `edit-files`, `run-validation`, `create-local-commit`, `push-target-branch` |
 | `validated-draft-pull-request-published` | `edit-files`, `run-validation`, `create-local-commit`, `push-target-branch`, `create-or-update-pull-request` |
-| `pull-request-ready-for-merge-but-not-merged` | Draft-PR actions plus the review actions required by `codex_review_requirement`, then `mark-pull-request-ready` only after the current-head review policy and remaining gates pass |
+| `pull-request-ready-for-merge-but-not-merged` | Draft-PR actions plus the review actions required by `codex_review_requirement`, then `mark-pull-request-ready` only after the current-revision review policy and remaining gates pass |
 
 ## Discovery Source Registry
 
@@ -239,6 +246,13 @@ capability may restrict a value; it never grants mutation permission.
 
 - Every visible Codex App task requires
   `visible_app_task_permission=granted-by-authorized-user`.
+- Across all worker surfaces, reject dispatch or recovery with more than three
+  concurrent nonterminal Feature Spec executions. Count a Spec from dispatch
+  through implementation, validation, draft PR, review, fixes, CI, upstream-
+  merge waiting, and stack resynchronization. A live `blocked` or `needs-owner`
+  task still consumes its slot. `merge-ready`, `target-complete`, and released
+  or replaced tasks do not. Serial caller-checkout mode further restricts the
+  count to one.
 - With `visible_app_task_permission=granted-by-authorized-user`, every
   implementation-eligible Feature Spec requires exactly one active visible
   task titled with that Spec's exact title. One task must not own multiple

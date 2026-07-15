@@ -3,7 +3,7 @@
 Load this reference only when
 `change_delivery_target=pull-request-ready-for-merge-but-not-merged`.
 `gates.md` owns this route and all gate selection;
-this file owns the resulting current-head review, wait, feedback disposition,
+this file owns the resulting current-revision review, wait, feedback disposition,
 parent Feature Spec closeout, watch, and post-merge algorithm.
 
 ## Execution Owner
@@ -30,7 +30,8 @@ For `pull-request-ready-for-merge-but-not-merged`, resolve
 `codex_review_requirement` per workstream before declaring the PR merge-ready or the
 workstream complete. The default
 `required-on-current-pull-request-head` value requires a verified terminal
-Codex result for the current head. An exact scoped authorized-user instruction
+Codex result for the current pull-request revision: the exact head SHA, base
+ref, and merge-base SHA. An exact scoped authorized-user instruction
 may select `explicitly-skipped-by-authorized-user`; that bypasses only the Codex request and wait, not local `$autoreview`,
 CI, validation, Feature Spec acceptance, integration, domain closeout, or parent-closeout
 head checks. Other delivery targets never load this reference.
@@ -56,22 +57,28 @@ When `codex_review_requirement=explicitly-skipped-by-authorized-user`:
    wait for pending or later feedback.
 4. Record `codex_review=skipped`, request/result evidence as absent unless an
    already-known result is being dispositioned, and the fully validated current
-   PR head as the closeout-qualified SHA. Mark the PR ready only through the
+   PR head, base ref, and merge-base SHA as the closeout-qualified revision.
+   Mark the PR ready only through the
    common post-policy promotion step below.
 
 Review completion is evidence-based, not GitHub-object-type-based. A verified
 terminal Codex result may be either:
 
-- a formal GitHub review whose reviewed commit matches the current PR head; or
+- a formal GitHub review whose reviewed commit matches the current PR head and
+  whose recorded request base ref and merge-base SHA still match the live PR; or
 - a Codex-provider-authored PR comment posted after the request that names an
-  unambiguous matching current-head SHA or prefix and gives a terminal result
-  such as clean/no findings or concrete findings; or
+  unambiguous matching current-head SHA or prefix, was requested for the same
+  base ref and merge-base SHA, and gives a terminal result such as clean/no
+  findings or concrete findings; or
 - an authenticated Codex clean reaction that GitStack binds to a review request
-  naming the current PR head and reports as `clean` with
-  `head_is_current=true`.
+  naming the current PR revision and reports as `clean` with
+  `head_is_current=true`, provided the locally verified base ref and merge-base
+  SHA still match the request revision.
 
 Use `$gitstack:github-review-threads` automated-review status as the primary
-state source. Run
+state source. Before every check, derive the live review revision by reading the
+PR head SHA and base ref and computing the merge-base SHA between that head and
+the current base head. Run
 `<plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <current-sha>`
 before any review request, promotion, resumed wait, or extended-deadline
 decision, and use its bounded `reviews wait` command after a request. The
@@ -83,6 +90,11 @@ checker API/authentication/configuration error or an evidenced tool-capability
 gap. A normal `acknowledged` or `pending` result never activates the fallback;
 never trust display text alone.
 
+For controller state, derive the stored review observation fingerprint from
+GitStack's stable observation plus the verified base ref and merge-base SHA.
+This preserves GitStack's provider classification while ensuring that a
+head-only match cannot make a changed effective diff look current.
+
 This flow uses the manual top-level PR-comment trigger `@codex review`.
 Automatic reviews are a separate repository setting and are neither required
 nor request evidence here. Do not infer that a manual request is unavailable
@@ -92,9 +104,9 @@ not move the PR to ready early to bypass the selected draft-review-first flow.
 
 Human comments, unverified authors, acknowledgements, pending or status
 messages, cloud task replies without a terminal review result, and provider
-errors are not completion evidence. Record request head, result head, checker
-status, evidence kind, provider identity, object id or URL, terminal status, and
-disposition.
+errors are not completion evidence. Record request and result head SHAs, base
+refs, merge-base SHAs, checker status, evidence kind, provider identity, object
+id or URL, terminal status, and disposition.
 
 ### Codex Review Request Matrix
 
@@ -103,37 +115,41 @@ When `codex_review_requirement=required-on-current-pull-request-head`, run this 
 
 | Status or evidence | Required freshness | Required action | May post another request? | Ledger consequence |
 | --- | --- | --- | --- | --- |
-| GitStack `clean` | `head_is_current=true` | Reuse the result and pass the review-result portion of the gate. | No. | Record the terminal result and object for this head. |
-| GitStack `findings` | `head_is_current=true` | Evaluate and disposition findings; fix accepted findings before closeout. | No for this head. | Record findings and disposition; a fix may create a new head with a new preflight. |
-| GitStack `acknowledged` or `pending` | `head_is_current=true` | Run bounded `reviews wait` for the same head and preserve the existing request. | No. | Keep the existing request object and next poll. |
-| GitStack `stale` | Refresh the assigned SHA, rerun `reviews check`, require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA. | Post one request naming the proven current head. | Yes, exactly once for that SHA. | Record the request before polling. |
-| GitStack `not-requested` | Require `head_is_current=true`, re-read the PR head immediately before mutation, and require no request object for that SHA. | Post one request naming the proven current head. | Yes, exactly once for that SHA. | Record the request before polling. |
-| GitStack API, authentication, or configuration error | Current head or request state is unproven. | Record the error and use the documented read-only fallback. An evidenced tool-capability gap uses this same error path; the fallback may classify an authenticated current-head terminal comment only here. | No. | Preserve any known request evidence; do not mutate from uncertainty. |
-| Terminal provider error for the current-head request | Existing request object and current head are recorded. | Record the error and follow recovery without another request for the unchanged head. | No. | Block or wait until a new head or external recovery exists. |
-| Unverified or human-authored comment claiming success | No verified result; use the GitStack status for the proven current head. | Ignore the comment and follow the matching GitStack row. | Only through a proven `stale` or `not-requested` row. | Record that the comment was rejected as evidence. |
+| GitStack `clean` | `head_is_current=true` and the request base ref plus merge-base SHA equal the live revision | Reuse the result and pass the review-result portion of the gate. | No. | Record the terminal result and object for this revision. |
+| GitStack `findings` | `head_is_current=true` and the request base ref plus merge-base SHA equal the live revision | Evaluate and disposition findings; fix accepted findings before closeout. | No for this revision. | Record findings and disposition; a fix or effective-base change creates a new revision with a new preflight. |
+| GitStack `acknowledged` or `pending` | `head_is_current=true` and the request base ref plus merge-base SHA equal the live revision | Run bounded `reviews wait` for the same revision and preserve the existing request. | No. | Keep the existing request object and next poll. |
+| GitStack `stale` | Refresh the full revision, rerun `reviews check`, require `head_is_current=true`, re-read the head/base/merge-base immediately before mutation, and require no request object for that revision. | Post one request naming the proven current head and base. | Yes, exactly once for that revision. | Record the request revision before polling. |
+| Locally stale base ref or merge-base SHA | Ignore any head-only clean/pending classification, recompute the full revision, and require no request object for that revision. | Post one request naming the unchanged head and new base revision. | Yes, exactly once for that revision. | Preserve the old result as history and record a new request revision before polling. |
+| GitStack `not-requested` | Require `head_is_current=true`, re-read the head/base/merge-base immediately before mutation, and require no request object for that revision. | Post one request naming the proven current head and base. | Yes, exactly once for that revision. | Record the request revision before polling. |
+| GitStack API, authentication, or configuration error | Current revision or request state is unproven. | Record the error and use the documented read-only fallback. An evidenced tool-capability gap uses this same error path; the fallback may classify an authenticated terminal comment only when its head/base/merge-base revision is proven. | No. | Preserve any known request evidence; do not mutate from uncertainty. |
+| Terminal provider error for the current-revision request | Existing request object and current revision are recorded. | Record the error and follow recovery without another request for the unchanged revision. | No. | Block or wait until a new revision or external recovery exists. |
+| Unverified or human-authored comment claiming success | No verified result; use the GitStack status plus local base evidence for the proven current revision. | Ignore the comment and follow the matching GitStack row. | Only through a proven stale-revision or `not-requested` row. | Record that the comment was rejected as evidence. |
 
-`request-codex-review` is idempotent per PR head. Do not post when a valid
-terminal result or an active request already exists for the current head. A new
-commit that changes the PR head invalidates the old result and permits exactly
-one new request. GitHub storing a valid Codex result as a comment rather than a
-formal review never permits a duplicate request by itself. Owner wording and
-retry instructions cannot override unchanged-head idempotency.
+`request-codex-review` is idempotent per PR revision. Do not post when a valid
+terminal result or an active request already exists for the current head SHA,
+base ref, and merge-base SHA. A new commit, base-ref change, or merge-base
+change invalidates the old result and permits exactly one new request for the
+new revision. Advancing the base branch without changing the merge base does
+not create a new revision. GitHub storing a valid Codex result as a comment
+rather than a formal review never permits a duplicate request by itself. Owner
+wording and retry instructions cannot override unchanged-revision idempotency.
 
 ### Codex Review Wait Budget
 
 For `codex_review_requirement=required-on-current-pull-request-head`, use only a 15-minute standard or 30-minute
-extended total active-wait budget per PR head. These budgets are timeout
+extended total active-wait budget per PR revision. These budgets are timeout
 deadlines for bounded `reviews wait`, not polling intervals, and are derived
 runtime state rather than selectable options. The ledger's
 `## Codex Review Wait Registry` is the sole timing authority: atomically find
-or create exactly one row keyed by `<owner>/<repo>#<number>@<current-sha>`.
-Every workstream mapped to that PR and head must reuse that row's earliest
+or create exactly one row keyed by
+`<owner>/<repo>#<number>@<head-sha>@<base-ref>@<merge-base-sha>`.
+Every workstream mapped to that PR revision must reuse that row's earliest
 `wait_started_at`, single `wait_deadline`, and `wait_record`; workstream fields
 are projections and must never initialize or extend an independent window.
 The row also stores GitStack's stable `observation_fingerprint` and
 `last_transition_at`. Persist the initial observation, then change those fields
 and the mapped workstream projections only for a new fingerprint, checker/wait
-state, request object/head, terminal result, or deadline tier. Repeated polls
+state, request object/revision, terminal result, or deadline tier. Repeated polls
 with the same fingerprint inside one bounded waiter perform no ledger write,
 timestamp refresh, note, metric, or progress message. If the complete bounded
 waiter times out unchanged in `monitoring-required`, write the next scheduled
@@ -153,8 +169,9 @@ controller state.
    seconds, capped at 30 seconds. Do not replace it with a caller loop of
    `reviews check` plus shell `sleep`, and do not run another waiter while it is
    active.
-2. If that deadline expires, rerun `reviews check` before waiting again. Only
-   when the same request object and current head remain `acknowledged` or
+2. If that deadline expires, recompute the live head, base ref, and merge-base
+   SHA, then rerun `reviews check` before waiting again. Only when the same
+   request object and current revision remain `acknowledged` or
    `pending`, promote the PR to `wait_profile=extended` and move the deadline
    to 30 minutes after the original `wait_started_at`. Continue only for the
    remaining budget, normally 15 minutes; never start a fresh 30-minute wait
@@ -164,10 +181,10 @@ controller state.
    `<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <current-sha> --timeout <remaining-seconds>s --interval 10s --max-interval 30s`.
    When less than one second remains, do not invoke GitStack; continue to the
    extended-deadline handling below.
-3. Once any head on a PR requires promotion, every workstream mapped to that PR
+3. Once any revision on a PR requires promotion, every workstream mapped to that PR
    preserves its exact `wait_profile_pr` plus `wait_profile=extended`, and
-   subsequent heads of that same PR start with a 30-minute total active-wait
-   budget. Reset `wait_started_at` and `wait_deadline` for the new head and run
+   subsequent revisions of that same PR start with a 30-minute total active-wait
+   budget. Reset `wait_started_at` and `wait_deadline` for the new revision and run
    GitStack with
    `<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <current-sha> --timeout 30m --interval 10s --max-interval 30s`.
    If the live PR identity differs from `wait_profile_pr`, reset to `standard`,
@@ -188,7 +205,7 @@ controller state.
    findings, stale, or error transition. Persist its final fingerprint once;
    do not replay its unchanged intermediate attempts into the ledger.
 5. If the current request is still `acknowledged` or `pending` at the extended
-   deadline, rerun the current-head check, preserve the request, set
+   deadline, rerun the current-revision check, preserve the request, set
    `wait_state=monitoring-required`, and stop the continuous waiter. Keep the
    action `ready-next`. In mandatory visible Feature Spec task mode, the
    assigned task remains the polling owner and resumes bounded polling at the
@@ -203,12 +220,21 @@ the wait-profile PR identity, profile, budget, timestamps, observation
 fingerprint, transition time, and state as
 `not-applicable`; do not start or resume a waiter.
 
+An `upstream-merge-ready-head` downstream PR is not eligible to enter the
+review algorithm while it still targets the upstream branch. Its assigned task
+may implement, validate, push, publish the draft PR, and run CI, then must keep
+the PR draft with `dependency_state=awaiting-upstream-merge`. After the upstream
+PR merges independently, the same task must reconcile the downstream branch
+onto the current default branch, retarget the PR, and record
+`dependency_state=satisfied` before requesting Codex review. Do not spend a
+review request or wait budget on the intentionally temporary stacked base.
+
 1. Verify the PR exists, targets the expected branch/base, contains the latest
    intended commit, and has passed required local gates plus current CI or a
    recorded CI blocker.
 2. Reconcile the PR body before the policy-specific closeout gate. If it already
    contains the parent Feature Spec closing keyword while parent closeout is not `armed`
-   with the same closeout-qualified SHA and recorded PR-body evidence, the
+   with the same closeout-qualified revision and recorded PR-body evidence, the
    closeout executor must remove it or replace it with a non-closing reference and record
    `pending-review` for `required-on-current-pull-request-head` or
    `pending-closeout` for `explicitly-skipped-by-authorized-user`. If the
@@ -219,8 +245,9 @@ fingerprint, transition time, and state as
    feedback disposition, and fix-validation path. If it is already non-draft,
    record that live state, but do not treat it as review or merge-ready evidence
    and do not convert it to draft without separate authority.
-4. When `codex_review_requirement=required-on-current-pull-request-head`, run GitStack
-   using the exact `reviews check` command above with the current head. Apply
+4. When `codex_review_requirement=required-on-current-pull-request-head`, derive
+   and record the current head SHA, base ref, and merge-base SHA, then run GitStack
+   using the exact `reviews check` command above with that head. Apply
    the returned status and the matrix before posting anything. Use an
    authenticated connector only for the documented read-only fallback after a
    checker error or evidenced capability gap; do not add a connector read to a
@@ -228,27 +255,30 @@ fingerprint, transition time, and state as
    `not-applicable` and continue to feedback disposition without checking or
    polling review status.
 5. Only when `codex_review_requirement=required-on-current-pull-request-head` and the matrix permits it,
-   immediately re-read the PR head and verify
-   it still equals the checked SHA and the ledger has no request object for that
-   SHA. Then post exactly one top-level PR comment. The official trigger is
-   exactly `@codex review`; name the current head and add a short focus only when
-   useful. Record the request object and head before any other action.
+   immediately re-read the PR head and base, recompute the merge base, and
+   verify all three values still equal the checked revision and the ledger has
+   no request object for that revision. Then post exactly one top-level PR
+   comment. The official trigger is exactly `@codex review`; name the current
+   head, base ref, and merge-base SHA and add a short focus only when useful. Record the request
+   object, head, base ref, and merge-base SHA before any other action.
 6. When `codex_review_requirement=required-on-current-pull-request-head`, run bounded GitStack
-   `reviews wait` against the same head using the Codex Review
+   `reviews wait` against the same revision using the Codex Review
    Wait Budget contract above. Reuse the request across `acknowledged`,
    `pending`, and timeouts; never post another request merely because the wait
    returned without a terminal result. At a final extended timeout, preserve
    the request and record troubleshooting evidence: Code review enabled for the
    repository, Codex cloud configured for the repository, exact trigger used,
-   request object, and current head. Classify it as `monitoring-required` while
+   request object, current head, base ref, and merge-base SHA. Classify it as
+   `monitoring-required` while
    it remains pollable, not as blocked. For `skip`, record this step as
    `not-applicable` and do not wait.
-7. Evaluate the feedback required by the resolved policy: all current-head Codex
+7. Evaluate the feedback required by the resolved policy: all current-revision Codex
    feedback for the required path, or only already-known actionable Codex
    feedback for the explicit-skip path. Fix accepted actionable findings, rerun the relevant tests,
    `$autoreview`, CI, and review-thread checks, then push the update. For
-   the required path, run the request matrix for the new head when the diff materially
-   changed; for the explicit-skip path, revalidate the new head without requesting review.
+   the required path, run the request matrix for the new revision when the head,
+   base ref, or merge base materially changed; for the explicit-skip path,
+   revalidate the new revision without requesting review.
 8. For findings judged non-actionable, not applicable, or intentionally
    deferred, post a PR discussion update with the disposition, evidence, and
    validation so the discussion is not left silent. Merge-ready Feature Spec-backed
@@ -260,14 +290,14 @@ fingerprint, transition time, and state as
    record `no-update-needed` in the ledger instead of posting a redundant
    comment.
 9. Promote the PR only after the policy-specific path is resolved on the exact
-   current head. For the required path, require a verified terminal current-head
+   current revision. For the required path, require a verified terminal current-revision
    Codex result, fully dispositioned feedback, and no unresolved actionable
    findings. For the skip path, require the current scoped skip evidence and
    disposition of already-known feedback. In both paths, require the
    closeout-qualified head, affected validation, and current CI to pass before
    running `gh pr ready <pr>` or an equivalent authorized action. Record the
-   non-draft state, re-read the head, base, body, and any checks triggered by the
-   ready transition, and return to the matching review or CI cycle if any
+   non-draft state, re-read the head, base, merge base, body, and any checks
+   triggered by the ready transition, and return to the matching review or CI cycle if any
    evidence becomes stale or fails. Never mark a draft PR ready while required
    review is pending, findings remain unresolved, fixes are unpushed, or required
    checks are not current.
@@ -276,17 +306,17 @@ Use this closeout state order for merge-ready PR work:
 
 1. `draft-pr-published`
 2. `codex-review-policy-resolved` (required or explicitly skipped)
-3. `current-head-review-preflight` (required path) or `not-applicable` (skip path)
+3. `current-revision-review-preflight` (required path) or `not-applicable` (skip path)
 4. `codex-review-requested-or-reused` (required path) or `not-applicable` (skip path)
-5. `current-head-terminal-result-received` (required path) or `not-applicable` (skip path)
+5. `current-revision-terminal-result-received` (required path) or `not-applicable` (skip path)
 6. `known-review-feedback-dispositioned` (required feedback, already-known skipped feedback, or `not-applicable`)
 7. `fixes-validated-and-pushed`
 8. `post-fix-ci-current`
-9. `closeout-head-current` (reviewed SHA for the required path; fully validated current SHA for the skip path)
+9. `closeout-revision-current` (reviewed head/base/merge-base for the required path; fully validated current revision for the skip path)
 10. `ready-for-review`
-11. `post-ready-head-and-ci-current`
+11. `post-ready-revision-and-ci-current`
 12. `parent-spec-closeout-resolved` (`armed`, `deferred-to-default-branch`, or `not-applicable`)
-13. `post-closeout-head-current` (`pass` for `armed`; otherwise `not-applicable` with reason)
+13. `post-closeout-revision-current` (`pass` for `armed`; otherwise `not-applicable` with reason)
 14. `parent-closeout-watch-established` (`root-monitoring`, `owner-handoff`, `automation-handoff`, or `not-applicable`)
 15. `merge-ready-report`
 
@@ -294,13 +324,14 @@ Do not final-answer from an intermediate state as complete, released, or
 merge-ready. Keep the ledger active, `ready-next`, or blocked while review is
 only requested, accepted findings are unresolved, a review fix is dirty in any
 publication checkout, a fix is committed but unpushed, checks are pending for
-the pushed fix, a policy-required fresh current-head Codex result is pending
+the pushed fix, a policy-required fresh current-revision Codex result is pending
 after a material diff change, or known PR review threads remain unresolved
-without an explicit disposition. Poll an existing current-head request instead
+without an explicit disposition. Poll an existing current-revision request instead
 of posting again only when `codex_review_requirement=required-on-current-pull-request-head`.
 
 For `codex_review_requirement=required-on-current-pull-request-head`, this gate passes only when the PR is
 non-draft, a verified terminal Codex result exists for the current PR head,
+base ref, and merge-base SHA,
 actionable feedback is fixed or explicitly dispositioned, and the PR discussion
 was updated or explicitly marked `no-update-needed`. For
 `codex_review_requirement=explicitly-skipped-by-authorized-user`, it passes when the PR is non-draft, scoped owner
@@ -330,22 +361,32 @@ an external condition prevents the next safe action. For partial PRs, ad hoc
 PRs, local-tracker PRs, and workstreams without a parent GitHub Feature Spec, record
 parent closeout as `not-applicable` and continue.
 
-Immediately before the closeout executor updates the PR body, re-read the PR head and require
-it to equal the closeout-qualified SHA: the reviewed SHA for the required path,
-or the fully validated current SHA for the skip path; also re-read the current default branch and
-require the PR base to match it. Re-read the head, current default branch, PR
-base, and current PR body after the body update and immediately before the
-merge-ready report. Require the live body or its fingerprint to match the
-recorded closeout evidence and contain exactly the intended parent closer. If
-the head differs, do not add the parent keyword, or remove/replace an
+The generic non-default-base completion rule does not make an
+`upstream-merge-ready-head` downstream PR merge-ready while its upstream is
+unmerged. That PR remains draft and nonterminal until the upstream merges and
+the downstream task reconciles it onto the default branch. Never add a closing
+keyword for the upstream Feature Spec or PR to the downstream PR, never treat
+the downstream merge as an indirect substitute for merging the upstream PR,
+and never transfer upstream PR ownership to the downstream task.
+
+Immediately before the closeout executor updates the PR body, re-read the PR
+head and base, recompute the merge base, and require all three to equal the
+closeout-qualified revision: the reviewed revision for the required path or the
+fully validated current revision for the skip path. Also re-read the current
+default branch and require the PR base to match it. Re-read the head, current
+default branch, PR base, merge base, and current PR body after the body update
+and immediately before the merge-ready report. Require the live body or its
+fingerprint to match the recorded closeout evidence and contain exactly the
+intended parent closer. If the default branch or PR base no longer matches,
+disarm the keyword and record `deferred-to-default-branch` until a linked
+default-branch closeout vehicle passes the gates. Otherwise, if the head or
+merge base differs, do not add the parent keyword, or remove/replace an
 already-added parent closing keyword with a non-closing reference, set
-`parent_spec_closeout=pending-review` and return to current-head review preflight
+`parent_spec_closeout=pending-review` and return to current-revision review preflight
 for the required path; for the skip path, set
 `parent_spec_closeout=pending-closeout`, rerun the
-affected validation and current CI for the new head, and do not request review.
-If the default branch or PR base no longer matches, disarm the keyword
-and record `deferred-to-default-branch` until a linked default-branch closeout
-vehicle passes the gates. If only the body differs, set
+affected validation and current CI for the new revision, and do not request
+review. If only the body differs, set
 `parent_spec_closeout=pending-closeout`, reconcile the live body without
 overwriting concurrent edits, and repeat the post-update checks. Any relevant
 change after `armed` invalidates that state and requires the matching
@@ -358,27 +399,28 @@ releasing the active root, establish exactly one parent closeout watch:
 - `root-monitoring`: use only when
   `pull_request_merge_permission=granted-for-named-pull-request` and the root is the designated
   merger. Keep the root claim active through the root-controlled merge and
-  actual Feature Spec closure check. Immediately before merge, re-read the PR head, base,
-  current default branch, and live body fingerprint; on any mismatch disarm the
+  actual Feature Spec closure check. Immediately before merge, re-read the PR
+  head, base, merge base, current default branch, and live body fingerprint; on
+  any mismatch disarm the
   parent closer and stop the merge for the matching review/revalidation or
   closeout cycle;
 - `owner-handoff`: required when `pull_request_merge_permission=not-granted` or another actor will
   merge. Move the unmerged parent closeout to `needs-owner`, keep the ledger
   `paused`, and record an owner-visible handoff that requires rechecking the PR
-  head, base, current default branch, and body fingerprint immediately before
+  head, base, merge base, current default branch, and body fingerprint immediately before
   merge; on any mismatch the owner must not merge and must return the work to
   the orchestrator for policy-specific disarm and review/revalidation;
 - `automation-handoff`: use only when the matching scoped row is
   `scheduled_automation_change_permission=granted-by-authorized-user` for a real event-driven
-  monitor that can observe head, base/default-branch, and PR-body
+  monitor that can observe head, base/merge-base/default-branch, and PR-body
   mutations before merge, block the merge or disarm the closer on mismatch, and
   verify post-merge issue state. Record its id, event triggers, last successful
   check, and identical mismatch/disarm behavior; or
 - `not-applicable`: only when parent closeout itself is not applicable.
 
-The durable watch packet must name the PR, parent Feature Spec, resolved review policy,
-closeout-qualified SHA,
-base/default branch, PR-body evidence, mutation triggers, and post-merge
+The durable watch packet must name the PR, parent Feature Spec, resolved review
+policy, closeout-qualified head and merge-base SHAs, base/default branch,
+PR-body evidence, mutation triggers, and post-merge
 issue-state check. A final report alone is owner-visible but is not durable
 handoff evidence unless the same packet is persisted in the ledger. Do not set
 the ledger `complete` while the parent is merely `armed` or

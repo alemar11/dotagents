@@ -29,6 +29,13 @@ If `source_spec_ref` is `draft-spec:<...>`, allow real dispatch only with
 `temporary_source_execution_permission=granted-by-authorized-user`. That
 permission never grants commit, push, PR, issue, or merge actions.
 
+When the registered dependency graph contains an explicit same-repository
+`upstream-merge-ready-head` edge, load `stacked-feature-specs.md` before
+dispatch. That value is source-graph dependency data, not a session option. Do
+not infer it from `depends-on`, implementation order, shared files, or a request
+to continue autonomously. Every other code dependency follows its ordinary
+recorded start rule.
+
 ## Required Handoff
 
 A generated issue's `## Orchestrator Handoff` must contain:
@@ -103,7 +110,7 @@ Resolve these concerns separately:
 3. `delivery_allowed_actions`: derived actions needed to reach that target.
 4. `worker_allowed_actions`: exact subset a worker may execute.
 5. `issue_update_permission`: independently allowed issue lifecycle mutation.
-6. `codex_review_requirement`: current-head review behavior for the merge-ready
+6. `codex_review_requirement`: current-revision review behavior for the merge-ready
    PR target.
 7. `pull_request_merge_permission`: whether the named PR may be merged.
 8. `pull_request_merge_confirmation`: whether another checkpoint remains after
@@ -120,7 +127,7 @@ Do not collapse these into a boolean or infer one from another. In particular,
 | `local-commit-created-without-pushing` | `granted-for-selected-target` | `no-pull-request` | `not-needed-for-selected-delivery-target` | Validated commit exists locally on the named branch; no push. |
 | `changes-pushed-to-target-branch-without-pull-request` | `granted-for-selected-target` | `no-pull-request` | `not-needed-for-selected-delivery-target` | Named remote branch contains the validated commit; no PR exists. |
 | `validated-draft-pull-request-published` | `granted-for-selected-target` | One total or one per repository | `not-needed-for-selected-delivery-target` | Validated draft PR exists; do not mark ready or request review. |
-| `pull-request-ready-for-merge-but-not-merged` | `granted-for-selected-target` | One total or one per repository | Required on current head or explicitly skipped | PR is non-draft and all selected gates pass; do not merge without separate permission. |
+| `pull-request-ready-for-merge-but-not-merged` | `granted-for-selected-target` | One total or one per repository | Required on current revision or explicitly skipped | PR is non-draft and all selected gates pass; do not merge without separate permission. |
 
 For every target except uncommitted changes, a missing delivery grant yields
 `delivery_gate_status=blocked`; it is not another permission value.
@@ -166,13 +173,13 @@ For every target except uncommitted changes, a missing delivery grant yields
 
 ### Pull Request Ready For Merge But Not Merged
 
-- Open as draft initially and keep it draft through required current-head Codex
-  review, feedback disposition, fix validation, and current CI. Mark it ready
-  only after that exact head has a verified terminal review with no unresolved
-  actionable feedback, or after an explicit review skip and all remaining gates
-  pass.
-- Apply `codex_review_requirement` to the current PR head.
-- Load `gates.md`; it alone routes current-head Codex review and parent Feature
+- Open as draft initially and keep it draft through required current-revision
+  Codex review, feedback disposition, fix validation, and current CI. Mark it
+  ready only after that exact head SHA, base ref, and merge-base SHA has a
+  verified terminal review with no unresolved actionable feedback, or after an
+  explicit review skip and all remaining gates pass.
+- Apply `codex_review_requirement` to the current PR revision.
+- Load `gates.md`; it alone routes current-revision Codex review and parent Feature
   Spec closeout through `codex-review-closeout.md`.
 - The Feature Spec source contract may grant commit, push, PR publication,
   mark-ready, review request/poll, required discussion disposition, and parent
@@ -249,14 +256,22 @@ return `needs-owner` for merge.
    publication checkout, starting-checkout handling, parent-closeout state,
    merge fields, and proof targets in the ledger.
 8. Build waves from dependencies, repository boundaries, and shared integration
-   risk. Delivery targets do not decide parallelism.
-9. Load `gates.md` before any owner-ready, issue-closed, release-ready, or final
+   risk. Delivery targets do not decide parallelism. Keep at most three
+   nonterminal Feature Spec executions across all surfaces; serial caller-
+   checkout execution remains one and internal subagents remain inside their
+   parent Spec slot.
+9. For an explicit `upstream-merge-ready-head` edge, apply
+   `stacked-feature-specs.md`; otherwise require the dependency's ordinary
+   completion proof before downstream dispatch.
+10. Load `gates.md` before any owner-ready, issue-closed, release-ready, or final
    status.
 
 ## Closeout Rules
 
 Feature Spec-backed implementation is incomplete whenever its selected target,
 integration proof, source closeout, or domain closeout remains unfinished.
+An intermediate stacked draft PR is dependency-stage proof only; it is not the
+downstream Spec's selected merge-ready target.
 
 Before final status require:
 

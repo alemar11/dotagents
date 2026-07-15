@@ -20,7 +20,8 @@ environments,
 `public-model-identifier` only when public names or API fields are changed or
 exposed, `cross-repo-integration` only when multiple repositories or packages
 must remain compatible, and `publication-safety` before push, draft PR
-publication, or a ready-for-review transition. Record
+publication, or a ready-for-review transition. Add `stacked-dependency` only
+for an explicit same-repository `upstream-merge-ready-head` edge. Record
 `not-applicable` only with a short reason in the ledger gate matrix.
 
 Proof means root-verifiable evidence, not only a worker assertion. Acceptable
@@ -167,6 +168,29 @@ branch, and its branch, HEAD, and status match the recorded baseline. Record
 dirty baseline, branch reuse, early branch switch, restoration mismatch, or
 missing proof blocks the serial lane.
 
+### Stacked Dependency Gate
+
+For an explicit `upstream-merge-ready-head` edge, load
+`stacked-feature-specs.md` and apply its complete preflight, execution, upstream-
+merge, reconciliation, and final-promotion sequence. Never select this gate from
+generic `depends-on` prose or for multi-repository, serial caller-checkout, or
+three-level dependency chains.
+
+Before the upstream PR merges independently, this gate may pass only for the
+downstream task's managed-worktree implementation, validation, current CI, and
+draft PR targeting the upstream branch. Final Codex PR review, parent closeout,
+ready transition, and downstream completion remain pending. After verified
+upstream merge, require the same downstream task to reconcile onto the current
+default branch, retarget its PR, revalidate, obtain current-revision Codex review,
+fix findings, and pass current CI before this gate permits ready.
+
+The root verifies this evidence and may merge only the upstream PR under its
+existing exact merge-permission rows. It never performs downstream
+implementation, reconciliation, review, fixes, publication, or ready
+transition. A lease mismatch, upstream mutation, retarget failure, conflict that
+cannot be resolved within scope, or any attempt to close or supersede the
+upstream PR blocks this gate.
+
 ### Live Proof Gate
 
 For user-facing behavior, require proof from the real app, CLI, API, service,
@@ -260,7 +284,7 @@ owner-ready next action.
 
 For
 `change_delivery_target=pull-request-ready-for-merge-but-not-merged`, load
-`codex-review-closeout.md` and apply its complete current-head review and
+`codex-review-closeout.md` and apply its complete current-revision review and
 parent-closeout algorithm. In mandatory visible Feature Spec task mode, the
 assigned task is the algorithm's execution and polling owner; the root must
 not call the review check/wait workflow for it. For every other target, do not load that reference:

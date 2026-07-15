@@ -65,6 +65,13 @@ merge-ready PR lifecycle; the root becomes orchestration-only for that work.
   checkout, runs only one Spec task through its complete delivery target,
   restores and verifies the original caller branch, and only then dispatches
   the next Spec.
+- Across all execution surfaces, keep at most three nonterminal Feature Spec
+  executions active at once. The root chooses one, two, or three from dependency
+  readiness, isolation, risk, and live capacity; this ceiling is an invariant,
+  not a user option. A Feature Spec consumes one slot until its assigned
+  execution reaches the selected delivery target. Internal subagents
+  inherit their parent Spec's slot and never consume another one. Serial caller-
+  checkout execution remains capped at one Spec.
 - The root resolves `worker_allowed_actions` per workstream. Actions are
   explicit, independent, and non-cumulative; allowed paths can narrow an action
   but never grant another one.
@@ -113,6 +120,7 @@ acceptance and closure authority.
 | Rough intent without durable Feature Spec and issues | Run `$plan-feature` `full-flow` before implementation scheduling. |
 | Durable Feature Spec without generated issues | Run `$plan-feature` `issues-from-existing-spec` unless inspect-only. |
 | Feature Spec-backed issue, linked partial Feature Spec, `source_spec_ref`, or `## Orchestrator Handoff` | Load `references/spec-backed-delivery.md`; reject retired vocabulary before registration. |
+| Same-repository Feature Spec dependency explicitly classified as `upstream-merge-ready-head` | After `spec-backed-delivery.md`, load `references/stacked-feature-specs.md`; never infer this path from generic dependency prose. |
 | Generated issue with valid handoff | Register directly; the handoff is its canonical dispatch projection. |
 | Generated issue without valid handoff | Inspect or regenerate through `$plan-feature`; implement only with explicit ad-hoc authority. |
 | PR, review, CI failure, bug, checklist, plan, TODO, implementation request, or other non-Feature-Spec issue | Register directly with `change_delivery_target=validated-changes-left-uncommitted`, `change_delivery_permission=not-required-for-uncommitted-changes`, `issue_update_permission=no-issue-changes`, and local acceptance plus validation closeout. |
@@ -227,9 +235,10 @@ visible task per implementation-eligible Feature Spec, title it with the
 exact Feature Spec title, and keep all of that Spec's issue, repo, PR,
 Codex-review, CI, and merge-readiness work in that task. The root chooses only
 when those tasks start and whether they run serially or in parallel from
-dependencies, checkout strategy, and live capacity. The root and every spawned Codex App task may
-use internal background subagents within their assigned scope; no user
-worker-count or topology option exists.
+dependencies, checkout strategy, and live capacity, subject to the run-wide
+three-Spec ceiling. The root and every spawned Codex App task may use internal
+background subagents within their assigned scope; those subagents remain inside
+the parent Spec's slot, and no user worker-count or topology option exists.
 
 Load `references/worker.md` before delegation. It owns current tool mapping,
 surface wording, permission, capability snapshots, worker actions, prompts,
@@ -270,7 +279,7 @@ new exact delivery target and permission row.
 
 Load `references/gates.md` before owner-ready, issue-closed, merge-ready,
 release-ready, or final status. It owns gate selection and conditionally routes
-`pull-request-ready-for-merge-but-not-merged` through the canonical current-head
+`pull-request-ready-for-merge-but-not-merged` through the canonical current-revision
 Codex review and parent Feature Spec closeout algorithm. Its review default is
 `codex_review_requirement=required-on-current-pull-request-head`; an exact
 scoped authorized-user instruction may select
@@ -337,6 +346,9 @@ artifacts by path/ref and fingerprint instead of repeating them. Use
   `workspace_context=multi-repository-workspace`.
 - `references/spec-backed-delivery.md`: Feature Spec graph, authorities, publication,
   issue mutation, review, and closeout.
+- `references/stacked-feature-specs.md`: conditional same-repository two-Spec
+  dependency stack from one reviewed upstream head through downstream retarget,
+  final review, and independent closeout.
 - `references/gates.md`: authorization, proof, review, integration, release,
   and closeout gates.
 - `references/recovery-validation.md`: conditional Recovery Packet freshness

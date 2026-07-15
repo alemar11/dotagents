@@ -676,6 +676,8 @@ class OrchestratorContractTests(unittest.TestCase):
                 contents: str = ledger_fixture,
                 live_task_evidence: str = "",
                 live_repo_evidence: str | None = None,
+                live_dependency_evidence: str = "",
+                live_review_evidence: str = "",
             ) -> subprocess.CompletedProcess[str]:
                 selected_set = set(selected)
                 normalized_rows: list[list[str]] = []
@@ -718,6 +720,10 @@ class OrchestratorContractTests(unittest.TestCase):
                 configured = (
                     f"ledger={shlex.quote(str(ledger_path))}\n"
                     f"LIVE_TASK_EVIDENCE_ROWS={shlex.quote(live_task_evidence)}\n"
+                    "LIVE_FEATURE_SPEC_DEPENDENCY_ROWS="
+                    f"{shlex.quote(live_dependency_evidence)}\n"
+                    "LIVE_REVIEW_REVISION_ROWS="
+                    f"{shlex.quote(live_review_evidence)}\n"
                     "LIVE_REPO_CHECKPOINT_ROWS="
                     f"{shlex.quote(live_repo_evidence or (local_live_repo if 'Implementation checkout strategy: serial-caller-checkout-branches' in contents else default_live_repo))}\n"
                     f"{configured}"
@@ -1050,6 +1056,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa | "
                 "goal-read:worker-1@goal-abc | not-applicable |\n\n"
+                "Feature Spec dependency rows:\n\n"
                 "## Workstreams",
             )
             visible_feature_task = visible_feature_task.replace(
@@ -1122,6 +1129,205 @@ class OrchestratorContractTests(unittest.TestCase):
                 assigned_feature_task.returncode,
                 0,
                 assigned_feature_task.stderr,
+            )
+
+            dependency_header = (
+                "| downstream_feature_spec_ref | upstream_feature_spec_ref | "
+                "repository_ref | dependency_start_condition | dependency_state | "
+                "stack_depth | upstream_pull_request_ref | upstream_branch | "
+                "upstream_head | upstream_base_ref | upstream_merge_base | "
+                "downstream_worker_id | downstream_branch | "
+                "downstream_pull_request_ref | evidence |\n"
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | "
+                "--- | --- | --- | --- | --- |"
+            )
+            dependency_fingerprint = "d" * 64
+            valid_dependency_row = (
+                "| spec:demo | spec:up | owner/repo | "
+                "upstream-merge-ready-head | stack-active | 2 | owner/repo#1 | "
+                "feature/up | abc1234 | main | def4567 | worker-1 | "
+                f"feature/demo | pending | {dependency_fingerprint} |"
+            )
+            stack_task_fixture = visible_feature_task.replace(
+                row(
+                    "workstream:a",
+                    "workstream_repository_refs",
+                    scoped_values["workstream_repository_refs"],
+                ),
+                row(
+                    "workstream:a",
+                    "workstream_repository_refs",
+                    ("owner/repo", "runtime-derived", "none"),
+                ),
+            ).replace(
+                "| spec:demo | Feature Spec: Demo | worker-1 | "
+                "Feature Spec: Demo | a | repo | pending |",
+                "| spec:demo | Feature Spec: Demo | worker-1 | "
+                "Feature Spec: Demo | a | owner/repo | pending |",
+            ).replace(
+                "| Repo / execution location | repo; ",
+                "| Repo / execution location | owner/repo; ",
+            ).replace(
+                "Feature Spec dependency rows:\n\n## Workstreams",
+                "Feature Spec dependency rows:\n\n"
+                f"{dependency_header}\n{valid_dependency_row}\n\n"
+                "## Workstreams",
+            )
+            stack_live_task = live_demo.replace(
+                "\tactive\trepo\tpending\t",
+                "\tactive\towner/repo\tpending\t",
+            )
+            stack_live_dependency = (
+                "spec:demo\tspec:up\towner/repo\tupstream-merge-ready-head\t"
+                "stack-active\t2\towner/repo#1\tfeature/up\tabc1234\tmain\t"
+                "def4567\tworker-1\tfeature/demo\tpending\t"
+                f"{dependency_fingerprint}"
+            )
+            accepted_live_stack = run(
+                complete_ids,
+                stack_task_fixture,
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency,
+            )
+            self.assertEqual(
+                accepted_live_stack.returncode,
+                0,
+                accepted_live_stack.stderr,
+            )
+            missing_live_stack = run(
+                complete_ids,
+                stack_task_fixture,
+                stack_live_task,
+            )
+            self.assertNotEqual(missing_live_stack.returncode, 0)
+            drifted_live_stack = run(
+                complete_ids,
+                stack_task_fixture,
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency.replace(
+                    "\tabc1234\t",
+                    "\tfff1234\t",
+                ),
+            )
+            self.assertNotEqual(drifted_live_stack.returncode, 0)
+            mismatched_stack_lifecycle = run(
+                complete_ids,
+                stack_task_fixture.replace(
+                    "implementing | now | none | none |",
+                    "awaiting-upstream-merge | now | none | none |",
+                ),
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency,
+            )
+            self.assertNotEqual(mismatched_stack_lifecycle.returncode, 0)
+            invalid_stack_depth = run(
+                complete_ids,
+                stack_task_fixture.replace(
+                    "stack-active | 2 | owner/repo#1",
+                    "stack-active | 1 | owner/repo#1",
+                ),
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency.replace(
+                    "\tstack-active\t2\t",
+                    "\tstack-active\t1\t",
+                ),
+            )
+            self.assertNotEqual(invalid_stack_depth.returncode, 0)
+            cross_repository_row = valid_dependency_row.replace(
+                "owner/repo",
+                "owner/other",
+            )
+            rejected_cross_repository_stack = run(
+                complete_ids,
+                stack_task_fixture.replace(
+                    valid_dependency_row,
+                    cross_repository_row,
+                ),
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency.replace(
+                    "owner/repo",
+                    "owner/other",
+                ),
+            )
+            self.assertNotEqual(rejected_cross_repository_stack.returncode, 0)
+
+            chained_dependency_row = (
+                "| spec:up | spec:root | owner/repo | "
+                "upstream-merge-ready-head | stack-active | 2 | owner/repo#3 | "
+                "feature/root | aaa1234 | main | bbb1234 | worker-up | "
+                f"feature/up | pending | {'e' * 64} |"
+            )
+            chained_live_stack = stack_task_fixture.replace(
+                valid_dependency_row,
+                f"{valid_dependency_row}\n{chained_dependency_row}",
+            )
+            rejected_three_level_stack = run(
+                complete_ids,
+                chained_live_stack,
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency,
+            )
+            self.assertNotEqual(rejected_three_level_stack.returncode, 0)
+
+            second_upstream_row = valid_dependency_row.replace(
+                "spec:up",
+                "spec:other",
+            ).replace(
+                "owner/repo#1",
+                "owner/repo#4",
+            ).replace(
+                dependency_fingerprint,
+                "f" * 64,
+            )
+            rejected_multiple_unmerged_upstreams = run(
+                complete_ids,
+                stack_task_fixture.replace(
+                    valid_dependency_row,
+                    f"{valid_dependency_row}\n{second_upstream_row}",
+                ),
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency,
+            )
+            self.assertNotEqual(rejected_multiple_unmerged_upstreams.returncode, 0)
+
+            cycle_row = (
+                "| spec:up | spec:demo | owner/repo | upstream-merged | "
+                "waiting-upstream | 1 | pending | pending | pending | pending | "
+                f"pending | pending | pending | pending | {'a' * 64} |"
+            )
+            rejected_dependency_cycle = run(
+                complete_ids,
+                stack_task_fixture.replace(
+                    valid_dependency_row,
+                    f"{valid_dependency_row}\n{cycle_row}",
+                ),
+                stack_live_task,
+                live_dependency_evidence=stack_live_dependency,
+            )
+            self.assertNotEqual(rejected_dependency_cycle.returncode, 0)
+
+            released_satisfied_row = (
+                "| spec:done | spec:up | owner/repo | "
+                "upstream-merge-ready-head | satisfied | 2 | owner/repo#1 | "
+                "feature/up | abc1234 | main | def4567 | old-worker | "
+                f"feature/done | owner/repo#2 | {'b' * 64} |"
+            )
+            released_satisfied_fixture = ledger_fixture.replace(
+                "## Workstreams",
+                "## Feature Spec Task Registry\n\n"
+                "Feature Spec dependency rows:\n\n"
+                f"{dependency_header}\n{released_satisfied_row}\n\n"
+                "## Workstreams",
+                1,
+            )
+            accepted_released_satisfied_edge = run(
+                complete_ids,
+                released_satisfied_fixture,
+            )
+            self.assertEqual(
+                accepted_released_satisfied_edge.returncode,
+                0,
+                accepted_released_satisfied_edge.stderr,
             )
 
             local_strategy_evidence = (
@@ -1424,6 +1630,24 @@ class OrchestratorContractTests(unittest.TestCase):
                 accepted_local_serial_task.returncode,
                 0,
                 accepted_local_serial_task.stderr,
+            )
+            serial_dispatch_while_active = local_feature_task.replace(
+                "Next Root Check: action=none; target=none; due_at=none",
+                "Next Root Check: action=dispatch-feature-spec; "
+                "target=spec:new; due_at=now",
+            ).replace(
+                "next_action=none; next_target=none; next_due_at=none",
+                "next_action=dispatch-feature-spec; next_target=spec:new; "
+                "next_due_at=now",
+            )
+            rejected_serial_dispatch_while_active = run(
+                complete_ids,
+                serial_dispatch_while_active,
+                live_demo,
+            )
+            self.assertNotEqual(
+                rejected_serial_dispatch_while_active.returncode,
+                0,
             )
             multi_repo_local_task = local_feature_task.replace(
                 row(
@@ -2026,25 +2250,39 @@ class OrchestratorContractTests(unittest.TestCase):
             terminal_wait_fixture = ledger_fixture.replace(
                 "## Codex Review Wait Registry\n\n",
                 "## Codex Review Wait Registry\n\n"
-                "| wait_record | wait_profile_pr | request_head | request_object | "
-                "wait_profile | wait_budget_minutes | wait_started_at | "
+                "| wait_record | wait_profile_pr | request_head | request_base_ref | "
+                "request_merge_base | request_object | wait_profile | "
+                "wait_budget_minutes | wait_started_at | "
                 "wait_deadline | wait_state | observation_fingerprint | "
                 "last_transition_at |\n"
-                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
-                f"| owner/repo#1@abc123 | owner/repo#1 | abc123 | comment:1 | "
+                "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+                "| owner/repo#1@abc1234@main@def4567 | owner/repo#1 | "
+                "abc1234 | main | def4567 | comment:1 | "
                 f"standard | 15 | t0 | t1 | terminal | {observation} | t2 |\n\n",
             ).replace(
                 "| Delivery | target_pull_request_ref=not-applicable |",
                 "| Delivery | target_pull_request_ref=not-applicable |\n"
-                "| Codex review evidence | request_head=abc123; "
+                "| Codex review evidence | request_head=abc1234; "
+                "request_base_ref=main; request_merge_base=def4567; "
                 "request_object=comment:1; checker_status=clean; "
-                "wait_record=owner/repo#1@abc123; wait_profile_pr=owner/repo#1; "
+                "wait_record=owner/repo#1@abc1234@main@def4567; "
+                "wait_profile_pr=owner/repo#1; "
                 "wait_profile=standard; wait_budget_minutes=15; "
                 "wait_started_at=t0; wait_deadline=t1; wait_state=terminal; "
                 f"observation_fingerprint={observation}; "
-                "last_transition_at=t2; terminal=clean |",
+                "last_transition_at=t2; result_head=abc1234; "
+                "result_base_ref=main; result_merge_base=def4567; "
+                "terminal=clean |",
             )
-            terminal_wait = run(complete_ids, terminal_wait_fixture)
+            live_terminal_review = (
+                f"owner/repo#1\tabc1234\tmain\tdef4567\t{observation}\t"
+                "gitstack:owner/repo#1@abc1234"
+            )
+            terminal_wait = run(
+                complete_ids,
+                terminal_wait_fixture,
+                live_review_evidence=live_terminal_review,
+            )
             self.assertEqual(terminal_wait.returncode, 0, terminal_wait.stderr)
             contradictory_wait = run(
                 complete_ids,
@@ -2055,14 +2293,16 @@ class OrchestratorContractTests(unittest.TestCase):
                     "wait_state=terminal;",
                     "wait_state=active;",
                 ).replace("last_transition_at=t2; terminal=clean", "last_transition_at=t2; terminal=none"),
+                live_review_evidence=live_terminal_review,
             )
             self.assertNotEqual(contradictory_wait.returncode, 0)
             mismatched_terminal_outcome = run(
                 complete_ids,
                 terminal_wait_fixture.replace(
-                    "last_transition_at=t2; terminal=clean",
-                    "last_transition_at=t2; terminal=findings",
+                    "result_merge_base=def4567; terminal=clean",
+                    "result_merge_base=def4567; terminal=findings",
                 ),
+                live_review_evidence=live_terminal_review,
             )
             self.assertNotEqual(mismatched_terminal_outcome.returncode, 0)
             orphaned_wait = run(
@@ -2072,6 +2312,7 @@ class OrchestratorContractTests(unittest.TestCase):
                     "",
                     terminal_wait_fixture,
                 ),
+                live_review_evidence=live_terminal_review,
             )
             self.assertNotEqual(orphaned_wait.returncode, 0)
             deadline_drift = run(
@@ -2080,8 +2321,18 @@ class OrchestratorContractTests(unittest.TestCase):
                     "wait_started_at=t0; wait_deadline=t1;",
                     "wait_started_at=t0; wait_deadline=t9;",
                 ),
+                live_review_evidence=live_terminal_review,
             )
             self.assertNotEqual(deadline_drift.returncode, 0)
+            live_review_drift = run(
+                complete_ids,
+                terminal_wait_fixture,
+                live_review_evidence=live_terminal_review.replace(
+                    "\tmain\tdef4567\t",
+                    "\trelease\tfeed999\t",
+                ),
+            )
+            self.assertNotEqual(live_review_drift.returncode, 0)
 
             missing_permission_source = run(
                 complete_ids,
@@ -2253,7 +2504,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("do not mark ready or request review", draft[4])
 
         merge_ready = rows[4]
-        self.assertIn("Required on current head or explicitly skipped", merge_ready[3])
+        self.assertIn("Required on current revision or explicitly skipped", merge_ready[3])
         self.assertIn("do not merge without separate permission", merge_ready[4])
         self.assertIn(
             "`change_delivery_target=pull-request-ready-for-merge-but-not-merged`",
@@ -2839,6 +3090,154 @@ class OrchestratorContractTests(unittest.TestCase):
             self.assertNotIn(forbidden, options)
             self.assertNotIn(forbidden, worker)
 
+    def test_feature_spec_parallelism_has_internal_cap_three(self) -> None:
+        skill = self.read("SKILL.md")
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        ledger_template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        multi_repo = self.read("references/multi-repo-workspace.md")
+        normalized = " ".join(
+            "\n".join((skill, options, worker, ledger_template, multi_repo)).split()
+        )
+
+        self.assertIn(
+            "hard runtime ceiling is three concurrent nonterminal Feature Spec executions",
+            normalized,
+        )
+        self.assertIn("root chooses one, two, or three", normalized)
+        self.assertIn("Serial caller-checkout", normalized)
+        self.assertIn("capped at one", normalized)
+        self.assertIn("Nested subagents do not consume additional Feature Spec", normalized)
+        self.assertIn("spec_task_cap=3", ledger_template)
+        self.assertIn("active_spec_task_count=<0-3>", ledger_template)
+        self.assertIn("eligible_spec_count=<non-negative integer>", ledger_template)
+        self.assertIn("selected_spec_task_count=<non-negative integer>", ledger_template)
+        self.assertIn("deferred_feature_specs=<ref:reason,...|none>", ledger_template)
+        self.assertIn("if (count > 3) exit 64", recovery)
+        self.assertIn("active_spec_task_count >= 3", recovery)
+        self.assertIn(
+            '"serial-caller-checkout-branches" ] && '
+            '[ "$ACTIVE_FEATURE_SPEC_TASK_COUNT" -gt 1 ]',
+            recovery,
+        )
+
+        cap_start = recovery.index('ACTIVE_FEATURE_SPEC_TASK_COUNT="$(')
+        cap_end = recovery.index('\n   )" || exit 64', cap_start) + len(
+            '\n   )" || exit 64'
+        )
+        cap_script = recovery[cap_start:cap_end]
+
+        def run_cap(task_rows: str, workstream_rows: str) -> subprocess.CompletedProcess[str]:
+            script = (
+                f"FEATURE_SPEC_TASK_ROWS={shlex.quote(task_rows)}\n"
+                f"ACTIVE_WORKSTREAM_ROWS={shlex.quote(workstream_rows)}\n"
+                f"{cap_script}\n"
+                "printf '%s\\n' \"$ACTIVE_FEATURE_SPEC_TASK_COUNT\""
+            )
+            return subprocess.run(
+                ["bash", "-c", script],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        three_specs = "\n".join(
+            f"ws-{index}\tworker-{index}\tbackground-codex-subagent\tspec:{index}"
+            for index in range(1, 4)
+        )
+        accepted_three = run_cap("", three_specs)
+        self.assertEqual(accepted_three.returncode, 0, accepted_three.stderr)
+        self.assertEqual(accepted_three.stdout.strip(), "3")
+
+        four_specs = (
+            f"{three_specs}\n"
+            "ws-4\tworker-4\tbackground-codex-subagent\tspec:4"
+        )
+        rejected_four = run_cap("", four_specs)
+        self.assertEqual(rejected_four.returncode, 64)
+
+        duplicate_ref = run_cap(
+            "",
+            "ws-1\tworker-1\tbackground-codex-subagent\tspec:one\n"
+            "ws-2\tworker-2\tbackground-codex-subagent\tspec:one",
+        )
+        self.assertEqual(duplicate_ref.returncode, 0, duplicate_ref.stderr)
+        self.assertEqual(duplicate_ref.stdout.strip(), "1")
+
+        released_merge_ready = run_cap(
+            "task-1\tspec:done\ttitle\tws-1\trepo\tpr\tmerge-ready",
+            "ws-1\tworker-1\tvisible-codex-app-task\tspec:done",
+        )
+        self.assertEqual(released_merge_ready.returncode, 0)
+        self.assertEqual(released_merge_ready.stdout.strip(), "0")
+
+        for forbidden_option in (
+            "max_concurrent_feature_specs",
+            "max_visible_app_tasks",
+            "max_concurrent_delegated_workers",
+        ):
+            self.assertNotIn(f"`{forbidden_option}`", options)
+
+    def test_same_repository_feature_spec_stack_is_task_owned_and_non_closing(self) -> None:
+        skill = self.read("SKILL.md")
+        stack = self.read("references/stacked-feature-specs.md")
+        worker = self.read("references/worker.md")
+        closeout = self.read("references/codex-review-closeout.md")
+        ledger_template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        plan_options = (
+            ROOT / "skills/plan-feature/references/options.md"
+        ).read_text(encoding="utf-8")
+        spec_template = (
+            ROOT / "skills/plan-feature/references/spec-template.md"
+        ).read_text(encoding="utf-8")
+        issue_phase = (
+            ROOT / "skills/plan-feature/references/issue-phase.md"
+        ).read_text(encoding="utf-8")
+        normalized_stack = " ".join(stack.split())
+        normalized_closeout = " ".join(closeout.split())
+        normalized_recovery = " ".join(recovery.split())
+
+        self.assertIn("references/stacked-feature-specs.md", skill)
+        self.assertIn("## Feature Dependencies", spec_template)
+        self.assertIn(
+            "| upstream_feature_spec_ref | dependency_start_condition | dependency_reason |",
+            spec_template,
+        )
+        self.assertIn("`upstream-merged`, `upstream-merge-ready-head`", plan_options)
+        self.assertIn("same exact single Git repository", normalized_stack)
+        self.assertIn("A is B's only unmerged upstream", normalized_stack)
+        self.assertIn("depth is at most two", normalized_stack)
+        self.assertIn("starting from that exact A reviewed SHA", normalized_stack)
+        self.assertIn("draft PR whose base is A's branch", normalized_stack)
+        self.assertIn("Do not request the canonical final Codex PR review", normalized_stack)
+        self.assertIn("A's own PR merged independently", normalized_stack)
+        self.assertIn("same B task performs all downstream work", normalized_stack)
+        self.assertIn("`--force-with-lease=<remote-branch>:<expected-object-id>`", stack)
+        self.assertIn("Never use plain `--force`", stack)
+        self.assertIn("B's task never merges, closes, replaces, or supersedes A", normalized_stack)
+        self.assertIn(
+            "never treat the downstream merge as an indirect substitute",
+            normalized_closeout,
+        )
+        self.assertIn("Feature Spec dependency rows:", ledger_template)
+        self.assertIn("awaiting-upstream-merge", ledger_template)
+        self.assertIn("resyncing", ledger_template)
+        self.assertIn(
+            "more than one unresolved `upstream-merge-ready-head`",
+            normalized_recovery,
+        )
+        self.assertIn("stack depth greater than two", normalized_recovery)
+        self.assertIn(
+            "Never copy an\n`upstream_feature_spec_ref` into `dependency_ids`",
+            issue_phase,
+        )
+        self.assertIn(
+            "Keep generated-issue `dependency_ids` and\n`blocked_issue_ids` limited to intra-Spec issue IDs",
+            stack,
+        )
+
     def test_retired_publication_authority_aliases_are_not_supported(self) -> None:
         ledger_template = self.read("references/ledger-template.md")
         delivery = self.read("references/spec-backed-delivery.md")
@@ -2893,7 +3292,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("do not resolve or override\noptions here", spec_template)
 
 
-    def test_codex_review_requests_are_idempotent_per_current_head(self) -> None:
+    def test_codex_review_requests_are_idempotent_per_current_revision(self) -> None:
         gates = self.read("references/codex-review-closeout.md")
         ledger_template = self.read("references/ledger-template.md")
         worker = self.read("references/worker.md")
@@ -2904,7 +3303,7 @@ class OrchestratorContractTests(unittest.TestCase):
 
         by_status = {row[0]: row for row in rows}
         self.assertEqual(by_status["GitStack `clean`"][3], "No.")
-        self.assertEqual(by_status["GitStack `findings`"][3], "No for this head.")
+        self.assertEqual(by_status["GitStack `findings`"][3], "No for this revision.")
         self.assertEqual(
             by_status["GitStack `acknowledged` or `pending`"][3],
             "No.",
@@ -2912,15 +3311,19 @@ class OrchestratorContractTests(unittest.TestCase):
         for status in ("GitStack `stale`", "GitStack `not-requested`"):
             self.assertEqual(
                 by_status[status][3],
-                "Yes, exactly once for that SHA.",
+                "Yes, exactly once for that revision.",
             )
             self.assertIn("Post one request", by_status[status][2])
+        self.assertEqual(
+            by_status["Locally stale base ref or merge-base SHA"][3],
+            "Yes, exactly once for that revision.",
+        )
         self.assertEqual(
             by_status["GitStack API, authentication, or configuration error"][3],
             "No.",
         )
         self.assertIn(
-            "`request-codex-review` is idempotent per PR head",
+            "`request-codex-review` is idempotent per PR revision",
             gates,
         )
         self.assertIn("provider-authored terminal comments", gates)
@@ -2929,17 +3332,19 @@ class OrchestratorContractTests(unittest.TestCase):
             gates,
         )
         self.assertIn(
-            "A new\ncommit that changes the PR head invalidates the old result and permits exactly\none new request",
+            "A new commit, base-ref change, or merge-base\nchange invalidates the old result and permits exactly one new request",
             gates,
         )
         self.assertIn("request_head=<sha|none>", ledger_template)
+        self.assertIn("request_base_ref=<branch|none>", ledger_template)
+        self.assertIn("request_merge_base=<sha|none>", ledger_template)
         self.assertIn(
             "`request-codex-review` and\n`poll-codex-review` are valid only with",
             worker,
         )
         self.assertIn("Actions\nare not a cumulative ladder", worker)
 
-    def test_required_codex_review_keeps_pr_draft_until_current_head_is_dispositioned(
+    def test_required_codex_review_keeps_pr_draft_until_current_revision_is_dispositioned(
         self,
     ) -> None:
         closeout = self.read("references/codex-review-closeout.md")
@@ -2965,16 +3370,16 @@ class OrchestratorContractTests(unittest.TestCase):
             states.index("ready-for-review"),
         )
         self.assertLess(
-            states.index("current-head-terminal-result-received"),
+            states.index("current-revision-terminal-result-received"),
             states.index("ready-for-review"),
         )
         self.assertLess(
-            states.index("closeout-head-current"),
+            states.index("closeout-revision-current"),
             states.index("ready-for-review"),
         )
         self.assertLess(
             states.index("ready-for-review"),
-            states.index("post-ready-head-and-ci-current"),
+            states.index("post-ready-revision-and-ci-current"),
         )
         self.assertIn(
             "keep it draft through the policy-specific review",
@@ -2989,12 +3394,12 @@ class OrchestratorContractTests(unittest.TestCase):
             normalized_closeout,
         )
         self.assertIn(
-            "verified terminal current-head Codex result, fully dispositioned "
+            "verified terminal current-revision Codex result, fully dispositioned "
             "feedback, and no unresolved actionable findings",
             normalized_closeout,
         )
         self.assertIn(
-            "keep it draft through required current-head Codex review",
+            "keep it draft through required current-revision Codex review",
             normalized_delivery,
         )
         self.assertIn(
@@ -3111,7 +3516,7 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("round down to positive integer seconds", normalized_wait_contract)
         self.assertIn("When less than one second remains, do not invoke GitStack", gates)
         self.assertIn("same round-down rule and remaining-budget command", gates)
-        self.assertIn("subsequent heads of that same PR", gates)
+        self.assertIn("subsequent revisions of that same PR", gates)
         self.assertIn("exact `wait_profile_pr`", wait_contract)
         self.assertIn(
             "If the live PR identity differs from `wait_profile_pr`",
@@ -3150,7 +3555,10 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("sole authority for review wait timing", ledger_template)
         self.assertIn("exactly one row for", ledger_template)
         self.assertIn("every one must carry\nthe same `wait_record`", ledger_template)
-        self.assertIn("wait_record=<pr-ref@head|none|not-applicable>", ledger_template)
+        self.assertIn(
+            "wait_record=<pr-ref@head@base-ref@merge-base|none|not-applicable>",
+            ledger_template,
+        )
         self.assertIn("wait_started_at=<timestamp|none|not-applicable>", ledger_template)
         self.assertIn("wait_deadline=<timestamp|none|not-applicable>", ledger_template)
         self.assertIn(
@@ -3202,15 +3610,15 @@ class OrchestratorContractTests(unittest.TestCase):
         ]
 
         self.assertLess(
-            states.index("closeout-head-current"),
+            states.index("closeout-revision-current"),
             states.index("parent-spec-closeout-resolved"),
         )
         self.assertLess(
             states.index("parent-spec-closeout-resolved"),
-            states.index("post-closeout-head-current"),
+            states.index("post-closeout-revision-current"),
         )
         self.assertLess(
-            states.index("post-closeout-head-current"),
+            states.index("post-closeout-revision-current"),
             states.index("parent-closeout-watch-established"),
         )
         self.assertLess(

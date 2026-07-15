@@ -113,20 +113,22 @@ the watch; that handoff releases the root with `ledger_status=paused`, never
 ## Codex Review Wait Registry
 
 This is the sole authority for review wait timing. Keep exactly one row for
-each active `<owner>/<repo>#<number>@<head-sha>` key; workstream wait fields are
-derived projections that reference this row and never create independent
-deadlines.
+each active
+`<owner>/<repo>#<number>@<head-sha>@<base-ref>@<merge-base-sha>` revision key;
+workstream wait fields are derived projections that reference this row and
+never create independent deadlines.
 
-| wait_record | wait_profile_pr | request_head | request_object | wait_profile | wait_budget_minutes | wait_started_at | wait_deadline | wait_state | observation_fingerprint | last_transition_at |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <owner/repo#number@head-sha> | <owner/repo#number> | <head-sha> | <id/url> | <standard|extended> | <15|30> | <timestamp> | <timestamp> | <active|monitoring-required|terminal> | <sha256> | <timestamp> |
+| wait_record | wait_profile_pr | request_head | request_base_ref | request_merge_base | request_object | wait_profile | wait_budget_minutes | wait_started_at | wait_deadline | wait_state | observation_fingerprint | last_transition_at |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <owner/repo#number@head-sha@base-ref@merge-base-sha> | <owner/repo#number> | <head-sha> | <base-ref> | <merge-base-sha> | <id/url> | <standard|extended> | <15|30> | <timestamp> | <timestamp> | <active|monitoring-required|terminal> | <sha256> | <timestamp> |
 
-When multiple workstreams map to the same PR and head, every one must carry
+When multiple workstreams map to the same PR revision, every one must carry
 the same `wait_record` and an exact projection of that row. Update the registry
 row first, then refresh all mapped projections. Retain the PR-level extended
-profile across later heads as described by the review gate, while using a new
-row and deadline for each new head. `observation_fingerprint` is the stable
-GitStack review observation fingerprint; update the row and
+profile across later revisions as described by the review gate, while using a
+new row and deadline whenever the head, base ref, or merge base changes.
+`observation_fingerprint` hashes the stable GitStack review observation together
+with the verified base ref and merge-base SHA; update the row and
 `last_transition_at` only when that fingerprint, the wait state, or a deadline
 tier changes. Derive elapsed time from `wait_started_at` and the current clock
 for reports only; it is not persisted controller state.
@@ -156,7 +158,7 @@ the stored title fields.
 
 | feature_spec_ref | feature_spec_title | visible_task_id | live_task_title | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | codex_review_poll_owner | state | last_read | drift | corrective_message_evidence | task_state_evidence | task_goal_mode | task_goal_status | task_goal_dispatch_objective_sha256 | task_goal_reported_objective_sha256 | task_goal_evidence | task_goal_missing_tool |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| <canonical ref> | <transport-encoded exact canonical title> | <task id> | <transport-encoded exact canonical title> | <comma-separated ids> | <comma-separated repo refs> | <comma-separated PR refs or pending> | visible-feature-spec-task | visible-feature-spec-task | <created|implementing|validating|draft-pr|review-polling|fixing-review|ci|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced> | <time> | <none|description> | <message ref or none> | <current `list_threads`/`read_thread` tool ref and fingerprint> | <pending|active|unavailable> | <pending|active|complete|blocked|not-applicable> | <root-computed 64-lowercase-hex> | <task-reported 64-lowercase-hex or pending> | <goal tool, technical `thread-message:`/`goal-create-message:`, or current `thread-read:` ref> | <runtime-goal-tool|not-applicable> |
+| <canonical ref> | <transport-encoded exact canonical title> | <task id> | <transport-encoded exact canonical title> | <comma-separated ids> | <comma-separated repo refs> | <comma-separated PR refs or pending> | visible-feature-spec-task | visible-feature-spec-task | <created|implementing|validating|draft-pr|review-polling|fixing-review|ci|awaiting-upstream-merge|resyncing|marking-ready|merge-ready|target-complete|blocked|needs-owner|replaced> | <time> | <none|description> | <message ref or none> | <current `list_threads`/`read_thread` tool ref and fingerprint> | <pending|active|unavailable> | <pending|active|complete|blocked|not-applicable> | <root-computed 64-lowercase-hex> | <task-reported 64-lowercase-hex or pending> | <goal tool, technical `thread-message:`/`goal-create-message:`, or current `thread-read:` ref> | <runtime-goal-tool|not-applicable> |
 
 Reject duplicate Feature Spec refs, one task id mapped to multiple Feature
 Specs, a live title that differs from the exact Feature Spec title, a
@@ -172,6 +174,31 @@ reached. An active Goal may be `complete` only with `merge-ready` or
 A replacement first records the prior task lifecycle, leaves only one active
 task for the Spec, and updates this row without changing the Spec key.
 
+Feature Spec dependency rows:
+
+Keep one row per authored cross-Spec dependency edge. Leave only the header and
+separator when no edge applies. `stack_depth=1` belongs to the normal
+`upstream-merged` path; `stack_depth=2` is the only permitted early stack. A
+current early stack is same-repository only and has at most one unresolved
+`upstream-merge-ready-head` edge per downstream Spec. No Spec may be both the
+downstream and upstream of unresolved early edges at the same time.
+
+| downstream_feature_spec_ref | upstream_feature_spec_ref | repository_ref | dependency_start_condition | dependency_state | stack_depth | upstream_pull_request_ref | upstream_branch | upstream_head | upstream_base_ref | upstream_merge_base | downstream_worker_id | downstream_branch | downstream_pull_request_ref | evidence |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| <canonical ref> | <canonical ref> | <single canonical owner/repo> | <upstream-merged|upstream-merge-ready-head> | <waiting-upstream|stack-active|awaiting-upstream-merge|resync-required|satisfied|blocked> | <1|2> | <owner/repo#number|pending> | <branch|pending> | <sha|pending> | <branch|pending> | <sha|pending> | <worker/task id|pending> | <branch|pending> | <owner/repo#number|pending> | <sha256 of current source/PR/task dependency projection> |
+
+For `stack-active`, `awaiting-upstream-merge`, and `resync-required`, freeze the
+upstream PR, branch, head, base ref, and merge base from current live evidence.
+`stack-active` also requires a real downstream worker and branch;
+`awaiting-upstream-merge` and `resync-required` require the downstream PR.
+`satisfied` on an early-stack edge requires the same concrete upstream and
+downstream evidence after reconciliation. `blocked` requires concrete blocker
+evidence even when a PR or branch is still pending. Compute `evidence` from the
+authored edge plus the state-specific live source, PR revision/state, CI/review,
+task, branch, and base facts required by `stacked-feature-specs.md`; a mutable
+state never relies on a ledger-only assertion. Do not reuse these rows for
+intra-Spec implementation-issue `dependency_ids`.
+
 ## Parent Closeout Watch
 
 Status: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
@@ -180,6 +207,7 @@ Closeout PR: <PR ref or pending>
 Review policy: <required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>
 Armed head: <closeout-qualified SHA or none>
 Closeout base: <branch or none>
+Closeout merge base: <closeout-qualified SHA or none>
 Current default branch: <branch or none>
 PR-body evidence: <URL/fingerprint or none>
 Merge state: open|merged|closed|unknown|not-applicable
@@ -319,8 +347,8 @@ Use one compact block per active workstream:
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
 | Scheduling | parallelization=<independent|depends-on|blocks|root-integrated>; dependency_ids=<refs|none>; blocked_issue_ids=<refs|none>; dependency_reason=<reason|none>; dependency_proof=<evidence|pending|none> |
-| Delivery | change_delivery_target=<validated-changes-left-uncommitted|local-commit-created-without-pushing|changes-pushed-to-target-branch-without-pull-request|validated-draft-pull-request-published|pull-request-ready-for-merge-but-not-merged>; delivery_decision_origin=<safe-default-for-ad-hoc-work|inherited-from-feature-spec|overridden-by-implementation-issue|specified-by-authorized-user>; delivery_decision_origin_evidence=<scoped-option-row/source-ref|none>; target_branch_name=<exact branch|not-applicable>; target_pull_request_ref=<owner/repo#number|pending|not-applicable>; delivery_permission_source_issue_ref=<issue:<NN>|not-applicable>; issue_update_permission_source_issue_ref=<issue:<NN>|not-applicable>; temporary_source_execution_permission=<not-granted|granted-by-authorized-user>; completion_evidence_policy=<require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>; pull_request_count_strategy=<one-pull-request-total|one-pull-request-per-repository|no-pull-request>; issue_completion_method=<feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion>; change_delivery_permission=<not-required-for-uncommitted-changes|not-granted|granted-for-selected-target>; delivery_gate_status=<ready|blocked|not-applicable>; delivery_allowed_actions=<canonical action list>; codex_review_requirement=<required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>; issue_update_permission=<no-issue-changes|pull-request-closing-keyword-only|direct-issue-updates-explicitly-authorized>; scheduled_automation_change_permission=<not-granted|granted-by-authorized-user>; automation_target=<source/workstream ref|none>; parent_spec_applicability=<required|deferred-vehicle|not-applicable>; parent_spec_applicability_reason=<whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-pull-request-target|other-reason>; parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_spec_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; pull_request_merge_permission=<not-granted|granted-for-named-pull-request>; pull_request_merge_confirmation=<ask-authorized-user-after-checks|merge-automatically-after-checks>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
-| Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; wait_record=<pr-ref@head|none|not-applicable>; wait_profile_pr=<pr-ref|none|not-applicable>; wait_profile=<standard|extended|not-applicable>; wait_budget_minutes=<15|30|not-applicable>; wait_started_at=<timestamp|none|not-applicable>; wait_deadline=<timestamp|none|not-applicable>; wait_state=<not-started|active|monitoring-required|terminal|not-applicable>; observation_fingerprint=<sha256|none|not-applicable>; last_transition_at=<timestamp|none|not-applicable>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
+| Delivery | change_delivery_target=<validated-changes-left-uncommitted|local-commit-created-without-pushing|changes-pushed-to-target-branch-without-pull-request|validated-draft-pull-request-published|pull-request-ready-for-merge-but-not-merged>; delivery_decision_origin=<safe-default-for-ad-hoc-work|inherited-from-feature-spec|overridden-by-implementation-issue|specified-by-authorized-user>; delivery_decision_origin_evidence=<scoped-option-row/source-ref|none>; target_branch_name=<exact branch|not-applicable>; target_pull_request_ref=<owner/repo#number|pending|not-applicable>; delivery_permission_source_issue_ref=<issue:<NN>|not-applicable>; issue_update_permission_source_issue_ref=<issue:<NN>|not-applicable>; temporary_source_execution_permission=<not-granted|granted-by-authorized-user>; completion_evidence_policy=<require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>; pull_request_count_strategy=<one-pull-request-total|one-pull-request-per-repository|no-pull-request>; issue_completion_method=<feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion>; change_delivery_permission=<not-required-for-uncommitted-changes|not-granted|granted-for-selected-target>; delivery_gate_status=<ready|blocked|not-applicable>; delivery_allowed_actions=<canonical action list>; codex_review_requirement=<required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>; issue_update_permission=<no-issue-changes|pull-request-closing-keyword-only|direct-issue-updates-explicitly-authorized>; scheduled_automation_change_permission=<not-granted|granted-by-authorized-user>; automation_target=<source/workstream ref|none>; parent_spec_applicability=<required|deferred-vehicle|not-applicable>; parent_spec_applicability_reason=<whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-pull-request-target|other-reason>; parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_spec_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; parent_closeout_merge_base=<sha|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; pull_request_merge_permission=<not-granted|granted-for-named-pull-request>; pull_request_merge_confirmation=<ask-authorized-user-after-checks|merge-automatically-after-checks>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
+| Codex review evidence | request_head=<sha|none>; request_base_ref=<branch|none>; request_merge_base=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; wait_record=<pr-ref@head@base-ref@merge-base|none|not-applicable>; wait_profile_pr=<pr-ref|none|not-applicable>; wait_profile=<standard|extended|not-applicable>; wait_budget_minutes=<15|30|not-applicable>; wait_started_at=<timestamp|none|not-applicable>; wait_deadline=<timestamp|none|not-applicable>; wait_state=<not-started|active|monitoring-required|terminal|not-applicable>; observation_fingerprint=<sha256|none|not-applicable>; last_transition_at=<timestamp|none|not-applicable>; result_head=<sha|none>; result_base_ref=<branch|none>; result_merge_base=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | workflow_skill=<gitstack skill>; primary_transport=connector; operation=<operation>; fallback=<unused|gh>; fallback_reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority_reused=<authority> |
 | Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; implementation_checkout_strategy=<managed-worktree-per-feature-spec|serial-caller-checkout-branches>; result_checkout_path=<checkout or not-applicable>; starting_checkout_branch_handling=<policy>; caller_checkout_original_branch=<branch|per-repository-checkpoints|not-applicable>; caller_checkout_target_branch=<branch|not-applicable>; caller_checkout_branch_evidence=<baseline HEAD/status plus create/switch Git ref|not-applicable>; caller_checkout_restore_state=<pending|restored|not-applicable>; caller_checkout_restore_evidence=<branch/HEAD/status Git ref|pending|not-applicable> |
 | Gates / proof | <required gates and current proof target> |
@@ -332,7 +360,9 @@ state `deferred-to-default-branch`, and a linked later default-branch
 `parent_closeout_vehicle` or `pending` vehicle-selection action in `ready-next`.
 `parent_spec_closeout=armed` is valid only when `parent_closeout_head` equals the
 current closeout-qualified SHA (reviewed for the required path, fully validated
-for the explicit-skip path), `parent_closeout_base` equals the current `default_branch`,
+for the explicit-skip path), `parent_closeout_base` equals the current
+`default_branch`, `parent_closeout_merge_base` equals the closeout-qualified
+review or validation revision's merge-base SHA,
 and `pr_body_evidence` proves the parent closing keyword is present; none of
 those proof fields may be `none`.
 An unmerged `armed` row also requires `parent_closeout_watch=root-monitoring`,
@@ -410,7 +440,16 @@ task id, list all child workstream and repository/PR refs under that mapping,
 name `visible-feature-spec-task` as lifecycle and review-poll owner, and prove
 the root did no implementation or review work. Include each task's Goal
 mode/status/evidence and prove no work began while its Goal was pending. Task
-count is derived from the Feature Spec set; do not record a user cap.
+count is derived from the Feature Spec set; do not record a user option. Record
+the hard controller invariant and scheduling result in every wave as
+`spec_task_cap=3`, `active_spec_task_count=<0-3>`,
+`eligible_spec_count=<non-negative integer>`,
+`selected_spec_task_count=<non-negative integer>`, and
+`deferred_feature_specs=<ref:reason,...|none>`. Count unique nonterminal Spec
+executions across every worker surface. Live `blocked` and `needs-owner` tasks
+still consume a slot; released `merge-ready`, `target-complete`, and `replaced`
+tasks do not. The selected count may not exceed the remaining slots. In serial
+caller-checkout mode, both the active and selected counts are at most one.
 
 When serial caller-checkout mode is selected, every wave report must prove the
 original caller branch baseline, the one Spec branch prepared for the wave, the
@@ -431,9 +470,9 @@ failed, or unsuitable and the session row is
 `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`. Keep the managed-worktree failure as
 runtime evidence only. This restriction does not apply in CLI-only sessions.
 
-| Wave | Started | Finished | Sources Scanned | Items Processed | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | <time> | <time> | <source ids> | <count> | <reported; startup baseline; worker split; action lists; delivery target; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
+| Wave | Started | Finished | Sources Scanned | Items Processed | Spec Task Cap | Active Spec Tasks | Eligible Specs | Selected Spec Tasks | Deferred Feature Specs | Execution Report | Remaining Actionable | Blockers | Ledger Mutations | Source Mutations | Next Scan/Check |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | <time> | <time> | <source ids> | <count> | 3 | <0-3> | <count> | <count within remaining slots> | <ref:reason,... or none> | <reported; startup baseline; worker split; action lists; delivery target; stop conditions; edits> | <count> | <summary> | <status changes> | <file/github updates or proposed updates> | <time/action> |
 
 Record worker evidence every time delegation is used or attempted. Include
 `visible_app_task_permission`, `actual_execution_location`, authorization state,

@@ -40,8 +40,11 @@ are orchestrator-derived runtime decisions governed by `options.md`, not
 session options or user-provided numeric fields. The granted visible-task
 mode is the exception to free surface/count selection: surface is visible and
 the mapping is exactly one task per implementation-eligible Feature Spec.
-Managed-worktree waves may activate multiple eligible Specs; serial caller-
-checkout waves may activate exactly one.
+Across all worker surfaces, the root may activate one, two, or three eligible
+nonterminal Feature Spec executions, never more. Managed-worktree waves may use
+any safe count within that ceiling; serial caller-checkout waves may activate
+exactly one. A nested subagent remains inside its parent Feature Spec execution
+slot and does not increase the Spec count.
 
 Execution fields:
 
@@ -206,7 +209,9 @@ these rules as one execution contract:
 - Do not split one Feature Spec across multiple active visible tasks and do
   not reuse one visible task for multiple Feature Specs. The root may choose
   serial or parallel starts from the dependency graph and live capacity, but
-  it may not change the one-to-one mapping.
+  it may not change the one-to-one mapping or exceed three nonterminal Feature
+  Spec executions across visible tasks, background workers, and root-owned
+  execution combined. Internal subagents never consume another Spec slot.
 - The root is orchestration-only: register and group sources, resolve authority
   and strategy, create/title/read/message/replace/archive tasks, maintain the
   ledger, reconcile read-only evidence, and report status. It must not edit,
@@ -234,7 +239,15 @@ Use `implementation_checkout_strategy=managed-worktree-per-feature-spec` unless
 the authorized user explicitly says not to use worktrees. In the default mode,
 create the visible task with its managed worktree target before implementation.
 Each Spec has an isolated checkout and the root may schedule independent Specs
-in parallel when dependencies and capacity permit.
+in parallel when dependencies and capacity permit, up to the run-wide ceiling
+of three nonterminal Feature Spec executions.
+
+When an otherwise blocked downstream Spec carries an explicit
+`upstream-merge-ready-head` dependency edge, load `stacked-feature-specs.md`
+before creating its task or checkout. That reference is the only managed-
+worktree exception that may start a downstream Spec from an unmerged upstream
+head. Generic `depends-on` relationships remain blocked until their recorded
+dependency proof satisfies the ordinary start rule.
 
 Normalize an exact no-worktree instruction to
 `implementation_checkout_strategy=serial-caller-checkout-branches`. That value
@@ -263,7 +276,7 @@ selects this complete controller flow:
 5. Do not switch branches or dispatch another Spec when the task is merely
    committed, pushed, in draft, waiting for review, fixing feedback, or waiting
    for CI. Wait until it reaches its complete selected delivery target—normally
-   a clean exact-head Codex review, passing CI, and merge-ready PR.
+   a clean current-revision Codex review, passing CI, and merge-ready PR.
 6. After terminal task evidence is reconciled, require a clean feature branch,
    switch back to the original branch, and prove its branch, HEAD, and status
    match the recorded baseline. Only then may the next Spec begin.
@@ -323,9 +336,12 @@ Outside mandatory Feature Spec task mode, the root chooses the worker
 surface, number of workers, and serial or parallel split for each wave within
 `visible_app_task_permission`, live runtime capacity, and the work graph. In
 mandatory mode, the surface and one-task-per-Spec count are fixed. Managed-
-worktree mode leaves serial or parallel scheduling to the root; serial caller-
-checkout mode forces one complete Spec task at a time. Each spawned Codex App task may
-choose its own internal background subagent topology within its assigned scope.
+worktree mode leaves a one-to-three serial or parallel scheduling choice to the
+root; serial caller-checkout mode forces one complete Spec task at a time. The
+three-Spec ceiling applies across root-owned execution, background workers, and
+visible tasks, not separately to each surface. Each spawned Codex App task may
+choose its own internal background subagent topology within its assigned scope;
+those subagents share the parent Spec slot.
 There is no separate workspace execution mode, delegation toggle, worker-count
 field, visibility selector, or parallelism option.
 
@@ -393,6 +409,11 @@ authorized fallback for an explicit no-worktree run.
   integration ownership. Inside mandatory mode, that value still means the
   work must integrate as one unit, but the assigned Feature Spec task is the
   integration surface and the root remains orchestration-only.
+- The only dependency that may dispatch from an unmerged head is an explicit
+  same-repository `upstream-merge-ready-head` edge that passes
+  `stacked-feature-specs.md`. It still uses a distinct downstream task, branch,
+  managed worktree, and pull request; it never shares or supersedes the
+  upstream task or pull request.
 - Workers may inspect, implement, test, and report only within their authorized
   mode. They may create and manage internal background subagents within the
   assigned scope and action set, but those subagents inherit the same authority
@@ -532,7 +553,7 @@ publication and never grants review actions.
 `pull-request-ready-for-merge-but-not-merged` may grant only the review actions
 required by `codex_review_requirement`. For the required path, keep the PR draft
 while request and polling actions run; `mark-pull-request-ready` becomes
-actionable only after a terminal current-head review with no unresolved
+actionable only after a terminal current-revision review with no unresolved
 actionable feedback, completed feedback disposition, validation, and current CI.
 An explicit skip still permits
 `mark-pull-request-ready` after the remaining gates pass, but not review request
@@ -753,9 +774,9 @@ Canonical actions:
 - `create-or-update-pull-request`: create or update the named PR, including
   authorized closing keywords in its body;
 - `mark-pull-request-ready`: transition the named draft PR to ready;
-- `request-codex-review`: request review only after the current-head preflight;
+- `request-codex-review`: request review only after the current-revision preflight;
 - `poll-codex-review`: run the one bounded GitStack waiter for the existing
-  request on that head; never implement caller-owned check/sleep polling;
+  request for that revision; never implement caller-owned check/sleep polling;
 - `post-review-disposition`: post the assigned task's evidence-backed
   disposition for feedback on its current PR and head;
 - `rerun-ci`: rerun named checks and inspect their result;
@@ -846,6 +867,7 @@ Scope:
 - parent_closeout_vehicle: <PR ref, pending, or none>
 - parent_closeout_head: <closeout-qualified SHA or none>
 - parent_closeout_base: <branch or none>
+- parent_closeout_merge_base: <closeout-qualified SHA or none>
 - default_branch: <branch or none>
 - pr_body_evidence: <URL/fingerprint or none>
 - parent_closeout_watch: <not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>
@@ -874,7 +896,7 @@ Scope:
   root-worker management, no ledger edits, no unrelated cleanup, no commit/push/PR/Codex-review
   request/release unless the exact action is listed; no merge or direct
   source closeout under any worker action set; no duplicate Codex-review request when
-  GitStack reports a terminal result or active request for the assigned head;
+  GitStack reports a terminal result or active request for the assigned revision;
   no work on another Feature Spec.
 
 Context:

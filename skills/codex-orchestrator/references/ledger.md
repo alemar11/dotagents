@@ -116,7 +116,8 @@ Keep one authoritative owner for each current-state fact:
 - `## Active Root` owns the root claim, root action, and run-wide serial
   caller-checkout branch-assignment registry;
 - `## Feature Spec Task Registry` owns visible-task identity, Feature Spec
-  assignment, lifecycle state, task Goal projection, and drift;
+  assignment, lifecycle state, task Goal projection, drift, and the canonical
+  current cross-Spec dependency-edge projection;
 - `## Workstreams` owns work state, delivery state, and the projection of its
   assigned task and review wait;
 - `## Codex Review Wait Registry` owns review timing, stable observations, and
@@ -144,11 +145,18 @@ it to `completed` only in the same controller reconciliation that records a
 verified `restored` lane, or to `blocked` with a blocked lane. Neither terminal
 state may be prepared or dispatched again.
 
-The stable GitStack `observation_fingerprint` is the review transition key.
+The stored `observation_fingerprint` hashes the stable GitStack review
+observation together with the verified base ref and merge-base SHA. That hash
+plus the review revision tuple
+`(PR ref, request_head, request_base_ref, request_merge_base)` is the review
+transition identity.
 Persist the first observation, then update review rows, transition timestamps,
 recovery fingerprints, notes, metrics, and owner commentary only when the
-fingerprint, checker/wait state, request head/object, terminal evidence, or
-deadline tier changes. Unchanged intermediate waiter observations are no-ops:
+fingerprint, checker/wait state, request revision/object, terminal evidence, or
+deadline tier changes. A changed base ref or merge base invalidates the prior
+wait and result even when the head is unchanged; movement of a base tip that
+leaves the merge base unchanged does not. Unchanged intermediate waiter
+observations are no-ops:
 do not rewrite the ledger, advance `Last Progress Read` or
 `last_transition_at`, append a progress note, or emit progress commentary
 merely because another poll occurred. When a complete bounded waiter exits by
@@ -157,6 +165,9 @@ write for the next `due_at`; update only Active Root plus its Recovery Packet
 projection and do not present that scheduling write as work progress.
 Elapsed time is derived from the persisted start/deadline timestamps only when
 reporting and is never persisted as mutable controller state.
+Released historical notes and bucket rows may retain their original head-only
+review wording, but no active wait row, active workstream projection, or current
+Recovery Packet may reuse that legacy evidence.
 
 `Next Root Check` is structured as
 `action=<value>; target=<value>; due_at=<value>` and must equal the Recovery
@@ -182,8 +193,36 @@ feedback-fix, CI-fix, PR mutation, or mark-ready work in mandatory visible
 Feature Spec task mode. A stale or unstructured root action makes the
 current projection invalid; repair it before dispatch, recovery, or closeout.
 
+The controller has a hard `spec_task_cap=3`; this is not a user option. Before
+each dispatch, count unique nonterminal Feature Spec refs across every current
+worker surface, compute the remaining slots, and select no more than that many
+eligible Specs. In `serial-caller-checkout-branches`, use a cap of one. Record
+`active_spec_task_count`, `eligible_spec_count`,
+`selected_spec_task_count`, and every capacity- or dependency-deferred Spec
+with its reason in the wave report. A blocked or owner-waiting task releases a
+slot only after its worker is actually handed off or released and its registry
+row moves to a released terminal state such as `replaced`; changing only the
+workstream bucket does not free capacity.
+
+Cross-Spec dependency rows project authored Feature Spec edges and never infer
+permission to stack. `upstream-merged` uses depth one and dispatches only after
+merge proof. `upstream-merge-ready-head` uses depth two and is valid only for
+one identical `owner/repo`; freeze its upstream PR, branch, head, base ref, and
+merge base before downstream dispatch. Keep at most one unresolved early edge
+per downstream Spec, and never let a Spec be both the downstream and upstream
+of unresolved early edges at once. The downstream remains nonterminal through
+`awaiting-upstream-merge` and `resyncing`; only current post-merge
+reconciliation can change the edge to `satisfied`. Bind every mutable row to a
+fresh source/PR/task projection fingerprint during recovery; a released
+`satisfied` row may retain immutable completion evidence. These edge rows are
+distinct from intra-Spec implementation-issue `dependency_ids`.
+
 Reject a controller snapshot when any of these invariants fails:
 
+- more than three unique nonterminal Feature Spec executions are live across
+  root, background, and visible-task surfaces; count `blocked` and
+  `needs-owner` while their worker remains live, but not released
+  `merge-ready`, `target-complete`, or `replaced` tasks;
 - in mandatory visible Feature Spec task mode, Active Root visible workers
   are not exactly the active registry task assignments, or Recovery Packet
   `active_workers` is not the complete Active Root worker set;
@@ -198,10 +237,15 @@ Reject a controller snapshot when any of these invariants fails:
   pending Goal has a non-monitor next action, its
   Goal state lacks root-readable evidence, or its Goal fallback does not name
   the unavailable runtime surface and exact objective;
+- a dependency edge is duplicated, cyclic, self-referential, cross-repository
+  for `upstream-merge-ready-head`, deeper than two, has more than one unresolved
+  early edge for the same downstream Spec, or lacks the state-specific frozen
+  upstream and downstream evidence defined by the ledger template;
 - a terminal wait row coexists with an active/pending workstream review
   projection, or a non-terminal wait row coexists with terminal evidence;
-- workstreams sharing a PR head disagree with the single wait row, observation
-  fingerprint, deadline, or transition timestamp;
+- workstreams sharing a PR revision disagree with the single wait row, head,
+  base ref, merge base, observation fingerprint, deadline, or transition
+  timestamp;
 - a complete Goal lacks `merge-ready` or `target-complete` lifecycle state, a
   blocked Goal lacks `blocked` or `needs-owner`, or live task Goal evidence
   differs from the authoritative dispatch objective/state;
@@ -324,7 +368,7 @@ roots in the active-root claim and in `## Notes`.
 | `active` | Codex-actionable orchestration, worker monitoring, root integration, or scheduled root check. Owner waiting belongs in `needs-owner`; missing access/state/dependency/proof belongs in `blocked`. Remove worker rows once integrated, abandoned, retained, or handed off unless a root closeout action remains named in `Next Check`. |
 | `autonomous` | Candidate safe to delegate under current session authorization and execution-report boundaries. Move to `active` when assigned or reclassify when delegation is no longer useful or safe. Ledger cannot be `complete` while actionable items remain. |
 | `needs-owner` | Waiting on owner decision, credentials, scope approval, risk acceptance, mutation authorization, or another non-Codex decision. Record decision brief, options, recommendation, and minimum owner action. |
-| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute in the owning surface when authorized; otherwise record the missing permission or blocker. In mandatory visible Feature Spec task mode, implementation and review actions stay assigned to that Spec's task and never become root actions. `pull-request-ready-for-merge-but-not-merged` keeps required review actions actionable while the PR is draft, then mark-ready and parent closeout actionable after the current-head review policy and remaining gates pass. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
+| `ready-next` | Work still needing an authorized delivery, review, closeout, merge, or release action. Execute in the owning surface when authorized; otherwise record the missing permission or blocker. In mandatory visible Feature Spec task mode, implementation and review actions stay assigned to that Spec's task and never become root actions. `pull-request-ready-for-merge-but-not-merged` keeps required review actions actionable while the PR is draft, then mark-ready and parent closeout actionable after the current-revision review policy and remaining gates pass. An explicit review skip makes request/wait actions `not-applicable`, not blocked. `validated-draft-pull-request-published` makes all later PR lifecycle actions `not-applicable`. |
 | `blocked` | Cannot progress with current access, state, dependency, or proof. Record blocker, evidence, minimum next action, and whether it is owner-actionable or external. |
 | `ignored-or-suppressed` | Known item intentionally excluded. Record source id, source fingerprint, owner, date, and reason; rediscover only if owner direction or source fingerprint changes. |
 | `completed` | Required gates passed and the exact `change_delivery_target` is proven. For `validated-changes-left-uncommitted`, acceptance plus validation are sufficient and commit/push/PR fields are not applicable. A default-branch GitHub whole Feature Spec closeout PR may report merge-ready with `parent_spec_closeout=armed`, proof, and an active or handed-off watch, but the parent source and portfolio ledger remain incomplete until merge and verified issue closure. A non-default-base PR workstream may reach its own target with `deferred-to-default-branch` only while the later closeout vehicle remains actionable. The draft-PR target records later lifecycle actions as not applicable. Otherwise record delivery proof, source closeout, publication checkout, caller-checkout disposition, lifecycle decision, and artifact disposition. Pending required delivery, closeout, or proof remains non-terminal. |
