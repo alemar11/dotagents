@@ -1,6 +1,10 @@
 # Maintenance Router
 
 Use this file first to route maintenance requests to the right playbook.
+This router runs only after the user explicitly invokes `$maintainer`, asks to
+run Maintainer, or an explicitly invoked parent workflow routes here. Ordinary
+skill, plugin, metadata, docs, or repository change requests must not
+auto-select this skill.
 
 ## Request Types
 - `maintain`: inspect one or more existing skills or plugins, detect drift, and apply the right maintenance mode

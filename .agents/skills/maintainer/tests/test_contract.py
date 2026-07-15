@@ -14,6 +14,39 @@ def read(relative: str) -> str:
     return (SKILL_ROOT / relative).read_text(encoding="utf-8")
 
 
+def root_mapping_boolean(text: str, section: str, field: str) -> bool:
+    lines = text.splitlines()
+    section_indexes = [
+        index for index, line in enumerate(lines) if line == f"{section}:"
+    ]
+    if len(section_indexes) != 1:
+        raise ValueError(f"expected one root {section} mapping")
+
+    field_pattern = re.compile(rf"^(\s*){re.escape(field)}:\s*(true|false)\s*$")
+    field_entries = [
+        (index, match)
+        for index, line in enumerate(lines)
+        if not line.lstrip().startswith("#")
+        if (match := field_pattern.fullmatch(line))
+    ]
+    if len(field_entries) != 1:
+        raise ValueError(f"expected one {field} boolean")
+
+    section_index = section_indexes[0]
+    section_end = next(
+        (
+            index
+            for index in range(section_index + 1, len(lines))
+            if lines[index] and not lines[index].startswith((" ", "\t"))
+        ),
+        len(lines),
+    )
+    field_index, field_match = field_entries[0]
+    if not section_index < field_index < section_end or field_match.group(1) != "  ":
+        raise ValueError(f"{field} must be a direct child of root {section}")
+    return field_match.group(2) == "true"
+
+
 def option_registry_rows(path: Path) -> list[tuple[str, str]]:
     lines = path.read_text(encoding="utf-8").splitlines()
     rows: list[tuple[str, str]] = []
@@ -107,6 +140,32 @@ class MaintainerContractTests(unittest.TestCase):
         skill = read("SKILL.md")
         self.assertRegex(skill, r"(?m)^name: maintainer$")
         self.assertIn("display_name: \"Maintainer\"", read("agents/openai.yaml"))
+
+    def test_invocation_is_manual_only_and_aligned(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        metadata = read("agents/openai.yaml")
+        router = " ".join(read("references/maintenance-router.md").split())
+        agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("This skill is manual-only", skill)
+        self.assertIn("Do not auto-select it for ordinary skill", skill)
+        self.assertFalse(root_mapping_boolean(metadata, "policy", "allow_implicit_invocation"))
+        self.assertIn("This router runs only after the user explicitly invokes", router)
+        self.assertIn("must not auto-select this skill", router)
+        self.assertIn("Keep `maintainer` manual-only", agents)
+        self.assertIn("only repo-level maintainer docs may define explicit", agents)
+        self.assertIn("Use `$maintainer` afterward", agents)
+        self.assertIn("only when the user explicitly invokes it", agents)
+        self.assertIn("During an explicit `$maintainer` run", agents)
+        self.assertIn("only when it was explicitly invoked", agents)
+        self.assertIn("Manually maintain and re-engineer repo skills and plugins", readme)
+        maintainer_routes = [
+            line for line in agents.splitlines() if "$maintainer" in line
+        ]
+        self.assertGreater(len(maintainer_routes), 5)
+        for route in maintainer_routes:
+            self.assertIn("explicit", route.lower())
 
     def test_all_entrypoint_references_exist(self) -> None:
         references = set(re.findall(r"references/([a-z0-9_-]+\.md)", read("SKILL.md")))

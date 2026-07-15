@@ -1,12 +1,17 @@
 ---
 name: maintainer
-description: Maintain and re-engineer existing repo skills and plugins through targeted upgrades, runtime-evidence workflow hardening, package migrations, metadata alignment, validation, and explicit refresh workflows.
+description: Manually maintain and re-engineer existing repo skills and plugins through targeted upgrades, runtime-evidence workflow hardening, package migrations, metadata alignment, validation, and explicit refresh workflows.
 ---
 
 # Maintainer
 
 ## Goal
-Use this project-maintainer skill to maintain existing skills and plugins in this repository. Its primary job is to turn repository or runtime evidence into scoped package improvements and keep implementation, metadata, validation, and repo-level maintainer docs aligned.
+Use this project-maintainer skill only after the user explicitly invokes
+`$maintainer`, asks to run Maintainer, or an explicitly invoked parent workflow
+routes here. Do not auto-select it for ordinary skill, plugin, metadata, docs,
+or repository change requests. Its primary job is to turn repository or runtime
+evidence into scoped package improvements and keep implementation, metadata,
+validation, and repo-level maintainer docs aligned.
 Treat maintenance as one unified task:
 - repo-wide pass when the user invokes `$maintainer` generically with a bare imperative such as `run` or `run your tasks`
 - targeted maintenance when the user names one or more existing skills or plugins
@@ -42,7 +47,7 @@ If the user asks what this skill can do, answer with three capability groups:
 For the exact user-facing task menu, open `references/task-menu.md`.
 
 ## Trigger Rules
-Use this skill when users ask to:
+This skill is manual-only. After explicit invocation, use it when users ask to:
 - Invoke `$maintainer` generically to maintain existing skills or plugins in this repository
 - Maintain, upgrade, sync, tighten, or clean up one or more existing skills or plugins
 - Maintain, upgrade, sync, tighten, or clean up repo-local plugins or shared repo structure around skills and plugins

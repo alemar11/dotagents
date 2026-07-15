@@ -1,5 +1,7 @@
 interface:
   display_name: "Maintainer"
-  short_description: "Maintain and re-engineer repo skills and plugins through evidence, lifecycle, validation, and refresh workflows."
+  short_description: "Manually maintain and re-engineer repo skills and plugins through evidence, lifecycle, validation, and refresh workflows."
   brand_color: "#B85C00"
-  default_prompt: "Run the requested maintenance workflow for existing skills or plugins in this repository. Route bare requests to conservative maintenance, named targets to scoped upgrades, runtime failures to workflow-family hardening, and package moves or removals to lifecycle maintenance. Use creator-first routing for substantial reshapes, select validation by change type, and keep instruction-density reviews proposal-first."
+  default_prompt: "Use $maintainer only for this explicit maintenance request. Route bare requests to conservative maintenance, named targets to scoped upgrades, runtime failures to workflow-family hardening, and package moves or removals to lifecycle maintenance. Use creator-first routing for substantial reshapes, select validation by change type, and keep instruction-density reviews proposal-first."
+policy:
+  allow_implicit_invocation: false
