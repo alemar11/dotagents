@@ -619,8 +619,19 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             orchestrator_options,
         )
         self.assertIn(
+            "`implementation_checkout_strategy` | "
+            "`managed-worktree-per-feature-spec`, "
+            "`serial-caller-checkout-branches`",
+            orchestrator_options,
+        )
+        self.assertIn(
             "visible_app_task_permission: "
             "not-requested|granted-by-authorized-user|denied-by-authorized-user",
+            ledger_template,
+        )
+        self.assertIn(
+            "implementation_checkout_strategy: "
+            "managed-worktree-per-feature-spec|serial-caller-checkout-branches",
             ledger_template,
         )
         self.assertIn(

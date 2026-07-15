@@ -20,7 +20,9 @@ not options.
 ## Primary Human Choices
 
 The delivery target is the normal per-workstream user-facing choice. Visible
-Codex App task consent is the independent session permission below.
+Codex App task consent is the independent session permission below. Managed
+worktrees require no additional choice; checkout strategy changes only when the
+authorized user explicitly requests no worktrees.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
@@ -31,15 +33,21 @@ are derived runtime decisions, not options or user-provided data. When visible
 tasks are not enabled, the orchestrator chooses worker surfaces from the work graph,
 ownership boundaries, safety, tool availability, and live runtime capacity.
 When visible tasks are enabled, the visible-task count is exactly the
-number of implementation-eligible Feature Specs in the dispatched waves; only their start order and
-serial or parallel scheduling remain derived. The root and every spawned Codex
-App task may create internal background subagents within their assigned scope.
+number of implementation-eligible Feature Specs in the dispatched waves. With
+`implementation_checkout_strategy=managed-worktree-per-feature-spec`, start
+order and serial or parallel scheduling remain derived. With
+`implementation_checkout_strategy=serial-caller-checkout-branches`, scheduling
+is derived as strictly serial across Feature Specs because every task mutates
+the same caller checkout. The root and every spawned Codex App task may create
+internal background subagents within their assigned scope, subject to the
+selected checkout strategy's mutation-safety rules.
 
 ## Session Permissions And Context
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
 | `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Explicit consent for visible Codex App tasks. The granted value selects mandatory one-task-per-Feature-Spec execution. |
+| `implementation_checkout_strategy` | `managed-worktree-per-feature-spec`, `serial-caller-checkout-branches` | `managed-worktree-per-feature-spec` | Checkout topology for visible Feature Spec implementation tasks. The serial caller-checkout value requires an explicit authorized-user instruction to avoid worktrees; it authorizes controller-owned feature-branch creation and switching, never implementation on the branch active when orchestration began. |
 | `unmanaged_git_worktree_fallback_permission` | `not-granted`, `granted-by-authorized-user` | `not-granted` | Permission to use an unmanaged Git worktree when the App cannot create the required managed worktree. |
 | `existing_orchestrator_session_takeover_policy` | `ask-authorized-user-before-takeover`, `take-over-only-if-existing-ledger-is-stale` | `ask-authorized-user-before-takeover` | Recovery policy when another orchestrator session claims overlapping scope. |
 | `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From project memory or safe repository evidence | Durable repository layout. This is derived context, not an execution-order preference. |
@@ -54,6 +62,39 @@ implementation, integration, validation, Codex-review request or polling,
 feedback fixes, CI repair, PR mutation, or ready transition for that Spec.
 Background Codex subagents are already authorized by orchestrator invocation
 and require no separate session option.
+
+`implementation_checkout_strategy=managed-worktree-per-feature-spec` is the
+default and requires every dispatched Feature Spec task to start in its own
+managed worktree. `serial-caller-checkout-branches` is valid only with
+`visible_app_task_permission=granted-by-authorized-user` and exact authorized-
+user evidence requesting no worktrees. In that mode:
+
+- require an attached original branch, then preserve that branch and HEAD as
+  the caller-checkout baseline; do not implement or commit on it;
+- require a clean caller checkout before the first branch switch;
+- create or resume one exact `target_branch_name` per Feature Spec, require
+  `starting_checkout_branch_handling=branch-switch-authorized`, record the
+  Spec/repository/branch ownership in the run-wide serial branch-assignment
+  registry before switching, retain it after completion, and reject one target
+  branch ever assigned to different Feature Spec refs in the same repository;
+- reject `change_delivery_target=validated-changes-left-uncommitted` for a
+  Feature Spec in this mode because serial branch rotation cannot preserve an
+  uncommitted terminal result while restoring the original branch;
+- keep at most one visible Feature Spec task active across the orchestration
+  scope until that task reaches its complete delivery target, including Codex
+  review, fixes, CI, and merge-ready transition when applicable;
+- restore and verify the original caller-checkout branch, HEAD, and clean status
+  before dispatching the next Feature Spec or completing the portfolio; and
+- allow parallel internal subagents only for read-only work. Any checkout
+  mutation remains single-owner and serial inside the active task.
+
+Keep `unmanaged_git_worktree_fallback_permission=not-granted` for this mode;
+raw or managed worktrees are not fallbacks for an explicit no-worktree choice.
+
+The no-worktree instruction selects this whole contract. It is not permission
+to implement on the original branch, share a feature branch across Specs, run
+multiple mutating tasks in the caller checkout, or stop serialization after the
+first commit while review or CI work remains.
 
 Here, `implementation-eligible` means a Feature Spec whose start/dependency
 gates passed and whose implementation is selected for dispatch in the current
@@ -90,6 +131,9 @@ The following are required scoped data rather than enum options:
 - `feature_spec_title`: title transport from `ledger-template.md` for the exact
   canonical Feature Spec title, or `not-applicable` with the ref. Decode only
   when setting or comparing a live title.
+- `workstream_repository_refs`: comma-separated canonical repository refs for
+  the workstream, with no spaces or duplicate refs. This is required scoped
+  data, not repository-layout or checkout-policy configuration.
 - `target_branch_name`: exact branch, or `not-applicable` only for
   `validated-changes-left-uncommitted`.
 - `target_pull_request_ref`: canonical `<owner>/<repo>#<number>`, `pending` for
@@ -162,11 +206,15 @@ capability may restrict a value; it never grants mutation permission.
 
 - Safe defaults may select only:
   - `visible_app_task_permission=not-requested`;
+  - `implementation_checkout_strategy=managed-worktree-per-feature-spec`;
   - every `not-granted`, `read-only`, `no-*`, or live-evidence value;
   - `validated-changes-left-uncommitted` for ad hoc work; and
   - `safe-default-for-ad-hoc-work`.
 - `visible_app_task_permission=granted-by-authorized-user` and
   `denied-by-authorized-user` require authorized-user evidence.
+- `implementation_checkout_strategy=serial-caller-checkout-branches` requires
+  authorized-user evidence and
+  `visible_app_task_permission=granted-by-authorized-user`.
 - Every `granted-*`, `apply-updates`, branch-switch, automated-merge,
   simulated-evidence, or explicit-skip value requires exact scoped
   authorized-user evidence or a current source contract that preserves it.

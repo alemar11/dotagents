@@ -413,6 +413,8 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("OPTION_WORKSTREAM_SCOPE_IDS=", recovery)
         self.assertIn("PACKET_OPTION_ROWS_FINGERPRINT=", recovery)
         self.assertIn("COMPUTED_OPTION_ROWS_FINGERPRINT=", recovery)
+        self.assertIn("ROOT_CHECKOUT_STRATEGY=", recovery)
+        self.assertIn("PACKET_CHECKOUT_STRATEGY=", recovery)
         self.assertIn("background-codex-subagent", recovery)
         self.assertIn("visible-codex-app-task", recovery)
         self.assertIn("Reject duplicate, omitted, extra, invalid", recovery)
@@ -428,6 +430,11 @@ class OrchestratorContractTests(unittest.TestCase):
 
         session_values = {
             "visible_app_task_permission": ("not-requested", "default", "none"),
+            "implementation_checkout_strategy": (
+                "managed-worktree-per-feature-spec",
+                "default",
+                "none",
+            ),
             "unmanaged_git_worktree_fallback_permission": (
                 "not-granted",
                 "default",
@@ -493,6 +500,11 @@ class OrchestratorContractTests(unittest.TestCase):
                 "runtime-derived",
                 "none",
             ),
+            "workstream_repository_refs": (
+                "repo",
+                "runtime-derived",
+                "none",
+            ),
             "codex_review_requirement": (
                 "not-needed-for-selected-delivery-target",
                 "runtime-derived",
@@ -540,6 +552,18 @@ class OrchestratorContractTests(unittest.TestCase):
             ),
         }
         scopes = ("workstream:a", "workstream:b")
+        original_head = "a" * 40
+        target_head = "b" * 40
+        clean_status = hashlib.sha256(b"").hexdigest()
+        active_status = "c" * 64
+        default_live_repo = (
+            f"/repo\t{original_head}\t{clean_status}\tmain\t"
+            "git-status:default"
+        )
+        local_live_repo = (
+            f"/repo\t{target_head}\t{active_status}\tfeature/demo\t"
+            "git-status:local"
+        )
 
         def row(scope: str, field: str, triple: tuple[str, str, str]) -> str:
             value, source_name, evidence = triple
@@ -578,6 +602,14 @@ class OrchestratorContractTests(unittest.TestCase):
                 "## Active Root",
                 "",
                 "Next Root Check: action=none; target=none; due_at=none",
+                "Implementation checkout strategy: "
+                "managed-worktree-per-feature-spec",
+                "Serial caller-checkout lane: "
+                "state=not-applicable; feature_spec_ref=none",
+                "Serial caller-checkout checkpoints:",
+                "- none",
+                "Serial caller-checkout branch assignments:",
+                "- none",
                 "Active workers:",
                 "- none",
                 "Takeover history:",
@@ -618,7 +650,14 @@ class OrchestratorContractTests(unittest.TestCase):
                 "",
                 "Root: root-1; claim=claimed; goal=test; active_workers=none; parent_closeout_watch=not-applicable",
                 "Current wave: idle; current_workstreams=a,b; next_action=none; next_target=none; next_due_at=none",
+                "Checkout strategy: managed-worktree-per-feature-spec; "
+                "serial_lane=not-applicable; active_feature_spec=none",
+                "Serial caller-checkout checkpoints:",
+                "- none",
                 "Option resolution refs: session_rows=fixture; scoped_rows=fixture; rows_fingerprint=auto",
+                "Repo checkpoints:",
+                f"- /repo; head={original_head}; worktree={clean_status}; "
+                "branch=main",
                 "",
                 "## Worker And Delivery References",
                 "",
@@ -636,6 +675,7 @@ class OrchestratorContractTests(unittest.TestCase):
                 selected: list[str],
                 contents: str = ledger_fixture,
                 live_task_evidence: str = "",
+                live_repo_evidence: str | None = None,
             ) -> subprocess.CompletedProcess[str]:
                 selected_set = set(selected)
                 normalized_rows: list[list[str]] = []
@@ -678,6 +718,8 @@ class OrchestratorContractTests(unittest.TestCase):
                 configured = (
                     f"ledger={shlex.quote(str(ledger_path))}\n"
                     f"LIVE_TASK_EVIDENCE_ROWS={shlex.quote(live_task_evidence)}\n"
+                    "LIVE_REPO_CHECKPOINT_ROWS="
+                    f"{shlex.quote(live_repo_evidence or (local_live_repo if 'Implementation checkout strategy: serial-caller-checkout-branches' in contents else default_live_repo))}\n"
                     f"{configured}"
                 )
                 return subprocess.run(
@@ -1081,6 +1123,605 @@ class OrchestratorContractTests(unittest.TestCase):
                 0,
                 assigned_feature_task.stderr,
             )
+
+            local_strategy_evidence = (
+                "permission-source-ref=authorized-user:request-4;"
+                "scope-ref=session;target-ref=caller-checkouts"
+            )
+            blocked_session = dict(visible_session)
+            blocked_session["implementation_checkout_strategy"] = (
+                "serial-caller-checkout-branches",
+                "authorized-user-instruction",
+                local_strategy_evidence,
+            )
+            blocked_serial_dispatch = with_session_values(
+                blocked_session,
+            ).replace(
+                "Next Root Check: action=none; target=none; due_at=none",
+                "Next Root Check: action=dispatch-feature-spec; "
+                "target=spec:new; due_at=now",
+            ).replace(
+                "Implementation checkout strategy: "
+                "managed-worktree-per-feature-spec",
+                "Implementation checkout strategy: "
+                "serial-caller-checkout-branches",
+            ).replace(
+                "Serial caller-checkout lane: "
+                "state=not-applicable; feature_spec_ref=none\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- none\n"
+                "Serial caller-checkout branch assignments:\n"
+                "- none\n"
+                "Active workers:",
+                "Serial caller-checkout lane: "
+                "state=blocked; feature_spec_ref=spec:past\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- repo_ref=repo; realpath=/repo; original_branch=main; "
+                f"original_head={original_head}; original_status={clean_status}; "
+                "target_branch=feature/past; evidence=git-status:blocked\n"
+                "Serial caller-checkout branch assignments:\n"
+                "- feature_spec_ref=spec:past; repository_ref=repo; "
+                "target_branch=feature/past; state=blocked; "
+                "evidence=issue:past\n"
+                "Active workers:",
+            ).replace(
+                "next_action=none; next_target=none; next_due_at=none",
+                "next_action=dispatch-feature-spec; "
+                "next_target=spec:new; next_due_at=now",
+            ).replace(
+                "Checkout strategy: managed-worktree-per-feature-spec; "
+                "serial_lane=not-applicable; active_feature_spec=none\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- none\n"
+                "Option resolution refs:",
+                "Checkout strategy: serial-caller-checkout-branches; "
+                "serial_lane=blocked; active_feature_spec=spec:past\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- repo_ref=repo; realpath=/repo; original_branch=main; "
+                f"original_head={original_head}; original_status={clean_status}; "
+                "target_branch=feature/past; evidence=git-status:blocked\n"
+                "Option resolution refs:",
+            )
+            rejected_blocked_dispatch = run(
+                complete_ids,
+                blocked_serial_dispatch,
+            )
+            self.assertNotEqual(rejected_blocked_dispatch.returncode, 0)
+            prepared_serial_dispatch = blocked_serial_dispatch.replace(
+                "state=blocked; feature_spec_ref=spec:past",
+                "state=branch-prepared; feature_spec_ref=spec:past",
+            ).replace(
+                "serial_lane=blocked; active_feature_spec=spec:past",
+                "serial_lane=branch-prepared; active_feature_spec=spec:past",
+            ).replace(
+                "target=spec:new; due_at=now",
+                "target=spec:past; due_at=now",
+            ).replace(
+                "next_target=spec:new; next_due_at=now",
+                "next_target=spec:past; next_due_at=now",
+            ).replace(
+                "target_branch=feature/past; state=blocked;",
+                "target_branch=feature/past; state=assigned;",
+            ).replace(
+                f"- /repo; head={original_head}; worktree={clean_status}; "
+                "branch=main",
+                f"- /repo; head={original_head}; worktree={clean_status}; "
+                "branch=feature/past",
+            )
+            prepared_live_repo = (
+                f"/repo\t{original_head}\t{clean_status}\tfeature/past\t"
+                "git-status:prepared"
+            )
+            accepted_prepared_dispatch = run(
+                complete_ids,
+                prepared_serial_dispatch,
+                live_repo_evidence=prepared_live_repo,
+            )
+            self.assertEqual(
+                accepted_prepared_dispatch.returncode,
+                0,
+                accepted_prepared_dispatch.stderr,
+            )
+            completed_assignment_dispatch = prepared_serial_dispatch.replace(
+                "target_branch=feature/past; state=assigned;",
+                "target_branch=feature/past; state=completed;",
+            )
+            rejected_completed_assignment_dispatch = run(
+                complete_ids,
+                completed_assignment_dispatch,
+                live_repo_evidence=prepared_live_repo,
+            )
+            self.assertNotEqual(
+                rejected_completed_assignment_dispatch.returncode,
+                0,
+            )
+            blocked_assignment_dispatch = prepared_serial_dispatch.replace(
+                "target_branch=feature/past; state=assigned;",
+                "target_branch=feature/past; state=blocked;",
+            )
+            rejected_blocked_assignment_dispatch = run(
+                complete_ids,
+                blocked_assignment_dispatch,
+                live_repo_evidence=prepared_live_repo,
+            )
+            self.assertNotEqual(
+                rejected_blocked_assignment_dispatch.returncode,
+                0,
+            )
+            dirty_prepared_dispatch = prepared_serial_dispatch.replace(
+                f"- /repo; head={original_head}; worktree={clean_status}; "
+                "branch=feature/past",
+                f"- /repo; head={original_head}; worktree={active_status}; "
+                "branch=feature/past",
+            )
+            dirty_prepared_live_repo = (
+                f"/repo\t{original_head}\t{active_status}\tfeature/past\t"
+                "git-status:dirty-prepared"
+            )
+            rejected_dirty_prepared_dispatch = run(
+                complete_ids,
+                dirty_prepared_dispatch,
+                live_repo_evidence=dirty_prepared_live_repo,
+            )
+            self.assertNotEqual(
+                rejected_dirty_prepared_dispatch.returncode,
+                0,
+            )
+            wrong_head_prepared_dispatch = prepared_serial_dispatch.replace(
+                f"- /repo; head={original_head}; worktree={clean_status}; "
+                "branch=feature/past",
+                f"- /repo; head={target_head}; worktree={clean_status}; "
+                "branch=feature/past",
+            )
+            wrong_head_prepared_live_repo = (
+                f"/repo\t{target_head}\t{clean_status}\tfeature/past\t"
+                "git-status:wrong-head-prepared"
+            )
+            rejected_wrong_head_prepared_dispatch = run(
+                complete_ids,
+                wrong_head_prepared_dispatch,
+                live_repo_evidence=wrong_head_prepared_live_repo,
+            )
+            self.assertNotEqual(
+                rejected_wrong_head_prepared_dispatch.returncode,
+                0,
+            )
+            mismatched_prepared_spec = prepared_serial_dispatch.replace(
+                "state=branch-prepared; feature_spec_ref=spec:past",
+                "state=branch-prepared; feature_spec_ref=spec:new",
+            ).replace(
+                "serial_lane=branch-prepared; active_feature_spec=spec:past",
+                "serial_lane=branch-prepared; active_feature_spec=spec:new",
+            ).replace(
+                "target=spec:past; due_at=now",
+                "target=spec:new; due_at=now",
+            ).replace(
+                "next_target=spec:past; next_due_at=now",
+                "next_target=spec:new; next_due_at=now",
+            )
+            rejected_mismatched_prepared_spec = run(
+                complete_ids,
+                mismatched_prepared_spec,
+                live_repo_evidence=prepared_live_repo,
+            )
+            self.assertNotEqual(
+                rejected_mismatched_prepared_spec.returncode,
+                0,
+            )
+            local_feature_task = visible_feature_task.replace(
+                row(
+                    "session",
+                    "implementation_checkout_strategy",
+                    session_values["implementation_checkout_strategy"],
+                ),
+                row(
+                    "session",
+                    "implementation_checkout_strategy",
+                    (
+                        "serial-caller-checkout-branches",
+                        "authorized-user-instruction",
+                        local_strategy_evidence,
+                    ),
+                ),
+            ).replace(
+                "Implementation checkout strategy: "
+                "managed-worktree-per-feature-spec",
+                "Implementation checkout strategy: "
+                "serial-caller-checkout-branches",
+            ).replace(
+                "Checkout strategy: managed-worktree-per-feature-spec;",
+                "Checkout strategy: serial-caller-checkout-branches;",
+            ).replace(
+                "Serial caller-checkout lane: "
+                "state=not-applicable; feature_spec_ref=none\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- none\n"
+                "Serial caller-checkout branch assignments:\n"
+                "- none\n"
+                "Active workers:",
+                "Serial caller-checkout lane: "
+                "state=task-active; feature_spec_ref=spec:demo\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- repo_ref=repo; realpath=/repo; original_branch=main; "
+                f"original_head={original_head}; original_status={clean_status}; "
+                "target_branch=feature/demo; evidence=git-switch:feature/demo\n"
+                "Serial caller-checkout branch assignments:\n"
+                "- feature_spec_ref=spec:demo; repository_ref=repo; "
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01\n"
+                "Active workers:",
+            ).replace(
+                "Checkout strategy: serial-caller-checkout-branches; "
+                "serial_lane=not-applicable; active_feature_spec=none\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- none\n"
+                "Option resolution refs:",
+                "Checkout strategy: serial-caller-checkout-branches; "
+                "serial_lane=task-active; active_feature_spec=spec:demo\n"
+                "Serial caller-checkout checkpoints:\n"
+                "- repo_ref=repo; realpath=/repo; original_branch=main; "
+                f"original_head={original_head}; original_status={clean_status}; "
+                "target_branch=feature/demo; evidence=git-switch:feature/demo\n"
+                "Option resolution refs:",
+            ).replace(
+                f"- /repo; head={original_head}; worktree={clean_status}; "
+                "branch=main",
+                f"- /repo; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo",
+            )
+            local_without_branch_authority = run(
+                complete_ids,
+                local_feature_task,
+                live_demo,
+            )
+            self.assertNotEqual(local_without_branch_authority.returncode, 0)
+
+            for scope in scopes:
+                branch_evidence = (
+                    "permission-source-ref=authorized-user:request-4;"
+                    f"scope-ref={scope};target-ref=caller-checkout;"
+                    "target-branch=feature/demo"
+                )
+                local_feature_task = local_feature_task.replace(
+                    row(
+                        scope,
+                        "starting_checkout_branch_handling",
+                        scoped_values["starting_checkout_branch_handling"],
+                    ),
+                    row(
+                        scope,
+                        "starting_checkout_branch_handling",
+                        (
+                            "branch-switch-authorized",
+                            "authorized-user-instruction",
+                            branch_evidence,
+                        ),
+                    ),
+                )
+
+            local_feature_task = local_feature_task.replace(
+                "| Worker evidence | "
+                "actual_execution_location=visible-codex-app-task |",
+                "| Worker evidence | "
+                "actual_execution_location=visible-codex-app-task |\n"
+                "| Integration | "
+                "implementation_checkout_strategy="
+                "serial-caller-checkout-branches; "
+                "result_checkout_path=caller-checkout; "
+                "starting_checkout_branch_handling=branch-switch-authorized; "
+                "caller_checkout_original_branch=main; "
+                "caller_checkout_target_branch=feature/demo; "
+                "caller_checkout_branch_evidence=git-switch:feature/demo; "
+                "caller_checkout_restore_state=pending; "
+                "caller_checkout_restore_evidence=pending |",
+            )
+            accepted_local_serial_task = run(
+                complete_ids,
+                local_feature_task,
+                live_demo,
+            )
+            self.assertEqual(
+                accepted_local_serial_task.returncode,
+                0,
+                accepted_local_serial_task.stderr,
+            )
+            multi_repo_local_task = local_feature_task.replace(
+                row(
+                    "workstream:a",
+                    "workstream_repository_refs",
+                    scoped_values["workstream_repository_refs"],
+                ),
+                row(
+                    "workstream:a",
+                    "workstream_repository_refs",
+                    (
+                        "repo,other-repo",
+                        "runtime-derived",
+                        "none",
+                    ),
+                ),
+            ).replace(
+                "Feature Spec: Demo | a | repo | pending |",
+                "Feature Spec: Demo | a | repo,other-repo | pending |",
+            ).replace(
+                "| Repo / execution location | repo; "
+                "visible-codex-app-task; worker=worker-1 |",
+                "| Repo / execution location | repo,other-repo; "
+                "visible-codex-app-task; worker=worker-1 |",
+            ).replace(
+                "caller_checkout_original_branch=main;",
+                "caller_checkout_original_branch=per-repository-checkpoints;",
+            ).replace(
+                "target_branch=feature/demo; evidence=git-switch:feature/demo",
+                "target_branch=feature/demo; evidence=git-switch:feature/demo\n"
+                "- repo_ref=other-repo; realpath=/other; "
+                "original_branch=develop; "
+                f"original_head={original_head}; original_status={clean_status}; "
+                "target_branch=feature/demo; "
+                "evidence=git-switch:feature/demo-other",
+            ).replace(
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01",
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01\n"
+                "- feature_spec_ref=spec:demo; "
+                "repository_ref=other-repo; "
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01-other",
+            ).replace(
+                f"- /repo; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo",
+                f"- /repo; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo\n"
+                f"- /other; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo",
+            )
+            live_demo_multi_repo = live_demo.replace(
+                "\tactive\trepo\tpending\t",
+                "\tactive\trepo,other-repo\tpending\t",
+            )
+            live_repo_multi = (
+                f"{local_live_repo}\n"
+                f"/other\t{target_head}\t{active_status}\tfeature/demo\t"
+                "git-status:other"
+            )
+            accepted_multi_repo_local_task = run(
+                complete_ids,
+                multi_repo_local_task,
+                live_demo_multi_repo,
+                live_repo_multi,
+            )
+            self.assertEqual(
+                accepted_multi_repo_local_task.returncode,
+                0,
+                accepted_multi_repo_local_task.stderr,
+            )
+            extra_serial_checkpoint = local_feature_task.replace(
+                "target_branch=feature/demo; evidence=git-switch:feature/demo",
+                "target_branch=feature/demo; evidence=git-switch:feature/demo\n"
+                "- repo_ref=other-repo; realpath=/other; "
+                "original_branch=develop; "
+                f"original_head={original_head}; original_status={clean_status}; "
+                "target_branch=feature/demo; "
+                "evidence=git-switch:feature/demo-other",
+            ).replace(
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01",
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01\n"
+                "- feature_spec_ref=spec:demo; "
+                "repository_ref=other-repo; "
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01-other",
+            ).replace(
+                f"- /repo; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo",
+                f"- /repo; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo\n"
+                f"- /other; head={target_head}; worktree={active_status}; "
+                "branch=feature/demo",
+            )
+            rejected_extra_serial_checkpoint = run(
+                complete_ids,
+                extra_serial_checkpoint,
+                live_demo,
+                live_repo_multi,
+            )
+            self.assertNotEqual(
+                rejected_extra_serial_checkpoint.returncode,
+                0,
+            )
+            active_a_body = local_feature_task.split(
+                "#### a: Active work\n\n",
+                1,
+            )[1].split("\n### ready-next", 1)[0]
+            two_workstreams_one_spec = local_feature_task.replace(
+                "workstream_ids=a\nTakeover history:",
+                "workstream_ids=a,b\nTakeover history:",
+            ).replace(
+                "Feature Spec: Demo | a | repo | pending |",
+                "Feature Spec: Demo | a,b | repo | pending |",
+            ).replace(
+                "\n### ready-next\n\n"
+                "- workstream_id=b; source_id=issue-1; next work",
+                "\n#### b: Active work\n\n"
+                f"{active_a_body}\n\n"
+                "### ready-next\n\n"
+                "- none",
+            )
+            accepted_two_workstreams_one_spec = run(
+                complete_ids,
+                two_workstreams_one_spec,
+                live_demo,
+            )
+            self.assertEqual(
+                accepted_two_workstreams_one_spec.returncode,
+                0,
+                accepted_two_workstreams_one_spec.stderr,
+            )
+            task_active_on_original_branch = run(
+                complete_ids,
+                local_feature_task.replace(
+                    f"- /repo; head={target_head}; worktree={active_status}; "
+                    "branch=feature/demo",
+                    f"- /repo; head={original_head}; worktree={clean_status}; "
+                    "branch=main",
+                ),
+                live_demo,
+                default_live_repo,
+            )
+            self.assertNotEqual(
+                task_active_on_original_branch.returncode,
+                0,
+            )
+            live_repository_drift = run(
+                complete_ids,
+                local_feature_task,
+                live_demo,
+                default_live_repo,
+            )
+            self.assertNotEqual(live_repository_drift.returncode, 0)
+            dirty_serial_baseline = run(
+                complete_ids,
+                local_feature_task.replace(
+                    f"original_status={clean_status}",
+                    f"original_status={active_status}",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(dirty_serial_baseline.returncode, 0)
+            conflicting_historical_assignment = run(
+                complete_ids,
+                local_feature_task.replace(
+                    "Serial caller-checkout branch assignments:\n"
+                    "- feature_spec_ref=spec:demo; repository_ref=repo; "
+                    "target_branch=feature/demo; state=assigned; "
+                    "evidence=issue:01",
+                    "Serial caller-checkout branch assignments:\n"
+                    "- feature_spec_ref=spec:past; repository_ref=repo; "
+                    "target_branch=feature/demo; state=completed; "
+                    "evidence=issue:00\n"
+                    "- feature_spec_ref=spec:demo; repository_ref=repo; "
+                    "target_branch=feature/demo; state=assigned; "
+                    "evidence=issue:01",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(
+                conflicting_historical_assignment.returncode,
+                0,
+            )
+            falsely_restored_active_task = run(
+                complete_ids,
+                local_feature_task.replace(
+                    "state=task-active; feature_spec_ref=spec:demo",
+                    "state=restored; feature_spec_ref=spec:demo",
+                ).replace(
+                    "serial_lane=task-active; active_feature_spec=spec:demo",
+                    "serial_lane=restored; active_feature_spec=spec:demo",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(falsely_restored_active_task.returncode, 0)
+            local_on_original_branch = run(
+                complete_ids,
+                local_feature_task.replace(
+                    "caller_checkout_original_branch=main",
+                    "caller_checkout_original_branch=feature/demo",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(local_on_original_branch.returncode, 0)
+            local_missing_restore_projection = run(
+                complete_ids,
+                local_feature_task.replace(
+                    "caller_checkout_restore_evidence=pending",
+                    "caller_checkout_restore_evidence=not-applicable",
+                ),
+                live_demo,
+            )
+            self.assertNotEqual(
+                local_missing_restore_projection.returncode,
+                0,
+            )
+
+            reused_branch_for_other_spec = local_feature_task.replace(
+                row(
+                    "workstream:b",
+                    "feature_spec_ref",
+                    feature_spec_contract("workstream:b")["feature_spec_ref"],
+                ),
+                row(
+                    "workstream:b",
+                    "feature_spec_ref",
+                    (
+                        "spec:other",
+                        "source-contract",
+                        "issue:02#source_spec_ref",
+                    ),
+                ),
+            ).replace(
+                row(
+                    "workstream:b",
+                    "feature_spec_title",
+                    feature_spec_contract("workstream:b")["feature_spec_title"],
+                ),
+                row(
+                    "workstream:b",
+                    "feature_spec_title",
+                    (
+                        "Feature Spec: Other",
+                        "source-contract",
+                        "issue:02#source_spec_ref",
+                    ),
+                ),
+            )
+            rejected_shared_branch = run(
+                complete_ids,
+                reused_branch_for_other_spec,
+                live_demo,
+            )
+            self.assertNotEqual(rejected_shared_branch.returncode, 0)
+            same_branch_in_other_repo = reused_branch_for_other_spec.replace(
+                row(
+                    "workstream:b",
+                    "workstream_repository_refs",
+                    scoped_values["workstream_repository_refs"],
+                ),
+                row(
+                    "workstream:b",
+                    "workstream_repository_refs",
+                    (
+                        "other-repo",
+                        "runtime-derived",
+                        "none",
+                    ),
+                ),
+            )
+            same_branch_in_other_repo = same_branch_in_other_repo.replace(
+                "Serial caller-checkout branch assignments:\n"
+                "- feature_spec_ref=spec:demo; repository_ref=repo; "
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01",
+                "Serial caller-checkout branch assignments:\n"
+                "- feature_spec_ref=spec:demo; repository_ref=repo; "
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:01\n"
+                "- feature_spec_ref=spec:other; repository_ref=other-repo; "
+                "target_branch=feature/demo; state=assigned; "
+                "evidence=issue:02",
+            )
+            accepted_repository_scoped_branch = run(
+                complete_ids,
+                same_branch_in_other_repo,
+                live_demo,
+            )
+            self.assertEqual(
+                accepted_repository_scoped_branch.returncode,
+                0,
+                accepted_repository_scoped_branch.stderr,
+            )
+
             missing_live_task = run(complete_ids, visible_feature_task)
             self.assertNotEqual(missing_live_task.returncode, 0)
             live_repo_drift = run(
@@ -2074,6 +2715,129 @@ class OrchestratorContractTests(unittest.TestCase):
         self.assertIn("`list_threads`/`read_thread` equivalents", recovery)
         self.assertIn("`post-review-disposition`", worker)
         self.assertNotIn("post-root-provided-review-response", worker)
+
+    def test_visible_task_checkout_strategy_defaults_to_worktrees_and_serializes_local_branches(self) -> None:
+        skill = self.read("SKILL.md")
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        gates = self.read("references/gates.md")
+        ledger = self.read("references/ledger.md")
+        ledger_template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        multi_repo = self.read("references/multi-repo-workspace.md")
+
+        normalized = {
+            name: " ".join(contents.split())
+            for name, contents in {
+                "skill": skill,
+                "options": options,
+                "worker": worker,
+                "gates": gates,
+                "ledger": ledger,
+                "ledger_template": ledger_template,
+                "recovery": recovery,
+                "multi_repo": multi_repo,
+            }.items()
+        }
+
+        self.assertIn(
+            "| `implementation_checkout_strategy` | `managed-worktree-per-feature-spec`, `serial-caller-checkout-branches` | `managed-worktree-per-feature-spec` |",
+            options,
+        )
+        self.assertIn(
+            "Default every visible Feature Spec implementation task to its own managed worktree",
+            normalized["skill"],
+        )
+        self.assertIn(
+            "require an attached original branch",
+            normalized["options"],
+        )
+        self.assertIn(
+            "keep at most one visible Feature Spec task active across the orchestration scope",
+            normalized["options"],
+        )
+        self.assertIn(
+            "do not implement or commit on it",
+            normalized["options"],
+        )
+        self.assertIn(
+            "reject `change_delivery_target=validated-changes-left-uncommitted`",
+            normalized["options"],
+        )
+        self.assertIn(
+            "Do not switch branches or dispatch another Spec when the task is merely committed, pushed, in draft, waiting for review, fixing feedback, or waiting for CI",
+            normalized["worker"],
+        )
+        self.assertIn(
+            "restores and verifies the original caller branch",
+            normalized["skill"],
+        )
+        self.assertIn(
+            "result_checkout_path_guard=serial-caller-checkout-branch",
+            normalized["gates"],
+        )
+        self.assertIn(
+            "a repository/target-branch pair reused by a different Feature Spec",
+            normalized["ledger"],
+        )
+        self.assertIn(
+            "implementation_checkout_strategy=<managed-worktree-per-feature-spec|serial-caller-checkout-branches>",
+            ledger_template,
+        )
+        self.assertIn(
+            "| Repo / execution location | <comma-separated canonical repository refs>;",
+            ledger_template,
+        )
+        self.assertIn(
+            "caller_checkout_original_branch=<branch|per-repository-checkpoints|not-applicable>",
+            ledger_template,
+        )
+        self.assertIn(
+            'active_app_count > 1',
+            recovery,
+        )
+        self.assertIn(
+            'local_branch_spec[branch_key] != canonical_spec_ref',
+            recovery,
+        )
+        self.assertIn("LIVE_REPO_CHECKPOINT_ROWS", recovery)
+        self.assertIn("Serial caller-checkout checkpoints:", ledger_template)
+        self.assertIn(
+            "Serial caller-checkout branch assignments:",
+            ledger_template,
+        )
+        self.assertIn(
+            "Retain completed and blocked rows",
+            normalized["ledger"],
+        )
+        self.assertIn(
+            'status != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"',
+            recovery,
+        )
+        self.assertIn(
+            "serial_assignment_branch[assignment_key] != branch",
+            recovery,
+        )
+        self.assertIn(
+            "checkpoint_target[repo_ref] != active_target_by_repo[repo_ref]",
+            recovery,
+        )
+        self.assertIn(
+            "current_branch[realpath] != checkpoint_original[repo_ref]",
+            recovery,
+        )
+        self.assertIn(
+            "permits only one active Feature Spec task across the workspace",
+            normalized["multi_repo"],
+        )
+
+        for forbidden in (
+            "parallel-caller-checkout-branches",
+            "shared-feature-spec-branch",
+            "implement-on-original-branch",
+        ):
+            self.assertNotIn(forbidden, options)
+            self.assertNotIn(forbidden, worker)
 
     def test_retired_publication_authority_aliases_are_not_supported(self) -> None:
         ledger_template = self.read("references/ledger-template.md")

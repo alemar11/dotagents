@@ -32,14 +32,16 @@ Session option fields:
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | Explicit consent; the granted value selects mandatory one-visible-task-per-Feature-Spec execution. |
+| `implementation_checkout_strategy` | `managed-worktree-per-feature-spec`, `serial-caller-checkout-branches` | Visible-task checkout topology. Managed worktrees are the default; the serial caller-checkout strategy requires exact authorized-user evidence requesting no worktrees. |
 | `unmanaged_git_worktree_fallback_permission` | `not-granted`, `granted-by-authorized-user` | Permission for an unmanaged Git worktree after managed-worktree failure evidence. |
 
 Worker surface, count, per-wave parallelism, and serial or parallel sequencing
 are orchestrator-derived runtime decisions governed by `options.md`, not
 session options or user-provided numeric fields. The granted visible-task
 mode is the exception to free surface/count selection: surface is visible and
-the count is exactly one active task per implementation-eligible Feature
-Spec.
+the mapping is exactly one task per implementation-eligible Feature Spec.
+Managed-worktree waves may activate multiple eligible Specs; serial caller-
+checkout waves may activate exactly one.
 
 Execution fields:
 
@@ -75,6 +77,13 @@ Integration fields:
 | `integration_method` | `handoff`, `worker-commit`, `patch-apply`, `manual-root`, `pending` | Integration path. `manual-root` is invalid in mandatory Feature Spec task mode. Replace `pending` before lifecycle closeout or record that no output was integrated. |
 | `starting_checkout_branch_handling` | `keep-current-branch-checked-out`, `branch-switch-authorized`, `not-applicable` | Whether the checkout where the owner invoked the orchestrator may switch branches during integration or publication. |
 | `result_checkout_path` | `worker-worktree`, `integration-worktree`, `caller-checkout`, `not-applicable` | Checkout where commit, push, draft PR publication, and ready-for-review transition will run. |
+
+For `serial-caller-checkout-branches`, `starting_checkout_branch_handling` must
+be `branch-switch-authorized` and `result_checkout_path` must be
+`caller-checkout`. Record the original branch and HEAD/status fingerprint, the
+Spec's exact target branch, branch creation or verified-resume evidence, and
+the final original-branch restoration proof. These are runtime evidence, not
+additional user options.
 
 In a Codex App session, `worker-worktree` and `integration-worktree` mean a
 worktree owned by a visible App task whenever the root creates or allocates a
@@ -219,6 +228,55 @@ these rules as one execution contract:
 - A mandatory Feature Spec task may not use `autoreview=reroute-to-root`;
   replace the task or record the unavailable gate as a blocker.
 
+### Checkout Strategy
+
+Use `implementation_checkout_strategy=managed-worktree-per-feature-spec` unless
+the authorized user explicitly says not to use worktrees. In the default mode,
+create the visible task with its managed worktree target before implementation.
+Each Spec has an isolated checkout and the root may schedule independent Specs
+in parallel when dependencies and capacity permit.
+
+Normalize an exact no-worktree instruction to
+`implementation_checkout_strategy=serial-caller-checkout-branches`. That value
+selects this complete controller flow:
+
+1. Before the first Spec, require an attached branch and record the caller
+   checkout's original branch, HEAD, and clean `git status --short`
+   fingerprint. A detached or dirty checkout blocks local dispatch; never carry
+   its changes onto a Spec branch.
+2. Select exactly one implementation-eligible Feature Spec. Verify its
+   `target_branch_name` is a valid dedicated feature branch, differs from the
+   original branch, and is not assigned to another Feature Spec in the same
+   repository during this run. Append its immutable
+   Spec/repository/target-branch ownership to the run-wide serial branch-
+   assignment registry before switching, and retain that row after completion.
+   Reject an uncommitted terminal delivery target because it cannot survive the
+   required branch restoration safely.
+3. From the resolved baseline, create and switch to that branch. On recovery,
+   switch to an existing branch only after proving it belongs to the same Spec
+   and matches the recorded baseline. Record the exact Git evidence.
+4. Create or resume the Spec's visible task in Local, establish its Goal, and
+   keep it as the only active visible Feature Spec task. The root owns only the
+   controller Git operations that create, switch, verify, and restore branches;
+   the task still owns every implementation, validation, publication, review,
+   fix, CI, and ready-transition action.
+5. Do not switch branches or dispatch another Spec when the task is merely
+   committed, pushed, in draft, waiting for review, fixing feedback, or waiting
+   for CI. Wait until it reaches its complete selected delivery target—normally
+   a clean exact-head Codex review, passing CI, and merge-ready PR.
+6. After terminal task evidence is reconciled, require a clean feature branch,
+   switch back to the original branch, and prove its branch, HEAD, and status
+   match the recorded baseline. Only then may the next Spec begin.
+
+If any branch preparation, terminal cleanliness, or restoration check fails,
+stop the serial lane as `needs-owner` or blocked and never dispatch another
+Spec from that state. Do not use a worktree as a
+silent fallback after the user selected no worktrees, do not implement on the
+original branch, and do not reuse one repository/feature-branch pair for
+different Specs.
+Internal subagents may explore or review read-only work in parallel, but only
+one agent may mutate the caller checkout at a time.
+
 ## Capability Snapshots
 
 The root records a capability snapshot when a worker is created, resumed, or
@@ -264,13 +322,14 @@ owner action.
 Outside mandatory Feature Spec task mode, the root chooses the worker
 surface, number of workers, and serial or parallel split for each wave within
 `visible_app_task_permission`, live runtime capacity, and the work graph. In
-mandatory mode, the surface and one-task-per-Spec count are fixed; the root
-chooses only serial or parallel scheduling. Each spawned Codex App task may
+mandatory mode, the surface and one-task-per-Spec count are fixed. Managed-
+worktree mode leaves serial or parallel scheduling to the root; serial caller-
+checkout mode forces one complete Spec task at a time. Each spawned Codex App task may
 choose its own internal background subagent topology within its assigned scope.
 There is no separate workspace execution mode, delegation toggle, worker-count
 field, visibility selector, or parallelism option.
 
-When the current runtime is the Codex App and the root chooses a new dedicated
+When the current runtime is the Codex App and the selected strategy requires a new dedicated
 worker, integration, or publication worktree, require
 `visible_app_task_permission=granted-by-authorized-user` and create the task with
 a worktree target before implementation. Do not run the
@@ -303,6 +362,11 @@ execution. A raw Git worktree still requires
 `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`, but
 that permission changes only checkout management and never waives the required
 visible task.
+
+If `implementation_checkout_strategy=serial-caller-checkout-branches` is
+selected and Local task creation or branch switching is unavailable, stop with
+the exact capability evidence. Neither a managed nor raw worktree is an
+authorized fallback for an explicit no-worktree run.
 
 ## Delegation Rules
 
@@ -341,7 +405,7 @@ visible task.
   archives, or replaces visible App tasks. Each task owns the lifecycle of its
   internal subagents.
 - When visible Codex App workers provide helper worktrees, preserve the caller
-  checkout branch by default. In mandatory mode, task-owned integration,
+  checkout branch by default. In managed-worktree mandatory mode, task-owned integration,
   validation, commit, push, and PR creation run from its managed worktree. In
   other modes, root-owned publication may use the worker worktree or a dedicated
   integration worktree. Switching the caller checkout is allowed only when the scoped row
@@ -352,6 +416,11 @@ visible task.
   with a worktree environment and bind the checkout to that task in the
   ledger. Do not create an unowned raw Git worktree merely to preserve the
   caller checkout. This requirement does not apply in CLI-only sessions.
+- In serial caller-checkout mode, the root may create, switch, verify, and
+  restore the dedicated Spec branch because those are controller-owned checkout
+  operations. It must not edit files, resolve implementation conflicts, commit,
+  push, or perform review work. Keep exactly one active Spec task until the full
+  target is complete and the original caller branch has been restored.
 
 ## Startup Option Resolution
 
@@ -359,6 +428,7 @@ Initialize every session with:
 
 ```text
 visible_app_task_permission=not-requested
+implementation_checkout_strategy=managed-worktree-per-feature-spec
 unmanaged_git_worktree_fallback_permission=not-granted
 repository_layout=<from project memory, safe repo evidence, or authorized-user instruction>
 ```
@@ -588,9 +658,10 @@ integration and chooses one path per worker output:
   the caller checkout unless
   `starting_checkout_branch_handling=branch-switch-authorized`.
 
-In mandatory Feature Spec task mode, the assigned task owns integration in
-its managed checkout and may use `handoff`, `worker-commit`, or `patch-apply`
-internally for its nested subagents. `manual-root` is forbidden. The root reads
+In mandatory Feature Spec task mode, the assigned task owns integration in its
+selected managed worktree or prepared serial caller-checkout branch and may use
+`handoff`, `worker-commit`, or `patch-apply` internally for its nested
+subagents. `manual-root` is forbidden. The root reads
 the resulting Git/PR/proof state and either accepts the evidence or sends the
 task a corrective message; it never applies, copies, reimplements, validates,
 or publishes the change itself.
@@ -625,6 +696,10 @@ If the App cannot create the required worktree, stop before `git worktree add`,
 report the exact limitation, and request explicit fallback authority. This rule
 does not apply in CLI-only sessions and does not require wrapping an existing
 owner-supplied checkout in a new task.
+
+This section applies only to `managed-worktree-per-feature-spec` and authorized
+raw-worktree fallback. Under `serial-caller-checkout-branches`, do not create a
+helper worktree; use the clean caller checkout and serial branch-rotation flow.
 
 Treat Codex App worker worktrees and other worker checkouts as temporary helper
 surfaces by default, but not as disposable until closeout. A helper worktree may
@@ -712,6 +787,7 @@ Scope:
 - repository: <repo path or owner/repo>
 - workstream: <short name>
 - workstream_ids: <all generated issue/workstream ids for this Feature Spec, or one bounded id>
+- workstream_repository_refs: <comma-separated canonical repository refs>
 - feature_spec_ref: <canonical Feature Spec URL/path/ref or not-applicable>
 - feature_spec_title: <exact canonical Feature Spec title or not-applicable>
 - feature_spec_task_assignment: <required|not-applicable>
@@ -719,6 +795,7 @@ Scope:
 - codex_review_poll_owner: <visible-feature-spec-task|assigned-worker|not-applicable>
 - root_implementation_fallback: <forbidden|not-applicable>
 - visible_app_task_permission: <not-requested|granted-by-authorized-user|denied-by-authorized-user>
+- implementation_checkout_strategy: <managed-worktree-per-feature-spec|serial-caller-checkout-branches>
 - actual_execution_location: <current-orchestrator-session|visible-codex-app-task|background-codex-subagent>
 - worker_id: <id or pending>
 - worker_title: <title or pending>
@@ -785,6 +862,11 @@ Scope:
 - integration_method: <handoff|worker-commit|patch-apply|manual-root|pending>
 - starting_checkout_branch_handling: <keep-current-branch-checked-out|branch-switch-authorized|not-applicable>
 - result_checkout_path: <worker-worktree path|integration-worktree path|caller-checkout path|not-applicable>
+- caller_checkout_original_branch: <branch|per-repository-checkpoints|not-applicable>
+- caller_checkout_target_branch: <exact Spec branch|not-applicable>
+- caller_checkout_branch_evidence: <baseline HEAD/status plus create/switch/resume proof|not-applicable>
+- caller_checkout_restore_state: <pending|restored|not-applicable>
+- caller_checkout_restore_evidence: <branch and HEAD/status proof|pending|not-applicable>
 - report_channel: this worker surface only
 - helper_checkout: <path or unknown>
 - next_ledger_check: <time/action or none>
@@ -809,7 +891,9 @@ Execution:
    work. Report its state and evidence; if no Goal tool exists, report the exact
    objective and unavailable-tool fallback instead.
 2. Inspect the current state before editing.
-3. Preserve unrelated uncommitted changes.
+3. Preserve unrelated uncommitted changes. In serial caller-checkout mode,
+   verify that this task is on its exact dedicated Spec branch and do not
+   create, switch, or reuse another branch.
 4. If editing, run focused validation.
 5. Run or request autoreview when required by the gate.
 6. Stop and report if blocked by access, ambiguous owner intent, unsafe state,
@@ -823,7 +907,8 @@ Final report:
 - Validation: commands run and outcomes
 - Delivery: selected delivery target, branch or PR used, closeout path, and PR links or
   `none`; include ready-for-review state, Codex review policy/state, publication
-  checkout, and caller checkout disposition
+  checkout, checkout strategy, caller-checkout branch preparation/restoration
+  evidence, and caller checkout disposition
 - Feature Spec task: exact Feature Spec ref/title, visible task id/title,
   lifecycle ownership, task Goal objective/mode/status/evidence, PR refs,
   Codex-review polling state, drift corrections, and whether the selected
@@ -839,6 +924,11 @@ Final report:
   untested adapters, setup gaps, or test gaps
 - Next: exact owner or orchestrator action
 ```
+
+Use `caller_checkout_original_branch=per-repository-checkpoints` whenever
+`workstream_repository_refs` contains more than one repository. Each original
+branch, HEAD, and clean-status fingerprint then comes exclusively from that
+repository's serial caller-checkout checkpoint.
 
 ## Ledger-Driven Progress Checks
 

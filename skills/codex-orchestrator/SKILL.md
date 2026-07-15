@@ -56,6 +56,15 @@ merge-ready PR lifecycle; the root becomes orchestration-only for that work.
   the owner explicitly refers to an API/protocol thread object or a GitHub PR
   review thread. Preserve technical tool names such as `create_thread` and
   API-returned thread identifiers only at the tool boundary.
+- Default every visible Feature Spec implementation task to its own managed
+  worktree. Only an exact authorized-user instruction to avoid worktrees may
+  select serial caller-checkout execution. That exception never permits
+  implementation on the branch active when orchestration began: the root
+  records and retains run-wide ownership of one dedicated feature branch per
+  Spec and repository, creates or resumes it, switches the clean caller
+  checkout, runs only one Spec task through its complete delivery target,
+  restores and verifies the original caller branch, and only then dispatches
+  the next Spec.
 - The root resolves `worker_allowed_actions` per workstream. Actions are
   explicit, independent, and non-cumulative; allowed paths can narrow an action
   but never grant another one.
@@ -206,9 +215,11 @@ blockers.
 
 ## Workers And Runtime Surfaces
 
-Resolve `visible_app_task_permission`, `unmanaged_git_worktree_fallback_permission`,
-and `repository_layout` from `references/options.md`. Defaults are
-`visible_app_task_permission=not-requested`, and
+Resolve `visible_app_task_permission`, `implementation_checkout_strategy`,
+`unmanaged_git_worktree_fallback_permission`, and `repository_layout` from
+`references/options.md`. Defaults are
+`visible_app_task_permission=not-requested`,
+`implementation_checkout_strategy=managed-worktree-per-feature-spec`, and
 `unmanaged_git_worktree_fallback_permission=not-granted`. Visible user-owned App
 tasks require `visible_app_task_permission=granted-by-authorized-user`. That
 value selects mandatory visible Feature Spec task mode: create exactly one
@@ -216,7 +227,7 @@ visible task per implementation-eligible Feature Spec, title it with the
 exact Feature Spec title, and keep all of that Spec's issue, repo, PR,
 Codex-review, CI, and merge-readiness work in that task. The root chooses only
 when those tasks start and whether they run serially or in parallel from
-dependencies and live capacity. The root and every spawned Codex App task may
+dependencies, checkout strategy, and live capacity. The root and every spawned Codex App task may
 use internal background subagents within their assigned scope; no user
 worker-count or topology option exists.
 
@@ -225,8 +236,14 @@ surface wording, permission, capability snapshots, worker actions, prompts,
 execution reports, resync, integration, artifacts, and lifecycle. Do not copy
 session worker choices into Feature Specs, issues, project memory, or handoffs.
 
-When mandatory visible Feature Spec task mode is selected, create the task
-and its managed worktree before implementation, title it, then require and
+When mandatory visible Feature Spec task mode is selected, create the task in
+its managed worktree before implementation unless
+`implementation_checkout_strategy=serial-caller-checkout-branches` carries
+exact authorized-user evidence. In that exception, keep only one active Spec
+task, persist its run-wide Spec/repository/branch assignment, prepare that
+dedicated feature branch in the clean caller checkout, and do not switch again
+until that task reaches its complete delivery target and the root restores the
+original caller branch. Title the task, then require and
 verify its task-owned Goal or unavailable-tool fallback. If the visible
 create/read/message surface cannot represent the assignment, stop or replace
 the visible task; never fall back to root-owned or background-only

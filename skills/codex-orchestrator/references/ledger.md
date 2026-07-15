@@ -113,7 +113,8 @@ ledger that passes the marker check above.
 
 Keep one authoritative owner for each current-state fact:
 
-- `## Active Root` owns the root claim and root action;
+- `## Active Root` owns the root claim, root action, and run-wide serial
+  caller-checkout branch-assignment registry;
 - `## Feature Spec Task Registry` owns visible-task identity, Feature Spec
   assignment, lifecycle state, task Goal projection, and drift;
 - `## Workstreams` owns work state, delivery state, and the projection of its
@@ -130,6 +131,18 @@ sections as one ledger patch. Append historical notes only after the current
 projection agrees. Do not patch an active-worker list, workstream, wait row,
 recovery field, or next action independently and leave the ledger split across
 controller cycles.
+
+For `serial-caller-checkout-branches`, append the Feature Spec, repository, and
+target branch to `Serial caller-checkout branch assignments` before the root
+switches the caller checkout. The `(feature_spec_ref, repository_ref)` row is
+immutable except for `state`, and a `(repository_ref, target_branch)` pair may
+belong to only one Feature Spec for the entire orchestration run. Retain
+completed and blocked rows after their workstreams leave every active or queued
+section; recovery and later dispatches must validate against the full registry.
+Keep the row `assigned` throughout `branch-prepared` and `task-active`. Change
+it to `completed` only in the same controller reconciliation that records a
+verified `restored` lane, or to `blocked` with a blocked lane. Neither terminal
+state may be prepared or dispatched again.
 
 The stable GitStack `observation_fingerprint` is the review transition key.
 Persist the first observation, then update review rows, transition timestamps,
@@ -174,6 +187,11 @@ Reject a controller snapshot when any of these invariants fails:
 - in mandatory visible Feature Spec task mode, Active Root visible workers
   are not exactly the active registry task assignments, or Recovery Packet
   `active_workers` is not the complete Active Root worker set;
+- `implementation_checkout_strategy=serial-caller-checkout-branches` has more
+  than one active Feature Spec task, an active task outside the caller checkout,
+  a repository/target-branch pair reused by a different Feature Spec, a missing original-branch
+  baseline, or a `dispatch-feature-spec` action before the prior task reached
+  its complete target and the original branch was restored;
 - a registry task, active workstream task assignment, or recovery task
   mapping disagrees about Feature Spec identity or lifecycle owner;
 - a visible task advances beyond `created` while its Goal is pending, a
@@ -347,6 +365,10 @@ Before marking a ledger `complete`, verify:
 - `completed` records final proof, source closeout, integration, publication
   checkout, caller-checkout disposition, worker lifecycle, and the applicable
   review/parent-closeout projections.
+- Serial caller-checkout completion additionally proves that implementation
+  occurred only on the Spec's dedicated target branch and that the original
+  branch, HEAD, and clean status were restored before the next dispatch or
+  portfolio closeout.
 - Generated ignored artifacts and helper worktrees are removed, retained with
   a reason, isolated in a helper worktree, or explicitly handed off.
 - The Recovery Packet reflects the final current-state projection or is

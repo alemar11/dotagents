@@ -68,6 +68,14 @@ Started: <YYYY-MM-DD HH:MM TZ>
 Last Progress Read: <YYYY-MM-DD HH:MM TZ>
 Next Root Check: action=<monitor-task|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none>; target=<visible-task-id|feature-spec-ref|owner-decision-ref|none>; due_at=<RFC3339|now|event-ref|none>
 existing_orchestrator_session_takeover_policy: ask-authorized-user-before-takeover|take-over-only-if-existing-ledger-is-stale
+Implementation checkout strategy: managed-worktree-per-feature-spec|serial-caller-checkout-branches
+Serial caller-checkout lane: state=<not-applicable|baseline-recorded|branch-prepared|task-active|restored|blocked>; feature_spec_ref=<ref|none>
+Serial caller-checkout checkpoints:
+- repo_ref=<canonical repo ref>; realpath=<absolute realpath>; original_branch=<branch>; original_head=<sha>; original_status=<sha256>; target_branch=<branch>; evidence=<git/tool ref>
+- none
+Serial caller-checkout branch assignments:
+- feature_spec_ref=<canonical ref>; repository_ref=<canonical repo ref>; target_branch=<branch>; state=<assigned|completed|blocked>; evidence=<source/tool ref>
+- none
 Scoped merge option refs: <exact workstream pull_request_merge_permission/pull_request_merge_confirmation row_ids or none>
 parent_closeout_watch: not-applicable|root-monitoring|owner-handoff|automation-handoff|complete
 Parent closeout watch evidence: <ledger section/fingerprint plus owner-visible handoff or automation id, or none>
@@ -81,6 +89,15 @@ Active workers:
 Nested internal subagents are reported under their parent worker evidence and
 do not become separate root workstream assignments unless the root explicitly
 registers them.
+Use exactly one serial caller-checkout checkpoint per affected repository while
+that strategy is active; remove the `- none` placeholder. The Recovery Packet
+must project the exact same sorted checkpoint set. `original_status` is the
+SHA-256 of the clean baseline `git status --short` bytes and therefore must be
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Current repo state belongs in `Repo checkpoints` and must be recomputed live
+during recovery. The branch-assignment registry is run-wide authoritative
+history: create its row before switching branches, update only its state, and
+never delete or retarget the row when a Spec leaves the active wave.
 Recovery packet content fingerprint: <sha256 from recovery-validation.md or none>
 Takeover history:
 - <date, previous root id, overlap, stale/owner approval evidence, worker disposition>
@@ -197,6 +214,10 @@ Content fingerprint: <sha256 of packet derived fields, excluding status/timestam
 Root: <root id>; claim=<status>; goal=<objective ref>; active_workers=<unique comma-separated worker ids or none>; parent_closeout_watch=<status/ref>
 Feature Spec tasks: <feature-spec-ref>=<visible-task-id>, or none
 Current wave: <wave id/status>; current_workstreams=<ids>; next_action=<monitor-task|send-correction|dispatch-feature-spec|reconcile-feature-spec|owner-action|none>; next_target=<visible-task-id|feature-spec-ref|owner-decision-ref|none>; next_due_at=<RFC3339|now|event-ref|none>
+Checkout strategy: <managed-worktree-per-feature-spec|serial-caller-checkout-branches>; serial_lane=<not-applicable|baseline-recorded|branch-prepared|task-active|restored|blocked>; active_feature_spec=<ref|none>
+Serial caller-checkout checkpoints:
+- repo_ref=<canonical repo ref>; realpath=<absolute realpath>; original_branch=<branch>; original_head=<sha>; original_status=<sha256>; target_branch=<branch>; evidence=<git/tool ref>
+- none
 Option resolution refs: session_rows=<unique comma-separated exact row_ids>; scoped_rows=<unique comma-separated exact current source/workstream row_ids or empty>; rows_fingerprint=<sha256 of exactly the referenced row union using recovery-validation.md>
 Repo checkpoints:
 - <repo realpath>; head=<sha>; worktree=<stable fingerprint of status --short>; branch=<name or detached>
@@ -222,10 +243,12 @@ fingerprints here; load `recovery-validation.md` before resume or recovery.
 authorization_resolution: per-workstream
 worker_allowed_actions: <explicit action list from worker.md>
 visible_app_task_permission: not-requested|granted-by-authorized-user|denied-by-authorized-user
+implementation_checkout_strategy: managed-worktree-per-feature-spec|serial-caller-checkout-branches
 feature_spec_task_assignment: required|not-applicable
 unmanaged_git_worktree_fallback_permission: not-granted|granted-by-authorized-user
 repository_layout: single-repository|monorepo|multi-repository-workspace
 workstream_repository_layout: single-repository|monorepo|multi-repository-workspace
+workstream_repository_refs: <comma-separated canonical repository refs>
 pull_request_count_strategy: one-pull-request-total|one-pull-request-per-repository|no-pull-request
 target_branch_name: <exact branch|not-applicable>
 delivery_permission_source_issue_ref: <issue:<NN>|not-applicable>
@@ -291,7 +314,7 @@ Use one compact block per active workstream:
 | --- | --- |
 | Source | <source id/ref and closeout target> |
 | Feature Spec task | feature_spec_ref=<canonical ref|not-applicable>; feature_spec_title=<transport-encoded exact canonical title|not-applicable>; feature_spec_task_assignment=<required|not-applicable>; visible_task_id=<id|not-applicable>; lifecycle_owner=<visible-feature-spec-task|bounded-worker|root>; codex_review_poll_owner=<visible-feature-spec-task|assigned-worker|not-applicable>; root_implementation_fallback=<forbidden|not-applicable>; task_goal_mode=<pending|active|unavailable|not-applicable>; task_goal_status=<pending|active|complete|blocked|not-applicable>; task_goal_dispatch_objective_sha256=<root-computed 64-lowercase-hex|not-applicable>; task_goal_reported_objective_sha256=<task-reported 64-lowercase-hex|pending|not-applicable>; task_goal_evidence=<goal tool/task ref|not-applicable>; task_goal_missing_tool=<runtime-goal-tool|not-applicable> |
-| Repo / execution location | <repo>; <current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; worker=<id or root> |
+| Repo / execution location | <comma-separated canonical repository refs>; <current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; worker=<id or root> |
 | Worker evidence | visible_app_task_permission=<not-requested|granted-by-authorized-user|denied-by-authorized-user>; actual_execution_location=<current-orchestrator-session|background-codex-subagent|visible-codex-app-task>; authorization_state=<authorized-by-invocation|authorized-user-consented|not-authorized>; status=<used|unavailable|attempt-failed|root-owned-fallback>; evidence=<tool/session/failure>; nested_subagents=<ids/scopes/outcomes/topology|none>; parallelism=<parallel|sequential|root-owned|simulated>; capability_snapshot=<filesystem/network/gh_auth/codex_cli/autoreview/checked_at evidence> |
 | Wave / status | <wave>; active; last_read=<time>; next_check=<time/action> |
 | Objective | <one concrete outcome> |
@@ -299,7 +322,7 @@ Use one compact block per active workstream:
 | Delivery | change_delivery_target=<validated-changes-left-uncommitted|local-commit-created-without-pushing|changes-pushed-to-target-branch-without-pull-request|validated-draft-pull-request-published|pull-request-ready-for-merge-but-not-merged>; delivery_decision_origin=<safe-default-for-ad-hoc-work|inherited-from-feature-spec|overridden-by-implementation-issue|specified-by-authorized-user>; delivery_decision_origin_evidence=<scoped-option-row/source-ref|none>; target_branch_name=<exact branch|not-applicable>; target_pull_request_ref=<owner/repo#number|pending|not-applicable>; delivery_permission_source_issue_ref=<issue:<NN>|not-applicable>; issue_update_permission_source_issue_ref=<issue:<NN>|not-applicable>; temporary_source_execution_permission=<not-granted|granted-by-authorized-user>; completion_evidence_policy=<require-live-system-evidence|allow-simulated-evidence-by-authorized-user-exception>; pull_request_count_strategy=<one-pull-request-total|one-pull-request-per-repository|no-pull-request>; issue_completion_method=<feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion>; change_delivery_permission=<not-required-for-uncommitted-changes|not-granted|granted-for-selected-target>; delivery_gate_status=<ready|blocked|not-applicable>; delivery_allowed_actions=<canonical action list>; codex_review_requirement=<required-on-current-pull-request-head|explicitly-skipped-by-authorized-user|not-needed-for-selected-delivery-target>; issue_update_permission=<no-issue-changes|pull-request-closing-keyword-only|direct-issue-updates-explicitly-authorized>; scheduled_automation_change_permission=<not-granted|granted-by-authorized-user>; automation_target=<source/workstream ref|none>; parent_spec_applicability=<required|deferred-vehicle|not-applicable>; parent_spec_applicability_reason=<whole-spec-final-pr|non-default-base|partial-pr|ad-hoc|local-tracker|no-parent|draft-pull-request-target|other-reason>; parent_spec_closeout=<not-applicable|pending-review|pending-closeout|deferred-to-default-branch|armed|closed|blocked>; parent_spec_ref=<ref|none>; parent_closeout_vehicle=<pr-ref|pending|none>; parent_closeout_head=<sha|none>; parent_closeout_base=<branch|none>; default_branch=<branch|none>; pr_body_evidence=<url/fingerprint|none>; parent_closeout_watch=<not-applicable|root-monitoring|owner-handoff|automation-handoff|complete>; watch_evidence=<ref|none>; pull_request_merge_permission=<not-granted|granted-for-named-pull-request>; pull_request_merge_confirmation=<ask-authorized-user-after-checks|merge-automatically-after-checks>; codex_review=<not-applicable|not-requested|requested|received|passed|skipped|blocked> |
 | Codex review evidence | request_head=<sha|none>; request_object=<id/url|none>; checker_status=<not-requested|acknowledged|pending|clean|findings|stale|error>; wait_record=<pr-ref@head|none|not-applicable>; wait_profile_pr=<pr-ref|none|not-applicable>; wait_profile=<standard|extended|not-applicable>; wait_budget_minutes=<15|30|not-applicable>; wait_started_at=<timestamp|none|not-applicable>; wait_deadline=<timestamp|none|not-applicable>; wait_state=<not-started|active|monitoring-required|terminal|not-applicable>; observation_fingerprint=<sha256|none|not-applicable>; last_transition_at=<timestamp|none|not-applicable>; result_head=<sha|none>; result_kind=<formal-review|provider-comment|clean-reaction|none>; result_object=<id/url|none>; provider=<verified identity|none>; terminal=<clean|findings|error|none>; disposition=<status/evidence> |
 | GitHub routing | workflow_skill=<gitstack skill>; primary_transport=connector; operation=<operation>; fallback=<unused|gh>; fallback_reason=<none|connector-unavailable|capability-unsupported|transport-failure>; evidence=<failure/result>; authority_reused=<authority> |
-| Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; result_checkout_path=<checkout or not-applicable>; starting_checkout_branch_handling=<policy> |
+| Integration | baseline=<commit/wave>; resync_state=<synced|needs-resync|replaced|root-owned>; implementation_checkout_strategy=<managed-worktree-per-feature-spec|serial-caller-checkout-branches>; result_checkout_path=<checkout or not-applicable>; starting_checkout_branch_handling=<policy>; caller_checkout_original_branch=<branch|per-repository-checkpoints|not-applicable>; caller_checkout_target_branch=<branch|not-applicable>; caller_checkout_branch_evidence=<baseline HEAD/status plus create/switch Git ref|not-applicable>; caller_checkout_restore_state=<pending|restored|not-applicable>; caller_checkout_restore_evidence=<branch/HEAD/status Git ref|pending|not-applicable> |
 | Gates / proof | <required gates and current proof target> |
 
 For every active row, `parent_spec_applicability=required` requires a parent ref
@@ -371,7 +394,8 @@ Reconciliation must reject unsupported `armed` or unjustified
 ## Wave Reports
 
 Record the canonical startup option snapshot before dispatch:
-`visible_app_task_permission`, `unmanaged_git_worktree_fallback_permission`, and
+`visible_app_task_permission`, `implementation_checkout_strategy`,
+`unmanaged_git_worktree_fallback_permission`, and
 `existing_orchestrator_session_takeover_policy`, with their option-resolution evidence. In a
 Codex App session, also record the App
 task id/title for every newly created worker, integration, or publication
@@ -387,6 +411,12 @@ name `visible-feature-spec-task` as lifecycle and review-poll owner, and prove
 the root did no implementation or review work. Include each task's Goal
 mode/status/evidence and prove no work began while its Goal was pending. Task
 count is derived from the Feature Spec set; do not record a user cap.
+
+When serial caller-checkout mode is selected, every wave report must prove the
+original caller branch baseline, the one Spec branch prepared for the wave, the
+absence of another active Feature Spec task, terminal delivery before the next
+dispatch, and restoration of the original branch. Keep the serial lane and the
+Recovery Packet projection synchronized after every branch transition.
 
 The execution report is not an approval prompt. Continue later waves while they
 stay inside the recorded source items, canonical option snapshot, worker

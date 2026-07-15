@@ -35,7 +35,12 @@ or stop for an owner-approved safe location. Do not dirty a parent coordination
 checkout just to create helper worktrees.
 
 The original child checkout remains the source of truth for remotes, default
-branch, and project memory. Worker implementation runs in the helper worktree.
+branch, and project memory. Under the default
+`managed-worktree-per-feature-spec` strategy, worker implementation runs in the
+helper worktree. Under `serial-caller-checkout-branches`, no helper worktree is
+created; the root rotates every affected clean child checkout onto the one
+active Spec's dedicated branch and restores all original branches after
+terminal delivery.
 
 ## Dispatch And Parallelism
 
@@ -48,8 +53,13 @@ Execution ordering is derived, not separately configured:
 - With `visible_app_task_permission=granted-by-authorized-user`, create one
   visible task per Feature Spec, not per repository. That task owns every
   child-repo implementation and every repo-specific PR required by the Spec.
-  The orchestrator still derives task start order and serial or parallel
-  scheduling, while each task derives its internal subagent topology.
+  With managed worktrees, the orchestrator still derives task start order and
+  serial or parallel scheduling. With
+  `implementation_checkout_strategy=serial-caller-checkout-branches`, prepare
+  the Spec's exact branch in every affected child caller checkout, run only that
+  Spec task, restore every original child branch after terminal delivery, and
+  only then dispatch the next Spec. Each task derives its internal subagent
+  topology within the selected checkout strategy.
 - Dependencies, dirty worktrees, overlapping path sets, missing authority, and
   repo/branch/worktree conflicts override requested parallelism.
 
@@ -57,6 +67,10 @@ Safe parallelism requires every active worker to have a unique
 `(repo, branch, worktree)` tuple. Same repo plus same branch must serialize,
 block, or fail safely through Git's branch ownership checks. Never force a
 second worktree checkout of a branch already used by another active worktree.
+Serial caller-checkout mode is stricter: it permits only one active Feature
+Spec task across the workspace even when its child repos or paths do not
+overlap. Different Feature Specs must not share a target branch name within the
+same child repo.
 
 ## Codex App Workers
 

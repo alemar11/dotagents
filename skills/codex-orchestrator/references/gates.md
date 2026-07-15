@@ -119,9 +119,9 @@ Before push, draft PR publication, or ready-for-review transition, evaluate
 - `branch_target_guard`: `default-branch-blocked`,
   `protected-branch-blocked`, or `verified-feature-branch`.
 - `result_checkout_path_guard`: `worker-worktree`, `integration-worktree`,
-  `branch-switch-authorized`, or `blocked`.
-- `caller_checkout_guard`: `preserved`, `policy-approved-switch`, or
-  `not-applicable`.
+  `serial-caller-checkout-branch`, or `blocked`.
+- `caller_checkout_guard`: `preserved`, `policy-approved-switch`,
+  `restored-after-terminal-task`, or `not-applicable`.
 - `pr_diff_status`: `non-empty`, `empty`, or `not-checked`.
 - `ready_for_review_state`: `draft`, `ready`, `not-checked`, or `not-applicable`.
 - `post_push_verification`: `verified`, `failed`, or `not-applicable`.
@@ -144,6 +144,28 @@ App-surface failure or unsuitability plus
 `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`;
 otherwise set `result_checkout_path_guard=blocked`. This additional guard does
 not apply in CLI-only sessions or to an existing owner-supplied checkout.
+
+For `implementation_checkout_strategy=serial-caller-checkout-branches`, set
+`result_checkout_path_guard=serial-caller-checkout-branch` only when all of the
+following are proven:
+
+- exact authorized-user evidence selected no-worktree execution and the
+  workstream has `starting_checkout_branch_handling=branch-switch-authorized`;
+- the caller checkout was clean before preparation and its original branch,
+  HEAD, and status fingerprint are recorded;
+- the active branch equals this Spec's exact `target_branch_name`, differs from
+  the original branch, matches the retained run-wide serial branch-assignment
+  row, and the same repository/branch pair has never been assigned to another
+  Feature Spec;
+- the ledger has no other active Feature Spec task; and
+- the task owns implementation through its complete delivery target.
+
+After the task reaches that target, do not dispatch the next Spec or close the
+portfolio until the feature branch is clean, the root has restored the original
+branch, and its branch, HEAD, and status match the recorded baseline. Record
+`caller_checkout_guard=restored-after-terminal-task` with Git evidence. A
+dirty baseline, branch reuse, early branch switch, restoration mismatch, or
+missing proof blocks the serial lane.
 
 ### Live Proof Gate
 

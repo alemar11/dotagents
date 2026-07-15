@@ -64,7 +64,35 @@ On resume:
    in-scope and claimed repo set from `## Scope` and `## Active Root`; reject
    missing or extra repos. Recompute every HEAD, branch, and
    `git status --short` fingerprint and verify the root claim plus active-worker
-   state still match. Parse the authoritative `Active workers` rows, reject
+   state still match. Build `LIVE_REPO_CHECKPOINT_ROWS` from those recomputed
+   values, never from ledger strings, with one tab-separated row per repo:
+
+   ```text
+   <absolute-realpath>\t<head-sha>\t<git-status-short-sha256>\t<branch-or-detached>\t<command-or-tool-evidence>
+   ```
+
+   Parse the Active Root and Recovery Packet serial caller-checkout projections
+   and require their exact checkpoint sets to match. Require every
+   `original_status` to equal the canonical SHA-256 of empty
+   `git status --short` bytes,
+   `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+   Parse the run-wide `Serial caller-checkout branch assignments`, retain
+   completed and blocked rows, reject duplicate Spec/repository assignments or
+   a repository/branch pair owned by different Specs, and require every current
+   serial Feature Spec workstream to match its registered assignment. When the lane is active,
+   bind every checkpoint to a live repo row. `task-active` requires the live
+   branch to equal that repo's recorded target branch; `baseline-recorded` and
+   `restored` require the live branch, HEAD, and status fingerprint to equal the
+   original baseline. `dispatch-feature-spec` is fresh only from
+   `branch-prepared`, when its target equals the lane Spec and every prepared
+   repository/branch matches that Spec's retained assignment and has a clean
+   live status fingerprint at the recorded original HEAD; a blocked lane
+   must remain blocked or route to owner action and may never dispatch another
+   Spec. For a multi-repository active workstream, require
+   `caller_checkout_original_branch=per-repository-checkpoints` and resolve each
+   different original branch from its checkpoint. A `restoring` intermediate state
+   is never fresh. Parse
+   the authoritative `Active workers` rows, reject
    duplicate worker IDs or malformed execution locations, and require their
    exact ID set to match the packet. Require every listed `workstream_ids`
    assignment to exist in the authoritative active workstream bucket and to
@@ -120,6 +148,13 @@ On resume:
    tab-separated `row_id,scope_id,field,value,source,evidence`, sort bytewise by
    `row_id`, and hash the resulting lines. Cells must not contain a literal
    `|`; encode it as `%7C`.
+
+   Also require the session checkout strategy, Active Root projection, and
+   Recovery Packet projection to match. In serial caller-checkout mode, reject
+   more than one active visible task, any Feature Spec without branch-switch
+   authority, target-branch reuse across different Spec refs, or an active task
+   whose Integration row lacks the caller-checkout branch and pending-
+   restoration evidence.
 
    ```bash
    OPTION_ROW_IDS='<comma-separated union of packet session_rows and scoped_rows>'
@@ -228,12 +263,12 @@ On resume:
        }
        function emit_workstream() {
          if (workstream == "") return
-         if (worker !~ /^[A-Za-z0-9:_-]+$/ || location !~ /^(current-orchestrator-session|background-codex-subagent|visible-codex-app-task)$/ || repo_ref == "" || pr_ref == "") exit 54
+         if (worker !~ /^[A-Za-z0-9:_-]+$/ || location !~ /^(current-orchestrator-session|background-codex-subagent|visible-codex-app-task)$/ || repo_ref !~ /^[A-Za-z0-9_.\/:@%+-]+(,[A-Za-z0-9_.\/:@%+-]+)*$/ || pr_ref == "") exit 54
          if (location == "current-orchestrator-session" && worker != "root") exit 54
          if (location == "visible-codex-app-task") {
            if (!valid_goal(goal_mode, goal_status, goal_dispatch_objective_sha256, goal_reported_objective_sha256, goal_evidence, goal_missing_tool, task_assignment == "required")) exit 57
          } else if (goal_mode != "not-applicable" || goal_status != "not-applicable" || goal_dispatch_objective_sha256 != "not-applicable" || goal_reported_objective_sha256 != "not-applicable" || goal_evidence != "not-applicable" || goal_missing_tool != "not-applicable") exit 57
-         print workstream "\t" worker "\t" location "\t" feature_spec_ref "\t" feature_spec_title "\t" task_assignment "\t" repo_ref "\t" pr_ref "\t" goal_mode "\t" goal_status "\t" goal_dispatch_objective_sha256 "\t" goal_reported_objective_sha256 "\t" goal_evidence "\t" goal_missing_tool
+         print workstream "\t" worker "\t" location "\t" feature_spec_ref "\t" feature_spec_title "\t" task_assignment "\t" repo_ref "\t" pr_ref "\t" goal_mode "\t" goal_status "\t" goal_dispatch_objective_sha256 "\t" goal_reported_objective_sha256 "\t" goal_evidence "\t" goal_missing_tool "\t" integration_checkout_strategy "\t" result_checkout_path "\t" integration_branch_handling "\t" caller_original_branch "\t" caller_target_branch "\t" caller_branch_evidence "\t" caller_restore_state "\t" caller_restore_evidence
          workstream=""
        }
        /^## Workstreams$/ { workstreams=1; next }
@@ -242,7 +277,7 @@ On resume:
        active && /^#### [A-Za-z0-9:_-]+: / {
          emit_workstream()
          workstream=$0; sub(/^#### /, "", workstream); sub(/: .*/, "", workstream)
-         worker=""; location=""; repo_ref=""; pr_ref=""; feature_spec_ref=""; feature_spec_title=""; task_assignment=""; goal_mode=""; goal_status=""; goal_dispatch_objective_sha256=""; goal_reported_objective_sha256=""; goal_evidence=""; goal_missing_tool=""; next
+         worker=""; location=""; repo_ref=""; pr_ref=""; feature_spec_ref=""; feature_spec_title=""; task_assignment=""; goal_mode=""; goal_status=""; goal_dispatch_objective_sha256=""; goal_reported_objective_sha256=""; goal_evidence=""; goal_missing_tool=""; integration_checkout_strategy=""; result_checkout_path=""; integration_branch_handling=""; caller_original_branch=""; caller_target_branch=""; caller_branch_evidence=""; caller_restore_state=""; caller_restore_evidence=""; next
        }
        active && /^\| Feature Spec task \|/ {
          value=norm($3)
@@ -267,6 +302,18 @@ On resume:
          next
        }
        active && /^\| Delivery \|/ { pr_ref=token_value(norm($3), "target_pull_request_ref"); next }
+       active && /^\| Integration \|/ {
+         value=norm($3)
+         integration_checkout_strategy=token_value(value, "implementation_checkout_strategy")
+         result_checkout_path=token_value(value, "result_checkout_path")
+         integration_branch_handling=token_value(value, "starting_checkout_branch_handling")
+         caller_original_branch=token_value(value, "caller_checkout_original_branch")
+         caller_target_branch=token_value(value, "caller_checkout_target_branch")
+         caller_branch_evidence=token_value(value, "caller_checkout_branch_evidence")
+         caller_restore_state=token_value(value, "caller_checkout_restore_state")
+         caller_restore_evidence=token_value(value, "caller_checkout_restore_evidence")
+         next
+       }
        END { emit_workstream() }
      ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1
    )" || exit 54
@@ -282,6 +329,7 @@ On resume:
    )" || exit 54
    PARSED_ACTIVE_WORKSTREAM_IDS="$(printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | awk -F '\t' 'NF { print $1 }' | LC_ALL=C sort | paste -sd, -)"
    [ "$ACTIVE_WORKSTREAM_IDS" = "$PARSED_ACTIVE_WORKSTREAM_IDS" ] || exit 54
+   ACTIVE_WORKSTREAM_PROJECTION="$(printf '%s\n' "$ACTIVE_WORKSTREAM_ROWS" | paste -sd $'\034' -)"
    FEATURE_SPEC_TASK_ROWS="$(
      awk -F '|' '
        function norm(value) {
@@ -393,7 +441,8 @@ On resume:
          if (authoritative_location[workstream] == "visible-codex-app-task") {
            task=authoritative_worker[workstream]
            if (live_goal_mode[task] != authoritative_goal_mode[workstream] || live_goal_status[task] != authoritative_goal_status[workstream] || live_goal_reported_objective_sha256[task] != authoritative_goal_reported_objective_sha256[workstream] || live_goal_evidence[task] != authoritative_goal_evidence[workstream] || live_goal_missing_tool[task] != authoritative_goal_missing_tool[workstream]) exit 58
-           active_visible_repo[task SUBSEP authoritative_repo[workstream]]=1
+           repo_count=split(authoritative_repo[workstream], repos, ",")
+           for (repo_index=1; repo_index <= repo_count; repo_index++) active_visible_repo[task SUBSEP repos[repo_index]]=1
            active_visible_pr[task SUBSEP authoritative_pr[workstream]]=1
          }
        }
@@ -401,10 +450,15 @@ On resume:
          if (!(workstream in authoritative) || assigned_worker[workstream] != registry_worker_for_workstream[workstream] || assigned_location[workstream] != "visible-codex-app-task") exit 57
          else {
            task=registry_worker_for_workstream[workstream]
-           repo_key=task SUBSEP authoritative_repo[workstream]
            pr_key=task SUBSEP authoritative_pr[workstream]
-           if (!(repo_key in registry_repo) || !(pr_key in registry_pr)) exit 57
-           active_registry_repo[repo_key]=1; active_registry_pr[pr_key]=1
+           if (!(pr_key in registry_pr)) exit 57
+           active_registry_pr[pr_key]=1
+           repo_count=split(authoritative_repo[workstream], repos, ",")
+           for (repo_index=1; repo_index <= repo_count; repo_index++) {
+             repo_key=task SUBSEP repos[repo_index]
+             if (!(repo_key in registry_repo)) exit 57
+             active_registry_repo[repo_key]=1
+           }
          }
        for (key in registry_repo) if (!(key in active_registry_repo) || !(key in live_repo)) exit 57
        for (key in registry_pr) if (!(key in active_registry_pr) || !(key in live_pr)) exit 57
@@ -570,13 +624,279 @@ On resume:
      [ -z "$target_branch_name" ] && continue
      [ "$target_branch_name" = "not-applicable" ] || git check-ref-format --branch "$target_branch_name" >/dev/null 2>&1 || exit 50
    done < <(printf '%s\n' "$OPTION_BRANCH_NAMES")
+   ROOT_CHECKOUT_STRATEGY="$(
+     awk '
+       /^## Active Root$/ { root=1; next }
+       /^## Codex Review Wait Registry$/ { exit }
+       root && /^Implementation checkout strategy: / {
+         rows++; value=$0; sub(/^Implementation checkout strategy: /, "", value)
+         if (value !~ /^(managed-worktree-per-feature-spec|serial-caller-checkout-branches)$/) exit 56
+         print value
+       }
+       END { if (rows != 1) exit 56 }
+     ' "$ledger"
+   )" || exit 56
+   PACKET_CHECKOUT_STRATEGY="$(
+     awk '
+       /^## Recovery Packet$/ { packet=1; next }
+       /^## Worker And Delivery References$/ { exit }
+       packet && /^Checkout strategy: / {
+         rows++; value=$0; sub(/^Checkout strategy: /, "", value); sub(/;.*/, "", value)
+         if (value !~ /^(managed-worktree-per-feature-spec|serial-caller-checkout-branches)$/) exit 56
+         print value
+       }
+       END { if (rows != 1) exit 56 }
+     ' "$ledger"
+   )" || exit 56
+   [ "$ROOT_CHECKOUT_STRATEGY" = "$PACKET_CHECKOUT_STRATEGY" ] || exit 56
+   ROOT_SERIAL_LANE="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Active Root$/ { root=1; next }
+       /^## Codex Review Wait Registry$/ { exit }
+       root && /^Serial caller-checkout lane: / {
+         rows++; value=$0; sub(/^Serial caller-checkout lane: /, "", value)
+         state=token_value(value, "state"); ref=token_value(value, "feature_spec_ref")
+         if (state !~ /^(not-applicable|baseline-recorded|branch-prepared|task-active|restored|blocked)$/ || ref == "") exit 61
+         print state "\t" ref
+       }
+       END { if (rows != 1) exit 61 }
+     ' "$ledger"
+   )" || exit 61
+   PACKET_SERIAL_LANE="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Recovery Packet$/ { packet=1; next }
+       /^## Worker And Delivery References$/ { exit }
+       packet && /^Checkout strategy: / {
+         rows++; value=$0; sub(/^Checkout strategy: /, "", value)
+         state=token_value(value, "serial_lane"); ref=token_value(value, "active_feature_spec")
+         if (state !~ /^(not-applicable|baseline-recorded|branch-prepared|task-active|restored|blocked)$/ || ref == "") exit 61
+         print state "\t" ref
+       }
+       END { if (rows != 1) exit 61 }
+     ' "$ledger"
+   )" || exit 61
+   [ "$ROOT_SERIAL_LANE" = "$PACKET_SERIAL_LANE" ] || exit 61
+   ROOT_SERIAL_CHECKPOINT_ROWS="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Active Root$/ { root=1; next }
+       /^## Codex Review Wait Registry$/ { exit }
+       root && /^Serial caller-checkout checkpoints:$/ { markers++; checkpoints=1; next }
+       checkpoints && /^- none$/ { none++; next }
+       checkpoints && /^- / {
+         rows++; value=$0; sub(/^- /, "", value)
+         repo=token_value(value, "repo_ref"); realpath=token_value(value, "realpath")
+         branch=token_value(value, "original_branch"); head=token_value(value, "original_head")
+         status=token_value(value, "original_status"); target=token_value(value, "target_branch")
+         evidence=token_value(value, "evidence")
+         if (repo == "" || realpath !~ /^\// || branch == "" || head !~ /^[0-9a-f]{7,64}$/ || status != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" || target == "" || evidence == "") exit 61
+         print repo "\t" realpath "\t" branch "\t" head "\t" status "\t" target "\t" evidence
+         next
+       }
+       checkpoints { checkpoints=0 }
+       END { if (markers != 1 || (none && rows) || (!none && !rows) || none > 1) exit 61 }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,2
+   )" || exit 61
+   PACKET_SERIAL_CHECKPOINT_ROWS="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Recovery Packet$/ { packet=1; next }
+       /^## Worker And Delivery References$/ { exit }
+       packet && /^Serial caller-checkout checkpoints:$/ { markers++; checkpoints=1; next }
+       checkpoints && /^- none$/ { none++; next }
+       checkpoints && /^- / {
+         rows++; value=$0; sub(/^- /, "", value)
+         repo=token_value(value, "repo_ref"); realpath=token_value(value, "realpath")
+         branch=token_value(value, "original_branch"); head=token_value(value, "original_head")
+         status=token_value(value, "original_status"); target=token_value(value, "target_branch")
+         evidence=token_value(value, "evidence")
+         if (repo == "" || realpath !~ /^\// || branch == "" || head !~ /^[0-9a-f]{7,64}$/ || status != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" || target == "" || evidence == "") exit 61
+         print repo "\t" realpath "\t" branch "\t" head "\t" status "\t" target "\t" evidence
+         next
+       }
+       checkpoints { checkpoints=0 }
+       END { if (markers != 1 || (none && rows) || (!none && !rows) || none > 1) exit 61 }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,2
+   )" || exit 61
+   [ "$ROOT_SERIAL_CHECKPOINT_ROWS" = "$PACKET_SERIAL_CHECKPOINT_ROWS" ] || exit 61
+   ROOT_SERIAL_BRANCH_ASSIGNMENT_ROWS="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Active Root$/ { root=1; next }
+       /^## Codex Review Wait Registry$/ { exit }
+       root && /^Serial caller-checkout branch assignments:$/ { markers++; assignments=1; next }
+       assignments && /^- none$/ { none++; next }
+       assignments && /^- / {
+         rows++; value=$0; sub(/^- /, "", value)
+         ref=token_value(value, "feature_spec_ref"); repo=token_value(value, "repository_ref")
+         branch=token_value(value, "target_branch"); state=token_value(value, "state")
+         evidence=token_value(value, "evidence")
+         if (ref == "" || ref == "not-applicable" || repo == "" || branch == "" || state !~ /^(assigned|completed|blocked)$/ || evidence == "") exit 63
+         spec_repo=ref SUBSEP repo; repo_branch=repo SUBSEP branch
+         if (seen_spec_repo[spec_repo]++ || (repo_branch in branch_owner && branch_owner[repo_branch] != ref)) exit 63
+         branch_owner[repo_branch]=ref
+         print ref "\t" repo "\t" branch "\t" state "\t" evidence
+         next
+       }
+       assignments { assignments=0 }
+       END { if (markers != 1 || (none && rows) || (!none && !rows) || none > 1) exit 63 }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,2 -k2,2
+   )" || exit 63
+   if [ "$ROOT_CHECKOUT_STRATEGY" = "managed-worktree-per-feature-spec" ] && [ -n "$ROOT_SERIAL_BRANCH_ASSIGNMENT_ROWS" ]; then exit 63; fi
+   ROOT_SERIAL_BRANCH_ASSIGNMENT_PROJECTION="$(printf '%s\n' "$ROOT_SERIAL_BRANCH_ASSIGNMENT_ROWS" | paste -sd $'\034' -)"
+   PACKET_REPO_CHECKPOINT_ROWS="$(
+     awk '
+       function norm(value) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); return value }
+       function token_value(value, key, count, parts, i, item, prefix) {
+         count=split(value, parts, ";"); prefix=key "="
+         for (i=1; i <= count; i++) { item=norm(parts[i]); if (substr(item, 1, length(prefix)) == prefix) return substr(item, length(prefix) + 1) }
+         return ""
+       }
+       /^## Recovery Packet$/ { packet=1; next }
+       /^## Worker And Delivery References$/ { exit }
+       packet && /^Repo checkpoints:$/ { markers++; repos=1; next }
+       repos && /^- / {
+         rows++; value=$0; sub(/^- /, "", value); split(value, parts, ";")
+         realpath=norm(parts[1]); head=token_value(value, "head")
+         status=token_value(value, "worktree"); branch=token_value(value, "branch")
+         if (realpath !~ /^\// || head !~ /^[0-9a-f]{7,64}$/ || status !~ /^[0-9a-f]{64}$/ || branch == "") exit 62
+         print realpath "\t" head "\t" status "\t" branch
+         next
+       }
+       repos { repos=0 }
+       END { if (markers != 1 || rows < 1) exit 62 }
+     ' "$ledger" | LC_ALL=C sort -t $'\t' -k1,1
+   )" || exit 62
+   {
+     printf '%s\n' "$PACKET_REPO_CHECKPOINT_ROWS" | awk -F '\t' 'NF { print "packet\t" $0 }'
+     printf '%s\n' "$LIVE_REPO_CHECKPOINT_ROWS" | awk -F '\t' 'NF { print "live\t" $0 }'
+   } | awk -F '\t' '
+     $1 == "packet" { if (NF != 5 || packet[$2]++) exit 62; head[$2]=$3; status[$2]=$4; branch[$2]=$5; next }
+     $1 == "live" { if (NF != 6 || live[$2]++ || $6 == "") exit 62; if (!($2 in packet) || head[$2] != $3 || status[$2] != $4 || branch[$2] != $5) exit 62; next }
+     END { for (repo in packet) if (!(repo in live)) exit 62; for (repo in live) if (!(repo in packet)) exit 62 }
+   ' || exit 62
+   IFS=$'\t' read -r SERIAL_LANE_STATE SERIAL_LANE_SPEC <<< "$ROOT_SERIAL_LANE"
+   {
+     printf '%s\n' "$PACKET_SERIAL_CHECKPOINT_ROWS" | awk -F '\t' 'NF { print "serial\t" $0 }'
+     printf '%s\n' "$PACKET_REPO_CHECKPOINT_ROWS" | awk -F '\t' 'NF { print "repo\t" $0 }'
+   } | awk -F '\t' -v strategy="$ROOT_CHECKOUT_STRATEGY" -v lane="$SERIAL_LANE_STATE" -v lane_spec="$SERIAL_LANE_SPEC" -v active_workstreams="$ACTIVE_WORKSTREAM_PROJECTION" -v serial_assignments="$ROOT_SERIAL_BRANCH_ASSIGNMENT_PROJECTION" -v next_action="$ROOT_NEXT_ACTION_NAME" -v next_target="$ROOT_NEXT_ACTION_TARGET" '
+     BEGIN {
+       count=split(active_workstreams, lines, "\034")
+       for (i=1; i <= count; i++) {
+         if (lines[i] == "") continue
+         fields=split(lines[i], values, "\t")
+         if (fields < 14) exit 61
+         if (values[3] == "visible-codex-app-task" && values[4] != "not-applicable") {
+           spec_ref=values[4]
+           if (!(spec_ref in active_spec_seen)) {
+             active_spec_seen[spec_ref]=1
+             active_spec_task[spec_ref]=values[2]
+             active_specs++
+             active_spec=spec_ref
+           } else if (active_spec_task[spec_ref] != values[2]) exit 61
+           repo_count=split(values[7], active_repos, ",")
+           for (repo_index=1; repo_index <= repo_count; repo_index++) {
+             repo_ref=active_repos[repo_index]
+             active_repo[repo_ref]=1
+             active_original_by_repo[repo_ref]=values[18]
+             active_target_by_repo[repo_ref]=values[19]
+           }
+         }
+       }
+       assignment_count=split(serial_assignments, assignment_lines, "\034")
+       for (i=1; i <= assignment_count; i++) {
+         if (assignment_lines[i] == "") continue
+         assignment_fields=split(assignment_lines[i], assignment_values, "\t")
+         if (assignment_fields != 5) exit 63
+         if (assignment_values[1] == lane_spec) {
+           assignment_repo[assignment_values[2]]=1
+           assignment_target[assignment_values[2]]=assignment_values[3]
+           assignment_state[assignment_values[2]]=assignment_values[4]
+         }
+       }
+     }
+     $1 == "repo" { current_head[$2]=$3; current_status[$2]=$4; current_branch[$2]=$5; next }
+     $1 == "serial" {
+       serial_rows++; repo_ref=$2; realpath=$3; original_branch=$4; original_head=$5; original_status=$6; target_branch=$7
+       if (serial_repo[repo_ref]++ || serial_path[realpath]++ || original_branch == target_branch) exit 61
+       checkpoint_repo[repo_ref]=1
+       checkpoint_path[repo_ref]=realpath
+       checkpoint_original[repo_ref]=original_branch
+       checkpoint_original_head[repo_ref]=original_head
+       checkpoint_original_status[repo_ref]=original_status
+       checkpoint_target[repo_ref]=target_branch
+       next
+     }
+     END {
+       if (strategy == "managed-worktree-per-feature-spec") {
+         if (lane != "not-applicable" || lane_spec != "none" || serial_rows != 0) exit 61
+         exit 0
+       }
+       if (serial_rows < 1 || lane == "not-applicable" || lane_spec == "none") exit 61
+       if (next_action == "dispatch-feature-spec" && lane != "branch-prepared") exit 61
+       for (repo_ref in checkpoint_repo) {
+         realpath=checkpoint_path[repo_ref]
+         if (!(realpath in current_branch)) exit 61
+         if (lane ~ /^(baseline-recorded|restored)$/ && (current_branch[realpath] != checkpoint_original[repo_ref] || current_head[realpath] != checkpoint_original_head[repo_ref] || current_status[realpath] != checkpoint_original_status[repo_ref])) exit 61
+         if (lane ~ /^(branch-prepared|task-active)$/ && current_branch[realpath] != checkpoint_target[repo_ref]) exit 61
+         if (lane == "branch-prepared" && (current_head[realpath] != checkpoint_original_head[repo_ref] || current_status[realpath] != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")) exit 61
+       }
+       if (lane ~ /^(branch-prepared|task-active|restored|blocked)$/) {
+         for (repo_ref in checkpoint_repo)
+           if (!(repo_ref in assignment_repo) || assignment_target[repo_ref] != checkpoint_target[repo_ref]) exit 63
+         for (repo_ref in assignment_repo) if (!(repo_ref in checkpoint_repo)) exit 63
+       }
+       if (lane ~ /^(branch-prepared|task-active)$/)
+         for (repo_ref in assignment_repo) if (assignment_state[repo_ref] != "assigned") exit 63
+       if (lane == "restored")
+         for (repo_ref in assignment_repo) if (assignment_state[repo_ref] != "completed") exit 63
+       if (lane == "blocked")
+         for (repo_ref in assignment_repo) if (assignment_state[repo_ref] != "blocked") exit 63
+       if (lane == "task-active") {
+         if (active_specs != 1 || active_spec != lane_spec) exit 61
+         for (repo_ref in active_repo) {
+           if (!(repo_ref in checkpoint_repo)) exit 61
+           if ((active_original_by_repo[repo_ref] != "per-repository-checkpoints" && checkpoint_original[repo_ref] != active_original_by_repo[repo_ref]) || checkpoint_target[repo_ref] != active_target_by_repo[repo_ref]) exit 61
+         }
+         for (repo_ref in checkpoint_repo) if (!(repo_ref in active_repo)) exit 61
+       } else if (active_specs != 0 && lane !~ /^(blocked)$/) exit 61
+       if (lane == "branch-prepared" && (active_specs != 0 || next_action != "dispatch-feature-spec" || next_target != lane_spec)) exit 61
+     }
+   ' || exit 61
    COMPUTED_OPTION_ROWS_FINGERPRINT="$(
-     awk -F '|' -v wanted="$OPTION_ROW_IDS" -v scopes="$OPTION_SCOPE_IDS" -v active_app_count="$ACTIVE_APP_WORKER_COUNT" -v active_workstreams="$ACTIVE_WORKSTREAM_ROWS" '
+     awk -F '|' -v wanted="$OPTION_ROW_IDS" -v scopes="$OPTION_SCOPE_IDS" -v active_app_count="$ACTIVE_APP_WORKER_COUNT" -v active_workstreams="$ACTIVE_WORKSTREAM_PROJECTION" -v projected_checkout_strategy="$ROOT_CHECKOUT_STRATEGY" -v serial_assignments="$ROOT_SERIAL_BRANCH_ASSIGNMENT_PROJECTION" '
        BEGIN {
-         split("visible_app_task_permission unmanaged_git_worktree_fallback_permission existing_orchestrator_session_takeover_policy repository_layout", fields, " ")
+         split("visible_app_task_permission implementation_checkout_strategy unmanaged_git_worktree_fallback_permission existing_orchestrator_session_takeover_policy repository_layout", fields, " ")
          for (i in fields) expected_session[fields[i]]=1
          expected_source["tracked_work_item_update_permission"]=1
-         split("tracked_work_item_update_permission change_delivery_permission issue_update_permission pull_request_merge_permission pull_request_merge_confirmation starting_checkout_branch_handling scheduled_automation_change_permission temporary_source_execution_permission completion_evidence_policy change_delivery_target delivery_decision_origin workstream_repository_layout codex_review_requirement pull_request_count_strategy issue_completion_method feature_spec_ref feature_spec_title target_branch_name target_pull_request_ref delivery_permission_source_issue_ref issue_update_permission_source_issue_ref", fields, " ")
+         split("tracked_work_item_update_permission change_delivery_permission issue_update_permission pull_request_merge_permission pull_request_merge_confirmation starting_checkout_branch_handling scheduled_automation_change_permission temporary_source_execution_permission completion_evidence_policy change_delivery_target delivery_decision_origin workstream_repository_layout codex_review_requirement pull_request_count_strategy issue_completion_method feature_spec_ref feature_spec_title workstream_repository_refs target_branch_name target_pull_request_ref delivery_permission_source_issue_ref issue_update_permission_source_issue_ref", fields, " ")
          for (i in fields) expected_workstream[fields[i]]=1
          count=split(wanted, ids, ",")
          for (i=1; i <= count; i++) if (ids[i] != "") { requested[ids[i]]++; selected[ids[i]]=1 }
@@ -588,7 +908,7 @@ On resume:
            else if (scope_ids[i] ~ /^workstream:/) applicable_workstream_scope[scope_ids[i]]=1
            else invalid=45
          }
-         active_count=split(active_workstreams, active_lines, "\n")
+         active_count=split(active_workstreams, active_lines, "\034")
          for (i=1; i <= active_count; i++) {
            if (active_lines[i] == "") continue
            field_count=split(active_lines[i], active_fields, "\t")
@@ -598,6 +918,23 @@ On resume:
            active_spec_ref[active_scope]=active_fields[4]
            active_spec_title[active_scope]=active_fields[5]
            active_task_assignment[active_scope]=active_fields[6]
+           active_repository_refs[active_scope]=active_fields[7]
+           active_checkout_strategy[active_scope]=active_fields[15]
+           active_result_checkout[active_scope]=active_fields[16]
+           active_branch_handling[active_scope]=active_fields[17]
+           active_original_branch[active_scope]=active_fields[18]
+           active_target_branch[active_scope]=active_fields[19]
+           active_branch_evidence[active_scope]=active_fields[20]
+           active_restore_state[active_scope]=active_fields[21]
+           active_restore_evidence[active_scope]=active_fields[22]
+         }
+         assignment_count=split(serial_assignments, assignment_lines, "\034")
+         for (i=1; i <= assignment_count; i++) {
+           if (assignment_lines[i] == "") continue
+           assignment_fields=split(assignment_lines[i], assignment_values, "\t")
+           if (assignment_fields != 5) { invalid=63; continue }
+           assignment_key=assignment_values[1] SUBSEP assignment_values[2]
+           serial_assignment_branch[assignment_key]=assignment_values[3]
          }
        }
        function norm(value) {
@@ -617,6 +954,7 @@ On resume:
        }
        function permission_bearing(field, value) {
          if (field == "visible_app_task_permission" && value == "granted-by-authorized-user") return 1
+         if (field == "implementation_checkout_strategy" && value == "serial-caller-checkout-branches") return 1
          if (field == "unmanaged_git_worktree_fallback_permission" && value == "granted-by-authorized-user") return 1
          if (field == "tracked_work_item_update_permission" && matches(value, "propose-updates-only|apply-updates")) return 1
          if (field == "change_delivery_permission" && value == "granted-for-selected-target") return 1
@@ -633,6 +971,7 @@ On resume:
        }
        function allowed_value(field, value) {
          if (field == "visible_app_task_permission") return matches(value, "not-requested|granted-by-authorized-user|denied-by-authorized-user")
+         if (field == "implementation_checkout_strategy") return matches(value, "managed-worktree-per-feature-spec|serial-caller-checkout-branches")
          if (field == "unmanaged_git_worktree_fallback_permission") return matches(value, "not-granted|granted-by-authorized-user")
          if (field == "existing_orchestrator_session_takeover_policy") return matches(value, "ask-authorized-user-before-takeover|take-over-only-if-existing-ledger-is-stale")
          if (field == "repository_layout" || field == "workstream_repository_layout") return matches(value, "single-repository|monorepo|multi-repository-workspace")
@@ -651,6 +990,7 @@ On resume:
          if (field == "issue_completion_method") return matches(value, "feature-pull-request-closing-keyword|repository-pull-request-closing-keyword|final-commit-closing-keyword|move-local-issue-to-done-after-proof|no-issue-completion")
          if (field == "feature_spec_ref") return value == "not-applicable" || value != ""
          if (field == "feature_spec_title") return value == "not-applicable" || (value != "" && encoded_title(value))
+         if (field == "workstream_repository_refs") return value ~ /^[A-Za-z0-9_.\/:@%+-]+(,[A-Za-z0-9_.\/:@%+-]+)*$/
          if (field == "target_branch_name") return value == "not-applicable" || value != ""
          if (field == "target_pull_request_ref") return matches(value, "not-applicable|pending|[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*")
          if (field == "delivery_permission_source_issue_ref" || field == "issue_update_permission_source_issue_ref") return matches(value, "not-applicable|issue:[A-Za-z0-9:_-]+")
@@ -660,6 +1000,7 @@ On resume:
          if (field == "repository_layout") return matches(source, "project-layout-config|runtime-derived|authorized-user-instruction")
          if (field == "workstream_repository_layout") return matches(source, "source-contract|runtime-derived|authorized-user-instruction")
          if (field == "visible_app_task_permission") return value == "not-requested" ? source == "default" : source == "authorized-user-instruction"
+         if (field == "implementation_checkout_strategy") return value == "managed-worktree-per-feature-spec" ? source == "default" : source == "authorized-user-instruction"
          if (field == "unmanaged_git_worktree_fallback_permission") return value == "not-granted" ? matches(source, "default|runtime-capability") : source == "authorized-user-instruction"
          if (field == "existing_orchestrator_session_takeover_policy") return value == "ask-authorized-user-before-takeover" ? source == "default" : source == "authorized-user-instruction"
          if (field == "tracked_work_item_update_permission") return value == "read-only" ? matches(source, "default|runtime-capability") : matches(source, "authorized-user-instruction|source-contract")
@@ -693,6 +1034,7 @@ On resume:
          }
          if (field == "pull_request_count_strategy" || field == "issue_completion_method") return matches(source, "source-contract|runtime-derived|default")
          if (field == "feature_spec_ref" || field == "feature_spec_title") return value == "not-applicable" ? matches(source, "default|runtime-derived") : source == "source-contract"
+         if (field == "workstream_repository_refs") return matches(source, "source-contract|runtime-derived")
          return 0
        }
        /^## Option Resolution$/ { options=1; next }
@@ -741,7 +1083,10 @@ On resume:
          for (scope_id in applicable_workstream_scope) for (field in expected_workstream) if (present[scope_id SUBSEP field] != 1) exit 45
 
          app_permission=resolved["session" SUBSEP "visible_app_task_permission"]
+         checkout_strategy=resolved["session" SUBSEP "implementation_checkout_strategy"]
+         if (checkout_strategy != projected_checkout_strategy) exit 56
          if (app_permission != "granted-by-authorized-user" && active_app_count != 0) exit 48
+         if (checkout_strategy == "serial-caller-checkout-branches" && (app_permission != "granted-by-authorized-user" || resolved["session" SUBSEP "unmanaged_git_worktree_fallback_permission"] != "not-granted" || active_app_count > 1)) exit 48
 
          for (scope_id in applicable_workstream_scope) {
            delivery=resolved[scope_id SUBSEP "change_delivery_target"]
@@ -759,12 +1104,38 @@ On resume:
            issue_transfer=resolved[scope_id SUBSEP "issue_update_permission_source_issue_ref"]
            canonical_spec_ref=resolved[scope_id SUBSEP "feature_spec_ref"]
            canonical_spec_title=resolved[scope_id SUBSEP "feature_spec_title"]
+           repository_refs=resolved[scope_id SUBSEP "workstream_repository_refs"]
+           branch_handling=resolved[scope_id SUBSEP "starting_checkout_branch_handling"]
 
            if ((canonical_spec_ref == "not-applicable") != (canonical_spec_title == "not-applicable")) exit 57
            if (scope_id in active_location && (active_spec_ref[scope_id] != canonical_spec_ref || active_spec_title[scope_id] != canonical_spec_title)) exit 57
+           if (scope_id in active_location && active_repository_refs[scope_id] != repository_refs) exit 57
            feature_spec_backed=(canonical_spec_ref != "not-applicable")
+           if (checkout_strategy == "serial-caller-checkout-branches" && feature_spec_backed) {
+             if (branch_handling != "branch-switch-authorized" || branch == "not-applicable" || delivery == "validated-changes-left-uncommitted") exit 48
+             repository_count=split(repository_refs, repository_items, ",")
+             for (repository_index=1; repository_index <= repository_count; repository_index++) {
+               repository_ref=repository_items[repository_index]
+               repository_scope_key=scope_id SUBSEP repository_ref
+               if (repository_scope_key in repository_seen) exit 48
+               repository_seen[repository_scope_key]=1
+               branch_key=repository_ref SUBSEP branch
+               if (branch_key in local_branch_spec && local_branch_spec[branch_key] != canonical_spec_ref) exit 48
+               local_branch_spec[branch_key]=canonical_spec_ref
+               assignment_key=canonical_spec_ref SUBSEP repository_ref
+               if (!(assignment_key in serial_assignment_branch) || serial_assignment_branch[assignment_key] != branch) exit 63
+             }
+           }
            if (app_permission == "granted-by-authorized-user" && feature_spec_backed && scope_id in active_location) {
              if (active_location[scope_id] != "visible-codex-app-task" || active_task_assignment[scope_id] != "required" || active_spec_ref[scope_id] == "" || active_spec_ref[scope_id] == "not-applicable" || active_spec_title[scope_id] == "" || active_spec_title[scope_id] == "not-applicable") exit 57
+           }
+           if (checkout_strategy == "serial-caller-checkout-branches" && feature_spec_backed && scope_id in active_location) {
+             if (active_checkout_strategy[scope_id] != checkout_strategy || active_result_checkout[scope_id] != "caller-checkout" || active_branch_handling[scope_id] != "branch-switch-authorized") exit 57
+             active_repository_count=split(repository_refs, active_repository_items, ",")
+             if (active_repository_count > 1 && active_original_branch[scope_id] != "per-repository-checkpoints") exit 57
+             if (active_repository_count == 1 && (active_original_branch[scope_id] == "" || active_original_branch[scope_id] ~ /^(not-applicable|detached|per-repository-checkpoints)$/)) exit 57
+             if (active_target_branch[scope_id] != branch || (active_repository_count == 1 && active_target_branch[scope_id] == active_original_branch[scope_id])) exit 57
+             if (active_branch_evidence[scope_id] == "" || active_branch_evidence[scope_id] == "not-applicable" || active_restore_state[scope_id] != "pending" || active_restore_evidence[scope_id] != "pending") exit 57
            }
 
            if (resolved[scope_id SUBSEP "pull_request_merge_confirmation"] == "merge-automatically-after-checks" && resolved[scope_id SUBSEP "pull_request_merge_permission"] != "granted-for-named-pull-request") exit 48
