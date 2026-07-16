@@ -24,8 +24,8 @@ should improve future agent context, not just the current conversation.
 - `capture_mode=defer-to-caller` is available when an explicit parent workflow requests it
   or the user directly requests a non-writing or deferred result. Inspect the
   same project context and resolve the same decisions, but do not edit
-  repository documentation. Return a structured
-  `domain_knowledge_delta` so the caller can assign capture to a later tracked
+  repository documentation. Return an optional structured `knowledge_delta`
+  data object so the caller can assign capture to a later tracked
   implementation or integration task.
 
 Load `$project-memory`'s `references/options.md` before resolving this field.
@@ -37,10 +37,13 @@ explicitly requests a non-writing or deferred result.
 
 Resolve the mode deterministically before inspecting or questioning:
 
-1. Direct `$grill-me-with-context` invocation uses `capture_mode=inline`.
-2. An explicit user request such as "do not edit docs" or "defer capture" uses
+1. An explicit user request such as "do not edit docs" or "defer capture" uses
    `capture_mode=defer-to-caller` and returns the structured delta to the user.
-3. A parent workflow uses the canonical `capture_mode` it passes explicitly.
+   This narrower no-write instruction wins over every writing default.
+2. Otherwise, a parent workflow uses the canonical `capture_mode` it passes
+   explicitly.
+3. Otherwise, direct `$grill-me-with-context` invocation uses
+   `capture_mode=inline`.
 
 Do not infer `capture_mode=defer-to-caller` merely because the request is
 planning-only, because the user did not separately request documentation
@@ -106,9 +109,8 @@ docs:
 
 ```yaml
 capture_mode: defer-to-caller
-capture_outcome: deferred | no-durable-change
-domain_knowledge_delta:
-  knowledge_delta: required | none
+capture_outcome: deferred
+knowledge_delta:
   decisions:
     - Accepted durable term, rule, boundary, or decision.
   target_surfaces:
@@ -118,19 +120,19 @@ domain_knowledge_delta:
     - current-repository/<repo-relative-path>
     - <repo-slug>/<repo-relative-path>
     - <hosted-source-or-accepted-decision-reference>
-  unresolved: []
+planning_blockers: []
 ```
 
-Use `knowledge_delta: required` with `capture_outcome: deferred` when accepted
-durable knowledge is new or changes an existing rule. Use
-`knowledge_delta: none` with `capture_outcome: no-durable-change` and empty
-`decisions`, `target_surfaces`, and `evidence` when the planning discussion
-introduced no durable project knowledge. The `unresolved` list is independent
-of `knowledge_delta`: keep it empty for an actionable handoff, or record
-remaining product-shaping questions there and return them to the caller as
-blockers. Continue grilling when possible rather than deferring a resolvable
-blocker. Recommend a target surface when one does not yet exist; do not create
-it with `capture_mode=defer-to-caller`. In multi-repo or
+Emit the optional `knowledge_delta` object with
+`capture_outcome=deferred` only when accepted durable knowledge is new or
+changes an existing rule. When the planning discussion introduced no durable
+project knowledge, omit `knowledge_delta` entirely and return
+`capture_outcome=no-durable-change`. Keep `planning_blockers` separate from the
+knowledge data: leave it empty for an actionable handoff, or record remaining
+product-shaping questions there and return them to the caller as blockers.
+Continue grilling when possible rather than deferring a resolvable blocker.
+Recommend a target surface when one does not yet exist; do not create it with
+`capture_mode=defer-to-caller`. In multi-repo or
 orchestrator work, qualify every target and repo-local evidence item with its
 repository slug. Use the literal `current-repository/` prefix only for the
 single current checkout.
@@ -180,5 +182,5 @@ With `capture_mode=inline`, summarize:
 - Do not silently leave durable accepted decisions undocumented. With
   `capture_mode=inline`, capture them or explicitly defer capture in the
   closeout. With `capture_mode=defer-to-caller`, record them and their intended
-  destinations in the structured delta.
+  destinations in the optional `knowledge_delta` object.
 - Do not create broad project doctrine from a single narrow decision.
