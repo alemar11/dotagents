@@ -1,45 +1,37 @@
-# Full-Flow Dry-Run Fixture
+# Full-Flow Propose Fixture
 
-Use this fixture to forward-test the planning pipeline without writing local
-artifacts or mutating a hosted tracker.
+Use this fixture to forward-test the complete planning pipeline without local
+or hosted writes.
 
 ## User Request
 
 ```text
-Use $plan-feature to plan a feature named "account settings export". This is a
-dry run: do not write files and do not mutate GitHub. Return draft publish
-commands instead.
+Use $plan-feature to plan a feature named "account settings export". Show me
+the complete Feature Spec and implementation issues before publishing them.
+Do not write files or mutate GitHub.
 ```
 
-## Setup Snapshot
+## Resolved Run
 
 ```text
 mode: full-flow
-execution_profile: standard
-tracker_backend: github
-effective_target: draft-publish-commands
-no_mutation_override: dry-run
-no_mutation_output: publish-commands
-local_mirror: not-requested
-local_mirror_path: not-applicable
-partial_output: withhold
-repository_layout: single-repository
-workspace_context: not-applicable
-feature_slug: account-settings-export
-change_delivery_target: pull-request-ready-for-merge-but-not-merged
-change_delivery_permission: granted-for-selected-target
-issue_update_permission: pull-request-closing-keyword-only
-codex_review_requirement: required-on-current-pull-request-head
-target_branch_name: feature/account-settings-export
-pull_request_count_strategy: one-pull-request-total
-source_spec_ref: draft-spec:account-settings-export
-spec_body_fingerprint: sha256:7f4a9c21d003
-capture_mode: defer-to-caller
-capture_outcome: deferred
-option_resolution: see-canonical-run-option-rows-below
-option_rows_fingerprint: sha256:99f7ff308ad9038ec8a158876a1438758f4c8878c6e424729c0a0bc06abff4a7
-domain_knowledge_delta:
-  knowledge_delta: required
+write_mode: propose
+
+Project Memory facts:
+  tracker_backend: github
+  repository_layout: single-repository
+
+Planning data:
+  feature_slug: account-settings-export
+  affected_repositories:
+    - current-repository
+  allowed_paths:
+    - src/account-settings/**
+    - tests/account-settings/**
+  target_branch_name: feature/account-settings-export
+  source_spec_ref: proposed-spec:account-settings-export
+
+knowledge_delta:
   decisions:
     - Account settings export is a user-owned portable archive.
   target_surfaces:
@@ -48,165 +40,411 @@ domain_knowledge_delta:
   evidence:
     - "Accepted planning decision: account settings export portability."
     - current-repository/src/account-settings/export.ts
-  unresolved: []
+planning_blockers: []
 ```
 
-## Canonical Run Option Rows
+## Proposed Feature Spec Result
 
-| row_id | scope_id | field | value | source | evidence |
-| --- | --- | --- | --- | --- | --- |
-| `run:mode` | `run` | `mode` | `full-flow` | `authorized-user-instruction` | `fixture-intent` |
-| `run:execution_profile` | `run` | `execution_profile` | `standard` | `default` | `none` |
-| `run:tracker_backend` | `run` | `tracker_backend` | `github` | `tracker-config` | `project-memory/config/issue-tracker.md` |
-| `run:effective_target` | `run` | `effective_target` | `draft-publish-commands` | `runtime-derived` | `run:no_mutation_override+run:no_mutation_output` |
-| `run:no_mutation_override` | `run` | `no_mutation_override` | `dry-run` | `authorized-user-instruction` | `fixture-intent` |
-| `run:no_mutation_output` | `run` | `no_mutation_output` | `publish-commands` | `authorized-user-instruction` | `fixture-intent` |
-| `run:local_mirror` | `run` | `local_mirror` | `not-requested` | `default` | `none` |
-| `run:local_mirror_path` | `run` | `local_mirror_path` | `not-applicable` | `default` | `none` |
-| `run:partial_output` | `run` | `partial_output` | `withhold` | `default` | `none` |
-| `run:repository_layout` | `run` | `repository_layout` | `single-repository` | `project-layout-config` | `project-memory/config/project-layout.md` |
-| `run:workspace_context` | `run` | `workspace_context` | `not-applicable` | `default` | `none` |
-| `run:change_delivery_target` | `run` | `change_delivery_target` | `pull-request-ready-for-merge-but-not-merged` | `default` | `none` |
-| `run:change_delivery_permission` | `run` | `change_delivery_permission` | `granted-for-selected-target` | `default` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export` |
-| `run:issue_update_permission` | `run` | `issue_update_permission` | `pull-request-closing-keyword-only` | `default` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export` |
-| `run:codex_review_requirement` | `run` | `codex_review_requirement` | `required-on-current-pull-request-head` | `default` | `run:change_delivery_target` |
-| `run:target_branch_name` | `run` | `target_branch_name` | `feature/account-settings-export` | `runtime-derived` | `run:change_delivery_target+feature_slug` |
-| `run:pull_request_count_strategy` | `run` | `pull_request_count_strategy` | `one-pull-request-total` | `runtime-derived` | `affected_repos=current-repository` |
+- Title: `Feature Spec: Account Settings Export`
+- Intended repository: current repository
+- Intended tracker: GitHub
+- Intended type: mapped `feature`
+- Proposed source ref: `proposed-spec:account-settings-export`
+- Feature dependencies: empty table body
+- App compatibility: compatible after publication replaces the proposed source
+  ref with a durable hosted ref
+- Domain capture: the non-persisted run delta is deferred to the final
+  integration issue; the Feature Spec body carries no payload
+- Proposed issue ref: `proposed-issue:account-settings-export/01`
+- Final proposed issue ref: `proposed-issue:account-settings-export/02`
+- Intended tracker metadata after apply: mapped type `task`, state
+  `ready-for-agent`
 
-## Representative Emitted Issue
-
-This serialization check emits every `issue:01` row with an artifact-local
-fingerprint. The graph-wide fingerprint remains in the issue-phase handoff.
+## Proposed Feature Spec
 
 ```markdown
-# account-settings-export: 01 Export account settings end to end
+# Feature Spec: Account Settings Export
 
-issue_type: task
-workflow_state: ready-for-agent
-source_spec_ref: draft-spec:account-settings-export
+## Source
 
-## Option Resolution
+- Accepted feature request in the current conversation.
+- `src/account-settings/export.ts`
 
-issue_option_rows_fingerprint: sha256:0e11ce282652a7a9f3725fa45a6e30220df157a0d46ee4154cf1d31c57649563
+## Planning Identity
 
-| row_id | scope_id | field | value | source | evidence |
-| --- | --- | --- | --- | --- | --- |
-| `issue:01:delivery_decision_origin` | `issue:01` | `delivery_decision_origin` | `inherited-from-feature-spec` | `source-spec` | `draft-spec:account-settings-export` |
-| `issue:01:change_delivery_target` | `issue:01` | `change_delivery_target` | `pull-request-ready-for-merge-but-not-merged` | `source-spec` | `run:change_delivery_target` |
-| `issue:01:change_delivery_permission` | `issue:01` | `change_delivery_permission` | `granted-for-selected-target` | `source-spec` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run` |
-| `issue:01:issue_repository_layout` | `issue:01` | `issue_repository_layout` | `single-repository` | `source-spec` | `run:repository_layout` |
-| `issue:01:issue_update_permission` | `issue:01` | `issue_update_permission` | `pull-request-closing-keyword-only` | `source-spec` | `permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run` |
-| `issue:01:codex_review_requirement` | `issue:01` | `codex_review_requirement` | `required-on-current-pull-request-head` | `source-spec` | `run:codex_review_requirement` |
-| `issue:01:pull_request_count_strategy` | `issue:01` | `pull_request_count_strategy` | `one-pull-request-total` | `source-spec` | `run:pull_request_count_strategy` |
-| `issue:01:parallelization` | `issue:01` | `parallelization` | `independent` | `runtime-derived` | `issue-graph:01` |
-| `issue:01:issue_completion_method` | `issue:01` | `issue_completion_method` | `feature-pull-request-closing-keyword` | `runtime-derived` | `run:tracker_backend+issue:01:pull_request_count_strategy` |
-| `issue:01:domain_closeout` | `issue:01` | `domain_closeout` | `implementation-closeout` | `runtime-derived` | `domain_knowledge_delta+issue-graph:01` |
-| `issue:01:target_branch_name` | `issue:01` | `target_branch_name` | `feature/account-settings-export` | `source-spec` | `run:target_branch_name` |
+- Feature slug: `account-settings-export`.
+- Repository layout: `single-repository`.
+
+## Problem
+
+Account owners cannot produce a portable archive of their supported settings.
+
+## Goals
+
+- Let an authorized account owner assemble and download a stable settings
+  archive.
+- Preserve account ownership boundaries throughout export and download.
+
+## Non-Goals
+
+- Export data that is not part of account settings.
+- Deploy or release the feature as part of planning.
+
+## Users And Use Cases
+
+- An account owner downloads their settings for portability or backup.
+
+## Requirements
+
+- Export only settings owned by the requesting account.
+- Produce a stable documented archive shape.
+- Reject cross-account access to an assembled archive.
+
+## Product / Repository Scope
+
+- Affected repositories: `current-repository`.
+- Allowed paths: `src/account-settings/**`, `tests/account-settings/**`,
+  `CONTEXT.md`, and `project-memory/adr/**`.
+- Shared target branch: `feature/account-settings-export`.
+
+## Feature Dependencies
+
+| upstream_feature_spec_ref | dependency_reason |
+| --- | --- |
+
+## Acceptance Criteria
+
+- [ ] An authorized account owner can download a portable settings archive.
+- [ ] The archive excludes settings owned by another account.
+- [ ] The complete export path has focused integration proof.
+
+## Validation Expectations
+
+- Focused account-settings export contract and integration tests.
+- Manual authorized and cross-account download checks as fallback proof.
+
+## Risks
+
+- Archive-shape drift could break portability without contract coverage.
+
+## Open Questions
+
+- None.
+
+## Issue-Splitting Notes
+
+- Build the authorized archive first, then connect download and integrated
+  domain-memory closeout.
+
 ```
 
-## Representative Issue-Phase Handoff
+## Representative Proposed Issue
 
-option_rows_fingerprint: sha256:8c03de3025fe18cabf269a8d011da37972cdc54a371c90bc7c7c5986684e48c0
-issue_count: 1
-issue_refs: draft-issue:account-settings-export:01
+```markdown
+# account-settings-export: 01 Assemble the account settings archive
+
+## Execution Contract
+
+| Field | Value |
+| --- | --- |
+| `source_spec_ref` | `proposed-spec:account-settings-export` |
+| `feature_slug` | `account-settings-export` |
+| `affected_repositories` | `current-repository` |
+| `allowed_paths` | `src/account-settings/**`, `tests/account-settings/**` |
+| `target_branch_name` | `feature/account-settings-export` |
+| `dependency_ids` | `none` |
+
+## Goal
+
+Allow an account owner to assemble a portable archive of supported account
+settings.
+
+## Non-Goals
+
+- Expose the archive through a download endpoint.
+- Update durable project-memory surfaces.
+
+## Requirements
+
+- Export only settings owned by the requesting account.
+- Produce a stable documented archive shape.
+
+## Implementation Plan
+
+Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
+
+Implement export assembly and authorization together with focused contract
+coverage.
+
+## Acceptance Criteria
+
+- [ ] An authorized account owner can assemble the archive.
+- [ ] The archive excludes settings owned by another account.
+
+## Validation
+
+- Preferred: focused account-settings export tests.
+- Fallback: equivalent repository test runner plus a manual archive assembly.
+
+## Completion
+
+- GitHub tracker: include this issue's closing keyword in the relevant
+  implementation PR; closure occurs after merge.
+```
+
+## Final Proposed Integration Issue
+
+Proposed issue ref: `proposed-issue:account-settings-export/02`
+
+```markdown
+# account-settings-export: 02 Download the archive and close durable context
+
+## Execution Contract
+
+| Field | Value |
+| --- | --- |
+| `source_spec_ref` | `proposed-spec:account-settings-export` |
+| `feature_slug` | `account-settings-export` |
+| `affected_repositories` | `current-repository` |
+| `allowed_paths` | `src/account-settings/download/**`, `tests/account-settings/**`, `CONTEXT.md`, `project-memory/adr/**` |
+| `target_branch_name` | `feature/account-settings-export` |
+| `dependency_ids` | `01` |
+
+## Goal
+
+Expose the authorized archive through the product download flow, prove the
+integrated behavior, and reconcile the accepted durable contract.
+
+## Non-Goals
+
+- Add unrelated account settings formats.
+- Release or deploy the feature.
+
+## Requirements
+
+- Connect the download flow to the archive produced by issue `01`.
+- Preserve account ownership checks through the integrated request path.
+- Run domain-memory closeout only after integrated behavior is proven.
+
+## Implementation Plan
+
+Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
+
+Implement the download boundary, exercise the complete export path, then hand
+the accepted durable delta to Project Memory and verify its documentation diff.
+
+## Acceptance Criteria
+
+- [ ] An authorized account owner can download the portable archive.
+- [ ] Another account cannot access that archive.
+- [ ] Integrated validation passes before durable context is updated.
+- [ ] Project Memory reconciles the accepted delta against landed behavior.
+
+## Validation
+
+- Preferred: focused account-settings export integration tests.
+- Fallback: equivalent repository test runner plus a manual authorized and
+  cross-account download check.
+
+## Domain Knowledge Closeout
+
+- Required workflow:
+  - Invoke `$project-memory` with `memory_slice=domain-memory` and
+    `domain_operation=implementation-closeout` after integrated behavior is
+    proven.
+knowledge_delta:
+  decisions:
+    - Account settings export is a user-owned portable archive.
+  target_surfaces:
+    - current-repository/CONTEXT.md
+    - current-repository/project-memory/adr/ADR-account-settings-export.md
+  evidence:
+    - "Accepted planning decision: account settings export portability."
+    - current-repository/src/account-settings/export.ts
+- Closeout proof:
+  - Require `capture_outcome=captured` from Project Memory.
+  - Verify every accepted item and required named target, report `CONTEXT.md`
+    and `project-memory/adr/ADR-account-settings-export.md` as reconciled
+    destinations, and verify the complete documentation diff.
+  - Treat `deferred` or `no-durable-change` as blocked for this nonempty delta.
+
+## Completion
+
+- GitHub tracker: include this issue's closing keyword in the relevant
+  implementation PR; closure occurs after merge.
+```
+
+## Multi-Repository Identity Probe
+
+This second propose-only case proves that two repo-scoped partials and their
+first generated issues cannot collide:
+
+```text
+project_slug: account-platform
+feature_slug: account-settings-export
+parent_source_spec_ref: proposed-spec:account-platform/account-settings-export
+child_source_spec_refs:
+  api: proposed-spec:account-platform/account-settings-export/api
+  web: proposed-spec:account-platform/account-settings-export/web
+child_issue_refs:
+  api: proposed-issue:account-platform/account-settings-export/api/01
+  web: proposed-issue:account-platform/account-settings-export/web/01
+implementation_target_branches:
+  api: feature/account-settings-export
+  web: feature/account-settings-export
+```
+
+The parent is coordination-only. Each generated implementation issue belongs
+to one repo-scoped partial and uses that partial's source ref.
+
+Every multi-repository bundle adds exactly one dedicated integration partial
+owned by the repository where a concrete integration change and integrated
+validation run:
+
+```text
+integration_source_spec_ref: proposed-spec:account-platform/account-settings-export/web/integration
+integration_feature_dependencies:
+  - upstream_feature_spec_ref: proposed-spec:account-platform/account-settings-export/api
+    dependency_reason: Wait for the API implementation partial to merge and prove its contract.
+  - upstream_feature_spec_ref: proposed-spec:account-platform/account-settings-export/web
+    dependency_reason: Wait for the web implementation partial to merge and prove its product path.
+integration_issue_ref: proposed-issue:account-platform/account-settings-export/web/integration/01
+integration_issue_dependency_ids: none
+integration_target_branch: feature/account-settings-export-integration
+knowledge_delta_owner: integration_issue_ref
+```
+
+The integration partial is downstream of both implementation partials, so its
+whole issue graph waits for their merges. Its issue IDs remain local to the
+integration partial; no sibling-partial issue ID is copied into
+`dependency_ids`. The integration issue owns a bounded change in the `web`
+repository plus the integrated proof, so it can produce a real PR. The
+`knowledge_delta_owner` line is present only when a delta exists; the same
+integration partial and issue remain mandatory without one.
+
+### Expected Applied Multi-Repository Identity Projection
+
+This is a non-mutating projection of the identities that a later apply run must
+persist. Hosted and local refs remain globally unambiguous after proposed refs
+are replaced:
+
+```text
+github_child_source_spec_refs:
+  api: acme/account-api#241
+  web: acme/account-web#118
+github_integration_source_spec_ref: acme/account-web#119
+github_integration_issue_source_spec_ref: acme/account-web#119
+github_integration_target_branch: feature/account-settings-export-integration
+github_integration_feature_dependencies:
+  - upstream_feature_spec_ref: acme/account-api#241
+    dependency_reason: Wait for the API implementation partial to merge and prove its contract.
+  - upstream_feature_spec_ref: acme/account-web#118
+    dependency_reason: Wait for the web implementation partial to merge and prove its product path.
+local_child_source_spec_refs:
+  api: api/planning/features/account-settings-export/SPEC.md
+  web: web/planning/features/account-settings-export/SPEC.md
+local_integration_source_spec_ref: web/planning/features/account-settings-export/integration/SPEC.md
+local_integration_issue_source_spec_ref: web/planning/features/account-settings-export/integration/SPEC.md
+local_integration_target_branch: feature/account-settings-export-integration
+local_integration_issue_affected_repositories: web
+local_integration_issue_allowed_paths:
+  - web/src/account-settings/export-integration/**
+  - web/planning/features/account-settings-export/integration/issues/01-prove-integrated-export.md
+  - web/planning/features/account-settings-export/integration/issues/done/01-prove-integrated-export.md
+local_integration_feature_dependencies:
+  - upstream_feature_spec_ref: api/planning/features/account-settings-export/SPEC.md
+    dependency_reason: Wait for the API implementation partial to merge and prove its contract.
+  - upstream_feature_spec_ref: web/planning/features/account-settings-export/SPEC.md
+    dependency_reason: Wait for the web implementation partial to merge and prove its product path.
+local_integration_completion_path: web/planning/features/account-settings-export/integration/issues/done/01-prove-integrated-export.md
+```
+
+Bare `#<number>` and bare repo-relative paths are not valid sibling identities.
+The applied integration Feature Spec and its generated issue are App-compatible
+only after these durable refs replace every proposed ref; this projection does
+not publish or enqueue them.
+
+## Spec-Only Delta Persistence Probe
+
+This two-invocation probe prevents a deferred delta from disappearing behind a
+durable payload-free Spec:
+
+```text
+invocation_1:
+  mode: spec-only
+  write_mode: apply
+  knowledge_delta: nonempty
+  writes: none
+  durable_source_created: false
+  result: blocked non-durable preview with exact delta
+  next_action: explicit full-flow run
+
+invocation_2:
+  source_from_invocation_1: unavailable
+  issues_from_existing_spec: impossible from invocation 1
+  rule: never treat the blocked preview as a durable no-delta Spec
+```
+
+The same write withholding applies to `write_mode=propose`; that mode already
+writes nothing, and the preview remains blocked from later publication. A later
+`full-flow` invocation must receive the exact delta again so its final issue can
+be the durable owner.
 
 ## Expected Pipeline
 
-1. `$plan-feature` reviews project memory and resolves the effective target.
-2. `$grill-me-with-context` runs with `capture_mode=defer-to-caller`, resolves
-   only blockers that affect the Feature Spec or issue split, performs no documentation
-   writes, and returns a structured `domain_knowledge_delta`.
-3. The Feature Spec phase returns the Feature Spec body, a draft Feature Spec publish command,
-   `source_spec_ref=draft-spec:account-settings-export`, and
-   `spec_body_fingerprint=sha256:7f4a9c21d003`, with
-   the structured delivery handoff tuple
-   `change_delivery_target=pull-request-ready-for-merge-but-not-merged`,
-   `change_delivery_permission=granted-for-selected-target`,
-   `repository_layout=single-repository`,
-   `issue_update_permission=pull-request-closing-keyword-only`,
-   `codex_review_requirement=required-on-current-pull-request-head`,
-   `target_branch_name=feature/account-settings-export`, and
-   `pull_request_count_strategy=one-pull-request-total`. When the delta is
-   required, the Feature Spec body carries it under `## Domain Knowledge Handoff`.
-4. The issue phase returns hardened issue bodies plus draft issue publish commands.
-   Every issue `## Delivery` and `## Orchestrator Handoff` projection carries
-   `repository_layout: single-repository` and
-   `target_branch_name: feature/account-settings-export`.
-   Draft issue bodies may contain `source_spec_ref: draft-spec:account-settings-export`
-   only because no hosted Feature Spec number exists yet. A required knowledge delta is
-   assigned to the last integration task, which depends on every terminal
-   implementation issue and includes `## Domain Knowledge Closeout`. That task
-   requires its later implementor to invoke `$project-memory domain-memory`,
-   which runs Project Memory's internal domain-modeling workflow; Plan Feature
-   does not run that capture during planning.
-   For example, if `02 depends-on 01` while `03` is independent, the
-   pre-closeout terminals are `02` and `03`; appended final task `04` depends
-   directly on both. Hosted issue numbers are tracked separately and do not
-   replace these generated dependency IDs.
-5. `$codex-orchestrator` may inspect the resulting issue graph in dry-run mode
-   but must not dispatch implementation workers, commit, push, create PRs, or
-   close issues from the draft Feature Spec ref.
-6. Any `$codex-orchestrator` session settings remain runtime-only; they are not
-   copied into the Feature Spec, generated issue bodies, `## Orchestrator Handoff`, or
-   draft publish commands.
-7. Each phase verifies the incoming `option_rows_fingerprint`; the issue-phase
-   report returns the recomputed fingerprint over all run and `issue:<NN>` rows.
+1. Resolve the two run fields and consume tracker/topology facts from Project
+   Memory.
+2. Run `$grill-me-with-context` only if the supplied intent and repository
+   evidence leave a material blocker; defer domain capture.
+3. Produce the complete Feature Spec body and deterministic proposed source
+   ref without writing.
+4. Split vertical issues, stabilize scope and graph, run one or more
+   `$plan-harder` passes per issue, persist only each final stable result,
+   validate the graph, and render exactly one Execution Contract per issue.
+5. Return bodies, intended repositories, mapped metadata, and topological
+   publication order using the deterministic single- or multi-repository
+   proposed issue refs from `options.md`. Return no executable publication
+   command.
+6. State that proposed refs are non-executable and must be replaced by durable
+   refs during a later `write_mode=apply` run.
 
-## Expected Draft Publish Plan
+## Expected Publication Order
 
-- Publish the Feature Spec first and capture the created issue number as `SPEC_NUMBER`.
-- Confirm the draft issue commands carry the same Feature Spec body fingerprint as the
-  draft Feature Spec command.
-- Replace every issue body line
-  `source_spec_ref: draft-spec:account-settings-export` with
-  `source_spec_ref: #$SPEC_NUMBER` before creating hosted implementation issues.
-- Attach each generated implementation issue to the Feature Spec parent when the tracker
-  supports parent/sub-issues.
-- Publish the final integration and domain-knowledge closeout task last, after
-  all terminal issue IDs are known, and preserve its dependency edges.
-- Draft commands may include the intended future `ready-for-agent` labels, but
-  the issues are not executable agent-ready output until `source_spec_ref` is replaced
-  with the durable Feature Spec issue number.
-- Return exact commands without executing them.
+1. Publish the Feature Spec, or the parent then every repo-scoped
+   implementation partial for a multi-repository bundle, and capture each
+   globally unambiguous durable ref.
+2. Publish the dedicated integration partial after its upstream partial refs
+   are durable, then update sibling maps and Feature Dependencies with those
+   same qualified refs.
+3. Replace every proposed source ref in issue bodies with its owning durable
+   ref.
+4. Publish ordinary implementation issues in topological order.
+5. Publish the final integration/domain-closeout issue last.
+6. Attach every generated issue to its owning Feature Spec when supported.
 
-## Expected Runtime Efficiency Evidence
-
-- Snapshot the supplied intent, generated Feature Spec, and each issue body once per
-  fingerprint; carry paths/refs, fingerprints, changed headings, and gate
-  excerpts between phases.
-- Full bodies are returned only because this fixture explicitly requests draft
-  publish output.
-- Report `routing`, `spec`, each `issue-hardening:<id>`, and
-  `issue-graph-and-publication` token deltas only for run-scoped,
-  uncontaminated counter intervals. Label interleaved deltas `exact-interval`;
-  otherwise report one `tokens=unavailable` result without estimation.
+This sequence is descriptive output only; it contains no executable command.
 
 ## Failure Conditions
 
-- A repo-local `planning/tmp/` Feature Spec or issue file is created.
-- `CONTEXT.md`, project domain docs, or ADRs are edited during the planning run.
-- A GitHub issue is created, edited, labeled, typed, closed, or attached.
-- An implementation worker receives `commit`, `push`, or `pr` authorization
-  from project memory, plan-feature output, tracker defaults, or the draft Feature Spec
-  ref alone.
-- Draft Feature Specs, generated issues, and draft publish commands include worker
-  authorization fields or worker capability modes.
-- Draft Feature Specs, generated issues, or draft publish commands include orchestration
-  session values such as worker surfaces, worker counts, checkpoint approval,
-  or publication authority. The canonical source-contract
-  `issue_update_permission` is allowed and must remain independently resolved.
-- A phase handoff or generated structured field uses a prose choice, boolean
-  option, non-canonical field name, or enum value outside `options.md`.
-- A Feature Spec phase handoff, generated issue `## Delivery`, or generated issue
-  `## Orchestrator Handoff` omits
-  `repository_layout: single-repository` or
-  `target_branch_name: feature/account-settings-export`.
-- Generated issues use a prose `source_spec_ref` such as the Feature Spec title when a stable
-  draft ref is available.
-- A required `domain_knowledge_delta` is omitted, captured during planning, or
-  placed in a docs-only task instead of the last integration task.
-- The final integration task permits direct edits to `CONTEXT.md`, domain docs,
-  or ADRs without invoking `$project-memory domain-memory` and running its
-  internal domain-modeling workflow.
-- Unchanged Feature Spec or issue bodies are repeatedly emitted between phases without a
-  draft-output, publication, or failed-gate reason.
+- Any local file or hosted tracker object is created or changed.
+- The output exposes more than the two registered run choices.
+- A proposed issue is presented as executable before its source ref is durable.
+- An applied multi-repository sibling or dependency uses a bare hosted issue
+  number or bare repo-relative path.
+- A proposed issue body contains an applied `workflow_state` header.
+- An issue contains more than one execution projection or omits one of the six
+  required normal fields.
+- Reverse dependency edges are persisted instead of derived.
+- Cross-Feature-Spec dependencies appear in issue dependency IDs.
+- A Feature Spec body persists `knowledge_delta` or a
+  `## Domain Knowledge Handoff` section.
+- A multi-repository bundle omits its distinct integration partial or emits a
+  validation-only integration issue that cannot produce a real PR.
+- Domain knowledge is captured during planning or assigned to a docs-only
+  issue.
+- A `knowledge_delta.target_surfaces` entry falls outside the final closeout
+  issue's `affected_repositories` or `allowed_paths`.
+- Worker permissions, task counts, checkout paths, or App-session settings
+  appear in the Feature Spec or issues.
+- A machine-local absolute path appears in a body.
+- The response includes an executable publication command.

@@ -1,1505 +1,865 @@
 from __future__ import annotations
 
-import hashlib
 import re
 import unittest
 from pathlib import Path
 
 
-SKILLS_ROOT = Path(__file__).resolve().parents[2]
-REPO_ROOT = SKILLS_ROOT.parent
-REMOVED_LEGACY_PLANNING_SKILL = "$to" + "-p" + "rd"
-REMOVED_ISSUE_SKILL = "$to" + "-issues"
-REMOVED_LEGACY_PLANNING_PATH = "skills/to" + "-p" + "rd"
-REMOVED_ISSUE_PATH = "skills/to" + "-issues"
-LEGACY_WORKER_AUTH_KEY = "default" + "_worker_authorization"
-LEGACY_WORKER_AUTH_HEADING = "Worker " + "Authorization Defaults"
-LEGACY_DEFAULT_WORKER_AUTH = "Default worker " + "authorization"
-ORCHESTRATION_POLICY_PATH = "project-memory/config/orchestration" + "-policy.md"
-STALE_NO_GATES_REMAIN = "no " + "gates remain"
-STALE_GATES_RESOLVED = "gates " + "resolved or deferred"
-STALE_REPO_PR_PLACEHOLDERS = "repo PR links " + "or placeholders"
-AUTO_DISPATCH_KEY = "auto" + "_dispatch"
-WORKER_SURFACES_KEY = "worker" + "_surfaces"
-MAX_ACTIVE_DELEGATED_WORKERS_KEY = "max" + "_active_delegated_workers"
-MAX_ACTIVE_CLI_SUBAGENTS_KEY = "max" + "_active_cli_subagents"
-MAX_ACTIVE_CODEX_APP_THREADS_KEY = "max" + "_active_codex_app_threads"
-SESSION_WIDE_DELEGATED_WORKER_CAP_KEY = "session" + "_wide_delegated_worker_cap"
-AUTHORIZATION_CEILING_KEY = "authorization" + "_ceiling"
-RUNTIME_POLICY_FIELDS = (
-    AUTO_DISPATCH_KEY + ":",
-    WORKER_SURFACES_KEY + ":",
-    MAX_ACTIVE_DELEGATED_WORKERS_KEY + ":",
-    MAX_ACTIVE_CLI_SUBAGENTS_KEY + ":",
-    MAX_ACTIVE_CODEX_APP_THREADS_KEY + ":",
-    SESSION_WIDE_DELEGATED_WORKER_CAP_KEY + ":",
-    AUTHORIZATION_CEILING_KEY + ":",
-)
-ACTIVE_TEXT_SUFFIXES = {".json", ".md", ".py", ".sh", ".toml", ".yaml", ".yml"}
+SKILL_ROOT = Path(__file__).resolve().parents[1]
+DOC_PATHS = [
+    SKILL_ROOT / "SKILL.md",
+    SKILL_ROOT / "agents/openai.yaml",
+    *sorted((SKILL_ROOT / "references").glob("*.md")),
+]
 
 
 def read(relative: str) -> str:
-    return (SKILLS_ROOT / relative).read_text(encoding="utf-8")
+    return (SKILL_ROOT / relative).read_text(encoding="utf-8")
 
 
-def read_repo(relative: str) -> str:
-    return (REPO_ROOT / relative).read_text(encoding="utf-8")
+def section(contents: str, heading: str, next_heading: str) -> str:
+    start = contents.index(heading) + len(heading)
+    end = contents.index(next_heading, start)
+    return contents[start:end]
 
 
-def option_row_evidence_is_valid(rows: list[list[str]]) -> bool:
-    for _, scope, field, value, source, evidence in rows:
-        if source != "default" and evidence in {"", "none"}:
-            return False
-        permission_bearing = (
-            field == "change_delivery_permission"
-            and value == "granted-for-selected-target"
-        ) or (
-            field == "issue_update_permission"
-            and value
-            in {
-                "pull-request-closing-keyword-only",
-                "direct-issue-updates-explicitly-authorized",
-            }
-        )
-        if not permission_bearing:
-            continue
-        if source not in {
-            "default",
-            "source-spec",
-            "authorized-user-instruction",
-        }:
-            return False
-        tokens = dict(
-            token.split("=", 1)
-            for token in evidence.split(";")
-            if "=" in token
-        )
-        permission_ref = tokens.get("permission-source-ref", "")
-        if (
-            not permission_ref
-            or tokens.get("scope-ref") != scope
-            or not tokens.get("target-ref")
-            or not tokens.get("target-branch")
-        ):
-            return False
-        if source == "default" and not permission_ref.startswith(
-            "feature-spec-default:"
-        ):
-            return False
-        if source == "authorized-user-instruction" and not permission_ref.startswith(
-            "authorized-user:"
-        ):
-            return False
-    return True
-
-
-def parse_option_rows(section: str) -> list[list[str]]:
-    rows: list[list[str]] = []
-    for line in section.splitlines():
+def table_fields(contents: str) -> list[str]:
+    fields: list[str] = []
+    for line in contents.splitlines():
         if not line.startswith("|"):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if cells[0] == "row_id" or all(
-            set(cell) <= {"-", ":", " "} for cell in cells
-        ):
+        if not cells or cells[0] in {"Field", "---"}:
             continue
-        if len(cells) != 6:
-            raise ValueError(f"option row has {len(cells)} cells instead of 6")
-        rows.append(
+        value = cells[0]
+        if value.startswith("`") and value.endswith("`"):
+            value = value[1:-1]
+        fields.append(value)
+    return fields
+
+
+def key_lines(contents: str) -> list[str]:
+    return re.findall(r"^- ([a-z][a-z0-9_]*):", contents, re.MULTILINE)
+
+
+REMOVED_FIELDS = (
+    "execution" + "_profile",
+    "effective" + "_target",
+    "no_mutation" + "_override",
+    "no_mutation" + "_output",
+    "local" + "_mirror",
+    "local" + "_mirror_path",
+    "partial" + "_output",
+    "change_delivery" + "_target",
+    "change_delivery" + "_permission",
+    "issue_update" + "_permission",
+    "codex_review" + "_requirement",
+    "pull_request_count" + "_strategy",
+    "delivery_decision" + "_origin",
+    "issue_repository" + "_layout",
+    "parallel" + "ization",
+    "blocked_issue" + "_ids",
+    "issue_completion" + "_method",
+    "domain" + "_closeout",
+    "dependency_start" + "_condition",
+    "option_rows" + "_finger" + "print",
+    "issue_option_rows" + "_finger" + "print",
+    "option" + "_resolution",
+    "domain_knowledge" + "_delta",
+)
+REMOVED_VALUE = "upstream-merge-ready" + "-head"
+REMOVED_HEADINGS = (
+    "## " + "Delivery",
+    "## " + "Orchestrator Handoff",
+    "## " + "Option Resolution",
+)
+
+
+class PlanFeatureReductionTests(unittest.TestCase):
+    def test_run_registry_has_only_mode_and_write_mode(self) -> None:
+        options = read("references/options.md")
+        registry = section(options, "## Run Registry", "## Project Memory Facts")
+
+        self.assertEqual(["mode", "write_mode"], table_fields(registry))
+        self.assertIn("`full-flow`, `spec-only`, `issues-from-existing-spec`", registry)
+        self.assertIn("`apply`, `propose`", registry)
+        self.assertIn("explicit Plan Feature request to create durable", registry)
+        self.assertIn("Project Memory resolves its own write authority", registry)
+
+    def test_tracker_and_topology_are_project_memory_facts(self) -> None:
+        options = read("references/options.md")
+        facts = section(options, "## Project Memory Facts", "## Execution Data")
+        registry = section(options, "## Run Registry", "## Project Memory Facts")
+
+        self.assertIn("`tracker_backend`", facts)
+        self.assertIn("`repository_layout`", facts)
+        self.assertNotIn("`tracker_backend`", registry)
+        self.assertNotIn("`repository_layout`", registry)
+
+    def test_retired_contract_is_absent_from_plan_feature_docs(self) -> None:
+        for path in DOC_PATHS:
+            contents = path.read_text(encoding="utf-8")
+            for field in REMOVED_FIELDS:
+                self.assertNotIn(field, contents, f"{field} remains in {path}")
+            self.assertNotIn(REMOVED_VALUE, contents, f"early stack remains in {path}")
+            for heading in REMOVED_HEADINGS:
+                self.assertNotIn(heading, contents, f"{heading} remains in {path}")
+            self.assertNotIn("finger" + "print", contents, f"digest field remains in {path}")
+
+    def test_normal_execution_contract_has_exactly_six_fields(self) -> None:
+        template = read("references/issue-body-template.md")
+        contract = section(template, "## Execution Contract", "## Goal")
+        fields = table_fields(contract)
+
+        self.assertEqual(
             [
-                cell[1:-1]
-                if len(cell) >= 2
-                and cell.startswith("`")
-                and cell.endswith("`")
-                else cell
-                for cell in cells
-            ]
-        )
-    return rows
-
-
-def fingerprint_option_rows(rows: list[list[str]]) -> str:
-    serialized = "".join(
-        "\t".join(row) + "\n" for row in sorted(rows, key=lambda row: row[0])
-    )
-    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-
-
-def markdown_section(contents: str, heading: str, next_heading: str) -> str:
-    starts = list(
-        re.finditer(rf"^{re.escape(heading)}$", contents, re.MULTILINE)
-    )
-    ends = list(
-        re.finditer(rf"^{re.escape(next_heading)}$", contents, re.MULTILINE)
-    )
-    if len(starts) != 1 or len(ends) != 1 or ends[0].start() <= starts[0].end():
-        raise ValueError(
-            f"expected one ordered {heading!r} to {next_heading!r} section"
-        )
-    return contents[starts[0].end() : ends[0].start()]
-
-
-def iter_active_text_files() -> list[Path]:
-    roots = [
-        REPO_ROOT / "README.md",
-        REPO_ROOT / "AGENTS.md",
-        SKILLS_ROOT,
-        REPO_ROOT / ".agents",
-    ]
-    files: list[Path] = []
-
-    for root in roots:
-        if not root.exists():
-            continue
-        if root.is_file():
-            files.append(root)
-            continue
-        for path in root.rglob("*"):
-            if (
-                path.is_file()
-                and path.suffix in ACTIVE_TEXT_SUFFIXES
-                and "__pycache__" not in path.parts
-            ):
-                files.append(path)
-
-    return sorted(set(files))
-
-
-MERGE_READY_DELIVERY = "pull-request-ready-for-merge-but-not-merged"
-FEATURE_DEPENDENCY_STARTS = {
-    "upstream-merged",
-    "upstream-merge-ready-head",
-}
-
-
-def validate_feature_dependency_fixture(
-    specs: dict[str, dict[str, object]],
-    downstream_ref: str,
-) -> dict[str, object]:
-    """Executable fixture for the authored cross-Feature-Spec contract."""
-
-    if downstream_ref not in specs:
-        raise ValueError("downstream Feature Spec ref must resolve")
-
-    graph: dict[str, list[str]] = {ref: [] for ref in specs}
-    normalized: dict[str, list[dict[str, str]]] = {}
-    legacy_refs: set[str] = set()
-
-    for ref, spec in specs.items():
-        raw_dependencies = spec.get("dependencies")
-        if raw_dependencies is None:
-            legacy_refs.add(ref)
-            dependencies: list[dict[str, str]] = []
-        else:
-            dependencies = list(raw_dependencies)  # type: ignore[arg-type]
-
-        seen_upstreams: set[str] = set()
-        normalized[ref] = []
-        for edge in dependencies:
-            upstream_ref = edge.get("upstream_feature_spec_ref", "")
-            start = edge.get("dependency_start_condition") or "upstream-merged"
-            reason = edge.get("dependency_reason", "").strip()
-            if not upstream_ref or upstream_ref not in specs:
-                raise ValueError("upstream Feature Spec ref must resolve")
-            if upstream_ref == ref:
-                raise ValueError("Feature Spec cannot depend on itself")
-            if upstream_ref in seen_upstreams:
-                raise ValueError("duplicate upstream Feature Spec ref")
-            if start not in FEATURE_DEPENDENCY_STARTS:
-                raise ValueError("invalid dependency start condition")
-            if not reason:
-                raise ValueError("dependency reason is required")
-            seen_upstreams.add(upstream_ref)
-            graph[upstream_ref].append(ref)
-            normalized[ref].append(
-                {
-                    "upstream_feature_spec_ref": upstream_ref,
-                    "dependency_start_condition": start,
-                    "dependency_reason": reason,
-                }
-            )
-
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(ref: str) -> None:
-        if ref in visiting:
-            raise ValueError("Feature Spec graph must be acyclic")
-        if ref in visited:
-            return
-        visiting.add(ref)
-        for downstream in graph[ref]:
-            visit(downstream)
-        visiting.remove(ref)
-        visited.add(ref)
-
-    for ref in specs:
-        visit(ref)
-
-    downstream_edges = normalized[downstream_ref]
-    early_edges = [
-        edge
-        for edge in downstream_edges
-        if edge["dependency_start_condition"] == "upstream-merge-ready-head"
-    ]
-    if not early_edges:
-        return {
-            "early_stack_edge_static_eligible": False,
-            "legacy_missing_section": downstream_ref in legacy_refs,
-            "dependencies": normalized[downstream_ref],
-        }
-    if downstream_ref in legacy_refs:
-        raise ValueError("legacy Feature Spec cannot request early stacking")
-    downstream = specs[downstream_ref]
-    downstream_repos = tuple(downstream.get("repositories", ()))
-    for edge in early_edges:
-        early_upstream = edge["upstream_feature_spec_ref"]
-        upstream = specs[early_upstream]
-        upstream_repos = tuple(upstream.get("repositories", ()))
-        if (
-            len(downstream_repos) != 1
-            or len(upstream_repos) != 1
-            or downstream_repos != upstream_repos
-        ):
-            raise ValueError("early stacking requires the same single repository")
-        if (
-            downstream.get("change_delivery_target") != MERGE_READY_DELIVERY
-            or upstream.get("change_delivery_target") != MERGE_READY_DELIVERY
-        ):
-            raise ValueError("both Feature Specs require merge-ready PR delivery")
-    return {
-        "early_stack_edge_static_eligible": True,
-        "legacy_missing_section": False,
-        "upstream_feature_spec_refs": [
-            edge["upstream_feature_spec_ref"] for edge in early_edges
-        ],
-        "dependencies": downstream_edges,
-    }
-
-
-class FullFlowDryRunFixtureTests(unittest.TestCase):
-    def test_feature_dependency_contract_and_early_stack_fixture(self) -> None:
-        specs: dict[str, dict[str, object]] = {
-            "spec:a": {
-                "dependencies": [],
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-            "spec:b": {
-                "dependencies": [
-                    {
-                        "upstream_feature_spec_ref": "spec:a",
-                        "dependency_start_condition": "upstream-merge-ready-head",
-                        "dependency_reason": "Needs the API introduced by spec:a.",
-                    }
-                ],
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-        }
-
-        result = validate_feature_dependency_fixture(specs, "spec:b")
-
-        self.assertTrue(result["early_stack_edge_static_eligible"])
-        self.assertEqual(["spec:a"], result["upstream_feature_spec_refs"])
-
-    def test_feature_dependency_default_and_legacy_fixture(self) -> None:
-        specs: dict[str, dict[str, object]] = {
-            "spec:a": {
-                "dependencies": [],
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-            "spec:default": {
-                "dependencies": [
-                    {
-                        "upstream_feature_spec_ref": "spec:a",
-                        "dependency_reason": "Needs the upstream contract.",
-                    }
-                ],
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-            "spec:legacy": {
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-        }
-
-        default_result = validate_feature_dependency_fixture(specs, "spec:default")
-        legacy_result = validate_feature_dependency_fixture(specs, "spec:legacy")
-
-        self.assertEqual(
-            "upstream-merged",
-            default_result["dependencies"][0]["dependency_start_condition"],
-        )
-        self.assertFalse(default_result["early_stack_edge_static_eligible"])
-        self.assertTrue(legacy_result["legacy_missing_section"])
-        self.assertEqual([], legacy_result["dependencies"])
-
-    def test_feature_dependency_fixture_rejects_invalid_graphs(self) -> None:
-        base: dict[str, dict[str, object]] = {
-            "spec:a": {
-                "dependencies": [],
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-            "spec:b": {
-                "dependencies": [
-                    {
-                        "upstream_feature_spec_ref": "spec:a",
-                        "dependency_start_condition": "upstream-merge-ready-head",
-                        "dependency_reason": "Needs spec:a.",
-                    }
-                ],
-                "repositories": ("repo",),
-                "change_delivery_target": MERGE_READY_DELIVERY,
-            },
-        }
-
-        invalid_ref = {ref: dict(spec) for ref, spec in base.items()}
-        invalid_ref["spec:b"]["dependencies"] = [
-            {
-                "upstream_feature_spec_ref": "spec:missing",
-                "dependency_start_condition": "upstream-merged",
-                "dependency_reason": "Missing source.",
-            }
-        ]
-        with self.assertRaisesRegex(ValueError, "ref must resolve"):
-            validate_feature_dependency_fixture(invalid_ref, "spec:b")
-
-        cycle = {ref: dict(spec) for ref, spec in base.items()}
-        cycle["spec:a"]["dependencies"] = [
-            {
-                "upstream_feature_spec_ref": "spec:b",
-                "dependency_start_condition": "upstream-merged",
-                "dependency_reason": "Creates a cycle.",
-            }
-        ]
-        with self.assertRaisesRegex(ValueError, "acyclic"):
-            validate_feature_dependency_fixture(cycle, "spec:b")
-
-        multi_repo = {ref: dict(spec) for ref, spec in base.items()}
-        multi_repo["spec:b"]["repositories"] = ("repo", "other")
-        with self.assertRaisesRegex(ValueError, "same single repository"):
-            validate_feature_dependency_fixture(multi_repo, "spec:b")
-
-        deep_authored_graph = {ref: dict(spec) for ref, spec in base.items()}
-        deep_authored_graph["spec:root"] = {
-            "dependencies": [],
-            "repositories": ("repo",),
-            "change_delivery_target": MERGE_READY_DELIVERY,
-        }
-        deep_authored_graph["spec:a"] = {
-            **deep_authored_graph["spec:a"],
-            "dependencies": [
-                {
-                    "upstream_feature_spec_ref": "spec:root",
-                    "dependency_start_condition": "upstream-merge-ready-head",
-                    "dependency_reason": "Runtime must serialize the live stack.",
-                }
+                "source_spec_ref",
+                "feature_slug",
+                "affected_repositories",
+                "allowed_paths",
+                "target_branch_name",
+                "dependency_ids",
             ],
-        }
-        deep_result = validate_feature_dependency_fixture(
-            deep_authored_graph,
-            "spec:b",
-        )
-        self.assertTrue(deep_result["early_stack_edge_static_eligible"])
-        self.assertEqual(["spec:a"], deep_result["upstream_feature_spec_refs"])
-
-    def test_feature_dependency_contract_is_projected_without_issue_edges(self) -> None:
-        plan_feature = read("plan-feature/SKILL.md")
-        options = read("plan-feature/references/options.md")
-        spec_template = read("plan-feature/references/spec-template.md")
-        spec_phase = read("plan-feature/references/spec-phase.md")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-
-        self.assertIn("## Feature Dependencies", spec_template)
-        self.assertIn(
-            "| upstream_feature_spec_ref | dependency_start_condition | dependency_reason |",
-            spec_template,
-        )
-        self.assertIn("`upstream-merged`, `upstream-merge-ready-head`", options)
-        self.assertIn("maximum-unmerged-depth-two dispatch gates", spec_phase)
-        self.assertIn("same canonical repository", options)
-        self.assertIn(
-            "validate the\nreachable upstream-to-downstream graph is acyclic",
-            spec_phase,
-        )
-        self.assertIn("legacy Feature Spec with no such section", plan_feature)
-        self.assertIn("cannot\nrequest early stacking", issue_phase)
-        self.assertIn(
-            "Never copy an\n`upstream_feature_spec_ref` into `dependency_ids`",
-            issue_phase,
+            fields,
         )
 
-    def test_multi_repo_workspace_topology_propagation_fixture(self) -> None:
-        workspace_feature_repos = ("api", "web")
-        child_specs = {
-            "api": {
-                "source_spec_ref": "https://github.com/example/api/issues/10",
-                "repository_layout": "multi-repository-workspace",
-                "child_repository_layout": "single-repository",
-            },
-            "web": {
-                "source_spec_ref": "https://github.com/example/web/issues/20",
-                "repository_layout": "multi-repository-workspace",
-                "child_repository_layout": "monorepo",
-            },
-        }
-        workspace_child_source_refs = {
-            repo: spec["source_spec_ref"] for repo, spec in child_specs.items()
-        }
-
-        self.assertEqual(set(workspace_child_source_refs), set(workspace_feature_repos))
-        for child_spec in child_specs.values():
-            self.assertEqual("multi-repository-workspace", child_spec["repository_layout"])
-            self.assertIn(
-                child_spec["child_repository_layout"],
-                {"single-repository", "monorepo", "multi-repository-workspace"},
-            )
-
-        def build_issue(
-            issue_id: str,
-            target_repos: tuple[str, ...],
-            parent_source_ref: str,
-        ) -> dict[str, object]:
-            if not set(target_repos).issubset(workspace_feature_repos):
-                raise ValueError("issue target repos must be within workspace_feature_repos")
-            if len(target_repos) == 1:
-                repo = target_repos[0]
-                return {
-                    "issue_id": issue_id,
-                    "target_repos": target_repos,
-                    "source_spec_ref": workspace_child_source_refs[repo],
-                    "issue_repository_layout": child_specs[repo]["child_repository_layout"],
-                    "workspace_child_source_refs": workspace_child_source_refs,
-                }
-            if parent_source_ref == "not-applicable":
-                raise ValueError("root-owned spanning issues require a workspace-level source")
-            return {
-                "issue_id": issue_id,
-                "target_repos": target_repos,
-                "source_spec_ref": parent_source_ref,
-                "issue_repository_layout": "multi-repository-workspace",
-                "workspace_child_source_refs": workspace_child_source_refs,
-            }
-
-        issues = [
-            build_issue("01", ("api",), "orchestration/platform/features/auth/SPEC.md"),
-            build_issue("02", ("web",), "orchestration/platform/features/auth/SPEC.md"),
-            build_issue("03", ("api", "web"), "orchestration/platform/features/auth/SPEC.md"),
-        ]
-
-        self.assertEqual("single-repository", issues[0]["issue_repository_layout"])
-        self.assertEqual("monorepo", issues[1]["issue_repository_layout"])
-        self.assertEqual("multi-repository-workspace", issues[2]["issue_repository_layout"])
-        with self.assertRaisesRegex(ValueError, "workspace-level source"):
-            build_issue("04", ("api", "web"), "not-applicable")
-
-        ledger_workstreams = {
-            issue["issue_id"]: {
-                "source_spec_ref": issue["source_spec_ref"],
-                "workstream_repository_layout": issue["issue_repository_layout"],
-                "workspace_child_source_refs": issue["workspace_child_source_refs"],
-            }
-            for issue in issues
-        }
-
+        fixture = read("references/full-flow-dry-run.md")
+        emitted = section(fixture, "## Execution Contract", "## Goal")
         self.assertEqual(
-            "single-repository",
-            ledger_workstreams["01"]["workstream_repository_layout"],
+            [
+                "source_spec_ref",
+                "feature_slug",
+                "affected_repositories",
+                "allowed_paths",
+                "target_branch_name",
+                "dependency_ids",
+            ],
+            table_fields(emitted),
+        )
+
+    def test_execution_contract_is_single_projection(self) -> None:
+        template = read("references/issue-body-template.md")
+        issue_phase = read("references/issue-phase.md")
+
+        self.assertEqual(1, template.count("## Execution Contract"))
+        before_contract = template.split("## Execution Contract", 1)[0]
+        self.assertNotIn("source_spec_ref:", before_contract)
+        self.assertNotIn("## Dependencies", template)
+        self.assertNotIn("## Dependencies", read("references/full-flow-dry-run.md"))
+        self.assertIn("exactly one", issue_phase)
+        self.assertIn("no duplicate delivery or handoff", issue_phase)
+
+    def test_reverse_edges_are_derived(self) -> None:
+        options = read("references/options.md")
+        issue_phase = read("references/issue-phase.md")
+        vertical = read("references/vertical-slices.md")
+
+        for contents in (options, issue_phase, vertical):
+            self.assertIn("reverse", contents.lower())
+            self.assertIn("derive", contents.lower())
+        self.assertIn("store only `dependency_ids`", issue_phase)
+
+    def test_feature_dependencies_have_no_start_choice(self) -> None:
+        options = read("references/options.md")
+        spec_template = read("references/spec-template.md")
+        spec_phase = read("references/spec-phase.md")
+
+        expected = "| upstream_feature_spec_ref | dependency_reason |"
+        self.assertIn(expected, spec_template)
+        contract = section(
+            options,
+            "## Feature Dependency Contract",
+            "## Canonical Input Requirement",
         )
         self.assertEqual(
-            "monorepo",
-            ledger_workstreams["02"]["workstream_repository_layout"],
+            ["upstream_feature_spec_ref", "dependency_reason"],
+            table_fields(contract),
         )
-        self.assertEqual(
-            "multi-repository-workspace",
-            ledger_workstreams["03"]["workstream_repository_layout"],
+        self.assertIn("waiting for upstream merge and integration proof", spec_phase)
+
+    def test_non_app_exception_is_conditional_and_app_incompatible(self) -> None:
+        skill = read("SKILL.md")
+        options = read("references/options.md")
+        reference = read("references/non-app-delivery.md")
+        issue_phase = read("references/issue-phase.md")
+        spec_template = read("references/spec-template.md")
+
+        self.assertIn("current request and any\ndurable source Feature Spec", skill)
+        self.assertIn("incompatible with", skill)
+        self.assertIn("`$codex-orchestrator`", skill)
+        self.assertIn("Before validating selectable fields", skill)
+        self.assertIn("before structured option validation", options)
+        self.assertIn("default-path run registry", skill)
+        for contents in (skill, options, reference, issue_phase, spec_template):
+            self.assertIn("canonical", contents)
+            self.assertIn("explicit_instruction_ref", contents)
+        self.assertIn("`non_app_delivery_target`", reference)
+        self.assertIn("evidence data, not an option", reference)
+        self.assertIn("record exactly one line for\neach datum", reference)
+        self.assertIn("Reject free-form quotes", reference)
+        self.assertIn("unresolved refs", reference)
+        self.assertIn("Add only `non_app_delivery_target`", reference)
+        base_contract = section(
+            read("references/issue-body-template.md"),
+            "## Execution Contract",
+            "## Goal",
         )
-        for workstream in ledger_workstreams.values():
-            self.assertEqual(
-                set(workstream["workspace_child_source_refs"]),
-                set(workspace_feature_repos),
-            )
-
-    def test_fixture_covers_pipeline_and_draft_source_spec(self) -> None:
-        fixture = read("plan-feature/references/full-flow-dry-run.md")
-
-        for text in (
-            "$plan-feature",
-            "$grill-me-with-context",
-            "The Feature Spec phase",
-            "The issue phase",
-            "$codex-orchestrator",
+        registry = section(reference, "## Registry", "## Canonical Evidence Data")
+        self.assertNotIn("explicit_instruction_ref", registry)
+        self.assertNotIn("explicit_instruction_ref", base_contract)
+        self.assertEqual(spec_template.count("non_app_delivery_target:"), 1)
+        self.assertEqual(spec_template.count("explicit_instruction_ref:"), 1)
+        self.assertIn("current-request-or-durable-source predicate", options)
+        self.assertIn("canonical durable-source carry-forward", reference)
+        self.assertNotIn("explicit-request predicate", options)
+        self.assertNotIn("explicit user selection is required", reference)
+        for value in (
+            "local-commit-created-without-pushing",
+            "changes-pushed-to-target-branch-without-pull-request",
+            "validated-draft-pull-request-published",
         ):
-            self.assertIn(text, fixture)
+            self.assertIn(value, reference)
+        self.assertIn("does not grant", reference)
+        self.assertIn("eventual non-App executor", reference)
 
-        self.assertNotIn(REMOVED_LEGACY_PLANNING_SKILL, fixture)
-        self.assertNotIn(REMOVED_ISSUE_SKILL, fixture)
+    def test_write_mode_propose_is_non_mutating_and_command_free(self) -> None:
+        options = read("references/options.md")
+        skill = read("SKILL.md")
+        spec_phase = read("references/spec-phase.md")
+        issue_phase = read("references/issue-phase.md")
+        fixture = read("references/full-flow-dry-run.md")
 
-        self.assertIn("effective_target: draft-publish-commands", fixture)
-        self.assertIn("no_mutation_override: dry-run", fixture)
-        self.assertIn("no_mutation_output: publish-commands", fixture)
-        self.assertIn("option_rows_fingerprint: sha256:", fixture)
-        self.assertIn("local_mirror_path: not-applicable", fixture)
-        self.assertIn("target_branch_name: feature/account-settings-export", fixture)
-        self.assertIn("the structured delivery handoff tuple", fixture)
+        for contents in (options, skill, spec_phase, issue_phase):
+            self.assertIn("`write_mode=propose`", contents)
+            self.assertRegex(
+                contents,
+                r"(?i)(perform|performs|write) no writes?|write nothing",
+            )
+        self.assertIn("mode: full-flow", fixture)
+        self.assertIn("write_mode: propose", fixture)
         self.assertIn(
-            "`change_delivery_target=pull-request-ready-for-merge-but-not-merged`",
+            "Return no executable publication command", " ".join(fixture.split())
+        )
+        self.assertNotIn("gh issue " + "create", fixture)
+        self.assertNotIn("gh issue " + "edit", fixture)
+        proposed_body = section(
             fixture,
-        )
-        self.assertIn(
-            "`change_delivery_permission=granted-for-selected-target`",
-            fixture,
-        )
-        self.assertIn("`target_branch_name=feature/account-settings-export`", fixture)
-        self.assertIn(
-            "`codex_review_requirement=required-on-current-pull-request-head`",
-            fixture,
-        )
-        self.assertIn("`pull_request_count_strategy=one-pull-request-total`", fixture)
-        self.assertIn("`repository_layout: single-repository` and\n   `target_branch_name: feature/account-settings-export`", fixture)
-        self.assertIn("source_spec_ref: draft-spec:account-settings-export", fixture)
-        self.assertIn("spec_body_fingerprint: sha256:7f4a9c21d003", fixture)
-        self.assertIn("capture_mode: defer-to-caller", fixture)
-        self.assertIn("capture_outcome: deferred", fixture)
-        self.assertIn("domain_knowledge_delta", fixture)
-        self.assertIn("knowledge_delta: required", fixture)
-        self.assertIn("target_surfaces:", fixture)
-        self.assertIn("evidence:", fixture)
-        self.assertIn("current-repository/src/account-settings/export.ts", fixture)
-
-        option_rows_section = markdown_section(
-            fixture,
-            "## Canonical Run Option Rows",
-            "## Representative Emitted Issue",
-        )
-        option_rows = parse_option_rows(option_rows_section)
-
-        row_ids = [row[0] for row in option_rows]
-        self.assertEqual(len(row_ids), len(set(row_ids)))
-        expected_run_fields = {
-            "mode",
-            "execution_profile",
-            "tracker_backend",
-            "effective_target",
-            "no_mutation_override",
-            "no_mutation_output",
-            "local_mirror",
-            "local_mirror_path",
-            "partial_output",
-            "repository_layout",
-            "workspace_context",
-            "change_delivery_target",
-            "change_delivery_permission",
-            "issue_update_permission",
-            "codex_review_requirement",
-            "target_branch_name",
-            "pull_request_count_strategy",
-        }
-        self.assertEqual(len(option_rows), len(expected_run_fields))
-        self.assertEqual({row[2] for row in option_rows}, expected_run_fields)
-        self.assertEqual(
-            set(row_ids),
-            {f"run:{field}" for field in expected_run_fields},
-        )
-        self.assertTrue(all(row[1] == "run" for row in option_rows))
-        self.assertTrue(option_row_evidence_is_valid(option_rows))
-        expected_run_contract = {
-            "mode": ("full-flow", "authorized-user-instruction", "fixture-intent"),
-            "execution_profile": ("standard", "default", "none"),
-            "tracker_backend": (
-                "github",
-                "tracker-config",
-                "project-memory/config/issue-tracker.md",
-            ),
-            "effective_target": (
-                "draft-publish-commands",
-                "runtime-derived",
-                "run:no_mutation_override+run:no_mutation_output",
-            ),
-            "no_mutation_override": (
-                "dry-run",
-                "authorized-user-instruction",
-                "fixture-intent",
-            ),
-            "no_mutation_output": (
-                "publish-commands",
-                "authorized-user-instruction",
-                "fixture-intent",
-            ),
-            "local_mirror": ("not-requested", "default", "none"),
-            "local_mirror_path": ("not-applicable", "default", "none"),
-            "partial_output": ("withhold", "default", "none"),
-            "repository_layout": (
-                "single-repository",
-                "project-layout-config",
-                "project-memory/config/project-layout.md",
-            ),
-            "workspace_context": ("not-applicable", "default", "none"),
-            "change_delivery_target": (
-                "pull-request-ready-for-merge-but-not-merged",
-                "default",
-                "none",
-            ),
-            "change_delivery_permission": (
-                "granted-for-selected-target",
-                "default",
-                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export",
-            ),
-            "issue_update_permission": (
-                "pull-request-closing-keyword-only",
-                "default",
-                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=run;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export",
-            ),
-            "target_branch_name": (
-                "feature/account-settings-export",
-                "runtime-derived",
-                "run:change_delivery_target+feature_slug",
-            ),
-            "codex_review_requirement": (
-                "required-on-current-pull-request-head",
-                "default",
-                "run:change_delivery_target",
-            ),
-            "pull_request_count_strategy": ("one-pull-request-total", "runtime-derived", "affected_repos=current-repository"),
-        }
-        self.assertEqual(
-            {row[2]: (row[3], row[4], row[5]) for row in option_rows},
-            expected_run_contract,
-        )
-        setup_snapshot = markdown_section(
-            fixture,
-            "## Setup Snapshot",
-            "## Canonical Run Option Rows",
-        )
-        incoming_fingerprints = re.findall(
-            r"^option_rows_fingerprint: sha256:([0-9a-f]{64})$",
-            setup_snapshot,
-            re.MULTILINE,
-        )
-        self.assertEqual(len(incoming_fingerprints), 1)
-        self.assertEqual(
-            fingerprint_option_rows(option_rows),
-            incoming_fingerprints[0],
-        )
-
-        issue_section = markdown_section(
-            fixture,
-            "## Representative Emitted Issue",
-            "## Representative Issue-Phase Handoff",
-        )
-        issue_rows = parse_option_rows(issue_section)
-        expected_issue_fields = {
-            "delivery_decision_origin",
-            "change_delivery_target",
-            "change_delivery_permission",
-            "issue_repository_layout",
-            "issue_update_permission",
-            "codex_review_requirement",
-            "pull_request_count_strategy",
-            "parallelization",
-            "issue_completion_method",
-            "domain_closeout",
-            "target_branch_name",
-        }
-        issue_row_ids = [row[0] for row in issue_rows]
-        self.assertEqual(len(issue_rows), len(expected_issue_fields))
-        self.assertEqual(len(issue_row_ids), len(set(issue_row_ids)))
-        self.assertEqual({row[2] for row in issue_rows}, expected_issue_fields)
-        self.assertEqual(
-            set(issue_row_ids),
-            {f"issue:01:{field}" for field in expected_issue_fields},
-        )
-        self.assertTrue(all(row[1] == "issue:01" for row in issue_rows))
-        self.assertTrue(option_row_evidence_is_valid(issue_rows))
-        expected_issue_contract = {
-            "delivery_decision_origin": (
-                "inherited-from-feature-spec",
-                "source-spec",
-                "draft-spec:account-settings-export",
-            ),
-            "change_delivery_target": (
-                "pull-request-ready-for-merge-but-not-merged",
-                "source-spec",
-                "run:change_delivery_target",
-            ),
-            "change_delivery_permission": (
-                "granted-for-selected-target",
-                "source-spec",
-                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run",
-            ),
-            "issue_repository_layout": ("single-repository", "source-spec", "run:repository_layout"),
-            "issue_update_permission": (
-                "pull-request-closing-keyword-only",
-                "source-spec",
-                "permission-source-ref=feature-spec-default:account-settings-export;scope-ref=issue:01;target-ref=draft-spec:account-settings-export;target-branch=feature/account-settings-export;permission-transfer-ref=run",
-            ),
-            "pull_request_count_strategy": ("one-pull-request-total", "source-spec", "run:pull_request_count_strategy"),
-            "codex_review_requirement": (
-                "required-on-current-pull-request-head",
-                "source-spec",
-                "run:codex_review_requirement",
-            ),
-            "parallelization": (
-                "independent",
-                "runtime-derived",
-                "issue-graph:01",
-            ),
-            "issue_completion_method": (
-                "feature-pull-request-closing-keyword",
-                "runtime-derived",
-                "run:tracker_backend+issue:01:pull_request_count_strategy",
-            ),
-            "domain_closeout": (
-                "implementation-closeout",
-                "runtime-derived",
-                "domain_knowledge_delta+issue-graph:01",
-            ),
-            "target_branch_name": (
-                "feature/account-settings-export",
-                "source-spec",
-                "run:target_branch_name",
-            ),
-        }
-        self.assertEqual(
-            {row[2]: (row[3], row[4], row[5]) for row in issue_rows},
-            expected_issue_contract,
-        )
-        emitted_fingerprints = re.findall(
-            r"^issue_option_rows_fingerprint: sha256:([0-9a-f]{64})$",
-            issue_section,
-            re.MULTILINE,
-        )
-        self.assertEqual(len(emitted_fingerprints), 1)
-        self.assertEqual(
-            fingerprint_option_rows(issue_rows),
-            emitted_fingerprints[0],
-        )
-        self.assertIsNone(
-            re.search(r"^option_rows_fingerprint:", issue_section, re.MULTILINE)
-        )
-        phase_handoff = markdown_section(
-            fixture,
-            "## Representative Issue-Phase Handoff",
+            "## Representative Proposed Issue",
             "## Expected Pipeline",
         )
-        graph_fingerprints = re.findall(
-            r"^option_rows_fingerprint: sha256:([0-9a-f]{64})$",
-            phase_handoff,
-            re.MULTILINE,
+        self.assertNotIn("workflow_state:", proposed_body)
+        self.assertIn("proposed-issue:account-settings-export/01", fixture)
+
+    def test_apply_routes_to_local_and_github_trackers(self) -> None:
+        spec_phase = read("references/spec-phase.md")
+        issue_phase = read("references/issue-phase.md")
+
+        for contents in (spec_phase, issue_phase):
+            self.assertIn("`write_mode=apply`, GitHub", contents)
+            self.assertIn("`write_mode=apply`, local", contents)
+        self.assertIn("$gitstack:github-issues", issue_phase)
+        self.assertIn("`mutation_mode=apply`", issue_phase)
+        self.assertIn("`issue_operation`", issue_phase)
+        self.assertIn("`write_mode=propose` never invokes GitStack", issue_phase)
+        self.assertIn("planning/features/<feature-slug>/issues/", issue_phase)
+
+    def test_incomplete_artifacts_are_withheld(self) -> None:
+        skill = read("SKILL.md")
+        options = read("references/options.md")
+        issue_phase = read("references/issue-phase.md")
+
+        for contents in (skill, options, issue_phase):
+            self.assertIn("Withhold", contents)
+            self.assertIn("blocker", contents.lower())
+
+    def test_domain_handoff_remains_deferred_to_final_integration_issue(self) -> None:
+        skill = read("SKILL.md")
+        spec_template = read("references/spec-template.md")
+        issue_template = read("references/issue-body-template.md")
+        issue_phase = read("references/issue-phase.md")
+
+        self.assertNotIn("knowledge_delta:", spec_template)
+        self.assertNotIn("## Domain Knowledge Handoff", spec_template)
+        for key in ("decisions:", "target_surfaces:", "evidence:"):
+            self.assertIn(key, issue_template)
+        for fixed_field in (
+            "capture_outcome",
+            "capture_mode",
+            "memory_slice",
+            "domain_operation",
+        ):
+            self.assertNotIn(fixed_field, spec_template)
+        for contents in (skill, issue_template, issue_phase):
+            self.assertIn("domain-memory", contents)
+            self.assertIn("implementation-closeout", contents)
+            self.assertIn("$project-memory", contents)
+        self.assertIn("only on one final", skill)
+        self.assertIn("Never generate a docs-only", issue_phase)
+
+    def test_knowledge_delta_is_optional_data_and_capture_is_report_only(self) -> None:
+        options = read("references/options.md")
+        skill = read("SKILL.md")
+        spec_phase = read("references/spec-phase.md")
+        issue_phase = read("references/issue-phase.md")
+        fixture = read("references/full-flow-dry-run.md")
+
+        self.assertIn("optional `knowledge_delta` object", options)
+        self.assertIn("Absence of `knowledge_delta`", options)
+        self.assertIn("separate `planning_blockers`", options)
+        self.assertIn("knowledge_delta:\n  decisions:", fixture)
+        self.assertIn("planning_blockers: []", fixture)
+        self.assertNotIn("  un" + "resolved:", fixture)
+        for contents in (options, skill, spec_phase, issue_phase):
+            self.assertIn("capture_outcome", contents)
+            self.assertIn("report", contents.lower())
+        for template in (
+            read("references/spec-template.md"),
+            read("references/issue-body-template.md"),
+        ):
+            self.assertNotRegex(template, r"(?m)^\s*capture_outcome:")
+        self.assertNotIn("capture_outcome", read("references/spec-template.md"))
+        self.assertIn(
+            "capture_outcome=captured",
+            read("references/issue-body-template.md"),
         )
-        self.assertEqual(len(graph_fingerprints), 1)
-        self.assertEqual(
-            fingerprint_option_rows(option_rows + issue_rows),
-            graph_fingerprints[0],
+        for value in (
+            "knowledge_delta=" + "none",
+            "knowledge_delta=" + "required",
+        ):
+            for path in DOC_PATHS:
+                self.assertNotIn(value, path.read_text(encoding="utf-8"))
+
+    def test_cross_spec_and_issue_dependencies_stay_separate(self) -> None:
+        skill = read("SKILL.md")
+        options = read("references/options.md")
+        issue_phase = read("references/issue-phase.md")
+
+        for contents in (skill, options, issue_phase):
+            self.assertIn("cross-Spec", contents)
+            self.assertIn("dependency_ids", contents)
+        self.assertIn(
+            "never copies those\nrefs into issue `dependency_ids`",
+            read("references/spec-phase.md"),
         )
-        self.assertIn("## Domain Knowledge Handoff", fixture)
+
+    def test_fixture_uses_proposed_refs_and_publication_order(self) -> None:
+        fixture = read("references/full-flow-dry-run.md")
+        options = read("references/options.md")
+
+        self.assertIn("source_spec_ref: proposed-spec:account-settings-export", fixture)
+        self.assertIn(
+            "`proposed-spec:<project_slug>/<feature_slug>`",
+            options,
+        )
+        self.assertIn("## Expected Publication Order", fixture)
+        self.assertIn("`proposed-issue:<feature_slug>/<NN>`", options)
+        self.assertIn("non-executable", fixture)
         self.assertIn("## Domain Knowledge Closeout", fixture)
-        self.assertIn("last integration task", fixture)
-        self.assertIn("$project-memory domain-memory", fixture)
-        self.assertIn("internal domain-modeling workflow", fixture)
-        self.assertIn("Replace every issue body line", fixture)
-        self.assertIn("must not dispatch implementation workers", fixture)
-        self.assertNotIn(LEGACY_WORKER_AUTH_KEY, fixture)
-        self.assertIn("project memory, plan-feature output, tracker defaults", fixture)
-        self.assertIn("authorization fields or worker capability modes", fixture)
-        self.assertIn("## Expected Runtime Efficiency Evidence", fixture)
-        self.assertIn("each `issue-hardening:<id>`", fixture)
-        self.assertIn("one `tokens=unavailable` result without estimation", fixture)
-        self.assertIn("repeatedly emitted between phases", fixture)
 
-    def test_non_default_option_sources_reject_empty_or_none_evidence(self) -> None:
-        base = [["run:mode", "run", "mode", "full-flow", "authorized-user-instruction", "request-1"]]
-        self.assertTrue(option_row_evidence_is_valid(base))
-        for invalid in ("", "none"):
-            with self.subTest(evidence=invalid):
-                row = [base[0][:-1] + [invalid]]
-                self.assertFalse(option_row_evidence_is_valid(row))
+    def test_multi_repo_proposed_refs_include_owning_repository(self) -> None:
+        fixture = read("references/full-flow-dry-run.md")
+        options = read("references/options.md")
+        spec_phase = read("references/spec-phase.md")
 
-        default_permission = [[
-            "run:change_delivery_permission",
-            "run",
-            "change_delivery_permission",
-            "granted-for-selected-target",
-            "default",
-            "none",
-        ]]
-        self.assertFalse(option_row_evidence_is_valid(default_permission))
-        default_permission[0][-1] = (
-            "permission-source-ref=feature-spec-default:demo;scope-ref=run;"
-            "target-ref=draft-spec:demo;target-branch=feature/demo"
+        expected = (
+            ("  api: ", "proposed-spec:account-platform/account-settings-export/api"),
+            ("  web: ", "proposed-spec:account-platform/account-settings-export/web"),
+            ("  api: ", "proposed-issue:account-platform/account-settings-export/api/01"),
+            ("  web: ", "proposed-issue:account-platform/account-settings-export/web/01"),
+            (
+                "integration_source_spec_ref: ",
+                "proposed-spec:account-platform/account-settings-export/web/integration",
+            ),
+            (
+                "integration_issue_ref: ",
+                "proposed-issue:account-platform/account-settings-export/web/integration/01",
+            ),
         )
-        self.assertTrue(option_row_evidence_is_valid(default_permission))
-        runtime_derived_permission = [list(default_permission[0])]
-        runtime_derived_permission[0][4] = "runtime-derived"
-        self.assertFalse(option_row_evidence_is_valid(runtime_derived_permission))
+        refs = [ref for _, ref in expected]
+        for prefix, ref in expected:
+            self.assertEqual(fixture.count(f"{prefix}{ref}"), 1)
+        self.assertEqual(len(set(refs)), len(refs))
+        self.assertIn("<repository_slug>", options)
+        self.assertIn("<repository_slug>", spec_phase)
+        self.assertIn("<repository_slug>", read("references/issue-phase.md"))
+        self.assertIn("coordination artifact", options)
+        self.assertIn("/integration", options)
+        self.assertNotIn(
+            "proposed-issue:<project_slug>/<feature_slug>/<NN>",
+            read("references/issue-phase.md"),
+        )
 
-        options = read("plan-feature/references/options.md")
-        self.assertIn("Every non-default\nsource requires non-empty evidence", options)
+    def test_every_multi_repo_bundle_uses_merge_gated_integration_partial(self) -> None:
+        fixture = read("references/full-flow-dry-run.md")
+        skill = read("SKILL.md")
+        spec_phase = read("references/spec-phase.md")
+        issue_phase = read("references/issue-phase.md")
+        vertical = read("references/vertical-slices.md")
 
-    def test_shared_contract_documents_draft_publish_handoff(self) -> None:
-        contract = read("project-memory/references/tracker-publishing.md")
-
-        self.assertIn("source_spec_ref", contract)
-        self.assertIn("draft-spec:<feature-slug>", contract)
-        self.assertIn("Create or update the Feature Spec first", contract)
-        self.assertIn("Replace `source_spec_ref: draft-spec:<...>`", contract)
-        self.assertIn("`no_mutation_override=dry-run`", contract)
-        self.assertIn("`no_mutation_override=draft-output`", contract)
-        self.assertIn("Do not dispatch implementation workers", contract)
-        self.assertIn("No permission row promotes a draft ref", contract)
-        self.assertNotIn("temporary_source_execution_permission", contract)
-        self.assertNotIn("explicit owner decision to use the full Feature Spec body", contract)
-
-    def test_project_memory_does_not_own_orchestration_policy_setup(self) -> None:
-        project_memory = read("project-memory/SKILL.md")
-        setup_workflow = read("project-memory/references/setup-workflow.md")
-        orchestrator = read("codex-orchestrator/SKILL.md")
-        worker = read("codex-orchestrator/references/worker.md")
-        ledger = read("codex-orchestrator/references/ledger.md")
-        ledger_template = read("codex-orchestrator/references/ledger-template.md")
-        orchestrator_options = read("codex-orchestrator/references/options.md")
-
-        self.assertNotIn(ORCHESTRATION_POLICY_PATH, project_memory)
-        self.assertNotIn("orchestration-policy", setup_workflow)
-        self.assertIn("## Structured Configuration", project_memory)
-        self.assertNotIn(ORCHESTRATION_POLICY_PATH, orchestrator)
-        self.assertIn("## Session Option Resolution", worker)
-        self.assertNotIn("policy-auto-dispatched", worker)
-        self.assertNotIn("policy-auto-dispatched", ledger)
-        for retired in (
-            "work_delegation_policy",
-            "delegated_worker_visibility",
-            "max_concurrent_delegated_workers",
-            "max_visible_app_tasks",
+        for contents in (skill, spec_phase, issue_phase, vertical):
+            self.assertIn("dedicated", contents)
+            self.assertIn("integration partial", contents)
+        self.assertIn("wait for every implementation partial to merge", skill)
+        self.assertIn(
+            "Feature Dependencies to cover every implementation partial",
+            " ".join(issue_phase.split()),
+        )
+        self.assertIn("issue dependencies local", skill)
+        self.assertIn("whether or not a knowledge delta", skill)
+        self.assertIn("bounded repository/path change", skill)
+        self.assertIn("exactly one dedicated repo-owned integration", issue_phase)
+        self.assertIn("whether or not\n`knowledge_delta` exists", issue_phase)
+        self.assertIn(
+            "Feature Spec: <Feature Name> - Integration",
+            spec_phase,
+        )
+        self.assertIn(
+            "planning/features/<feature-slug>/integration/SPEC.md",
+            spec_phase,
+        )
+        self.assertIn("Partial role: integration", spec_phase)
+        self.assertIn(
+            "does not require or create a coordination repository",
+            " ".join(spec_phase.split()),
+        )
+        self.assertIn(
+            "planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md",
+            issue_phase,
+        )
+        probe = section(
+            fixture,
+            "## Multi-Repository Identity Probe",
+            "## Expected Pipeline",
+        )
+        self.assertIn(
+            "integration_source_spec_ref: proposed-spec:account-platform/account-settings-export/web/integration",
+            probe,
+        )
+        for upstream in (
+            "proposed-spec:account-platform/account-settings-export/api",
+            "proposed-spec:account-platform/account-settings-export/web",
         ):
-            self.assertNotIn(retired, orchestrator_options)
-            self.assertNotIn(retired, ledger_template)
-        self.assertIn(
-            "`visible_app_task_permission` | `not-requested`, "
-            "`granted-by-authorized-user`, `denied-by-authorized-user`",
-            orchestrator_options,
-        )
-        self.assertNotIn("implementation_checkout_strategy", orchestrator_options)
-        self.assertNotIn("implementation_checkout_strategy", ledger_template)
-        self.assertIn("`checkout_owner` | `codex-app-managed`", orchestrator_options)
-        self.assertIn("## Feature Spec Task Registry", ledger_template)
-        self.assertIn(
-            "grant selects mandatory one-task-per-Feature-Spec execution",
-            " ".join(worker.split()),
-        )
-        self.assertIn("exactly one visible task per Feature Spec", worker)
-        self.assertIn("Internal Subagents", worker)
-        self.assertIn("## Wave Reports", ledger_template)
-        self.assertIn("Execution Report", worker)
-        self.assertNotIn("## Wave Checkpoints", ledger)
-        self.assertNotIn("## Wave Checkpoints", ledger_template)
+            self.assertIn(f"upstream_feature_spec_ref: {upstream}", probe)
+        self.assertIn("integration_issue_dependency_ids: none", probe)
+        self.assertIn("no sibling-partial issue ID", probe)
+        self.assertIn("remain mandatory without one", probe)
+        self.assertIn("produce a real PR", probe)
 
-    def test_issue_tracker_templates_stay_tracker_focused(self) -> None:
-        for relative in (
-            "project-memory/references/issue-tracker-github.md",
-            "project-memory/references/issue-tracker-local.md",
+    def test_applied_multi_repo_refs_remain_globally_unambiguous(self) -> None:
+        fixture = read("references/full-flow-dry-run.md")
+        spec_phase = read("references/spec-phase.md")
+        options = read("references/options.md")
+        projection = section(
+            fixture,
+            "### Expected Applied Multi-Repository Identity Projection",
+            "## Expected Pipeline",
+        )
+
+        for ref in (
+            "acme/account-api#241",
+            "acme/account-web#118",
+            "acme/account-web#119",
+            "api/planning/features/account-settings-export/SPEC.md",
+            "web/planning/features/account-settings-export/SPEC.md",
+            "web/planning/features/account-settings-export/integration/SPEC.md",
         ):
-            contents = read(relative)
-            normalized = " ".join(contents.split())
-            with self.subTest(file=relative):
-                self.assertIn("## Configuration", contents)
-                self.assertIn("| Key | Type | Value | Allowed values | Meaning |", contents)
-                self.assertNotIn(ORCHESTRATION_POLICY_PATH, contents)
-                self.assertIn("Tracker setup records artifact routing", contents)
-                self.assertIn("Branch only on the canonical `effective_target`", normalized)
-                self.assertIn("`source_spec_ref`", contents)
-                self.assertNotIn("Source " + "Feature Spec", contents)
-                if relative.endswith("issue-tracker-local.md"):
-                    self.assertIn("must use canonical", normalized)
-                else:
-                    self.assertIn("canonical `source_spec_ref` field", contents)
-                self.assertNotIn("current request explicitly asks for dry-run", contents)
-                self.assertNotIn("current-run no-mutation override is active", contents)
-                for field in RUNTIME_POLICY_FIELDS:
-                    self.assertNotIn(field, contents)
+            self.assertIn(ref, projection)
+        self.assertIn("owner/repository#<number>", spec_phase)
+        self.assertIn("<repository_slug>/<repo-relative-spec-path>", spec_phase)
+        self.assertIn("same globally unambiguous refs", options)
+        self.assertIn("Bare `#<number>`", projection)
+        self.assertIn("does\nnot publish or enqueue", projection)
+        self.assertIn("globally unambiguous durable ref", fixture)
+        self.assertIn("same qualified refs", fixture)
 
-        github_contract = read("project-memory/references/issue-tracker-github.md")
-        self.assertIn("`source_spec_ref`, delivery metadata", github_contract)
-        self.assertIn("canonical `source_spec_ref` field", github_contract)
-        self.assertIn("`local_mirror=requested`", github_contract)
-        self.assertNotIn("explicitly asks to keep a local mirror", github_contract)
+    def test_existing_spec_requires_canonical_dependency_section(self) -> None:
+        options = read("references/options.md")
+        skill = read("SKILL.md")
+        spec_phase = read("references/spec-phase.md")
+        issue_phase = read("references/issue-phase.md")
+        normalized = " ".join(spec_phase.split())
 
-        local_contract = read("project-memory/references/issue-tracker-local.md")
-        self.assertIn("`effective_target=local-dry-run`", local_contract)
-        self.assertIn("temporary working space only", local_contract)
-        self.assertIn("`planning/features/<feature-slug>/SPEC.md`", local_contract)
-        self.assertIn("`planning/features/<feature-slug>/issues/<NN>-<slug>.md`", local_contract)
-        self.assertIn("Never use a `planning/tmp/`", local_contract)
-        self.assertNotIn("explicitly asks to keep completed issue", local_contract)
+        self.assertIn("Existing Feature Specs", options)
+        self.assertIn("Always run the canonical source-contract validation", skill)
+        self.assertIn("return its original body and ref", skill)
+        self.assertIn("do not switch\nmodes", skill)
+        self.assertIn("`mode=issues-from-existing-spec`", spec_phase)
+        self.assertIn("incompatible structured input", normalized)
+        self.assertIn("Never interpret absence as an empty edge set", normalized)
+        self.assertIn("do not draft or update the source", spec_phase)
+        self.assertIn("return that exact source", spec_phase)
+        self.assertIn("skip Apply Or Propose", spec_phase)
+        self.assertIn("separate explicitly authorized Feature Spec update", spec_phase)
+        self.assertIn("This step does not run for `mode=issues-from-existing-spec`", spec_phase)
+        self.assertIn("exact existing section without adding, removing, or rewriting", spec_phase)
+        self.assertIn("validate without modifying the body", spec_phase)
+        self.assertNotIn("legacy Feature\nSpec without the section is read as", spec_phase)
+        self.assertIn("exactly one `## Feature Dependencies` section", issue_phase)
+        self.assertIn("even\n  for `mode=issues-from-existing-spec`", issue_phase)
+        self.assertIn("reject absence, duplicates, extra\n  columns", issue_phase)
 
-    def test_plan_feature_references_internal_phase_templates(self) -> None:
-        plan_feature = read("plan-feature/SKILL.md")
-        spec_phase = read("plan-feature/references/spec-phase.md")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-        spec_template = read("plan-feature/references/spec-template.md")
-        issue_template = read("plan-feature/references/issue-body-template.md")
-        vertical_slices = read("plan-feature/references/vertical-slices.md")
-        options = read("plan-feature/references/options.md")
-        spec_delivery = read("codex-orchestrator/references/spec-backed-delivery.md")
-        normalized_plan_feature = " ".join(plan_feature.split())
-        normalized_spec_phase = " ".join(spec_phase.split())
-        normalized_spec_template = " ".join(spec_template.split())
-        normalized_options = " ".join(options.split())
+    def test_local_integration_completion_stays_in_integration_subtree(self) -> None:
+        template = read("references/issue-body-template.md")
+        issue_phase = read("references/issue-phase.md")
+        fixture = read("references/full-flow-dry-run.md")
 
-        self.assertIn("references/full-flow-dry-run.md", plan_feature)
-        self.assertIn("`tracker_backend`", plan_feature)
-        self.assertIn("keyed\n`option_resolution` rows", plan_feature)
-        self.assertIn("`repository_layout`", plan_feature)
-        self.assertIn("`child_repository_layout`", plan_feature)
-        self.assertIn("run only `$project-memory project-layout`\nbefore recording the option snapshot", plan_feature)
-        self.assertIn(
-            "`codex_review_requirement`, `target_branch_name`, and",
-            plan_feature,
+        expected = (
+            "planning/features/<feature-slug>/integration/issues/done/"
+            "<NN>-<slug>.md"
         )
-        self.assertIn("Keep worker surfaces, worker counts", plan_feature)
-        self.assertIn("run child repo partial planning only when all affected child repos share one effective child `tracker_backend`", normalized_plan_feature)
-        self.assertIn("when child backends are mixed", plan_feature)
-        self.assertIn("two-pass child publication flow", plan_feature)
-        self.assertIn("the run-level `repository_layout` row is `multi-repository-workspace`", normalized_plan_feature)
-        self.assertIn("per-issue `issue_repository_layout`", plan_feature)
-        self.assertIn("each affected child repo's `project-memory/config/project-layout.md`", plan_feature)
-        self.assertIn("`workspace_context=multi-repository-workspace`", plan_feature)
-        self.assertIn("`workspace_child_source_refs` repo-to-Feature-Spec mapping", plan_feature)
-        self.assertIn("`workspace_child_source_refs=unresolved-first-pass`", plan_feature)
-        self.assertIn("Invoke the issue phase only after the required child partial Feature Spec refs", plan_feature)
-        self.assertNotIn(ORCHESTRATION_POLICY_PATH, plan_feature)
-        self.assertIn("`tracker_backend` as planning-artifact write authority", plan_feature)
-        self.assertIn("Planning blockers", plan_feature)
-        self.assertIn("Include exactly one canonical domain outcome", plan_feature)
-        self.assertNotIn("Domain knowledge: captured in <path or durable surface>", plan_feature)
-        self.assertIn("`capture_outcome=deferred`", plan_feature)
-        self.assertIn("`capture_outcome=no-durable-change`", plan_feature)
-        self.assertIn("`mode=spec-only`", plan_feature)
-        self.assertIn("never emits `capture_outcome=captured`", plan_feature)
-        self.assertIn("issue lifecycle mutations belong to", plan_feature)
-        self.assertNotIn(STALE_NO_GATES_REMAIN, plan_feature)
-        self.assertNotIn(STALE_GATES_RESOLVED, plan_feature)
-        self.assertIn("references/spec-phase.md", plan_feature)
-        self.assertIn("references/issue-phase.md", plan_feature)
-        self.assertIn("tracker-publishing.md", spec_phase)
-        self.assertIn("## Feature Spec Target Model", spec_phase)
-        self.assertIn("planning/features/<feature-slug>/SPEC.md", spec_phase)
-        self.assertIn("When `workspace_context=multi-repository-workspace`", spec_phase)
-        self.assertIn("Feature Spec body fingerprint", spec_phase)
-        self.assertIn("Feature Spec planning-artifact publication", spec_phase)
-        self.assertIn("tracker_backend` is the planning-artifact write authority", spec_phase)
-        self.assertIn("affected child repo's `project-memory/config/issue-tracker.md`", spec_phase)
-        self.assertIn("`project-memory/config/project-layout.md`", spec_phase)
-        self.assertIn("source for `child_repository_layout`", spec_phase)
-        self.assertIn("one\noption-resolution run may publish only one artifact set", spec_phase)
-        self.assertIn("then publish child repo partials in\nchild run(s) that cite the parent `source_spec_ref`", spec_phase)
-        self.assertIn("All affected child repos\nin one generated issue graph must share the same effective child backend", spec_phase)
-        self.assertIn("child\nbackends are mixed", spec_phase)
-        self.assertIn("two-pass child publication flow", spec_phase)
-        self.assertIn("`workspace_context=multi-repository-workspace`", spec_phase)
-        self.assertIn("Parent `tracker_backend` controls only the parent/global", spec_phase)
-        self.assertIn("`effective_target=configured-tracker`", spec_phase)
-        self.assertIn("`local_mirror=requested`", spec_phase)
-        self.assertIn("validated `local_mirror_path`", spec_phase)
-        self.assertIn("`local_mirror_path`", issue_phase)
-        self.assertIn("`target_branch_name`", spec_phase)
-        self.assertIn("`target_branch_name`", issue_phase)
-        self.assertIn("For `effective_target=local-dry-run`", spec_phase)
+        self.assertIn(expected, template)
         self.assertIn(
-            "Commit or push targets require exact\nauthorized-user evidence naming the branch",
-            options,
-        )
-        self.assertIn("the structured delivery handoff tuple: `change_delivery_target`,", spec_phase)
-        self.assertIn("`repository_layout`", spec_phase)
-        self.assertIn("`child_repository_layout`", spec_phase)
-        self.assertIn("`workspace_context`, `workspace_parent_source_ref`", spec_phase)
-        self.assertIn("`workspace_child_source_refs` mapping each `workspace_feature_repos` repo", spec_phase)
-        self.assertIn("Keys are canonical repo slugs and must match\n  `workspace_feature_repos`", spec_phase)
-        self.assertIn("workspace_child_source_refs=unresolved-first-pass", normalized_spec_phase)
-        self.assertIn("`issue_update_permission`, `issue_update_permission_evidence`", spec_phase)
-        self.assertNotIn("- Project topology: verified `repository_layout` row value.", spec_template)
-        self.assertIn("- repository_layout: [verified `repository_layout` row value]", spec_template)
-        self.assertIn("- child_repository_layout: [child repo durable topology", spec_template)
-        self.assertIn("- workspace_context: [multi-repository-workspace or not-applicable].", spec_template)
-        self.assertIn("- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable].", spec_template)
-        self.assertIn("- workspace_child_source_refs: [complete repo-to-child Feature Spec mapping", spec_template)
-        self.assertIn("`unresolved-first-pass` during first-pass workspace child publication", spec_template)
-        self.assertIn("Never choose an individual child partial as the primary source", issue_phase)
-        self.assertIn("- target_branch_name: [verified exact branch data]", spec_template)
-        self.assertIn("branch mutations also require `target-branch=<target_branch_name>`", normalized_options)
-        self.assertIn("- target_branch_name: [verified exact branch data]", issue_template)
-        self.assertIn("- target_branch_name: [same effective branch data as `## Delivery`]", issue_template)
-        self.assertIn(
-            "- change_delivery_permission: [verified `change_delivery_permission` row value]",
-            issue_template,
+            "planning/features/<feature-slug>/integration/issues/done/",
+            issue_phase,
         )
         self.assertIn(
-            "- codex_review_requirement: [verified `codex_review_requirement` row value]",
-            issue_template,
+            "local_integration_completion_path: "
+            "web/planning/features/account-settings-export/integration/issues/done/"
+            "01-prove-integrated-export.md",
+            fixture,
         )
-        self.assertIn(
-            "- issue_update_permission: [verified `issue_update_permission` row value]",
-            issue_template,
+
+    def test_fixture_renders_complete_proposed_feature_spec(self) -> None:
+        fixture = read("references/full-flow-dry-run.md")
+        proposed_spec = section(
+            fixture,
+            "## Proposed Feature Spec",
+            "## Representative Proposed Issue",
         )
-        self.assertIn("`issue_update_permission=direct-issue-updates-explicitly-authorized`", issue_phase)
-        self.assertIn("Do not resolve delivery or mutation options in this phase", spec_phase)
-        self.assertNotIn("Resolve the Feature Spec `change_delivery_target`", spec_phase)
-        self.assertIn("delivery permission alone is insufficient", normalized_options)
-        self.assertIn("Retired planning and delivery fields are invalid input", options)
-        self.assertIn("`issue_completion_method=final-commit-closing-keyword`,\n  `issue_update_permission=direct-issue-updates-explicitly-authorized`", issue_template)
-        self.assertNotIn("repository_integration_method", issue_template)
-        self.assertNotIn("repository_integration_method", issue_phase)
-        self.assertIn("label the ref\nnon-executable", issue_phase)
-        for identity_field in (
-            "feature_slug",
-            "product_slug",
-            "workspace_path",
-            "context_file",
-            "project_slug",
+
+        self.assertIn("# Feature Spec: Account Settings Export", proposed_spec)
+        for heading in (
+            "## Problem",
+            "## Goals",
+            "## Non-Goals",
+            "## Requirements",
+            "## Product / Repository Scope",
+            "## Feature Dependencies",
+            "## Acceptance Criteria",
+            "## Validation Expectations",
         ):
-            self.assertIn(f"`{identity_field}`", issue_phase)
-        self.assertNotIn("run explicitly requested no-mutation output", spec_phase)
-        self.assertNotIn("explicitly asked for a local mirror", spec_phase)
-        self.assertIn("## Effective Planning-Artifact Target", options)
-        self.assertIn("## Per-Issue Registry", options)
-        self.assertIn("sole owner of option values", issue_phase)
-        self.assertIn("sole owner of option values", normalized_spec_phase)
+            self.assertIn(heading, proposed_spec)
+        dependencies = section(
+            proposed_spec,
+            "## Feature Dependencies",
+            "## Acceptance Criteria",
+        ).strip()
+        self.assertEqual(
+            "| upstream_feature_spec_ref | dependency_reason |\n| --- | --- |",
+            dependencies,
+        )
+        self.assertNotIn("## Domain Knowledge Handoff", proposed_spec)
+        self.assertNotIn("knowledge_delta:", proposed_spec)
+        self.assertNotIn("workflow_state:", proposed_spec)
+        self.assertNotIn("issue_type:", proposed_spec)
+        for field in REMOVED_FIELDS:
+            self.assertNotIn(field, proposed_spec)
+
+    def test_fixture_renders_complete_final_integration_issue(self) -> None:
+        fixture = read("references/full-flow-dry-run.md")
+        final_issue = section(
+            fixture,
+            "## Final Proposed Integration Issue",
+            "## Multi-Repository Identity Probe",
+        )
+
+        self.assertIn("proposed-issue:account-settings-export/02", final_issue)
+        self.assertEqual(final_issue.count("## Execution Contract"), 1)
+        contract = section(final_issue, "## Execution Contract", "## Goal")
+        self.assertEqual(
+            [
+                "source_spec_ref",
+                "feature_slug",
+                "affected_repositories",
+                "allowed_paths",
+                "target_branch_name",
+                "dependency_ids",
+            ],
+            table_fields(contract),
+        )
+        self.assertIn("| `dependency_ids` | `01` |", final_issue)
+        self.assertIn("## Non-Goals", final_issue)
+        self.assertIn("## Domain Knowledge Closeout", final_issue)
+        self.assertIn("memory_slice=domain-memory", final_issue)
+        self.assertIn("domain_operation=implementation-closeout", final_issue)
+        self.assertIn("knowledge_delta:\n  decisions:", final_issue)
+        self.assertIn("capture_outcome=captured", final_issue)
+        self.assertIn("required named target", final_issue)
+        self.assertIn("complete documentation diff", final_issue)
+        self.assertIn("`deferred` or `no-durable-change`", final_issue)
+        self.assertIn("prove the\nintegrated behavior", final_issue)
+
+        ordinary_issue = section(
+            fixture,
+            "## Representative Proposed Issue",
+            "## Final Proposed Integration Issue",
+        )
+        self.assertIn("## Non-Goals", ordinary_issue)
+        self.assertNotIn("## Domain Knowledge Closeout", ordinary_issue)
+
+    def test_spec_only_reports_delta_without_persisting_or_enabling_app(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        spec_phase = " ".join(read("references/spec-phase.md").split())
+        spec_template = read("references/spec-template.md")
+
+        for contents in (skill, spec_phase):
+            self.assertIn("exact delta as non-persisted report data", contents)
+            self.assertIn("not App-executable until", contents)
+        self.assertNotIn("knowledge_delta:", spec_template)
+        self.assertNotIn("## Domain Knowledge Handoff", spec_template)
+
+    def test_existing_spec_accepts_delta_only_as_explicit_invocation_data(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        spec_phase = " ".join(read("references/spec-phase.md").split())
+        issue_phase = " ".join(read("references/issue-phase.md").split())
+
+        for contents in (skill, spec_phase, issue_phase):
+            self.assertIn("explicit accepted invocation data", contents)
+        self.assertIn("never infer it from the Feature Spec", skill)
+        self.assertIn("Reject a source containing `knowledge_delta`", spec_phase)
+        self.assertIn("Never infer it from Feature Spec prose", issue_phase)
+
+    def test_knowledge_targets_are_contained_by_final_issue_scope(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        options = " ".join(read("references/options.md").split())
+        spec_phase = " ".join(read("references/spec-phase.md").split())
+        issue_phase = " ".join(read("references/issue-phase.md").split())
+        template = " ".join(read("references/issue-body-template.md").split())
+
+        for contents in (skill, options, issue_phase, template):
+            self.assertIn("`affected_repositories`", contents)
+            self.assertIn("`allowed_paths`", contents)
+        self.assertIn("unchanged Feature Spec repository/path scope", options)
+        self.assertIn("reject the delta instead of widening", skill)
+        self.assertIn("never widen the immutable source", spec_phase)
+        self.assertIn("Never rely on Project Memory to write outside", issue_phase)
+
+        fixture = read("references/full-flow-dry-run.md")
+        final_issue = section(
+            fixture,
+            "## Final Proposed Integration Issue",
+            "## Multi-Repository Identity Probe",
+        )
+        contract = section(final_issue, "## Execution Contract", "## Goal")
+        allowed_match = re.search(
+            r"^\| `allowed_paths` \| (.+) \|$", contract, re.MULTILINE
+        )
+        self.assertIsNotNone(allowed_match)
+        allowed_paths = [
+            value.strip().strip("`")
+            for value in allowed_match.group(1).split(",")
+        ]
+        closeout = section(
+            final_issue, "## Domain Knowledge Closeout", "## Completion"
+        )
+        target_block = closeout.split("  target_surfaces:", 1)[1].split(
+            "  evidence:", 1
+        )[0]
+        targets = re.findall(
+            r"^    - current-repository/(.+)$", target_block, re.MULTILINE
+        )
+        self.assertTrue(targets)
+        for target in targets:
+            self.assertTrue(
+                any(
+                    target == scope
+                    or (scope.endswith("/**") and target.startswith(scope[:-3]))
+                    for scope in allowed_paths
+                ),
+                f"{target} is outside final issue allowed_paths",
+            )
         self.assertIn(
-            "Resolve `effective_target` only through `references/options.md`",
-            normalized_spec_phase,
+            "| `affected_repositories` | `current-repository` |", contract
+        )
+
+        planning_delta = section(
+            fixture, "## Resolved Run", "## Proposed Feature Spec Result"
+        ).split("knowledge_delta:\n", 1)[1].split("planning_blockers:", 1)[0]
+        persisted_delta = closeout.split(
+            "knowledge_delta:\n", 1
+        )[1].split("- Closeout proof:", 1)[0]
+        normalize_payload = lambda payload: "\n".join(
+            line.strip() for line in payload.strip().splitlines()
+        )
+        self.assertEqual(
+            normalize_payload(planning_delta),
+            normalize_payload(persisted_delta),
+        )
+
+    def test_knowledge_owner_uses_executable_remaining_graph_rule(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        issue_phase = " ".join(read("references/issue-phase.md").split())
+        vertical = " ".join(read("references/vertical-slices.md").split())
+
+        self.assertIn("exclude that owner and its own `dependency_ids`", skill)
+        self.assertIn(
+            "remove that owner and its outgoing `dependency_ids`",
+            issue_phase,
+        )
+        self.assertIn("nodes with no dependents in the remaining", issue_phase)
+        self.assertIn("another issue depends on the owner", issue_phase)
+        self.assertIn("owner-excluded terminal algorithm", issue_phase)
+        self.assertIn("owner-excluded terminal rule", vertical)
+        self.assertIn("Freeze stable IDs only after", issue_phase)
+        self.assertIn("topologically last", issue_phase)
+        self.assertIn("append a new owner", issue_phase)
+        self.assertIn("strictly earlier generated ID", issue_phase)
+
+        template = " ".join(read("references/issue-body-template.md").split())
+        for contents in (issue_phase, template):
+            self.assertIn("capture_outcome=captured", contents)
+            self.assertIn("required named target", contents)
+            self.assertIn("deferred", contents)
+            self.assertIn("no-durable-change", contents)
+            self.assertIn("block", contents)
+            self.assertIn("contradicted", contents)
+            self.assertIn("owner decision", contents)
+
+    def test_spec_only_multi_repo_delta_targets_integration_partial(self) -> None:
+        spec_phase = " ".join(read("references/spec-phase.md").split())
+
+        self.assertIn(
+            "future_closeout_issue_source_spec_ref: <source_spec_ref>", spec_phase
         )
         self.assertIn(
-            "`references/options.md` solely owns effective-target and local-mirror option resolution",
-            normalized_spec_phase,
+            "future_closeout_issue_source_spec_ref: <integration_source_spec_ref>",
+            spec_phase,
         )
-        self.assertIn(
-            "owns transient body transport, mirror-path application, draft-ref replacement",
-            normalized_spec_phase,
-        )
-        self.assertIn(
-            "`references/options.md` is the sole owner of option names, values, defaults",
-            normalized_spec_template,
-        )
-        self.assertIn(
-            "only projects an already verified option snapshot",
-            normalized_spec_template,
-        )
-        for duplicated_schema in (
-            "tracker_backend: <github|local>",
-            "change_delivery_target: <pull-request|direct-commit>",
-            "pull_request_count_strategy: <one-pull-request-total|one-pull-request-per-repository|none>",
+        self.assertIn("dedicated integration partial's ref", spec_phase)
+        self.assertIn("never the parent or an ordinary partial ref", spec_phase)
+        self.assertIn("not a task ref or selectable field", spec_phase)
+        self.assertNotIn("final-implementation-task-from", spec_phase)
+
+    def test_spec_only_delta_cannot_be_lost_between_invocations(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        options = " ".join(read("references/options.md").split())
+        spec_phase = " ".join(read("references/spec-phase.md").split())
+        spec_template = " ".join(read("references/spec-template.md").split())
+        fixture = read("references/full-flow-dry-run.md")
+
+        for contents in (skill, options, spec_phase, spec_template):
+            self.assertIn("spec-only", contents)
+            self.assertIn("nonempty `knowledge_delta`", contents)
+            self.assertIn("withhold", contents)
+            self.assertIn("full-flow", contents)
+        self.assertIn("Do not silently downgrade `write_mode`", spec_phase)
+        self.assertIn("no durable source exists", spec_phase)
+        self.assertIn("no durable Feature Spec source exists", spec_template)
+        self.assertIn("must never consume the preview", spec_template)
+        self.assertIn("no final issue ref exists", skill)
+        self.assertIn("future_closeout_issue_source_spec_ref", skill)
+        self.assertIn("## Spec-Only Delta Persistence Probe", fixture)
+        self.assertIn("durable_source_created: false", fixture)
+        self.assertIn("issues_from_existing_spec: impossible", fixture)
+
+    def test_local_issue_scope_covers_move_and_final_head_sequence(self) -> None:
+        issue_phase = " ".join(read("references/issue-phase.md").split())
+        template = " ".join(read("references/issue-body-template.md").split())
+        fixture = read("references/full-flow-dry-run.md")
+
+        for token in (
+            "tracker-owning repository",
+            "exact active path",
+            "`done/` destination",
+            "inside that affected Git repository",
+            "never invent a tracker-owning repository",
         ):
-            self.assertNotIn(duplicated_schema, spec_phase)
-            self.assertNotIn(duplicated_schema, issue_phase)
-        self.assertIn("Records the issue-effective stopping point", options)
-        self.assertIn("Every issue records its effective delivery tuple", options)
-        self.assertIn("## Resolution Record", options)
-        self.assertIn("Record one six-column row per run field", options)
-        self.assertIn("plus issue-effective `target_branch_name`", options)
+            self.assertIn(token, issue_phase)
+        self.assertIn("Commit and push the move", template)
+        self.assertIn("rerun every final gate", template)
+        self.assertIn("prepared, not globally completed", template)
         self.assertIn(
-            "Permission-bearing values require\n`permission-source-ref`, exact `scope-ref`, and `target-ref`",
-            options,
+            "web/planning/features/account-settings-export/integration/issues/"
+            "01-prove-integrated-export.md",
+            fixture,
         )
         self.assertIn(
-            "Canonicalize all rows with columns `row_id`, `scope_id`, `field`, `value`,",
-            options,
-        )
-        self.assertIn("option_rows_fingerprint: sha256:", options)
-        self.assertIn("emits\n`issue_option_rows_fingerprint`", options)
-        self.assertIn("`issue:<NN>:<field>`", options)
-        self.assertIn("`local-artifacts` | `local-dry-run`", options)
-        self.assertIn("`issue_completion_method=move-local-issue-to-done-after-proof`", options)
-        self.assertIn("`issue_completion_method=final-commit-closing-keyword`", options)
-        self.assertIn("Resolve these fields after the issue graph exists", options)
-        self.assertIn("`depends-on` requires dependency ids only", options)
-        self.assertIn("An issue target override atomically re-resolves", options)
-        self.assertIn("Reject every other combination", options)
-        self.assertIn("tracker-publishing.md", issue_phase)
-        self.assertIn("Do not add worker authorization defaults", issue_phase)
-        self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_phase)
-        self.assertIn("final hardened issue bodies", issue_phase)
-        self.assertIn("complete Per-Issue Registry row set", issue_phase)
-        self.assertIn("atomically resolves the", issue_phase)
-        self.assertIn("complete delivery tuple", issue_phase)
-        self.assertIn("Do not hardcode another default\ndelivery tuple", issue_phase)
-        self.assertNotIn("- change_delivery_target: pull-request", issue_phase)
-        self.assertIn("`partial_output=allow-non-agent-ready`", issue_phase)
-        self.assertNotIn("explicitly requested partial backlog output", issue_phase)
-        self.assertNotIn("unless it explicitly permits partial output", issue_phase)
-        self.assertNotIn("current run explicitly requested\nno-mutation", issue_phase)
-        self.assertNotIn("user explicitly requested one", issue_phase)
-        self.assertIn("machine-local absolute paths", issue_phase)
-        self.assertIn("planning issue publication", issue_phase)
-        self.assertIn("tracker_backend` as planning-artifact write authority", issue_phase)
-        self.assertIn("Run The Verticality Gate", issue_phase)
-        self.assertIn("Re-run `$plan-harder`", issue_phase)
-        self.assertNotIn(STALE_REPO_PR_PLACEHOLDERS, issue_phase)
-        self.assertIn("references/issue-body-template.md", issue_phase)
-        self.assertIn("## Orchestrator Handoff", issue_phase)
-        self.assertIn("must not contain worker authorization", issue_phase)
-        self.assertIn("For root-owned\n  integration or domain-closeout issues spanning multiple repos", issue_phase)
-        self.assertIn("Never choose an individual child partial as the primary source", issue_phase)
-        self.assertIn("do not choose one child repo's durable topology as the run-level\n  value", issue_phase)
-        self.assertIn("for root-owned issues spanning multiple repos, use\n  `multi-repository-workspace`", issue_phase)
-        self.assertNotIn("# <feature-slug>: <NN> <vertical outcome>", issue_phase)
-        self.assertIn("# Feature Spec: [Feature Name]", spec_template)
-        self.assertIn("## Change Delivery Target", spec_template)
-        self.assertIn("## Domain Knowledge Handoff", spec_template)
-        self.assertIn("# <feature-slug>: <NN> <vertical outcome>", issue_template)
-        self.assertIn("issue_type: [canonical bug | feature | task]", issue_template)
-        self.assertIn("workflow_state: [canonical state", issue_template)
-        self.assertIn("## Option Resolution", issue_template)
-        self.assertIn("issue_option_rows_fingerprint:", issue_template)
-        self.assertIn(
-            "| row_id | scope_id | field | value | source | evidence |",
-            issue_template,
-        )
-        self.assertIn("exactly one row for every Per-Issue Registry field", issue_template)
-        self.assertIn("do not infer or omit row metadata here", issue_template)
-        self.assertNotIn("\nType: [mapped issue type", issue_template)
-        self.assertNotIn("\nStatus: [mapped triage state", issue_template)
-        self.assertNotIn("\ntype:", issue_template)
-        self.assertNotIn("\nstatus:", issue_template)
-        self.assertNotIn("Project Topology: [verified inherited `repository_layout` row value]", issue_template)
-        self.assertIn("- repository_layout: [same feature/workspace graph value as the source Feature Spec]", issue_template)
-        self.assertIn("- issue_repository_layout: [verified `issue_repository_layout` row value]", issue_template)
-        self.assertIn(
-            "- change_delivery_permission_evidence: [verified permission-source, scope, target, branch, and transfer evidence]",
-            issue_template,
-        )
-        self.assertIn("- workspace_context: [multi-repository-workspace or not-applicable]", issue_template)
-        self.assertIn("- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable]", issue_template)
-        self.assertIn("- workspace_child_source_refs: [complete repo-to-Feature-Spec-ref mapping", issue_template)
-        self.assertIn("- pull_request_count_strategy: [verified `pull_request_count_strategy` row value]", issue_template)
-        self.assertIn("sole owner of delivery, scheduling, closeout", issue_template)
-        self.assertIn("without resolving or defaulting them here", issue_template)
-        for duplicated_schema in (
-            "[pull-request | direct-commit]",
-            "[one-pull-request-total | one-pull-request-per-repository | none]",
-            "[merge-ready | draft-only | not-applicable]",
-            "[independent | depends-on | blocks | root-integrated]",
-        ):
-            self.assertNotIn(duplicated_schema, issue_template)
-        self.assertIn(
-            "- issue_repository_layout: [same issue-effective value as `## Delivery`]",
-            issue_template,
+            "web/planning/features/account-settings-export/integration/issues/done/"
+            "01-prove-integrated-export.md",
+            fixture,
         )
         self.assertIn(
-            "- pull_request_count_strategy: [same effective value as `## Delivery`]",
-            issue_template,
+            "web/src/account-settings/export-integration/**",
+            fixture,
         )
+
+    def test_github_completion_is_always_armed_for_app_delivery(self) -> None:
+        template = " ".join(
+            read("references/issue-body-template.md").split()
+        )
+
+        self.assertIn("closing keyword", template)
+        self.assertIn("owner/repository#<number>", template)
+        self.assertIn("repository's default branch", template)
+        self.assertIn("withhold the App-compatible issue or bundle as blocked", template)
+        self.assertIn("a non-closing link is not completion proof", template)
+
+    def test_hardening_keeps_only_the_final_stable_pass(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        issue_phase = " ".join(read("references/issue-phase.md").split())
+        template = read("references/issue-body-template.md")
+        fixture = read("references/full-flow-dry-run.md")
+        provenance = (
+            "Plan-hardening: final stable $plan-harder issue-hardening pass "
+            "completed for this issue."
+        )
+
+        self.assertIn("one or more times per generated issue", skill)
+        self.assertIn("after vertical boundaries", skill)
+        self.assertIn("at least once for each candidate issue", issue_phase)
+        self.assertIn("persist only the final stable result", issue_phase)
+        self.assertEqual(template.count(provenance), 1)
+        self.assertEqual(fixture.count(provenance), 2)
+
+    def test_integration_partial_uses_a_distinct_derived_branch(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        options = " ".join(read("references/options.md").split())
+        issue_phase = " ".join(read("references/issue-phase.md").split())
+        fixture = read("references/full-flow-dry-run.md")
+
+        self.assertIn("feature/<feature_slug>-integration", skill)
+        self.assertIn("appending `-integration` to the resolved ordinary partial branch", skill)
+        self.assertIn("never reuse the ordinary partial's branch", skill)
+        self.assertIn("Branch sharing is per Feature Spec", options)
+        self.assertIn("distinct derived branch", options)
+        self.assertIn("<ordinary_target_branch_name>-integration", options)
+        self.assertIn("Never reuse the ordinary partial's branch", issue_phase)
         self.assertIn(
-            "- change_delivery_permission_evidence: [same evidence as `## Delivery`]",
-            issue_template,
+            "integration_target_branch: feature/account-settings-export-integration",
+            fixture,
         )
-        self.assertIn("## Orchestrator Handoff", issue_template)
-        self.assertIn("## Domain Knowledge Closeout", issue_template)
-        self.assertIn("Do not include worker action grants", issue_template)
-        self.assertNotIn(ORCHESTRATION_POLICY_PATH, issue_template)
-        self.assertIn("source_spec_ref: [path, issue number, or stable draft ref;", issue_template)
-        self.assertIn("draft refs are valid", issue_template)
-        self.assertIn("portable references", issue_template)
-        self.assertIn("Placeholders are scheduling expectations", issue_template)
-        self.assertIn("## Dependency Rules", vertical_slices)
-        self.assertIn("## Verticality Gate", vertical_slices)
-        self.assertIn("blocking gate", vertical_slices)
-        self.assertIn("circular dependencies", vertical_slices)
-        self.assertIn("final integration and domain-knowledge closeout task", vertical_slices)
-        self.assertIn("orchestrator closeout", vertical_slices)
-        self.assertIn("## Orchestrator Handoff", vertical_slices)
-        self.assertIn("draft-spec:<...>", spec_delivery)
-        self.assertIn("A generated issue's `## Orchestrator Handoff` must contain", spec_delivery)
-        self.assertIn("`delivery_decision_origin_evidence`", spec_delivery)
-        self.assertIn("for the exact workstream", spec_delivery)
-        self.assertIn("The execution-ready bundle owns target selection", spec_delivery)
-        self.assertIn("The root validates and preserves that tuple", spec_delivery)
-        self.assertIn("Real PR refs replace placeholders before completion", spec_delivery)
-        self.assertIn("Local Markdown issues use `move-local-issue-to-done-after-proof`", spec_delivery)
-        self.assertIn("Validation Commands", issue_phase)
-        self.assertIn("equivalent fallback", issue_phase)
-        self.assertIn("move-local-issue-to-done-after-proof", options)
-        self.assertIn("- issue_completion_method: [verified `issue_completion_method` row value]", issue_template)
-        self.assertIn("Fallback:", issue_template)
-        self.assertIn("non-uncommitted delivery target has live proof", issue_template)
+        self.assertIn("web: feature/account-settings-export", fixture)
 
-    def test_plan_feature_defers_domain_capture_to_final_integration_task(self) -> None:
-        plan_feature = read("plan-feature/SKILL.md")
-        grill_with_context = read("grill-me-with-context/SKILL.md")
-        spec_phase = read("plan-feature/references/spec-phase.md")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-        issue_template = read("plan-feature/references/issue-body-template.md")
-        fixture = read("plan-feature/references/full-flow-dry-run.md")
+    def test_produced_bundle_has_unique_repository_branch_owners(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        options = " ".join(read("references/options.md").split())
+        spec_phase = " ".join(read("references/spec-phase.md").split())
 
-        self.assertIn("capture_mode=defer-to-caller", plan_feature)
-        self.assertIn("domain_knowledge_delta", plan_feature)
-        self.assertIn("Initialize every run with a structured", plan_feature)
-        self.assertIn("`knowledge_delta=none`", plan_feature)
-        self.assertIn("must not update `CONTEXT.md`", plan_feature)
-        self.assertIn("final implementation/integration issue", plan_feature)
-        self.assertIn("is never docs-only", plan_feature)
-        self.assertIn("preserve it in the Feature Spec handoff", plan_feature)
-        self.assertIn("Plan Feature never invokes `domain-memory`", plan_feature)
+        for contents in (skill, options, spec_phase):
+            self.assertIn("(affected_repository, target_branch_name)", contents)
+            self.assertIn("exactly one Feature Spec owner", contents)
+            self.assertIn("different repositories", contents)
+            self.assertIn("paths are disjoint", contents)
+            self.assertIn("immutable existing source", contents)
+        self.assertIn("stop instead of renaming", skill)
+        self.assertIn("stop rather than rename", options)
 
-        self.assertIn("## Capture Modes", grill_with_context)
-        self.assertIn("`capture_mode=inline` is the default", grill_with_context)
-        self.assertIn("### Mode Resolution", grill_with_context)
-        self.assertIn("uses `capture_mode=inline`", grill_with_context)
-        self.assertIn("Do not infer `capture_mode=defer-to-caller`", grill_with_context)
-        self.assertIn("preserves `capture_mode=inline`", grill_with_context)
-        self.assertIn("`capture_mode=defer-to-caller`", grill_with_context)
-        self.assertIn("Never write `CONTEXT.md`", grill_with_context)
-        self.assertIn("domain_knowledge_delta:", grill_with_context)
-        self.assertIn("capture_outcome: deferred | no-durable-change", grill_with_context)
-        self.assertIn("knowledge_delta: required | none", grill_with_context)
-        self.assertIn("<repo-slug>/<repo-relative-path>", grill_with_context)
-        self.assertIn("The `unresolved` list is independent\nof `knowledge_delta`", grill_with_context)
-        self.assertIn("record\nremaining product-shaping questions there", grill_with_context)
-        self.assertIn("For a direct user request, add a", grill_with_context)
+    def test_metadata_remains_manual_only_and_matches_workflow(self) -> None:
+        metadata = read("agents/openai.yaml")
 
-        self.assertIn("## Domain Knowledge Handoff", spec_phase)
-        self.assertIn("deferred-work carrier", spec_phase)
-        self.assertIn("<repo-slug>/<repo-relative-path>", spec_phase)
-        self.assertIn("structured\n  `domain_knowledge_delta`", spec_phase)
-        self.assertIn("`knowledge_delta`, `decisions`, `target_surfaces`", spec_phase)
-        self.assertNotIn("domain_knowledge_delta.status", spec_phase)
-        self.assertIn("choose its final owner", issue_phase)
-        self.assertIn("append the last generated issue", issue_phase)
-        self.assertIn("depend directly\n   on every other terminal issue", issue_phase)
-        self.assertIn("Never append a documentation-only task", issue_phase)
-        self.assertIn("publish or write it last", issue_phase)
-        self.assertIn("Normalize each dependency edge from prerequisite", issue_phase)
-        self.assertIn("pre-closeout nodes with no\n  downstream consumers", issue_phase)
-        self.assertIn("exclude it from the terminal prerequisites", issue_phase)
-        self.assertIn("requires `$project-memory` with", issue_phase)
-        self.assertIn("`memory_slice=domain-memory`", issue_phase)
-        self.assertIn("`domain_operation=implementation-closeout`", issue_phase)
-        self.assertIn("is not a substitute", issue_template)
-        self.assertIn("internal domain-modeling workflow completion", issue_template)
+        self.assertIn("allow_implicit_invocation: false", metadata)
+        self.assertIn("choose a mode and apply or propose", metadata)
+        self.assertIn("defer any knowledge delta", metadata)
 
-        self.assertIn("performs no documentation", fixture)
-        self.assertIn("last integration task", fixture)
-        self.assertIn("placed in a docs-only task", fixture)
-        self.assertIn("pre-closeout terminals are `02` and `03`", fixture)
-        self.assertIn("do not\n   replace these generated dependency IDs", fixture)
-        self.assertIn("does not run that capture during planning", fixture)
+    def test_all_reference_names_are_lowercase(self) -> None:
+        for path in (SKILL_ROOT / "references").glob("*.md"):
+            self.assertEqual(path.name, path.name.lower())
 
-    def test_planning_entrypoints_have_unambiguous_output_contracts(self) -> None:
-        plan_feature = read("plan-feature/SKILL.md")
-        plan_feature_metadata = read("plan-feature/agents/openai.yaml")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-        plan_harder = read("plan-harder/SKILL.md")
-        plan_harder_options = read("plan-harder/references/options.md")
-        plan_harder_templates = read("plan-harder/references/templates.md")
-        triage = read("triage/SKILL.md")
-        triage_agent_brief = read("triage/references/agent-brief.md")
-
-        self.assertIn("default for new feature intent after input normalization", plan_feature)
-        self.assertIn("branch only on that canonical value", plan_feature)
-        self.assertIn("Select full-flow for new intent", plan_feature_metadata)
-        self.assertNotIn("split it into hardened vertical issues when requested", plan_feature_metadata)
-        self.assertIn("`partial_output=allow-non-agent-ready` permits", plan_feature)
-        self.assertIn("`planning_mode=issue-hardening`", plan_feature)
-        self.assertIn("`output_surface=caller`", plan_feature)
-        self.assertIn("output_surface=caller", issue_phase)
-        self.assertIn("require `result_status`", issue_phase)
-        self.assertIn("`result_status: blocked`", issue_phase)
-        self.assertNotIn("require `status`, `implementation_plan`", issue_phase)
-        self.assertNotIn("`status: blocked`", issue_phase)
-        self.assertIn("result_status: ready | blocked", plan_harder_templates)
-        self.assertIn("estimated_complexity: <low|medium|high>", plan_harder_templates)
-        self.assertIn("`planning_mode` | `full-plan`, `issue-hardening`", plan_harder_options)
-        self.assertIn("`result_status` | `ready`, `blocked`", plan_harder_options)
-        self.assertNotIn("issue-hardening caller mode", triage)
-        self.assertIn("`planning_mode=issue-hardening`", triage)
-        self.assertIn("`output_surface=caller`", triage)
-        self.assertIn("`planning_mode=issue-hardening`", triage_agent_brief)
-        self.assertIn("`output_surface=caller`", triage_agent_brief)
-        self.assertIn("Do not auto-select this skill merely because an implementation request", plan_harder)
-        self.assertIn(
-            "return only the structured issue-hardening result", plan_harder
-        )
-        self.assertIn("instead of starting a separate user-facing question loop", plan_harder)
-
-    def test_lean_profiles_reduce_discovery_without_skipping_gates(self) -> None:
-        plan_feature = read("plan-feature/SKILL.md")
-        spec_phase = read("plan-feature/references/spec-phase.md")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-
-        self.assertIn("## Execution Profiles", plan_feature)
-        self.assertIn("`lean-spec`", plan_feature)
-        self.assertIn("`lean-issues`", plan_feature)
-        self.assertIn("Lean profiles reduce discovery and repeated output only", plan_feature)
-        for required_gate in (
-            "`$plan-harder`",
-            "verticality",
-            "graph",
-            "publication",
-            "domain-closeout",
-        ):
-            self.assertIn(required_gate, plan_feature)
-
-        self.assertIn("For `lean-spec`, begin with only", spec_phase)
-        self.assertIn("project-memory/config/domain.md", spec_phase)
-        self.assertIn("`CONTEXT-MAP.md` when either exists", spec_phase)
-        self.assertIn("Widen to\n`standard`", spec_phase)
-        self.assertIn("For `lean-issues`, read the durable Feature Spec once", issue_phase)
-        self.assertIn("The lean profile does not weaken any hardening or output gate", issue_phase)
-        self.assertIn("at most two candidate vertical", plan_feature)
-
-    def test_planning_uses_delta_evidence_and_exact_optional_metrics(self) -> None:
-        plan_feature = read("plan-feature/SKILL.md")
-        spec_phase = read("plan-feature/references/spec-phase.md")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-
-        self.assertIn("Snapshot each source or artifact in full at most once", plan_feature)
-        self.assertIn("Label\n  interleaved cumulative deltas `exact-interval`", plan_feature)
-        self.assertIn("Never estimate or make metrics a completion gate", plan_feature)
-        self.assertIn("## Evidence And Phase Metrics", spec_phase)
-        self.assertIn("phase=spec", spec_phase)
-        self.assertIn("completion output should identify the\nFeature Spec and its fingerprint", spec_phase)
-        self.assertIn("## Evidence And Phase Metrics", issue_phase)
-        self.assertIn("phase=issue-hardening:<issue-id>", issue_phase)
-        self.assertIn("Do not repeat unchanged\nFeature Spec or issue bodies", issue_phase)
-        self.assertIn("never estimate, reread session\narchives", issue_phase)
-        self.assertIn("do not attribute it to an\nissue phase", issue_phase)
-
-    def test_project_memory_triage_and_learn_keep_narrow_authority(self) -> None:
-        project_memory = read("project-memory/SKILL.md")
-        domain_modeling = read("project-memory/references/domain-modeling.md")
-        setup_workflow = read("project-memory/references/setup-workflow.md")
-        triage = read("triage/SKILL.md")
-        architecture = read("improve-codebase-architecture/SKILL.md")
-        learn = read("learn/SKILL.md")
-
-        self.assertIn("Use the smallest requested `memory_slice`", project_memory)
-        self.assertIn("only the requested `memory_slice`", project_memory)
-        self.assertIn("single public entry point", project_memory)
-        self.assertIn("`domain_operation=implementation-closeout`", project_memory)
-        self.assertIn("`domain_operation=inline-update`", project_memory)
-        self.assertIn("explicitly invoked composed workflow", project_memory)
-        self.assertIn("durable domain-memory write authority", project_memory)
-        self.assertIn("ready implementation-closeout task", project_memory)
-        self.assertIn("internal semantic workflow", domain_modeling)
-        self.assertIn("`$project-memory domain-memory` is the public invocation", domain_modeling)
-        self.assertFalse((SKILLS_ROOT / "domain-modeling/SKILL.md").exists())
-        self.assertIn("Ask only when the target or behavior-affecting value is materially", project_memory)
-        self.assertIn("proceed without a second confirmation", setup_workflow)
-        self.assertIn("## One-Issue Best-Effort Fallback", triage)
-        self.assertIn("`capture_mode=inline`", triage)
-        self.assertIn("`capture_mode=defer-to-caller`", triage)
-        self.assertIn("Tracker mutation authority alone does not authorize", triage)
-        self.assertIn("`memory_slice=domain-memory`", triage)
-        self.assertIn("`domain_operation=inline-update`", triage)
-        self.assertIn("`capture_mode=inline`", architecture)
-        self.assertIn("`domain_operation=inline-update`", architecture)
-        self.assertIn("do not apply `ready-for-agent`", triage)
-        self.assertIn("wait for\n  an affirmative user reply", learn)
-        self.assertIn("Never fall back or redirect to global", learn)
-
-    def test_plan_feature_outputs_do_not_define_runtime_policy(self) -> None:
-        for relative in (
-            "plan-feature/references/spec-template.md",
-            "plan-feature/references/issue-body-template.md",
-            "plan-feature/references/issue-phase.md",
-            "plan-feature/references/vertical-slices.md",
-            "plan-feature/references/full-flow-dry-run.md",
-        ):
-            contents = read(relative)
-            with self.subTest(file=relative):
-                for field in RUNTIME_POLICY_FIELDS:
-                    self.assertNotIn(field, contents)
-
-    def test_domain_and_triage_handoffs_use_canonical_option_fields(self) -> None:
-        project_memory_options = read("project-memory/references/options.md")
-        grill_with_context = read("grill-me-with-context/SKILL.md")
-        plan_feature = read("plan-feature/SKILL.md")
-        issue_phase = read("plan-feature/references/issue-phase.md")
-        triage_options = read("triage/references/options.md")
-        triage_local = read("triage/references/local-markdown.md")
-
-        self.assertIn(
-            "`memory_slice` | `tracker-routing`, `project-layout`, `domain-memory`, `translation-memory`",
-            project_memory_options,
-        )
-        self.assertIn("Use only `tracker-routing` or `project-layout`", plan_feature)
-        self.assertIn("`capture_mode` | `inline`, `defer-to-caller`", project_memory_options)
-        self.assertIn("`knowledge_delta` | `required`, `none`", project_memory_options)
-        self.assertIn(
-            "`capture_outcome` | `captured`, `deferred`, `no-durable-change`",
-            project_memory_options,
-        )
-        self.assertIn("knowledge_delta: required | none", grill_with_context)
-        self.assertNotIn("\n  status: required | none", grill_with_context)
-        self.assertIn("`capture_outcome=deferred`", plan_feature)
-        self.assertNotIn("domain_knowledge_delta.status", plan_feature)
-        self.assertIn("preserve\n  independent `unresolved` blockers", plan_feature)
-        self.assertIn("target, `capture_outcome`, domain-delta", plan_feature)
-        self.assertIn("Validate `capture_outcome=deferred`", issue_phase)
-        self.assertIn("`capture_outcome=no-durable-change`", issue_phase)
-        self.assertIn("Preserve a\nnon-empty `unresolved` list independently", issue_phase)
-
-        self.assertIn("`issue_type` | `bug`, `feature`, `task`", triage_options)
-        self.assertIn(
-            "`workflow_state` | `needs-triage`, `needs-info`, `ready-for-agent`",
-            triage_options,
-        )
-        self.assertIn("issue_type: bug | feature | task", triage_local)
-        self.assertIn("workflow_state: needs-triage | needs-info", triage_local)
-        self.assertIn("source_spec_ref:", triage_local)
-        self.assertIn("The header metadata region starts after the first H1", triage_options)
-        self.assertIn("Reject unknown aliases", triage_options)
-        self.assertIn("conflicting duplicate canonical fields", triage_options)
-        self.assertIn("Apply the header-region scope", triage_local)
-        self.assertNotIn("\nType: bug | feature | task", triage_local)
-        self.assertNotIn("\nStatus: needs-triage", triage_local)
-
-    def test_worker_authorization_is_orchestrator_owned(self) -> None:
-        ledger = read("codex-orchestrator/references/ledger.md")
-        ledger_template = read("codex-orchestrator/references/ledger-template.md")
-        worker = read("codex-orchestrator/references/worker.md")
-        orchestrator = read("codex-orchestrator/SKILL.md")
-
-        self.assertIn("authorization_resolution: per-workstream", ledger_template)
-        self.assertIn("per workstream and session", worker)
-        self.assertIn("The root resolves `worker_allowed_actions` per workstream", orchestrator)
-        self.assertIn("worker_allowed_actions:", worker)
-        self.assertIn("Worker evidence", ledger_template)
-        self.assertIn("Worker evidence", worker)
-        self.assertIn("feature_spec_task_assignment", worker)
-        self.assertIn("root_implementation_fallback", worker)
-        self.assertIn(
-            "parallelism=<parallel|sequential>",
-            ledger_template,
-        )
-        self.assertIn("exact failure reason", orchestrator)
-
-    def test_project_memory_no_longer_defines_worker_auth_defaults(self) -> None:
-        for path in iter_active_text_files():
+    def test_docs_do_not_publish_machine_local_paths(self) -> None:
+        for path in DOC_PATHS:
             contents = path.read_text(encoding="utf-8")
-            with self.subTest(file=str(path.relative_to(REPO_ROOT))):
-                self.assertNotIn(LEGACY_WORKER_AUTH_KEY, contents)
-                self.assertNotIn(LEGACY_WORKER_AUTH_HEADING, contents)
-                self.assertNotIn(LEGACY_DEFAULT_WORKER_AUTH, contents)
-
-    def test_removed_public_phase_skills_are_not_referenced(self) -> None:
-        for path in iter_active_text_files():
-            contents = path.read_text(encoding="utf-8")
-            with self.subTest(file=str(path.relative_to(REPO_ROOT))):
-                self.assertNotIn(REMOVED_LEGACY_PLANNING_SKILL, contents)
-                self.assertNotIn(REMOVED_ISSUE_SKILL, contents)
-                self.assertNotIn(REMOVED_LEGACY_PLANNING_PATH, contents)
-                self.assertNotIn(REMOVED_ISSUE_PATH, contents)
-
-    def test_runtime_contracts_use_feature_spec_vocabulary(self) -> None:
-        retired_term = "p" + "rd"
-        for path in iter_active_text_files():
-            contents = path.read_text(encoding="utf-8").lower()
-            with self.subTest(file=str(path.relative_to(REPO_ROOT))):
-                self.assertNotIn(retired_term, contents)
+            self.assertNotRegex(contents, r"/Users/[A-Za-z0-9._-]+/")
+            self.assertNotRegex(contents, r"/home/[A-Za-z0-9._-]+/")
 
 
 if __name__ == "__main__":

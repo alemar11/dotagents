@@ -1,241 +1,199 @@
 # Plan Feature Option Contract
 
-Load this reference before resolving a Plan Feature run. It is the canonical
-registry for selectable planning behavior and the delivery projection consumed
-by Codex Orchestrator.
+Load this reference before the first Plan Feature phase. It is the sole owner
+of default-path selectable Plan Feature behavior. The one conditional non-App
+extension remains owned by `non-app-delivery.md` and is valid only after its
+current-request-or-durable-source predicate is satisfied.
 
 ## Syntax And Hard Cut
 
-- Field names use snake_case; enum values use lower-kebab-case.
-- Counts, paths, slugs, refs, fingerprints, and evidence remain separate data.
-- User wording and tracker prose are selection evidence only. Persist only the
-  canonical field/value plus evidence.
-- Retired planning and delivery fields are invalid input and are never
-  translated. Active Feature Specs and generated issues must already use this
-  registry before the runtime consumes them.
+- Field names use snake_case and enum values use lower-kebab-case.
+- User wording is selection evidence, never an alternative value.
+- Before rejecting unknown fields, inspect the current request and any durable
+  source Feature Spec for the non-App predicate. Load `non-app-delivery.md` when
+  the current user explicitly selects a non-App stopping point, or when a
+  canonical source already carries exactly one `non_app_delivery_target` and
+  exactly one resolvable `explicit_instruction_ref`. Validate that conditional
+  field together with the Run Registry. Otherwise reject it and every other
+  selectable field or value not listed below. Do not translate retired fields,
+  aliases, or prose values.
+- Keep facts, paths, slugs, refs, dependency IDs, and evidence as data rather
+  than options.
 
 ## Run Registry
 
-Resolve these fields before the first phase handoff.
-
-| Field | Allowed values | Default | Notes |
+| Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `mode` | `full-flow`, `spec-only`, `issues-from-existing-spec` | `full-flow` for new intent | A direct existing Feature Spec split resolves to `issues-from-existing-spec`; an explicit stop after the Feature Spec resolves to `spec-only`. |
-| `execution_profile` | `lean-spec`, `lean-issues`, `standard` | `standard` | Internal optimization only; it cannot weaken gates. |
-| `tracker_backend` | `github`, `local` | From project memory | Planning-artifact write authority for the current artifact set. |
-| `effective_target` | `configured-tracker`, `local-dry-run`, `draft-publish-commands` | `configured-tracker` | Derived from tracker routing plus the current-run mutation option. |
-| `no_mutation_override` | `none`, `dry-run`, `temp`, `rehearsal`, `validation`, `disabled-writes`, `draft-output` | `none` | Changes planning-artifact output, never implementation delivery. |
-| `no_mutation_output` | `not-applicable`, `local-artifacts`, `publish-commands` | Derived | Non-mutating output shape. |
-| `local_mirror` | `not-requested`, `requested` | `not-requested` | Applies only to hosted planning artifacts. |
-| `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From project memory or safe repository evidence | Planning graph layout, not execution order. |
-| `workspace_context` | `multi-repository-workspace`, `not-applicable` | Derived | Selects workspace-only partial Feature Spec and child-source behavior. |
-| `change_delivery_target` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | `pull-request-ready-for-merge-but-not-merged` | Exact implementation stopping point. Merge is never implied. |
-| `change_delivery_permission` | `not-granted`, `granted-for-selected-target` | `granted-for-selected-target` for the default Feature Spec PR target | Permission transferred by the Feature Spec. Non-default targets require exact evidence. |
-| `issue_update_permission` | `no-issue-changes`, `pull-request-closing-keyword-only`, `direct-issue-updates-explicitly-authorized` | Derived from tracker and target | Final-commit closure remains independently authorized. |
-| `codex_review_requirement` | `required-on-current-pull-request-head`, `explicitly-skipped-by-authorized-user`, `not-needed-for-selected-delivery-target` | Derived from target | The explicit skip requires exact scoped evidence. |
-| `pull_request_count_strategy` | `one-pull-request-total`, `one-pull-request-per-repository`, `no-pull-request` | Derived from target and affected repositories | Every involved repository uses the same target branch for per-repository PR delivery. |
-| `partial_output` | `withhold`, `allow-non-agent-ready` | `withhold` | The non-default value never permits `ready-for-agent`. |
+| `mode` | `full-flow`, `spec-only`, `issues-from-existing-spec` | `full-flow` for new intent | Select the planning phases to run. |
+| `write_mode` | `apply`, `propose` | `apply` for an explicit Plan Feature request to create durable planning artifacts | `apply` writes through the configured tracker; `propose` performs no writes. |
 
-`local_mirror_path` is validated repo-relative data when a mirror is requested;
-otherwise use `not-applicable`.
+Resolve both fields once before phase work:
 
-`target_branch_name` is required data for every delivery target. PR targets
-default to `feature/<feature_slug>` unless a current source contract or repo
-policy provides another valid branch. Commit or push targets require exact
-authorized-user evidence naming the branch.
+- Use `spec-only` only when the user explicitly stops after the Feature Spec.
+- A nonempty `knowledge_delta` has no durable owner in `spec-only`. Under either
+  write mode, return only a blocked non-durable preview plus the exact delta and
+  withhold all tracker/file publication. Do not silently change `write_mode` or
+  add a marker to the Feature Spec; durable publication requires a later
+  explicit `full-flow` run that can persist the payload on its final issue.
+- Use `issues-from-existing-spec` only when a complete canonical durable Feature
+  Spec already exists and can be consumed unchanged. A proposed or chat-only
+  body is not durable. Any required schema or content change blocks issue
+  generation until a separate explicitly authorized Feature Spec update lands.
+- Any request that forbids writes, asks for a dry run, or asks to inspect the
+  result before publication resolves to `write_mode=propose`.
+- An explicit Plan Feature request to create or plan durable artifacts defaults
+  to `write_mode=apply` through the configured tracker. This is Plan Feature's
+  invocation contract; Project Memory resolves its own write authority
+  independently.
+- `write_mode=propose` returns proposed bodies, target locations, metadata,
+  and publication order. Never return executable publication commands.
+- Withhold incomplete Feature Specs and implementation issues from both
+  publication and proposed output intended for later agent-ready application.
+  Return blockers instead.
 
-`child_repository_layout` is data for repo-scoped workspace partial Feature
-Specs. It uses the same values as `repository_layout` and is `not-applicable`
-outside repo-scoped workspace partials.
+## Project Memory Facts
 
-Resolve `workspace_context` before phase handoff. Precedence is: an explicit
-current Feature Spec value; `repository_layout=multi-repository-workspace`;
-linked parent/global or sibling-partial evidence; safe project-memory evidence;
-otherwise `not-applicable`. A contradiction stops as `needs-owner`.
+Read these facts from their canonical Project Memory files. They are not run
+options and must not appear in the Run Registry:
+
+- `tracker_backend`: `github` or `local`, from
+  `project-memory/config/issue-tracker.md`;
+- `repository_layout`: `single-repository`, `monorepo`, or
+  `multi-repository-workspace`, from
+  `project-memory/config/project-layout.md`;
+- issue type and workflow-state mappings from
+  `project-memory/config/triage-labels.md`.
+
+If a required fact is absent, stale, or contradictory, route to the matching
+Project Memory slice before planning. Do not turn a missing fact into another
+Plan Feature option.
+
+## Execution Data
+
+Carry only the data needed to connect planning artifacts:
+
+- planning identity: `feature_slug` and any applicable `product_slug`,
+  `project_slug`, `workspace_path`, or `context_file`;
+- source identity: a durable `source_spec_ref`, or in `write_mode=propose`
+  `proposed-spec:<feature_slug>` for a single Feature Spec,
+  `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,
+  and `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>` for each
+  repo-scoped partial;
+- applied multi-repository source identity: use `owner/repository#<number>` or a
+  canonical hosted URL for every GitHub partial, and
+  `<repository_slug>/<repo-relative-spec-path>` for every local partial. Use the
+  same globally unambiguous refs in sibling maps and Feature Dependencies;
+- issue scope: `affected_repositories`, `allowed_paths`, and one
+  `target_branch_name` shared by all affected repositories inside the current
+  Feature Spec. For a local
+  Markdown issue, the affected set includes the tracker-owning repository and
+  the allowed paths include both its exact active path and exact derived
+  `done/` destination. Both must resolve inside that affected Git repository and
+  its future App-managed checkout; otherwise normal App-compatible output is
+  withheld unless the explicit non-App contract applies;
+- issue graph: `dependency_ids` containing generated issue IDs inside the
+  current Feature Spec;
+- proposal identity: `proposed-issue:<feature_slug>/<NN>` for a single Feature
+  Spec, or
+  `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/<NN>` for an
+  issue owned by a multi-repository partial. A parent/global Feature Spec is a
+  coordination artifact and does not own generated implementation issues;
+- multi-repository integration identity: every multi-repository bundle has
+  exactly one evidence-selected integration owner repository that receives
+  a dedicated integration partial with proposed source ref
+  `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration`
+  and proposed issue refs
+  `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/integration/<NN>`.
+  This identity is derived data, not a new run option, and exists independently
+  of `knowledge_delta`;
+- optional workspace links between a parent Feature Spec and repo-scoped
+  partial Feature Specs;
+- an optional `knowledge_delta` object with `decisions`, `target_surfaces`, and
+  `evidence` lists;
+- a separate `planning_blockers` list for unresolved planning questions.
+
+Absence of `knowledge_delta` means planning introduced no durable project
+knowledge. When present, all three lists must be explicit and the delta is
+carried as run/phase data and persisted only on exactly one final
+implementation/integration issue. It never appears in a Feature Spec body.
+Normalize each target surface to one canonical affected repository and one
+portable repo-relative path after rejecting absolute paths and `..` traversal.
+The final issue must include that repository in `affected_repositories`, and
+its `allowed_paths` must contain the exact target or an explicit ancestor scope
+that contains it. In `issues-from-existing-spec`, all targets must already be
+contained by the unchanged Feature Spec repository/path scope; reject
+out-of-scope invocation data instead of widening the source or generated issue.
+`capture_outcome` is derived only in the completion report: `deferred` when the
+delta is present and `no-durable-change` when it is absent. It is never input or
+persisted Feature Spec metadata.
+
+Default an ordinary implementation Feature Spec's `target_branch_name` to
+`feature/<feature_slug>` unless repository policy or the source provides another
+valid branch. For the dedicated integration partial, derive
+`<ordinary_target_branch_name>-integration` from that resolved branch. With the
+default this yields `feature/<feature_slug>-integration`; it always differs from
+the ordinary partial branch in the same owner repository. Branch sharing is per
+Feature Spec, not across parent and partial Specs. Across the complete
+implementation-eligible bundle, each `(affected_repository,
+target_branch_name)` pair has exactly one Feature Spec owner. Reusing the same
+branch name in different repositories is valid; reusing it across two Specs in
+the same repository is a collision even when paths are disjoint or execution is
+serialized. Resolve a new bundle before publication, but stop rather than
+rename a branch in an immutable existing source. Validate every branch with
+`git check-ref-format --branch`. Paths must be
+repo-relative or explicitly repo-qualified; never publish machine-local absolute
+paths.
+
+## Issue Execution Contract
+
+Every generated issue has exactly one `## Execution Contract` table with
+these fields:
+
+| Field | Required data |
+| --- | --- |
+| `source_spec_ref` | Durable Feature Spec ref, or proposed ref only in `write_mode=propose`. |
+| `feature_slug` | Canonical feature slug. |
+| `affected_repositories` | Canonical repo slugs, or `current-repository`; for a local issue this includes its tracker-owning repository. |
+| `allowed_paths` | Repo-relative or repo-qualified execution scope; for a local issue this includes its exact active and derived `done/` paths. |
+| `target_branch_name` | The valid branch shared within this Feature Spec; the integration partial uses a distinct derived branch. |
+| `dependency_ids` | Earlier generated issue IDs, or `none`. |
+
+The section is the single execution projection. Do not duplicate its fields in
+a delivery section, handoff section, or option table. Derive reverse dependency
+edges by scanning `dependency_ids`; never persist a second reverse-edge list.
+
+Normal artifacts are App-compatible and rely on the App orchestrator's fixed
+reviewed, CI-clean pull-request-ready flow. Plan Feature does not select or
+grant implementation, publication, review, merge, or issue-mutation authority.
+
+In `write_mode=propose`, return the intended mapped issue type and workflow
+state as report metadata only. Do not put an applied `workflow_state` line in a
+proposed body or imply that a proposed issue has entered an execution queue.
+
+Load `non-app-delivery.md` before structured option validation or drafting when
+the current user explicitly requests a non-App stopping point, or when a
+canonical durable source Spec already carries exactly one target and exactly
+one resolvable `explicit_instruction_ref`. Validate its registry together with
+this default-path registry. `explicit_instruction_ref` is evidence data, not an
+option or issue field. That reference owns the sole optional extension to the
+Execution Contract.
 
 ## Feature Dependency Contract
 
-Every newly produced Feature Spec contains a `## Feature Dependencies` table.
-This table is the sole owner of authored cross-Feature-Spec edges and uses
-exactly these columns:
+Every newly produced Feature Spec contains a `## Feature Dependencies` table
+with exactly these columns:
 
-| Field | Allowed values | Default | Notes |
-| --- | --- | --- | --- |
-| `upstream_feature_spec_ref` | A durable hosted or local Feature Spec ref; a `draft-spec:<...>` ref only in non-mutating output | None | Required and unique per downstream Feature Spec; it cannot reference the downstream Feature Spec itself. |
-| `dependency_start_condition` | `upstream-merged`, `upstream-merge-ready-head` | `upstream-merged` per authored edge | Persist the resolved value in every data row. The second value is an explicit early-stacking request, not a general permission to bypass dependencies. |
-| `dependency_reason` | Non-empty portable text | None | Explain the concrete capability, contract, or implementation result required from the upstream Feature Spec. |
+| Field | Required data |
+| --- | --- |
+| `upstream_feature_spec_ref` | Unique durable upstream Feature Spec ref; proposed refs are allowed only in `write_mode=propose`. |
+| `dependency_reason` | Non-empty portable explanation of the required upstream result. |
 
-The start condition describes the upstream Feature Spec's implementation
-delivery, not whether its planning issue is open or closed.
-`upstream-merged` requires the upstream implementation PR to be merged into its
-intended base with integration proof. `upstream-merge-ready-head` permits the
-downstream to start only from the upstream PR's verified current merge-ready
-head; a stale or merely draft head does not satisfy it.
-
-An empty table body means the Feature Spec has no authored cross-Spec edges.
-A legacy Feature Spec without this section is read as having no authored
-cross-Spec edges; absence never implies an edge from prose and never permits
-`upstream-merge-ready-head`. The Feature Spec phase adds the section when it
-creates or intentionally updates a Feature Spec, but the issue phase does not
-rewrite a legacy source merely to add it.
-
-Before returning, publishing, updating, or splitting a Feature Spec:
-
-- resolve every ref to one Feature Spec in the current planning scope; accept
-  `#<number>` only when the owning repository is unambiguous, otherwise require
-  a hosted URL or repo-qualified durable local path;
-- reject missing, duplicate, unresolved, or self refs and non-empty rows with
-  missing reasons;
-- normalize edges from upstream to downstream and validate the reachable
-  Feature Spec graph is acyclic; unresolved graph nodes block output rather
-  than being inferred from titles or prose;
-- keep these edges separate from generated issue `dependency_ids` and
-  `blocked_issue_ids`, which identify issues inside one Feature Spec only.
-
-`upstream-merge-ready-head` is valid as an authored early-stack edge only when
-these static conditions are proven from the two source contracts:
-
-- each Feature Spec resolves to exactly one repository and both resolve to the
-  same canonical repository;
-- both use
-  `change_delivery_target=pull-request-ready-for-merge-but-not-merged`;
-- a multi-repository scope, unequal repository, or ambiguous scope rejects the
-  authored early-stack condition. Do not silently rewrite it; require the owner
-  to select `upstream-merged` or repair the invalid source contract.
-
-Planning does not require the upstream PR to be merge-ready or merged already;
-the condition describes a future dispatch gate. At runtime, Orchestrator may
-start from an unmerged head only when exactly one early-stack upstream remains
-unmerged, every other direct and transitive dependency is merged, and the
-current unmerged stack contains exactly the upstream and downstream Specs.
-Otherwise it waits without treating the authored graph as invalid.
-
-Early-stack validation authorizes only using the verified upstream merge-ready
-PR head as the downstream starting point. It does not authorize merging,
-closing, retargeting, or bypassing review on either pull request.
-
-## Per-Issue Registry
-
-Resolve these fields after the issue graph exists and before emitting an issue
-or its `## Orchestrator Handoff`.
-
-| Field | Allowed values | Default | Notes |
-| --- | --- | --- | --- |
-| `delivery_decision_origin` | `inherited-from-feature-spec`, `overridden-by-implementation-issue` | `inherited-from-feature-spec` | Override evidence remains separate. |
-| `change_delivery_target` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | Inherited | Records the issue-effective stopping point. |
-| `change_delivery_permission` | `not-granted`, `granted-for-selected-target` | Inherited | Must be re-resolved atomically with any issue override. |
-| `issue_repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | From the issue target repository | Preserves heterogeneous child layouts. |
-| `issue_update_permission` | `no-issue-changes`, `pull-request-closing-keyword-only`, `direct-issue-updates-explicitly-authorized` | Inherited | Re-resolve with tracker, target, and completion method. |
-| `codex_review_requirement` | `required-on-current-pull-request-head`, `explicitly-skipped-by-authorized-user`, `not-needed-for-selected-delivery-target` | Inherited or derived from an override | Never infer a skip from prose. |
-| `pull_request_count_strategy` | `one-pull-request-total`, `one-pull-request-per-repository`, `no-pull-request` | Inherited | Re-resolve with any target override. |
-| `parallelization` | `independent`, `depends-on`, `blocks`, `root-integrated` | Derived | Dependency ids remain data. |
-| `issue_completion_method` | `feature-pull-request-closing-keyword`, `repository-pull-request-closing-keyword`, `final-commit-closing-keyword`, `move-local-issue-to-done-after-proof`, `no-issue-completion` | Derived from tracker and target | Names the terminal lifecycle action. |
-| `domain_closeout` | `not-applicable`, `implementation-closeout` | `not-applicable` | Decisions and targets remain data. |
-
-Every issue records its effective delivery tuple even when it is inherited:
-`delivery_decision_origin`, `change_delivery_target`,
-`change_delivery_permission`, `issue_update_permission`,
-`codex_review_requirement`, `pull_request_count_strategy`,
-`issue_completion_method`, and `target_branch_name`.
-
-## Effective Planning-Artifact Target
-
-| `tracker_backend` | `no_mutation_override` | `no_mutation_output` | `effective_target` |
-| --- | --- | --- | --- |
-| `github` | `none` | `not-applicable` | `configured-tracker` |
-| `local` | `none` | `not-applicable` | `configured-tracker` |
-| `github` | Any non-`none` value | `publish-commands` | `draft-publish-commands` |
-| `github` | Any non-`none` value | `local-artifacts` | `local-dry-run` |
-| `local` | Any non-`none` value | `local-artifacts` | `local-dry-run` |
-
-Reject every other combination. Downstream phases branch only on
-`effective_target`; they never reinterpret the mutation reason.
-
-## Cross-Field Validation
-
-- `local_mirror=requested` requires GitHub configured-tracker output and a safe
-  `local_mirror_path`; otherwise the path is `not-applicable`.
-- `local-commit-created-without-pushing` and
-  `changes-pushed-to-target-branch-without-pull-request` require
-  `pull_request_count_strategy=no-pull-request` and
-  `codex_review_requirement=not-needed-for-selected-delivery-target`.
-- PR targets require `one-pull-request-total` for one affected repository or
-  `one-pull-request-per-repository` for multiple affected repositories. The
-  latter uses the same `target_branch_name` in every involved repository.
-- `validated-draft-pull-request-published` requires
-  `codex_review_requirement=not-needed-for-selected-delivery-target`.
-- `pull-request-ready-for-merge-but-not-merged` requires
-  `required-on-current-pull-request-head` or an exact scoped explicit skip.
-- Every target requires `change_delivery_permission=granted-for-selected-target`
-  before an issue may be `ready-for-agent`.
-- `tracker_backend=local` uses
-  `issue_update_permission=no-issue-changes` and
-  `issue_completion_method=move-local-issue-to-done-after-proof`.
-- GitHub PR targets use
-  `issue_update_permission=pull-request-closing-keyword-only` and either
-  `feature-pull-request-closing-keyword` or
-  `repository-pull-request-closing-keyword` according to PR count.
-- GitHub `changes-pushed-to-target-branch-without-pull-request` requires
-  `issue_update_permission=direct-issue-updates-explicitly-authorized` and
-  `issue_completion_method=final-commit-closing-keyword`. The issue permission
-  requires separate evidence; delivery permission alone is insufficient.
-- `local-commit-created-without-pushing` cannot close a hosted issue. Use
-  `no-issue-completion` for GitHub or the local done move for local trackers.
-- Every `target_branch_name` must pass
-  `git check-ref-format --branch <target_branch_name>`.
-- `repository_layout=multi-repository-workspace` publishes parent/global and
-  child repo artifacts in separate option-resolution runs. Repo-scoped child
-  issue graphs must use one tracker backend, while child layouts remain
-  explicit through `child_repository_layout` and `issue_repository_layout`.
-- An issue target override atomically re-resolves permission, issue updates,
-  review requirement, PR count, completion method, and branch. Reject any tuple
-  retaining incompatible feature-level values.
-- `parallelization=independent` requires no dependency or blocked ids;
-  `depends-on` requires dependency ids only; `blocks` requires blocked ids only;
-  `root-integrated` may carry either when justified. The graph remains acyclic.
-- `repository_integration_method` and `pr_closeout` are retired. Derive their
-  former behavior from `change_delivery_target` and
-  `pull_request_count_strategy`.
-
-## Resolution Record
-
-Record one six-column row per run field plus `local_mirror_path` and
-`target_branch_name` before the first phase handoff. Record one row per
-per-issue field plus issue-effective `target_branch_name` before emitting each
-issue.
-
-| row_id | scope_id | field | value | source | evidence |
-| --- | --- | --- | --- | --- | --- |
-| `run:<field>` | `run` | `<run field>` | `<canonical value>` | `default`, `tracker-config`, `project-layout-config`, `source-spec`, `authorized-user-instruction`, or `runtime-derived` | `<ref or none>` |
-| `issue:<NN>:<field>` | `issue:<NN>` | `<issue field>` | `<canonical value>` | `source-spec`, `authorized-user-instruction`, or `runtime-derived` | `<ref>` |
-
-Keep `row_id` unique. Encode literal `|` in evidence as `%7C`. Every non-default
-source requires non-empty evidence. Permission-bearing values require
-`permission-source-ref`, exact `scope-ref`, and `target-ref`; branch mutations
-also require `target-branch=<target_branch_name>`.
-
-The default Feature Spec target and its delivery permission may use
-`source=default`; its delivery and PR-closing-keyword permission rows use
-`permission-source-ref=feature-spec-default:<feature_slug>` plus exact scope,
-target, and branch tokens. Inherited issue rows preserve those tokens, change
-only `scope-ref`, and add `permission-transfer-ref=run`. Every commit-only,
-push-without-PR, draft-PR, explicit review skip, direct issue update, or issue
-override requires `authorized-user-instruction` or a current source contract
-that preserves `permission-source-ref=authorized-user:<instruction-ref>` and
-equivalent scoped evidence. Runtime-derived values never grant permission.
-
-## Fingerprints
-
-Canonicalize all rows with columns `row_id`, `scope_id`, `field`, `value`,
-`source`, and `evidence`; trim cells, encode `|`, sort bytewise by `row_id`,
-serialize tab-separated rows with trailing newlines, and SHA-256 hash the UTF-8
-bytes. Emit `option_rows_fingerprint: sha256:<lowercase-hex>`.
-
-Each issue repeats this process for its own per-issue rows and emits
-`issue_option_rows_fingerprint`. A missing row, duplicate id, invalid value, or
-fingerprint mismatch is blocking; never reinterpret prose to repair it.
+All cross-Feature-Spec edges wait for the upstream implementation to merge and
+produce integration proof. Validate refs, uniqueness, self-reference, and the
+reachable graph's acyclicity. Keep cross-Spec edges separate from intra-Spec
+issue `dependency_ids`.
 
 ## Canonical Input Requirement
 
-Feature Specs and generated issues must already use this registry. Reject
-noncanonical artifacts instead of translating or rewriting them.
+Existing Feature Specs and generated issues must already use this contract.
+Reject incompatible structured input instead of translating or rewriting it.

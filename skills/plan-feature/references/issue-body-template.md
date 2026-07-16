@@ -1,109 +1,26 @@
 # Issue Body Template
 
-Use this shape unless the tracker has a stronger local template. Delete only
-optional presentation fields whose bracketed instructions say to omit them;
-never omit a verified Per-Issue Registry projection. Evidence references in
-issue bodies must be portable: use repo-relative paths,
-sibling-repo-relative paths, hosted issue or PR URLs, or descriptive references.
-Do not include developer-machine absolute paths in returned bodies, local issue
-files, hosted issue bodies, or draft publish commands.
-
-`references/options.md` is the sole owner of delivery, scheduling, closeout,
-integration, domain-closeout, source, and evidence values. This template owns
-only their output placement and completion prose; project the complete verified
-Per-Issue Registry rows without resolving or defaulting them here.
+Use this shape unless the tracker has a stronger local template. Evidence and
+paths must be portable: repo-relative, repo-qualified, hosted, or descriptive.
+Never include developer-machine absolute paths.
 
 ```markdown
 # <feature-slug>: <NN> <vertical outcome>
 
-issue_type: [canonical bug | feature | task]
-workflow_state: [canonical state, usually ready-for-agent]
-source_spec_ref: [path, issue number, or stable draft ref; draft refs are valid
-only in non-mutating output before hosted mutation]
+## Execution Contract
 
-Affected Repos: [issue-local target repo slugs for workspace issues; otherwise omit]
-
-Product Scope: [for monorepos, workspace path and selected context file; for
-single-repository issues, `current repository`; for workspace issues, use
-`Affected Repos`]
-
-## Option Resolution
-
-issue_option_rows_fingerprint: [verified fingerprint over this issue's rows
-below]
-
-| row_id | scope_id | field | value | source | evidence |
-| --- | --- | --- | --- | --- | --- |
-| `issue:<NN>:<field>` | `issue:<NN>` | [Per-Issue Registry field or `target_branch_name`] | [verified value or data] | [verified canonical source] | [verified portable evidence or `none` only when allowed] |
-
-Expand the row above into exactly one row for every Per-Issue Registry field
-plus the issue-effective `target_branch_name` row. Preserve the verified six-column
-cells; do not infer or omit row metadata here.
-
-## Delivery
-
-- change_delivery_target: [verified `change_delivery_target` row value]
-- change_delivery_permission: [verified `change_delivery_permission` row value]
-- change_delivery_permission_evidence: [verified permission-source, scope, target, branch, and transfer evidence]
-- delivery_decision_origin: [verified `delivery_decision_origin` row value]
-- delivery_decision_origin_evidence: [verified delivery evidence data]
-- repository_layout: [same feature/workspace graph value as the source Feature Spec]
-- issue_repository_layout: [verified `issue_repository_layout` row value]
-- issue_update_permission: [verified `issue_update_permission` row value]
-- issue_update_permission_evidence: [verified independent mutation evidence data]
-- codex_review_requirement: [verified `codex_review_requirement` row value]
-- target_branch_name: [verified exact branch data]
-- pull_request_count_strategy: [verified `pull_request_count_strategy` row value]
-- parallelization: [verified `parallelization` row value]
-- dependency_ids: [issue ids or none]
-- blocked_issue_ids: [issue ids or none]
-- issue_completion_method: [verified `issue_completion_method` row value]
-
-## Orchestrator Handoff
-
-- source_spec_ref: [same value as the header `source_spec_ref` line]
-- feature_slug: [authoritative lowercase feature slug]
-- change_delivery_target: [same effective value as `## Delivery`]
-- change_delivery_permission: [same effective value as `## Delivery`]
-- change_delivery_permission_evidence: [same evidence as `## Delivery`]
-- delivery_decision_origin: [same canonical value as `## Delivery`]
-- delivery_decision_origin_evidence: [same evidence as `## Delivery`]
-- repository_layout: [same feature/workspace graph value as the source Feature Spec]
-- issue_repository_layout: [same issue-effective value as `## Delivery`]
-- workspace_context: [multi-repository-workspace or not-applicable]
-- workspace_parent_source_ref: [parent/global Feature Spec ref or not-applicable]
-- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable]
-- workspace_child_source_refs: [complete repo-to-Feature-Spec-ref mapping for `workspace_feature_repos`, or not-applicable]
-- issue_update_permission: [same effective value as `## Delivery`]
-- issue_update_permission_evidence: [same evidence as `## Delivery`]
-- codex_review_requirement: [same effective value as `## Delivery`]
-- target_branch_name: [same effective branch data as `## Delivery`]
-- pull_request_count_strategy: [same effective value as `## Delivery`]
-- affected_repos_or_product_scope: [repo slugs, workspace path, or current
-  repository]
-- scope:
-  - [Only this issue's implementation slice.]
-- parallelization: [same verified value as `## Delivery`]
-- dependency_ids: [generated issue IDs or none]
-- blocked_issue_ids: [generated issue IDs or none]
-- dependency_reason: [reason or none]
-- validation: [commands, checks, or proof required for this issue.]
-- domain_closeout: [verified `domain_closeout` row value]
-- domain_closeout_data: [when applicable, the exact
-  decisions, target surfaces, evidence, `memory_slice=domain-memory`, and
-  `domain_operation=implementation-closeout` required by
-  `## Domain Knowledge Closeout` below]
-- issue_completion_method: [same verified value as `## Delivery`]
-
-Do not include worker action grants, worker surfaces, worker counts,
-checkpoint approval, publication authority, or orchestration session settings
-in this section. The source-contract `issue_update_permission` does not grant a
-worker permission; `$codex-orchestrator` validates and projects it after
-registering the issue as a workstream.
+| Field | Value |
+| --- | --- |
+| `source_spec_ref` | [durable path or hosted ref; proposed refs are valid only in write_mode=propose] |
+| `feature_slug` | [authoritative lowercase feature slug] |
+| `affected_repositories` | [canonical repo slugs or current-repository] |
+| `allowed_paths` | [repo-relative or repo-qualified paths for this slice] |
+| `target_branch_name` | [one valid branch shared by all affected repositories inside this Feature Spec] |
+| `dependency_ids` | [earlier generated issue IDs or none] |
 
 ## Goal
 
-[One vertical outcome.]
+[One independently valuable vertical outcome.]
 
 ## Non-Goals
 
@@ -111,46 +28,12 @@ registering the issue as a workstream.
 
 ## Context
 
-[Relevant Feature Spec and repo context using portable references only.]
+[Relevant Feature Spec and repository context using portable references.]
 
 ## Cross-Repo Notes
 
-[Include only for workspace issues: affected repos, interface contracts,
-existing repo PR links, expected repo PR slots or pre-implementation
-placeholders, and validation order. Placeholders are scheduling expectations,
-not completion proof; orchestrator closeout records real PR links or equivalent
-integration proof.]
-
-## Integration Gates
-
-[Include only when separate validation, release, or cross-repo proof affects
-completion.]
-
-## Domain Knowledge Closeout
-
-[Include only on the final integration task when the source_spec_ref carries a
-required domain-knowledge handoff. This task must also prove integrated feature
-behavior; never use this section to justify a docs-only issue.]
-
-- Required workflow:
-  - Invoke `$project-memory` with `memory_slice=domain-memory` and
-    `domain_operation=implementation-closeout` after the integrated behavior is
-    proven. Project Memory must run its internal domain-modeling workflow;
-    reading `project-memory/config/domain.md` or editing the targets directly
-    is not a substitute.
-
-- Decisions:
-  - [Accepted durable term, rule, boundary, or decision carried from the Feature Spec.]
-- Target surfaces:
-  - [`current-repository/<repo-relative-path>` or
-    `<repo-slug>/<repo-relative-path>` destination.]
-- Evidence:
-  - [Portable current-repository, repo-slug-qualified, hosted, or accepted
-    implementation evidence.]
-- Closeout proof:
-  - [Integration validation, `$project-memory domain-memory` completion,
-    internal domain-modeling workflow completion, and documentation
-    diff/consistency verification.]
+[Include only for multi-repository issues: repository roles, interface
+contracts, integration order, and named gates.]
 
 ## Requirements
 
@@ -158,12 +41,11 @@ behavior; never use this section to justify a docs-only issue.]
 
 ## Implementation Plan
 
-Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.
+Plan-hardening: final stable $plan-harder issue-hardening pass completed for this issue.
 
-[Concise implementation approach synthesized from the $plan-harder hardening
-brief. Do not duplicate acceptance criteria, validation, dependencies,
-questions, or completion rules here; merge those details into their top-level
-sections.]
+[Concise implementation approach synthesized from the hardening brief. Merge
+acceptance and validation details into their owning sections. Explain material
+dependency reasons in Context or this prose without repeating dependency IDs.]
 
 ## Acceptance Criteria
 
@@ -172,41 +54,92 @@ sections.]
 ## Validation
 
 - Preferred: [Command, test, or manual check.]
-- Fallback: [Equivalent runner when the preferred command wrapper is
-  unavailable, or `None`.]
+- Fallback: [Equivalent proof when the preferred runner is unavailable, or
+  None.]
+
+## Integration Gates
+
+[Include only when separate release, deployment, or cross-repo proof affects
+completion.]
+
+## Domain Knowledge Closeout
+
+[Include only on the final implementation/integration issue when the issue
+phase receives a knowledge delta as run data. In a single Spec, this issue must
+prove integrated feature behavior and satisfy the owner-excluded terminal rule
+from `issue-phase.md`. In
+a multi-repository bundle, it belongs to the dedicated integration partial,
+whose Feature Dependencies already wait for every implementation partial to
+merge; its issue dependencies remain local to that integration partial. Every
+target surface below must resolve to a repository named in this issue's
+`affected_repositories` and a path equal to or contained by one of this issue's
+`allowed_paths`.]
+
+- Required workflow:
+  - Invoke `$project-memory` with `memory_slice=domain-memory` and
+    `domain_operation=implementation-closeout` after integrated behavior is
+    proven. Project Memory runs its internal domain-modeling workflow.
+knowledge_delta:
+  decisions:
+    - [Accepted durable term, rule, boundary, or decision.]
+  target_surfaces:
+    - [current-repository/<repo-relative-path> or <repo-slug>/<repo-relative-path>.]
+  evidence:
+    - [Portable implementation evidence.]
+- Closeout proof:
+  - [Integration validation; `capture_outcome=captured`; every accepted delta
+    item and required named target reconciled; named destinations; and complete
+    documentation-diff verification. Treat `deferred` or `no-durable-change`
+    for this nonempty accepted delta as blocked, not completed. A supplied
+    accepted item rejected or contradicted by landed behavior also blocks for an
+    owner decision or separately authorized planning/implementation correction.]
 
 ## Completion
 
-When all acceptance criteria pass and validation is complete:
-
-- GitHub: close this implementation issue from the relevant PR body, following
-  `issue_completion_method`. Use `Closes #<this-issue-number>` only when the PR lives in the
-  same GitHub repository as the issue. For orchestrator or cross-repo closeout
-  where the PR repository differs from the issue repository, use
-  `Closes owner/repo#<this-issue-number>` only when that cross-repo closing path
-  is intended and supported; otherwise use non-closing links and record the
-  coordination closeout action separately. Final-commit closure requires
-  `issue_completion_method=final-commit-closing-keyword`,
-  `issue_update_permission=direct-issue-updates-explicitly-authorized`, and its exact scoped
-  authorization evidence. Do not add the parent Feature Spec closing keyword from an individual child
-  issue. For a whole Feature Spec final feature
-  or integration PR, the root delivery orchestrator adds that parent keyword
-  only after its resolved review policy and all Feature Spec closeout gates pass.
-- Local markdown: move this file to `issues/done/<NN>-<slug>.md`, creating
-  `issues/done/` on demand after validation and after the selected
-  non-uncommitted delivery target has live proof. For orchestrator workspace
-  issues, move it only
-  after cross-repo integration proof is recorded. Do not delete the file or add
-  a `done` status.
-
-## Dependencies
-
-- Depends on: [generated issue IDs and reason, or `None`.]
-- Blocks: [generated issue IDs and reason, or `None`.]
+- GitHub tracker: arm this issue with a closing keyword in the relevant
+  implementation PR. Use the fully qualified `owner/repository#<number>` form
+  when the issue belongs to another repository, and require that PR to target
+  its repository's default branch so the keyword can take effect on merge. If
+  no relevant PR can carry an effective closing keyword, withhold the
+  App-compatible issue or bundle as blocked; a non-closing link is not
+  completion proof.
+- Local tracker: after implementation, integration proof, and any domain
+  closeout succeed, move this file to the `done/` directory of its owning issue
+  subtree. Commit and push that move, run final validation and `$autoreview`,
+  convert draft PRs to ready-for-review, then obtain current-revision review and
+  CI before terminal merge-ready. An ordinary issue moves to
+  `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`; an integration
+  issue moves to
+  `planning/features/<feature-slug>/integration/issues/done/<NN>-<slug>.md`.
+  Create only the selected `done/` directory on demand. For multi-repository
+  work, require cross-repo integration proof first. The Execution Contract must
+  include the tracker-owning repository plus both the exact active and exact
+  destination paths, and both paths must resolve inside that affected Git
+  repository. Commit and push the move, then rerun every final gate that the
+  resulting head invalidates. The `done/` path reaches the default branch only
+  when the later PR merge lands it; at the App terminal state closeout is
+  prepared, not globally completed.
+- Explicit non-App bundle: follow `non-app-delivery.md`; the eventual executor
+  owns authorization and tracker lifecycle. Planning grants neither.
 ```
 
-Include a `## Questions` section only when
-`partial_output=allow-non-agent-ready`, and put the concrete human/reporter
-question there. Omit
-the section entirely for `ready-for-agent` issues; never write `N/A` as a
-placeholder question.
+Tracker metadata is rendered by mode and backend rather than duplicated in the
+base body:
+
+- GitHub `write_mode=apply`: apply the mapped task Issue Type and
+  `ready-for-agent` label as tracker metadata; do not copy them into the body.
+- Local `write_mode=apply`: insert canonical `issue_type: task` and
+  `workflow_state: ready-for-agent` lines below the H1 title.
+- `write_mode=propose`: leave both lines out of the proposed body and return the
+  intended mappings as report metadata. A proposal is never an applied queue
+  state.
+
+For an explicit non-App bundle, append a `non_app_delivery_target` row to the
+same Execution Contract exactly as `non-app-delivery.md` requires. Do not add
+`explicit_instruction_ref` or another delivery, permission, option, dependency,
+or orchestrator-handoff section. Derive issues blocked by this issue by scanning other issues'
+`dependency_ids`; keep dependency reasons in Context or implementation prose
+without re-listing IDs.
+
+Withhold an issue that still needs a human answer. Agent-ready issue bodies do
+not contain a Questions section or unresolved placeholders.

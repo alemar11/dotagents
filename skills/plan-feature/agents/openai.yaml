@@ -1,7 +1,7 @@
 interface:
   display_name: "Plan Feature"
-  short_description: "Manually plan features into Feature Specs and agent-ready issues."
+  short_description: "Plan Feature Spec bundles and agent-ready issues."
   brand_color: "#10B981"
-  default_prompt: "Use $plan-feature for planning only. Select full-flow for new intent, spec-only when explicitly requested, and issues-from-existing-spec when a durable Feature Spec is supplied. Resolve tracker routing and planning identity, defer domain capture, publish through the configured target, harden every vertical issue, and assign required domain-memory closeout to the final integration task."
+  default_prompt: "Use $plan-feature for planning only: choose a mode and apply or propose, consume Project Memory routing, harden each vertical issue, and defer any knowledge delta to the final integration issue."
 policy:
   allow_implicit_invocation: false

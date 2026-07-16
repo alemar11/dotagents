@@ -1,152 +1,125 @@
 # Feature Spec Template
 
-Use this shape unless the project already has a stronger local Feature Spec format.
-
-## Structured Value Projection
-
-`references/options.md` is the sole owner of option names, values, defaults,
-sources, evidence, and cross-field constraints. This template only projects an
-already verified option snapshot into the Feature Spec; do not resolve or override
-options here.
-Render each field and its evidence exactly from that verified snapshot; keep
-derived paths, fingerprints, and integration proof as separate data.
+Use this shape unless the project already has a stronger local Feature Spec
+format. Keep option selection out of the body; `references/options.md` owns the
+two run choices.
 
 ```markdown
 # Feature Spec: [Feature Name]
 
 ## Source
 
-- Conversation, issue, doc, or repo evidence used to create this Feature Spec.
-- Use portable evidence references only: repo-relative paths for current-repo
-  files, `<repo-name>/<repo-relative-path>` for sibling repos, hosted URLs, or
-  descriptive labels for local-only references. Do not include
-  developer-machine absolute paths.
+- Conversation, issue, document, or repository evidence used to create this
+  Feature Spec.
+- Use only repo-relative, repo-qualified, hosted, or descriptive references.
 
 ## Planning Identity
 
-- Feature slug: accepted lowercase kebab-case slug.
-- Product or project slug: for monorepos or orchestrator workspaces.
-- Workspace path: for monorepos or multi-context repos.
-- Context file: selected `CONTEXT.md` when `CONTEXT-MAP.md` is used.
+- Feature slug: [accepted lowercase kebab-case slug].
+- Partial role: integration. [Include only for the dedicated multi-repository
+  integration partial; omit it from the parent and implementation partials.]
+- Product or project slug: [include only for monorepos or orchestrator workspaces].
+- Workspace path: [include only for monorepos or multi-context repositories].
+- Context file: [include only when a context map selects one].
+- Repository layout: [Project Memory fact].
 
 ## Problem
 
-What user or system problem this solves.
+[The user or system problem this change solves.]
 
 ## Goals
 
-- Concrete outcome this Feature Spec should deliver.
+- [Concrete outcome.]
 
 ## Non-Goals
 
-- Explicitly excluded work.
+- [Explicitly excluded work.]
 
-## Users and Use Cases
+## Users And Use Cases
 
-- Target user, actor, or system.
-- Primary workflow.
+- [Target user, actor, or system.]
+- [Primary workflow.]
 
 ## Requirements
 
-- Functional requirement.
-- Behavior, data, permission, API, or integration requirement when relevant.
+- [Functional behavior.]
+- [Data, permission, API, or integration requirement when relevant.]
 
 ## Product / Repository Scope
 
-- For single-repository Feature Specs: say `current repository` and name any relevant module
-  or package.
-- For monorepo Feature Specs: selected product/workspace path, selected context file,
-  and explicitly out-of-scope sibling workspaces when relevant.
-- For orchestrator workspace Feature Specs: affected repos, each repo's role, and any
-  repo-local implementation notes.
-
-## Change Delivery Target
-
-- change_delivery_target: [verified `change_delivery_target` row value].
-- change_delivery_target_evidence: [verified target option-row source and evidence].
-- change_delivery_permission: [verified `change_delivery_permission` row value].
-- change_delivery_permission_evidence: [verified `permission-source-ref`, scope, target, branch, and transfer evidence].
-- repository_layout: [verified `repository_layout` row value].
-- child_repository_layout: [child repo durable topology for repo-scoped workspace partials, or not-applicable].
-- workspace_context: [multi-repository-workspace or not-applicable].
-- workspace_parent_source_ref: [parent/global Feature Spec ref or not-applicable].
-- workspace_feature_repos: [complete feature-wide repo slug set or not-applicable].
-- workspace_child_source_refs: [complete repo-to-child Feature Spec mapping before issue generation, `unresolved-first-pass` during first-pass workspace child publication, or not-applicable outside workspace flows].
-- issue_update_permission: [verified `issue_update_permission` row value].
-- issue_update_permission_evidence: [verified independent option-row source and evidence].
-- codex_review_requirement: [verified `codex_review_requirement` row value].
-- target_branch_name: [verified exact branch data].
-- pull_request_count_strategy: [verified `pull_request_count_strategy` row value].
-- integration_proof: validation or cross-repo proof required before generated
-  issues close or move to `issues/done/`.
-- issue_inheritance: generated issues link this Feature Spec with `source_spec_ref`, copy
-  the effective `change_delivery_target`, `change_delivery_permission`,
-  `codex_review_requirement`, feature/workspace `repository_layout`, and
-  `pull_request_count_strategy` values as feature-level metadata, derive
-  `issue_repository_layout` from `child_repository_layout` or target repo evidence,
-  and carry issue-level ordering, dependencies, parallelization, closeout, and
-  exceptions. The issue phase validates the generated issue graph before
-  publication.
+- Affected repositories: [canonical repo slugs or current repository].
+- Allowed paths: [repo-relative or repo-qualified scope].
+- Spec target branch: [valid branch shared by this Spec's generated issues; use
+  the distinct derived integration branch for an integration partial].
+- [For monorepos, include the selected workspace and context.]
+- [For multi-repository work, state each repository's role and cross-repo
+  contract.]
 
 ## Feature Dependencies
 
-| upstream_feature_spec_ref | dependency_start_condition | dependency_reason |
-| --- | --- | --- |
-| [durable Feature Spec ref] | [upstream-merged or upstream-merge-ready-head] | [concrete non-empty reason] |
+| upstream_feature_spec_ref | dependency_reason |
+| --- | --- |
+| [durable upstream Feature Spec ref] | [concrete non-empty reason] |
 
 ## Cross-Repo Contracts
 
-Include only when multiple repositories or packages must remain compatible:
-API shape, schema, version, migration, fixture, deploy, or compatibility
-contracts that issue splitting must preserve.
+[Include only when multiple repositories or packages must preserve an API,
+schema, version, migration, fixture, deployment, or compatibility contract.]
 
 ## Acceptance Criteria
 
-- [ ] Specific, testable product or system outcome.
+- [ ] [Specific, testable product or system outcome.]
+
+## Validation Expectations
+
+- [Required automated or manual proof.]
+- [Named integration gate when applicable.]
 
 ## Risks
 
-- Risk, tradeoff, or compatibility concern.
+- [Risk, tradeoff, or compatibility concern.]
 
 ## Open Questions
 
-- Question that must be resolved before or during issue splitting.
+- [Question that must be resolved before publication or issue generation.]
 
 ## Issue-Splitting Notes
 
-- Suggested vertical slices, sequencing constraints, or dependencies for
-  the issue phase.
+- [Suggested vertical slices or sequencing constraints.]
 
-## Integration Gates
+## Non-App Delivery
 
-Include only when separate validation, release, or cross-repo proof affects issue
-splitting or closeout.
+[Include this section only after loading `non-app-delivery.md` for an explicit
+current request or a canonical durable source that already carries exactly one
+target and one resolvable instruction ref. Use each canonical line exactly once
+and state that this Feature Spec bundle is incompatible with
+`$codex-orchestrator`.]
 
-## Domain Knowledge Handoff
-
-Include only when planning resolved new durable project knowledge. This is a
-deferred handoff for the final implementation task, not completed capture.
-
-- `knowledge_delta=required`
-- `capture_outcome=deferred`
-- `memory_slice=domain-memory`
-- `domain_operation=implementation-closeout`
-- Decisions:
-  - Accepted durable term, rule, boundary, or decision.
-- Target surfaces:
-  - `current-repository/<repo-relative-path>` for single-repository work, or
-    `<repo-slug>/<repo-relative-path>` for multi-repo context, project doc, or
-    ADR destinations.
-- Evidence:
-  - Portable current-repository, repo-slug-qualified, hosted, or accepted
-    conversation evidence.
-- Closeout proof:
-  - Update the target surfaces after implementation and verify they describe
-    the integrated behavior that actually landed.
+non_app_delivery_target: [canonical value]
+explicit_instruction_ref: [portable resolvable authorized-user instruction ref]
 ```
 
 The `## Feature Dependencies` section is mandatory for every newly produced
-Feature Spec. Emit exactly one data row per authored upstream edge. When there
-are no edges, retain the heading and table header but omit the placeholder data
-row. Resolve the default `upstream-merged` value before rendering a row; never
-persist a blank start condition.
+Feature Spec. Keep the heading and table header with no data rows when there
+are no authored edges. Every edge waits for upstream merge and integration
+proof; no start-condition field exists.
+
+Omit the optional Non-App Delivery section when its predicate is false. Do not
+leave placeholder text in a published body.
+
+No Feature Spec body persists `knowledge_delta` or a domain-knowledge handoff
+section. The optional delta remains run/phase data
+until the issue phase places its exact payload on the sole final
+implementation/integration issue. For `spec-only` with a nonempty
+`knowledge_delta`,
+withhold every write and return only a blocked non-durable preview plus the
+exact delta; no durable Feature Spec source exists. Only a later explicit
+`full-flow` run carrying that exact delta may publish it and create its final
+issue. A later `issues-from-existing-spec` run must never consume the preview.
+
+Every multi-repository bundle has exactly one repo-owned integration partial
+with its distinct backend-owned title or
+path, retain `Partial role: integration` in its body, and include one merge-wait
+Feature Dependency edge to every implementation partial. This integration
+partial exists independently of a knowledge delta and never carries the delta
+in its Feature Spec body.

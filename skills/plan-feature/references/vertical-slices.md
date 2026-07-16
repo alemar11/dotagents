@@ -1,287 +1,182 @@
-# Vertical Slices
+# Vertical Slice Guide
 
-Use this reference when turning a Feature Spec into implementation issues. The default
-is always vertical slicing. Use a horizontal issue only when a vertical slice is
-not practical and the exception rules below are satisfied.
+Use this reference while splitting and validating implementation issues.
 
-## Definition
+## Core Rule
 
-A vertical issue delivers one independently verifiable product or system
-outcome. It may touch UI, API, storage, tests, docs, jobs, migrations, and
-configuration in one issue when those changes belong to the same outcome.
-In an orchestrator workspace, one vertical issue may span multiple independent
-repos when the outcome is cross-repo by nature.
+A vertical slice delivers one independently testable user or system outcome
+through every required layer. Do not split by architecture alone.
 
-A good vertical issue:
+Good slices read like outcomes:
 
-- changes one user-visible or system-verifiable behavior,
-- can be validated on its own,
-- includes the minimum layers needed to make that behavior real,
-- names the product/workspace context in monorepos or the affected repos and
-  integration gates in orchestrator workspaces,
-- links back to the source_spec_ref for delivery mode and states how the issue
-  can run in parallel,
-- has explicit dependencies and no hidden ordering assumptions,
-- gives the implementation agent enough local context to start,
-- has acceptance criteria written as outcomes, not internal chores.
+- a user can export one supported data set end to end;
+- an operator can observe and retry one failed workflow;
+- one consumer can adopt a compatible API path with its integration proof.
 
-## Slice Boundary Heuristics
+Weak slices read like layers:
 
-Choose issue boundaries by behavior, not by code layer. Prefer these boundary
-types:
+- create the database table;
+- add the API endpoint;
+- build the UI;
+- write tests later.
 
-- one actor can complete one workflow path,
-- one state transition becomes possible,
-- one permission or policy rule is enforced,
-- one integration path works end to end,
-- one cross-repo contract is introduced and consumed by at least one affected
-  repo,
-- one validation or failure mode is handled,
-- one migration or compatibility step becomes verifiable,
-- one observable system behavior changes.
+Layer work may appear inside one issue's implementation plan, but it is not a
+reason to create a separate issue unless it delivers a reusable enabling
+capability with its own acceptance and validation.
 
-When a Feature Spec contains CRUD work, do not create one issue per technical operation
-by default. Split by meaningful workflow path instead, such as "user can create
-and see a draft" before "user can publish a draft" before "user can archive a
-published item."
+## Slice Construction
 
-## Ordering Strategy
+For each candidate issue:
 
-Order issues so an agentic loop can implement them sequentially with minimal
-backtracking:
+1. Name one observable outcome.
+2. Identify the smallest repository and path scope that can deliver it.
+3. Include all layers needed for that outcome.
+4. Define specific acceptance criteria.
+5. Name preferred validation and a realistic fallback.
+6. Add only dependencies that are technically necessary.
+7. Confirm it can land safely when those dependencies complete.
 
-1. **Walking skeleton**: the smallest end-to-end path that proves the main
-   architecture, route, state, permissions, and validation surface can work.
-2. **Primary happy path**: the core user or system behavior from the Feature Spec.
-3. **Required variants**: important alternate actors, states, integrations, or
-   data shapes.
-4. **Failure and edge paths**: validation failures, permission denials,
-   retries, empty states, and compatibility fallbacks.
-5. **Operational polish**: observability, docs, cleanup, or migration follow-up
-   only when tied to a concrete delivered behavior.
-6. **Integration and knowledge closeout**: when Plan Feature carries a required
-   domain-knowledge delta, the last task validates the integrated feature and
-   updates the named durable context/docs/ADR surfaces to match what landed.
-   Prefer enriching an existing terminal integration task and make it depend on
-   every other terminal issue; otherwise append a final task that depends on
-   every terminal issue.
+Prefer fewer complete issues over many coordination-heavy issues. Do not create
+an issue merely to hold shared notes, planning, documentation, or tracker
+administration.
 
-Each issue must list only direct prerequisites in `## Dependencies`. If issue
-`03` depends on issue `01` but not issue `02`, say that directly. Do not rely
-on issue numbering alone to imply ordering.
+## Enabling Slices
 
-## Dependency Rules
+An enabling slice is valid only when all of these are true:
 
-Dependencies must be explicit, minimal, and implementable:
+- multiple later outcomes genuinely depend on it;
+- it creates a usable, testable capability rather than a stub;
+- its acceptance criteria prove that capability independently;
+- combining it with one consumer would create unsafe scope or duplicate work.
 
-- Use `None` when the issue can start immediately.
-- Reference generated issue IDs such as `01` or `02` when a prior generated
-  issue must land first. Include the issue title as explanatory prose when it
-  improves readability, but keep the ID as the stable dependency handle.
-- Explain what dependency is needed, such as "uses the draft creation endpoint
-  from Issue 01."
-- Do not create circular dependencies or retain cycles that can lock the
-  issue queue.
-- Do not depend on a broad phase such as "backend complete" or "frontend
-  complete."
-- If the issue depends on an unresolved decision, withhold it and return the
-  blocker by default instead of publishing a partial issue. Emit `needs-info`
-  only when `partial_output=allow-non-agent-ready`.
-  If it depends only on another generated implementation issue being completed,
-  it may still be `ready-for-agent`; queue consumers must wait for the listed
-  dependency to finish before starting it.
+Otherwise fold the enabling work into the first vertical consumer.
 
-For final-closeout selection, normalize dependency edges from prerequisite to
-downstream consumer: `02 depends-on 01` and `01 blocks 02` both mean
-`01 -> 02`. A terminal issue is a pre-closeout issue with no downstream
-generated consumer.
+## Multi-Repository Slices
 
-## Avoid Horizontal Tickets
+Prefer one issue per independently mergeable repository outcome. Use one
+cross-repository issue only when the repositories must change atomically or one
+integration owner must prove the complete behavior.
 
-Avoid issues whose only goal is:
+Each issue must identify:
 
-- build the backend,
-- build the frontend,
-- add tests,
-- update docs,
-- add fixtures,
-- refactor shared utilities,
-- create database tables,
-- wire configuration,
-- add observability.
+- exact affected repository slugs;
+- repo-relative or repo-qualified allowed paths;
+- interface, schema, version, migration, fixture, or deployment contracts;
+- named integration gates and validation order;
+- sibling Feature Spec refs when repo-scoped partials exist.
 
-Those tasks usually belong inside a vertical issue. A separate enabling issue
-is allowed only when all of these are true:
+Expected PR slots are planning context, not completion proof. The executor
+records real PR links during implementation.
 
-- no useful vertical slice can be implemented before it,
-- it unblocks at least one named later vertical issue,
-- it is independently verifiable,
-- it has clear acceptance criteria,
-- it is small enough for one focused implementation pass,
-- its dependencies and consumers are listed explicitly.
+Every multi-repository bundle has exactly one distinct repo-owned integration
+partial downstream of all implementation partials and at least one integration
+issue that owns a bounded repo/path change and proves the cross-repository result
+after those upstream merges. A validation-only or no-op issue cannot satisfy the
+App's real-PR conclusion; withhold the App-compatible bundle if no concrete
+integration vehicle exists. This structure does not depend on a knowledge
+delta.
 
-Name allowed enabling issues by the capability they unlock, not by the layer.
-Prefer "Enable authenticated draft storage for Issue 02 and Issue 03" over
-"Add database tables."
+## Dependency Graph
 
-A final integration and domain-knowledge closeout task is allowed only when a
-required delta exists and no existing terminal issue owns feature-level
-integration proof. It is not a docs-only exception: it must depend on every
-terminal implementation issue, validate the integrated feature, update only the
-carried target surfaces, and prove the durable docs match the implemented
-behavior. It must be the last generated task and must be hardened like every
-other issue.
+Use stable generated IDs and one forward list per issue:
 
-## Verticality Gate
+```text
+01: dependency_ids: none
+02: dependency_ids: 01
+03: dependency_ids: 01
+04: dependency_ids: 02, 03
+```
 
-Before generated implementation issues are written, returned, or published,
-review the final hardened issue bodies as the source of truth. This is a
-blocking gate, not a summary pass.
+Rules:
 
-For each issue, confirm that:
+- every ID resolves inside the current Feature Spec;
+- no issue depends on itself;
+- dependency edges form an acyclic graph;
+- a dependency represents a real implementation prerequisite, not preferred
+  scheduling;
+- the list contains generated IDs, never hosted issue numbers or upstream
+  Feature Spec refs;
+- reverse edges are derived by scanning all lists and are never stored.
 
-- the title and goal name a user-visible or system-verifiable outcome,
-- acceptance criteria prove the outcome instead of listing internal tasks,
-- validation can prove the issue independently after its direct dependencies
-  are complete,
-- tests, docs, fixtures, migrations, configuration, and observability work are
-  inside the vertical issue whose outcome they prove unless an enabling-slice
-  exception applies,
-- any enabling-slice exception lists the later issue IDs it unlocks and why no
-  useful vertical issue can land before it,
-- dependencies use generated issue IDs and remain direct, minimal, and
-  acyclic,
-- orchestrator or multi-repo issues name affected repos, integration gates, and
-  proof required for closeout.
-- a required domain-knowledge delta has exactly one final owner, that owner is
-  last in the graph, and its outcome includes integration proof rather than
-  documentation alone.
+An agent-ready issue may list unfinished dependencies: it is ready for the
+queue, but execution waits until those dependencies finish.
 
-If an issue fails the gate, repair the issue set before output:
+Cross-Feature-Spec dependencies stay in the Feature Spec's dependency table.
+They gate the complete downstream Feature Spec and always wait for upstream
+merge plus integration proof.
 
-- merge chore-only work into the vertical issue that needs it,
-- split mixed work by independently verifiable behavior instead of code layer,
-- reframe infrastructure work only when it is a real independently verifiable
-  system outcome,
-- keep separate enabling work only when all exception rules above are satisfied,
-- withhold unresolved anomalies instead of publishing them as
-  `ready-for-agent`.
+## Scope Overlap Gate
 
-After any repair, rerun hardening for materially changed issues and revalidate
-the final graph before issue bodies are returned or published.
+Two issues may be independently executable only when their allowed paths and
+contracts do not create unsafe concurrent edits. When overlap exists:
 
-## Ready vs Blocked
+- narrow one issue's scope;
+- combine the outcomes when they are not independently useful; or
+- add a dependency when ordered ownership is necessary.
 
-Mark an issue `ready-for-agent` only when it has:
+Do not introduce a selectable scheduling field. Independence is derived from
+the graph and actual path scope by the eventual orchestrator.
 
-- a clear vertical outcome,
-- non-goals,
-- direct dependencies,
-- product/workspace/context scope when the Feature Spec comes from a multi-context repo
-  or monorepo,
-- affected repos and integration gates when the issue is an orchestrator
-  workspace issue,
-- a durable `source_spec_ref` pointer and copied feature-level `change_delivery_target`,
-  independently resolved `issue_update_permission`, and `pull_request_count_strategy` metadata,
-- parallelization status, expected closeout path, and any delivery or
-  integration exception,
-- a `## Orchestrator Handoff` section that restates the dispatchable source
-  Feature Spec, feature slug, `change_delivery_target`,
-  `change_delivery_permission`, `issue_update_permission`,
-  `codex_review_requirement`, `pull_request_count_strategy`, affected repos or
-  product scope, scope, start rule, dependencies, validation, and closeout,
-- acceptance criteria,
-- validation steps,
-- implementation guidance enriched by `$plan-harder`,
-- no unresolved product, technical, access, API, data, or validation blocker.
+## Domain Knowledge Closeout
 
-A `ready-for-agent` issue may list dependencies on other ready issues. That
-means it is specified enough for an agent queue, not that it is immediately
-startable before those dependencies are complete.
+When the issue phase receives a knowledge delta, exactly one final
+implementation/integration issue persists it. No Feature Spec body carries the
+payload. Exclude the selected owner and its outgoing `dependency_ids`, derive
+the nodes with no dependents in the remaining graph, then make the owner depend
+directly on every such node and reject any issue that depends on the owner.
 
-Only publish or return a `needs-info` issue when
-`partial_output=allow-non-agent-ready`. Otherwise withhold the issue and report
-the blocking question. Under that canonical value, mark the issue `needs-info`
-when any of these remain unclear:
+For a multi-repository bundle, persist the delta only on the final issue of its
+dedicated repo-owned integration partial. That partial exists regardless of the
+delta, and its Feature Dependencies point to every implementation partial so all
+cross-Spec edges wait for upstream merge. Apply the owner-excluded terminal rule
+only inside that integration partial; never copy sibling-partial issue IDs
+across Specs.
 
-- product behavior or user outcome,
-- selected product/workspace/context in a multi-context repo or monorepo,
-- required source of truth,
-- API contract or schema,
-- permissions or roles,
-- migration or compatibility policy,
-- access to credentials, services, fixtures, or test data,
-- validation command or acceptance signal,
-- source_spec_ref, delivery mode inheritance or exception, or whether the issue is
-  safe to implement in parallel.
+The final issue must:
 
-If the source Feature Spec has open questions that affect scope, acceptance criteria,
-dependency ordering, validation, permissions, publication target, data
-contracts, or cross-repo contracts, stop and resolve them before returning or
-publishing `ready-for-agent` issues. A deferred question is safe only when it
-is explicitly classified as non-blocking for the generated issue set.
+- prove integrated feature behavior;
+- invoke `$project-memory domain-memory` only after implementation proof;
+- carry exact decisions, target surfaces, and evidence;
+- cover every target surface with the same issue's `affected_repositories` and
+  `allowed_paths`;
+- verify the resulting documentation diff.
 
-For orchestrator issues, expected repo PR slots or pre-implementation
-placeholders may appear before implementation starts when all other
-implementation details are agent-ready. Treat those placeholders as scheduling
-expectations, not completion proof. Completion remains an orchestrator closeout
-responsibility and requires real PR links or equivalent integration proof before
-the issue moves to `done` or closes.
+Never create a docs-only closeout slice.
 
-Mark an issue `ready-for-human` when the next step requires human judgment,
-business approval, design approval, or manual operational access before an
-agent can safely proceed.
+## Readiness Gate
 
-## Plan Harder Handoff
+Every agent-ready issue must have:
 
-Every issue must be hardened after the vertical slice is drafted and before it
-is returned or published.
+- one bounded vertical goal;
+- explicit non-goals;
+- complete requirements and acceptance criteria;
+- preferred validation plus a fallback or explicit `None`;
+- exactly one `## Execution Contract` containing the six required normal
+  fields from `references/options.md`;
+- valid generated dependency IDs and an acyclic graph;
+- portable source and evidence refs;
+- no unresolved human decision or placeholder question;
+- a completed final stable `$plan-harder` issue-hardening pass, after graph and
+  scope stabilization;
+- domain closeout only on the unique final issue when required.
 
-For each issue:
+For explicit non-App planning, the same section also carries the conditional
+target field and the bundle is not App-compatible.
 
-- pass only that draft issue body plus the minimum relevant Feature Spec context to
-  `$plan-harder`,
-- request `planning_mode=issue-hardening` with `output_surface=caller` and
-  consume its structured result,
-- start `## Implementation Plan` with the standard provenance line
-  `Plan-hardening: $plan-harder issue-hardening pass completed for this issue only.`,
-- synthesize the implementation-relevant guidance under `## Implementation Plan`,
-- merge acceptance criteria, validation, dependency, and blocker details into
-  the matching top-level issue sections,
-- keep any `$plan-harder` blocker visible,
-- do not mark the issue `ready-for-agent` until blockers are resolved,
-- do not batch multiple issues into one `$plan-harder` call.
+Withhold any issue that fails this gate and report its blockers. Do not emit a
+weaker agent-ready variant.
 
-Do not paste the `$plan-harder` output wholesale if doing so duplicates
-sections already present in the issue body.
+## Repair Order
 
-`$plan-harder` never writes files; `output_surface=caller` returns the structured
-brief to the issue phase, which owns any issue tracker or local Markdown writes.
+When validation fails, repair in this order:
 
-## Good Split Example
+1. feature scope and acceptance ambiguity;
+2. vertical slice boundaries;
+3. repository/path overlap;
+4. dependency graph;
+5. validation and integration proof;
+6. domain closeout ownership;
+7. template and metadata consistency.
 
-For a Feature Spec that adds team invitations:
-
-1. `01 Create pending invitation`
-   - Outcome: admin can invite an email and see a pending invite.
-   - Dependencies: `None`.
-2. `02 Accept invitation into team`
-   - Outcome: invited user can accept and join the team.
-   - Dependencies: `01 Create pending invitation`.
-3. `03 Handle expired or revoked invitation`
-   - Outcome: invalid invite links fail with the correct user-facing state.
-   - Dependencies: `01 Create pending invitation`.
-4. `04 Show invitation audit trail`
-   - Outcome: admin can see invite lifecycle events.
-   - Dependencies: `01 Create pending invitation`, `02 Accept invitation into
-     team`, `03 Handle expired or revoked invitation`.
-
-Bad split:
-
-- `Build invitation backend`
-- `Build invitation frontend`
-- `Add invitation tests`
-- `Update invitation docs`
-
-The bad split blocks parallel understanding and forces agents to coordinate
-across layers without a verifiable product increment.
+Re-run `$plan-harder` for any issue materially changed by repairs, keep only the
+final stable result and one provenance line, then repeat the readiness gate.

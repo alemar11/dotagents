@@ -1,415 +1,337 @@
 # Feature Spec Phase
 
-Use this reference when `plan-feature` needs to turn clarified feature,
-product, migration, cross-repo project, or workflow intent into a practical Feature Spec.
-This is an internal phase, not a public skill.
+Use this internal phase to turn clarified feature, product, migration,
+cross-repository, or workflow intent into a complete Feature Spec. Do not use
+it as a public skill.
 
 ## Goal
 
-Produce or publish a Feature Spec that can feed the issue phase. If the source material
-is still too vague to produce a useful Feature Spec, return the smallest blocking
-question set or route back through `$grill-me-with-context`.
+Produce or publish a Feature Spec that can feed the issue phase. If the source
+is too vague, return the smallest blocking question set through the caller.
 
 ## Boundaries
 
-- Do not implement the feature.
-- Do not split the Feature Spec into implementation issues; the issue phase owns that.
-- Do not edit `CONTEXT.md`, project domain docs, or ADRs. Carry accepted durable
-  knowledge as the caller-provided `domain_knowledge_delta`.
-- Do not invent requirements, users, constraints, or acceptance criteria that
-  are not supported by user input, repo evidence, or project memory.
-- Do not ask for separate Feature Spec write/publish confirmation after `plan-feature`
-  has resolved setup, planning identity, blockers, and effective target.
-  `tracker_backend` is the planning-artifact write authority only when
-  `effective_target=configured-tracker`; other target values are non-mutating.
-- In GitHub tracker mode, do not persist repo-local Feature Spec mirrors
-  or `planning/tmp/` staging copies unless `local_mirror=requested` and
-  `effective_target=configured-tracker`.
-- Use structured values for multi-choice fields. `references/options.md` is the
-  sole owner of option values, defaults, evidence, and cross-field resolution;
-  read tracker and type mappings from project memory, then project the verified
-  values through `references/spec-template.md`.
-- Resolve `effective_target` only through `references/options.md`. After
-  resolution, use `$project-memory`'s `references/tracker-publishing.md` for
-  publication transport, stable `source_spec_ref` behavior, mutation
-  verification, cleanup, and partial recovery.
+- Do not implement the feature or split it into issues.
+- Do not edit `CONTEXT.md`, domain documents, or ADRs. Carry accepted durable
+  knowledge only as optional phase data in `knowledge_delta`; never render it
+  in a Feature Spec body.
+- Do not invent users, requirements, constraints, or acceptance criteria.
+- Use `references/options.md` for `mode` and `write_mode`; do not create another
+  phase-level option.
+- Treat tracker backend, repository layout, and tracker mappings as Project
+  Memory facts.
+- Publish only with `write_mode=apply`. With `write_mode=propose`, perform no
+  local or hosted write and return proposed bodies, locations, metadata, and
+  publication order rather than executable commands.
+- Do not create hosted-artifact mirrors or temporary planning trees.
+- Load `non-app-delivery.md` only when its current-request predicate is true or
+  a canonical durable source Spec carries exactly one target and one resolvable
+  `explicit_instruction_ref`.
 
-## Phase Handoff Inputs
+## Phase Inputs
 
-Receive the verified run-level `option_resolution` rows and
-`option_rows_fingerprint` defined by `references/options.md`, plus:
+Receive:
 
-- the planning identity (`feature_slug` and any selected `product_slug`,
-  `workspace_path`, `context_file`, `project_slug`, `repository_layout`,
-  `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
-  and `workspace_feature_repos`), plus the authored `feature_dependencies`
-  rows defined by `references/options.md`;
-- pending or existing `source_spec_ref` state and the
-  `hosted_body_file_policy=transient-outside-repo` transport rule;
-- `capture_mode=defer-to-caller`, `capture_outcome`, and the structured
-  `domain_knowledge_delta` (`knowledge_delta`, `decisions`, `target_surfaces`,
-  `evidence`, and independent `unresolved` blockers).
+- `mode` and `write_mode`;
+- `tracker_backend`, `repository_layout`, and issue-type mappings from Project
+  Memory;
+- planning identity: `feature_slug` and any selected `product_slug`,
+  `project_slug`, `workspace_path`, or `context_file`;
+- affected repositories, allowed paths, per-Spec target branch, and any
+  parent/child workspace links;
+- existing or pending `source_spec_ref` state;
+- authored Feature Spec dependency rows;
+- optional `knowledge_delta` with `decisions`, `target_surfaces`, and
+  `evidence` lists, plus a separate `planning_blockers` list;
+- `non_app_delivery_target` and its non-option `explicit_instruction_ref` only
+  when the conditional reference was loaded.
 
-The handoff is mandatory even when no grilling occurred. Use
-`knowledge_delta: none` with `capture_outcome: no-durable-change` and empty
-`decisions`, `target_surfaces`, and `evidence` lists when planning introduced
-no durable project knowledge. Preserve `unresolved` independently and route
-non-empty blockers through clarification and readiness gates. Use
-`capture_outcome: deferred` when `knowledge_delta: required`.
-Recompute `option_rows_fingerprint` with `references/options.md` before any
-drafting or write. Stop on a mismatch.
+Absence of `knowledge_delta` means planning introduced no durable project
+knowledge. Do not emit an empty object. Preserve unresolved planning blockers
+independently and withhold output until they are resolved or proven
+non-blocking.
 
 ## Workflow
 
 ### 1. Ground In Project Memory
 
-For `lean-spec`, begin with only:
+Read the minimum evidence needed to establish the contract:
 
 - `project-memory/config/issue-tracker.md`;
 - `project-memory/config/project-layout.md`;
 - `project-memory/config/triage-labels.md`;
-- the shape/ownership routing in `project-memory/config/domain.md` and
-  `CONTEXT-MAP.md` when either exists, without loading unrelated content;
-- the selected `CONTEXT.md` only when needed to resolve terminology or scope;
-- the supplied intent plus directly relevant source, tests, or product docs.
+- `project-memory/config/domain.md` and the selected `CONTEXT.md` when
+  terminology or ownership requires them;
+- relevant ADRs, product documentation, source, and tests when they constrain
+  the feature;
+- orchestrator workspace project, repository, and integration-gate documents
+  when the selected scope is a multi-repository workspace.
 
-Do not scan every ADR, sibling workspace doc, translation memory, or broad
-source tree on the lean path unless the minimum evidence is missing,
-contradictory, or reveals multi-context/cross-repo ownership. Widen to
-`standard` immediately when a lean prerequisite fails and record why.
+Do not broadly scan unrelated domain or localization material. Widen evidence
+only when the current sources are incomplete or contradictory.
 
-For `standard`, inspect the current project context before drafting:
+When a context map describes multiple products or workspaces, resolve the
+selected product, workspace path, context file, and feature slug before
+drafting. Stop rather than guess when more than one owner remains plausible.
 
-- `project-memory/config/issue-tracker.md`
-- `project-memory/config/project-layout.md`
-- `project-memory/config/triage-labels.md`
-- `project-memory/config/domain.md`
-- `CONTEXT.md` or `CONTEXT-MAP.md`
-- `TRANSLATION.md`, when present for the selected context
-- `project-memory/adr/`
-- orchestrator workspace docs such as `orchestration/<project>/PROJECT.md` and
-  `orchestration/<project>/repos/*.md`, when planning from a local orchestrator
-  workspace
-- README, product docs, issue templates, and relevant source/tests
+### 2. Resolve Artifact Targets
 
-If setup files are missing, continue with repo evidence and say which project
-memory files were unavailable.
+Use Project Memory facts to choose locations:
 
-If `CONTEXT-MAP.md` or `project-memory/config/domain.md` indicates a
-multi-context repo or monorepo, resolve the selected product/workspace context
-before writing:
+| Repository layout | Tracker backend | Feature Spec location |
+| --- | --- | --- |
+| `single-repository` | `github` | `Feature Spec: <Feature Name>` issue in the current repository. |
+| `single-repository` | `local` | `planning/features/<feature-slug>/SPEC.md`. |
+| `monorepo` | `github` or `local` | One Feature Spec scoped to the selected product/workspace and its configured tracker. |
+| `multi-repository-workspace` | Per owning repository | Accepted parent/global Feature Spec when one exists, plus linked repo-scoped partial Feature Specs for affected child repositories. |
 
-- `product_slug`
-- `workspace_path`
-- `context_file`
-- `feature_slug`
-- `repository_layout`
+Do not invent a global workspace Feature Spec. Use one only when it is the
+accepted planning source. Resolve every affected child repository's tracker
+and topology facts independently. A GitHub child gets a repo-scoped hosted
+Feature Spec; a local child gets its configured local path.
 
-Use identity values passed by `plan-feature` when present. Otherwise derive
-only those identity fields from project memory and repo evidence, asking when
-multiple contexts could plausibly own the feature.
+For multi-repository work:
 
-Do not resolve delivery or mutation options in this phase. Consume the complete
-verified delivery tuple and `target_branch_name` data from the run-level
-`option_resolution` handoff, whose values, defaults, evidence, and cross-field
-rules are owned by `references/options.md`. If required rows are absent,
-contradictory, or fail their fingerprint, return to caller-owned option
-resolution before drafting. Project the accepted rows without reinterpreting
-their prose or applying another default.
+1. Produce the accepted parent/global artifact first when one is required.
+2. Produce every child partial to obtain stable durable or proposed refs. In
+   proposal mode use
+   `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>` for each
+   partial; never reuse the parent ref for a child.
+   In apply mode, make every multi-repository ref globally unambiguous: use
+   `owner/repository#<number>` or a canonical hosted URL for GitHub and
+   `<repository_slug>/<repo-relative-spec-path>` for local Markdown. Use those
+   same refs in the repo-to-child mapping, sibling links, and Feature
+   Dependencies; bare `#<number>` and bare repo-relative paths are invalid in a
+   multi-repository bundle.
+3. Choose the one repository that owns post-merge cross-repository integration
+   proof from accepted scope and evidence;
+   stop if that owner is ambiguous. Create a dedicated integration partial with proposed ref
+   `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration`.
+   Its mandatory Feature Dependencies table contains one edge to every
+   implementation partial, so it cannot execute until every upstream partial
+   has merged. Its generated integration task owns the cross-repository proof.
+   The integration owner is an affected child repository selected from evidence;
+   this does not require or create a coordination repository. Create this
+   partial independently of `knowledge_delta`, and never render the delta in its
+   Feature Spec body. Require a bounded repo-owned integration vehicle that can
+   produce a concrete path change and real PR in addition to validation proof;
+   withhold the App-compatible bundle if no such vehicle exists. Derive its
+   target branch as `<ordinary_target_branch_name>-integration` from the
+   resolved ordinary branch in the same repository; the default result is
+   `feature/<feature_slug>-integration`.
+4. Give the integration partial a durable identity distinct from the ordinary
+   implementation partial in the same repository. On GitHub, title it
+   `Feature Spec: <Feature Name> - Integration`, include
+   `Partial role: integration` in its Planning Identity, and use its own
+   `owner/repository#<number>` ref or canonical hosted URL as the applied
+   `source_spec_ref`. With the local backend, write it to
+   `planning/features/<feature-slug>/integration/SPEC.md` or the configured
+   equivalent, expose its applied source ref with the owning repository slug,
+   and keep its issues under the matching `integration/issues/` subtree.
+5. Validate every implementation-eligible partial as one bundle: each
+   `(affected_repository, target_branch_name)` pair must have exactly one
+   Feature Spec owner. The same branch string may appear in different
+   repositories, but two partials in the same repository must not share it,
+   even when paths are disjoint or dependencies serialize them. Resolve collisions
+   before new publication; for an immutable existing source, stop rather than
+   rename it.
+6. Add the complete repo-to-child-ref mapping and sibling links to every child
+   and integration partial.
+7. Start issue generation only after the complete linked artifact set exists.
 
-If the repo shape makes the affected repo set ambiguous, ask before writing the
-Feature Spec.
+Mixed child tracker backends are valid because routing is an owning-repository
+fact, not one run-wide choice. Preserve one publication plan ordered by parent,
+implementation partials, the integration partial, cross-link
+updates, then generated issues. Proposed refs are inspection-only and never
+agent-executable.
 
-## Feature Spec Target Model
+### 3. Gate An Existing Source Or Draft
 
-Use this model before writing or publishing a Feature Spec:
+Use user conversation, clarification output, existing issues or documents,
+project memory, and relevant repository behavior as sources. Ask only for
+decisions that materially change scope, acceptance, dependencies, validation,
+or repository ownership.
 
-When `workspace_context=multi-repository-workspace`, `repository_layout` is the
-workspace graph topology and must use `multi-repository-workspace`. Repo-scoped child
-partials preserve the child repo's durable topology in `child_repository_layout`.
+For `mode=issues-from-existing-spec`, do not draft or update the source. Carry
+the original durable body and `source_spec_ref` unchanged through the dependency
+and body gates below. After both gates pass, return that exact source to the
+issue phase and skip Apply Or Propose. If a missing section, blocking question,
+new decision, schema repair, or content correction would change the source,
+stop and require a separate explicitly authorized Feature Spec update before
+issue generation. Never switch this run to `full-flow`, rewrite the source, or
+publish a repaired copy. Reject a source containing `knowledge_delta` or
+`## Domain Knowledge Handoff` as incompatible structured input. The issue phase
+may receive a delta only as explicit accepted invocation data kept separate from
+this unchanged source. Normalize each of that delta's target surfaces to a
+repository and repo-relative path, then require it to be contained by the
+source's unchanged affected repositories and allowed paths. An out-of-scope or
+ambiguously owned target blocks issue generation; never widen the immutable
+source or a future issue to accommodate it.
 
-| Project topology | Tracker backend | Feature Spec target | Generated issue source |
-| --- | --- | --- | --- |
-| `single-repository` | `github` | One Feature Spec GitHub issue in the repo. | `source_spec_ref: #<number>` |
-| `single-repository` | `local` | `planning/features/<feature-slug>/SPEC.md` | `source_spec_ref: planning/features/<feature-slug>/SPEC.md` |
-| `monorepo` | `github` or `local` | One Feature Spec for the selected product/workspace context. | The selected Feature Spec issue/path plus product or workspace scope in each issue. |
-| `multi-repository-workspace` | Parent `github` or `local`; child tracker per affected repo | Parent/global Feature Spec only when it is the accepted source. Repo-scoped partial Feature Specs route through each affected child repo's tracker. | Each repo issue points at its repo partial Feature Spec and links sibling partial Feature Specs. |
+For `full-flow` and `spec-only`, draft with `references/spec-template.md` unless
+the repository has a stronger Feature Spec format. Keep it
+implementation-facing:
 
-Do not invent a global Feature Spec for workspace features. Use one only when it is the
-accepted planning source; otherwise preserve the linked partial Feature Spec graph.
-For `multi-repository-workspace`, resolve `workspace_feature_repos` first, then read
-each affected child repo's `project-memory/config/issue-tracker.md` and
-`project-memory/config/project-layout.md`, or accepted repo metadata that
-explicitly covers both tracker routing and durable topology, before publishing
-partial Feature Specs. Use the child layout config or accepted metadata as the
-source for `child_repository_layout`; if child topology is unavailable or
-contradictory, stop before child partial publication. A child repo with
-`tracker_backend=github` gets a repo-scoped GitHub Feature Spec issue in that
-child repository. A child repo with `tracker_backend=local` gets its configured
-repo-local Feature Spec path. If child tracker routing is unavailable, stop
-instead of writing a parent-local artifact as a substitute. Because the current
-run-level contract has one `tracker_backend` and one `effective_target`, one
-option-resolution run may publish only one artifact set. Publish an accepted
-parent/global Feature Spec in a parent run, then publish child repo partials in
-child run(s) that cite the parent `source_spec_ref`. All affected child repos
-in one generated issue graph must share the same effective child backend
-because issue publication, closeout, and option fingerprints are currently
-single-backend per graph; stop before agent-ready issue generation when child
-backends are mixed. Use a two-pass child publication flow: publish or draft all
-child partials to obtain stable refs, then update every child partial with the
-complete `workspace_child_source_refs` mapping and cross-links before issue
-generation. Parent `tracker_backend` controls only the parent/global
-coordination artifact, while child runs keep each child repo's durable
-topology as `child_repository_layout` and carry parent workspace context as
-`workspace_context=multi-repository-workspace`, `workspace_parent_source_ref`, and
-source/ref data.
+- problem, users, goals, and non-goals;
+- functional and integration requirements;
+- product and repository scope;
+- affected repositories, allowed paths, and the target branch shared inside
+  this Feature Spec;
+- acceptance criteria and validation expectations;
+- cross-repository contracts and integration gates;
+- risks, open questions, and issue-splitting notes.
 
-### 2. Confirm The Feature Spec Source
+The normal Feature Spec does not carry selectable delivery, review,
+permission, pull-request-count, scheduling, or tracker-closeout fields. Its
+generated issues are compatible with the App orchestrator's fixed flow.
 
-Identify the source material:
+When the explicit non-App exception applies, include exactly one selected
+`non_app_delivery_target`, exactly one resolvable `explicit_instruction_ref`,
+and a prominent App-incompatibility statement. The ref is evidence data, not an
+option or issue field. Do not add authority fields.
 
-- user conversation or pasted notes,
-- output from `$grill-me-with-context`,
-- the structured `domain_knowledge_delta` returned by deferred clarification,
-- an existing issue, doc, or planning note,
-- repo behavior that needs to become a defined product surface.
+### 4. Validate Feature Dependencies
 
-If key facts are missing, ask only for decisions that would materially change
-the Feature Spec. Prefer defaults when the repo or project memory already implies them.
+For `full-flow` and `spec-only`, create the mandatory
+`## Feature Dependencies` table with exactly `upstream_feature_spec_ref` and
+`dependency_reason`. For `issues-from-existing-spec`, require and validate that
+exact existing section without adding, removing, or rewriting anything.
 
-### 3. Draft The Feature Spec
+For every edge:
 
-Use `references/spec-template.md` unless the repo has a stronger local Feature Spec
-format.
+- require a unique durable upstream ref, or a proposed ref only in
+  `write_mode=propose`;
+- in a multi-repository applied bundle, require every upstream ref to identify
+  its owning repository through `owner/repository#<number>`, a canonical hosted
+  URL, or `<repository_slug>/<repo-relative-spec-path>`;
+- reject self, duplicate, missing, and ambiguous refs;
+- require a concrete portable reason;
+- normalize upstream-to-downstream edges and validate the reachable Feature
+  Spec graph is acyclic;
+- treat the edge as waiting for upstream merge and integration proof.
 
-Create the mandatory `## Feature Dependencies` section before publication.
-Render exactly the canonical columns from `references/options.md`; use an
-empty table body when no cross-Spec edge is authored. For every edge, resolve
-the default `dependency_start_condition=upstream-merged`, require a non-empty
-portable `dependency_reason`, resolve the upstream ref, and validate the
-reachable upstream-to-downstream graph is acyclic. Do not infer edges from
-Issue-Splitting Notes, prose ordering, implementation issue IDs, branch names,
-or similar titles.
+An empty table body means no authored cross-Spec dependencies. The section and
+its two canonical columns are mandatory, including for
+`mode=issues-from-existing-spec`. A Feature Spec without them is incompatible structured
+input: stop and require an explicitly authorized canonical update
+before issue generation. Never interpret absence as an empty edge set or infer
+edges from prose, issue ordering, branch names, or similar titles.
 
-Accept `dependency_start_condition=upstream-merge-ready-head` only when the
-static authoring contract in `references/options.md` passes: each edge connects
-two Feature Specs in the same single repository and both select the merge-ready
-PR delivery target. Reject multi-repo, ambiguous, or unequal-repo cases instead
-of weakening the edge. Do not require current merge-ready or merged runtime
-state during planning; Orchestrator owns the one-unmerged-upstream, all-other-
-dependencies-merged, and maximum-unmerged-depth-two dispatch gates. This is
-planning metadata only and grants no merge, close, retarget, or review-bypass
-authority.
+Keep cross-Spec edges separate from generated issue dependencies. The issue
+phase may validate and preserve the Feature Spec graph but never copies those
+refs into issue `dependency_ids`.
 
-Before returning, writing, or publishing the Feature Spec, sanitize every source and
-evidence reference that came from local filesystem inspection. Published Feature Specs
-must not include developer-machine absolute paths such as `/Users/<name>/...`,
-`/home/<name>/...`, drive-root paths, temp directories, or cache paths. Use
-portable references instead:
+### 5. Sanitize And Gate The Body
 
-- current repository evidence: repo-relative paths such as
-  `agents/src/session_data.py` or `agents/src/session_data.py:42`;
-- sibling repository evidence: `<repo-name>/<repo-relative-path>` or
-  `<repo-name>/<repo-relative-path>:<line>`, using the sibling repo directory
-  name or configured repo slug;
-- hosted source evidence: the URL, issue, PR, or `owner/repo:path` reference;
-- local-only exploratory evidence that cannot be safely identified: a short
-  descriptive label such as `<local-reference>: runtime session collector`, not
-  the raw absolute path.
+For `full-flow` and `spec-only`, replace local filesystem evidence with portable
+references before return or publication. For `issues-from-existing-spec`,
+validate without modifying the body; any nonportable evidence blocks issue
+generation until a separate explicitly authorized source update lands.
 
-If the same file is useful both locally and in the Feature Spec, keep the raw absolute
-path only in private working context and put only the sanitized reference in
-the Feature Spec body or GitHub issue body. If sanitization would make the evidence
-ambiguous, add the repo name or source label rather than restoring an absolute
-path.
+Portable forms are:
 
-Keep the Feature Spec implementation-facing:
+- current repository: `path/to/file` or `path/to/file:line`;
+- sibling repository: `<repo-slug>/<repo-relative-path>`;
+- hosted evidence: URL, issue, PR, or `owner/repo:path`;
+- local-only evidence without a stable identity: a descriptive source label.
 
-- clear problem and target user,
-- goals and non-goals,
-- functional requirements,
-- user workflow or system behavior,
-- selected planning identity: feature slug, product or project slug, workspace
-  path, context file, and project topology when applicable,
-- delivery contract: `change_delivery_target`, independently resolved
-  `change_delivery_permission`, `issue_update_permission`,
-  `codex_review_requirement`, `repository_layout`, `child_repository_layout`,
-  `pull_request_count_strategy`, branch data, and integration-proof expectations,
-- issue-splitting note: sequencing, dependencies, and startability are derived
-  from generated implementation issues and validated by the issue phase,
-- data, permissions, API, or integration constraints when relevant,
-- acceptance criteria,
-- risks and open questions,
-- notes for later issue splitting.
+Then verify:
 
-When `domain_knowledge_delta.knowledge_delta` is `required`, include a
-`## Domain Knowledge Handoff` section using `references/spec-template.md`. Keep
-the decisions and target surfaces portable and specific enough for the final
-implementation task to update the repository after the behavior lands. This
-section is a deferred-work carrier, not proof that domain docs were captured.
-For multi-repo work, use `<repo-slug>/<repo-relative-path>` for every target and
-repo-local evidence item; never publish an ambiguous bare `CONTEXT.md` or ADR
-path.
+- no machine-local absolute path remains;
+- no runtime worker or App-session setting is present;
+- the source, scope, acceptance, validation, and dependency contract are
+  complete;
+- open questions are empty or proven non-blocking;
+- a present phase-level knowledge delta has explicit portable decisions,
+  targets, and evidence, while no Feature Spec body contains `knowledge_delta`
+  or a `## Domain Knowledge Handoff` section;
+- every knowledge target has one unambiguous repository owner and lies inside
+  the accepted Feature Spec repository/path scope, so the final issue can cover
+  it without a later scope expansion;
+- every multi-repository bundle has exactly one dedicated integration partial
+  with Feature Dependencies covering every implementation
+  partial, and its title or path plus `Partial role: integration` distinguish it
+  from the implementation partial in the same repository;
+- non-App data is absent unless the conditional reference was loaded; when
+  present, exactly one target and one `explicit_instruction_ref` exist in the
+  owning section, and the ref resolves to an authorized-user instruction that
+  selects the same target and scope;
+- the body contains no workflow status field such as `Status: Draft`.
 
-Before returning, writing, or publishing the Feature Spec, run a small documentation
-gate: verify that evidence references are portable, runtime worker settings are
-absent, delivery expectations are not presented as completion proof, open
-questions are explicit, and rationale is sufficient for issue splitting without
-turning the Feature Spec into an implementation plan. Repair the Feature Spec before output when
-this gate fails.
+Withhold the artifact and return blockers when the gate fails.
 
-Do not include workflow status fields such as `Status: Draft` in the Feature Spec body.
-Feature Spec readiness and lifecycle state belong in the issue tracker, mapped labels,
-or the generated implementation issues, not in the Feature Spec content itself.
+### 6. Apply Or Propose
 
-### 4. Choose Publication Target
+This step does not run for `mode=issues-from-existing-spec`; that branch returns
+the unchanged durable source after the dependency and body gates pass.
 
-Read `project-memory/config/issue-tracker.md` for the repo target,
-`project-memory/config/project-layout.md` for topology, and
-`project-memory/config/triage-labels.md` for the mapped `feature` type.
-`references/options.md` solely owns effective-target and local-mirror option
-resolution. After that resolution, `$project-memory`'s
-`references/tracker-publishing.md` owns transient body transport, mirror-path
-application, draft-ref replacement, hosted mutation verification, cleanup, and
-partial recovery. Branch only on the verified target:
+It also performs no write for `mode=spec-only` with a nonempty
+`knowledge_delta`, regardless of the resolved `write_mode`. Return a blocked,
+non-durable preview with deterministic proposed refs and the exact delta as
+report data, state that publication was withheld and no durable source exists,
+and require a later explicit `full-flow` run. Do not silently downgrade
+`write_mode`, persist a delta marker, or publish a source that a later
+`issues-from-existing-spec` run could consume without the payload.
 
-| Target | Feature Spec phase action |
-| --- | --- |
-| `tracker_backend=github`, `effective_target=configured-tracker` | Publish the sanitized `Feature Spec: <Feature Name>` through `$gitstack:github-issues`; apply the mapped feature type when supported. |
-| `tracker_backend=local`, `effective_target=configured-tracker` | Write the resolved path from the Feature Spec Target Model. |
-| `effective_target=local-dry-run` | Return the resolved target, body, deterministic `draft-spec:<...>` ref, and Feature Spec body fingerprint without writing; label the source non-executable. |
-| `effective_target=draft-publish-commands` | Ask `$gitstack:github-issues` for exact commands and return the title, body, identity, deterministic draft ref, and fingerprint; publish the Feature Spec first and replace draft refs before issue mutation. |
+Read tracker and type mappings immediately before output.
 
-For `effective_target=local-dry-run`, Orchestrator may inspect but must not
-dispatch or mutate from the temporary source. Hosted local writes require both
-`effective_target=configured-tracker` and `local_mirror=requested`, and must use
-the validated `local_mirror_path`.
+- `write_mode=apply`, GitHub: publish the sanitized ordinary Feature Spec as
+  `Feature Spec: <Feature Name>` and, for every multi-repository bundle, exactly
+  one dedicated integration partial as
+  `Feature Spec: <Feature Name> - Integration` through
+  `$gitstack:github-issues`. Translate
+  each write to GitStack-owned `mutation_mode=apply`, its exact target, and one
+  canonical `issue_operation`; apply the mapped feature type when supported,
+  verify every mutation, and retain the hosted issue number or URL as
+  `source_spec_ref`. In multi-repository work, store `owner/repository#<number>`
+  or the canonical URL, never a bare issue number.
+- `write_mode=apply`, local: write the resolved Feature Spec path and use that
+  durable path as `source_spec_ref`. Prefix it with `<repository_slug>/` in a
+  multi-repository bundle. A dedicated integration partial and its issues use
+  the distinct `integration/SPEC.md` and `integration/issues/` subtrees beneath
+  the resolved feature directory.
+- `write_mode=propose`: write nothing. Return the sanitized body, intended
+  location, mapped metadata, and deterministic source identity:
+  `proposed-spec:<feature_slug>` for a single Feature Spec,
+  `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,
+  or `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>` for a
+  repo-scoped implementation partial. A dedicated integration partial uses
+  `proposed-spec:<project_slug>/<feature_slug>/<repository_slug>/integration`.
+  Return publication order and state that every proposed source is
+  non-executable until applied.
 
-For a local orchestrator workspace with an accepted parent/global Feature Spec,
-the resolved parent path is
-`orchestration/<project-slug>/features/<feature-slug>/SPEC.md`. This phase may also
-create or update `PROJECT.md`, `repos/<repo-slug>.md`, and
-`integration-gates.md` only from accepted planning sources and must report that
-source. Do not publish repo-scoped child partials in that same parent run.
-Repo-scoped partial Feature Specs use each affected child repo's tracker
-backend in child run(s) that cite the parent source. For child GitHub planning,
-publish linked partial Feature Specs through `$gitstack:github-issues`,
-preserve cross-repo links, and create no local feature artifacts except an
-authorized mirror.
+`write_mode=propose` never invokes GitStack. GitStack does not interpret Plan
+Feature's tracker or write policy.
 
-Derive `<Feature Name>` from the accepted product or short feature phrase; omit
-issue numbers, statuses, and slice names. State concrete repo/workspace scope and topology,
-including affected repos, cross-repo contracts, integration gates, and order
-when material. In every Feature Spec, render the verified delivery tuple through
-`references/spec-template.md`, including the resolved topology, repo/branch/PR shape, and
-integration proof. For child partials in a multi-repo workspace, include
-`workspace_context=multi-repository-workspace` and `workspace_parent_source_ref` in
-the Feature Spec body and phase handoff. Placeholders are expectations, not
-completion proof.
+For hosted publication, use transient transport outside the repository and
+remove it after verified mutation. Do not construct raw mutating commands with
+generated Markdown.
 
-The Feature Spec remains canonical for the feature delivery tuple; the issue phase
-projects it, adds issue-level scheduling/closeout, and validates the graph. For
-GitHub, `$gitstack:github-issues` owns safe body transport, mutation
-verification, cleanup, and recovery; do not construct a mutating `gh issue
-create` command with generated Markdown.
-
-Immediately before hosted publication, reject any remaining machine-local
-absolute path. Hosted mutation is limited to Feature Spec planning-artifact publication
-and metadata; implementation lifecycle and closeout mutations
-belong to `$codex-orchestrator`. If tracker setup is absent, return the Feature Spec in
-chat and recommend `$project-memory` before publication.
-
-### 5. Report Completion
+### 7. Report
 
 Return:
 
-- Feature Spec title,
-- canonical keyed option rows and option-resolution evidence, including any
-  execution-profile widening reason,
-- `option_rows_fingerprint`,
-- authoritative `feature_slug`,
-- the structured delivery handoff tuple: `change_delivery_target`, `repository_layout`,
-  `child_repository_layout`, `workspace_context`, `workspace_parent_source_ref`,
-  `workspace_feature_repos`, `change_delivery_permission`,
-  `change_delivery_permission_evidence`,
-  `issue_update_permission`, `issue_update_permission_evidence`,
-  `codex_review_requirement`, `target_branch_name`, and
-  `pull_request_count_strategy`,
-- the validated `feature_dependencies` rows plus ref-resolution and acyclicity
-  evidence, or `none` for an empty table,
-- `workspace_child_source_refs` mapping each `workspace_feature_repos` repo to
-  its child partial Feature Spec ref only after the child partial artifact set
-  exists. Keys are canonical repo slugs and must match
-  `workspace_feature_repos`. A parent/global run or first-pass child run
-  returns `workspace_child_source_refs=unresolved-first-pass` or omits it, and
-  is not issue-ready by itself,
-- product/workspace/context or orchestrator project identity used, when
-  applicable,
-- that issue ordering and dependency graph validation are delegated to the
-  issue phase,
-- target location or "chat only",
-- `local_mirror` result and `local_mirror_path`,
-- `source_spec_ref` for the issue phase,
-- Feature Spec body fingerprint when `source_spec_ref` is a `draft-spec:<...>` value,
-- issue type applied, when the tracker supports it,
-- support docs created or updated and the accepted source used for each, when
-  applicable,
-- any open questions,
-- `knowledge_delta`, `capture_outcome`, and whether the Feature Spec contains a
-  `## Domain Knowledge Handoff`,
-- whether it is ready for the issue phase to create generated implementation
-  issues.
+- title, feature slug, source ref, and intended or actual location;
+- `mode`, `write_mode`, tracker backend, repository layout, and selected
+  context identity;
+- affected repositories, allowed paths, and each per-Spec target branch;
+- validated Feature Spec dependencies and acyclicity result;
+- workspace parent/child refs and publication order when applicable;
+- issue type applied or proposed;
+- open blockers and withheld output;
+- derived domain capture outcome and future closeout owner;
+- explicit App incompatibility when a non-App target is present.
 
-When reading a legacy Feature Spec during an intentional update, a missing
-`## Feature Dependencies` section means zero authored cross-Spec edges and no
-early-stack permission. Add the mandatory empty section to the updated output;
-never recover dependency edges from prose.
-
-## Evidence And Phase Metrics
-
-Read each unchanged source body once. Keep a compact working index containing
-its portable path/ref, fingerprint, and relevant headings. After drafting or
-repairing the Feature Spec, carry only the target path/ref, body fingerprint, changed
-headings, and failed-gate excerpts between passes. Re-open or emit the complete
-body only when its fingerprint changed, a gate requires the relevant section,
-the effective target is chat/draft output, or final publication needs it.
-
-For configured local or hosted targets, completion output should identify the
-Feature Spec and its fingerprint instead of repeating the complete body. Draft/chat
-output still returns the requested body.
-
-When root-scoped runtime token counters cover an uncontaminated Feature Spec interval,
-capture start and end checkpoints and return:
-
-```text
-phase=spec
-tokens=<exact delta|unavailable>
-references_loaded=<paths actually opened>
-artifact=<source_spec_ref>; fingerprint=<sha256 or hosted revision>
-full_body_emitted=<no|chat-output|draft-output|publication|gate-failure>
-```
-
-If the interval contains other activity, label its delta `exact-interval` and
-do not attribute it to the Feature Spec phase. If exact counters are unavailable, record
-`tokens=unavailable` once without probing session archives, estimating from
-text size, or blocking the phase.
-
-## Guardrails
-
-- Do not hide uncertainty. Put unresolved decisions in `## Open Questions`.
-- Do not make the Feature Spec a broad architecture plan; keep implementation details at
-  the level needed for issue splitting.
-- Do not create implementation issues from the Feature Spec in this phase.
-- Do not treat the Feature Spec's `## Domain Knowledge Handoff` as completed durable
-  capture.
-- Preserve existing Feature Spec content when updating a local Feature Spec file; revise only the
-  sections needed for the current source material.
-- Do not leak developer-machine paths in Feature Spec evidence, source, or publication
-  output. Use repo-relative, sibling-repo-relative, hosted, or descriptive
-  sanitized references.
-
-## References
-
-- `references/spec-template.md`: default Feature Spec shape.
-- `$project-memory`'s `references/tracker-publishing.md`: shared tracker
-  publication and `source_spec_ref` contract.
+When `knowledge_delta` is present, report `capture_outcome=deferred`. In
+`mode=spec-only`, return the exact delta as non-persisted report data and report
+`future_closeout_issue_source_spec_ref: <source_spec_ref>` for a single Spec or
+`future_closeout_issue_source_spec_ref: <integration_source_spec_ref>` for a
+multi-repository bundle. The latter must be the dedicated integration partial's
+ref, never the parent or an ordinary partial ref. This is report data identifying
+the future issue's owning Spec, not a task ref or selectable field. State that
+publication was withheld, no durable source was created, and the standalone
+preview is not App-executable until a later explicit `full-flow` run carries the
+exact delta and persists it on its final issue. In `full-flow`, pass the delta
+directly to the issue phase. Otherwise report
+`capture_outcome=no-durable-change`. The result is report-only; this phase never
+persists it in the Feature Spec or reports domain knowledge as captured.
