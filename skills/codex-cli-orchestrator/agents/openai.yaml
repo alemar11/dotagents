@@ -1,0 +1,7 @@
+interface:
+  display_name: "Codex CLI Orchestrator"
+  short_description: "Coordinate tmux-hosted Codex CLI Feature Spec sessions with root-owned delivery."
+  brand_color: "#7F5AF0"
+  default_prompt: "Use $codex-cli-orchestrator only for explicit CLI orchestration. Keep this interactive CLI session as root, claim the shared ledger, create one isolated tmux-hosted Codex CLI session per Feature Spec, monitor structured artifacts instead of panes, and keep Git integration, review, publication, and closeout root-owned. Never create or steer visible Codex App tasks."
+policy:
+  allow_implicit_invocation: false

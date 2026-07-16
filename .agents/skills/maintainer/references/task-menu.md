@@ -86,14 +86,14 @@ maintenance request needs to be routed to a concrete task.
      TanStack-owned docs before updating local runtime guidance.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 12. `refresh codex tool surface`
-   - Inspect the currently exposed Codex subagent and Codex App thread tools,
+   - Inspect the currently exposed Codex subagent and Codex App task tools,
      including spawn, wait, send/resume/close, create-thread,
      read/rename/archive/handoff, and related lifecycle operations.
-   - Compare the discovered surface against `skills/codex-orchestrator/`
-     runtime requirements, worker-surface rules, and prompt templates.
-   - Update `codex-orchestrator` only when the actual tool names, visibility
-     behavior, lifecycle capabilities, or authorization boundaries have
-     materially changed.
+   - Inspect Codex CLI exec/resume, structured output, tmux, and session-id
+     behavior separately.
+   - Compare App changes against `skills/codex-orchestrator/` and CLI changes
+     against `skills/codex-cli-orchestrator/`; never add the other adapter's
+     machinery to either public runtime path.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 13. `refresh okf spec`
    - Check `skills/okf/assets/manifest.json` and the bundled official spec copy

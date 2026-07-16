@@ -1,0 +1,1876 @@
+#!/usr/bin/env python3
+"""Supervise tmux-hosted Codex CLI Feature Spec sessions."""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import fcntl
+import hashlib
+import importlib.machinery
+import importlib.util
+import json
+import os
+import re
+import signal
+import shlex
+import shutil
+import subprocess
+import sys
+import time
+import uuid
+from pathlib import Path
+from typing import Any
+
+__version__ = "0.5.0"
+SCHEMA_VERSION = "1.0.0"
+CLAIM_HEARTBEAT_SECONDS = 30
+_CLAIM_RUNTIME: Any = None
+ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+GLOBAL_SOURCE_RE = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$")
+SLOT_STATES = {
+    "preparing",
+    "prepare-failed",
+    "prepared",
+    "running",
+    "succeeded",
+    "failed",
+    "stopped",
+    "cleaning",
+    "cleanup-blocked",
+}
+REPORT_FIELDS = {
+    "result_status",
+    "summary",
+    "changed_files",
+    "validation",
+    "generated_artifacts",
+    "internal_subagents",
+    "risks",
+    "blockers",
+    "recommended_root_action",
+}
+
+
+class CliError(Exception):
+    def __init__(self, code: str, message: str, exit_code: int, details: Any = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.exit_code = exit_code
+        self.details = details or {}
+
+
+def cache_root() -> Path:
+    override = os.environ.get("CODEX_CLI_ORCHESTRATOR_CACHE")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path.home() / ".cache/dotagents/skills/codex-cli-orchestrator/runs"
+
+
+def shared_claim_tool() -> Path:
+    return Path(__file__).resolve().parents[2] / "codex-orchestrator/scripts/orchestrator-claim"
+
+
+def shared_claim_root() -> Path:
+    override = os.environ.get("CODEX_ORCHESTRATOR_CLAIM_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path.home() / ".cache/dotagents/skills/codex-orchestrator/claims"
+
+
+def canonical_worker_schema_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "assets/worker-output-schema.json"
+
+
+def shared_claim_runtime() -> Any:
+    global _CLAIM_RUNTIME
+    if _CLAIM_RUNTIME is None:
+        tool = shared_claim_tool()
+        loader = importlib.machinery.SourceFileLoader("_codex_orchestrator_claim_runtime", str(tool))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        if spec is None:
+            raise CliError("invalid-input", f"cannot load shared claim helper: {tool}", 2)
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+        _CLAIM_RUNTIME = module
+    return _CLAIM_RUNTIME
+
+
+def new_cli_claim_root_id(run_id: str) -> str:
+    check_id(run_id, "run_id")
+    return f"cli-{run_id}-{uuid.uuid4()}"
+
+
+def invoke_shared_claim(arguments: list[str]) -> dict[str, Any]:
+    tool = shared_claim_tool()
+    if not tool.is_file() or not os.access(tool, os.X_OK):
+        raise CliError("invalid-input", f"missing executable shared claim helper: {tool}", 2)
+    result = subprocess.run([str(tool), "--json", *arguments], text=True, capture_output=True)
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise CliError(
+            "state-conflict",
+            "shared claim helper returned invalid JSON",
+            4,
+            {"returncode": result.returncode, "stderr": result.stderr[-2000:]},
+        ) from exc
+    if result.returncode:
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        raise CliError(
+            error.get("code", "state-conflict"),
+            error.get("message", "shared claim helper failed"),
+            result.returncode,
+            error.get("details", {}),
+        )
+    if not isinstance(payload, dict) or not payload.get("ok"):
+        raise CliError("state-conflict", "shared claim helper returned an invalid success payload", 4)
+    return payload
+
+
+def acquire_run_claim(manifest: dict[str, Any], root_id: str) -> dict[str, Any]:
+    arguments = [
+        "claim",
+        "acquire",
+        "--root-id",
+        root_id,
+        "--adapter",
+        "codex-cli-session",
+        "--ledger-ref",
+        manifest["ledger_path"],
+    ]
+    repositories = sorted(
+        {repo["source_path"] for spec in manifest["feature_specs"] for repo in spec["repositories"]}
+    )
+    sources: set[str] = set()
+    for spec in manifest["feature_specs"]:
+        spec_ref = spec["spec_ref"]
+        if not GLOBAL_SOURCE_RE.fullmatch(spec_ref):
+            for repo in spec["repositories"]:
+                repository = resolved_git_path(Path(repo["source_path"]), "--git-common-dir")
+                sources.add(f"git:{repository}::ref:{spec_ref}")
+        else:
+            sources.add(spec_ref)
+    for repository in repositories:
+        arguments.extend(["--repository", repository])
+    for source in sorted(sources):
+        arguments.extend(["--source", source])
+    return invoke_shared_claim(arguments)
+
+
+def release_run_claim(root_id: str, fingerprint: str, evidence: str) -> dict[str, Any]:
+    check_id(root_id, "atomic_claim_root_id")
+    return invoke_shared_claim(
+        [
+            "claim",
+            "release",
+            "--root-id",
+            root_id,
+            "--expected-fingerprint",
+            fingerprint,
+            "--evidence",
+            evidence,
+        ]
+    )
+
+
+def release_or_confirm_absent(root_id: str, fingerprint: str, evidence: str) -> dict[str, Any]:
+    try:
+        return release_run_claim(root_id, fingerprint, evidence)
+    except CliError as exc:
+        if exc.code != "not-found":
+            raise
+        return {
+            "ok": True,
+            "command": "claim.release",
+            "state": "already-released",
+            "root_id": root_id,
+            "evidence": evidence,
+        }
+
+
+def run_claim_identity(run_id: str) -> tuple[str, str] | None:
+    state = load_json(run_dir(run_id) / "status.json")
+    if not isinstance(state, dict):
+        raise CliError("state-conflict", "run status is invalid", 4)
+    if state.get("atomic_claim_state") == "released":
+        return None
+    root_id = state.get("atomic_claim_root_id")
+    fingerprint = state.get("atomic_claim_fingerprint")
+    if not isinstance(root_id, str) or not isinstance(fingerprint, str):
+        raise CliError("state-conflict", "run is missing its atomic claim identity", 4)
+    check_id(root_id, "atomic_claim_root_id")
+    return root_id, fingerprint
+
+
+def heartbeat_run_claim(run_id: str) -> dict[str, Any] | None:
+    identity = run_claim_identity(run_id)
+    if identity is None:
+        return None
+    root_id, fingerprint = identity
+    return invoke_shared_claim(
+        [
+            "claim",
+            "heartbeat",
+            "--root-id",
+            root_id,
+            "--expected-fingerprint",
+            fingerprint,
+        ]
+    )
+
+
+@contextlib.contextmanager
+def run_claim_lease(run_id: str):
+    identity = run_claim_identity(run_id)
+    if identity is None:
+        raise CliError("state-conflict", "run claim is already released", 4)
+    root_id, fingerprint = identity
+    runtime = shared_claim_runtime()
+    try:
+        with runtime.ownership_lease(root_id, fingerprint):
+            yield
+    except runtime.ClaimError as exc:
+        raise CliError(exc.code, exc.message, exc.exit_code, exc.details) from exc
+
+
+def owned_write_json(run_id: str, path: Path, value: Any) -> None:
+    with run_claim_lease(run_id):
+        write_json(path, value)
+
+
+def owned_command(run_id: str, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    with run_claim_lease(run_id):
+        return command(args, check=check)
+
+
+def owned_mkdir(run_id: str, path: Path) -> None:
+    with run_claim_lease(run_id):
+        path.mkdir(parents=True, exist_ok=True)
+
+
+def run_dir(run_id: str) -> Path:
+    check_id(run_id, "run_id")
+    return cache_root() / run_id
+
+
+def spec_dir(run_id: str, spec_id: str) -> Path:
+    check_id(spec_id, "spec_id")
+    return run_dir(run_id) / "specs" / spec_id
+
+
+def check_id(value: str, field: str) -> None:
+    if not ID_RE.fullmatch(value):
+        raise CliError("invalid-input", f"{field} is not canonical: {value}", 2)
+
+
+def load_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError as exc:
+        raise CliError("invalid-input", f"missing file: {path}", 2) from exc
+    except json.JSONDecodeError as exc:
+        raise CliError("invalid-input", f"invalid JSON in {path}: {exc}", 2) from exc
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    temporary.replace(path)
+
+
+def absolute_path(value: Any, field: str) -> Path:
+    if not isinstance(value, str) or not Path(value).is_absolute():
+        raise CliError("invalid-input", f"{field} must be an absolute path", 2)
+    return Path(value).resolve()
+
+
+def manifest_for(run_id: str) -> dict[str, Any]:
+    path = run_dir(run_id) / "manifest.json"
+    return validate_manifest(load_json(path))
+
+
+def find_spec(manifest: dict[str, Any], spec_id: str) -> dict[str, Any]:
+    for spec in manifest["feature_specs"]:
+        if spec["spec_id"] == spec_id:
+            return spec
+    raise CliError("invalid-input", f"unknown spec_id: {spec_id}", 2)
+
+
+def validate_manifest(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise CliError("invalid-input", "manifest must be an object", 2)
+    value = json.loads(json.dumps(value))
+    required = {
+        "schema_version",
+        "run_id",
+        "root_cwd",
+        "worktree_root",
+        "ledger_path",
+        "feature_specs",
+    }
+    unknown = set(value) - required
+    missing = required - set(value)
+    if unknown or missing:
+        raise CliError(
+            "invalid-input",
+            "manifest fields do not match the canonical schema",
+            2,
+            {"unknown": sorted(unknown), "missing": sorted(missing)},
+        )
+    if value["schema_version"] != SCHEMA_VERSION:
+        raise CliError("invalid-input", "unsupported schema_version", 2)
+    check_id(value["run_id"], "run_id")
+    root_cwd = absolute_path(value["root_cwd"], "root_cwd")
+    worktree_root = absolute_path(value["worktree_root"], "worktree_root")
+    ledger_path = absolute_path(value["ledger_path"], "ledger_path")
+    value["root_cwd"] = str(root_cwd)
+    value["worktree_root"] = str(worktree_root)
+    value["ledger_path"] = str(ledger_path)
+    if not root_cwd.is_dir():
+        raise CliError("invalid-input", f"root_cwd is not a directory: {root_cwd}", 2)
+    if root_cwd not in worktree_root.parents:
+        raise CliError("invalid-input", "worktree_root must be a strict descendant of root_cwd", 2)
+    if not ledger_path.is_file():
+        raise CliError("invalid-input", f"ledger_path is not a file: {ledger_path}", 2)
+    if not isinstance(value["feature_specs"], list) or not value["feature_specs"]:
+        raise CliError("invalid-input", "feature_specs must be a non-empty array", 2)
+    seen_specs: set[str] = set()
+    branch_owners: set[tuple[str, str]] = set()
+    for spec in value["feature_specs"]:
+        expected = {
+            "spec_id",
+            "spec_ref",
+            "spec_title",
+            "prompt_path",
+            "output_schema_path",
+            "repositories",
+        }
+        if not isinstance(spec, dict) or set(spec) != expected:
+            raise CliError("invalid-input", "Feature Spec fields are not canonical", 2)
+        check_id(spec["spec_id"], "spec_id")
+        if spec["spec_id"] in seen_specs:
+            raise CliError("invalid-input", f"duplicate spec_id: {spec['spec_id']}", 2)
+        seen_specs.add(spec["spec_id"])
+        for field in ("spec_ref", "spec_title"):
+            if not isinstance(spec[field], str) or not spec[field].strip():
+                raise CliError("invalid-input", f"{field} must be non-empty", 2)
+        prompt_path = absolute_path(spec["prompt_path"], "prompt_path")
+        output_schema_path = absolute_path(spec["output_schema_path"], "output_schema_path")
+        spec["prompt_path"] = str(prompt_path)
+        spec["output_schema_path"] = str(output_schema_path)
+        if not prompt_path.is_file() or not output_schema_path.is_file():
+            raise CliError("invalid-input", "prompt and output schema files must exist", 2)
+        if output_schema_path != canonical_worker_schema_path():
+            raise CliError(
+                "invalid-input",
+                "output_schema_path must reference the shipped worker-output-schema.json",
+                2,
+            )
+        repos = spec["repositories"]
+        if not isinstance(repos, list) or not repos:
+            raise CliError("invalid-input", "repositories must be a non-empty array", 2)
+        seen_repos: set[str] = set()
+        for repo in repos:
+            expected_repo = {
+                "repo_id",
+                "source_path",
+                "base_ref",
+                "target_branch",
+            }
+            if not isinstance(repo, dict) or set(repo) != expected_repo:
+                raise CliError("invalid-input", "repository fields are not canonical", 2)
+            check_id(repo["repo_id"], "repo_id")
+            if repo["repo_id"] in seen_repos:
+                raise CliError("invalid-input", f"duplicate repo_id: {repo['repo_id']}", 2)
+            seen_repos.add(repo["repo_id"])
+            source = absolute_path(repo["source_path"], "source_path")
+            repo["source_path"] = str(source)
+            if not (source / ".git").exists():
+                raise CliError("invalid-input", f"source_path is not a Git checkout: {source}", 2)
+            for field in ("base_ref", "target_branch"):
+                if not isinstance(repo[field], str) or not repo[field].strip():
+                    raise CliError("invalid-input", f"{field} must be non-empty", 2)
+            try:
+                repository_identity = resolved_git_path(source, "--git-common-dir")
+            except CliError as exc:
+                raise CliError("invalid-input", f"cannot resolve Git repository identity: {source}", 2) from exc
+            owner = (str(repository_identity), repo["target_branch"])
+            if owner in branch_owners:
+                raise CliError("invalid-input", "target branch is shared across Specs", 2)
+            branch_owners.add(owner)
+            if (
+                source == worktree_root
+                or source in worktree_root.parents
+                or worktree_root in source.parents
+            ):
+                raise CliError("invalid-input", "worktree_root overlaps a source checkout", 2)
+    return value
+
+
+def command(args: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True)
+    if check and result.returncode:
+        raise CliError(
+            "subprocess-failure",
+            f"command failed: {shlex.join(args)}",
+            5,
+            {"returncode": result.returncode, "stderr": result.stderr[-2000:]},
+        )
+    return result
+
+
+def resolved_git_path(checkout: Path, argument: str) -> Path:
+    value = command(["git", "-C", str(checkout), "rev-parse", argument]).stdout.strip()
+    path = Path(value)
+    return path.resolve() if path.is_absolute() else (checkout / path).resolve()
+
+
+def registered_worktrees(source: Path) -> set[Path]:
+    result = command(["git", "-C", str(source), "worktree", "list", "--porcelain"])
+    return {
+        Path(line.removeprefix("worktree ")).resolve()
+        for line in result.stdout.splitlines()
+        if line.startswith("worktree ")
+    }
+
+
+def validate_worktree_identity(
+    source: Path,
+    path: Path,
+    target_branch: str,
+    *,
+    error_code: str = "state-conflict",
+    exit_code: int = 4,
+) -> None:
+    result = command(["git", "-C", str(path), "rev-parse", "--show-toplevel"], check=False)
+    if result.returncode or Path(result.stdout.strip()).resolve() != path.resolve():
+        raise CliError(error_code, f"conflicting worktree path: {path}", exit_code)
+    source_common = resolved_git_path(source, "--git-common-dir")
+    path_common = resolved_git_path(path, "--git-common-dir")
+    branch = command(["git", "-C", str(path), "symbolic-ref", "--quiet", "--short", "HEAD"], check=False)
+    if (
+        source_common != path_common
+        or branch.returncode
+        or branch.stdout.strip() != target_branch
+        or path.resolve() not in registered_worktrees(source)
+    ):
+        raise CliError(
+            error_code,
+            f"existing worktree identity does not match manifest: {path}",
+            exit_code,
+        )
+
+
+def validate_spec_worktrees(manifest: dict[str, Any], spec: dict[str, Any], *, cleanup: bool = False) -> list[dict[str, Any]]:
+    root = Path(manifest["worktree_root"]) / spec["spec_id"]
+    validated = []
+    for repo in spec["repositories"]:
+        path = root / repo["repo_id"]
+        if not path.exists():
+            raise CliError(
+                "unsafe-cleanup" if cleanup else "state-conflict",
+                f"missing prepared worktree: {path}",
+                6 if cleanup else 4,
+            )
+        validate_worktree_identity(
+            Path(repo["source_path"]),
+            path,
+            repo["target_branch"],
+            error_code="unsafe-cleanup" if cleanup else "state-conflict",
+            exit_code=6 if cleanup else 4,
+        )
+        validated.append({"repo": repo, "path": path})
+    return validated
+
+
+@contextlib.contextmanager
+def run_lock(run_id: str):
+    path = run_dir(run_id) / ".lock"
+    with path.open("a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+@contextlib.contextmanager
+def run_creation_lock(run_id: str):
+    check_id(run_id, "run_id")
+    lock_root = cache_root() / ".locks"
+    lock_root.mkdir(parents=True, exist_ok=True)
+    with (lock_root / f"{run_id}.lock").open("a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def tmux_session(run_id: str) -> str:
+    storage_identity = str(run_dir(run_id).resolve())
+    digest = hashlib.sha256(storage_identity.encode()).hexdigest()[:12]
+    return f"codex-orch-{run_id[:36]}-{digest}"
+
+
+def tmux_window(spec_id: str) -> str:
+    digest = hashlib.sha256(spec_id.encode()).hexdigest()[:10]
+    return f"spec-{spec_id[:40]}-{digest}"
+
+
+def has_tmux_target(target: str) -> bool:
+    return command(["tmux", "has-session", "-t", target], check=False).returncode == 0
+
+
+def process_group_members(pgid: Any) -> list[dict[str, Any]]:
+    if not isinstance(pgid, int) or pgid <= 0:
+        return []
+    observed = subprocess.run(
+        ["ps", "-axo", "pid=,pgid=,stat=,lstart="],
+        text=True,
+        capture_output=True,
+    )
+    if observed.returncode == 0:
+        members = []
+        for line in observed.stdout.splitlines():
+            fields = line.split(None, 3)
+            if (
+                len(fields) == 4
+                and fields[0].isdigit()
+                and fields[1].isdigit()
+                and int(fields[1]) == pgid
+                and not fields[2].startswith("Z")
+            ):
+                members.append({"pid": int(fields[0]), "started_at": fields[3].strip()})
+        return members
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return []
+    except PermissionError:
+        return [{"pid": pgid, "started_at": None}]
+    return [{"pid": pgid, "started_at": None}]
+
+
+def process_started_at(pid: int) -> str | None:
+    observed = subprocess.run(
+        ["ps", "-o", "lstart=", "-p", str(pid)],
+        text=True,
+        capture_output=True,
+    )
+    value = observed.stdout.strip() if observed.returncode == 0 else ""
+    return value or None
+
+
+def process_group_live(pgid: Any, leader_started_at: str | None = None) -> bool:
+    members = process_group_members(pgid)
+    if leader_started_at:
+        leader = next((member for member in members if member["pid"] == pgid), None)
+        if (
+            leader is not None
+            and leader["started_at"] is not None
+            and leader["started_at"] != leader_started_at
+        ):
+            return False
+    return bool(members)
+
+
+def persistent_anchor_snapshot(pgid: int, leader_started_at: str) -> tuple[str, list[dict[str, Any]]]:
+    members = process_group_members(pgid)
+    if not members:
+        return "not-running", members
+    leader = next((member for member in members if member["pid"] == pgid), None)
+    if leader is None or leader["started_at"] is None:
+        return "unverifiable", members
+    if leader["started_at"] != leader_started_at:
+        return "reused-pgid", members
+    return "matching-anchor", members
+
+
+def terminate_anchored_process_group(
+    pgid: int,
+    *,
+    leader_started_at: str,
+    require_death: bool = False,
+) -> bool:
+    """Signal a group whose matching leader is contractually persistent."""
+    identity, members = persistent_anchor_snapshot(pgid, leader_started_at)
+    if identity in {"not-running", "reused-pgid"}:
+        return True
+    if identity != "matching-anchor":
+        return False
+    try:
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        identity, _ = persistent_anchor_snapshot(pgid, leader_started_at)
+        return identity in {"not-running", "reused-pgid"}
+    except PermissionError:
+        return False
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        identity, members = persistent_anchor_snapshot(pgid, leader_started_at)
+        if identity in {"not-running", "reused-pgid"}:
+            return True
+        if identity != "matching-anchor":
+            return False
+        if all(member["pid"] == pgid for member in members):
+            break
+        time.sleep(0.05)
+    identity, _ = persistent_anchor_snapshot(pgid, leader_started_at)
+    if identity in {"not-running", "reused-pgid"}:
+        return True
+    if identity != "matching-anchor":
+        return False
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        return True
+    except PermissionError:
+        return False
+    deadline = None if require_death else time.monotonic() + 2
+    while process_group_live(pgid, leader_started_at):
+        if deadline is not None and time.monotonic() >= deadline:
+            return False
+        time.sleep(0.05)
+    return True
+
+
+def read_status(run_id: str, spec_id: str) -> dict[str, Any]:
+    path = spec_dir(run_id, spec_id) / "status.json"
+    if path.exists():
+        status = load_json(path)
+    else:
+        status = {"state": "declared"}
+    target = f"{tmux_session(run_id)}:{tmux_window(spec_id)}"
+    status["tmux_live"] = has_tmux_target(target) if shutil.which("tmux") else False
+    pgid = status.get("worker_pgid")
+    leader_started_at = status.get("worker_leader_started_at")
+    group_model = status.get("worker_group_model")
+    members = process_group_members(pgid)
+    if members and (not leader_started_at or group_model != "persistent-anchor-v1"):
+        status["worker_process_identity"] = "unverifiable"
+        status["worker_process_live"] = True
+    elif members:
+        leader = next((member for member in members if member["pid"] == pgid), None)
+        if leader is None or leader["started_at"] is None:
+            status["worker_process_identity"] = "unverifiable"
+            status["worker_process_live"] = True
+        elif leader is not None and leader["started_at"] != leader_started_at:
+            status["worker_process_identity"] = "reused-pgid"
+            status["worker_process_live"] = False
+        else:
+            status["worker_process_identity"] = "matching-incarnation"
+            status["worker_process_live"] = True
+    else:
+        status["worker_process_identity"] = "not-running"
+        status["worker_process_live"] = False
+    if status.get("state") == "running" and not status["tmux_live"]:
+        if status["worker_process_live"]:
+            status["recovery_reason"] = "tmux-window-not-live-worker-still-running"
+        else:
+            status["persisted_state"] = "running"
+            status["state"] = "stopped"
+            status["recovery_reason"] = "tmux-window-not-live"
+    session_path = spec_dir(run_id, spec_id) / "codex_session_id"
+    status["codex_session_id"] = session_path.read_text().strip() if session_path.exists() else None
+    return status
+
+
+def response(command_name: str, run_id: str | None = None, spec_id: str | None = None, **extra: Any) -> dict[str, Any]:
+    value: dict[str, Any] = {"ok": True, "command": command_name}
+    if run_id is not None:
+        value["run_id"] = run_id
+    if spec_id is not None:
+        value["spec_id"] = spec_id
+    value.update(extra)
+    return value
+
+
+def doctor() -> dict[str, Any]:
+    tools = {}
+    for name in ("python3", "git", "ps", "tmux", "codex"):
+        path = shutil.which(name)
+        tools[name] = {"available": path is not None, "path": path}
+    skill_root = Path(__file__).resolve().parents[1]
+    core_root = skill_root.parent / "codex-orchestrator" / "references"
+    required = [
+        "core/options.md",
+        "ledger.md",
+        "gates.md",
+        "spec-backed-delivery.md",
+    ]
+    shared = {name: (core_root / name).is_file() for name in required}
+    claim_tool = shared_claim_tool()
+    claim_helper = {
+        "available": claim_tool.is_file() and os.access(claim_tool, os.X_OK),
+        "path": str(claim_tool),
+    }
+    return {
+        "ok": all(item["available"] for item in tools.values())
+        and all(shared.values())
+        and claim_helper["available"],
+        "command": "doctor",
+        "version": __version__,
+        "offline": True,
+        "auth_required": False,
+        "tools": tools,
+        "shared_core": {"path": str(core_root), "files": shared},
+        "claim_helper": claim_helper,
+    }
+
+
+def create_run(manifest_path: Path) -> dict[str, Any]:
+    manifest = validate_manifest(load_json(manifest_path))
+    with run_creation_lock(manifest["run_id"]):
+        return create_reserved_run(manifest)
+
+
+def create_reserved_run(manifest: dict[str, Any]) -> dict[str, Any]:
+    root = run_dir(manifest["run_id"])
+    if root.exists():
+        raise CliError("state-conflict", f"run already exists: {manifest['run_id']}", 4)
+    claim_root_id = new_cli_claim_root_id(manifest["run_id"])
+    atomic_claim = acquire_run_claim(manifest, claim_root_id)
+    try:
+        (root / "specs").mkdir(parents=True)
+        write_json(root / "manifest.json", manifest)
+        write_json(
+            root / "status.json",
+            {
+                "state": "created",
+                "atomic_claim_root_id": claim_root_id,
+                "atomic_claim_fingerprint": atomic_claim["claim"]["fingerprint"],
+            },
+        )
+        for spec in manifest["feature_specs"]:
+            directory = root / "specs" / spec["spec_id"]
+            directory.mkdir()
+            write_json(directory / "status.json", {"state": "declared"})
+    except Exception:
+        if root.is_symlink():
+            root.unlink()
+        elif root.exists():
+            shutil.rmtree(root)
+        release_run_claim(
+            claim_root_id,
+            atomic_claim["claim"]["fingerprint"],
+            f"run-create-rollback:{manifest['run_id']}",
+        )
+        raise
+    return response(
+        "run.create",
+        manifest["run_id"],
+        state="created",
+        path=str(root),
+        atomic_claim=atomic_claim["claim"],
+    )
+
+
+def prepare_spec(run_id: str, spec_id: str) -> dict[str, Any]:
+    with run_lock(run_id):
+        heartbeat_run_claim(run_id)
+        manifest = manifest_for(run_id)
+        spec = find_spec(manifest, spec_id)
+        status = read_status(run_id, spec_id)
+        if status["state"] != "declared":
+            raise CliError("state-conflict", f"cannot prepare from {status['state']}", 4)
+        if active_count(run_id, spec_id) >= 3:
+            raise CliError("state-conflict", "three Feature Spec executions are already nonterminal", 4)
+        root = Path(manifest["worktree_root"]) / spec_id
+        prepared_repo_ids: list[str] = []
+        worktrees = []
+        preparing_repo_id = None
+        owned_write_json(
+            run_id,
+            spec_dir(run_id, spec_id) / "status.json",
+            {"state": "preparing", "prepared_repo_ids": prepared_repo_ids, "worktrees": worktrees},
+        )
+        try:
+            owned_mkdir(run_id, root)
+            for repo in spec["repositories"]:
+                preparing_repo_id = repo["repo_id"]
+                owned_write_json(
+                    run_id,
+                    spec_dir(run_id, spec_id) / "status.json",
+                    {
+                        "state": "preparing",
+                        "prepared_repo_ids": prepared_repo_ids,
+                        "preparing_repo_id": preparing_repo_id,
+                        "worktrees": worktrees,
+                    },
+                )
+                source = Path(repo["source_path"])
+                path = root / repo["repo_id"]
+                if path.exists():
+                    validate_worktree_identity(source, path, repo["target_branch"])
+                else:
+                    branch_exists = command(
+                        ["git", "-C", str(source), "show-ref", "--verify", "--quiet", f"refs/heads/{repo['target_branch']}"],
+                        check=False,
+                    ).returncode == 0
+                    args = ["git", "-C", str(source), "worktree", "add"]
+                    if branch_exists:
+                        args += [str(path), repo["target_branch"]]
+                    else:
+                        args += ["-b", repo["target_branch"], str(path), repo["base_ref"]]
+                    owned_command(run_id, args)
+                prepared_repo_ids.append(repo["repo_id"])
+                worktrees.append({"repo_id": repo["repo_id"], "path": str(path), "branch": repo["target_branch"]})
+                preparing_repo_id = None
+                owned_write_json(
+                    run_id,
+                    spec_dir(run_id, spec_id) / "status.json",
+                    {"state": "preparing", "prepared_repo_ids": prepared_repo_ids, "worktrees": worktrees},
+                )
+        except Exception as exc:
+            owned_write_json(
+                run_id,
+                spec_dir(run_id, spec_id) / "status.json",
+                {
+                    "state": "prepare-failed",
+                    "prepared_repo_ids": prepared_repo_ids,
+                    "preparing_repo_id": preparing_repo_id,
+                    "worktrees": worktrees,
+                    "reason": exc.code if isinstance(exc, CliError) else "prepare-failed",
+                },
+            )
+            raise
+        owned_write_json(
+            run_id,
+            spec_dir(run_id, spec_id) / "status.json",
+            {"state": "prepared", "worktrees": worktrees},
+        )
+    return response("spec.prepare", run_id, spec_id, state="prepared", worktrees=worktrees)
+
+
+def active_count(run_id: str, exclude: str | None = None) -> int:
+    manifest = manifest_for(run_id)
+    count = 0
+    for spec in manifest["feature_specs"]:
+        if spec["spec_id"] == exclude:
+            continue
+        state = read_status(run_id, spec["spec_id"])["state"]
+        if state in SLOT_STATES:
+            count += 1
+    return count
+
+
+def launch_window(run_id: str, spec_id: str, resume: bool) -> dict[str, Any]:
+    with run_lock(run_id):
+        heartbeat_run_claim(run_id)
+        manifest = manifest_for(run_id)
+        spec = find_spec(manifest, spec_id)
+        validate_spec_worktrees(manifest, spec)
+        status = read_status(run_id, spec_id)
+        allowed = {"prepared"} if not resume else {"succeeded", "failed", "stopped"}
+        if status["state"] not in allowed:
+            raise CliError("state-conflict", f"cannot {'resume' if resume else 'start'} from {status['state']}", 4)
+        if resume:
+            session_id = recover_session_id(spec_dir(run_id, spec_id))
+            if not session_id:
+                raise CliError(
+                    "state-conflict",
+                    "cannot resume without a valid recorded Codex session UUID",
+                    4,
+                )
+        if active_count(run_id, spec_id) >= 3:
+            raise CliError("state-conflict", "three Feature Spec executions are already nonterminal", 4)
+        session = tmux_session(run_id)
+        if not has_tmux_target(session):
+            owned_command(run_id, ["tmux", "new-session", "-d", "-s", session, "-n", "control"])
+        window = tmux_window(spec_id)
+        target = f"{session}:{window}"
+        if has_tmux_target(target):
+            raise CliError("state-conflict", f"tmux window is already live: {target}", 4)
+        invocation = [
+            str(Path(__file__).resolve()),
+            "_launch",
+            "--run-id",
+            run_id,
+            "--spec-id",
+            spec_id,
+            "--cache-root",
+            str(cache_root()),
+            "--claim-root",
+            str(shared_claim_root()),
+        ]
+        if resume:
+            invocation.append("--resume")
+        owned_write_json(
+            run_id,
+            spec_dir(run_id, spec_id) / "status.json",
+            {
+                "state": "running",
+                "tmux_session": session,
+                "tmux_window": window,
+                "launch_mode": "resume-existing-session" if resume else "fresh-session",
+            },
+        )
+        try:
+            owned_command(
+                run_id,
+                ["tmux", "new-window", "-d", "-t", session, "-n", window, shlex.join(invocation)],
+            )
+        except CliError:
+            if not has_tmux_target(target):
+                owned_write_json(
+                    run_id,
+                    spec_dir(run_id, spec_id) / "status.json",
+                    {"state": "failed", "reason": "tmux-launch-failed", "tmux_session": session, "tmux_window": window},
+                )
+            raise
+        observed = read_status(run_id, spec_id)
+    return response(
+        "spec.resume" if resume else "spec.start",
+        run_id,
+        spec_id,
+        state=observed["state"],
+        tmux={"session": session, "window": window},
+    )
+
+
+def canonical_session_id(value: Any) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return str(uuid.UUID(value.strip()))
+    except ValueError:
+        return None
+
+
+def event_session_ids(events: Path) -> set[str]:
+    if not events.exists():
+        return set()
+    session_ids: set[str] = set()
+    for line in events.read_text(errors="replace").splitlines():
+        try:
+            item = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise CliError(
+                "state-conflict",
+                "malformed JSON in Codex session events",
+                4,
+            ) from exc
+        if isinstance(item, dict) and item.get("type") == "thread.started":
+            thread = item.get("thread")
+            nested_id = thread.get("id") if isinstance(thread, dict) else None
+            value = item.get("thread_id") or nested_id
+            session_id = canonical_session_id(value)
+            if not session_id:
+                raise CliError(
+                    "state-conflict",
+                    "malformed Codex session UUID in events",
+                    4,
+                )
+            session_ids.add(session_id)
+    return session_ids
+
+
+def recover_session_id(directory: Path) -> str | None:
+    session_file = directory / "codex_session_id"
+    if session_file.exists():
+        file_value = session_file.read_text().strip()
+        file_session_id = canonical_session_id(file_value)
+        if not file_session_id:
+            raise CliError(
+                "state-conflict",
+                "malformed canonical Codex session UUID",
+                4,
+            )
+        if file_value != file_session_id:
+            raise CliError(
+                "state-conflict",
+                "noncanonical canonical Codex session UUID",
+                4,
+            )
+        return file_session_id
+    event_ids = event_session_ids(directory / "events.jsonl")
+    if len(event_ids) > 1:
+        raise CliError("state-conflict", "conflicting Codex session UUIDs in events", 4)
+    session_id = next(iter(event_ids), None)
+    if session_id:
+        session_file.write_text(session_id + "\n")
+    return session_id
+
+
+def validate_final_report(path: Path) -> str | None:
+    if not path.is_file():
+        return "final-report-missing"
+    try:
+        value = load_json(path)
+    except CliError:
+        return "final-report-invalid-json"
+    if not isinstance(value, dict) or set(value) != REPORT_FIELDS:
+        return "final-report-invalid-fields"
+    if value["result_status"] not in {"ready", "blocked"}:
+        return "final-report-invalid-status"
+    if not isinstance(value["summary"], str) or not isinstance(value["recommended_root_action"], str):
+        return "final-report-invalid-text"
+    for field in ("changed_files", "generated_artifacts", "risks", "blockers"):
+        if not isinstance(value[field], list) or not all(isinstance(item, str) for item in value[field]):
+            return f"final-report-invalid-{field}"
+    if not isinstance(value["validation"], list):
+        return "final-report-invalid-validation"
+    for item in value["validation"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"command", "result", "evidence"}
+            or not all(isinstance(item[key], str) for key in item)
+            or item["result"] not in {"passed", "failed", "not-run"}
+        ):
+            return "final-report-invalid-validation"
+    if not isinstance(value["internal_subagents"], list):
+        return "final-report-invalid-internal-subagents"
+    for item in value["internal_subagents"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"id", "scope", "outcome", "topology"}
+            or not all(isinstance(item[key], str) for key in item)
+            or item["topology"] not in {"serial", "parallel"}
+        ):
+            return "final-report-invalid-internal-subagents"
+    if value["result_status"] == "ready" and (
+        not value["validation"]
+        or value["blockers"]
+        or any(item["result"] != "passed" for item in value["validation"])
+    ):
+        return "final-report-ready-without-proof"
+    if value["result_status"] == "blocked" and not value["blockers"]:
+        return "final-report-blocked-without-blocker"
+    return None
+
+
+def anchor_forever() -> None:
+    while True:
+        signal.pause()
+
+
+def internal_worker_anchor(config_path: Path) -> int:
+    config = load_json(config_path.resolve())
+    expected = {"args", "cwd", "prompt", "events", "stderr", "control"}
+    if not isinstance(config, dict) or set(config) != expected:
+        raise CliError("invalid-input", "worker anchor config fields are not canonical", 2)
+    if not isinstance(config["args"], list) or not config["args"] or not all(
+        isinstance(item, str) and item for item in config["args"]
+    ):
+        raise CliError("invalid-input", "worker anchor args must be a non-empty string array", 2)
+    cwd = absolute_path(config["cwd"], "cwd")
+    prompt_path = absolute_path(config["prompt"], "prompt")
+    events_path = absolute_path(config["events"], "events")
+    stderr_path = absolute_path(config["stderr"], "stderr")
+    control_path = absolute_path(config["control"], "control")
+    if os.getpid() != os.getpgrp():
+        write_json(control_path, {"state": "spawn-failed", "error": "anchor-is-not-process-group-leader"})
+        anchor_forever()
+    # A caught handler resets to the default disposition when the Codex child
+    # execs. SIGTERM therefore reaches the worker normally while this group
+    # leader stays alive to reserve the PGID until the supervisor's SIGKILL.
+    signal.signal(signal.SIGTERM, lambda _signum, _frame: None)
+    try:
+        with prompt_path.open("rb") as prompt, events_path.open("ab") as stdout, stderr_path.open("ab") as stderr:
+            worker = subprocess.Popen(
+                config["args"],
+                cwd=cwd,
+                stdin=prompt,
+                stdout=stdout,
+                stderr=stderr,
+            )
+        write_json(control_path, {"state": "spawned", "worker_child_pid": worker.pid})
+        returncode = worker.wait()
+        write_json(
+            control_path,
+            {"state": "exited", "worker_child_pid": worker.pid, "returncode": returncode},
+        )
+    except OSError as exc:
+        write_json(control_path, {"state": "spawn-failed", "error": str(exc)})
+    finally:
+        # The anchor intentionally never exits on its own. Keeping the original
+        # group leader alive prevents PGID reuse between identity validation and
+        # the supervisor's group signal.
+        anchor_forever()
+    return 5
+
+
+def wait_for_anchor_handshake(
+    control_path: Path,
+    anchor_process: subprocess.Popen[Any],
+    timeout: float = 10,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if control_path.is_file():
+            try:
+                event = load_json(control_path)
+            except CliError as exc:
+                raise OSError(f"invalid worker anchor handshake: {exc.message}") from exc
+            if isinstance(event, dict) and event.get("state") in {"spawned", "exited", "spawn-failed"}:
+                return event
+        if anchor_process.poll() is not None:
+            raise OSError(f"worker anchor exited before handshake: {anchor_process.returncode}")
+        time.sleep(0.01)
+    raise OSError("worker anchor handshake timed out")
+
+
+def current_anchor_event(control_path: Path) -> dict[str, Any] | None:
+    if not control_path.is_file():
+        return None
+    try:
+        event = load_json(control_path)
+    except CliError as exc:
+        return {"state": "control-error", "error": exc.message, "returncode": 5}
+    return event if isinstance(event, dict) else None
+
+
+def cleanup_started_anchor(
+    anchor_process: subprocess.Popen[Any],
+    leader_started_at: str | None,
+) -> bool:
+    if leader_started_at is None:
+        return anchor_process.poll() is not None and not process_group_live(anchor_process.pid)
+    terminated = terminate_anchored_process_group(
+        anchor_process.pid,
+        leader_started_at=leader_started_at,
+        require_death=True,
+    )
+    if terminated:
+        anchor_process.wait()
+    return terminated
+
+
+def publish_anchor_recovery_required(
+    run_id: str,
+    spec_id: str,
+    anchor_process: subprocess.Popen[Any],
+    leader_started_at: str | None,
+    worker_child_pid: Any,
+    error: str,
+) -> None:
+    with run_lock(run_id):
+        with run_claim_lease(run_id):
+            path = spec_dir(run_id, spec_id) / "status.json"
+            current = load_json(path)
+            current.update(
+                {
+                    "state": "running",
+                    "reason": "worker-anchor-recovery-required",
+                    "worker_pid": anchor_process.pid,
+                    "worker_pgid": anchor_process.pid,
+                    "worker_leader_started_at": leader_started_at,
+                    "worker_group_model": "persistent-anchor-v1",
+                    "worker_child_pid": worker_child_pid,
+                    "worker_process_live": True,
+                    "anchor_error": error,
+                }
+            )
+            write_json(path, current)
+
+
+def internal_launch(run_id: str, spec_id: str, resume: bool) -> int:
+    manifest = manifest_for(run_id)
+    spec = find_spec(manifest, spec_id)
+    directory = spec_dir(run_id, spec_id)
+    try:
+        validated = validate_spec_worktrees(manifest, spec)
+    except CliError as exc:
+        try:
+            with run_lock(run_id):
+                with run_claim_lease(run_id):
+                    write_json(directory / "status.json", {"state": "failed", "reason": exc.code})
+        except CliError as ownership_error:
+            return ownership_error.exit_code
+        return exc.exit_code
+    spec_root = Path(manifest["worktree_root"]) / spec_id
+    execution_cwd = validated[0]["path"] if len(validated) == 1 else spec_root
+    events = directory / "events.jsonl"
+    stderr_path = directory / "stderr.log"
+    final = directory / "final.json"
+    worker_started_at = None
+    worker_child_pid = None
+    anchor_process = None
+    anchor_config_path = directory / "worker-anchor-config.json"
+    anchor_control_path = directory / "worker-anchor-control.json"
+    if resume:
+        try:
+            with run_lock(run_id):
+                with run_claim_lease(run_id):
+                    try:
+                        session_id = recover_session_id(directory)
+                    except CliError as exc:
+                        write_json(
+                            directory / "status.json",
+                            {"state": "failed", "reason": exc.code, "error": exc.message},
+                        )
+                        return exc.exit_code
+                    if not session_id:
+                        write_json(
+                            directory / "status.json",
+                            {"state": "failed", "reason": "missing-codex-session-id"},
+                        )
+                        return 4
+        except CliError as ownership_error:
+            return ownership_error.exit_code
+        args = [
+            "codex",
+            "exec",
+            "resume",
+            session_id,
+            "--json",
+            "--output-schema",
+            spec["output_schema_path"],
+            "--output-last-message",
+            str(final),
+            "-",
+        ]
+        if len(validated) > 1:
+            args.insert(3, "--skip-git-repo-check")
+    else:
+        args = [
+            "codex",
+            "exec",
+            "--cd",
+            str(execution_cwd),
+            "--sandbox",
+            "workspace-write",
+            "--json",
+            "--output-schema",
+            spec["output_schema_path"],
+            "--output-last-message",
+            str(final),
+            "-",
+        ]
+        if len(validated) > 1:
+            args.insert(4, "--skip-git-repo-check")
+    try:
+        with run_lock(run_id):
+            with run_claim_lease(run_id):
+                final.unlink(missing_ok=True)
+                anchor_control_path.unlink(missing_ok=True)
+                write_json(
+                    anchor_config_path,
+                    {
+                        "args": args,
+                        "cwd": str(execution_cwd),
+                        "prompt": spec["prompt_path"],
+                        "events": str(events),
+                        "stderr": str(stderr_path),
+                        "control": str(anchor_control_path),
+                    },
+                )
+                with stderr_path.open("ab") as anchor_stderr:
+                    anchor_process = subprocess.Popen(
+                        [str(Path(__file__).resolve()), "_worker_anchor", "--config", str(anchor_config_path)],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=anchor_stderr,
+                        start_new_session=True,
+                    )
+                worker_started_at = process_started_at(anchor_process.pid)
+                while worker_started_at is None:
+                    if anchor_process.poll() is not None:
+                        raise OSError(
+                            f"worker anchor exited before its identity was recorded: {anchor_process.returncode}"
+                        )
+                    time.sleep(0.01)
+                    worker_started_at = process_started_at(anchor_process.pid)
+                try:
+                    current = load_json(directory / "status.json")
+                except CliError:
+                    current = {"state": "running"}
+                current.update(
+                    {
+                        "state": "running",
+                        "worker_pid": anchor_process.pid,
+                        "worker_pgid": anchor_process.pid,
+                        "worker_leader_started_at": worker_started_at,
+                        "worker_group_model": "persistent-anchor-v1",
+                        "worker_child_pid": None,
+                        "worker_bootstrap_phase": "awaiting-child-handshake",
+                    }
+                )
+                write_json(directory / "status.json", current)
+                anchor_event = wait_for_anchor_handshake(anchor_control_path, anchor_process)
+                if anchor_event["state"] == "spawn-failed":
+                    raise OSError(anchor_event.get("error", "Codex worker spawn failed"))
+                worker_child_pid = anchor_event.get("worker_child_pid")
+                current = load_json(directory / "status.json")
+                current["worker_child_pid"] = worker_child_pid
+                current["worker_bootstrap_phase"] = "supervising-child"
+                write_json(directory / "status.json", current)
+    except CliError as exc:
+        if anchor_process is not None and not cleanup_started_anchor(anchor_process, worker_started_at):
+            with contextlib.suppress(CliError):
+                publish_anchor_recovery_required(
+                    run_id,
+                    spec_id,
+                    anchor_process,
+                    worker_started_at,
+                    worker_child_pid,
+                    exc.message,
+                )
+        return exc.exit_code
+    except OSError as exc:
+        if anchor_process is not None and not cleanup_started_anchor(anchor_process, worker_started_at):
+            try:
+                publish_anchor_recovery_required(
+                    run_id,
+                    spec_id,
+                    anchor_process,
+                    worker_started_at,
+                    worker_child_pid,
+                    str(exc),
+                )
+            except CliError as ownership_error:
+                return ownership_error.exit_code
+            return 5
+        try:
+            with run_lock(run_id):
+                with run_claim_lease(run_id):
+                    with stderr_path.open("ab") as stderr:
+                        stderr.write(f"codex spawn failed: {exc}\n".encode())
+                    (directory / "exit_code").write_text("5\n")
+                    current = load_json(directory / "status.json")
+                    state = "stopped" if current.get("state") == "stopped" else "failed"
+                    write_json(
+                        directory / "status.json",
+                        {
+                            "state": state,
+                            "reason": "codex-spawn-failed",
+                            "returncode": 5,
+                            "process_returncode": None,
+                            "spawn_error": str(exc),
+                        },
+                    )
+        except CliError as ownership_error:
+            return ownership_error.exit_code
+        return 5
+    claim_error = None
+    worker_event = current_anchor_event(anchor_control_path)
+    next_heartbeat = time.monotonic() + CLAIM_HEARTBEAT_SECONDS
+    while not worker_event or worker_event.get("state") not in {"exited", "control-error"}:
+        if anchor_process.poll() is not None:
+            worker_event = {
+                "state": "exited",
+                "worker_child_pid": worker_child_pid,
+                "returncode": 5,
+                "anchor_error": f"worker anchor exited unexpectedly: {anchor_process.returncode}",
+            }
+            break
+        if time.monotonic() >= next_heartbeat:
+            try:
+                heartbeat_run_claim(run_id)
+            except CliError as exc:
+                claim_error = exc
+                terminated = terminate_anchored_process_group(
+                    anchor_process.pid,
+                    leader_started_at=worker_started_at,
+                    require_death=True,
+                )
+                if terminated:
+                    anchor_process.wait()
+                break
+            next_heartbeat = time.monotonic() + CLAIM_HEARTBEAT_SECONDS
+        time.sleep(min(0.05, max(0.0, next_heartbeat - time.monotonic())))
+        worker_event = current_anchor_event(anchor_control_path)
+    result = subprocess.CompletedProcess(args, int(worker_event.get("returncode", 5)))
+    if claim_error is not None:
+        return claim_error.exit_code
+    try:
+        with run_lock(run_id):
+            with run_claim_lease(run_id):
+                terminated = terminate_anchored_process_group(
+                    anchor_process.pid,
+                    leader_started_at=worker_started_at,
+                    require_death=True,
+                )
+                if not terminated:
+                    return 5
+                anchor_process.wait()
+                session_identity_error = None
+                try:
+                    session_id = recover_session_id(directory)
+                except CliError:
+                    session_id = None
+                    session_identity_error = "conflicting-codex-session-id"
+                if result.returncode == 0 and not session_id and session_identity_error is None:
+                    session_identity_error = "missing-codex-session-id"
+                report_error = session_identity_error or (
+                    validate_final_report(final) if result.returncode == 0 else None
+                )
+                report = load_json(final) if result.returncode == 0 and report_error is None else None
+                worker_result_status = report["result_status"] if report else None
+                if report_error is not None:
+                    effective_returncode = 5
+                elif worker_result_status == "blocked":
+                    effective_returncode = 4
+                else:
+                    effective_returncode = result.returncode
+                (directory / "exit_code").write_text(f"{effective_returncode}\n")
+                state = "succeeded" if effective_returncode == 0 else "failed"
+                current = load_json(directory / "status.json")
+                if current.get("state") == "stopped":
+                    state = "stopped"
+                write_json(
+                    directory / "status.json",
+                    {
+                        "state": state,
+                        "returncode": effective_returncode,
+                        "process_returncode": result.returncode,
+                        "artifact_error": report_error,
+                        "worker_result_status": worker_result_status,
+                        "worker_pid": anchor_process.pid,
+                        "worker_pgid": anchor_process.pid,
+                        "worker_leader_started_at": worker_started_at,
+                        "worker_group_model": "persistent-anchor-v1",
+                        "worker_child_pid": worker_child_pid,
+                        "worker_process_live": False,
+                        "worker_control_error": worker_event.get("error") or worker_event.get("anchor_error"),
+                        "blockers": report["blockers"] if report else [],
+                    },
+                )
+    except CliError as ownership_error:
+        cleanup_started_anchor(anchor_process, worker_started_at)
+        return ownership_error.exit_code
+    return effective_returncode
+
+
+def stop_spec(run_id: str, spec_id: str) -> dict[str, Any]:
+    with run_lock(run_id):
+        with run_claim_lease(run_id):
+            status = read_status(run_id, spec_id)
+            if status["state"] != "running":
+                raise CliError("state-conflict", f"cannot stop from {status['state']}", 4)
+            if status.get("worker_process_identity") == "unverifiable":
+                raise CliError(
+                    "state-conflict",
+                    "cannot safely stop a worker group without a verifiable persistent-anchor identity",
+                    4,
+                    {"worker_pgid": status.get("worker_pgid")},
+                )
+            target = f"{tmux_session(run_id)}:{tmux_window(spec_id)}"
+            if status["tmux_live"]:
+                result = command(["tmux", "kill-window", "-t", target], check=False)
+            else:
+                result = subprocess.CompletedProcess(["tmux", "kill-window"], 0, "", "")
+            still_live = has_tmux_target(target)
+            if still_live:
+                write_json(
+                    spec_dir(run_id, spec_id) / "status.json",
+                    {
+                        "state": "running",
+                        "reason": "tmux-stop-failed",
+                        "tmux_session": tmux_session(run_id),
+                        "tmux_window": tmux_window(spec_id),
+                        "worker_pid": status.get("worker_pid"),
+                        "worker_pgid": status.get("worker_pgid"),
+                        "worker_leader_started_at": status.get("worker_leader_started_at"),
+                        "worker_group_model": status.get("worker_group_model"),
+                        "stop_returncode": result.returncode,
+                        "stop_stderr": result.stderr[-2000:],
+                    },
+                )
+                raise CliError(
+                    "state-conflict",
+                    "tmux worker did not stop cleanly; stop remains retryable",
+                    4,
+                    {"returncode": result.returncode, "tmux_live": still_live},
+                )
+            pgid = status.get("worker_pgid")
+            leader_started_at = status.get("worker_leader_started_at")
+            if status.get("worker_process_live") and not terminate_anchored_process_group(
+                pgid,
+                leader_started_at=leader_started_at,
+            ):
+                write_json(
+                    spec_dir(run_id, spec_id) / "status.json",
+                    {
+                        "state": "running",
+                        "reason": "worker-process-stop-failed",
+                        "worker_pid": status.get("worker_pid"),
+                        "worker_pgid": pgid,
+                        "worker_leader_started_at": leader_started_at,
+                        "worker_group_model": status.get("worker_group_model"),
+                    },
+                )
+                raise CliError(
+                    "state-conflict",
+                    "Codex worker process group did not stop; stop remains retryable",
+                    4,
+                    {"worker_pgid": pgid},
+                )
+            write_json(
+                spec_dir(run_id, spec_id) / "status.json",
+                {
+                    "state": "stopped",
+                    "worker_pgid": pgid,
+                    "worker_leader_started_at": leader_started_at,
+                    "worker_group_model": status.get("worker_group_model"),
+                    "worker_process_live": False,
+                },
+            )
+    return response("spec.stop", run_id, spec_id, state="stopped")
+
+
+def cleanup_spec(run_id: str, spec_id: str, disposition: str) -> dict[str, Any]:
+    with run_lock(run_id):
+        heartbeat_run_claim(run_id)
+        manifest = manifest_for(run_id)
+        spec = find_spec(manifest, spec_id)
+        status = read_status(run_id, spec_id)
+        cleanup_states = {
+            "prepared",
+            "preparing",
+            "prepare-failed",
+            "succeeded",
+            "failed",
+            "stopped",
+            "cleaning",
+            "cleanup-blocked",
+        }
+        if status["state"] not in cleanup_states or status["tmux_live"] or status["worker_process_live"]:
+            raise CliError("unsafe-cleanup", f"Spec is not safely terminal: {status['state']}", 6)
+        if status["state"] not in {"succeeded", "cleaning", "cleanup-blocked"} and disposition == "integrated":
+            raise CliError("unsafe-cleanup", "only a succeeded Spec may be cleaned as integrated", 6)
+        root = Path(manifest["worktree_root"]) / spec_id
+        repo_by_id = {repo["repo_id"]: repo for repo in spec["repositories"]}
+        if status["state"] in {"cleaning", "cleanup-blocked"}:
+            if status.get("disposition") != disposition:
+                raise CliError("unsafe-cleanup", "cleanup disposition cannot change during recovery", 6)
+            pending_ids = status.get("pending_repo_ids", [])
+            removed = status.get("removed_worktrees", [])
+            cleanup_repo_ids = status.get("cleanup_repo_ids", [])
+            if (
+                not isinstance(pending_ids, list)
+                or not isinstance(removed, list)
+                or not isinstance(cleanup_repo_ids, list)
+                or len(pending_ids) != len(set(pending_ids))
+                or len(removed) != len(set(removed))
+                or len(cleanup_repo_ids) != len(set(cleanup_repo_ids))
+                or any(repo_id not in repo_by_id for repo_id in pending_ids)
+                or any(repo_id not in repo_by_id for repo_id in cleanup_repo_ids)
+                or not set(pending_ids).issubset(cleanup_repo_ids)
+            ):
+                raise CliError("unsafe-cleanup", "invalid cleanup recovery state", 6)
+            removing_repo_id = status.get("removing_repo_id")
+            if removing_repo_id in pending_ids:
+                removing_repo = repo_by_id[removing_repo_id]
+                removing_path = root / removing_repo_id
+                if not removing_path.exists():
+                    if removing_path.resolve() in registered_worktrees(Path(removing_repo["source_path"])):
+                        raise CliError("unsafe-cleanup", "missing cleanup path remains registered", 6)
+                    removed.append(str(removing_path))
+                    pending_ids.remove(removing_repo_id)
+            expected_removed = {
+                str(root / repo_id)
+                for repo_id in cleanup_repo_ids
+                if repo_id not in pending_ids
+            }
+            if set(removed) != expected_removed:
+                raise CliError("unsafe-cleanup", "cleanup recovery evidence does not match pending repositories", 6)
+            for repo_id in cleanup_repo_ids:
+                if repo_id in pending_ids:
+                    continue
+                removed_path = root / repo_id
+                if removed_path.exists() or removed_path.resolve() in registered_worktrees(Path(repo_by_id[repo_id]["source_path"])):
+                    raise CliError("unsafe-cleanup", "removed worktree evidence is not current", 6)
+        elif status["state"] in {"preparing", "prepare-failed"}:
+            cleanup_repo_ids = status.get("prepared_repo_ids", [])
+            if (
+                not isinstance(cleanup_repo_ids, list)
+                or len(cleanup_repo_ids) != len(set(cleanup_repo_ids))
+                or any(repo_id not in repo_by_id for repo_id in cleanup_repo_ids)
+            ):
+                raise CliError("unsafe-cleanup", "invalid partial preparation state", 6)
+            preparing_repo_id = status.get("preparing_repo_id")
+            if preparing_repo_id is not None:
+                if preparing_repo_id not in repo_by_id:
+                    raise CliError("unsafe-cleanup", "invalid in-flight preparation state", 6)
+                in_flight_repo = repo_by_id[preparing_repo_id]
+                in_flight_path = root / preparing_repo_id
+                if in_flight_path.exists():
+                    try:
+                        validate_worktree_identity(
+                            Path(in_flight_repo["source_path"]),
+                            in_flight_path,
+                            in_flight_repo["target_branch"],
+                            error_code="unsafe-cleanup",
+                            exit_code=6,
+                        )
+                    except CliError:
+                        pass
+                    else:
+                        if preparing_repo_id not in cleanup_repo_ids:
+                            cleanup_repo_ids.append(preparing_repo_id)
+            pending_ids = list(cleanup_repo_ids)
+            removed = []
+        else:
+            cleanup_repo_ids = list(repo_by_id)
+            pending_ids = list(cleanup_repo_ids)
+            removed = []
+        validated = []
+        for repo_id in pending_ids:
+            repo = repo_by_id[repo_id]
+            path = root / repo_id
+            validate_worktree_identity(
+                Path(repo["source_path"]), path, repo["target_branch"],
+                error_code="unsafe-cleanup", exit_code=6,
+            )
+            dirty = command(["git", "-C", str(path), "status", "--porcelain", "--untracked-files=all"]).stdout
+            if dirty:
+                raise CliError("unsafe-cleanup", f"dirty worktree: {path}", 6, {"status": dirty.splitlines()})
+            validated.append({"repo": repo, "path": path})
+        owned_write_json(
+            run_id,
+            spec_dir(run_id, spec_id) / "status.json",
+            {
+                "state": "cleaning",
+                "disposition": disposition,
+                "cleanup_repo_ids": cleanup_repo_ids,
+                "pending_repo_ids": pending_ids,
+                "removed_worktrees": removed,
+            },
+        )
+        for item in validated:
+            repo = item["repo"]
+            path = item["path"]
+            owned_write_json(
+                run_id,
+                spec_dir(run_id, spec_id) / "status.json",
+                {"state": "cleaning", "disposition": disposition, "cleanup_repo_ids": cleanup_repo_ids, "pending_repo_ids": pending_ids, "removed_worktrees": removed, "removing_repo_id": repo["repo_id"]},
+            )
+            try:
+                owned_command(
+                    run_id,
+                    ["git", "-C", repo["source_path"], "worktree", "remove", str(path)],
+                )
+            except CliError as exc:
+                owned_write_json(
+                    run_id,
+                    spec_dir(run_id, spec_id) / "status.json",
+                    {"state": "cleanup-blocked", "disposition": disposition, "cleanup_repo_ids": cleanup_repo_ids, "pending_repo_ids": pending_ids, "removed_worktrees": removed, "removing_repo_id": repo["repo_id"], "reason": exc.code},
+                )
+                raise CliError("unsafe-cleanup", "cleanup is partially complete and recoverable", 6, {"removed": removed, "pending_repo_ids": pending_ids}) from exc
+            removed.append(str(path))
+            pending_ids.remove(repo["repo_id"])
+            owned_write_json(
+                run_id,
+                spec_dir(run_id, spec_id) / "status.json",
+                {"state": "cleaning", "disposition": disposition, "cleanup_repo_ids": cleanup_repo_ids, "pending_repo_ids": pending_ids, "removed_worktrees": removed},
+            )
+        owned_write_json(
+            run_id,
+            spec_dir(run_id, spec_id) / "status.json",
+            {"state": "cleaned", "disposition": disposition, "removed_worktrees": removed},
+        )
+    return response("spec.cleanup", run_id, spec_id, state="cleaned", disposition=disposition, removed=removed)
+
+
+def run_status(run_id: str) -> dict[str, Any]:
+    heartbeat_run_claim(run_id)
+    manifest = manifest_for(run_id)
+    specs = {spec["spec_id"]: read_status(run_id, spec["spec_id"]) for spec in manifest["feature_specs"]}
+    states = {item["state"] for item in specs.values()}
+    dispositions = {item.get("disposition") for item in specs.values() if item["state"] == "cleaned"}
+    if states == {"cleaned"} and dispositions <= {"integrated"}:
+        state = "complete"
+    elif states & {"prepare-failed", "failed", "stopped", "cleanup-blocked"} or "abandoned" in dispositions:
+        state = "blocked"
+    elif states & {"preparing", "running", "succeeded", "cleaning", "cleaned"}:
+        state = "active"
+    else:
+        state = "created"
+    return response("run.status", run_id, state=state, specs=specs)
+
+
+def cleanup_run(run_id: str) -> dict[str, Any]:
+    with run_lock(run_id):
+        run_state_path = run_dir(run_id) / "status.json"
+        run_state = load_json(run_state_path)
+        if not isinstance(run_state, dict):
+            raise CliError("state-conflict", "run status is invalid", 4)
+        if run_state.get("state") == "cleaned" and run_state.get("atomic_claim_state") == "released":
+            atomic_claim = {
+                "ok": True,
+                "command": "claim.release",
+                "state": "already-released",
+                "root_id": run_state.get("atomic_claim_root_id"),
+                "evidence": f"run-cleanup:{run_id}",
+            }
+            return response(
+                "run.cleanup",
+                run_id,
+                state="cleaned",
+                artifacts_retained=True,
+                atomic_claim=atomic_claim,
+            )
+        if run_state.get("state") == "releasing":
+            claim_root_id = run_state.get("atomic_claim_root_id")
+            claim_fingerprint = run_state.get("atomic_claim_fingerprint")
+            if not isinstance(claim_root_id, str) or not isinstance(claim_fingerprint, str):
+                raise CliError("state-conflict", "releasing checkpoint is incomplete", 4)
+            atomic_claim = release_or_confirm_absent(
+                claim_root_id,
+                claim_fingerprint,
+                f"run-cleanup:{run_id}",
+            )
+            write_json(
+                run_state_path,
+                {
+                    "state": "cleaned",
+                    "atomic_claim_root_id": claim_root_id,
+                    "atomic_claim_fingerprint": claim_fingerprint,
+                    "atomic_claim_state": "released",
+                },
+            )
+            return response(
+                "run.cleanup",
+                run_id,
+                state="cleaned",
+                artifacts_retained=True,
+                atomic_claim=atomic_claim,
+            )
+        heartbeat_run_claim(run_id)
+        manifest = manifest_for(run_id)
+        specs = {spec["spec_id"]: read_status(run_id, spec["spec_id"]) for spec in manifest["feature_specs"]}
+        if any(item["state"] != "cleaned" for item in specs.values()):
+            raise CliError("unsafe-cleanup", "all Specs must be cleaned first", 6)
+        session = tmux_session(run_id)
+        if has_tmux_target(session):
+            owned_command(run_id, ["tmux", "kill-session", "-t", session])
+        identity = run_claim_identity(run_id)
+        if identity is None:
+            raise CliError("state-conflict", "run claim is already released", 4)
+        claim_root_id, claim_fingerprint = identity
+        owned_write_json(
+            run_id,
+            run_state_path,
+            {
+                "state": "releasing",
+                "atomic_claim_root_id": claim_root_id,
+                "atomic_claim_fingerprint": claim_fingerprint,
+            },
+        )
+        atomic_claim = release_or_confirm_absent(
+            claim_root_id,
+            claim_fingerprint,
+            f"run-cleanup:{run_id}",
+        )
+        write_json(
+            run_state_path,
+            {
+                "state": "cleaned",
+                "atomic_claim_root_id": claim_root_id,
+                "atomic_claim_fingerprint": claim_fingerprint,
+                "atomic_claim_state": "released",
+            },
+        )
+    return response(
+        "run.cleanup",
+        run_id,
+        state="cleaned",
+        artifacts_retained=True,
+        atomic_claim=atomic_claim,
+    )
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--json", action="store_true", dest="as_json")
+    sub = parser.add_subparsers(dest="noun", required=True)
+    sub.add_parser("doctor", help="Check local tools and the shared contract installation.")
+    run = sub.add_parser("run", help="Create, list, inspect, or clean orchestration runs.")
+    run_sub = run.add_subparsers(dest="verb", required=True)
+    create = run_sub.add_parser("create")
+    create.add_argument("--manifest", type=Path, required=True)
+    run_sub.add_parser("list")
+    for verb in ("status", "cleanup"):
+        item = run_sub.add_parser(verb)
+        item.add_argument("--run-id", required=True)
+    spec = sub.add_parser("spec", help="Prepare and supervise one Feature Spec session.")
+    spec_sub = spec.add_subparsers(dest="verb", required=True)
+    for verb in ("prepare", "start", "status", "resume", "stop"):
+        item = spec_sub.add_parser(verb)
+        item.add_argument("--run-id", required=True)
+        item.add_argument("--spec-id", required=True)
+    clean = spec_sub.add_parser("cleanup")
+    clean.add_argument("--run-id", required=True)
+    clean.add_argument("--spec-id", required=True)
+    clean.add_argument("--disposition", choices=("integrated", "abandoned"), required=True)
+    hidden = sub.add_parser("_launch", help=argparse.SUPPRESS)
+    hidden.add_argument("--run-id", required=True)
+    hidden.add_argument("--spec-id", required=True)
+    hidden.add_argument("--cache-root", type=Path, required=True)
+    hidden.add_argument("--claim-root", type=Path, required=True)
+    hidden.add_argument("--resume", action="store_true")
+    anchor = sub.add_parser("_worker_anchor", help=argparse.SUPPRESS)
+    anchor.add_argument("--config", type=Path, required=True)
+    return parser
+
+
+def dispatch(args: argparse.Namespace) -> dict[str, Any] | int:
+    if args.noun == "doctor":
+        return doctor()
+    if args.noun == "_launch":
+        os.environ["CODEX_CLI_ORCHESTRATOR_CACHE"] = str(args.cache_root.resolve())
+        os.environ["CODEX_ORCHESTRATOR_CLAIM_ROOT"] = str(args.claim_root.resolve())
+        return internal_launch(args.run_id, args.spec_id, args.resume)
+    if args.noun == "_worker_anchor":
+        return internal_worker_anchor(args.config)
+    if args.noun == "run":
+        if args.verb == "create":
+            return create_run(args.manifest)
+        if args.verb == "list":
+            runs = sorted(path.name for path in cache_root().glob("*") if (path / "manifest.json").is_file())
+            return response("run.list", runs=runs)
+        if args.verb == "status":
+            return run_status(args.run_id)
+        return cleanup_run(args.run_id)
+    if args.verb == "prepare":
+        return prepare_spec(args.run_id, args.spec_id)
+    if args.verb == "start":
+        return launch_window(args.run_id, args.spec_id, False)
+    if args.verb == "status":
+        heartbeat_run_claim(args.run_id)
+        status = read_status(args.run_id, args.spec_id)
+        directory = spec_dir(args.run_id, args.spec_id)
+        return response(
+            "spec.status",
+            args.run_id,
+            args.spec_id,
+            **status,
+            artifacts={name: str(directory / name) for name in ("events.jsonl", "final.json", "stderr.log", "exit_code", "status.json")},
+        )
+    if args.verb == "resume":
+        return launch_window(args.run_id, args.spec_id, True)
+    if args.verb == "stop":
+        return stop_spec(args.run_id, args.spec_id)
+    return cleanup_spec(args.run_id, args.spec_id, args.disposition)
+
+
+def emit(value: dict[str, Any], as_json: bool) -> None:
+    if as_json:
+        print(json.dumps(value, sort_keys=True))
+    else:
+        print(json.dumps(value, indent=2, sort_keys=True))
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        value = dispatch(args)
+        if isinstance(value, int):
+            return value
+        emit(value, args.as_json)
+        return 0 if value.get("ok", True) else 3
+    except CliError as exc:
+        value = {"ok": False, "error": {"code": exc.code, "message": exc.message, "details": exc.details}}
+        emit(value, getattr(args, "as_json", False))
+        return exc.exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

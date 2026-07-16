@@ -1,9 +1,9 @@
 # Codex Tool Surface Refresh
 
 Use this playbook when explicitly asked to check whether Codex changed how
-subagents are spawned, subagents are inspected or closed, or Codex App worker
-threads are created and managed. This task exists primarily to keep
-`skills/codex-orchestrator/` current.
+subagents are spawned, Codex App tasks are created and managed, or Codex CLI
+sessions are supervised. This task keeps the App and CLI orchestrator adapters
+current without merging their runtime surfaces.
 
 ## Scope
 
@@ -11,11 +11,12 @@ Review only Codex worker and thread orchestration surfaces:
 
 - subagent creation, roles, model inheritance, wait/send/resume/close lifecycle,
   and UI visibility;
-- Codex App thread creation, project/worktree targets, thread read/write,
+- Codex App task creation, project/worktree targets, task read/write,
   title, archive, handoff, fork, pin, and listing behavior;
-- CLI `/agent` equivalents when available;
-- `codex-orchestrator` runtime requirements, worker-surface selection,
-  worker prompt templates, and ledger fields that depend on those surfaces.
+- CLI subagents plus `codex exec` start/resume/structured-output behavior;
+- `codex-orchestrator` App task requirements and managed-worktree adapter;
+- `codex-cli-orchestrator` tmux/process, session-id, artifact, and manual
+  worktree adapter.
 
 Do not use this task to redesign generic orchestration behavior, add new
 workers to a live task, or update unrelated skills.
@@ -37,14 +38,16 @@ workers to a live task, or update unrelated skills.
    - `skills/codex-orchestrator/references/ledger.md`;
    - `skills/codex-orchestrator/references/gates.md` only when tool changes
      affect authorization, proof, or closeout behavior.
+   - `skills/codex-cli-orchestrator/SKILL.md` and
+     `skills/codex-cli-orchestrator/references/runtime.md` for CLI changes.
 3. Check whether current docs still answer these questions precisely:
    - What creates a subagent?
    - What creates a separate visible Codex App thread?
    - Which surfaces are visible to the user, and where?
    - Which lifecycle actions can the root orchestrator perform?
    - What should happen when a logical tool name is unavailable or renamed?
-   - Which worker type should be selected by default under current owner intent?
-4. Update `codex-orchestrator` only when the live tool surface materially
+   - Does each public skill remain confined to its own runtime adapter?
+4. Update only the affected adapter when the live tool surface materially
    differs from the documented contract. Material differences include renamed
    tools, changed arguments, new required lifecycle calls, new visibility
    behavior, removed capabilities, or newly exposed safer primitives.
@@ -59,7 +62,7 @@ workers to a live task, or update unrelated skills.
   globally unavailable just because it is missing in one thread.
 - Prefer logical operation names in runtime skills, but record actual callable
   names when they differ.
-- Keep visible Codex App threads distinct from subagents unless the current
+- Keep visible Codex App tasks distinct from subagents and CLI sessions unless the current
   runtime explicitly exposes the same surface as both.
 - Do not create visible Codex App threads merely to inspect the tool schema.
   Use a bounded internal subagent for live validation only when the active
@@ -72,7 +75,8 @@ workers to a live task, or update unrelated skills.
 ## Branch Report Additions
 
 - Current subagent creation and lifecycle surface
-- Current Codex App thread creation and lifecycle surface
+- Current Codex App task creation and lifecycle surface
+- Current Codex CLI exec/resume and tmux supervision surface
 - Any runtime-dependent uncertainty that should be rechecked in Codex App or CLI
 
 Add these items to the common final report owned by `release-checklist.md`.
