@@ -42,8 +42,9 @@ durable issue-tracker configuration.
   first completed issue into it.
 - Issue type is recorded as an `issue_type:` line near the top of each issue
   file, using canonical `bug`, `feature`, or `task`.
-- Triage state is recorded as a `workflow_state:` line near the top of each
-  issue file, using the canonical values from the Triage option contract.
+- Workflow state is recorded as a `workflow_state:` line near the top of each
+  issue file, using the canonical values owned by Project Memory in
+  `triage-labels.md`.
 - The Feature Spec pointer is recorded as `source_spec_ref:` reference data.
 - Comments and conversation history append under a `## Comments` heading
 - `$plan-feature` owns Feature Spec and generated issue body shape, including

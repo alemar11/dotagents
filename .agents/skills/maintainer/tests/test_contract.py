@@ -381,7 +381,6 @@ class MaintainerContractTests(unittest.TestCase):
             REPO_ROOT / "skills/plan-harder/references/options.md",
             REPO_ROOT / "skills/postgres/references/options.md",
             REPO_ROOT / "skills/project-memory/references/options.md",
-            REPO_ROOT / "skills/triage/references/options.md",
             SKILL_ROOT / "references/options.md",
         }
         self.assertEqual(expected.difference(option_files), set())

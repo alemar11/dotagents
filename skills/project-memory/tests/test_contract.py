@@ -24,6 +24,46 @@ class ProjectMemoryContractTests(unittest.TestCase):
             self.assertIn(relative_path, skill)
             self.assertIn(relative_path, setup)
 
+    def test_project_memory_owns_issue_type_and_workflow_state_registry(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        labels = (SKILL_ROOT / "references" / "triage-labels.md").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("sole reusable registry", skill)
+        self.assertIn("sole reusable owner", labels)
+        self.assertIn("project-memory/config/triage-labels.md", labels)
+        for value in (
+            "`bug`",
+            "`feature`",
+            "`task`",
+            "`needs-triage`",
+            "`needs-info`",
+            "`ready-for-agent`",
+            "`ready-for-human`",
+            "`wontfix`",
+        ):
+            self.assertIn(value, labels)
+
+        self.assertIn(
+            "Require exactly one `issue_type` and one `workflow_state`", labels
+        )
+        self.assertIn("`proposed-spec:`", labels)
+
+        plan_feature = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (REPO_ROOT / "skills" / "plan-feature").rglob("*.md")
+        )
+        self.assertIn("project-memory/config/triage-labels.md", plan_feature)
+        self.assertFalse((REPO_ROOT / "skills" / "triage").exists())
+
+        for options_path in REPO_ROOT.glob("skills/**/references/options.md"):
+            options = options_path.read_text(encoding="utf-8")
+            with self.subTest(options_path=options_path):
+                self.assertNotRegex(
+                    options, r"(?m)^\| `(?:issue_type|workflow_state)` \|"
+                )
+
     def test_project_layout_is_owned_separately_from_tracker_routing(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         options = (SKILL_ROOT / "references" / "options.md").read_text(
@@ -51,7 +91,6 @@ class ProjectMemoryContractTests(unittest.TestCase):
             REPO_ROOT / "AGENTS.md",
             REPO_ROOT / "skills" / "project-memory",
             REPO_ROOT / "skills" / "plan-feature",
-            REPO_ROOT / "skills" / "triage",
             REPO_ROOT / "skills" / "grill-me-with-context",
             REPO_ROOT / "skills" / "improve-codebase-architecture",
         ]

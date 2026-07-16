@@ -1,5 +1,0 @@
-interface:
-  display_name: "Triage"
-  short_description: "Triage GitHub or local markdown issues into typed workflow states."
-  brand_color: "#F97316"
-  default_prompt: "Use $triage to classify GitHub or local Markdown issues with the narrowest required repo evidence. For one named issue, continue best-effort when project-memory or companion skills are unavailable, but never apply ready-for-agent without hardening. Run only tracker-routing setup when durable routing or mappings are actually needed."

@@ -65,7 +65,6 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - Treat `improve-codebase-architecture` as Codex-aware but portable because optional subagents can speed read-only repo exploration, while sequential source inspection plus `$grill-me-with-context` is the fallback path.
 - Treat `project-memory` as Codex-aware but portable because optional session-history bootstrap is isolated in `skills/project-memory/references/session-history.md`, while its core setup and internal domain-modeling flow fall back to repo/workspace evidence plus optional localization evidence.
 - Treat `plan-feature` as portable and skill-composed because its core and local-tracker workflows require `$project-memory`, `$grill-me-with-context`, and `$plan-harder`; its GitHub tracker backend additionally requires `$gitstack:github-issues`.
-- Treat `triage` as portable and skill-composed because its core and local-tracker workflows rely on project-memory mappings, `$grill-me-with-context`, and `$plan-harder`; its GitHub tracker backend additionally requires `$gitstack:github-issues`.
 - Treat `skill-cli-creator` as Codex-aware but portable because it may route to Codex scaffold helpers when available, but its embedded-CLI design workflow can continue with an equivalent manually created skill or plugin host.
 - Treat GitStack as Codex-dependent because its bundled workflows require the official GitHub connector. Its shared CLI fallback remains runtime-dependent on Python 3.11+, local `git`, and authenticated `gh`.
 - Treat `okf` as portable runtime-dependent because it requires `python3` for its shipped `scripts/okf` CLI, uses optional `PyYAML` when available for exact YAML parsing, and otherwise relies on local markdown/spec assets without Codex-only runtime tools.
@@ -128,7 +127,7 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - `project-memory` must always use `AGENTS.md` for setup pointers and project-memory routing when an agent-instruction file is needed.
 - Keep `project-memory` pointer-first for `AGENTS.md`: agent operating rules and short project-memory links stay there, while domain context, tracker detail, planning history, and accepted decisions move to `CONTEXT.md`, `project-memory/config/*`, or ADRs after confirmation.
 - Keep `project-memory` issue-tracker setup limited to the durable `tracker_backend` values `github` and `local`; workspace, repo, path, and cross-repo linking details belong in conventions, Feature Specs, generated issues, or prose, not as extra backend enum values.
-- Keep `project-memory/config/triage-labels.md` responsible for both issue type/category mapping (`bug`, `feature`, `task`) and workflow state mapping (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`).
+- Keep Project Memory as the sole reusable owner of canonical issue types (`bug`, `feature`, `task`) and workflow states (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`) through `skills/project-memory/references/triage-labels.md`; keep each repository's `project-memory/config/triage-labels.md` as the concrete tracker mapping source consumed by Plan Feature and other workflows. Do not create a parallel option registry in a consumer skill.
 - For already-used projects, `project-memory` may seed `CONTEXT.md` and `project-memory/adr/` from strong repo evidence and recent same-repo session history, using its internal domain-modeling workflow for context and ADR content.
 - Keep `TRANSLATION.md` optional and evidence-backed: create it only when localization support or durable translation rules are clear from repo evidence or explicit user confirmation, and add an `AGENTS.md` localization pointer only when the file exists or is confirmed.
 - Keep `CONTEXT.md` to `TRANSLATION.md` links optional: add a one-line pointer only when localization affects audience, domain terms, product naming, or user-facing copy, and never create broken pointers.
@@ -175,16 +174,6 @@ Codex skills reference: `https://developers.openai.com/codex/skills/`.
 - In local orchestrator mode, the `plan-feature` Feature Spec phase owns the Feature Spec and accepted project/repo/gate support files, while the issue phase owns issue files and never refreshes `PROJECT.md`, `repos/*.md`, or `integration-gates.md`; requested support-file changes must finish in the Feature Spec phase before the issue-phase handoff.
 - Both `plan-feature` phases should read `project-memory/config/issue-tracker.md`, `project-memory/config/project-layout.md`, and related project memory before deciding where Feature Specs or issues belong.
 - Keep `plan-feature` lean profiles internal and evidence-driven: they may narrow discovery and repeated output for clear `spec-only` runs or small runs from an existing Feature Spec, but must not skip `$plan-harder`, verticality, graph, publication, or domain-closeout gates. Record exact phase-token deltas only for run-scoped uncontaminated counter intervals; label interleaved deltas as intervals or report `unavailable` without estimation. (Codex learning)
-
-### Triage skill
-- Keep `triage` focused on existing incoming GitHub or local markdown issues; new feature planning should still go through `plan-feature`.
-- In GitHub mode, use GitHub Issue Type for work kind (`Bug`, `Feature`, `Task` by default) and labels for workflow state.
-- In local markdown mode, persist `issue_type`, `workflow_state`, and
-  `source_spec_ref`; reject noncanonical issue metadata instead of reading or
-  rewriting aliases.
-- Treat `needs-info` as a human/reporter waiting state, not an implementation queue state: reporter activity returns the issue to `needs-triage` for re-evaluation before it can become `ready-for-agent`.
-- In local markdown mode, completed issues move to the configured `issues/done/` path instead of adding a new completed status; create the `done/` directory on demand when completing the first issue.
-- Before marking an existing issue `ready-for-agent`, `triage` must harden that single issue through `$plan-harder` and preserve the resulting agent brief in the tracker.
 
 ### Maintainer skill
 - Keep `maintainer` manual-only in Codex metadata with `policy.allow_implicit_invocation: false`; ordinary skill, plugin, metadata, docs, or repository change requests must not auto-select it. Use it only when the user invokes `$maintainer`, asks to run Maintainer, or an explicitly invoked parent workflow routes there. (Codex learning)

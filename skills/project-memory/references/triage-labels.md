@@ -1,9 +1,14 @@
-# Triage Labels
+# Issue Types And Workflow States
 
-The skills speak in terms of canonical issue types and canonical triage states.
-This file maps those canonical values to actual GitHub issue types and labels.
-Local Markdown persists the canonical `issue_type` and `workflow_state` values
-directly.
+Project Memory is the sole reusable owner of the canonical `issue_type` and
+`workflow_state` fields and values. The generated
+`project-memory/config/triage-labels.md` file is the repository-specific source
+of truth that maps those values to actual GitHub issue types and labels. Local
+Markdown persists the canonical values directly.
+
+Consumers such as `$plan-feature` may select or apply these values, but must
+load the Project Memory mapping and must not define a competing registry,
+aliases, or compatibility syntax.
 
 ## Issue Types
 
@@ -33,7 +38,7 @@ Issue Type values when available.
 In local markdown mode, record the canonical value as an `issue_type:` line
 near the top of the issue file.
 
-## Triage States
+## Workflow States
 
 Triage state describes where the issue is in the workflow. It can change as
 information arrives or work becomes ready.
@@ -62,3 +67,17 @@ acyclic so completed work cannot be locked behind circular prerequisites.
 Edit the right-hand columns to match the vocabulary actually used in this
 repo's tracker. If GitHub issue types are disabled for the organization, record
 the fallback labels or body-field convention here.
+
+## Local Markdown Validation
+
+The header metadata region starts after the first H1 title and ends at the
+first `##` heading. Require exactly one `issue_type` and one `workflow_state`
+line in that region. Reject missing fields, unknown aliases, noncanonical
+values, or conflicting duplicate canonical fields. Do not add a schema-version
+field, and never treat similarly named fields in issue-body sections as header
+metadata.
+
+For a Plan-generated issue, keep `source_spec_ref` only in the canonical
+`## Execution Contract` row. Never duplicate it in the header. A
+`source_spec_ref` beginning with `proposed-spec:` is proposal-only and cannot
+receive an applied `workflow_state: ready-for-agent` value.

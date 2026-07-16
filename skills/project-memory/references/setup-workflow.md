@@ -180,9 +180,9 @@ exists or is authorized; never create a broken pointer:
 
 [one-line summary of project topology]. See `project-memory/config/project-layout.md`.
 
-### Triage types and labels
+### Issue types and workflow states
 
-[one-line summary of issue type and state vocabulary]. See `project-memory/config/triage-labels.md`.
+[one-line summary of the canonical issue type/workflow state vocabulary and its tracker mappings]. See `project-memory/config/triage-labels.md`.
 
 ### Domain memory
 

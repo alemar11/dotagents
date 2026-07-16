@@ -13,7 +13,8 @@ memory:
 - lean project-memory pointers in `AGENTS.md`;
 - tracker and delivery routing in `project-memory/config/issue-tracker.md`;
 - durable project topology in `project-memory/config/project-layout.md`;
-- issue type/state mappings in `project-memory/config/triage-labels.md`;
+- canonical issue type/state vocabulary and repository mappings in
+  `project-memory/config/triage-labels.md`;
 - domain layout in `project-memory/config/domain.md`;
 - `CONTEXT.md`, domain docs, and ADRs under `project-memory/adr/`;
 - optional `TRANSLATION.md` when localization rules are real.
@@ -29,7 +30,7 @@ structured fields in current handoffs and reports.
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | Tracker backend, delivery target, issue-type mapping, and triage-state mapping. |
+| `tracker-routing` | Tracker backend, delivery target, and canonical issue-type and workflow-state vocabulary and mappings. |
 | `project-layout` | Durable project topology: `single-repository`, `monorepo`, or `multi-repository-workspace`. |
 | `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
@@ -94,6 +95,13 @@ Behavior-affecting setup uses human-first Markdown tables with
 
 Retired delivery and repository-layout values are invalid input. Project-memory
 configuration must already use this schema before the runtime consumes it.
+
+`references/triage-labels.md` is the sole reusable registry for canonical
+`issue_type` and `workflow_state` values. The generated
+`project-memory/config/triage-labels.md` is the repository-specific source of
+truth for their tracker mappings. Consuming skills must load that mapping and
+must not define parallel enums or aliases.
+
 Do not add durable keys for Codex runtime workspace shape, source-root lists,
 worktree paths, setup flow, GitHub repo, coordination repo, workers,
 publication/issue-mutation authority, scheduled checks, or current-run
@@ -197,8 +205,10 @@ weak session evidence plainly.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
 - `project-layout.md`: durable `repository_layout` configuration and topology
   detection boundaries.
-- `issue-tracker-*.md`, `tracker-publishing.md`, `triage-labels.md`: tracker,
-  artifact, type/state, source-ref, and completion contracts.
+- `triage-labels.md`: sole reusable canonical issue-type/workflow-state registry
+  and repository mapping template.
+- `issue-tracker-*.md`, `tracker-publishing.md`: tracker artifact, source-ref,
+  publication, and completion contracts.
 - `domain.md`: domain-memory layout and ownership.
 - `domain-modeling.md`: domain setup, inline update, implementation closeout,
   and periodic review semantics.
