@@ -52,11 +52,11 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
-| `plan-feature` | Manually plan features into Feature Specs and agent-ready issues through full-flow, spec-only, or issues-from-existing-spec modes. |
+| `plan-feature` | Manually plan Feature Spec bundles and agent-ready issues in apply or proposal mode. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
-| `codex-orchestrator` | Execute execution-ready Feature Specs in visible Codex App tasks through one mandatory GitHub pull-request-ready implementation flow. |
+| `codex-orchestrator` | Execute execution-ready Feature Spec bundles in visible Codex App tasks through one fixed GitHub PR-ready flow. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
@@ -80,7 +80,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `codex-orchestrator` requires local `python3` and `git` for its shipped atomic active-root claim helper, `$autoreview`, and the relevant GitStack bundled skills for GitHub-backed issue lifecycle, CI, review, commit, and pull-request work. It accepts only execution-ready Feature Spec bundles and never performs planning or repairs incomplete planning artifacts.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, Feature Spec writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$gitstack:github-issues` for GitHub Feature Spec or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
+- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` when applying GitHub tracker mutations.
 
 ## Project-Local Skills
 
