@@ -3,99 +3,76 @@
 ## Scope
 
 Objective: <exact objective>
-Repositories: <canonical realpaths>
-Sources: <stable ids/refs>
+Repositories: <canonical Git common directories>
+Sources: <stable ids and refs>
 
-## Option Resolution
+## Authorization
 
-authorization_resolution: per-workstream
+| field | value | source_ref | evidence_fingerprint | resolved_at |
+| --- | --- | --- | --- | --- |
+| `visible_app_task_permission` | `granted-by-authorized-user` | <user instruction> | <sha256> | <RFC3339> |
 
-| scope_id | field | value | source | source_ref | fingerprint | resolved_at |
-| --- | --- | --- | --- | --- | --- | --- |
+Add `stale_claim_takeover_permission` only when explicitly resolved for an
+exact verified-stale conflict set.
 
-## Discovery Sources
+## Source Snapshots
 
-| source_id | source_ref | repository | fingerprint | acceptance_ref | closeout_target |
-| --- | --- | --- | --- | --- | --- |
+| authoritative_source_ref | canonical_source_id | planned_done_ref | source_state | artifact_kind | canonical_repository | content_fingerprint | acceptance_ref | observed_at |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Active Root
 
 Root id: <id>
 Atomic claim ref: <absolute claim path>
 Atomic claim fingerprint: <sha256>
-Goal mode: active|unavailable
-Goal evidence: <ref>
-Repository claims: <realpaths>
+Repository claims: <Git common directories>
 Source claims: <ids>
 Opened at: <RFC3339>
 Heartbeat at: <RFC3339>
-Takeover evidence: <none or ref>
-
-## Codex Review Wait Registry
-
-| revision_key | request_ref | provider_state | observation_fingerprint | result_disposition | wait_profile | wait_started_at | wait_deadline | due_at | poll_owner |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+Takeover transaction: <none or transaction id and prepared-journal ref>
+Takeover evidence: <none or permission plus full replaced-claim snapshots, prior ledger refs, and validated per-Spec task/Goal/managed-checkout or no-task mappings>
 
 ## Feature Spec Task Registry
 
-| feature_spec_ref | feature_spec_title | task_ref | task_evidence_ref | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | state | last_observed |
+| source_spec_ref | feature_spec_title | task_ref | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+## Codex Review Wait Registry
+
+| revision_key | request_ref | provider_state | observation_fingerprint | disposition | wait_started_at | wait_deadline | due_at | poll_owner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-Worker evidence:
+## Gate Evidence
 
-- feature_spec_ref=<ref>; task_ref=<visible task id>;
-  managed_checkouts=<repository checkout refs>;
-  parallelism=<parallel|sequential>; fallback_reason=<none or evidence>.
-
-## Parent Closeout Handoff
-
-| source_spec_ref | closeout_vehicle | state | evidence | external_next_action |
-| --- | --- | --- | --- | --- |
-
-## Recovery Packet
-
-Option fingerprint: <hash>
-Repository fingerprints: <refs>
-Active task refs: <refs or none>
-Due gates/checks: <refs or none>
-Next action: <action and target>
-Evidence index: <refs>
-
-## Gate Policy
-
-| scope_id | gate | requirement | state | evidence |
-| --- | --- | --- | --- | --- |
-
-## Workstreams
-
-### active
-
-### needs-owner
-
-### ready-next
-
-### blocked
-
-### deferred
-
-### completed
-
-### released
-
-Each workstream row records source/spec, repositories/paths, dependencies,
-allowed actions, delivery and issue permissions, task ref, evidence, gates,
-lifecycle state, and next action.
+| source_spec_ref | repository | gate | state | evidence_ref | observed_at |
+| --- | --- | --- | --- | --- | --- |
 
 ## Wave Reports
 
-Record selected Specs, dependency proof, slots, task refs, changes, validation,
-delivery, reconciliation, and recovery update.
+For each wave record ordered ready candidates, merged-dependency and
+path-disjointness proof, capacity, selected task refs, state changes,
+validation, PR mergeability/repository rules, review/CI,
+domain-knowledge closeout, and tracker-closeout
+evidence, and next action.
 
-## Runtime Metrics
+## Recovery Packet
 
-Record exact phase counters only when measured over an uncontaminated interval;
-otherwise use `unavailable`.
+Source fingerprints: <refs>
+Repository fingerprints: <refs>
+Atomic claim fingerprint: <sha256>
+Active task refs: <refs or none>
+Managed checkout evidence: <refs>
+Current PR tuples: <refs or none>
+Domain closeout evidence: <none or captured gate evidence ref bound to delta fingerprint, destinations, docs diff, and implementation revision tuples>
+Due checks: <refs or none>
+Next action: <action and target>
+Evidence index: <refs>
+
+## External Handoffs
+
+| handoff_kind | source_spec_ref | pull_request_tuples | tracker_closeout_ref | due_or_next_action | evidence_ref |
+| --- | --- | --- | --- | --- | --- |
 
 ## Notes
 
-<bounded durable runtime notes>
+<bounded runtime notes only>

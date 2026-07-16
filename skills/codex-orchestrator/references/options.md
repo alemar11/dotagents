@@ -1,75 +1,68 @@
-# Orchestrator Option Contract
+# App Orchestrator Authorization Contract
 
 ## Syntax And Hard Cut
 
 Behavior fields use snake_case and enum values use lower-kebab. Resolve prose
 directly to canonical values and persist only those values. Reject aliases,
-retired fields, and unknown structured inputs.
+retired fields, unknown structured inputs, and merge authorization fields.
 
-This file owns every App orchestration option. Merge authorization and merge
-confirmation are not options: this skill stops when every pull request is ready
-to merge and rejects merge fields as unknown structured input.
+This file owns every user-controlled App orchestration field.
 
 ## Registry
 
-| Field | Allowed values | Default | Notes |
+| Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Explicit visible App task consent. |
-| `existing_orchestrator_session_takeover_policy` | `deny`, `takeover-authorized` | `deny` | Active-root takeover. |
-| `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | Derived | Project topology. |
-| `change_delivery_target` | `pull-request-ready-for-merge-but-not-merged` | Derived | Fixed App workstream target. |
-| `change_delivery_permission` | `not-granted`, `granted-for-selected-target` | Derived | Exact target authority transferred by the execution-ready Feature Spec bundle. |
-| `issue_update_permission` | `no-issue-changes`, `pull-request-closing-keyword-only`, `direct-issue-updates-explicitly-authorized` | `no-issue-changes` | Issue mutation authority. |
-| `codex_review_requirement` | `required-on-current-pull-request-head`, `explicitly-skipped-by-authorized-user` | `required-on-current-pull-request-head` | Current-head review gate. |
-| `delivery_decision_origin` | `inherited-from-feature-spec`, `overridden-by-implementation-issue`, `specified-by-authorized-user` | Derived | Origin of the fixed target; evidence remains separate. |
-| `issue_repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | Derived | Issue-effective repository layout. |
-| `pull_request_count_strategy` | `one-pull-request-total`, `one-pull-request-per-repository` | Derived | PR topology. |
-| `parallelization` | `independent`, `depends-on`, `blocks`, `root-integrated` | Derived | Issue graph relationship; ids remain separate data. |
-| `issue_completion_method` | `feature-pull-request-closing-keyword`, `repository-pull-request-closing-keyword`, `move-local-issue-to-done-after-proof`, `no-issue-completion` | Derived | Terminal issue lifecycle action. |
-| `domain_closeout` | `not-applicable`, `implementation-closeout` | `not-applicable` | Durable decision closeout requirement. |
-| `starting_checkout_branch_handling` | `preserve`, `branch-switch-authorized` | `preserve` | Owner checkout authority. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent to create one visible App task per executable Feature Spec and perform the complete fixed flow. |
+| `stale_claim_takeover_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Exceptional run-scoped consent to stop the disclosed conflicting tasks, replace their complete verified-stale root scopes, and adopt the same task refs. |
 
-App implementation requires
-`visible_app_task_permission=granted-by-authorized-user`. Resolve it only after
-the mandatory runtime surface gate verifies visible Codex App task creation and
-App-managed worktree binding. After that gate, resolve permission before all
-other runtime work. `not-requested` requires one direct permission question;
-`denied-by-authorized-user`, no answer, or inability to ask aborts without
-runtime artifacts. No field selects worker surface, worker count, checkout
-strategy, unmanaged checkout fallback, task Goal behavior, or delivery owner.
+Resolve `visible_app_task_permission` only after the mandatory runtime surface
+gate proves visible Codex App task creation and App-managed worktree binding.
+When missing, ask once. Denial, no answer, or inability to ask aborts without
+runtime artifacts.
 
-## Fixed App Delivery
+The visible-task grant authorizes only the disclosed fixed execution flow:
+inspect, edit, validate, commit, push, publish or update pull requests, request
+and poll current-revision Codex review, fix actionable findings, wait for CI,
+prepare tracker closeout, move completed local Markdown issue files to the
+configured done folder on the delivery branch after substantive proof, commit
+and push the moves, rerun final current-head gates, convert draft pull requests
+to ready-for-review, and report. It never
+authorizes scope expansion, merge, release, deployment, or target-repository
+instruction changes.
 
-The App orchestrator does not offer a delivery-target choice. It accepts only
-`change_delivery_target=pull-request-ready-for-merge-but-not-merged` together
-with `change_delivery_permission=granted-for-selected-target`. Every other
-target is unsupported for App execution and blocks before task dispatch. Do not
-ask the user to select a target and do not downgrade after a capability failure.
-Neither the root nor the visible task merges. A later merge request belongs to a
-separate GitHub workflow.
+Resolve `stale_claim_takeover_permission` after read-only discovery proves an
+atomic claim conflict, stale-heartbeat evidence, every replaced root's complete
+repository/source scope, and every recorded task's identity and resumability.
+The separate question names those roots, scopes, and tasks and discloses the
+exact interruption or termination, full-scope claim replacement, and same-task
+adoption. Denial aborts as `needs-owner` before stopping a task. Only a grant
+permits the root to stop and verify every task; stale heartbeat alone is
+insufficient.
 
-## Derived Execution Fields
+## Fixed Policy And Bundle Data
 
-The App orchestrator derives:
+The successful outcome is always
+`pull-request-ready-for-merge-but-not-merged`; current-revision Codex review is
+always required; execution always uses one visible task per Feature Spec,
+App-managed worktrees, and at most three nonterminal tasks. These are invariants,
+not options.
 
-| Field | Value |
-| --- | --- |
-| `execution_unit` | `feature-spec` |
-| `feature_spec_task_cap` | `3` |
-| `checkout_owner` | `codex-app-managed` |
-| `lifecycle_owner` | `visible-feature-spec-task` |
-| `root_implementation_fallback` | `forbidden` |
+Source refs, feature slugs, repositories, allowed paths, target branch names,
+intra-Spec dependency ids, parent Feature Spec dependency rows, acceptance
+criteria, validation commands, and an optional final-issue knowledge closeout
+are bundle data. A Feature Spec body never carries the knowledge payload. Task
+ids, managed checkouts, canonical claim/task source ids, source fingerprints,
+discovered default PR bases, PR count, scheduling, tracker closeout, Goal
+evidence, review/CI state, prepared-takeover transaction ids, prior-claim
+snapshots, and per-Spec task-adoption mappings are derived runtime evidence.
+They are never additional user-controlled fields.
 
-## Resolution Evidence
+For a local Markdown issue, the tracker-owning repository plus its exact active
+and derived `done/` paths are required execution-bundle scope. Both paths must
+resolve inside an affected Git repository and its App-managed checkout; this is
+not another user-controlled field.
 
-Every resolved row records scope id, field, canonical value, source category,
-source ref, evidence fingerprint, resolver, and timestamp. Authorized mutations
-require exact user/source evidence scoped to the affected workstream or object.
-
-The complete delivery projection also carries `target_branch_name`, source and
-issue refs, dependency ids, validation commands, and the evidence fields paired
-with permission-bearing rows. Those are validated data, not enum options.
-
-Worker-surface selection, checkout strategy, unmanaged worktree fallback,
-actual execution location, delegation visibility, and numeric worker limits
-are not options and are invalid as structured inputs.
+Delivery permissions, review requirements or skips, worker action lists,
+parallelization, checkout strategies, repository-layout copies, PR-count
+strategies, completion methods, closeout enums, lifecycle owners, adapter
+fields, and root fallbacks are retired and invalid as structured inputs.

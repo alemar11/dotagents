@@ -16,7 +16,7 @@ def run_app_preclaim_fixture(
     mutations: list[str] = []
     if not surface_available:
         return "unsupported-runtime", observations, mutations
-    observations.append("permission")
+    observations.append("authorization")
     if permission != "granted-by-authorized-user":
         return "permission-denied", observations, mutations
     observations.append("intake")
@@ -24,29 +24,6 @@ def run_app_preclaim_fixture(
         return "planning-required", observations, mutations
     mutations.extend(["atomic-claim", "ledger-projection", "portfolio-goal"])
     return "accepted", observations, mutations
-
-
-def permission_contract_conflicts(text: str) -> list[str]:
-    normalized = " ".join(text.split()).lower()
-    conflicts: list[str] = []
-    patterns = {
-        "permission-before-surface": (
-            r"resolve it before all other runtime work",
-            r"first resolve visible-task permission",
-            r"(?:ask|request|resolve).{0,80}(?:consent|permission).{0,80}before.{0,80}(?:verify|check|inspect).{0,80}(?:app|runtime).{0,80}(?:capabilit|surface)",
-        ),
-        "broad-task-creation-grant": (
-            r"if the instruction grants task creation",
-            r"generic delegation (?:grants?|authorizes?).{0,120}visible (?:app )?task",
-            r"subagent authority (?:grants?|authorizes?).{0,120}visible (?:app )?task",
-            r"delegation(?!.{0,100}does not grant).{0,80}(?:includes|covers|grants?|authorizes?).{0,80}visible.{0,40}tasks?",
-            r"task creation permission.{0,80}(?:inherited|derived).{0,80}(?:worker|subagent|delegation) authority",
-        ),
-    }
-    for label, candidates in patterns.items():
-        if any(re.search(candidate, normalized) for candidate in candidates):
-            conflicts.append(label)
-    return conflicts
 
 
 class AppOrchestratorContractTests(unittest.TestCase):
@@ -61,7 +38,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
     def runtime_text(self) -> str:
         return "\n".join(path.read_text() for path in self.runtime_paths())
 
-    def test_required_package_files_exist(self) -> None:
+    def test_required_package_files_and_removed_stack_reference(self) -> None:
         required = {
             "SKILL.md",
             "agents/openai.yaml",
@@ -72,100 +49,222 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "references/worker.md",
             "references/gates.md",
             "references/spec-backed-delivery.md",
-            "references/stacked-feature-specs.md",
             "references/codex-review-closeout.md",
             "references/recovery-validation.md",
             "references/multi-repo-workspace.md",
         }
         self.assertTrue(all((ROOT / path).is_file() for path in required))
+        self.assertFalse((ROOT / "references/stacked-feature-specs.md").exists())
 
-    def test_app_surface_is_visible_task_only(self) -> None:
-        text = self.runtime_text()
-        for required in (
-            "visible_app_task_permission=granted-by-authorized-user",
-            "exactly one visible task per Feature Spec",
-            "App-managed worktrees",
-            "root_implementation_fallback",
-            "forbidden",
-            "assignment-scoped Goal",
-            "feature_spec_task_cap",
-            "`3`",
-        ):
-            self.assertIn(required, text)
-        self.assertIn("abort as blocked", text)
-        self.assertIn("## Mandatory Permission Gate", text)
-        self.assertIn("ask the user once", text)
-        self.assertIn("abort the run without implementation or runtime", text)
-        self.assertIn("explicitly grants creation of visible Codex App tasks", text)
-        self.assertIn("Generic delegation, subagent, background-worker", text)
-        self.assertIn("does not grant visible App task creation", text)
-
-    def test_runtime_surface_gate_precedes_permission_and_all_work(self) -> None:
+    def test_runtime_surface_gate_precedes_authorization_and_intake(self) -> None:
         skill = self.read("SKILL.md")
-        metadata = self.read("agents/openai.yaml")
-        options = self.read("references/options.md")
         surface = skill.index("## Mandatory Runtime Surface Gate")
-        permission = skill.index("## Mandatory Permission Gate")
+        authorization = skill.index("## Mandatory Run Authorization")
+        intake = skill.index("## Execution-Ready Intake")
         controller = skill.index("## Controller Loop")
 
-        self.assertLess(surface, permission)
-        self.assertLess(permission, controller)
-        self.assertIn("This is the first runtime step", skill[surface:permission])
-        self.assertIn("visible Codex App task\n  creation", skill[surface:permission])
-        self.assertIn("App-managed worktree binding", skill[surface:permission])
-        self.assertIn("generic/background subagent tools", skill[surface:permission])
-        self.assertIn("Do not ask for visible-task\n  permission", skill[surface:permission])
+        self.assertLess(surface, authorization)
+        self.assertLess(authorization, intake)
+        self.assertLess(intake, controller)
+        surface_text = " ".join(skill[surface:authorization].split())
+        self.assertIn("This is the first runtime step", surface_text)
+        self.assertIn("visible Codex App task creation", surface_text)
+        self.assertIn("App-managed worktree binding", surface_text)
+        self.assertIn("without asking permission", surface_text)
         self.assertIn("0. **SURFACE**", skill[controller:])
-        self.assertLess(skill.index("0. **SURFACE**"), skill.index("1. **PERMISSION**"))
-        self.assertIn("First verify that the current runtime exposes", metadata)
-        self.assertIn("abort before asking permission", metadata)
-        self.assertIn("Resolve it only after\nthe mandatory runtime surface gate", options)
-        self.assertIn("App-managed worktree binding", options)
-        self.assertNotIn("Resolve it before all\nother runtime work", options)
+        self.assertLess(skill.index("0. **SURFACE**"), skill.index("1. **AUTHORIZE**"))
 
-        recovery = self.read("references/recovery-validation.md")
-        recovery_surface = recovery.index("## Mandatory App Runtime Surface Revalidation")
-        recovery_validation = recovery.index("## Freshness Validation")
-        self.assertLess(recovery_surface, recovery_validation)
-        recovery_gate = " ".join(
-            recovery[recovery_surface:recovery_validation].split()
+        recovery = " ".join(
+            self.read("references/recovery-validation.md").split()
         )
-        self.assertIn("before reading the Recovery Packet", recovery_gate)
-        self.assertIn("visible Codex App task creation", recovery_gate)
-        self.assertIn("App-managed worktree binding", recovery_gate)
-        self.assertIn("without asking permission", recovery_gate)
-        self.assertIn("Only after this gate passes", recovery_gate)
+        self.assertIn("Before reading the packet", recovery)
+        self.assertIn("visible Codex App task creation", recovery)
+        self.assertIn("App-managed worktree binding", recovery)
+        self.assertIn("without asking permission", recovery)
 
-        for path in self.runtime_paths():
-            with self.subTest(path=path.relative_to(ROOT)):
-                self.assertEqual(permission_contract_conflicts(path.read_text()), [])
+    def test_option_registry_contains_only_two_run_permissions(self) -> None:
+        options = self.read("references/options.md")
+        fields = re.findall(r"^\| `([a-z][a-z0-9_]*)` \|", options, re.MULTILINE)
+        self.assertEqual(
+            fields,
+            ["visible_app_task_permission", "stale_claim_takeover_permission"],
+        )
+        for field in fields:
+            row = next(line for line in options.splitlines() if line.startswith(f"| `{field}`"))
+            for value in (
+                "not-requested",
+                "granted-by-authorized-user",
+                "denied-by-authorized-user",
+            ):
+                self.assertIn(value, row)
+        self.assertIn("This file owns every user-controlled App orchestration field", options)
 
-        contradictory_fixtures = {
-            "permission-first": "First resolve visible-task permission from the invocation.",
-            "legacy-order": "Resolve it before all other runtime work.",
-            "generic-delegation": (
-                "Generic delegation grants visible App task creation for this run."
-            ),
-            "generic-subagent": (
-                "Subagent authority authorizes visible task permission for this run."
-            ),
-            "consent-before-capabilities": (
-                "Ask for consent before verifying App capabilities."
-            ),
-            "delegation-includes-visible-tasks": (
-                "Delegation includes visible App tasks for this run."
-            ),
-            "worker-authority-inheritance": (
-                "Task creation permission is inherited from worker authority."
-            ),
-        }
-        for label, fixture in contradictory_fixtures.items():
-            with self.subTest(fixture=label):
-                self.assertTrue(permission_contract_conflicts(fixture))
+    def test_one_consent_covers_the_complete_fixed_flow(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        options = " ".join(self.read("references/options.md").split())
+        for token in (
+            "inspect",
+            "edit",
+            "validate",
+            "commit",
+            "push",
+            "publish or update pull requests",
+            "current-revision Codex review",
+            "fix findings",
+            "wait for CI",
+            "prepare tracker closeout",
+            "move completed local Markdown issue files",
+            "convert draft pull requests to ready-for-review",
+        ):
+            self.assertIn(token, skill)
+        self.assertIn(
+            "visible_app_task_permission=granted-by-authorized-user", skill
+        )
+        self.assertIn("fixed execution flow", options)
+        self.assertIn("Generic delegation or subagent authority never supplies this grant", skill)
 
-    def test_app_surface_has_no_manual_checkout_or_alternate_worker_machinery(self) -> None:
-        text = self.runtime_text().lower()
-        forbidden = (
+    def test_fixed_worker_actions_are_not_an_option(self) -> None:
+        worker = self.read("references/worker.md")
+        options = self.read("references/options.md")
+        self.assertIn("## Fixed Actions", worker)
+        for action in (
+            "inspect",
+            "edit",
+            "validate",
+            "commit",
+            "push",
+            "complete-domain-closeout",
+            "publish-or-update-pull-request",
+            "run-autoreview",
+            "mark-ready-for-review",
+            "request-review",
+            "poll-review",
+            "fix-review",
+            "run-ci",
+            "prepare-tracker-closeout",
+            "move-local-issues-to-done",
+            "check-mergeability",
+            "report",
+        ):
+            self.assertIn(action, worker)
+        self.assertNotIn("worker_allowed_actions", worker)
+        self.assertNotIn("worker_allowed_actions", options)
+
+    def test_app_has_one_fixed_successful_conclusion_and_never_merges(self) -> None:
+        runtime = self.runtime_text()
+        skill = " ".join(self.read("SKILL.md").split())
+        fixed = "pull-request-ready-for-merge-but-not-merged"
+        for relative in (
+            "SKILL.md",
+            "references/options.md",
+            "references/worker.md",
+            "agents/openai.yaml",
+        ):
+            self.assertIn(fixed, self.read(relative))
+        self.assertIn("only successful App result", skill)
+        self.assertIn("This skill never merges a pull request", skill)
+        self.assertIn("A later merge request must start a separate GitHub workflow", skill)
+        self.assertNotIn("pull_request_merge_permission", runtime)
+        self.assertNotIn("pull_request_merge_confirmation", runtime)
+
+    def test_intake_uses_one_execution_contract_and_root_fingerprints(self) -> None:
+        delivery = self.read("references/spec-backed-delivery.md")
+        skill = " ".join(self.read("SKILL.md").split())
+        self.assertIn("exactly one `## Execution Contract`", delivery)
+        fields = re.findall(r"^\| `([a-z][a-z0-9_]*)` \|", delivery, re.MULTILINE)
+        self.assertEqual(
+            fields,
+            [
+                "source_spec_ref",
+                "feature_slug",
+                "affected_repositories",
+                "allowed_paths",
+                "target_branch_name",
+                "dependency_ids",
+            ],
+        )
+        self.assertIn("computes its own fingerprints", " ".join(delivery.split()))
+        self.assertIn("Earlier generated issue ids within this Feature Spec", delivery)
+        self.assertIn("`## Feature Dependencies` table", delivery)
+        self.assertIn("`upstream_feature_spec_ref`", delivery)
+        self.assertIn("`dependency_reason`", delivery)
+        self.assertIn("`proposed-spec:<...>` refs", delivery)
+        self.assertIn("one read-only intake", skill)
+        self.assertIn("planning-required", skill)
+        self.assertIn("unsupported-app-delivery-target", skill)
+        self.assertIn("no claim, ledger, Goal, task, tracker write, or source mutation", skill)
+        self.assertNotIn("$plan-feature", self.runtime_text())
+        self.assertIn("mandatory `## Feature Dependencies` table", delivery)
+        self.assertIn("Never interpret absence as an empty edge set", delivery)
+        self.assertNotIn("legacy Feature Spec", delivery)
+
+    def test_plan_feature_execution_contract_matches_app_consumer(self) -> None:
+        producer = (
+            REPO / "skills/plan-feature/references/issue-body-template.md"
+        ).read_text()
+        base_contract = producer.split("## Execution Contract", 1)[1].split(
+            "## Goal", 1
+        )[0]
+        producer_fields = re.findall(
+            r"^\| `([a-z][a-z0-9_]*)` \|", base_contract, re.MULTILINE
+        )
+        consumer_fields = re.findall(
+            r"^\| `([a-z][a-z0-9_]*)` \|",
+            self.read("references/spec-backed-delivery.md"),
+            re.MULTILINE,
+        )
+        self.assertEqual(producer_fields, consumer_fields)
+        self.assertEqual(len(consumer_fields), 6)
+        self.assertNotIn("non_app_delivery_target", base_contract)
+
+    def test_retired_structured_fields_are_a_hard_cut(self) -> None:
+        runtime = self.runtime_text()
+        for field in (
+            "existing_orchestrator_session_takeover_policy",
+            "change_delivery_permission",
+            "codex_review_requirement",
+            "delivery_decision_origin",
+            "issue_repository_layout",
+            "pull_request_count_strategy",
+            "issue_completion_method",
+            "domain_closeout",
+            "starting_checkout_branch_handling",
+            "worker_allowed_actions",
+            "execution_adapter",
+            "lifecycle_owner",
+        ):
+            self.assertNotIn(field, runtime, field)
+
+    def test_scheduling_is_deterministic_path_disjoint_and_merge_gated(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        self.assertIn("Sort ready candidates by canonical claim/task source id ascending", skill)
+        self.assertIn("`## Feature Dependencies` table", skill)
+        self.assertIn("Greedily select", skill)
+        self.assertIn("remaining three-task capacity", skill)
+        self.assertIn("pairwise disjoint", skill)
+        self.assertIn("ancestor/descendant path scopes as overlapping", skill)
+        self.assertIn(
+            "every upstream ref in its parent `## Feature Dependencies` table is merged",
+            skill,
+        )
+        self.assertIn("merge-ready but unmerged upstream does not make a downstream ready", skill)
+        for token in (
+            "upstream-merge-ready-head",
+            "intermediate-upstream-merge-handoff",
+            "pre-promotion",
+            "awaiting-upstream-merge",
+            "resyncing",
+        ):
+            self.assertNotIn(token, self.runtime_text())
+
+    def test_app_surface_is_one_managed_task_per_spec(self) -> None:
+        runtime = self.runtime_text()
+        normalized = runtime.lower()
+        self.assertIn("exactly one visible app task", normalized)
+        self.assertIn("app-managed worktrees", normalized)
+        self.assertIn("assignment-scoped goal", normalized)
+        self.assertIn("at most three nonterminal", normalized)
+        for token in (
             "tmux",
             "codex exec",
             "git worktree add",
@@ -175,111 +274,160 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "implementation_checkout_strategy",
             "current-orchestrator-session",
             "background-codex-subagent",
-        )
-        for token in forbidden:
-            self.assertNotIn(token, text, token)
+        ):
+            self.assertNotIn(token, normalized)
 
-    def test_app_has_one_fixed_successful_implementation_conclusion(self) -> None:
-        skill = self.read("SKILL.md")
-        options = self.read("references/options.md")
-        worker = self.read("references/worker.md")
-        metadata = self.read("agents/openai.yaml")
-        fixed = "pull-request-ready-for-merge-but-not-merged"
-        for text in (skill, options, worker, metadata):
-            self.assertIn(fixed, text)
-        self.assertIn("The only successful App implementation conclusion", skill)
-        self.assertIn("## Fixed App Delivery", options)
-        self.assertIn("## Fixed Implementation Conclusion", skill)
-        self.assertIn("PR-PREFLIGHT", skill)
-        self.assertIn("never downgrade", skill)
-        self.assertNotIn("target-complete", worker)
-        self.assertLess(skill.index("2. **INTAKE**"), skill.index("3. **CLAIM**"))
-        self.assertLess(skill.index("3. **CLAIM**"), skill.index("4. **REGISTER**"))
-        claim_step = skill.split("3. **CLAIM**", 1)[1].split("4. **REGISTER**", 1)[0]
-        normalized_claim_step = " ".join(claim_step.split())
-        self.assertLess(
-            normalized_claim_step.index("acquire the active-root claim atomically"),
-            normalized_claim_step.index("create the portfolio Goal or exact fallback"),
+        recovery = " ".join(
+            self.read("references/recovery-validation.md").split()
         )
-        self.assertLess(skill.index("4. **REGISTER**"), skill.index("5. **PR-PREFLIGHT**"))
-        self.assertLess(skill.index("5. **PR-PREFLIGHT**"), skill.index("6. **DISPATCH**"))
+        worker = " ".join(self.read("references/worker.md").split())
+        self.assertIn("Resume only the original visible task", recovery)
+        self.assertIn("never create a replacement", recovery)
+        self.assertIn("resumed in the same visible task", worker)
+        self.assertNotIn("resumed or replaced", normalized)
+        self.assertNotIn("`replaced`", self.read("references/worker.md"))
 
-    def test_app_accepts_only_execution_ready_bundles_and_never_plans(self) -> None:
-        skill = self.read("SKILL.md")
-        delivery = self.read("references/spec-backed-delivery.md")
-        metadata = self.read("agents/openai.yaml")
-        runtime = self.runtime_text()
-        normalized_skill = " ".join(skill.split())
-        normalized_delivery = " ".join(delivery.split())
-
-        self.assertIn("## Execution-Ready Intake", skill)
-        self.assertIn("one read-only intake", normalized_skill)
-        self.assertIn("planning-required", skill)
-        self.assertIn("unsupported-app-delivery-target", skill)
-        self.assertIn("pr-preflight-failed", skill)
-        self.assertIn("Do not continue to CLAIM", normalized_skill)
-        self.assertIn("no runtime artifact or mutation was created", normalized_skill)
-        self.assertIn("Do not fabricate ledger-derived status", normalized_skill)
-        self.assertIn("durable Feature Spec", delivery)
-        self.assertIn("complete generated implementation issue graph", normalized_delivery)
-        self.assertIn(
-            "never creates, repairs, regenerates, or publishes planning artifacts",
-            normalized_delivery,
-        )
-        self.assertIn(
-            "Merge authority is not an execution-ready handoff field",
-            normalized_delivery,
-        )
-        self.assertIn("merge execution is outside this skill", normalized_skill.lower())
-        self.assertIn("invalid as structured orchestrator input", normalized_delivery)
-        self.assertIn(
-            "The root validates and preserves that tuple; it never selects, rewrites, or widens it",
-            normalized_delivery,
-        )
-        self.assertNotIn("The root owns target selection", delivery)
-        self.assertIn("planning-required", metadata)
-        self.assertNotIn("$plan-feature", runtime)
-        self.assertNotIn("## Source Routing", skill)
-        self.assertNotIn("Rough intent without a Feature Spec", skill)
-        self.assertNotIn("Ad-hoc implementation source", skill)
-        self.assertNotIn("Missing implementation detail may be regenerated", runtime)
-        self.assertNotIn("safe-default-for-ad-hoc-work", runtime)
-        self.assertNotIn("temporary_source_execution_permission", runtime)
-
-        readme_dependency = next(
-            line
-            for line in (REPO / "README.md").read_text().splitlines()
-            if line.startswith("- `codex-orchestrator` requires")
-        )
-        agents_dependency = next(
-            line
-            for line in (REPO / "AGENTS.md").read_text().splitlines()
-            if line.startswith("- Treat `codex-orchestrator` as Codex-dependent")
-        )
-        self.assertNotIn("$plan-feature", readme_dependency)
-        self.assertNotIn("$plan-feature", agents_dependency)
-
-    def test_stacked_upstream_is_handed_off_before_downstream_waits(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
-        stacked = " ".join(
-            self.read("references/stacked-feature-specs.md").split()
-        )
-        self.assertIn("intermediate-upstream-merge-handoff", skill)
-        self.assertIn("intermediate-upstream-merge-handoff", stacked)
-        self.assertLess(
-            stacked.index("publish its pre-promotion draft PR"),
-            stacked.index("intermediate-upstream-merge-handoff"),
-        )
-        self.assertIn("Do this before waiting for the external merge", stacked)
-        self.assertIn("keep the active-root claim and recovery packet live", stacked)
-        self.assertIn("separate GitHub workflow", stacked)
-        self.assertIn("never accepts or executes that merge", stacked)
-
+    def test_review_is_mandatory_with_one_fixed_thirty_minute_deadline(self) -> None:
+        closeout = self.read("references/codex-review-closeout.md")
         gates = self.read("references/gates.md")
-        self.assertIn("parent-closeout preparation and external handoff proof", gates)
-        self.assertNotIn("issue/source closeout proof", gates)
+        for token in ("head SHA", "base ref", "merge-base SHA"):
+            self.assertIn(token, closeout)
+        self.assertIn("entire tuple matches", closeout)
+        self.assertIn("one 30-minute total active-wait deadline", closeout)
+        self.assertIn("monitoring-required", closeout)
+        self.assertIn("Do not extend the deadline", " ".join(closeout.split()))
+        self.assertIn("`review_operation`", closeout)
+        self.assertIn("`mutation_mode=apply`", closeout)
+        self.assertIn("never expose the translation as a user option", closeout)
+        self.assertIn("Review has no skip", gates)
+        self.assertNotIn("15-minute", closeout)
+        self.assertNotIn("extended profile", closeout)
+        self.assertNotIn("explicitly-skipped-by-authorized-user", self.runtime_text())
 
-    def test_preclaim_fixture_has_zero_mutations_on_every_early_abort(self) -> None:
+    def test_ci_requires_current_head_evidence_and_cannot_pass_empty(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        gates = " ".join(self.read("references/gates.md").split())
+
+        self.assertIn("expected to produce at least one applicable result", skill)
+        self.assertIn("exact head SHA", gates)
+        self.assertIn("Zero applicable CI results", gates)
+        self.assertIn("`ci-unavailable` blocker", gates)
+
+    def test_closeout_arms_issues_partials_and_global_parent_without_merging(self) -> None:
+        closeout = " ".join(
+            self.read("references/codex-review-closeout.md").split()
+        )
+        gates = " ".join(self.read("references/gates.md").split())
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+
+        for text in (closeout, gates, delivery):
+            self.assertIn("generated implementation issue", text)
+            self.assertIn("implementation-eligible Feature Spec", text)
+            self.assertIn("parent/global Feature Spec", text)
+            self.assertIn("final integration partial", text)
+            self.assertIn("every partial gate", text)
+            self.assertIn("fully qualified", text)
+        self.assertIn("default-branch closeout PR", closeout)
+        self.assertIn("hosted issues stay open until merge", delivery)
+        for text in (closeout, gates, delivery):
+            self.assertIn("default branch", text)
+
+    def test_ledger_is_a_compact_evidence_projection(self) -> None:
+        ledger = self.read("references/ledger.md")
+        template = self.read("references/ledger-template.md")
+        for text in (ledger, template):
+            for heading in (
+                "## Authorization",
+                "## Source Snapshots",
+                "## Active Root",
+                "## Feature Spec Task Registry",
+                "## Codex Review Wait Registry",
+                "## Recovery Packet",
+                "## External Handoff",
+            ):
+                self.assertIn(heading, text)
+            self.assertNotIn("## Option Resolution", text)
+            self.assertNotIn("Runtime Metrics", text)
+            self.assertNotIn("fallback_reason", text)
+
+    def test_takeover_contract_uses_renamed_permission(self) -> None:
+        runtime = self.runtime_text()
+        self.assertIn("stale_claim_takeover_permission", runtime)
+        self.assertIn("--takeover-permission granted-by-authorized-user", runtime)
+        self.assertIn("--expected-task-termination", runtime)
+        self.assertIn("--expected-task-adoption", runtime)
+        self.assertIn("claim recover-takeover", runtime)
+        self.assertIn("stale heartbeat alone", runtime.lower())
+        self.assertIn("claim retire-legacy", runtime)
+        self.assertIn("schema-3", runtime)
+        self.assertNotIn("--takeover-policy", runtime)
+        self.assertNotIn("takeover-authorized", runtime)
+
+    def test_takeover_permission_precedes_task_stop_and_preserves_task_identity(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        options = " ".join(self.read("references/options.md").split())
+        worker = " ".join(self.read("references/worker.md").split())
+
+        discovery = skill.index("perform read-only discovery first")
+        permission = skill.index("Then resolve `stale_claim_takeover_permission`")
+        stop = skill.index("may the root stop the tasks through the App runtime")
+        takeover = skill.index("scripts/orchestrator-claim --json claim takeover")
+        self.assertLess(discovery, permission)
+        self.assertLess(permission, stop)
+        self.assertLess(stop, takeover)
+
+        self.assertIn("Denial creates no task mutation", skill)
+        self.assertIn("complete repository/source scopes", skill)
+        self.assertIn("partial-root takeover is invalid", skill)
+        self.assertIn("adopt those exact tasks", skill)
+        self.assertIn(
+            "Never create a new task for a Spec that has recorded or embedded task evidence",
+            skill,
+        )
+        self.assertIn("before stopping a task", options)
+        self.assertIn("same-task adoption", options)
+        self.assertIn("adopt the exact original task ref", worker.lower())
+        self.assertIn("inability to adopt or resume it is a blocker", worker)
+
+    def test_takeover_is_prepared_recoverable_and_self_contained(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        ledger = " ".join(self.read("references/ledger.md").split())
+        recovery = " ".join(
+            self.read("references/recovery-validation.md").split()
+        )
+        worker = " ".join(self.read("references/worker.md").split())
+        options = self.read("references/options.md")
+
+        self.assertIn("prepared-takeover journal before it deletes any prior claim", skill)
+        self.assertIn("journal remains an ownership record", skill)
+        self.assertIn("full replaced-claim snapshot", skill)
+        self.assertIn("validated per-Spec adoption data", skill)
+        self.assertIn("claim recover-takeover", skill)
+        self.assertIn("<candidate-root>.takeover", ledger)
+        self.assertIn("journal itself owns the union scope", ledger)
+        self.assertIn("Every mutating helper command first replays", ledger)
+        self.assertIn("one `specs` entry for every claimed source exactly once", ledger)
+        self.assertIn("task_state: \"no-task\"", ledger)
+        self.assertIn("one owner across the complete takeover candidate", ledger)
+        self.assertIn("current branch to equal `target_branch_name`", ledger)
+        self.assertIn("`baseline_revision` resolves as a commit", ledger)
+        self.assertIn("candidate recovery root", ledger)
+        for field in (
+            '"source_spec_ref"',
+            '"task_ref"',
+            '"goal_evidence_ref"',
+            '"managed_checkouts"',
+        ):
+            self.assertIn(field, ledger)
+        self.assertIn("`ledger_ref`", ledger)
+        self.assertIn("rebuild only that exact projection", recovery)
+        self.assertIn("candidate claim's validated embedded adoption mapping", worker)
+        self.assertIn("prepared-takeover transaction ids", options)
+        self.assertNotIn("expected_task_adoption", options)
+
+    def test_preclaim_fixture_has_zero_mutations_on_early_abort(self) -> None:
         cases = (
             (False, "not-requested", False, "unsupported-runtime", ["surface"]),
             (
@@ -287,14 +435,14 @@ class AppOrchestratorContractTests(unittest.TestCase):
                 "denied-by-authorized-user",
                 True,
                 "permission-denied",
-                ["surface", "permission"],
+                ["surface", "authorization"],
             ),
             (
                 True,
                 "granted-by-authorized-user",
                 False,
                 "planning-required",
-                ["surface", "permission", "intake"],
+                ["surface", "authorization", "intake"],
             ),
         )
         for surface, permission, ready, expected, observations in cases:
@@ -314,77 +462,338 @@ class AppOrchestratorContractTests(unittest.TestCase):
             bundle_ready=True,
         )
         self.assertEqual(outcome, "accepted")
-        self.assertEqual(observations, ["surface", "permission", "intake"])
+        self.assertEqual(observations, ["surface", "authorization", "intake"])
         self.assertEqual(
-            mutations,
-            ["atomic-claim", "ledger-projection", "portfolio-goal"],
+            mutations, ["atomic-claim", "ledger-projection", "portfolio-goal"]
         )
 
-    def test_registry_tracks_one_visible_app_task_per_spec(self) -> None:
-        ledger = self.read("references/ledger.md")
-        template = self.read("references/ledger-template.md")
-        for text in (ledger, template):
-            self.assertIn("Feature Spec Task Registry", text)
-            self.assertIn("task_ref", text)
-            self.assertIn("task_evidence_ref", text)
-            self.assertNotIn("execution_adapter", text)
-            self.assertNotIn("adapter_evidence_ref", text)
-
-    def test_multi_repo_requires_managed_child_checkouts(self) -> None:
+    def test_multi_repo_requires_one_task_and_all_managed_checkouts(self) -> None:
         text = " ".join(self.read("references/multi-repo-workspace.md").split())
         self.assertIn("one visible App task per Feature Spec", text)
-        self.assertIn("isolated checkout for every required child repository", text)
-        self.assertIn("Do not use owner checkouts, raw helper worktrees", text)
+        self.assertIn("distinct isolated checkout for every required repository", text)
+        self.assertIn("one real, non-draft, reviewed, CI-clean", text)
+        self.assertIn("Each task uses its Feature Spec's target branch name", text)
+        self.assertIn("exactly one distinct repo-owned integration Feature Spec", text)
+        self.assertIn("bounded path change", text)
+        self.assertIn("validation-only or no-op", text)
+        self.assertIn("feature/<feature_slug>-integration", text)
+        self.assertIn("<ordinary_target_branch_name>-integration", text)
+        self.assertIn("must equal `<ordinary_target_branch_name>-integration`", text)
 
-    def test_options_use_canonical_syntax_and_retire_mixed_surface_fields(self) -> None:
-        text = self.read("references/options.md")
-        fields = re.findall(r"\| `([a-z][a-z0-9_]*)` \|", text)
-        self.assertTrue(fields)
-        self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9_]*", field) for field in fields))
-        self.assertIn("invalid as structured inputs", text)
-        self.assertIn("every App orchestration option", text)
-        self.assertIn("`granted-for-selected-target`", text)
-        self.assertIn("`pull-request-closing-keyword-only`", text)
-        self.assertIn("`delivery_decision_origin`", text)
-        self.assertIn("`pull_request_count_strategy`", text)
-        self.assertIn("`issue_completion_method`", text)
-        self.assertNotIn("pull_request_merge_permission", text)
-        self.assertNotIn("pull_request_merge_confirmation", text)
+    def test_knowledge_payload_exists_only_on_the_final_issue(self) -> None:
+        delivery = self.read("references/spec-backed-delivery.md")
+        skill = self.read("SKILL.md")
+        spec_template = (
+            REPO / "skills/plan-feature/references/spec-template.md"
+        ).read_text()
+        issue_template = (
+            REPO / "skills/plan-feature/references/issue-body-template.md"
+        ).read_text()
 
-    def test_merge_is_outside_the_orchestrator_surface(self) -> None:
-        runtime = self.runtime_text()
-        normalized = " ".join(runtime.split()).lower()
-        self.assertFalse((ROOT / "references/merge-authorization.md").exists())
-        self.assertNotIn("pull_request_merge_permission", runtime)
-        self.assertNotIn("pull_request_merge_confirmation", runtime)
-        self.assertIn("this skill never merges a pull request", normalized)
-        self.assertIn("a later merge request must start a separate github workflow", normalized)
-        self.assertIn("release the active-root claim", normalized)
+        self.assertNotIn("knowledge_delta:", spec_template)
+        self.assertNotIn("## Domain Knowledge Handoff", spec_template)
+        self.assertIn("## Domain Knowledge Closeout", issue_template)
+        self.assertIn("knowledge_delta:", issue_template)
+        self.assertIn("A Feature Spec containing", delivery)
+        self.assertIn("is incompatible", delivery)
+        self.assertIn("only in the final issue's `## Domain Knowledge Closeout`", skill)
 
-    def test_metadata_is_manual_app_entrypoint(self) -> None:
+    def test_knowledge_targets_must_fit_final_issue_execution_scope(self) -> None:
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        skill = " ".join(self.read("SKILL.md").split())
+
+        for contents in (delivery, skill):
+            self.assertIn("repository", contents)
+            self.assertIn("repo-relative path", contents)
+            self.assertIn("`affected_repositories`", contents)
+            self.assertIn("`allowed_paths`", contents)
+            self.assertIn("`planning-required`", contents)
+        self.assertIn("every `target_surfaces` entry", delivery)
+        self.assertIn("intake must not widen the Execution Contract", delivery)
+        self.assertIn("intake never widens execution scope", skill)
+
+    def test_knowledge_closeout_owner_is_graph_final_and_self_contained(self) -> None:
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        skill = " ".join(self.read("SKILL.md").split())
+
+        for contents in (delivery, skill):
+            self.assertIn("remaining", contents)
+            self.assertIn("dedicated integration partial", contents)
+            self.assertIn("memory_slice=domain-memory", contents)
+            self.assertIn("domain_operation=implementation-closeout", contents)
+            self.assertIn("after integrated behavior", contents)
+            self.assertIn("planning-required", contents)
+        self.assertIn("exclude it and its own `dependency_ids`", skill)
+        self.assertIn("no-dependent", skill)
+        self.assertIn("nodes with no dependents", delivery)
+        self.assertIn("Require exactly one `## Domain Knowledge Closeout` owner", delivery)
+        self.assertIn("temporarily remove the owner and its outgoing `dependency_ids`", delivery)
+        self.assertIn("No issue may depend on the owner", delivery)
+        self.assertIn("must not infer or add it from worker instructions", delivery)
+
+    def test_nonempty_knowledge_closeout_requires_captured_result(self) -> None:
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        skill = " ".join(self.read("SKILL.md").split())
+        gates = " ".join(self.read("references/gates.md").split())
+        worker = " ".join(self.read("references/worker.md").split())
+
+        for contents in (delivery, skill, gates, worker):
+            self.assertIn("capture_outcome=captured", contents)
+            self.assertIn("every", contents)
+            self.assertIn("named target", contents)
+            self.assertIn("documentation-diff", contents)
+            self.assertIn("deferred", contents)
+            self.assertIn("no-durable-change", contents)
+            self.assertIn("blocks", contents)
+            self.assertIn("contradicted", contents)
+            self.assertIn("owner decision", contents)
+        self.assertIn("Domain Knowledge Closeout Gate", gates)
+        self.assertIn("blocks domain closeout and terminal `merge-ready`", gates)
+
+    def test_domain_closeout_evidence_is_revision_bound_and_recoverable(self) -> None:
+        ledger = " ".join(self.read("references/ledger.md").split())
+        template = " ".join(self.read("references/ledger-template.md").split())
+        recovery = " ".join(self.read("references/recovery-validation.md").split())
+        review = " ".join(self.read("references/codex-review-closeout.md").split())
+
+        for token in (
+            "knowledge_delta` fingerprint",
+            "verified named destination",
+            "documentation-diff fingerprint",
+            "implementation revision tuples",
+        ):
+            self.assertIn(token, ledger)
+        self.assertIn("gate=domain-knowledge-closeout", ledger)
+        self.assertIn("Domain closeout evidence", template)
+        self.assertIn("recompute the delta fingerprint", recovery)
+        self.assertIn("requires the exact Project Memory closeout again", recovery)
+        self.assertIn("invalidates captured domain-closeout evidence", review)
+        self.assertIn("persist fresh delta", review)
+
+    def test_intake_rejects_non_forward_generated_dependencies(self) -> None:
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        skill = " ".join(self.read("SKILL.md").split())
+
+        self.assertIn("strictly-earlier intra-Spec dependency IDs", skill)
+        self.assertIn("strictly earlier generated issue", delivery)
+        self.assertIn("reject self, same-ID, and later-ID dependencies", delivery)
+
+    def test_github_shorthand_is_normalized_for_claim_and_task_identity(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        ledger = self.read("references/ledger.md")
+        template = self.read("references/ledger-template.md")
+
+        for text in (skill, delivery, ledger):
+            self.assertIn("owner/repository#N", text)
+            self.assertIn("https://github.com/owner/repository/issues/N", text)
+        self.assertIn("use the URL as the claim/task source id", skill)
+        self.assertIn("Preserve the shorthand as the authoritative artifact ref", delivery)
+        for text in (ledger, template):
+            self.assertIn("authoritative_source_ref", text)
+            self.assertIn("canonical_source_id", text)
+        self.assertIn("Never pass GitHub shorthand directly to the helper", skill)
+
+    def test_local_move_is_scoped_and_revalidated_at_the_resulting_head(self) -> None:
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        gates = " ".join(self.read("references/gates.md").split())
+        recovery = " ".join(
+            self.read("references/recovery-validation.md").split()
+        )
+        ledger = " ".join(self.read("references/ledger.md").split())
+
+        for token in (
+            "tracker-owning Git repository",
+            "exact active",
+            "derived `done/`",
+            "inside that affected Git repository",
+        ):
+            self.assertIn(token, delivery)
+        self.assertIn("outside all affected Git repositories is non-App-executable", delivery)
+        self.assertLess(gates.index("move each issue"), gates.index("commit and push"))
+        self.assertLess(gates.index("commit and push"), gates.index("current-revision review"))
+        self.assertLess(
+            gates.index("current-revision review"),
+            gates.index("terminal merge-ready state"),
+        )
+        self.assertIn("prepared", gates)
+        self.assertIn("planned_done_ref", ledger)
+        self.assertIn("source_state=active", ledger)
+        self.assertIn("source_state=done", ledger)
+        self.assertIn("accept a missing active path only when", recovery)
+        self.assertIn("do not classify it as external drift", recovery)
+        self.assertIn("Both paths, neither path", recovery)
+
+    def test_terminal_pr_base_is_derived_default_branch(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        gates = " ".join(self.read("references/gates.md").split())
+        closeout = " ".join(
+            self.read("references/codex-review-closeout.md").split()
+        )
+
+        self.assertIn("Every terminal PR targets", skill)
+        self.assertIn("discovered default branch", skill)
+        self.assertIn("derived and verified, never selected", skill)
+        self.assertIn("verified during preflight and current-head review", delivery)
+        self.assertIn("base equal to that repository's currently discovered default branch", gates)
+        self.assertIn("closing keywords cannot take effect", closeout)
+
+    def test_terminal_pr_requires_current_mergeability_and_repo_rules(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        gates = " ".join(self.read("references/gates.md").split())
+        worker = " ".join(self.read("references/worker.md").split())
+        ledger = " ".join(self.read("references/ledger.md").split())
+        closeout = " ".join(
+            self.read("references/codex-review-closeout.md").split()
+        )
+
+        for contents in (skill, gates, worker, closeout):
+            self.assertIn("`OPEN`", contents)
+            self.assertIn("mergeability", contents)
+            self.assertIn("conflict", contents)
+            self.assertIn("approval", contents)
+            self.assertIn("merge-queue eligibility", contents)
+            self.assertIn("unknown", contents.lower())
+            self.assertIn("never enqueue", contents.lower())
+        self.assertIn("gate=pr-mergeability", ledger)
+        self.assertIn("`isDraft=false`", ledger)
+        self.assertIn("exact PR/head/base/merge-base tuple", ledger)
+        self.assertIn("current-head mergeability and repository-rule evidence", skill)
+
+        report = " ".join(self.read("references/worker.md").split())
+        for token in (
+            "actual `capture_outcome`",
+            "delta fingerprint",
+            "verified named destination",
+            "documentation-diff fingerprint",
+            "implementation revision tuples",
+        ):
+            self.assertIn(token, report)
+        self.assertIn("convert it to ready-for-review", skill)
+        self.assertIn("transition is not the terminal result", skill)
+        self.assertIn("Do not make draft status a circular prerequisite", gates)
+        self.assertIn("ready-for-review with `isDraft=false`", gates)
+        self.assertIn("convert any draft to ready-for-review", worker)
+        self.assertIn("After that nonterminal transition", worker)
+        self.assertLess(
+            worker.index("convert any draft to ready-for-review"),
+            worker.index("current GitHub mergeability"),
+        )
+        states = worker.split("Canonical states are", 1)[1].split(".\n", 1)[0]
+        self.assertLess(
+            states.index("`marking-ready-for-review`"),
+            states.index("`review-polling`"),
+        )
+        self.assertLess(
+            states.index("`preparing-tracker-closeout`"),
+            states.index("`checking-mergeability`"),
+        )
+        self.assertNotIn("`marking-ready`", states)
+        self.assertIn("captured domain-closeout evidence", skill)
+        self.assertIn("read access to PR lifecycle", skill)
+        self.assertIn("mergeability/conflicts", skill)
+        for token in (
+            "current PR lifecycle/conflict/mergeability state",
+            "required base-freshness",
+            "approval state",
+            "merge-queue eligibility",
+            "observation tuple/time",
+        ):
+            self.assertIn(token, report)
+
+    def test_integration_partial_uses_a_distinct_per_spec_branch(self) -> None:
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        plan_options = " ".join(
+            (
+                REPO / "skills/plan-feature/references/options.md"
+            ).read_text().split()
+        )
+        fixture = (
+            REPO / "skills/plan-feature/references/full-flow-dry-run.md"
+        ).read_text()
+
+        self.assertIn("shared inside each Feature Spec", delivery)
+        self.assertIn("<ordinary_target_branch_name>-integration", delivery)
+        self.assertIn("feature/<feature_slug>-integration", plan_options)
+        self.assertIn("<ordinary_target_branch_name>-integration", plan_options)
+        self.assertIn("Branch sharing is per Feature Spec", plan_options)
+        self.assertIn(
+            "integration_target_branch: feature/account-settings-export-integration",
+            fixture,
+        )
+
+    def test_portfolio_rejects_same_repository_branch_collisions(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
+        workspace = " ".join(
+            self.read("references/multi-repo-workspace.md").split()
+        )
+
+        for contents in (skill, delivery, workspace):
+            self.assertIn("(repository, target_branch_name)", contents)
+            self.assertIn("implementation-eligible", contents)
+            self.assertIn("coordination-only parent/global", contents)
+            self.assertIn("no task", contents)
+            self.assertIn("App-managed worktree", contents)
+            self.assertIn("same branch name", contents)
+            self.assertIn("different repositories", contents)
+            self.assertIn("paths are disjoint", contents)
+            self.assertIn("`planning-required` before CLAIM", contents)
+        self.assertIn("Never serialize around it", skill)
+        self.assertIn("force-bind", skill)
+        self.assertIn("schedule around the collision", workspace)
+
+    def test_local_closeout_uses_one_ready_for_review_sequence(self) -> None:
+        clauses = {
+            "SKILL.md": "For a local source, after substantive acceptance",
+            "references/gates.md": "For local Markdown, complete substantive acceptance",
+            "references/codex-review-closeout.md": "For a local Markdown source, first finish",
+            "references/spec-backed-delivery.md": "For local Markdown, after substantive acceptance",
+            "references/worker.md": "For local tracker artifacts",
+            "../plan-feature/references/issue-body-template.md": "Local tracker: after implementation",
+        }
+
+        for path, start in clauses.items():
+            contents = " ".join(self.read(path).split())
+            self.assertIn(start, contents, path)
+            segment = contents.split(start, 1)[1][:900]
+            self.assertLess(segment.index("$autoreview"), segment.index("ready-for-review"), path)
+            self.assertLess(
+                segment.index("ready-for-review"),
+                segment.index("current-revision review"),
+                path,
+            )
+            self.assertLess(segment.index("current-revision review"), segment.index("CI"), path)
+            self.assertLess(segment.index("CI"), segment.index("terminal merge-ready"), path)
+
+    def test_metadata_is_manual_and_compact(self) -> None:
         metadata = self.read("agents/openai.yaml")
         self.assertIn('display_name: "Codex App Orchestrator"', metadata)
         self.assertIn("allow_implicit_invocation: false", metadata)
-        self.assertIn("Use only App-managed worktrees", metadata)
-
-    def test_review_freshness_uses_full_revision_tuple(self) -> None:
-        closeout = self.read("references/codex-review-closeout.md")
-        gates = self.read("references/gates.md")
-        for token in ("head SHA", "base ref", "merge-base SHA"):
-            self.assertIn(token, closeout)
-        self.assertIn("entire tuple matches", closeout)
-        self.assertIn("merge-base changes invalidate", gates)
-        for token in (
-            "Codex Review Wait Registry",
-            "15-minute standard",
-            "30-minute extended",
-            "exactly one row keyed by",
-            "idempotent per full revision tuple",
-            "wait_started_at",
-            "wait_deadline",
-            "monitoring-required",
-        ):
-            self.assertIn(token, closeout)
+        prompt = re.search(r'^  default_prompt: "(.+)"$', metadata, re.MULTILINE)
+        self.assertIsNotNone(prompt)
+        assert prompt is not None
+        self.assertEqual(prompt.group(1).count("."), 1)
+        self.assertLess(len(prompt.group(1)), 240)
 
     def test_app_is_the_only_orchestrator_package(self) -> None:
         orchestrators = sorted(

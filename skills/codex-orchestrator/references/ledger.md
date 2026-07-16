@@ -3,97 +3,212 @@
 ## Resolution
 
 Use one ledger per overlapping repository/source portfolio under
-`~/.cache/dotagents/skills/codex-orchestrator/ledgers/`. Resolve it before
-implementation, task creation, managed-worktree creation, or source mutation.
-Validate the required headings, option rows, source fingerprints, active-root
-claim, and current task evidence. Invalid current ledgers block; missing
-ledgers load `ledger-template.md` and create a fresh projection.
+`~/.cache/dotagents/skills/codex-orchestrator/ledgers/`. Create it only after
+atomic claim acquisition. A missing ledger loads `ledger-template.md`; an
+incompatible current ledger blocks rather than being migrated.
 
-## Required Structure
+The ledger is evidence, not a second option registry or concurrency primitive.
+Record only:
 
-- Scope
-- Option Resolution
-- Discovery Sources
-- Active Root
-- Codex Review Wait Registry
-- Feature Spec Task Registry
-- Parent Closeout Handoff
-- Recovery Packet
-- Gate Policy
-- Workstreams with active, needs-owner, ready-next, blocked, deferred,
-  completed, and released states
-- Wave Reports
-- Runtime Metrics
-- Notes
+- run authorization and exceptional takeover evidence;
+- authoritative source refs, derived canonical claim/task source ids, and
+  root-computed fingerprints;
+- active-root claim ownership;
+- visible task, Goal, and managed-checkout state;
+- PR revision, mergeability/repository rules, review, CI, validation,
+  domain-knowledge closeout, and
+  tracker-closeout proof;
+- deterministic scheduling waves and recovery state;
+- external monitoring, merge, and closeout handoffs.
+
+## Authorization
+
+Persist `visible_app_task_permission=granted-by-authorized-user` with its exact
+run-scoped evidence. Add `stale_claim_takeover_permission` only when a takeover
+question is actually resolved. Do not store fixed policy, derived state, bundle
+data, or retired option rows as authorization.
+
+## Source Snapshots
+
+Keep one row per authoritative Feature Spec and generated issue. Preserve the
+authored ref separately from the canonical runtime id:
+
+| authoritative_source_ref | canonical_source_id | planned_done_ref | source_state | artifact_kind | canonical_repository | content_fingerprint | acceptance_ref | observed_at |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+
+For a verified GitHub `owner/repository#N` Feature Spec, store that shorthand in
+`authoritative_source_ref` and
+`https://github.com/owner/repository/issues/N` in `canonical_source_id`. Use the
+canonical id for claims, scheduling, task identity, and takeover. For a local
+ref, store the authored path separately from its
+`git:<git-common-dir>::ref:<source-ref>` canonical id.
+
+For a local generated issue, record its exact predeclared destination in
+`planned_done_ref` and start with `source_state=active`. After substantive
+acceptance, integration, and any required captured domain-knowledge closeout,
+permit exactly one
+active-path-to-planned-done-path transition. The task performs the tracked move;
+then atomically replace the row's authoritative ref and git-qualified canonical
+id with the done-path forms and set `source_state=done`, while recording move
+evidence in Gate Evidence. The body fingerprint must remain identical; no
+current canonical closeout metadata mutation is allowed. The missing old path is
+therefore expected only for this exact transition. Both paths existing, neither
+path existing, another destination, or any body change is source drift.
+
+The root computes fingerprints from complete current artifacts during intake
+and reconciliation. A changed fingerprint invalidates dispatch or recovery
+until the bundle is revalidated.
 
 ## Active Root Claim
 
-The Markdown section is a projection, not the concurrency primitive. Use
-`scripts/orchestrator-claim`, which serializes overlap checks and writes under
-one filesystem `flock` in
-`~/.cache/dotagents/skills/codex-orchestrator/claims/`. Canonicalize every
-repository realpath and source id, then atomically acquire before creating this
-ledger, a Goal, task, managed worktree, or any other runtime artifact.
+The Markdown section is a projection. Use `scripts/orchestrator-claim`, which
+serializes overlap checks under one filesystem lock in
+`~/.cache/dotagents/skills/codex-orchestrator/claims/`. Acquire before ledger,
+Goal, task, managed checkout, or mutation. Persist the returned claim ref,
+fingerprint, canonical Git-common-directory repositories, source ids, opened
+time, and heartbeat.
 
-A claim records root id, Git-common-directory repository identities, checkout
-evidence, source set, ledger ref, fingerprint, opened and heartbeat timestamps,
-and takeover evidence. Linked worktrees of the same Git repository therefore
-overlap even when their checkout paths differ. All App runs share this
-namespace. Persist the helper-returned fingerprint and claim ref in this
-projection; never infer ownership by reading the Markdown row alone.
+An overlapping claim blocks as `needs-owner`. Before takeover, read the exact
+stale snapshots, complete root scopes, ledgers, recorded task refs, and current
+App state without mutation. Resolve
+`stale_claim_takeover_permission=granted-by-authorized-user` before interrupting
+or terminating a task. After the grant, require verified non-mutating and
+resumable state or proven task absence, one task-stop evidence ref per root, and
+full candidate coverage of every replaced repository and source. Pass
+`--takeover-permission granted-by-authorized-user`; a stale heartbeat alone is
+insufficient. Every heartbeat and release uses the acquire-time fingerprint.
 
-An overlapping live claim blocks as `needs-owner`. Takeover requires stale
-heartbeat evidence plus
-`existing_orchestrator_session_takeover_policy=takeover-authorized`. Never infer
-takeover from an inaccessible task or old timestamp alone. `claim takeover`
-requires the exact conflicting root ids and fails atomically if the live
-conflict set differs. It also requires `--takeover-policy takeover-authorized`,
-the `verified-stale` reason, and the current fingerprint and heartbeat for every
-expected claim. A takeover must satisfy the helper's fixed five-minute
-heartbeat threshold. Terminal owners release their own claim; opaque terminal
-evidence never authorizes replacement.
+For each replaced root, pass one absolute JSON file through
+`--expected-task-adoption <root-id>=<path>`. The helper validates and embeds the
+file before deleting any claim. Its exact shape is:
 
-Every acquisition generates a fresh nonce, so its fingerprint is unique even
-when a released root id later reacquires the same scope. Every heartbeat and
-release includes that acquire-time expected fingerprint. Mutations use the
-helper's ownership lease: it validates the same fingerprint while holding the
-authoritative claim-store lock for the complete mutation, so takeover cannot
-interleave after the check. `claim release` requires terminal or durable
-handoff evidence and runs before the projection is marked released.
+```json
+{
+  "root_id": "<replaced-root-id>",
+  "claim_fingerprint": "<sha256>",
+  "task_termination_evidence": "<same evidence ref passed separately>",
+  "specs": [
+    {
+      "source_spec_ref": "<exact claimed source>",
+      "task_state": "recorded",
+      "task_ref": "<exact visible App task ref>",
+      "goal_evidence_ref": "<exact Goal evidence ref>",
+      "managed_checkouts": [
+        {
+          "repository": "<canonical Git common directory>",
+          "checkout": "<absolute App-managed checkout>",
+          "target_branch_name": "<valid branch>",
+          "git_top_level": "<absolute top level>",
+          "baseline_revision": "<full revision>",
+          "isolation_evidence_ref": "<evidence ref>"
+        }
+      ],
+      "evidence_ref": "<stopped-and-resumable evidence ref>"
+    }
+  ]
+}
+```
+
+Use one `specs` entry for every claimed source exactly once. For a Spec with no
+created task, use `task_state: "no-task"`, `task_ref: "none"`,
+`goal_evidence_ref: "none"`, an empty `managed_checkouts` list, and an explicit
+absence `evidence_ref`. A root may mix recorded and no-task entries. The helper
+requires every recorded task ref and managed `(repository, checkout)` pair to
+have one owner across the complete takeover candidate. It verifies each
+recorded checkout against the replaced repository identity, requires its
+current branch to equal `target_branch_name`, proves `baseline_revision`
+resolves as a commit, and requires the JSON termination evidence to match the
+separate CLI evidence.
+
+Before any replaced claim is deleted, the helper atomically persists
+`<candidate-root>.takeover` with the complete candidate, full replaced claims,
+and adoption mappings. The journal itself owns the union scope until
+finalization. Every mutating helper command first replays valid pending
+transactions. For explicit recovery, read its transaction id through
+`claim status`, then run `claim recover-takeover`; replay is idempotent before,
+among, or after claim deletions and after candidate creation. A live replaced
+claim that differs from the prepared snapshot blocks replay and remains intact.
+`claim status --root-id <replaced-root>` returns the prepared transaction plus
+its candidate recovery root, including after that replaced claim was deleted.
+
+The helper reports schema-3 claims as legacy and permits only exact-owner
+`retire-legacy` with the stored fingerprint plus terminal or durable-handoff
+evidence; it never migrates them. Release after terminal proof or an explicit
+durable handoff.
+
+After takeover, create or verify the new registry from the candidate claim's
+embedded adoption mappings, even when recovery begins before the new ledger was
+written. Cross-check an available prior ledger through its embedded
+`ledger_ref`. Resume the same task and never allocate a second task for that
+Spec. Missing or contradictory embedded evidence and an unadoptable task block
+the taken-over root.
 
 ## Feature Spec Task Registry
 
 Keep one row per implementation-eligible Feature Spec:
 
-| feature_spec_ref | feature_spec_title | task_ref | task_evidence_ref | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | state | last_observed |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| source_spec_ref | feature_spec_title | task_ref | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-Each row points to one visible App task, its assignment Goal, and its managed
-checkout evidence. At most three rows may be nonterminal. One Feature Spec
-consumes one slot across all repositories and internal subagents. A Spec has at
-most one live task ref.
+A Spec has at most one live task. At most three rows are nonterminal. The task
+registry's `source_spec_ref` is the canonical claim/task source id and points
+back to the Source Snapshots row that preserves the authoritative authored ref.
+The task row points to fixed worker actions; only affected repositories and
+allowed paths vary.
 
-## Workstreams And Waves
+## Scheduling
 
-Every workstream records source/spec refs, repository and allowed paths,
-dependencies, actions, delivery target and permission, issue authority, task
-registry ref, evidence, gates, lifecycle state, and next action.
+Each wave records the ordered ready candidate refs, verified merged dependencies,
+path-disjointness proof, available capacity, selected task refs, state changes,
+validation, PR/review/CI, domain-knowledge closeout, and tracker-closeout
+evidence, and next action. The root
+sorts by canonical claim/task source id and greedily selects up to capacity; it never
+persists user-selected parallelism.
 
-Every wave records selected Specs, dependency proof, slot count, task refs,
-capability evidence, changes, validation, delivery evidence, reconciliation,
-and recovery update. Task reports are evidence; only the root changes ledger
-lifecycle or source status.
+## Codex Review Wait Registry
+
+Keep one row per exact PR/head/base/merge-base tuple with its fixed 30-minute
+deadline, request evidence, provider state, disposition, due time, and poll
+owner.
+
+## Gate Evidence
+
+Keep validation, PR, current-head mergeability and repository-rule satisfaction,
+review, CI, integration, domain-knowledge closeout, and tracker-closeout
+evidence by Spec and repository. Do not duplicate bundle
+fields into option tables. For `gate=domain-knowledge-closeout`, use
+`state=captured` only and make `evidence_ref` resolve to the exact
+`knowledge_delta` fingerprint, `capture_outcome=captured`, every verified named
+destination, complete documentation-diff fingerprint, and the relevant
+implementation revision tuples. A later material code, evidence, target, or
+documentation change invalidates that row and requires the Project Memory
+closeout to run again before terminal `merge-ready`.
+
+For `gate=pr-mergeability`, bind lifecycle `OPEN`, `isDraft=false`, conflict-free
+mergeability, required base-update state, required approvals, merge-queue
+eligibility, and the observation time to the exact PR/head/base/merge-base tuple.
+Unknown or pending state never passes.
 
 ## Recovery Packet
 
-The packet is a compact derived projection: option fingerprint, repository
-HEAD/status fingerprints, active task rows, due gates/checks, next action, and
-evidence refs. On resume, validate every fingerprint and task ref before
-mutation. Any mismatch invalidates the packet and triggers full reconciliation.
+The packet is a compact derived projection containing source and repository
+fingerprints, claim fingerprint, active task refs, managed-checkout evidence,
+current PR tuples, current domain-closeout evidence ref when required, due
+review/CI checks, next action, and evidence refs. On
+resume, validate every item before mutation. Any mismatch triggers full source
+and ledger reconciliation.
 
-## Closeout
+## External Handoffs And Closeout
 
-Before final status, reconcile sources, task registry, gates, reviews, CI, and
-due checks. Require no active task, ready-next action, unresolved authorized
-work, or unverified source mutation. Release the active-root claim only after
-terminal evidence or an explicit durable handoff is recorded.
+Record monitoring handoffs after an exhausted review deadline and merge/closeout
+handoffs after PR-ready proof. Include exact PR tuples, checks, tracker closeout
+vehicle, due or next action, and evidence. Before final status require no active
+task, due in-run check, newly ready Spec, or unresolved authorized work. Release
+the claim only after terminal evidence or the durable handoff is persisted.
+
+## Hard Cut
+
+Reject ledgers containing retired delivery permissions, review skips, worker
+action options, parallelization, checkout strategies, adapter or lifecycle-owner
+fields, stacked states, PR-count strategies, completion methods, closeout enums,
+or source-provided option fingerprints. Do not migrate them in place.
