@@ -47,9 +47,9 @@ Worker evidence:
   managed_checkouts=<repository checkout refs>;
   parallelism=<parallel|sequential>; fallback_reason=<none or evidence>.
 
-## Parent Closeout Watch
+## Parent Closeout Handoff
 
-| source_spec_ref | closeout_vehicle | state | evidence | next_check |
+| source_spec_ref | closeout_vehicle | state | evidence | external_next_action |
 | --- | --- | --- | --- | --- |
 
 ## Recovery Packet

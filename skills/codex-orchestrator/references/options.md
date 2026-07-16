@@ -6,9 +6,9 @@ Behavior fields use snake_case and enum values use lower-kebab. Resolve prose
 directly to canonical values and persist only those values. Reject aliases,
 retired fields, and unknown structured inputs.
 
-This file owns every pre-conclusion App orchestration option. Merge fields live
-only in `merge-authorization.md`, which is loaded after the fixed delivery
-target is complete and only when the owner separately requests merge.
+This file owns every App orchestration option. Merge authorization and merge
+confirmation are not options: this skill stops when every pull request is ready
+to merge and rejects merge fields as unknown structured input.
 
 ## Registry
 
@@ -45,6 +45,8 @@ The App orchestrator does not offer a delivery-target choice. It accepts only
 with `change_delivery_permission=granted-for-selected-target`. Every other
 target is unsupported for App execution and blocks before task dispatch. Do not
 ask the user to select a target and do not downgrade after a capability failure.
+Neither the root nor the visible task merges. A later merge request belongs to a
+separate GitHub workflow.
 
 ## Derived Execution Fields
 

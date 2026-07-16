@@ -67,7 +67,6 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "agents/openai.yaml",
             "scripts/orchestrator-claim",
             "references/options.md",
-            "references/merge-authorization.md",
             "references/ledger.md",
             "references/ledger-template.md",
             "references/worker.md",
@@ -231,12 +230,8 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "Merge authority is not an execution-ready handoff field",
             normalized_delivery,
         )
-        self.assertIn(
-            "Keep `pull_request_merge_permission` and `pull_request_merge_confirmation` unresolved during CLAIM",
-            normalized_skill,
-        )
-        self.assertIn("post-conclusion root authorization step", normalized_skill)
-        self.assertIn("Do not load `references/merge-authorization.md`", skill)
+        self.assertIn("merge execution is outside this skill", normalized_skill.lower())
+        self.assertIn("invalid as structured orchestrator input", normalized_delivery)
         self.assertIn(
             "The root validates and preserves that tuple; it never selects, rewrites, or widens it",
             normalized_delivery,
@@ -263,6 +258,26 @@ class AppOrchestratorContractTests(unittest.TestCase):
         )
         self.assertNotIn("$plan-feature", readme_dependency)
         self.assertNotIn("$plan-feature", agents_dependency)
+
+    def test_stacked_upstream_is_handed_off_before_downstream_waits(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        stacked = " ".join(
+            self.read("references/stacked-feature-specs.md").split()
+        )
+        self.assertIn("intermediate-upstream-merge-handoff", skill)
+        self.assertIn("intermediate-upstream-merge-handoff", stacked)
+        self.assertLess(
+            stacked.index("publish its pre-promotion draft PR"),
+            stacked.index("intermediate-upstream-merge-handoff"),
+        )
+        self.assertIn("Do this before waiting for the external merge", stacked)
+        self.assertIn("keep the active-root claim and recovery packet live", stacked)
+        self.assertIn("separate GitHub workflow", stacked)
+        self.assertIn("never accepts or executes that merge", stacked)
+
+        gates = self.read("references/gates.md")
+        self.assertIn("parent-closeout preparation and external handoff proof", gates)
+        self.assertNotIn("issue/source closeout proof", gates)
 
     def test_preclaim_fixture_has_zero_mutations_on_every_early_abort(self) -> None:
         cases = (
@@ -323,13 +338,11 @@ class AppOrchestratorContractTests(unittest.TestCase):
 
     def test_options_use_canonical_syntax_and_retire_mixed_surface_fields(self) -> None:
         text = self.read("references/options.md")
-        merge = self.read("references/merge-authorization.md")
         fields = re.findall(r"\| `([a-z][a-z0-9_]*)` \|", text)
         self.assertTrue(fields)
         self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9_]*", field) for field in fields))
         self.assertIn("invalid as structured inputs", text)
-        self.assertIn("every pre-conclusion App orchestration option", text)
-        self.assertIn("Merge fields live\nonly in `merge-authorization.md`", text)
+        self.assertIn("every App orchestration option", text)
         self.assertIn("`granted-for-selected-target`", text)
         self.assertIn("`pull-request-closing-keyword-only`", text)
         self.assertIn("`delivery_decision_origin`", text)
@@ -337,9 +350,16 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertIn("`issue_completion_method`", text)
         self.assertNotIn("pull_request_merge_permission", text)
         self.assertNotIn("pull_request_merge_confirmation", text)
-        self.assertIn("These fields have no pre-conclusion defaults", merge)
-        self.assertIn("`pull_request_merge_permission`", merge)
-        self.assertIn("`pull_request_merge_confirmation`", merge)
+
+    def test_merge_is_outside_the_orchestrator_surface(self) -> None:
+        runtime = self.runtime_text()
+        normalized = " ".join(runtime.split()).lower()
+        self.assertFalse((ROOT / "references/merge-authorization.md").exists())
+        self.assertNotIn("pull_request_merge_permission", runtime)
+        self.assertNotIn("pull_request_merge_confirmation", runtime)
+        self.assertIn("this skill never merges a pull request", normalized)
+        self.assertIn("a later merge request must start a separate github workflow", normalized)
+        self.assertIn("release the active-root claim", normalized)
 
     def test_metadata_is_manual_app_entrypoint(self) -> None:
         metadata = self.read("agents/openai.yaml")

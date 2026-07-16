@@ -11,15 +11,16 @@ Before owner-ready or terminal status require:
 - non-trivial `$autoreview` with actionable findings resolved;
 - dependency and integration proof;
 - merge-ready pull-request proof;
-- issue/source closeout proof;
+- parent-closeout preparation and external handoff proof;
 - no active task, due check, or ready-next action.
 
 ## Authorization
 
-Commit, push, PR creation/readiness, issue mutation, review skip, merge, release,
+Commit, push, PR creation/readiness, issue mutation, review skip, release,
 deployment, and target-repo instruction changes each require their canonical
 permission and exact scope evidence. Permissions are independent. Read access
-and one mutation never imply another.
+and one mutation never imply another. Merge cannot be authorized inside this
+skill.
 
 ## Managed Checkout Gate
 
@@ -46,13 +47,18 @@ Material diff changes, base-ref changes, or merge-base changes invalidate older
 review evidence. Failed CI or actionable review feedback returns the task to
 fixing and revalidation.
 
-## Merge And Source Closeout
+## Terminal Handoff
 
-Merge is root-owned and unavailable by default. It requires permission for the
-named PR and the configured confirmation behavior. Parent Feature Spec closure
-is prepared before merge but verified only after merge and actual tracker
-closure. `armed` is not closed.
+Ready-to-merge is terminal for the final portfolio conclusion. Prepare the
+parent Feature Spec closing keyword and record it as `armed`, then report the
+exact PR, revision, checks, and closeout vehicle. Do not merge, wait for the
+final merge, or verify post-merge tracker closure after the terminal report. A
+later GitHub workflow owns those actions; `armed` is not closed. During an
+unfinished two-Spec stack, let the downstream publish its pre-promotion draft
+against the merge-ready upstream branch, then emit the upstream external merge
+handoff before waiting. Keep the run nonterminal and observe the externally
+completed merge only as dependency evidence for the downstream task.
 
 Multi-repo completion requires every child delivery plus cross-repo integration
-proof. Release/deployment gates require their separate authority, artifacts,
-credentials, and live proof.
+proof before this handoff. Release/deployment gates require their separate
+authority, artifacts, credentials, and live proof.

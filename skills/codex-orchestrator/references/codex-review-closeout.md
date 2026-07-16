@@ -79,7 +79,7 @@ the default-branch whole-Spec PR selected as the closeout vehicle. Record
 `armed` before merge. Non-default-base PRs link to a later closeout vehicle and
 must not close the parent prematurely.
 
-The root owns any separately authorized merge watch and post-merge verification.
-The parent completes only after merge, actual issue closure, every child
-outcome, and cross-repo integration proof. `armed`, merge-ready, or a merged
-child PR is not final parent closure.
+The orchestrator reports the armed closeout vehicle and stops at ready-to-merge.
+A separate GitHub workflow owns merge and verifies actual issue closure. The
+parent is not reported complete by this skill; `armed`, merge-ready, or a
+merged child PR is not final closure.

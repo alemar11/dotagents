@@ -17,7 +17,7 @@ ledgers load `ledger-template.md` and create a fresh projection.
 - Active Root
 - Codex Review Wait Registry
 - Feature Spec Task Registry
-- Parent Closeout Watch
+- Parent Closeout Handoff
 - Recovery Packet
 - Gate Policy
 - Workstreams with active, needs-owner, ready-next, blocked, deferred,

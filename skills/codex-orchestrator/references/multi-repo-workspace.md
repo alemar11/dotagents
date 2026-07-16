@@ -31,6 +31,6 @@ authority, and cross-repo gates override parallelism.
 The task executes cross-repo integration validation, PR review/fix/CI loops,
 and merge-ready preparation. Successful App completion requires one real,
 non-draft, ready-to-merge PR per affected repository plus cross-repo integration
-proof. The root reconciles proof, owns any authorized
-merge, verifies child and parent issue closure, and closes the parent source
-only after every child outcome and integration gate passes.
+proof. The root reconciles that proof, records one external merge and closeout
+handoff covering every child PR, and stops. A separate GitHub workflow owns all
+merges plus child and parent issue-closure verification.

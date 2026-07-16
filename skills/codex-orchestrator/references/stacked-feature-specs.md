@@ -19,9 +19,22 @@ exact upstream reviewed SHA. Never reuse the upstream task or checkout. Each
 Spec keeps its own branch, PR, review evidence, gates, Goal evidence, and
 closeout.
 
+## External Upstream Merge Handoff
+
+First let the downstream task implement and validate from the exact upstream
+reviewed SHA, then publish its pre-promotion draft PR against the upstream
+branch without final Codex review. Once that draft state is recorded, emit an
+`intermediate-upstream-merge-handoff` containing the upstream's exact PR,
+reviewed head, base, merge-base, checks, armed closeout vehicle, and external
+next action. Do this before waiting for the external merge. Mark the downstream
+`awaiting-upstream-merge`, keep the active-root claim and recovery packet live,
+and wait for a separate GitHub workflow to merge the upstream PR. The
+orchestrator never accepts or executes that merge.
+
 ## Promotion
 
-After upstream merge, verify the actual merged default-branch result. The
+After observing the external upstream merge, verify the actual merged
+default-branch result. The
 downstream task rebases or retargets its branch, re-runs affected validation,
 requests a new current-head review, resolves feedback, and passes CI. History
 rewrite requires explicit force-push authority for the named branch; otherwise

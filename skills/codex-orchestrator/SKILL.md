@@ -11,9 +11,9 @@ Use this Codex-dependent skill only when the owner explicitly invokes
 `$codex-orchestrator` or asks to run Codex Orchestrator in the App. It is the
 single App-only orchestration surface.
 
-The root owns execution-ready intake, the active-root claim, portfolio Goal or ledger
-fallback, scheduling, permission decisions, ledger state, merge decisions,
-source closeout, and final status. Implementation always runs in exactly one
+The root owns execution-ready intake, the active-root claim, portfolio Goal or
+ledger fallback, scheduling, permission decisions, ledger state, closeout
+handoff, and final status. Implementation always runs in exactly one
 visible App task per implementation-eligible Feature Spec. That task owns its
 Spec through the fixed terminal target
 `pull-request-ready-for-merge-but-not-merged`.
@@ -63,8 +63,8 @@ The only successful App implementation conclusion is
 `pull-request-ready-for-merge-but-not-merged`. This is a runtime invariant, not
 a user option. A draft pull request is an intermediate state. Uncommitted
 changes, local commits, pushes without a pull request, and draft-only delivery
-are never successful App conclusions. Merge still requires separate explicit
-authority.
+are never successful App conclusions. This skill never merges a pull request.
+A later merge request is a separate GitHub operation outside this runtime.
 
 After registration and before dispatch, run a GitHub PR preflight for every
 affected repository. Require a GitHub repository target, authenticated access,
@@ -77,12 +77,10 @@ target or continue with a partial delivery mode.
 ## Non-Negotiable Invariants
 
 - Load `references/options.md` and `references/ledger.md` during CLAIM. Resolve
-  only the non-merge fields needed
-  for registration using canonical snake_case fields and lower-kebab values.
-  Keep `pull_request_merge_permission` and
-  `pull_request_merge_confirmation` unresolved during CLAIM, registration, and
-  worker execution. Do not load `references/merge-authorization.md` on
-  that path.
+  only the fields needed for registration using canonical snake_case fields
+  and lower-kebab values.
+  Reject merge authorization or confirmation fields as unsupported structured
+  input; merge execution is outside this skill.
 - Use `scripts/orchestrator-claim` as the sole active-root authority. Acquire
   the canonical repository/source claim before creating the ledger projection,
   portfolio Goal, task, worktree, or any other runtime artifact. A conflicting
@@ -153,8 +151,8 @@ with `unsupported-app-delivery-target`. A complete bundle finalizes the affected
 repository set and continues to CLAIM.
 
 Every accepted App implementation uses a pull request ready for merge but not
-merged. Merge, release, deployment, source mutation, and target-repo instruction
-changes each require their exact permission.
+merged. Merge is outside this skill. Release, deployment, source mutation, and
+target-repo instruction changes each require their exact permission.
 
 ## Controller Loop
 
@@ -173,7 +171,7 @@ changes each require their exact permission.
    `git:<git-common-dir>::ref:<source-ref>`; the helper rejects unqualified local
    refs. Preserve URI-shaped hosted or globally durable source ids unchanged so
    they still conflict across repositories. Only after ownership is established,
-   create the ledger projection, resolve remaining non-merge options, and create
+   create the ledger projection, resolve remaining options, and create
    the portfolio Goal or exact fallback.
 4. **REGISTER** — snapshot the finalized sources, repositories, acceptance, dependency, authority, and
    closeout evidence.
@@ -186,8 +184,14 @@ changes each require their exact permission.
    corrections when a task drifts.
 8. **GATE** — require the task to execute the fixed PR delivery and gate
    sequence. The root observes; it never takes implementation or review back.
+   For an eligible stack, first let the downstream task implement, validate,
+   and publish its pre-promotion draft against the merge-ready upstream branch.
+   Then emit the upstream external merge handoff, mark the downstream
+   `awaiting-upstream-merge`, and keep the active-root claim alive while the
+   separate GitHub workflow performs the merge.
 9. **RECONCILE** — rescan sources and dependencies, update the ledger and
-   recovery packet, and dispatch newly ready Specs.
+   recovery packet, observe any externally completed stacked upstream merge,
+   and dispatch newly ready Specs.
 
 Every wave yields a ledger transition, proof, source update, owner decision, or
 explicit no-progress record. Continue until completion or a real authority,
@@ -237,26 +241,34 @@ If a task fails or becomes stale, read it, record failure evidence, and resume
 or replace it with one task for the same Spec. Never keep two active tasks for
 one Spec and never transfer its implementation or review work to the root.
 
-## Delivery And Closeout
+## Delivery And Handoff
 
 Load `references/gates.md` before merge-ready or final status. A successful App
 run requires every affected repository PR to be non-draft, current-revision
 review-complete, CI-clean, free of unresolved actionable feedback, and ready to
 merge. The Feature Spec task owns pre-merge PR and parent-closeout preparation;
-the root owns any separately authorized merge, post-merge verification, and
-final source closeout.
+the root verifies the fixed conclusion, records the external merge handoff, and
+releases the active-root claim. Neither the root nor its task performs merge,
+post-merge verification, or final tracker closure.
 
 Use the smallest matching GitStack workflow for issues, CI, review threads,
 commits, pull requests, releases, or portfolio inspection. `$autoreview`
 remains a required non-trivial edit gate unless the canonical closeout contract
 selects another exact owner.
 
-Only after every affected PR reaches the fixed PR-ready conclusion, and only
-when the owner separately requests merge, may the root resolve
-`pull_request_merge_permission` and `pull_request_merge_confirmation`. This is
-a post-conclusion root authorization step, not intake, CLAIM, registration, or
-worker authority. Load `references/merge-authorization.md` only for that
-step.
+For `upstream-merge-ready-head`, dispatch the downstream from the exact reviewed
+upstream head and let it implement, validate, and publish its draft PR against
+the upstream branch without final review. Once that pre-promotion draft state
+is recorded, emit an `intermediate-upstream-merge-handoff` with the upstream's
+exact revision, checks, closeout vehicle, and external next action. Keep the run
+nonterminal and the claim active, wait for the separate GitHub workflow, then
+verify the external merge and promote the downstream task through
+`stacked-feature-specs.md`.
+
+After every affected PR reaches the fixed conclusion, stop the orchestrator and
+report the exact PRs, reviewed revisions, checks, armed closing keywords, and
+remaining merge action. A later merge request must start a separate GitHub
+workflow; do not resume this orchestrator to perform it.
 
 ## Final Report
 
@@ -274,8 +286,6 @@ artifacts by path/ref and fingerprint instead of repeating them.
 ## References
 
 - `references/options.md`: App orchestration option registry.
-- `references/merge-authorization.md`: separately loaded post-conclusion merge
-  authority.
 - `references/ledger.md`: ledger, claims, task registry, and state.
 - `references/worker.md`: visible App Feature Spec task contract.
 - `references/multi-repo-workspace.md`: managed multi-repo App execution.

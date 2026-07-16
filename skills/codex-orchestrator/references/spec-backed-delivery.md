@@ -19,9 +19,8 @@ repository and issue layouts; every affected repository; scope and allowed
 paths; acceptance criteria; validation commands; dependencies and
 parallelization; delivery target, permission, branch, and evidence; issue update
 permission; review requirement; parent closeout vehicle; and durable-knowledge
-handoff. Merge authority is not an execution-ready handoff field; the root may
-resolve it separately only after the fixed PR-ready conclusion is complete by
-loading `merge-authorization.md`.
+handoff. Merge authority is not an execution-ready handoff field and is invalid
+as structured orchestrator input because merge execution is outside this skill.
 
 Missing implementation detail makes the bundle non-executable. Missing
 mutation authority blocks only the affected mutation; it never expands from
@@ -36,8 +35,7 @@ delivery tuple, issue completion method, and
 `delivery_decision_origin_evidence` for the exact workstream. The execution-ready bundle owns target selection, delivery permission, and issue
 mutation authority. The root validates and preserves that tuple; it never
 selects, rewrites, or widens it. The visible Feature Spec task executes the
-resolved contract. The root owns only a separately requested post-conclusion
-merge authorization.
+resolved contract through the fixed ready-to-merge conclusion.
 
 ## Fixed Delivery Target
 
@@ -64,8 +62,9 @@ parent closeout. Real PR refs replace placeholders before completion.
 
 GitHub issues close through the authorized PR closing keyword by default. Local
 Markdown issues move to the configured done folder only after delivery and
-integration proof. Parent Feature Specs remain open until every child and
-post-merge closeout condition is actually satisfied.
+integration proof. At the orchestrator's terminal report, hosted parent Feature
+Specs remain open with their closing keyword armed. A separate GitHub workflow
+merges and verifies the post-merge closeout conditions.
 
 Local Markdown issues use `move-local-issue-to-done-after-proof`; a generated
 issue's handoff must name that completion method when it applies.
@@ -74,4 +73,5 @@ issue's handoff must name that completion method when it applies.
 
 Record target proof, repository commits/PRs, current reviewed SHA, CI,
 integration, issue/parent closeout state, task evidence, and remaining owner
-actions. Merge remains a separate root-owned permission.
+actions. Report the external merge and post-merge closeout handoff; do not
+perform either action.
