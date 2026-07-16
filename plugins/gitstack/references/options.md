@@ -1,45 +1,47 @@
-# GitStack Option Registry
+# GitStack Invocation Registry
 
-Use these canonical fields for behavior-affecting choices shared by GitStack
-skills and the plugin CLI. Field names are `snake_case`; assigned values are
-lower-kebab. User phrases may explain or select an option, but consumers must
-branch on the resolved value.
+Use these canonical input fields when a GitStack skill or composing workflow
+must normalize behavior for one invocation. They are protocol inputs, not
+persistent user settings or a checklist to present to the user. Derive them
+from the explicit request and ask only when the target, action, or mutation
+authority is ambiguous. Field names are `snake_case`; assigned values are
+lower-kebab.
 
-## GitStack-owned options
+## GitStack-owned invocation fields
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `mutation_mode` | `apply`, `dry-run` | `dry-run` | Whether an authorized GitHub operation executes or only returns a preview. |
+| `mutation_mode` | `apply`, `dry-run` | `dry-run` | For a write-shaped GitHub operation, whether it executes or returns a preview. Omit this field for pure reads. |
 | `issue_operation` | `create`, `edit`, `set-type`, `remove-type`, `create-label`, `add-label`, `remove-label`, `comment`, `attach-parent`, `remove-parent`, `add-sub-issue`, `remove-sub-issue`, `close`, `reopen` | none | The one issue lifecycle operation being requested. |
 | `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | none | The local Git operation owned by Git Commit. |
-| `review_state` | `not-requested`, `acknowledged`, `pending`, `clean`, `findings`, `stale`, `error` | none | The current-head automated-review state returned by `gitstack reviews`; `error` is terminal provider failure evidence, distinct from an API/configuration error envelope. |
+| `review_operation` | `inspect`, `check`, `wait`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve` | none | The one pull-request review operation being requested. |
 | `release_operation` | `inspect`, `create-tag`, `draft`, `publish`, `upload-asset`, `delete` | `inspect` | The requested tag or GitHub Release lifecycle operation. |
-| `refactor_disposition` | `required`, `optional`, `not-required` | `not-required` | Whether a deep review recommends a larger refactor. |
 
-Keep data separate from these values. For example, pair
-`refactor_disposition` with `refactor_shape`, and pair an operation with its
-issue, PR, release, label, or relationship reference in a separate field.
+Keep an operation separate from its issue, PR, release, label, or relationship
+reference.
 
 ## Boundary normalization
 
-| Input evidence | Canonical result |
+| Input evidence | Canonical invocation |
 | --- | --- |
 | `commit`, `commit this`, or `create a commit` | `commit_operation=commit-only` |
 | `commit and push` | `commit_operation=commit-and-push` |
 | `push-only` | `commit_operation=push-only` |
-| `dry run`, `draft only`, `local only`, or `do not mutate` | `mutation_mode=dry-run` |
+| Pure inspection, check, wait, or other read | Omit `mutation_mode` |
+| `dry run`, `draft only`, `local only`, or `do not mutate` for a write-shaped request | `mutation_mode=dry-run` |
 | Explicit create, edit, publish, post, close, or reopen instruction for an exact target | `mutation_mode=apply` plus the matching operation |
 
 Resolve natural-language instructions to canonical values. Structured callers
-must use the registry directly; reject unknown fields or values.
+must use only the applicable registry fields; reject unknown fields or values.
 Factual envelope fields such as `ok: true`, GitHub API fields, CLI flags, and
 other externally owned syntax are not option values and remain unchanged.
 
 ## Caller-owned authorization
 
-GitStack does not own planning or orchestration authority. When Codex
-Orchestrator calls GitHub Review Threads, require
-`change_delivery_permission=granted-for-selected-target`, the exact PR target,
-and the requested operation in `delivery_allowed_actions` or
-`worker_allowed_actions`. The caller remains the source of truth for those
-fields.
+GitStack does not own planning or orchestration authority. When another
+workflow calls a GitStack mutating skill, that caller must normalize
+its own policy to `mutation_mode=apply`, the exact target, and one canonical
+GitStack operation before invocation. GitStack rejects caller-owned planning,
+tracker, orchestration, delivery, publication, permission, or phase fields
+instead of interpreting them. `mutation_mode=apply` authorizes only the named
+operation and target.

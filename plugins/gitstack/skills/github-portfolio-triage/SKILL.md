@@ -7,10 +7,11 @@ description: Scan multiple GitHub repos read-only for queue, PR, issue, CI, rele
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes. Use
-`gh` for connector gaps. An authorized connector write may fall back
-automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported.
+Prefer the required GitHub connector for supported remote reads. Use the
+read-only portfolio script or direct `gh` reads only for connector gaps after
+authentication and access verification, and report that fallback. This skill
+never performs GitHub writes or automatically falls back between write
+transports.
 
 
 ## Role

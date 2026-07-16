@@ -67,10 +67,11 @@ reactions into one current-head state and one stable observation fingerprint.
    scheduling or heartbeat ownership remains with that caller. Callers must use
    the bounded waiter instead of wrapping one-shot checks in manual sleep loops.
 
-For `$codex-orchestrator`, require
-`change_delivery_permission=granted-for-selected-target`, the exact PR target,
-and the requested review action in `delivery_allowed_actions` or
-`worker_allowed_actions`.
+For a composed workflow, require the exact PR target and one canonical
+`review_operation`. Mutating operations additionally require
+`mutation_mode=apply`. Caller-specific authorization and phase policy must be
+normalized before invocation; reject those caller-owned fields instead of
+interpreting them here.
 
 ## References
 

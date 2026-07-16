@@ -57,8 +57,10 @@ check as evidence and keep analysis read-only:
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 ```
 
-Route waiting, findings disposition, replies, and re-review loops to
-`$gitstack:github-review-threads`.
+Route review work to `$gitstack:github-review-threads` with the exact repository
+and PR plus one operation per invocation: `review_operation=check|wait` for
+read-only freshness, or `review_operation=reply|request|resolve` with
+`mutation_mode=apply` only after the matching write is authorized.
 
 Read local instructions, issue workflows, test guidance, and maintainer runbooks
 before deciding. If the repository is not checked out locally, clone or fetch it
@@ -83,7 +85,9 @@ Always answer these points when they apply:
 
 Do not approve, comment, close, merge, push, or land unless the user explicitly
 asks for that action. Route authorized GitHub issue comments, labels, type
-changes, or closure through `$gitstack:github-issues`.
+changes, or closure through `$gitstack:github-issues` after normalizing each
+write to `mutation_mode=apply`, the exact repository and issue target, and one
+canonical `issue_operation`.
 
 ## Code Reading Depth
 
@@ -157,5 +161,8 @@ Proof: <tests/live/CI/source/dependency docs>
 Risk: <remaining uncertainty>
 ```
 
-Use the canonical values from `../../references/options.md`; keep the
-explanation of why a refactor is or is not warranted in the surrounding prose.
+Use the canonical invocation fields from `../../references/options.md` for
+routed GitStack operations. `refactor_disposition` is a judgment returned by
+this skill, not an invocation option: derive it from the review evidence and do
+not ask the user to select it. Keep the explanation of why a refactor is or is
+not warranted in the surrounding prose.

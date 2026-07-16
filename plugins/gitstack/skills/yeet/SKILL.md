@@ -25,7 +25,8 @@ If there is no local work to publish, or the request is only GitHub issue
 hygiene such as creating, commenting on, labeling, or closing issues, do not run
 the full publish flow. Route that work to `$gitstack:github-issues`, perform the
 authorized GitHub issue operation with resolved `mutation_mode=apply|dry-run`,
-and state that full `yeet` was not applicable.
+the exact repository and issue target, and one canonical `issue_operation`, and
+state that full `yeet` was not applicable.
 
 Prefer the shortest publish path that matches the state in front of you:
 
@@ -56,9 +57,11 @@ Prefer the shortest publish path that matches the state in front of you:
    create a duplicate.
 6. Return branch, PR URL, commit hash, and verification performed.
 7. When the calling workflow requires an automated-review publication gate,
-   hand it to `$gitstack:github-review-threads` with the configured provider
-   and exact published head SHA. Do not duplicate provider detection or polling
-   inside Yeet.
+   hand it to `$gitstack:github-review-threads` with the exact repository and
+   PR, configured provider, and published head SHA. Use one operation per
+   invocation: `review_operation=request` with `mutation_mode=apply` for an
+   authorized request, then `review_operation=wait` for the bounded read-only
+   wait. Do not duplicate provider detection or polling inside Yeet.
 
 ## References
 

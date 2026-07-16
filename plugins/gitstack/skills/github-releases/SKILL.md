@@ -28,13 +28,14 @@ confirmation.
 2. Inspect tags and existing releases before creating anything.
 3. Compare the intended version against package manifests or changelog files.
 4. Treat release creation, tag creation, asset upload, publishing, and deletion
-   as mutations that require explicit user authorization. Without that
-   authorization, resolve `mutation_mode=dry-run` and return the proposed
-   command or draft release notes only.
-5. Generate or review notes with `gh release view` and
-   `gh release create --generate-notes` only after resolving
-   `release_operation=inspect|create-tag|draft|publish|upload-asset|delete` and
-   `mutation_mode=apply|dry-run`.
+   as mutations that require explicit user authorization. For a requested
+   write without that authorization, resolve `mutation_mode=dry-run` and return
+   the proposed command or draft release notes only.
+5. Resolve the requested action to
+   `release_operation=inspect|create-tag|draft|publish|upload-asset|delete`.
+   Omit `mutation_mode` for `inspect`; for a write-shaped operation, resolve
+   `mutation_mode=apply|dry-run` before using `gh release create
+   --generate-notes` or another mutating command.
 6. After a mutation, verify the resulting tag, GitHub Release, asset state, and
    any package registry availability requested by the user.
 

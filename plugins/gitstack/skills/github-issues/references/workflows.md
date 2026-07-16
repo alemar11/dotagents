@@ -5,44 +5,26 @@ context, `issue_operation`, and `mutation_mode`. Add `--repo <owner>/<repo>`
 when the current checkout is not the target repo or the caller supplied an
 explicit repository.
 
-## Tracker Write Policy
+## Mutation Policy
 
-For current project-memory setups, prefer the compact tracker backend:
+GitStack receives only its own normalized contract:
 
 ```md
-tracker_backend: github # github | local
-effective_target: configured-tracker # configured-tracker | draft-publish-commands | local-dry-run
+mutation_mode: apply # apply | dry-run
+issue_operation: create # one canonical GitStack issue operation
 ```
 
-`tracker_backend` selects the artifact target:
-
-- `github`: write tracker artifacts as GitHub issues.
-- `local`: write tracker artifacts as local files; this GitHub skill should not
-  create GitHub issues unless the user explicitly supplies a GitHub target.
-
-`effective_target` selects the current run behavior:
-
-- `configured-tracker`: create or update the requested GitHub issues as soon as
-  repository context, duplicate checks, labels, types, and relationships are
-  resolved.
-- `draft-publish-commands`: return exact draft bodies and commands instead of
-  mutating GitHub.
-- `local-dry-run`: do not create GitHub issues; local artifact handling belongs
-  to the caller.
-
-Normalize that caller-owned policy once at the GitStack boundary:
-
-- `tracker_backend=github` plus `effective_target=configured-tracker` resolves
-  `mutation_mode=apply`.
-- `draft-publish-commands` or `local-dry-run` resolves
-  `mutation_mode=dry-run`.
+A composed workflow must translate its own write, tracker, or publication
+policy before invoking this skill. `mutation_mode=apply` plus the exact target
+and `issue_operation` authorizes only that operation. `mutation_mode=dry-run`
+returns the body and exact command without mutation.
 
 Direct user instructions such as create, publish, or open the issues resolve
 `mutation_mode=apply` for the requested `issue_operation` unless the same
 request supplies no-mutation evidence, which resolves `mutation_mode=dry-run`.
 
-Reject tracker handoffs that do not use canonical `tracker_backend` and
-`effective_target` fields.
+Reject caller-owned planning, tracker, orchestration, delivery, or publication
+policy fields at this boundary; GitStack must not interpret them.
 
 ## Repository Context
 
@@ -222,9 +204,8 @@ gh issue close <number-or-url> --reason "not planned" --comment "<closing ration
 ```
 
 Before closing partially satisfied work, create or link an owner-visible
-follow-up when the effective target permits the write. If a no-mutation override
-is active, keep the source issue open and report the proposed follow-up
-title/body.
+follow-up when mutation is authorized. Otherwise keep the source issue open and
+report the proposed follow-up title/body.
 
 ## Reopening
 
@@ -238,9 +219,7 @@ gh issue view <number-or-url> --json number,state,url
 
 ## Dry Runs
 
-When `effective_target=draft-publish-commands` or another explicit
-no-mutation override is active, do not run mutating commands.
-Return:
+When `mutation_mode=dry-run`, do not run mutating commands. Return:
 
 - the exact issue title and body or comment body,
 - the exact `gh` command that would be run,

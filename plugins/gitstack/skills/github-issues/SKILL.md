@@ -48,10 +48,10 @@ This skill only handles GitHub Issues.
   `issueType`; do not request `type`, which is not a valid issue JSON field.
 - Do not create labels, close issues, or mutate issue relationships unless the
   user or calling workflow has explicit mutation authority.
-- Treat a calling workflow handoff with `tracker_backend=github` and
-  `effective_target=configured-tracker` as mutation authority for issue-ready
-  planning artifacts after repository context, duplicate checks, labels, issue
-  types, and relationships are resolved.
+- Treat a composed-workflow handoff with `mutation_mode=apply`, an exact target,
+  and one canonical `issue_operation` as authority for that operation after
+  repository context, duplicate checks, labels, issue types, and relationships
+  are resolved. Caller-specific policy must be normalized before invocation.
 - Treat direct user instructions such as create, publish, or open the issue as
   mutation authority for the requested GitHub issue operation unless the same
   request explicitly says dry run, draft only, local only, or do not mutate.
@@ -68,7 +68,8 @@ This skill only handles GitHub Issues.
    - explicit `--repo <owner>/<repo>`,
    - or a target repository supplied by the user or calling workflow.
 2. Resolve `mutation_mode` from the user request or canonical calling workflow
-   handoff. Default to `dry-run` when mutation authority is absent.
+   handoff. Default to `dry-run` when mutation authority is absent. Reject
+   unnormalized caller-owned policy fields.
 3. If `mutation_mode=dry-run`, return draft issue bodies and exact `gh`
    commands without mutating GitHub.
 4. If the evidence requires a user decision before publishing, ask, then store
@@ -90,7 +91,7 @@ This skill only handles GitHub Issues.
    assumptions.
 9. Verify the changed issue or queue state after mutation.
 10. Report the issue URL/number, commands run or drafted, and any skipped
-   mutation because a no-mutation override was active.
+    mutation.
 
 ## Routing
 

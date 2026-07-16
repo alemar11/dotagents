@@ -74,7 +74,9 @@ gh issue list --state open --limit 50 --json number,title,state,url
 
 If there are no relevant local changes to stage, do not create an empty commit,
 branch, push, or PR. Route issue creation, comments, labels, type changes,
-relationships, or closure to `$gitstack:github-issues`, then verify the result with
+relationships, or closure to `$gitstack:github-issues` with
+`mutation_mode=apply`, the exact repository and issue target, and one matching
+`issue_operation` per write. Then verify the result with
 `$gitstack:github-issues` or direct read-only `gh issue view` / `gh issue list`.
 
 Close out by saying explicitly:
@@ -119,4 +121,6 @@ Return:
 - validation performed before publishing
 
 If CI fails or review comments need follow-up, route to `$gitstack:github-ci`
-or `$gitstack:github-review-threads` after the publish step.
+or `$gitstack:github-review-threads` after the publish step. Supply the exact
+repository and PR plus one `review_operation`; add `mutation_mode=apply` only
+for an authorized reply, request, review submission, or resolution.

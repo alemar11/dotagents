@@ -7,10 +7,10 @@ description: Inspect current-repo GitHub issue and PR queues read-only; route mu
 
 ## Transport
 
-Prefer the required GitHub connector for supported remote reads and writes. Use
-`gh` for connector gaps. An authorized connector write may fall back
-automatically only when the operation and repository are identical, `gh`
-authentication and access succeed, and the transport switch is reported.
+Prefer the required GitHub connector for supported remote reads. Use `gh` only
+for read gaps after authentication and access verification, and report that
+fallback. This skill never performs GitHub writes or automatically falls back
+between write transports; route every write-shaped request to its owning skill.
 
 
 ## Role
@@ -34,12 +34,17 @@ parent/sub-issue relationships, and closure.
    or follow-up owner.
 5. Do not edit labels, milestones, assignees, titles, or comments from this
    skill; route authorized GitHub issue lifecycle mutations to
-   `$gitstack:github-issues`.
-6. Before recommending issue closure or resolution of partial work, read
-   `references/issue-workflows.md` and require a linked or proposed follow-up
-   for any deferred acceptance criteria.
+   `$gitstack:github-issues` only after normalizing the handoff to
+   `mutation_mode=apply`, the exact repository and issue target, and one
+   canonical `issue_operation`. Route an explicit mutation preview with
+   `mutation_mode=dry-run` and the same exact target and operation. Pure queue
+   reads omit both fields.
+6. Route evidence-backed issue disposition questions, including whether an
+   issue should close or partial work satisfies its acceptance criteria, to
+   `$gitstack:github-deep-review`. Route any authorized resulting lifecycle
+   mutation to `$gitstack:github-issues`.
 
 ## References
 
 - `references/workflows.md`: current-repo queue and item workflows.
-- `references/issue-workflows.md`: issue closure and follow-up safety rules.
+- `../../references/options.md`: canonical GitStack invocation fields for routed handoffs.

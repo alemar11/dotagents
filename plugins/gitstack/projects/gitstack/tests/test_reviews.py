@@ -34,23 +34,42 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "3.0.2")
+        self.assertEqual(stdout.getvalue().strip(), "4.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "3.0.2")
+        self.assertEqual(payload["version"], "4.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
-    def test_shared_option_registry_includes_terminal_error_state(self) -> None:
-        options = (
-            Path(__file__).resolve().parents[3] / "references" / "options.md"
+    def test_review_owner_documents_terminal_state_and_shared_operations(self) -> None:
+        plugin_root = Path(__file__).resolve().parents[3]
+        options = (plugin_root / "references" / "options.md").read_text(
+            encoding="utf-8"
+        )
+        review_contract = (
+            plugin_root
+            / "skills"
+            / "github-review-threads"
+            / "references"
+            / "script-summary.md"
         ).read_text(encoding="utf-8")
+        for state in (
+            "not-requested",
+            "acknowledged",
+            "pending",
+            "clean",
+            "findings",
+            "stale",
+            "error",
+        ):
+            with self.subTest(state=state):
+                self.assertIn(f"`{state}`", review_contract)
         self.assertIn(
-            "`not-requested`, `acknowledged`, `pending`, `clean`, `findings`, `stale`, `error`",
+            "`inspect`, `check`, `wait`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve`",
             options,
         )
 
@@ -84,7 +103,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "3.0.2")
+        self.assertEqual(payload["version"], "4.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -149,7 +168,7 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "3.0.2")
+        self.assertEqual(payload["version"], "4.0.0")
         self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
 
     def test_review_reply_uses_pr_scoped_endpoint(self) -> None:

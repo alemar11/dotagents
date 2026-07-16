@@ -52,7 +52,8 @@ plus normalized review, request, terminal-comment, and selected terminal
 evidence. States are `not-requested`, `acknowledged`, `pending`, `clean`,
 `findings`, `stale`, and `error`. `error` is terminal provider-authored failure
 evidence for the requested head, distinct from a GitStack API/configuration
-error envelope. Terminal evidence may be a formal review, an
+error envelope. `review_state` is factual CLI result state, not an invocation
+option. Terminal evidence may be a formal review, an
 authenticated provider-authored top-level comment posted after the matching
 request and naming the reviewed head, or a clean provider reaction. Conflicting
 terminal outcomes, or a terminal comment that cannot be correlated across

@@ -63,8 +63,8 @@ arbitrary comment text into `--reply-body` in a shell command. Remove temporary
 message files after the action is verified.
 
 Use `--dry-run` for batch replies unless the user already approved posting or a
-calling skill assignment names the exact PR, selected comments, reply body, and
-posting authority.
+calling workflow supplies `mutation_mode=apply`, the exact PR, selected
+comments, reply body, and `review_operation=reply`.
 
 ## Post Top-Level PR Discussion Comments
 
@@ -77,11 +77,10 @@ requests:
 ```
 
 Use `--dry-run` unless the user explicitly asked to post the discussion comment
-or a calling skill assignment names the exact PR, comment body, and posting
-authority. `$codex-orchestrator` may post the top-level `@codex review` request
-or root-supplied PR discussion disposition only when the exact action appears
-in `delivery_allowed_actions` or `worker_allowed_actions` and
-`change_delivery_permission=granted-for-selected-target` applies to that PR.
+or a calling workflow supplies `mutation_mode=apply`, the exact PR, the comment
+body, and `review_operation=request` for an automated-review request or
+`review_operation=comment` for another discussion comment. Caller-specific
+authorization and phase fields must be normalized before this boundary.
 
 ## Fallback Direct Commands
 
