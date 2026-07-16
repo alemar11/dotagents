@@ -1,6 +1,6 @@
 ---
 name: codex-orchestrator
-description: Execute execution-ready Feature Specs in visible Codex App tasks through one mandatory GitHub pull-request-ready implementation flow.
+description: Execute execution-ready Feature Spec bundles in visible Codex App tasks through one mandatory GitHub pull-request-ready implementation flow.
 ---
 
 # Codex App Orchestrator

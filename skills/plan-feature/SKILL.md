@@ -11,6 +11,9 @@ Use this planning-only skill to turn feature intent into a durable Feature Spec
 and, when requested by the selected mode, hardened vertical implementation
 issues. The public pipeline is:
 
+A Feature Spec is the durable parent contract for one bounded product or system
+change.
+
 `project-memory routing if needed -> repo-backed clarification if needed -> Feature Spec phase -> issue phase -> deferred domain-memory closeout`
 
 Use it only when the user invokes `$plan-feature`, asks to run Plan Feature, or
