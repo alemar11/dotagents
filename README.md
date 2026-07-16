@@ -58,7 +58,6 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |
 | `codex-orchestrator` | Execute execution-ready Feature Specs in visible Codex App tasks through one mandatory GitHub pull-request-ready implementation flow. |
-| `codex-cli-orchestrator` | Coordinate tmux-hosted Codex CLI Feature Spec sessions with isolated Git worktrees and root-owned delivery. |
 | `postgres` | Connect to Postgres, run SQL/diagnostics, inspect schemas/migrations, and review query, PostGIS, or pgvector patterns. |
 | `skill-audit` | Audit installed Codex skills, plugin packages, and bundled plugin skills using repo, memory, session, and portfolio-health evidence. |
 | `swift-api-design` | Design or review Swift APIs using local summaries and the bundled official Swift API Design Guidelines. |
@@ -80,7 +79,6 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `code-wiki` requires `$imagegen` when generating raster overview or conceptual images for a wiki.
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires `$autoreview` for non-trivial implementation closeout.
 - `codex-orchestrator` requires local `python3` and `git` for its shipped atomic active-root claim helper, `$autoreview`, and the relevant GitStack bundled skills for GitHub-backed issue lifecycle, CI, review, commit, and pull-request work. It accepts only execution-ready Feature Spec bundles and never performs planning or repairs incomplete planning artifacts.
-- `codex-cli-orchestrator` requires the sibling `codex-orchestrator` installation for the atomic claim helper plus canonical shared source, ledger, delivery, gate, and closeout references; it never invokes the App entrypoint. It also requires local `python3`, `git`, `ps`, `tmux`, and Codex CLI.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` so it can run setup, repo-backed clarification with deferred domain capture, Feature Spec writing, agent-ready issue generation, and a final integration/knowledge closeout task when durable decisions changed. It uses `$gitstack:github-issues` for GitHub Feature Spec or issue publishing, issue type and label handling, parent/sub-issue relationships, and dry-run command mechanics.
@@ -153,7 +151,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/okf skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/codex-cli-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/okf skills/triage skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/grill-me skills/learn skills/project-memory skills/codex-orchestrator skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -163,11 +161,6 @@ Use $skill-installer to install skills from alemar11/dotagents --path skills/cod
 ```
 
 Replace `skills/code-wiki` with any path listed in the reusable skills table.
-For the CLI orchestrator, install both dependent paths together:
-
-```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/codex-orchestrator skills/codex-cli-orchestrator
-```
 
 ### Install Reusable Skills With `npx skills`
 
@@ -200,7 +193,6 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill learn \
   --skill project-memory \
   --skill codex-orchestrator \
-  --skill codex-cli-orchestrator \
   --skill postgres \
   --skill skill-audit \
   --skill swift-api-design \
@@ -214,7 +206,5 @@ npx skills add alemar11/dotagents -a codex -g -y --skill code-wiki
 ```
 
 Replace `code-wiki` with any skill name from the reusable skills table. Omit `-g` to install into the current project's `.agents/skills/` instead of your global `~/.codex/skills/`.
-Install `codex-cli-orchestrator` together with `codex-orchestrator` when using
-the CLI surface.
 
 Restart Codex after installing or updating skills.

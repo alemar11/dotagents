@@ -1,9 +1,8 @@
 # Codex Tool Surface Refresh
 
 Use this playbook when explicitly asked to check whether Codex changed how
-subagents are spawned, Codex App tasks are created and managed, or Codex CLI
-sessions are supervised. This task keeps the App and CLI orchestrator adapters
-current without merging their runtime surfaces.
+subagents are spawned or Codex App tasks are created and managed. This task
+keeps the App orchestrator current.
 
 ## Scope
 
@@ -13,10 +12,7 @@ Review only Codex worker and thread orchestration surfaces:
   and UI visibility;
 - Codex App task creation, project/worktree targets, task read/write,
   title, archive, handoff, fork, pin, and listing behavior;
-- CLI subagents plus `codex exec` start/resume/structured-output behavior;
-- `codex-orchestrator` App task requirements and managed-worktree adapter;
-- `codex-cli-orchestrator` tmux/process, session-id, artifact, and manual
-  worktree adapter.
+- `codex-orchestrator` App task requirements and managed-worktree behavior.
 
 Do not use this task to redesign generic orchestration behavior, add new
 workers to a live task, or update unrelated skills.
@@ -30,24 +26,23 @@ workers to a live task, or update unrelated skills.
      `set_thread_archived`, `handoff_thread`, `fork_thread`, `list_threads`,
      and `set_thread_pinned`;
    - record the exact callable namespaces and names;
-   - note whether each surface is a subagent surface, visible Codex App thread
-     surface, CLI-only equivalent, or unavailable in the current runtime.
+   - note whether each surface is a subagent surface, visible Codex App task
+     surface, or unavailable in the current runtime.
 2. Compare the discovered surface against:
    - `skills/codex-orchestrator/SKILL.md`;
    - `skills/codex-orchestrator/references/worker.md`;
    - `skills/codex-orchestrator/references/ledger.md`;
    - `skills/codex-orchestrator/references/gates.md` only when tool changes
      affect authorization, proof, or closeout behavior.
-   - `skills/codex-cli-orchestrator/SKILL.md` and
-     `skills/codex-cli-orchestrator/references/runtime.md` for CLI changes.
 3. Check whether current docs still answer these questions precisely:
    - What creates a subagent?
    - What creates a separate visible Codex App thread?
    - Which surfaces are visible to the user, and where?
    - Which lifecycle actions can the root orchestrator perform?
    - What should happen when a logical tool name is unavailable or renamed?
-   - Does each public skill remain confined to its own runtime adapter?
-4. Update only the affected adapter when the live tool surface materially
+   - Does the skill remain confined to visible App tasks and App-managed
+     worktrees?
+4. Update the App contract when the live tool surface materially
    differs from the documented contract. Material differences include renamed
    tools, changed arguments, new required lifecycle calls, new visibility
    behavior, removed capabilities, or newly exposed safer primitives.
@@ -62,7 +57,7 @@ workers to a live task, or update unrelated skills.
   globally unavailable just because it is missing in one thread.
 - Prefer logical operation names in runtime skills, but record actual callable
   names when they differ.
-- Keep visible Codex App tasks distinct from subagents and CLI sessions unless the current
+- Keep visible Codex App tasks distinct from subagents unless the current
   runtime explicitly exposes the same surface as both.
 - Do not create visible Codex App threads merely to inspect the tool schema.
   Use a bounded internal subagent for live validation only when the active
@@ -76,7 +71,6 @@ workers to a live task, or update unrelated skills.
 
 - Current subagent creation and lifecycle surface
 - Current Codex App task creation and lifecycle surface
-- Current Codex CLI exec/resume and tmux supervision surface
-- Any runtime-dependent uncertainty that should be rechecked in Codex App or CLI
+- Any runtime-dependent uncertainty that should be rechecked in Codex App
 
 Add these items to the common final report owned by `release-checklist.md`.

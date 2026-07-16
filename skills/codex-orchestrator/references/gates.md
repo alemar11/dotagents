@@ -1,4 +1,4 @@
-# Shared Orchestration Gates
+# Codex App Orchestration Gates
 
 ## Universal Gates
 
@@ -6,13 +6,13 @@ Before owner-ready or terminal status require:
 
 - scope and acceptance evidence;
 - exact mutation authority;
-- preserved owner changes and safe checkout ownership;
+- preserved owner changes and App-managed checkout ownership;
 - current diff and focused validation;
 - non-trivial `$autoreview` with actionable findings resolved;
 - dependency and integration proof;
-- delivery-target proof;
+- merge-ready pull-request proof;
 - issue/source closeout proof;
-- no active execution, due check, or ready-next action.
+- no active task, due check, or ready-next action.
 
 ## Authorization
 
@@ -21,48 +21,30 @@ deployment, and target-repo instruction changes each require their canonical
 permission and exact scope evidence. Permissions are independent. Read access
 and one mutation never imply another.
 
-## Adapter Checkout Gate
+## Managed Checkout Gate
 
-The selected adapter owns checkout proof:
+Require App-managed isolated checkout evidence for every repository in the
+Feature Spec. Missing checkout proof blocks the run. Do not create raw Git
+worktrees, rotate the caller checkout, or transfer implementation to the root.
 
-- `codex-app-task` requires App-managed isolated checkout evidence for every
-  repository in the Feature Spec;
-- `codex-cli-session` requires the CLI manifest, unique worktree/branch map,
-  terminal worker artifacts, and root-owned integration evidence.
+## Pull Request Gate
 
-Missing adapter checkout proof blocks. The gate never falls back to another
-adapter's checkout machinery.
-
-## Delivery Gates
-
-For `codex-app-task`, only the merge-ready PR gate applies. Other delivery gates
-below exist solely for the CLI adapter's broader source contracts and must not
-be selected, offered, or used as App fallback conclusions.
-
-- Validated-uncommitted requires focused validation and an inspectable diff.
-- Local commit requires the intended commit and clean relevant checkout.
-- Push-without-PR requires remote branch proof and no implied issue closure.
-- Draft PR requires current diff, validation, published draft URL, and declared
-  remaining gates.
-- Merge-ready PR requires current-revision review disposition, passing required
-  CI, resolved review threads, safe PR metadata, parent-closeout preparation,
-  and ready state.
-
-An App run succeeds only when every affected repository has a real non-draft
-PR URL at its current head, all required checks pass, current-revision review is
-dispositioned, actionable feedback is resolved, and the PR is ready to merge.
-Draft publication is intermediate evidence, never App completion.
+The only delivery gate is a merge-ready pull request. Every affected repository
+must have a real non-draft PR URL at its current head, all required checks must
+pass, current-revision review must be dispositioned, actionable feedback must
+be resolved, safe PR metadata and parent-closeout preparation must be complete,
+and the PR must be ready to merge. Draft publication is intermediate evidence,
+never App completion.
 
 ## Review And CI
 
-Current-revision Codex review is required for merge-ready delivery unless the
-authorized user explicitly selects
-`codex_review_requirement=explicitly-skipped-by-authorized-user`. That skip
-does not bypass autoreview, CI, issue, integration, or publication gates.
+Current-revision Codex review is required unless the authorized user explicitly
+selects `codex_review_requirement=explicitly-skipped-by-authorized-user`. That
+skip does not bypass autoreview, CI, issue, integration, or publication gates.
 
 Material diff changes, base-ref changes, or merge-base changes invalidate older
-review evidence. Failed CI or actionable review feedback returns the execution
-to fixing and revalidation.
+review evidence. Failed CI or actionable review feedback returns the task to
+fixing and revalidation.
 
 ## Merge And Source Closeout
 

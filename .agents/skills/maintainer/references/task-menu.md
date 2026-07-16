@@ -89,11 +89,8 @@ maintenance request needs to be routed to a concrete task.
    - Inspect the currently exposed Codex subagent and Codex App task tools,
      including spawn, wait, send/resume/close, create-thread,
      read/rename/archive/handoff, and related lifecycle operations.
-   - Inspect Codex CLI exec/resume, structured output, tmux, and session-id
-     behavior separately.
-   - Compare App changes against `skills/codex-orchestrator/` and CLI changes
-     against `skills/codex-cli-orchestrator/`; never add the other adapter's
-     machinery to either public runtime path.
+   - Compare App changes against `skills/codex-orchestrator/` and keep the
+     runtime path limited to visible App tasks and App-managed worktrees.
    - Keep this task explicit; do not fold it into generic repo-wide maintenance.
 13. `refresh okf spec`
    - Check `skills/okf/assets/manifest.json` and the bundled official spec copy

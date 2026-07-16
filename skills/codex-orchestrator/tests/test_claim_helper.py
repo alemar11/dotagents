@@ -55,7 +55,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
         root_id: str,
         repository: Path,
         source: str,
-        adapter: str = "codex-app-task",
     ) -> list[str]:
         if not source.startswith("git:") and "://" not in source:
             common = subprocess.run(
@@ -74,8 +73,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "acquire",
             "--root-id",
             root_id,
-            "--adapter",
-            adapter,
             "--repository",
             str(repository),
             "--source",
@@ -90,7 +87,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
         path.write_text(json.dumps(claim, indent=2, sort_keys=True) + "\n")
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "1.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "2.0.0")
+        self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         doctor = json.loads(run_claim("--json", "doctor", env=self.env).stdout)
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
@@ -203,7 +201,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             run_claim(*self.acquire_args("root-a", self.repo, "spec-1"), env=self.env).stdout
         )
         result = run_claim(
-            *self.acquire_args("root-b", linked, "spec-2", "codex-cli-session"),
+            *self.acquire_args("root-b", linked, "spec-2"),
             env=self.env,
             check=False,
         )
@@ -218,6 +216,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             acquired["claim"]["repository_checkouts"][0]["checkout"],
             str(self.repo.resolve()),
         )
+        self.assertEqual(acquired["claim"]["execution_adapter"], "codex-app-task")
 
     def test_bare_repository_local_source_ref_is_rejected(self) -> None:
         for source in ("#1", "planning/features/demo/SPEC.md"):
@@ -244,8 +243,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "takeover",
                 "--root-id",
                 "root-c",
-                "--adapter",
-                "codex-app-task",
                 "--repository",
                 str(self.repo),
                 "--source",
@@ -283,8 +280,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "takeover",
             "--root-id",
             "root-b",
-            "--adapter",
-            "codex-app-task",
             "--repository",
             str(self.repo),
             "--source",
@@ -317,8 +312,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "takeover",
             "--root-id",
             "root-b",
-            "--adapter",
-            "codex-app-task",
             "--repository",
             str(self.repo),
             "--source",
@@ -370,8 +363,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "takeover",
                 "--root-id",
                 "root-b",
-                "--adapter",
-                "codex-cli-session",
                 "--repository",
                 str(self.repo),
                 "--source",

@@ -1,8 +1,8 @@
 # Post-Conclusion Merge Authorization
 
-Load this reference only after the selected adapter has completed its delivery
-target and the owner separately requests merge. Never load or resolve these
-fields during intake, CLAIM, registration, dispatch, worker execution, or
+Load this reference only after the App orchestrator has completed its fixed
+delivery target and the owner separately requests merge. Never load or resolve
+these fields during intake, CLAIM, registration, dispatch, task execution, or
 delivery gating.
 
 | Field | Allowed values | Resolution |

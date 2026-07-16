@@ -886,7 +886,7 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertNotIn("implementation_checkout_strategy", orchestrator_options)
         self.assertNotIn("implementation_checkout_strategy", ledger_template)
         self.assertIn("`checkout_owner` | `codex-app-managed`", orchestrator_options)
-        self.assertIn("## Feature Spec Execution Registry", ledger_template)
+        self.assertIn("## Feature Spec Task Registry", ledger_template)
         self.assertIn(
             "grant selects mandatory one-task-per-Feature-Spec execution",
             " ".join(worker.split()),
@@ -1218,7 +1218,6 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("The execution-ready bundle owns target selection", spec_delivery)
         self.assertIn("The root validates and preserves that tuple", spec_delivery)
         self.assertIn("Real PR refs replace placeholders before completion", spec_delivery)
-        self.assertIn("Named remote branch contains the validated commit", spec_delivery)
         self.assertIn("Local Markdown issues use `move-local-issue-to-done-after-proof`", spec_delivery)
         self.assertIn("Validation Commands", issue_phase)
         self.assertIn("equivalent fallback", issue_phase)
@@ -1473,11 +1472,10 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("feature_spec_task_assignment", worker)
         self.assertIn("root_implementation_fallback", worker)
         self.assertIn(
-            "parallelism=<parallel|sequential|root-owned|simulated>",
+            "parallelism=<parallel|sequential>",
             ledger_template,
         )
         self.assertIn("exact failure reason", orchestrator)
-        self.assertNotIn("recommend `$codex-cli-orchestrator`", orchestrator)
 
     def test_project_memory_no_longer_defines_worker_auth_defaults(self) -> None:
         for path in iter_active_text_files():

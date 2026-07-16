@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomically coordinate overlapping Codex orchestrator roots."""
+"""Atomically coordinate overlapping Codex App orchestrator roots."""
 
 from __future__ import annotations
 
@@ -18,12 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 SCHEMA_VERSION = "3.0.0"
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 GLOBAL_SOURCE_RE = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$")
-ADAPTERS = {"codex-app-task", "codex-cli-session"}
+APP_EXECUTION_SURFACE = "codex-app-task"
 TAKEOVER_POLICY = "takeover-authorized"
 TAKEOVER_REASONS = {"verified-stale"}
 STALE_AFTER_SECONDS = 300
@@ -234,15 +234,13 @@ def write_claim(path: Path, value: dict[str, Any]) -> None:
 
 def build_claim(args: argparse.Namespace, *, takeover_evidence: Any = "none", replaced: list[str] | None = None) -> dict[str, Any]:
     root_id = check_id(args.root_id, "root_id")
-    if args.adapter not in ADAPTERS:
-        raise ClaimError("invalid-input", f"unsupported execution_adapter: {args.adapter}", 2)
     opened_at = timestamp()
     repositories, repository_checkouts = canonical_repositories(args.repository)
     value = {
         "schema_version": SCHEMA_VERSION,
         "root_id": root_id,
         "acquisition_nonce": secrets.token_hex(16),
-        "execution_adapter": args.adapter,
+        "execution_adapter": APP_EXECUTION_SURFACE,
         "repositories": repositories,
         "repository_checkouts": repository_checkouts,
         "sources": canonical_sources(args.source),
@@ -463,14 +461,13 @@ def check_fingerprint(value: str) -> str:
 
 def add_claim_identity(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--root-id", required=True)
-    parser.add_argument("--adapter", required=True, choices=sorted(ADAPTERS))
     parser.add_argument("--repository", action="append", required=True)
     parser.add_argument("--source", action="append", required=True)
     parser.add_argument("--ledger-ref", required=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Atomically coordinate overlapping Codex orchestrator roots.")
+    parser = argparse.ArgumentParser(description="Atomically coordinate overlapping Codex App orchestrator roots.")
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--json", action="store_true")
     subcommands = parser.add_subparsers(dest="noun", required=True)

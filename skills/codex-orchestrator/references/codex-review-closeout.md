@@ -2,11 +2,9 @@
 
 ## Execution Owner
 
-For App execution, the visible Feature Spec task owns review request, polling,
-feedback fixes, CI, and ready transition. The root only monitors and reconciles.
-For CLI execution, the root CLI session owns those steps after accepting the
-terminal worker result. Ownership never changes mid-loop as a convenience
-fallback.
+The visible Feature Spec task owns review request, polling, feedback fixes, CI,
+and ready transition. The root only monitors and reconciles. Ownership never
+changes mid-loop as a convenience fallback.
 
 ## Current-Revision Review
 

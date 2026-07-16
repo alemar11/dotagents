@@ -9,8 +9,7 @@ description: Execute execution-ready Feature Specs in visible Codex App tasks th
 
 Use this Codex-dependent skill only when the owner explicitly invokes
 `$codex-orchestrator` or asks to run Codex Orchestrator in the App. It is the
-App execution adapter and the canonical owner of the shared orchestration
-contracts consumed by `$codex-cli-orchestrator`.
+single App-only orchestration surface.
 
 The root owns execution-ready intake, the active-root claim, portfolio Goal or ledger
 fallback, scheduling, permission decisions, ledger state, merge decisions,
@@ -18,10 +17,6 @@ source closeout, and final status. Implementation always runs in exactly one
 visible App task per implementation-eligible Feature Spec. That task owns its
 Spec through the fixed terminal target
 `pull-request-ready-for-merge-but-not-merged`.
-
-The App orchestrator never invokes, routes to, or recommends the CLI
-orchestrator. The two public entrypoints are independent runtime surfaces even
-though the CLI package consumes shared contracts owned here.
 
 ## Mandatory Runtime Surface Gate
 
@@ -81,12 +76,12 @@ target or continue with a partial delivery mode.
 
 ## Non-Negotiable Invariants
 
-- Load `references/core/options.md`, `references/options.md`, and
-  `references/ledger.md` during CLAIM. Resolve only the non-merge fields needed
+- Load `references/options.md` and `references/ledger.md` during CLAIM. Resolve
+  only the non-merge fields needed
   for registration using canonical snake_case fields and lower-kebab values.
   Keep `pull_request_merge_permission` and
   `pull_request_merge_confirmation` unresolved during CLAIM, registration, and
-  worker execution. Do not load `references/core/merge-authorization.md` on
+  worker execution. Do not load `references/merge-authorization.md` on
   that path.
 - Use `scripts/orchestrator-claim` as the sole active-root authority. Acquire
   the canonical repository/source claim before creating the ledger projection,
@@ -171,9 +166,9 @@ changes each require their exact permission.
 2. **INTAKE** — validate the execution-ready bundle read-only and finalize the
    complete affected-repository set; abort as `planning-required` before CLAIM
    when any required evidence is missing or invalid.
-3. **CLAIM** — canonicalize the finalized repositories, load the shared ledger,
+3. **CLAIM** — canonicalize the finalized repositories, load the ledger,
    and call `scripts/orchestrator-claim --json claim acquire` to acquire the
-   common active-root claim atomically. Qualify every repository-local source ref,
+   active-root claim atomically. Qualify every repository-local source ref,
    including `#42` and repo-relative Feature Spec paths, as
    `git:<git-common-dir>::ref:<source-ref>`; the helper rejects unqualified local
    refs. Preserve URI-shaped hosted or globally durable source ids unchanged so
@@ -202,8 +197,8 @@ access, dependency, tool, gate, or safety blocker stops progress.
 
 Normal App runtime uses the shipped `scripts/orchestrator-claim` artifact. Run
 `--json doctor` without creating state, then acquire with the root id,
-`codex-app-task` adapter, every canonical repository realpath, every source id,
-and the absolute ledger ref. Persist its returned claim fingerprint in the
+every canonical repository realpath, every source id, and the absolute ledger
+ref. Persist its returned claim fingerprint in the
 ledger projection. Use `claim heartbeat` while active and `claim release` only
 after terminal evidence or an explicit durable handoff is recorded. Both
 commands require the fingerprint returned by acquire so a reused root id cannot
@@ -227,10 +222,10 @@ matching active Goal; a replacement creates a new Goal. A task marks its Goal
 complete only after the terminal target and gates pass.
 
 The canonical ledger lives under
-`~/.cache/dotagents/skills/codex-orchestrator/ledgers/`. App and CLI adapters
-share the same active-root claim namespace so overlapping runs stop safely.
+`~/.cache/dotagents/skills/codex-orchestrator/ledgers/`. All App runs use the
+same active-root claim namespace so overlapping runs stop safely.
 
-## App Task Adapter
+## Visible App Task
 
 Load `references/worker.md` before creating, resuming, reading, or steering a
 task. Title the task with the exact Feature Spec title and bind it to the
@@ -260,7 +255,7 @@ Only after every affected PR reaches the fixed PR-ready conclusion, and only
 when the owner separately requests merge, may the root resolve
 `pull_request_merge_permission` and `pull_request_merge_confirmation`. This is
 a post-conclusion root authorization step, not intake, CLAIM, registration, or
-worker authority. Load `references/core/merge-authorization.md` only for that
+worker authority. Load `references/merge-authorization.md` only for that
 step.
 
 ## Final Report
@@ -278,27 +273,25 @@ artifacts by path/ref and fingerprint instead of repeating them.
 
 ## References
 
-- `references/core/options.md`: shared non-merge authority and delivery registry.
-- `references/core/merge-authorization.md`: separately loaded post-conclusion
-  merge authority.
-- `references/options.md`: App-only option registry.
-- `references/ledger.md`: shared ledger, claims, execution registry, and state.
-- `references/worker.md`: visible App task adapter.
+- `references/options.md`: App orchestration option registry.
+- `references/merge-authorization.md`: separately loaded post-conclusion merge
+  authority.
+- `references/ledger.md`: ledger, claims, task registry, and state.
+- `references/worker.md`: visible App Feature Spec task contract.
 - `references/multi-repo-workspace.md`: managed multi-repo App execution.
-- `references/spec-backed-delivery.md`: shared execution-ready bundle, delivery,
+- `references/spec-backed-delivery.md`: execution-ready bundle, delivery,
   and authority contract.
-- `references/stacked-feature-specs.md`: shared two-Spec stack.
-- `references/gates.md`: shared proof and closeout gates.
-- `references/codex-review-closeout.md`: adapter-aware PR review closeout.
-- `references/recovery-validation.md`: shared and App recovery validation.
+- `references/stacked-feature-specs.md`: two-Spec stack.
+- `references/gates.md`: proof and closeout gates.
+- `references/codex-review-closeout.md`: PR review closeout.
+- `references/recovery-validation.md`: App recovery validation.
 - `references/runtime-efficiency.md`: multi-wave delta evidence and metrics.
 
-## CLI Maintenance
+## Claim Helper Maintenance
 
 `scripts/orchestrator-claim` is the only supported atomic-claim artifact. It is
 a standard-library Python script with `__version__` as its semver source of
 truth and no maintenance project. Change it in place, then re-run `--help`,
 `--version`, `--json doctor`, the competing-root fixture, and the focused App
-and CLI contract tests. Use major versions for breaking command or JSON
-contracts, minor versions for backward-compatible commands, and patches for
-fixes.
+contract tests. Use major versions for breaking command or JSON contracts,
+minor versions for backward-compatible commands, and patches for fixes.

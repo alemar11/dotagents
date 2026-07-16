@@ -27,8 +27,7 @@ root_implementation_fallback: forbidden
 Record the task id, managed checkout, Goal evidence, allowed actions,
 capability snapshot, internal subagent topology, state transitions, validation,
 delivery artifacts, blockers, and any fallback reason. Root-owned or simulated
-execution may appear only as imported historical evidence; this App adapter
-cannot select either as an implementation location.
+execution is not valid implementation evidence.
 
 ## Authorization
 
@@ -55,7 +54,7 @@ multi-repository Spec, the managed task workspace must expose all child
 checkouts. If any required checkout is missing or not isolated, stop and
 report the App run as blocked.
 
-The App adapter never creates, removes, or repairs raw Git worktrees and never
+The orchestrator never creates, removes, or repairs raw Git worktrees and never
 rotates the caller checkout.
 
 ## Goal Contract

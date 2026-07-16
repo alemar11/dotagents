@@ -67,8 +67,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "agents/openai.yaml",
             "scripts/orchestrator-claim",
             "references/options.md",
-            "references/core/options.md",
-            "references/core/merge-authorization.md",
+            "references/merge-authorization.md",
             "references/ledger.md",
             "references/ledger-template.md",
             "references/worker.md",
@@ -98,7 +97,6 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertIn("## Mandatory Permission Gate", text)
         self.assertIn("ask the user once", text)
         self.assertIn("abort the run without implementation or runtime", text)
-        self.assertIn("never invokes, routes to, or recommends", text)
         self.assertIn("explicitly grants creation of visible Codex App tasks", text)
         self.assertIn("Generic delegation, subagent, background-worker", text)
         self.assertIn("does not grant visible App task creation", text)
@@ -128,12 +126,14 @@ class AppOrchestratorContractTests(unittest.TestCase):
 
         recovery = self.read("references/recovery-validation.md")
         recovery_surface = recovery.index("## Mandatory App Runtime Surface Revalidation")
-        recovery_validation = recovery.index("## Shared Validation")
+        recovery_validation = recovery.index("## Freshness Validation")
         self.assertLess(recovery_surface, recovery_validation)
-        recovery_gate = recovery[recovery_surface:recovery_validation]
+        recovery_gate = " ".join(
+            recovery[recovery_surface:recovery_validation].split()
+        )
         self.assertIn("before reading the Recovery Packet", recovery_gate)
         self.assertIn("visible Codex App task creation", recovery_gate)
-        self.assertIn("App-managed\nworktree binding", recovery_gate)
+        self.assertIn("App-managed worktree binding", recovery_gate)
         self.assertIn("without asking permission", recovery_gate)
         self.assertIn("Only after this gate passes", recovery_gate)
 
@@ -164,7 +164,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
             with self.subTest(fixture=label):
                 self.assertTrue(permission_contract_conflicts(fixture))
 
-    def test_app_surface_has_no_cli_or_manual_checkout_machinery(self) -> None:
+    def test_app_surface_has_no_manual_checkout_or_alternate_worker_machinery(self) -> None:
         text = self.runtime_text().lower()
         forbidden = (
             "tmux",
@@ -174,14 +174,11 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "serial-caller-checkout",
             "unmanaged_git_worktree_fallback_permission",
             "implementation_checkout_strategy",
-            "cli-only sessions",
             "current-orchestrator-session",
             "background-codex-subagent",
         )
         for token in forbidden:
             self.assertNotIn(token, text, token)
-        self.assertNotIn("recommend `$codex-cli-orchestrator`", text)
-        self.assertNotIn("route to `$codex-cli-orchestrator`", text)
 
     def test_app_has_one_fixed_successful_implementation_conclusion(self) -> None:
         skill = self.read("SKILL.md")
@@ -202,7 +199,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
         claim_step = skill.split("3. **CLAIM**", 1)[1].split("4. **REGISTER**", 1)[0]
         normalized_claim_step = " ".join(claim_step.split())
         self.assertLess(
-            normalized_claim_step.index("acquire the common active-root claim atomically"),
+            normalized_claim_step.index("acquire the active-root claim atomically"),
             normalized_claim_step.index("create the portfolio Goal or exact fallback"),
         )
         self.assertLess(skill.index("4. **REGISTER**"), skill.index("5. **PR-PREFLIGHT**"))
@@ -239,7 +236,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
             normalized_skill,
         )
         self.assertIn("post-conclusion root authorization step", normalized_skill)
-        self.assertIn("Do not load `references/core/merge-authorization.md`", skill)
+        self.assertIn("Do not load `references/merge-authorization.md`", skill)
         self.assertIn(
             "The root validates and preserves that tuple; it never selects, rewrites, or widens it",
             normalized_delivery,
@@ -308,41 +305,38 @@ class AppOrchestratorContractTests(unittest.TestCase):
             ["atomic-claim", "ledger-projection", "portfolio-goal"],
         )
 
-    def test_shared_registry_is_adapter_neutral(self) -> None:
+    def test_registry_tracks_one_visible_app_task_per_spec(self) -> None:
         ledger = self.read("references/ledger.md")
         template = self.read("references/ledger-template.md")
         for text in (ledger, template):
-            self.assertIn("Feature Spec Execution Registry", text)
-            self.assertIn("execution_adapter", text)
-            self.assertIn("adapter_evidence_ref", text)
-            self.assertIn("codex-app-task", text)
-            self.assertIn("codex-cli-session", text)
-        self.assertNotIn("Feature Spec Task Registry", ledger)
+            self.assertIn("Feature Spec Task Registry", text)
+            self.assertIn("task_ref", text)
+            self.assertIn("task_evidence_ref", text)
+            self.assertNotIn("execution_adapter", text)
+            self.assertNotIn("adapter_evidence_ref", text)
 
     def test_multi_repo_requires_managed_child_checkouts(self) -> None:
         text = " ".join(self.read("references/multi-repo-workspace.md").split())
         self.assertIn("one visible App task per Feature Spec", text)
         self.assertIn("isolated checkout for every required child repository", text)
-        self.assertIn("Do not invoke another orchestrator or use owner checkouts", text)
+        self.assertIn("Do not use owner checkouts, raw helper worktrees", text)
 
     def test_options_use_canonical_syntax_and_retire_mixed_surface_fields(self) -> None:
         text = self.read("references/options.md")
-        shared = self.read("references/core/options.md")
-        merge = self.read("references/core/merge-authorization.md")
+        merge = self.read("references/merge-authorization.md")
         fields = re.findall(r"\| `([a-z][a-z0-9_]*)` \|", text)
         self.assertTrue(fields)
         self.assertTrue(all(re.fullmatch(r"[a-z][a-z0-9_]*", field) for field in fields))
-        self.assertIn("Retired mixed-surface fields", text)
-        self.assertIn("shared non-merge authority", text)
-        self.assertIn("Merge\nfields live only in `core/merge-authorization.md`", text)
-        self.assertIn("`granted-for-selected-target`", shared)
-        self.assertIn("`pull-request-closing-keyword-only`", shared)
-        self.assertIn("`not-needed-for-selected-delivery-target`", shared)
-        self.assertIn("`delivery_decision_origin`", shared)
-        self.assertIn("`pull_request_count_strategy`", shared)
-        self.assertIn("`issue_completion_method`", shared)
-        self.assertNotIn("pull_request_merge_permission", shared)
-        self.assertNotIn("pull_request_merge_confirmation", shared)
+        self.assertIn("invalid as structured inputs", text)
+        self.assertIn("every pre-conclusion App orchestration option", text)
+        self.assertIn("Merge fields live\nonly in `merge-authorization.md`", text)
+        self.assertIn("`granted-for-selected-target`", text)
+        self.assertIn("`pull-request-closing-keyword-only`", text)
+        self.assertIn("`delivery_decision_origin`", text)
+        self.assertIn("`pull_request_count_strategy`", text)
+        self.assertIn("`issue_completion_method`", text)
+        self.assertNotIn("pull_request_merge_permission", text)
+        self.assertNotIn("pull_request_merge_confirmation", text)
         self.assertIn("These fields have no pre-conclusion defaults", merge)
         self.assertIn("`pull_request_merge_permission`", merge)
         self.assertIn("`pull_request_merge_confirmation`", merge)
@@ -372,11 +366,15 @@ class AppOrchestratorContractTests(unittest.TestCase):
         ):
             self.assertIn(token, closeout)
 
-    def test_cli_companion_and_shared_dependency_exist(self) -> None:
-        cli = REPO / "skills/codex-cli-orchestrator"
-        self.assertTrue((cli / "SKILL.md").is_file())
-        self.assertTrue((cli / "scripts/codex-session").is_file())
-        self.assertIn("requires the sibling `codex-orchestrator`", (cli / "SKILL.md").read_text())
+    def test_app_is_the_only_orchestrator_package(self) -> None:
+        orchestrators = sorted(
+            path.name
+            for path in (REPO / "skills").iterdir()
+            if path.is_dir()
+            and path.name.endswith("orchestrator")
+            and (path / "SKILL.md").is_file()
+        )
+        self.assertEqual(orchestrators, ["codex-orchestrator"])
 
 
 if __name__ == "__main__":

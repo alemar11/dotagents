@@ -18,9 +18,8 @@ for every required child repository and record repo id, path, branch, Git
 top-level, and baseline.
 
 If the App cannot supply the complete managed checkout map, abort the App run
-as blocked before edits. Do not invoke another orchestrator or use owner
-checkouts, raw helper worktrees, branch rotation, or one task per child
-repository as fallback.
+as blocked before edits. Do not use owner checkouts, raw helper worktrees,
+branch rotation, or one task per child repository as fallback.
 
 ## Scheduling And Closeout
 

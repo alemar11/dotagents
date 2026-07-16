@@ -1,4 +1,4 @@
-# Shared Ledger Template
+# Codex App Ledger Template
 
 ## Scope
 
@@ -21,7 +21,6 @@ authorization_resolution: per-workstream
 ## Active Root
 
 Root id: <id>
-Execution adapter: codex-app-task|codex-cli-session
 Atomic claim ref: <absolute claim path>
 Atomic claim fingerprint: <sha256>
 Goal mode: active|unavailable
@@ -37,16 +36,16 @@ Takeover evidence: <none or ref>
 | revision_key | request_ref | provider_state | observation_fingerprint | result_disposition | wait_profile | wait_started_at | wait_deadline | due_at | poll_owner |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-## Feature Spec Execution Registry
+## Feature Spec Task Registry
 
-| feature_spec_ref | feature_spec_title | execution_adapter | execution_ref | adapter_evidence_ref | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | state | last_observed |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| feature_spec_ref | feature_spec_title | task_ref | task_evidence_ref | workstream_ids | repository_refs | pull_request_refs | lifecycle_owner | state | last_observed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 Worker evidence:
 
-- feature_spec_ref=<ref>; execution_ref=<task/session id>;
-  actual_execution_location=<visible-codex-app-task|codex-cli-session>;
-  parallelism=<parallel|sequential|root-owned|simulated>; fallback reason=<none or evidence>.
+- feature_spec_ref=<ref>; task_ref=<visible task id>;
+  managed_checkouts=<repository checkout refs>;
+  parallelism=<parallel|sequential>; fallback_reason=<none or evidence>.
 
 ## Parent Closeout Watch
 
@@ -57,7 +56,7 @@ Worker evidence:
 
 Option fingerprint: <hash>
 Repository fingerprints: <refs>
-Active execution refs: <refs or none>
+Active task refs: <refs or none>
 Due gates/checks: <refs or none>
 Next action: <action and target>
 Evidence index: <refs>
@@ -84,13 +83,13 @@ Evidence index: <refs>
 ### released
 
 Each workstream row records source/spec, repositories/paths, dependencies,
-allowed actions, delivery and issue permissions, execution ref, evidence,
-gates, lifecycle state, and next action.
+allowed actions, delivery and issue permissions, task ref, evidence, gates,
+lifecycle state, and next action.
 
 ## Wave Reports
 
-Record selected Specs, dependency proof, slots, execution refs, changes,
-validation, delivery, reconciliation, and recovery update.
+Record selected Specs, dependency proof, slots, task refs, changes, validation,
+delivery, reconciliation, and recovery update.
 
 ## Runtime Metrics
 
