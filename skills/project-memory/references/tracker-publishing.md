@@ -1,103 +1,104 @@
 # Tracker Publishing Contract
 
-Use this reference when `$plan-feature` needs to
-write local artifacts, mutate a hosted tracker, or return draft publish
-commands. `project-memory/config/issue-tracker.md` remains the repo-specific
-source of truth; this file defines the shared mechanics.
+Use this reference when `$plan-feature` needs to publish planning artifacts or
+return a non-mutating proposal. `project-memory/config/issue-tracker.md` owns
+durable tracker routing; this file owns the shared `write_mode` behavior.
 
 ## Tracker Backend
 
 Use `tracker_backend` to choose the durable artifact target:
 
-- `github`: write Feature Specs and implementation issues as GitHub issues through
-  `$gitstack:github-issues`, or return exact draft `gh` commands when the current run is
-  non-mutating.
-- `local`: write Feature Specs and implementation issues as Markdown files in the
-  configured local conventions, or return draft paths and bodies when the
-  current run is non-mutating.
+- `github`: Feature Specs and implementation issues are GitHub issues managed
+  through `$gitstack:github-issues`;
+- `local`: Feature Specs and implementation issues are Markdown files in the
+  configured local conventions.
 
-By default, `tracker_backend` is the write authority for planning artifacts:
-`github` publishes to GitHub and `local` writes local tracker files after
-`$plan-feature` resolves setup, planning identity, and blockers. No-mutation,
-dry-run, temp, and rehearsal behavior is current-run policy, not a durable
-issue-tracker configuration row.
+Reject tracker configuration without a canonical `tracker_backend`. Do not
+store current-run mutation intent, implementation delivery policy, branch
+strategy, or executor authorization in Project Memory.
 
-Reject tracker configuration that does not provide a canonical
-`tracker_backend`. Run-scoped non-mutation behavior must arrive through the
-current Plan Feature fields; do not infer it from obsolete setup keys.
+## Write Mode
 
-Hosted body-file inputs are temporary transport files. They must live outside
-the repo and be removed after mutation unless the resolved Plan Feature option
-is `local_mirror=requested`; write that mirror only under the validated
-repo-relative `local_mirror_path` carried through both Plan Feature phase
-handoffs. For GitHub tracker runs,
-`$gitstack:github-issues` owns this transport:
-create transient body files with non-interpolating writes, run `gh --body-file`,
-verify tracker state after mutation, clean up temp files, and recover partial
-publication by inspecting GitHub before retrying missing operations.
+| `write_mode` | GitHub backend | Local backend |
+| --- | --- | --- |
+| `apply` | Publish or update hosted issues, verify resulting tracker state, and remove temporary transport files. | Write or update durable Feature Spec and issue files at their canonical paths. |
+| `propose` | Return proposed titles, bodies, metadata, relationships, and publication order without mutating GitHub or returning executable commands. | Return proposed bodies and canonical target paths without writing tracker files. |
+
+`write_mode` is run-scoped authority, not durable configuration. Resolve
+inspect-only, review-only, dry-run, rehearsal, validation, and proposal
+requests to `propose`. Resolve `apply` only from explicit write authority for
+the selected planning scope.
+
+For GitHub `apply`, temporary body files are transport only. Keep them outside
+the repository, use non-interpolating writes, verify tracker state after each
+mutation, remove them after use, and inspect GitHub before retrying a partially
+completed publication. Never persist a repo-local mirror solely for transport.
 
 ## Stable Feature Spec References
 
-Every handoff from a Feature Spec to generated issues must carry `source_spec_ref`:
+Every handoff from a Feature Spec to generated issues carries
+`source_spec_ref`:
 
-- Hosted Feature Spec already exists: `source_spec_ref=#<spec-number>`.
-- Local Feature Spec exists: `source_spec_ref=<repo-relative-spec-path>`.
-- Draft-command or local-dry-run output before hosted mutation: use a
-  deterministic draft ref,
-  `source_spec_ref=draft-spec:<feature-slug>` for one repo or
-  `source_spec_ref=draft-spec:<project-slug>/<feature-slug>` for workspace
-  planning.
+- applied hosted Feature Spec in one repository:
+  `source_spec_ref=#<spec-number>`;
+- applied hosted partial in a multi-repository bundle:
+  `source_spec_ref=owner/repository#<spec-number>` or its canonical hosted URL;
+- applied local Feature Spec in one repository:
+  `source_spec_ref=<repo-relative-spec-path>`;
+- applied local partial in a multi-repository bundle:
+  `source_spec_ref=<repository-slug>/<repo-relative-spec-path>`;
+- applied hosted integration partial: its own
+  `source_spec_ref=owner/repository#<integration-spec-number>` or canonical URL
+  in a multi-repository bundle, produced by the distinct title `Feature Spec:
+  <Feature Name> - Integration` and body marker `Partial role: integration`;
+- applied local integration partial:
+  `source_spec_ref=<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`
+  in a multi-repository bundle, or the unqualified configured path only in one
+  repository; never the implementation partial's `SPEC.md`;
+- proposed output before publication:
+  `source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec,
+  `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>` for a
+  multi-repository parent, or
+  `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>`
+  for a repo-scoped implementation partial. A dedicated integration partial
+  uses
+  `source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>/integration`.
 
-When using a draft Feature Spec ref, also return the Feature Spec title, `feature_slug`,
-`project_slug` when applicable, and a short Feature Spec body fingerprint so later
-commands can prove the generated issues still point at the same Feature Spec draft.
+Proposed output also carries the Feature Spec title, `feature_slug`,
+`project_slug` when applicable, and enough proposal identity to keep child
+issue bodies attached to the same proposed parent. For one Feature Spec, create
+that Spec, replace its proposed ref with the resulting durable ref, then create
+and attach its issues. For multi-repository work, create the accepted parent
+when present, create every implementation partial, create the integration
+partial after its upstream refs are durable, update repo-to-child mappings,
+sibling links, and Feature Dependencies with the same globally unambiguous
+`owner/repository#<number>`, hosted URL, or
+`<repository-slug>/<repo-relative-spec-path>` identities, then create issues
+under their owning Specs. Bare issue numbers and bare repo-relative paths are
+repository-local and invalid across siblings.
 
-Draft issue bodies may use `source_spec_ref: draft-spec:<...>` only in
-non-mutating output while no hosted Feature Spec number exists. The draft publish plan
-must say how to replace that value before mutation:
-
-1. Create or update the Feature Spec first.
-2. Capture the hosted Feature Spec issue number as `SPEC_NUMBER`.
-3. Replace `source_spec_ref: draft-spec:<...>` with
-   `source_spec_ref: #$SPEC_NUMBER` in
-   each implementation issue body before creating those hosted issues.
-4. Attach each implementation issue to the Feature Spec parent when the tracker supports
-   parent/sub-issues.
-
-Do not dispatch implementation workers from a `draft-spec:<...>` source as if it
-were a durable Feature Spec. A dry-run orchestrator may inspect the graph, but real
-implementation scheduling requires a hosted Feature Spec number or a durable
-local Feature Spec path. No permission row promotes a draft ref to an executable
-source.
+A `proposed-spec:<...>` ref is non-executable. It cannot dispatch an
+implementation worker or become durable through permission metadata; publish
+the parent or write the canonical local file first.
 
 ## Phase Ownership
 
-- The `$plan-feature` Feature Spec phase owns Feature Spec body creation, Feature Spec local writes, Feature Spec
-  hosted issue creation, and the `source_spec_ref` value it returns.
-- The `$plan-feature` issue phase owns generated implementation issue bodies,
-  issue local writes, issue hosted creation, sub-issue attachment, and
-  replacement of draft Feature Spec refs in hosted publish commands.
-- `$plan-feature` owns passing the same `tracker_backend`, `effective_target`,
-  `no_mutation_override`, `no_mutation_output`, `local_mirror`,
-  `local_mirror_path`, planning identity, `change_delivery_target`,
-  `change_delivery_permission`, `issue_update_permission`, and
-  `source_spec_ref` through the full planning pipeline and its phase modes, with
-  the verified `option_rows_fingerprint` for each current row set.
-- Non-mutating handoffs preserve the resolved canonical run value:
-  `no_mutation_override=dry-run`, `no_mutation_override=temp`,
-  `no_mutation_override=rehearsal`, `no_mutation_override=validation`,
-  `no_mutation_override=disabled-writes`, or
-  `no_mutation_override=draft-output`. They are not inferred from older field
-  names or prose.
-- `$codex-orchestrator` may consume generated issues only after `source_spec_ref`
-  is durable enough for the requested action.
+- The `$plan-feature` Feature Spec phase owns Feature Spec body creation,
+  Feature Spec publication, and the `source_spec_ref` it returns.
+- The `$plan-feature` issue phase owns generated issue bodies, issue
+  publication, parent/child relationships, and replacement of proposed refs when
+  applying hosted publication.
+- `$plan-feature` carries the same `tracker_backend`, `write_mode`, planning
+  identity, and `source_spec_ref` through both phases.
+- `$codex-orchestrator` consumes only a durable hosted or local Feature Spec
+  ref, globally qualified for multi-repository work, never proposed output.
 
-## Mode Summary
+## Durable Targets
 
-| Tracker backend | Feature Spec owner output | Issue owner output |
+| Tracker backend | Feature Spec | Implementation issues |
 | --- | --- | --- |
-| `github` | Feature Spec GitHub issue, linked partial Feature Spec issues for multi-repo work, or Feature Spec body plus draft command | GitHub sub-issues under the Feature Spec, linked repo issues for multi-repo work, or issue bodies plus draft commands |
-| `local` | `planning/features/<feature-slug>/SPEC.md` or `orchestration/<project-slug>/features/<feature-slug>/SPEC.md` for local workspace parents | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` or `orchestration/<project-slug>/features/<feature-slug>/issues/<NN>-<slug>.md` for local workspace parents |
+| `github` | GitHub Feature Spec issue; multi-repository refs use `owner/repository#<number>` or canonical URLs, and a dedicated integration partial uses a separate `Feature Spec: <Feature Name> - Integration` issue in its owner repository | GitHub sub-issues under their owning Feature Spec; integration issues use the integration partial's distinct globally qualified hosted ref |
+| `local` | `planning/features/<feature-slug>/SPEC.md` or `orchestration/<project-slug>/features/<feature-slug>/SPEC.md`; multi-repository refs prefix the owning repository slug, and an integration partial appends `/integration/SPEC.md` beneath the feature directory | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` or its configured equivalent; integration issues append `/integration/issues/<NN>-<slug>.md` and complete under `/integration/issues/done/` beneath the feature directory |
 
-Lower-kebab-case values are canonical. Reject noncanonical values instead of
-rewriting them.
+Lower-kebab-case values are canonical. Reject noncanonical option values
+instead of rewriting them.

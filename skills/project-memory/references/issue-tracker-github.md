@@ -1,154 +1,128 @@
 # Issue Tracker: GitHub
 
-Feature Specs and implementation issues for this repo live as GitHub issues. Use
-`$gitstack:github-issues` for GitHub issue lifecycle operations.
+Feature Specs and implementation issues for this repo live as GitHub issues.
+Use `$gitstack:github-issues` for GitHub issue lifecycle operations.
 
 ## Configuration
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs and implementation issues are written as GitHub issues. |
-| `change_delivery_target` | enum | `pull-request-ready-for-merge-but-not-merged` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | Exact implementation stopping point. A local-only commit leaves the hosted issue open. |
+| `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs and implementation issues are routed to GitHub. |
 
-GitHub is the authoritative artifact store in this mode. Do not create or keep
-repo-local `planning/tmp/` Feature Spec/issue mirrors, `project-memory/features/` mirrors, or
-other local planning copies merely to feed `gh --body-file`. Temporary body
-files must live outside the repo and be removed after mutation. Create a
-persistent mirror only when the canonical Plan Feature rows contain
-`local_mirror=requested` and a validated `local_mirror_path`.
+GitHub is the authoritative artifact store in this mode. Project Memory stores
+only tracker routing and conventions; implementation delivery, branch/PR
+strategy, and executor permissions belong to Feature Specs and executing
+workflows.
 
-Feature-planning workflows write to GitHub by default in this mode after setup,
-planning identity, and blockers are resolved. Branch only on the canonical
-`effective_target`: `configured-tracker` writes to GitHub,
-`draft-publish-commands` returns exact draft commands, and `local-dry-run`
-returns non-executable local artifacts.
+Do not create repo-local planning mirrors merely to feed hosted mutations.
+Temporary body files must live outside the repo and be removed after use.
 
-## Non-Mutating Runs
+## Publication
 
-Require a non-`none` `no_mutation_override` before either non-mutating target.
-For `effective_target=local-dry-run`, return local paths and bodies without
-writing GitHub. For `effective_target=draft-publish-commands`, ask
-`$gitstack:github-issues` for draft issue bodies and exact `gh` commands without
-executing them.
-When returning draft commands before the Feature Spec issue exists, use
-`source_spec_ref=draft-spec:<feature-slug>` and publish the Feature Spec first; generated
-issue bodies must replace that draft ref with `source_spec_ref: #<spec-number>` before
-hosted mutation.
-Treat `no_mutation_override`, `no_mutation_output`, and the derived
-non-mutating target as run-scoped rows. Do not record them as durable
-issue-tracker configuration.
+- `write_mode=apply`: use `$gitstack:github-issues` to create or update issues,
+  relationships, types, and labels. Normalize each write to
+  `mutation_mode=apply`, the exact repository/issue target, and one canonical
+  `issue_operation`, then verify hosted state.
+- `write_mode=propose`: return proposed titles, bodies, metadata,
+  relationships, and publication order without mutating GitHub or returning
+  executable commands.
+
+When proposed output precedes the hosted Feature Spec, use
+`source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec,
+`proposed-spec:<project-slug>/<feature-slug>` for a multi-repository parent, or
+`proposed-spec:<project-slug>/<feature-slug>/<repository-slug>` for each
+repo-scoped implementation partial. A dedicated integration partial uses
+`proposed-spec:<project-slug>/<feature-slug>/<repository-slug>/integration`.
+Order the proposal so each owning Feature Spec is created before its issues.
+Before hosted child creation, replace that proposed ref in the child's canonical
+`## Execution Contract` `source_spec_ref` row with the owning
+`#<spec-number>` for a single-repository bundle, or with
+`owner/repository#<spec-number>` or its canonical hosted URL for a
+multi-repository partial. Use the same globally qualified identity in
+repo-to-child mappings, sibling links, and cross-repository Feature Dependency
+rows. Never treat a proposed ref as an executable source, use a bare issue
+number across repositories, or add a duplicate header field.
+
+On apply, a dedicated integration partial is a second hosted Feature Spec in
+its evidence-derived owner repository. Give it the distinct title
+`Feature Spec: <Feature Name> - Integration`, retain
+`Partial role: integration` in its Planning Identity, and use its own hosted
+issue number, expressed as an `owner/repository#<number>` ref or canonical
+hosted URL, as the durable `source_spec_ref`. It must not reuse the ordinary
+implementation partial's title, body identity, or issue number. Selecting an
+integration owner does not require a coordination repository.
 
 ## Conventions
 
 Infer the repo from `git remote -v` unless this file records a specific target.
-Use `$gitstack:github-issues` to create, read, edit, comment on, label, type, attach, or
-close GitHub issues.
+Use `$gitstack:github-issues` to create, read, edit, comment on, label, type,
+attach, or close GitHub issues.
 
-Use `project-memory/config/triage-labels.md` for type and label mappings. The
-default GitHub issue types are:
+For a mutation, pass `mutation_mode=apply`, the exact repository/issue target,
+and one canonical `issue_operation`. A read or proposal supplies no mutation
+authority and must not be upgraded at this boundary.
 
-- `Bug` for `bug`
-- `Feature` for `feature`
-- `Task` for `task`
-
-The default GitHub workflow-state labels are lowercase tracker values:
-
-- `needs-triage` for `needs-triage`
-- `needs-info` for `needs-info`
-- `ready-for-agent` for `ready-for-agent`
-- `ready-for-human` for `ready-for-human`
-- `wontfix` for `wontfix`
-
-If GitHub issue types are disabled or customized for the organization, record
-the actual available values or fallback label convention in
-`project-memory/config/triage-labels.md`.
-
-## Delivery Defaults
-
-- Default `change_delivery_target`:
-  `pull-request-ready-for-merge-but-not-merged`.
-- Branch naming: PR targets default to `feature/<feature-slug>`.
-  `changes-pushed-to-target-branch-without-pull-request` uses the exact branch
-  carried by scoped authorized-user evidence.
-- PR shape: one draft PR for a single repo or monorepo feature. In multi-repo
-  work, every involved repo uses the same branch name and opens its own PR.
-  Generated implementation issues are scheduling units and normally close from
-  the relevant PR body.
-- Multi-repo Feature Spec shape: use a single Feature Spec only when that is the accepted
-  planning source. Otherwise use linked repo-scoped partial Feature Specs or generated
-  issues; each one names its affected repo and links the siblings that define
-  the same feature. No central repo, central issue, project label, or global
-  Feature Spec is required as durable setup configuration.
-- Exceptions: `changes-pushed-to-target-branch-without-pull-request` requires
-  `source=authorized-user-instruction` plus exact feature-scope and target-branch
-  evidence, or a `source-spec` row preserving that evidence. Final-commit issue
-  closure additionally requires a separate
-  `issue_update_permission=direct-issue-updates-explicitly-authorized` row whose
-  explicitly authorizes that closeout for the same scope, target, and branch.
-
-## Runtime Boundary
-
-- Tracker setup records artifact routing, delivery-target defaults, and closeout
-  conventions only.
+Load canonical issue types and workflow states only from
+`references/triage-labels.md`, then use the concrete tracker mappings in
+`project-memory/config/triage-labels.md`. This tracker reference does not repeat
+that registry. If GitHub issue types are disabled or customized for the
+organization, record the actual available values or fallback label convention
+in the repository mapping file.
 
 ## Title Format
 
 - Feature Spec issue: `Feature Spec: <Feature Name>`
+- Integration Feature Spec issue: `Feature Spec: <Feature Name> - Integration`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
 
 Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
-the Feature Spec planning identity, or the Feature Spec source path. Derive it from the Feature Spec title
-only when no accepted slug exists. Use two-digit ordering (`01`, `02`, `03`)
-for implementation issues so the global issue list remains scannable even
-outside the Feature Spec sub-issue view.
+the Feature Spec planning identity, or the Feature Spec source path. Derive it
+from the title only when no accepted slug exists. Use two-digit ordering
+(`01`, `02`, `03`) for implementation issues.
 
-## When a skill says "publish to the issue tracker"
+## Feature Planning
 
-Use `$gitstack:github-issues` to create a GitHub issue.
-
-For feature planning:
-
-- The Feature Spec is a GitHub issue titled `Feature Spec: <Feature Name>` with type `Feature`
-  unless the repo maps `feature` to a different value.
-- Generated implementation issues are the execution graph. Do not create a
-  separate execution-plan issue. A requested non-authoritative summary remains
-  a response view and is not tracker publication.
-- Implementation issues are GitHub sub-issues of the Feature Spec issue with type
-  `Task` unless the repo maps `task` to a different value.
-- Implementation issue titles use
-  `<feature-slug>: <NN> <vertical outcome>`.
+- Resolve every artifact's issue type by role from
+  `references/triage-labels.md` and the repository mapping immediately before
+  publication. Do not hard-code canonical or tracker-specific type values in
+  this reference.
+- Publish the Feature Spec as a GitHub issue titled
+  `Feature Spec: <Feature Name>`.
+- Publish a dedicated integration partial, when present, as a separate GitHub
+  issue titled `Feature Spec: <Feature Name> - Integration`, with
+  `Partial role: integration` in its body.
+- Treat generated implementation issues as the execution graph. Do not create
+  a separate execution-plan issue.
+- Publish implementation issues as sub-issues of the Feature Spec with titles
+  using the format above.
 - `$plan-feature` owns Feature Spec and generated issue body shape, including
-  `source_spec_ref`, delivery metadata, partial Feature Spec links, and issue graph
-  validation. Source references must use the canonical `source_spec_ref` field.
+  `source_spec_ref`, affected repositories and paths, dependency ids, planning
+  identity, partial Feature Spec links, and graph validation.
+- For multi-repo planning, use one accepted parent when appropriate or link
+  repo-scoped partial Feature Specs and issues. Do not persist a coordination
+  repo or global project label as setup configuration.
 
-For triage:
+## Existing Issue Classification
 
-- Existing bug reports should use the mapped `bug` type.
-- Existing feature or enhancement requests should use the mapped `feature`
-  type.
-- Existing maintenance, docs, cleanup, follow-up, or implementation work items
-  should use the mapped `task` type.
-- Workflow state belongs in the mapped triage labels, not in the GitHub issue
-  type.
+When a caller classifies an existing issue, load the canonical issue types,
+workflow states, and their selection semantics from
+`references/triage-labels.md`, then resolve their concrete GitHub mappings from
+`project-memory/config/triage-labels.md`. Workflow state belongs in the mapped
+labels, not the GitHub issue type. This reference defines no additional type or
+state values.
 
-## Completion
+## Completion Convention
 
-When all acceptance criteria pass and validation is complete, close that
-implementation issue from the relevant PR body with a GitHub closing keyword
-such as `Closes #<issue-number>`. For either pull-request delivery target,
-the relevant feature or repo PR closes generated implementation issues.
-Final-commit closure is allowed only for
-`issue_completion_method=final-commit-closing-keyword` with
-`issue_update_permission=direct-issue-updates-explicitly-authorized` and exact separately scoped
-authorization evidence. The issue closes when that authorized
-commit reaches the default branch.
+Use a GitHub closing keyword only when the consuming implementation workflow
+has proved that the referenced issue is satisfied. The issue closes when the
+closing change reaches the default branch. Do not close a parent Feature Spec
+from an individual child issue; a final integration change may close it only
+after all Feature Spec gates pass.
 
-Use closing keywords only for issues actually satisfied by the change. Do not
-add the parent Feature Spec closing keyword from an individual child issue. For a
-whole Feature Spec final feature or integration PR, the root delivery orchestrator may
-add that parent keyword only after its resolved review policy and all Feature Spec
-closeout gates pass.
+Project Memory records this tracker convention but does not choose the
+implementation stopping point, grant issue-mutation authority, or prescribe a
+branch/PR workflow.
 
-## When a skill says "fetch the relevant issue"
+## Fetch
 
 Use `$gitstack:github-issues` to view the issue and recent comments.

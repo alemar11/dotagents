@@ -40,7 +40,7 @@ near the top of the issue file.
 
 ## Workflow States
 
-Triage state describes where the issue is in the workflow. It can change as
+Workflow state describes where the issue is in the workflow. It can change as
 information arrives or work becomes ready.
 
 | Canonical state | Label or status in our tracker | Meaning |

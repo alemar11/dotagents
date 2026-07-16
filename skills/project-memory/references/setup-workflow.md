@@ -10,11 +10,11 @@ When reviewing existing setup, summarize values in the selected setup slice
 before recommending changes. Include the full list only for an explicit full
 review:
 
-- setup flow: `fresh-setup`, `existing-project-bootstrap`, or
-  `orchestrator-workspace` (runtime classification, not a stored key)
+- execution context: `orchestrator-workspace`, `fresh-setup`,
+  `existing-project-bootstrap`, or `current-project` (derived in the exact
+  precedence from `options.md`, not a stored key or option)
 - `repository_layout`
 - `tracker_backend`
-- `change_delivery_target`
 - `issue_type` mapping
 - `workflow_state` mapping
 - domain memory layout
@@ -39,9 +39,8 @@ Editable sections:
 
 - `issue-tracker`
 - `project-layout`
-- `delivery-target`
 - `issue-type-mapping`
-- `triage-state-mapping`
+- `workflow-state-mapping`
 - `domain-memory`
 - `translation-memory`
 - `context-seed`
@@ -54,13 +53,9 @@ and the relevant alternatives:
 - `issue-tracker`: `github` or `local`.
 - `project-layout`: `single-repository`, `monorepo`, or
   `multi-repository-workspace`.
-- `delivery-target`: `local-commit-created-without-pushing`,
-  `changes-pushed-to-target-branch-without-pull-request`,
-  `validated-draft-pull-request-published`, or
-  `pull-request-ready-for-merge-but-not-merged`.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
   custom per canonical type.
-- `triage-state-mapping`: default GitHub lowercase labels, canonical local
+- `workflow-state-mapping`: default GitHub lowercase labels, canonical local
   mapping, or custom per canonical state.
 - `domain-memory`: `single-context`, `multi-context`, `orchestrator-context`.
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
@@ -88,14 +83,8 @@ through unrelated editable sections.
   coordination workspace with multiple child Git repos. Ask when evidence is
   contradictory.
 - For dry runs or no-mutation runs, do not let a GitHub remote force GitHub
-  mutation. Treat the no-mutation choice as current-run behavior, not durable
-  issue-tracker configuration.
-- Default the delivery target to
-  `pull-request-ready-for-merge-but-not-merged`. In a single repository or
-  monorepo this means one feature branch and PR; in a multi-repository workspace
-  every involved repo uses the same branch name and opens its own PR. Every
-  commit-only, push-without-PR, or draft-PR target requires explicit
-  authorization.
+  mutation. Resolve `write_mode=propose` and treat it as current-run behavior,
+  not durable issue-tracker configuration.
 - Do not define durable worker assignments, worker-count limits, scheduled
   checks, publication policy, or issue mutation policy in project memory.
 - Default domain layout to `single-context` unless `CONTEXT-MAP.md`, repo
@@ -147,6 +136,9 @@ After direct write authority or separate affirmative confirmation:
 - Keep behavior-affecting setup fields in typed configuration tables with
   `Key`, `Type`, `Value`, `Allowed values`, and `Meaning` columns before
   explanatory prose.
+- Keep `issue-tracker.md` limited to `tracker_backend` plus human-readable
+  tracker conventions. Implementation delivery policy belongs to Feature Specs
+  and executors.
 - Keep `project-layout.md` limited to `repository_layout`. Do not store
   source-root lists, worktree paths, worker surfaces, thread limits, or Codex
   App runtime state there.
@@ -194,7 +186,7 @@ exists or is authorized; never create a broken pointer:
 ```
 
 Keep this block concise. Do not paste domain vocabulary, tracker procedures,
-delivery details, localization rules, worker-dispatch rules, or context seed
+implementation policy, localization rules, worker-dispatch rules, or context seed
 material into `AGENTS.md`. `$codex-orchestrator` owns its session worker
 questions, checkpoint, dispatch, and ledger progress record. For orchestrator
 workspaces, explicitly say the workspace coordinates external repos and child
@@ -204,13 +196,12 @@ repos keep their own project memory and code ownership.
 
 Summarize only the applicable fields:
 
-- setup flow;
+- execution context;
 - files written;
 - settings reviewed and changed;
 - selected issue tracker;
 - project topology;
-- delivery mode;
-- issue-type and triage-state mapping;
+- issue-type and workflow-state mapping;
 - domain-memory layout;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;

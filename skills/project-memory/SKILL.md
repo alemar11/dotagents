@@ -11,7 +11,7 @@ Use `$project-memory` as the single public entry point for durable repository
 memory:
 
 - lean project-memory pointers in `AGENTS.md`;
-- tracker and delivery routing in `project-memory/config/issue-tracker.md`;
+- tracker routing in `project-memory/config/issue-tracker.md`;
 - durable project topology in `project-memory/config/project-layout.md`;
 - canonical issue type/state vocabulary and repository mappings in
   `project-memory/config/triage-labels.md`;
@@ -30,7 +30,7 @@ structured fields in current handoffs and reports.
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | Tracker backend, delivery target, and canonical issue-type and workflow-state vocabulary and mappings. |
+| `tracker-routing` | Tracker backend plus canonical issue-type and workflow-state vocabulary and mappings. |
 | `project-layout` | Durable project topology: `single-repository`, `monorepo`, or `multi-repository-workspace`. |
 | `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
@@ -41,18 +41,14 @@ For `memory_slice=domain-memory`, resolve `domain_operation` from
 `references/domain-modeling.md`: `setup-bootstrap`, `inline-update`,
 `implementation-closeout`, or `periodic-review`.
 
-`execution_context` is orthogonal to `memory_slice` and `domain_operation`:
+Derive `execution_context` from repository evidence after selecting the slice;
+it is not a user or caller option. Apply the exact ordered precedence in
+`references/options.md`, which yields one of `orchestrator-workspace`,
+`fresh-setup`, `existing-project-bootstrap`, or `current-project`. Do not
+redefine or reorder those predicates in another reference.
 
-- `execution_context=fresh-setup`: selected files are missing;
-- `execution_context=existing-project-bootstrap`: reconcile accepted repo or recent same-repo
-  session evidence;
-- `execution_context=orchestrator-workspace`: configure only root coordination memory and never
-  create project/feature artifacts during setup;
-- `execution_context=current-project`: operate on established project memory
-  without bootstrap semantics.
-
-Resolve `write_mode=propose` for a current-run no-mutation override; otherwise
-use `write_mode=apply` only when the selected scope has write authority.
+Resolve `write_mode=propose` for a non-mutating run. Use `write_mode=apply` only
+when the selected scope has write authority.
 
 ## Non-Negotiable Boundaries
 
@@ -90,28 +86,29 @@ Behavior-affecting setup uses human-first Markdown tables with
 | Key | Values | Owner |
 | --- | --- | --- |
 | `tracker_backend` | `github`, `local` | `issue-tracker.md` |
-| `change_delivery_target` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | `issue-tracker.md`, Feature Specs, generated issues |
 | `repository_layout` | `single-repository`, `monorepo`, `multi-repository-workspace` | `project-layout.md` |
 
-Retired delivery and repository-layout values are invalid input. Project-memory
-configuration must already use this schema before the runtime consumes it.
+Project Memory does not store implementation delivery targets, branch or PR
+policy, or executor authorization. Those belong to the current Feature Spec or
+the executing workflow. Unknown tracker keys and retired repository-layout
+values are invalid input; configuration must already use this schema before the
+runtime consumes it.
 
 `references/triage-labels.md` is the sole reusable registry for canonical
 `issue_type` and `workflow_state` values. The generated
 `project-memory/config/triage-labels.md` is the repository-specific source of
 truth for their tracker mappings. Consuming skills must load that mapping and
 must not define parallel enums or aliases.
-
 Do not add durable keys for Codex runtime workspace shape, source-root lists,
 worktree paths, setup flow, GitHub repo, coordination repo, workers,
-publication/issue-mutation authority, scheduled checks, or current-run
-no-mutation intent. Use prose, planning artifacts, or the orchestrator ledger
-for those concerns.
+implementation delivery, publication/issue-mutation authority, scheduled
+checks, or current-run mutation intent. Use prose, planning artifacts, or the
+orchestrator ledger for those concerns.
 
 `references/setup-workflow.md` owns the settings editor, canonical table
 validation, draft checklist, pointer block, and completion report.
-When touching `issue-tracker.md`, require `tracker_backend` and `change_delivery_target`,
-preserve useful prose, and reject runtime-only or unknown table rows.
+When touching `issue-tracker.md`, require `tracker_backend`, preserve useful
+prose, and reject runtime-only or unknown table rows.
 
 ## Reference Loading Matrix
 
@@ -121,7 +118,7 @@ Load only the selected branch:
 | --- | --- |
 | Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
 | Project layout | `project-layout.md` and `setup-workflow.md` for edits. |
-| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only for `execution_context=existing-project-bootstrap`. |
+| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
 | Translation | `translation.md`. |
 | Pointer/settings work | `setup-workflow.md`. |
@@ -131,13 +128,14 @@ work. This operation-specific loading rule is part of the token contract.
 
 ## Workflow
 
-### 1. Resolve Slice, Operation, And Write Authority
+### 1. Resolve Options, Context, And Write Authority
 
-Select the smallest `memory_slice` and `execution_context` above. For
+Select the smallest `memory_slice`, resolve its operation, and derive
+`execution_context` from current evidence. For
 `domain_operation=implementation-closeout`, carry only the named decisions,
 evidence, targets, and integrated feature proof. For
 temporary/rehearsal/validation work, resolve `write_mode=propose` rather than
-persisting the no-mutation intent as configuration.
+persisting run intent as configuration.
 
 ### 2. Inspect Focused Evidence
 
@@ -173,7 +171,7 @@ named targets, and write authority instead of unrelated setup.
 Before writing, show intended files and meaningful before/after values. Follow
 the loading matrix and existing local formats. In custom tracker workflows,
 preserve the described conventions while keeping the structured table limited
-to `tracker_backend` and `change_delivery_target`.
+to `tracker_backend`.
 
 ### 5. Write And Verify Authorized Memory
 
@@ -196,8 +194,14 @@ omit that domain-only field. Keep destinations, accepted/rejected decisions,
 and deferral explanations as separate data. For
 `domain_operation=implementation-closeout`, also report the source
 task/decision, durable decisions accepted or rejected, named targets updated,
-feature proof, and documentation-diff verification. Mention unavailable or
-weak session evidence plainly.
+feature proof, and documentation-diff verification. A nonempty accepted delta
+is `captured` only when every item and required named target is reconciled and
+verified; any unresolved target returns `capture_outcome=deferred`, while
+`capture_outcome=no-durable-change` cannot complete that closeout. Mention
+unavailable or weak session evidence plainly. A supplied accepted item that is
+rejected or contradicted by landed behavior also returns `deferred` and requires
+an owner decision or separately authorized planning/implementation correction;
+it never counts as captured.
 
 ## Reference Responsibilities
 

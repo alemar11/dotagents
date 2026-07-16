@@ -54,8 +54,8 @@ ask when evidence is contradictory.
 ## Consumers
 
 - `$plan-feature` reads `repository_layout` when planning identity, Feature Spec
-  scope, `pull_request_count_strategy`, or workspace routing depends on repo layout.
-- `$codex-orchestrator` reads `repository_layout` during routing to choose the
-  lean single-repository/monorepo path or the multi-repo workspace reference.
+  scope, affected repositories, or workspace routing depends on repo layout.
+- `$codex-orchestrator` reads `repository_layout` as factual topology while it
+  derives affected repositories and managed checkouts from the Feature Spec.
 - `$project-memory full-setup` creates this file when setup authority covers
   project layout. Direct layout-only updates use `memory_slice=project-layout`.

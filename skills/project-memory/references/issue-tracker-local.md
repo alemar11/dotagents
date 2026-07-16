@@ -1,37 +1,56 @@
 # Issue Tracker: Local Markdown
 
 Feature Specs and implementation issues for this repo live as durable Markdown
-files under each `planning/features/<feature-slug>/` subtree. The
-`planning/tmp/` tree is temporary working space only.
+files under each `planning/features/<feature-slug>/` subtree.
 
 ## Configuration
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs and implementation issues are written as local Markdown files. |
-| `change_delivery_target` | enum | `pull-request-ready-for-merge-but-not-merged` | `local-commit-created-without-pushing`, `changes-pushed-to-target-branch-without-pull-request`, `validated-draft-pull-request-published`, `pull-request-ready-for-merge-but-not-merged` | Exact implementation stopping point. Merge is never implied. |
+| `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs and implementation issues are routed to local Markdown files. |
 
-Durable local tracker artifacts must live under `planning/features/`, not
-`planning/tmp/`, `.scratch/`, or `project-memory/features/`. Keep `project-memory/` for
-routing, domain, and ADR memory. Keep `planning/tmp/` for dry-run output,
-rehearsal files, temporary body files, fingerprints, and comparison snapshots
-that are safe to delete after the run.
+Project Memory stores only tracker routing and conventions. Implementation
+delivery, branch/PR strategy, and executor permissions belong to Feature Specs
+and executing workflows.
 
-Feature-planning workflows write Feature Specs and generated implementation issues to
-the configured local Markdown tracker by default after setup, planning identity,
-and blockers are resolved. Branch only on the canonical `effective_target`:
-`configured-tracker` writes tracker files and `local-dry-run` returns draft
-paths and bodies without writing them.
+## Publication
 
-A non-mutating run requires a non-`none` `no_mutation_override`,
-`no_mutation_output=local-artifacts`, and
-`effective_target=local-dry-run`. Do not record these run-scoped rows as
-durable issue-tracker configuration.
+- `write_mode=apply`: create or update durable Feature Spec and issue files at
+  their canonical paths.
+- `write_mode=propose`: return proposed bodies, canonical target paths,
+  metadata, relationships, and publication order without writing files.
+
+Proposed output may use `source_spec_ref=proposed-spec:<feature-slug>` for one
+Feature Spec,
+`source_spec_ref=proposed-spec:<project-slug>/<feature-slug>` for a
+multi-repository parent, or
+`source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>`
+for a repo-scoped implementation partial, or
+`source_spec_ref=proposed-spec:<project-slug>/<feature-slug>/<repository-slug>/integration`
+for a dedicated integration partial until that Feature Spec is written. A
+proposed ref and any `planning/tmp/` artifact are non-executable and must never
+be used as a durable `ready-for-agent` source.
+
+Applied single-repository refs use the repo-relative durable path. Applied
+multi-repository partials prefix that path with the owning repository slug,
+using the canonical `<repository-slug>/<repo-relative-spec-path>` shape. For
+example,
+`source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
+`source_spec_ref=<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`.
+Use the same qualified refs in repo-to-child mappings, sibling links, and
+Feature Dependencies. A bare repo-relative path is invalid across sibling
+repositories because identical tracker paths can exist in more than one child.
 
 ## Conventions
 
 - One feature per directory: `planning/features/<feature-slug>/`
 - The Feature Spec is `planning/features/<feature-slug>/SPEC.md`
+- A dedicated integration partial in the same repository is
+  `planning/features/<feature-slug>/integration/SPEC.md`; its issues are
+  `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` and its
+  completed issues move under the matching `integration/issues/done/`
+  subtree. It never reuses the implementation partial's `SPEC.md` or
+  `issues/` paths.
 - Implementation issues are
   `planning/features/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
 - Implementation issue headings use:
@@ -41,94 +60,73 @@ durable issue-tracker configuration.
 - Create `planning/features/<feature-slug>/issues/done/` only when moving the
   first completed issue into it.
 - Issue type is recorded as an `issue_type:` line near the top of each issue
-  file, using canonical `bug`, `feature`, or `task`.
+  file, using the canonical value loaded from `triage-labels.md` and the
+  repository mapping.
 - Workflow state is recorded as a `workflow_state:` line near the top of each
-  issue file, using the canonical values owned by Project Memory in
-  `triage-labels.md`.
-- The Feature Spec pointer is recorded as `source_spec_ref:` reference data.
-- Comments and conversation history append under a `## Comments` heading
+  issue file, using the canonical value loaded from `triage-labels.md` and the
+  repository mapping.
+- In a Plan-generated implementation issue, the Feature Spec pointer is
+  recorded only in the canonical `## Execution Contract` `source_spec_ref`
+  row, never as duplicate header metadata.
+- Comments and conversation history append under a `## Comments` heading.
 - `$plan-feature` owns Feature Spec and generated issue body shape, including
-  `source_spec_ref`, delivery metadata, partial Feature Spec links, and issue graph
-  validation. Local issue metadata must use canonical `issue_type`,
-  `workflow_state`, and `source_spec_ref` fields.
-- In multi-context repos or monorepos, feature slugs must include the accepted
-  product or workspace slug when needed to avoid collisions, for example
-  `customer-portal-weekly-digest` instead of `weekly-digest`.
-- When a Feature Spec has an accepted `Planning Identity`, use that `feature_slug`
-  rather than deriving a new slug from the Feature Spec title.
+  `source_spec_ref`, affected repositories and paths, dependency ids, planning
+  identity, partial Feature Spec links, and graph validation.
+- App-compatible generated issues include the Git repository that owns the
+  tracker file in `affected_repositories` and include both the exact active
+  issue path and exact derived `done/` path in `allowed_paths`. Both paths must
+  resolve inside that repository. A tracker artifact at a non-Git workspace root
+  or outside every affected Git repository is non-App-executable; do not invent
+  a tracker owner.
+- In multi-context repos or monorepos, include the accepted product or
+  workspace slug when needed to avoid collisions.
+- When a Feature Spec has an accepted Planning Identity, use its
+  `feature_slug` rather than deriving a new slug from the title.
 
-## Delivery Defaults
+Durable local tracker artifacts live under `planning/features/`, not
+`planning/tmp/`, `.scratch/`, or `project-memory/features/`. Keep
+`project-memory/` for routing, domain, and ADR memory. Temporary artifacts are
+caller-owned working data and never durable source references.
 
-- Default `change_delivery_target`:
-  `pull-request-ready-for-merge-but-not-merged`.
-- Branch naming: for either pull-request target, default to
-  `feature/<feature-slug>`. Commit-only and push-without-PR targets use the exact
-  branch carried by scoped authorized-user evidence.
-- PR shape: one draft PR for a single repo or monorepo feature when the work is
-  later published. In multi-repo work, every involved repo uses the same branch
-  name and opens its own PR. Local issue files are scheduling units and move to
-  `issues/done/` only after validation and the configured proof are complete.
-- Commit-only shape: `local-commit-created-without-pushing` is delivery proof,
-  not the local issue lifecycle. Implement on the named branch, validate,
-  commit without pushing, record proof, then move the local issue to
-  `issues/done/`.
-- Push-without-PR shape:
-  `changes-pushed-to-target-branch-without-pull-request` validates, commits,
-  pushes the named branch, records proof, then moves the local issue to
-  `issues/done/`.
-- Multi-repo Feature Spec shape: use a single Feature Spec only when that is the accepted
-  planning source. Otherwise use linked repo-scoped partial Feature Specs or generated
-  issue files; each one names its affected repo and links the siblings that
-  define the same feature. A global Feature Spec is not required as durable setup
-  configuration.
-- Exceptions: either non-PR target requires
-  `source=authorized-user-instruction` plus exact feature-scope and target-branch
-  evidence, or a `source-spec` row preserving that evidence.
-- Local issue completion uses `issue_update_permission=no-issue-changes`;
-  delivery proof
-  never grants a hosted-style final-commit closure.
+Implementation issues created from a Feature Spec normally use
+`issue_type: task`. Feature Spec files do not need `issue_type:` or
+`workflow_state:` unless the repo intentionally treats them as local feature
+issues. Do not add `Status: Draft`; workflow state belongs on implementation
+issues or in tracker convention.
 
-## Runtime Boundary
+## Completion Convention
 
-- Tracker setup records artifact routing, delivery-target defaults, and closeout
-  conventions only.
-
-Implementation issues created from a Feature Spec usually use `issue_type: task`. Feature Spec
-files do not need `issue_type:` or `workflow_state:` lines unless the repo
-chooses to treat Feature Specs as local feature issues. Do not add `Status: Draft` to
-ordinary Feature Spec files;
-workflow status belongs on implementation issues or in the tracker convention.
-
-## Completion
-
-When all acceptance criteria pass and validation is complete, move the issue
-file from `planning/features/<feature-slug>/issues/<NN>-<slug>.md` to
+After the consuming implementation workflow provides substantive acceptance,
+integration, and any required knowledge-closeout proof, move the issue on the
+delivery branch from
+`planning/features/<feature-slug>/issues/<NN>-<slug>.md` to
 `planning/features/<feature-slug>/issues/done/<NN>-<slug>.md`.
 
-For `change_delivery_target: local-commit-created-without-pushing`, commit on
-the authorized branch without pushing and record proof before moving the issue
-file. For `changes-pushed-to-target-branch-without-pull-request`, additionally
-record remote-branch proof. Use
-`issue_completion_method=move-local-issue-to-done-after-proof` for both; a
-hosted final-commit closing keyword is not a local Markdown lifecycle signal.
+For a dedicated integration partial, move the issue from
+`planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` to
+`planning/features/<feature-slug>/integration/issues/done/<NN>-<slug>.md`.
+Derive the completion target from the owning issue subtree; never move an
+integration issue into the ordinary feature's `issues/done/` directory.
 
-Do not delete completed issue files. Do not add a `done` status; the
-`done/` folder is the completion signal, while `workflow_state:` remains the
-lifecycle state used for active issues. If the feature's `done/` folder does
-not exist yet, create it when completing the first issue.
+Do not delete completed issue files or add a `done` status. The `done/` folder
+is the completion signal; `workflow_state:` remains the lifecycle state for
+active issues. Create the folder on demand when completing the first issue.
+Commit and push the move as part of the delivery change set, then rerun final
+validation, review, and CI gates invalidated by the new head. Until the later PR
+merge lands that path on the default branch, closeout is prepared rather than
+globally completed.
 
-## When a skill says "publish to the issue tracker"
+Project Memory records this local tracker lifecycle but does not choose the
+implementation stopping point or prescribe its delivery proof.
 
-Create or update the durable Feature Spec or issue file under
-`planning/features/<feature-slug>/`, creating directories as needed for
-`effective_target=configured-tracker`. For
-`effective_target=local-dry-run`, return bodies and either the would-be durable
-target path or a clearly temporary `planning/tmp/<feature-slug>/...` draft
-path without writing local tracker files. Never use a `planning/tmp/` or
-`.scratch/` path as a durable `source_spec_ref` or `ready-for-agent`
-issue location.
+## Publish And Fetch
 
-## When a skill says "fetch the relevant issue"
+For `write_mode=apply`, create or update the durable artifact under
+`planning/features/<feature-slug>/`, creating directories as needed. For
+`write_mode=propose`, return the would-be durable path and body without writing
+it. A dedicated integration partial uses the distinct `integration/` subtree
+in the evidence-derived owner repository; it does not require a coordination
+repository.
 
-Read the referenced markdown file. The user will normally pass the path or
-feature/issue number directly.
+To fetch an issue, read the referenced Markdown file. The user normally passes
+the path or feature/issue number directly.

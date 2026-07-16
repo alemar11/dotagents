@@ -14,8 +14,9 @@ before there is evidence from the user, repository, or existing docs.
 
 ## Operation Boundary
 
-Honor `domain_operation`, `execution_context`, and `write_mode` resolved by
-`$project-memory` through `references/options.md`:
+Honor the `domain_operation` and `write_mode` options resolved by
+`$project-memory`. Use its evidence-derived `execution_context`; never accept
+that classification as a caller-selected option:
 
 - `execution_context=fresh-setup`: create the smallest evidence-backed initial context surface.
 - `execution_context=existing-project-bootstrap`: reconcile accepted knowledge from current repo
@@ -30,6 +31,11 @@ Honor `domain_operation`, `execution_context`, and `write_mode` resolved by
 Stay within the selected context, authorized target surfaces, and evidence
 boundary. Do not expand into tracker, localization, pointer, or unrelated
 domain surfaces.
+
+When a caller supplies a `knowledge_delta`, treat it as input data: accepted
+terms, rules, boundaries, or decisions plus evidence and intended targets.
+Reconcile it against the current repository before capture. Do not reduce it to
+an enum or treat its presence as write authority.
 
 ## Workflow
 
@@ -124,9 +130,20 @@ Return to `$project-memory`:
 - candidates or capture deferred and why,
 - unresolved domain questions,
 - ADR-worthy decisions,
-- `capture_outcome` plus separate destination or deferral data,
+- the derived `capture_outcome` result (`captured`, `deferred`, or
+  `no-durable-change`) plus separate destination or deferral data,
 - documentation-diff verification for
   `domain_operation=implementation-closeout`.
+
+For a nonempty implementation-closeout delta, account for every accepted item
+and every required named target. Return `capture_outcome=captured` only when all
+are reconciled, each destination is updated or verified already current, and
+the complete documentation diff is verified. If any item, target, evidence, or
+destination remains unresolved, return `capture_outcome=deferred` with the
+specific destination and reason; `no-durable-change` cannot complete that
+closeout. If landed behavior rejects or contradicts a supplied accepted item,
+do not silently reinterpret the delta: return `deferred` and require an owner
+decision or a separately authorized planning/implementation correction.
 
 ## Guardrails
 
