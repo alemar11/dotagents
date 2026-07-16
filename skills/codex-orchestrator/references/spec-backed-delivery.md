@@ -1,309 +1,95 @@
-# Feature Spec-Backed Delivery
+# Execution-Ready Feature Spec Delivery
 
-Use this reference when a registered workstream comes from a Feature Spec,
-generated implementation issue, linked partial Feature Spec, or
-`## Orchestrator Handoff`. Load `options.md` first.
+## Applicability
 
-## Applicability And Hard Cut
+Load only for a durable Feature Spec with its complete generated implementation
+issue graph and Orchestrator Handoffs. This is the adapter-neutral
+execution-ready bundle. Reject rough intent, a standalone Feature Spec, ad-hoc
+implementation requests, retired planning or authority vocabulary, and missing
+or contradictory handoff evidence.
 
-Feature Spec-backed work uses the source contract for scope, dependencies,
-acceptance, delivery target, and issue lifecycle. The root still resolves every
-permission and worker action for the exact workstream.
-
-Ad hoc sources without a Feature Spec default to:
-
-```text
-change_delivery_target=validated-changes-left-uncommitted
-change_delivery_permission=not-required-for-uncommitted-changes
-issue_update_permission=no-issue-changes
-codex_review_requirement=not-needed-for-selected-delivery-target
-pull_request_count_strategy=no-pull-request
-issue_completion_method=no-issue-completion
-```
-
-Retired delivery, PR-closeout, authority, topology, and integration fields are
-invalid. Do not normalize them at runtime. Reject stale Feature Specs or issues
-before registration.
-
-If `source_spec_ref` is `draft-spec:<...>`, allow real dispatch only with
-`temporary_source_execution_permission=granted-by-authorized-user`. That
-permission never grants commit, push, PR, issue, or merge actions.
-
-When the registered dependency graph contains an explicit same-repository
-`upstream-merge-ready-head` edge, load `stacked-feature-specs.md` before
-dispatch. That value is source-graph dependency data, not a session option. Do
-not infer it from `depends-on`, implementation order, shared files, or a request
-to continue autonomously. Every other code dependency follows its ordinary
-recorded start rule.
+The Feature Spec and generated issues are acceptance and execution authority;
+the ledger is their runtime projection. This contract never creates, repairs,
+regenerates, or publishes planning artifacts. Planning happens outside an active
+orchestrator run.
 
 ## Required Handoff
 
-A generated issue's `## Orchestrator Handoff` must contain:
+Require a stable durable source Spec ref; the complete issue/workstream ids;
+repository and issue layouts; every affected repository; scope and allowed
+paths; acceptance criteria; validation commands; dependencies and
+parallelization; delivery target, permission, branch, and evidence; issue
+update permission; review requirement; parent closeout vehicle; and
+durable-knowledge handoff. Merge authority is not an execution-ready handoff
+field; the root may resolve it separately only after the fixed PR-ready
+conclusion is complete by loading `core/merge-authorization.md`.
 
-- `source_spec_ref`, `feature_slug`, affected repositories or product scope;
-- `repository_layout`, `issue_repository_layout`, `workspace_context`, and
-  workspace parent/child refs when applicable;
-- `delivery_decision_origin`, `change_delivery_target`,
-  `change_delivery_permission`, `delivery_decision_origin_evidence`, and
-  `change_delivery_permission_evidence`;
-- `target_branch_name`, `pull_request_count_strategy`, and
-  `codex_review_requirement`;
-- `issue_update_permission` and `issue_update_permission_evidence` as an
-  independently scoped evidence chain;
-- scope, start rule, parallelization, dependencies, validation, and proof;
-- `issue_completion_method`; and
-- `domain_closeout` plus exact decision/evidence data when implementation
-  closeout is required, including `domain_operation=implementation-closeout`
-  when Project Memory capture owns the final integrated decision update.
+Missing implementation detail makes the bundle non-executable. Missing
+mutation authority blocks only the affected mutation; it never expands from
+prose or another permission. A `draft-spec:<...>` ref is inspection-only and
+non-executable for every adapter; no permission promotes it to an executable
+source. Replace it with a durable hosted or local Feature Spec ref before
+intake. The App adapter reports the missing durable source as
+`planning-required`.
 
-`repository_integration_method` and `pr_closeout` are not handoff fields.
-Derive their former behavior from `change_delivery_target`,
-`pull_request_count_strategy`, repository refs, and the selected issue
-completion method.
+A generated issue's `## Orchestrator Handoff` must contain its source Spec, repository and
+workstream scope, dependency graph, validation commands, delivery tuple, issue
+completion method, and `delivery_decision_origin_evidence` for the exact workstream.
+The execution-ready bundle owns target selection, delivery permission, and
+issue mutation authority. The root validates and preserves that tuple; it never
+selects, rewrites, or widens it. The selected adapter executes the resolved
+contract. The root owns only a separately requested post-conclusion merge
+authorization.
 
-The handoff never grants worker actions. It transfers only current source
-contract evidence. The root validates that evidence, resolves the matching
-workstream rows, and selects an exact `worker_allowed_actions` list.
+## Delivery Targets
 
-## Permission Transfer
+The App adapter accepts only
+`pull-request-ready-for-merge-but-not-merged`. If a Feature Spec or generated
+issue resolves another target, App intake stops as
+`unsupported-app-delivery-target` before CLAIM; it does not rewrite the source
+contract, ask for another target, or downgrade delivery.
+The remaining target variants are available only to adapters whose public
+contract explicitly supports them.
 
-For a Feature Spec or implementation-issue delivery grant, preserve these
-evidence tokens:
+- `validated-changes-left-uncommitted`: validate and leave an inspectable diff.
+- `local-commit-created-without-pushing`: validate and create the authorized
+  local commit.
+- `changes-pushed-to-target-branch-without-pull-request`: validate and push the
+  named branch; do not imply issue closure. Named remote branch contains the validated commit before this target is complete.
+- `validated-draft-pull-request-published`: validate and publish a draft with
+  remaining gates explicit.
+- `pull-request-ready-for-merge-but-not-merged`: validate, publish, obtain the
+  required current-head review, resolve feedback, pass CI, prepare parent
+  closeout, and mark ready without merging.
 
-```text
-permission-source-ref=<feature-spec-default:feature_slug|authorized-user:instruction-ref>
-scope-ref=<run or issue scope>
-target-ref=<feature or source ref>
-target-branch=<target_branch_name>
-```
+The selected adapter decides who executes an accepted target:
 
-Feature-level inherited issue rows use
-`delivery_decision_origin=inherited-from-feature-spec`, preserve the Feature
-Spec permission source, target, and branch, change only `scope-ref` to the
-issue, and record the run as `permission-transfer-ref=run`. The canonical
-default PR target uses
-`permission-source-ref=feature-spec-default:<feature_slug>`; an authorized
-issue override uses `overridden-by-implementation-issue` plus
-`permission-source-ref=authorized-user:<instruction-ref>` and its own exact
-evidence.
+- App: the visible Feature Spec task owns delivery through the selected target;
+- CLI: the root CLI session owns integration and delivery after worker exit.
 
-When registering the issue as a workstream, the root may change only the scope
-projection to `workstream:<id>` and record the exact issue in
-`delivery_permission_source_issue_ref`. Preserve permission source, target,
-branch, and original evidence unchanged.
+Workers and adapters never reinterpret the target or permissions.
 
-Issue-update permission has a separate evidence chain and transfer row:
-`issue_update_permission_source_issue_ref`. A delivery grant never creates or
-widens issue-update permission. The canonical PR-closing-keyword permission may
-preserve the same Feature Spec default ref; direct issue updates always require
-an independent `authorized-user:<instruction-ref>` permission source.
+## Repository Layout
 
-Any missing, stale, or contradictory transfer evidence stops as `needs-owner`.
-
-## Authority Model
-
-Resolve these concerns separately:
-
-1. `change_delivery_target`: observable stopping point.
-2. `change_delivery_permission`: whether the target's Git or GitHub mutations
-   are allowed.
-3. `delivery_allowed_actions`: derived actions needed to reach that target.
-4. `worker_allowed_actions`: exact subset a worker may execute.
-5. `issue_update_permission`: independently allowed issue lifecycle mutation.
-6. `codex_review_requirement`: current-revision review behavior for the merge-ready
-   PR target.
-7. `pull_request_merge_permission`: whether the named PR may be merged.
-8. `pull_request_merge_confirmation`: whether another checkpoint remains after
-   all merge gates pass.
-
-Do not collapse these into a boolean or infer one from another. In particular,
-`pull-request-ready-for-merge-but-not-merged` never grants merge.
-
-## Canonical Target Resolution
-
-| `change_delivery_target` | `change_delivery_permission` | PR count | Review requirement | Required terminal state |
-| --- | --- | --- | --- | --- |
-| `validated-changes-left-uncommitted` | `not-required-for-uncommitted-changes` | `no-pull-request` | `not-needed-for-selected-delivery-target` | Local acceptance and validation pass; no commit, push, or PR. |
-| `local-commit-created-without-pushing` | `granted-for-selected-target` | `no-pull-request` | `not-needed-for-selected-delivery-target` | Validated commit exists locally on the named branch; no push. |
-| `changes-pushed-to-target-branch-without-pull-request` | `granted-for-selected-target` | `no-pull-request` | `not-needed-for-selected-delivery-target` | Named remote branch contains the validated commit; no PR exists. |
-| `validated-draft-pull-request-published` | `granted-for-selected-target` | One total or one per repository | `not-needed-for-selected-delivery-target` | Validated draft PR exists; do not mark ready or request review. |
-| `pull-request-ready-for-merge-but-not-merged` | `granted-for-selected-target` | One total or one per repository | Required on current revision or explicitly skipped | PR is non-draft and all selected gates pass; do not merge without separate permission. |
-
-For every target except uncommitted changes, a missing delivery grant yields
-`delivery_gate_status=blocked`; it is not another permission value.
-
-## Target-Specific Rules
-
-### Validated Changes Left Uncommitted
-
-- Use only for ad hoc work or an exact explicit source contract.
-- The target branch and PR ref are `not-applicable`.
-- Workers may receive `edit-files` and `run-validation`, never commit, push, or
-  PR actions.
-
-### Local Commit Created Without Pushing
-
-- Require exact branch and permission evidence.
-- Workers require `create-local-commit`; do not grant `push-target-branch`.
-- For local Markdown trackers, record commit proof and then use
-  `move-local-issue-to-done-after-proof`.
-- A local-only commit cannot close a hosted issue; use
-  `issue_completion_method=no-issue-completion` there.
-
-### Changes Pushed Without A Pull Request
-
-- Require exact branch and permission evidence.
-- Workers need the exact subset of `edit-files`, `run-validation`,
-  `create-local-commit`, and `push-target-branch` required by the assignment.
-- For hosted final-commit closure, require
-  `issue_update_permission=direct-issue-updates-explicitly-authorized` and
-  `issue_completion_method=final-commit-closing-keyword` with independently
-  scoped evidence. Branch publication alone is insufficient.
-- For local Markdown trackers, use the local done move after remote-branch
-  proof instead of a hosted closing keyword.
-
-### Validated Draft Pull Request Published
-
-- Open or update the draft PR only after local validation and publication
-  safety pass.
-- Do not mark it ready, request Codex review, claim merge readiness, or arm
-  parent Feature Spec closeout.
-- Record review and parent-closeout gates as `not-applicable` with this target
-  as evidence.
-
-### Pull Request Ready For Merge But Not Merged
-
-- Open as draft initially and keep it draft through required current-revision
-  Codex review, feedback disposition, fix validation, and current CI. Mark it
-  ready only after that exact head SHA, base ref, and merge-base SHA has a
-  verified terminal review with no unresolved actionable feedback, or after an
-  explicit review skip and all remaining gates pass.
-- Apply `codex_review_requirement` to the current PR revision.
-- Load `gates.md`; it alone routes current-revision Codex review and parent Feature
-  Spec closeout through `codex-review-closeout.md`.
-- The Feature Spec source contract may grant commit, push, PR publication,
-  mark-ready, review request/poll, required discussion disposition, and parent
-  closing-keyword update after gates. It never grants merge.
-- When `visible_app_task_permission=granted-by-authorized-user`, the single
-  visible task assigned to the Feature Spec must execute all of those actions
-  and every intervening implementation, integration, validation, review, fix,
-  and CI step. The root monitors and steers that task but must not execute or
-  poll the PR lifecycle itself.
-- A review skip bypasses only request and wait. All other validation,
-  discussion, CI, integration, and parent-closeout gates remain.
-
-An existing draft PR may advance to the merge-ready target only after a new
-canonical target and permission tuple is resolved. Never infer the transition
-from the PR's existence.
-
-## PR Count And Repository Layout
-
-- One affected repository uses `one-pull-request-total`.
-- Multiple affected repositories use `one-pull-request-per-repository`, the
-  same exact branch name, and one PR per repository.
-- `multi-repository-workspace` loads `multi-repo-workspace.md` before dispatch
-  and preserves child repository layout in `issue_repository_layout`.
-- Real PR refs replace placeholders before completion. Expected refs are not
-  proof of publication.
+Single-repository and monorepo delivery normally produces one PR. A
+multi-repository Feature Spec produces one PR per affected repository using the
+same feature branch name unless the Spec records an explicit repository-level
+exception. Every child outcome and cross-repo integration gate must pass before
+parent closeout. Real PR refs replace placeholders before completion.
 
 ## Issue Completion
 
-- GitHub PR targets use `feature-pull-request-closing-keyword` for one final
-  feature PR or `repository-pull-request-closing-keyword` for per-repository
-  PRs.
-- The parent Feature Spec closing keyword may be added only after the applicable
-  whole-feature gates pass. In mandatory visible Feature Spec task mode, the
-  assigned task owns that pre-merge PR-body mutation; otherwise it remains
-  root-owned.
-- GitHub push-without-PR delivery uses `final-commit-closing-keyword` only with
-  its independent issue-update permission.
-- Local Markdown issues use `move-local-issue-to-done-after-proof` after target,
-  validation, and integration proof.
-- Ad hoc work without a tracked issue uses `no-issue-completion`.
+GitHub issues close through the authorized PR closing keyword by default.
+Direct final-commit closure requires independent direct-issue-update authority.
+Local Markdown issues move to the configured done folder only after delivery
+and integration proof. Parent Feature Specs remain open until every child and
+post-merge closeout condition is actually satisfied.
 
-Direct comments, labels, immediate hosted closure, merge, release, and deploy
-remain independently permissioned root actions.
+Local Markdown issues use `move-local-issue-to-done-after-proof`; a generated
+issue's handoff must name that completion method when it applies.
 
-## Merge Boundary
+## Closeout
 
-Default to:
-
-```text
-pull_request_merge_permission=not-granted
-pull_request_merge_confirmation=ask-authorized-user-after-checks
-```
-
-Use `granted-for-named-pull-request` only when exact evidence names the PR or PR
-set. Use `merge-automatically-after-checks` only when the same instruction
-waives another checkpoint. Otherwise stop at the selected delivery target and
-return `needs-owner` for merge.
-
-## Required Resolution Steps
-
-1. Read the Feature Spec or issue directly. Reject retired field names or
-   values before registration.
-2. Verify the required handoff fields and row fingerprint. Resolve the exact
-   canonical Feature Spec ref and title from the source, apply the ledger title
-   transport, and persist `feature_spec_ref` plus `feature_spec_title` scoped
-   data; never infer them from generic issue permission transfers.
-3. Verify repository layout and workspace child refs; load
-   `multi-repo-workspace.md` when applicable.
-4. Resolve the exact delivery target, permission, origin, branch, PR count,
-   review requirement, issue-update permission, and completion method.
-5. Verify transfer evidence and record source-issue refs.
-6. Derive `delivery_allowed_actions` and `delivery_gate_status`.
-7. Record worker location, exact worker actions, branch expectation,
-   publication checkout, starting-checkout handling, parent-closeout state,
-   merge fields, and proof targets in the ledger.
-8. Build waves from dependencies, repository boundaries, and shared integration
-   risk. Delivery targets do not decide parallelism. Keep at most three
-   nonterminal Feature Spec executions across all surfaces; serial caller-
-   checkout execution remains one and internal subagents remain inside their
-   parent Spec slot.
-9. For an explicit `upstream-merge-ready-head` edge, apply
-   `stacked-feature-specs.md`; otherwise require the dependency's ordinary
-   completion proof before downstream dispatch.
-10. Load `gates.md` before any owner-ready, issue-closed, release-ready, or final
-   status.
-
-## Closeout Rules
-
-Feature Spec-backed implementation is incomplete whenever its selected target,
-integration proof, source closeout, or domain closeout remains unfinished.
-An intermediate stacked draft PR is dependency-stage proof only; it is not the
-downstream Spec's selected merge-ready target.
-
-Before final status require:
-
-- root-verifiable acceptance and validation proof;
-- the exact delivery target's live proof;
-- real branch and PR refs where applicable;
-- required issue and parent Feature Spec closeout proof;
-- required `$project-memory domain-memory` closeout; and
-- no authorized `ready-next` delivery or closeout action.
-
-`validated-draft-pull-request-published` is terminal only for that exact target.
-It records ready-for-review, Codex review, merge-ready, merge, and parent
-closeout as not applicable.
-
-## Worker Boundary
-
-The root owns target selection, delivery permission, branch and PR strategy,
-merge decisions, ledger state, final source closeout, and final status. Outside
-mandatory visible Feature Spec task mode, it also owns integration, review
-disposition, and parent-closeout execution. In mandatory mode, the assigned
-task owns the complete already-decided implementation and pre-merge delivery
-sequence through merge-ready, including all PRs when the Spec spans multiple
-repositories.
-
-Workers never infer permission from the handoff, choose another branch, create
-independent feature PRs, merge, close issues directly, or mutate the ledger.
-Only the assigned visible Feature Spec task may add or remove its authorized
-parent closing keyword, disposition its review, and mark its PRs ready.
-
-## Ad Hoc Sources
-
-Do not block ad hoc implementation merely because Feature Spec fields are
-absent. Use the safe uncommitted target tuple at the top of this reference.
-Commit, push, PR, issue changes, merge, release, and deployment require a new
-exact target plus their independently resolved permission rows.
+Record target proof, repository commits/PRs, current reviewed SHA, CI,
+integration, issue/parent closeout state, adapter evidence, and remaining owner
+actions. Merge remains a separate root-owned permission.

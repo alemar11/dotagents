@@ -1,0 +1,535 @@
+#!/usr/bin/env python3
+"""Atomically coordinate overlapping Codex orchestrator roots."""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import fcntl
+import hashlib
+import json
+import os
+import re
+import secrets
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Iterator
+
+__version__ = "1.0.0"
+SCHEMA_VERSION = "3.0.0"
+ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
+GLOBAL_SOURCE_RE = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$")
+ADAPTERS = {"codex-app-task", "codex-cli-session"}
+TAKEOVER_POLICY = "takeover-authorized"
+TAKEOVER_REASONS = {"verified-stale"}
+STALE_AFTER_SECONDS = 300
+
+
+class ClaimError(Exception):
+    def __init__(self, code: str, message: str, exit_code: int, details: Any = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.exit_code = exit_code
+        self.details = details or {}
+
+
+def claim_root() -> Path:
+    override = os.environ.get("CODEX_ORCHESTRATOR_CLAIM_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path.home() / ".cache/dotagents/skills/codex-orchestrator/claims"
+
+
+def timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def check_id(value: str, field: str) -> str:
+    if not isinstance(value, str) or not ID_RE.fullmatch(value):
+        raise ClaimError("invalid-input", f"{field} is not canonical: {value}", 2)
+    return value
+
+
+def canonical_repositories(values: list[str]) -> tuple[list[str], list[dict[str, str]]]:
+    repositories: set[str] = set()
+    checkouts: dict[str, str] = {}
+    for value in values:
+        try:
+            path = Path(value).expanduser().resolve(strict=True)
+        except FileNotFoundError as exc:
+            raise ClaimError("invalid-input", f"repository does not exist: {value}", 2) from exc
+        if not path.is_dir():
+            raise ClaimError("invalid-input", f"repository is not a directory: {path}", 2)
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--git-common-dir"],
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode or not result.stdout.strip():
+            raise ClaimError("invalid-input", f"repository is not a Git checkout: {path}", 2)
+        common_dir = Path(result.stdout.strip())
+        if not common_dir.is_absolute():
+            common_dir = path / common_dir
+        identity = str(common_dir.resolve(strict=True))
+        repositories.add(identity)
+        checkouts[str(path)] = identity
+    if not repositories:
+        raise ClaimError("invalid-input", "at least one repository is required", 2)
+    return sorted(repositories), [
+        {"checkout": checkout, "git_common_dir": checkouts[checkout]}
+        for checkout in sorted(checkouts)
+    ]
+
+
+def canonical_sources(values: list[str]) -> list[str]:
+    sources = sorted({value.strip() for value in values if isinstance(value, str) and value.strip()})
+    if not sources:
+        raise ClaimError("invalid-input", "at least one source id is required", 2)
+    unqualified_local_refs = [
+        source
+        for source in sources
+        if not source.startswith("git:") and not GLOBAL_SOURCE_RE.fullmatch(source)
+    ]
+    if unqualified_local_refs:
+        raise ClaimError(
+            "invalid-input",
+            "repository-local source refs must be Git-identity-qualified",
+            2,
+            {"source_ids": unqualified_local_refs},
+        )
+    return sources
+
+
+def canonical_ledger_ref(value: str) -> str:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise ClaimError("invalid-input", "ledger_ref must be an absolute path", 2)
+    return str(path.resolve(strict=False))
+
+
+def fingerprint(value: dict[str, Any]) -> str:
+    payload = {
+        key: value[key]
+        for key in (
+            "root_id",
+            "acquisition_nonce",
+            "execution_adapter",
+            "repositories",
+            "repository_checkouts",
+            "sources",
+            "ledger_ref",
+        )
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def ownership_scope(value: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value[key]
+        for key in (
+            "root_id",
+            "execution_adapter",
+            "repositories",
+            "repository_checkouts",
+            "sources",
+            "ledger_ref",
+        )
+    }
+
+
+def claim_path(root_id: str) -> Path:
+    return claim_root() / f"{check_id(root_id, 'root_id')}.json"
+
+
+@contextlib.contextmanager
+def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None]:
+    root = claim_root()
+    if not root.exists() and not create:
+        yield None
+        return
+    if create:
+        root.mkdir(parents=True, exist_ok=True)
+    lock_path = root / ".lock"
+    mode = "a+" if create else "r"
+    try:
+        lock = lock_path.open(mode)
+    except FileNotFoundError:
+        if create:
+            raise
+        yield None
+        return
+    with lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        try:
+            yield root
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def load_claim(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ClaimError("state-conflict", f"invalid claim file: {path}", 4) from exc
+    required = {
+        "schema_version",
+        "root_id",
+        "acquisition_nonce",
+        "execution_adapter",
+        "repositories",
+        "repository_checkouts",
+        "sources",
+        "ledger_ref",
+        "opened_at",
+        "heartbeat_at",
+        "takeover_evidence",
+        "replaced_root_ids",
+        "fingerprint",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise ClaimError("state-conflict", f"claim schema mismatch: {path}", 4)
+    if value["schema_version"] != SCHEMA_VERSION or value["fingerprint"] != fingerprint(value):
+        raise ClaimError("state-conflict", f"claim fingerprint mismatch: {path}", 4)
+    return value
+
+
+def load_claims(root: Path | None) -> dict[str, dict[str, Any]]:
+    if root is None:
+        return {}
+    claims: dict[str, dict[str, Any]] = {}
+    for path in sorted(root.glob("*.json")):
+        claim = load_claim(path)
+        root_id = check_id(claim["root_id"], "root_id")
+        if path.name != f"{root_id}.json" or root_id in claims:
+            raise ClaimError("state-conflict", f"claim identity mismatch: {path}", 4)
+        claims[root_id] = claim
+    return claims
+
+
+@contextlib.contextmanager
+def ownership_lease(root_id: str, expected_fingerprint: str) -> Iterator[dict[str, Any]]:
+    root_id = check_id(root_id, "root_id")
+    expected_fingerprint = check_fingerprint(expected_fingerprint)
+    with locked_claim_store(create=False, exclusive=True) as root:
+        claims = load_claims(root)
+        claim = claims.get(root_id)
+        if not claim or root is None:
+            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
+        if claim["fingerprint"] != expected_fingerprint:
+            raise ClaimError("state-conflict", "claim ownership fingerprint mismatch", 4)
+        yield claim
+
+
+def write_claim(path: Path, value: dict[str, Any]) -> None:
+    temporary = path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+    os.replace(temporary, path)
+
+
+def build_claim(args: argparse.Namespace, *, takeover_evidence: Any = "none", replaced: list[str] | None = None) -> dict[str, Any]:
+    root_id = check_id(args.root_id, "root_id")
+    if args.adapter not in ADAPTERS:
+        raise ClaimError("invalid-input", f"unsupported execution_adapter: {args.adapter}", 2)
+    opened_at = timestamp()
+    repositories, repository_checkouts = canonical_repositories(args.repository)
+    value = {
+        "schema_version": SCHEMA_VERSION,
+        "root_id": root_id,
+        "acquisition_nonce": secrets.token_hex(16),
+        "execution_adapter": args.adapter,
+        "repositories": repositories,
+        "repository_checkouts": repository_checkouts,
+        "sources": canonical_sources(args.source),
+        "ledger_ref": canonical_ledger_ref(args.ledger_ref),
+        "opened_at": opened_at,
+        "heartbeat_at": opened_at,
+        "takeover_evidence": takeover_evidence,
+        "replaced_root_ids": sorted(replaced or []),
+    }
+    value["fingerprint"] = fingerprint(value)
+    return value
+
+
+def overlapping(candidate: dict[str, Any], claims: dict[str, dict[str, Any]]) -> list[str]:
+    repositories = set(candidate["repositories"])
+    sources = set(candidate["sources"])
+    return sorted(
+        root_id
+        for root_id, claim in claims.items()
+        if root_id != candidate["root_id"]
+        and (repositories.intersection(claim["repositories"]) or sources.intersection(claim["sources"]))
+    )
+
+
+def acquire(args: argparse.Namespace) -> dict[str, Any]:
+    candidate = build_claim(args)
+    with locked_claim_store(create=True, exclusive=True) as root:
+        assert root is not None
+        claims = load_claims(root)
+        current = claims.get(candidate["root_id"])
+        if current:
+            if ownership_scope(current) != ownership_scope(candidate):
+                raise ClaimError("state-conflict", "root_id already owns a different claim", 4)
+            return {"ok": True, "command": "claim.acquire", "state": "already-owned", "claim": current}
+        conflicts = overlapping(candidate, claims)
+        if conflicts:
+            raise ClaimError("state-conflict", "overlapping active-root claim", 4, {"root_ids": conflicts})
+        write_claim(root / f"{candidate['root_id']}.json", candidate)
+    return {"ok": True, "command": "claim.acquire", "state": "acquired", "claim": candidate}
+
+
+def takeover(args: argparse.Namespace) -> dict[str, Any]:
+    evidence = args.evidence.strip()
+    expected = sorted({check_id(value, "expected_root_id") for value in args.expected_root_id})
+    if not evidence or not expected:
+        raise ClaimError("invalid-input", "takeover requires evidence and expected_root_id", 2)
+    if args.takeover_policy != TAKEOVER_POLICY or args.takeover_reason not in TAKEOVER_REASONS:
+        raise ClaimError("invalid-input", "takeover authorization contract is invalid", 2)
+    expected_fingerprints = keyed_values(
+        args.expected_claim_fingerprint,
+        "expected_claim_fingerprint",
+        lambda value: bool(FINGERPRINT_RE.fullmatch(value)),
+    )
+    expected_heartbeats = keyed_values(
+        args.expected_claim_heartbeat,
+        "expected_claim_heartbeat",
+        valid_timestamp,
+    )
+    if sorted(expected_fingerprints) != expected or sorted(expected_heartbeats) != expected:
+        raise ClaimError(
+            "invalid-input",
+            "takeover evidence must identify every expected root exactly once",
+            2,
+        )
+    takeover_evidence = {
+        "existing_orchestrator_session_takeover_policy": args.takeover_policy,
+        "takeover_reason": args.takeover_reason,
+        "evidence": evidence,
+        "expected_claims": [
+            {
+                "root_id": root_id,
+                "fingerprint": expected_fingerprints[root_id],
+                "heartbeat_at": expected_heartbeats[root_id],
+            }
+            for root_id in expected
+        ],
+    }
+    candidate = build_claim(args, takeover_evidence=takeover_evidence, replaced=expected)
+    with locked_claim_store(create=True, exclusive=True) as root:
+        assert root is not None
+        claims = load_claims(root)
+        conflicts = overlapping(candidate, claims)
+        if conflicts != expected:
+            raise ClaimError(
+                "state-conflict",
+                "takeover conflicts do not match expected roots",
+                4,
+                {"expected": expected, "actual": conflicts},
+            )
+        for root_id in expected:
+            claim = claims[root_id]
+            if (
+                claim["fingerprint"] != expected_fingerprints[root_id]
+                or claim["heartbeat_at"] != expected_heartbeats[root_id]
+            ):
+                raise ClaimError(
+                    "state-conflict",
+                    "takeover evidence is stale",
+                    4,
+                    {"root_id": root_id},
+                )
+        if args.takeover_reason == "verified-stale":
+            now = datetime.now(timezone.utc)
+            live_roots = [
+                root_id
+                for root_id in expected
+                if (now - parse_timestamp(claims[root_id]["heartbeat_at"])).total_seconds()
+                < STALE_AFTER_SECONDS
+            ]
+            if live_roots:
+                raise ClaimError(
+                    "state-conflict",
+                    "takeover stale threshold is not satisfied",
+                    4,
+                    {"root_ids": live_roots, "stale_after_seconds": STALE_AFTER_SECONDS},
+                )
+        if candidate["root_id"] in claims:
+            raise ClaimError("state-conflict", "takeover root_id already exists", 4)
+        for root_id in expected:
+            (root / f"{root_id}.json").unlink()
+        write_claim(root / f"{candidate['root_id']}.json", candidate)
+    return {"ok": True, "command": "claim.takeover", "state": "acquired", "claim": candidate}
+
+
+def valid_timestamp(value: str) -> bool:
+    try:
+        parse_timestamp(value)
+    except ValueError:
+        return False
+    return value.endswith("Z")
+
+
+def parse_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def keyed_values(
+    values: list[str],
+    field: str,
+    validator: Any,
+) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for item in values:
+        root_id, separator, value = item.partition("=")
+        root_id = check_id(root_id, "root_id")
+        if not separator or root_id in parsed or not validator(value):
+            raise ClaimError("invalid-input", f"{field} is invalid: {item}", 2)
+        parsed[root_id] = value
+    return parsed
+
+
+def status(args: argparse.Namespace) -> dict[str, Any]:
+    with locked_claim_store(create=False, exclusive=False) as root:
+        claims = load_claims(root)
+    if args.root_id:
+        root_id = check_id(args.root_id, "root_id")
+        claim = claims.get(root_id)
+        if not claim:
+            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
+        return {"ok": True, "command": "claim.status", "claim": claim}
+    return {"ok": True, "command": "claim.status", "claims": list(claims.values())}
+
+
+def heartbeat(args: argparse.Namespace) -> dict[str, Any]:
+    root_id = check_id(args.root_id, "root_id")
+    expected_fingerprint = check_fingerprint(args.expected_fingerprint)
+    with locked_claim_store(create=False, exclusive=True) as root:
+        claims = load_claims(root)
+        claim = claims.get(root_id)
+        if not claim or root is None:
+            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
+        if claim["fingerprint"] != expected_fingerprint:
+            raise ClaimError("state-conflict", "claim ownership fingerprint mismatch", 4)
+        claim["heartbeat_at"] = timestamp()
+        write_claim(root / f"{root_id}.json", claim)
+    return {"ok": True, "command": "claim.heartbeat", "state": "active", "claim": claim}
+
+
+def release(args: argparse.Namespace) -> dict[str, Any]:
+    root_id = check_id(args.root_id, "root_id")
+    expected_fingerprint = check_fingerprint(args.expected_fingerprint)
+    evidence = args.evidence.strip()
+    if not evidence:
+        raise ClaimError("invalid-input", "release evidence is required", 2)
+    with locked_claim_store(create=False, exclusive=True) as root:
+        claims = load_claims(root)
+        if root_id not in claims or root is None:
+            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
+        if claims[root_id]["fingerprint"] != expected_fingerprint:
+            raise ClaimError("state-conflict", "claim ownership fingerprint mismatch", 4)
+        (root / f"{root_id}.json").unlink()
+    return {"ok": True, "command": "claim.release", "state": "released", "root_id": root_id, "evidence": evidence}
+
+
+def doctor() -> dict[str, Any]:
+    root = claim_root()
+    git = shutil.which("git")
+    return {
+        "ok": bool(git),
+        "command": "doctor",
+        "version": __version__,
+        "offline": True,
+        "claim_root": str(root),
+        "claim_root_exists": root.exists(),
+        "fcntl_available": True,
+        "git": {"available": bool(git), "path": git},
+    }
+
+
+def check_fingerprint(value: str) -> str:
+    if not isinstance(value, str) or not FINGERPRINT_RE.fullmatch(value):
+        raise ClaimError("invalid-input", f"claim fingerprint is invalid: {value}", 2)
+    return value
+
+
+def add_claim_identity(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--root-id", required=True)
+    parser.add_argument("--adapter", required=True, choices=sorted(ADAPTERS))
+    parser.add_argument("--repository", action="append", required=True)
+    parser.add_argument("--source", action="append", required=True)
+    parser.add_argument("--ledger-ref", required=True)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Atomically coordinate overlapping Codex orchestrator roots.")
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--json", action="store_true")
+    subcommands = parser.add_subparsers(dest="noun", required=True)
+    subcommands.add_parser("doctor", help="Check local atomic-claim readiness without writing state.")
+    claim = subcommands.add_parser("claim", help="Acquire, inspect, heartbeat, release, or take over a claim.")
+    verbs = claim.add_subparsers(dest="verb", required=True)
+    acquire_parser = verbs.add_parser("acquire", help="Atomically acquire a non-overlapping active-root claim.")
+    add_claim_identity(acquire_parser)
+    status_parser = verbs.add_parser("status", help="Read one claim or the current claim set.")
+    status_parser.add_argument("--root-id")
+    heartbeat_parser = verbs.add_parser("heartbeat", help="Refresh one owned claim heartbeat.")
+    heartbeat_parser.add_argument("--root-id", required=True)
+    heartbeat_parser.add_argument("--expected-fingerprint", required=True)
+    release_parser = verbs.add_parser("release", help="Release one terminal or handed-off claim.")
+    release_parser.add_argument("--root-id", required=True)
+    release_parser.add_argument("--expected-fingerprint", required=True)
+    release_parser.add_argument("--evidence", required=True)
+    takeover_parser = verbs.add_parser("takeover", help="Replace the exact verified-stale conflicting roots.")
+    add_claim_identity(takeover_parser)
+    takeover_parser.add_argument("--expected-root-id", action="append", required=True)
+    takeover_parser.add_argument("--takeover-policy", required=True, choices=(TAKEOVER_POLICY,))
+    takeover_parser.add_argument("--takeover-reason", required=True, choices=sorted(TAKEOVER_REASONS))
+    takeover_parser.add_argument("--expected-claim-fingerprint", action="append", required=True)
+    takeover_parser.add_argument("--expected-claim-heartbeat", action="append", required=True)
+    takeover_parser.add_argument("--evidence", required=True)
+    return parser
+
+
+def dispatch(args: argparse.Namespace) -> dict[str, Any]:
+    if args.noun == "doctor":
+        return doctor()
+    if args.verb == "acquire":
+        return acquire(args)
+    if args.verb == "status":
+        return status(args)
+    if args.verb == "heartbeat":
+        return heartbeat(args)
+    if args.verb == "release":
+        return release(args)
+    return takeover(args)
+
+
+def emit(value: dict[str, Any], as_json: bool) -> None:
+    print(json.dumps(value, sort_keys=as_json, indent=None if as_json else 2))
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        emit(dispatch(args), args.json)
+        return 0
+    except ClaimError as exc:
+        emit(
+            {"ok": False, "error": {"code": exc.code, "message": exc.message, "details": exc.details}},
+            getattr(args, "json", False),
+        )
+        return exc.exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

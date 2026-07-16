@@ -66,10 +66,9 @@ must say how to replace that value before mutation:
 
 Do not dispatch implementation workers from a `draft-spec:<...>` source as if it
 were a durable Feature Spec. A dry-run orchestrator may inspect the graph, but real
-implementation scheduling requires a hosted Feature Spec number, a local Feature Spec path, or an
-exact scoped Orchestrator row with
-`temporary_source_execution_permission=granted-by-authorized-user`. That row does not grant
-publication or issue mutation.
+implementation scheduling requires a hosted Feature Spec number or a durable
+local Feature Spec path. No permission row promotes a draft ref to an executable
+source.
 
 ## Phase Ownership
 

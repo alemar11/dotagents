@@ -850,10 +850,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("`no_mutation_override=dry-run`", contract)
         self.assertIn("`no_mutation_override=draft-output`", contract)
         self.assertIn("Do not dispatch implementation workers", contract)
-        self.assertIn(
-            "`temporary_source_execution_permission=granted-by-authorized-user`",
-            contract,
-        )
+        self.assertIn("No permission row promotes a draft ref", contract)
+        self.assertNotIn("temporary_source_execution_permission", contract)
         self.assertNotIn("explicit owner decision to use the full Feature Spec body", contract)
 
     def test_project_memory_does_not_own_orchestration_policy_setup(self) -> None:
@@ -885,38 +883,18 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "`granted-by-authorized-user`, `denied-by-authorized-user`",
             orchestrator_options,
         )
+        self.assertNotIn("implementation_checkout_strategy", orchestrator_options)
+        self.assertNotIn("implementation_checkout_strategy", ledger_template)
+        self.assertIn("`checkout_owner` | `codex-app-managed`", orchestrator_options)
+        self.assertIn("## Feature Spec Execution Registry", ledger_template)
         self.assertIn(
-            "`implementation_checkout_strategy` | "
-            "`managed-worktree-per-feature-spec`, "
-            "`serial-caller-checkout-branches`",
-            orchestrator_options,
-        )
-        self.assertIn(
-            "visible_app_task_permission: "
-            "not-requested|granted-by-authorized-user|denied-by-authorized-user",
-            ledger_template,
-        )
-        self.assertIn(
-            "implementation_checkout_strategy: "
-            "managed-worktree-per-feature-spec|serial-caller-checkout-branches",
-            ledger_template,
-        )
-        self.assertIn(
-            "internal_subdelegation: allowed-within-assigned-scope",
-            ledger_template,
-        )
-        self.assertIn("## Feature Spec Task Registry", ledger_template)
-        self.assertIn(
-            "both authorizes the surface and requires its use for Feature Spec implementation",
-            " ".join(orchestrator_options.split()),
-        )
-        self.assertIn(
-            "exactly one active visible Codex App task for each",
+            "grant selects mandatory one-task-per-Feature-Spec execution",
             " ".join(worker.split()),
         )
-        self.assertIn("codex_review_poll_owner", ledger_template)
+        self.assertIn("exactly one visible task per Feature Spec", worker)
+        self.assertIn("Internal Subagents", worker)
         self.assertIn("## Wave Reports", ledger_template)
-        self.assertIn("Execution Report", ledger_template)
+        self.assertIn("Execution Report", worker)
         self.assertNotIn("## Wave Checkpoints", ledger)
         self.assertNotIn("## Wave Checkpoints", ledger_template)
 
@@ -1237,7 +1215,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
         self.assertIn("A generated issue's `## Orchestrator Handoff` must contain", spec_delivery)
         self.assertIn("`delivery_decision_origin_evidence`", spec_delivery)
         self.assertIn("for the exact workstream", spec_delivery)
-        self.assertIn("The root owns target selection, delivery permission", spec_delivery)
+        self.assertIn("The execution-ready bundle owns target selection", spec_delivery)
+        self.assertIn("The root validates and preserves that tuple", spec_delivery)
         self.assertIn("Real PR refs replace placeholders before completion", spec_delivery)
         self.assertIn("Named remote branch contains the validated commit", spec_delivery)
         self.assertIn("Local Markdown issues use `move-local-issue-to-done-after-proof`", spec_delivery)
@@ -1497,7 +1476,8 @@ class FullFlowDryRunFixtureTests(unittest.TestCase):
             "parallelism=<parallel|sequential|root-owned|simulated>",
             ledger_template,
         )
-        self.assertIn("fallback reason", orchestrator)
+        self.assertIn("exact failure reason", orchestrator)
+        self.assertNotIn("recommend `$codex-cli-orchestrator`", orchestrator)
 
     def test_project_memory_no_longer_defines_worker_auth_defaults(self) -> None:
         for path in iter_active_text_files():

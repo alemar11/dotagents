@@ -1,357 +1,304 @@
 ---
 name: codex-orchestrator
-description: Explicitly coordinate Codex source graphs, workers, gates, ledgers, and authorized delivery closeout.
+description: Execute execution-ready Feature Specs in visible Codex App tasks through one mandatory GitHub pull-request-ready implementation flow.
 ---
 
-# Codex Orchestrator
+# Codex App Orchestrator
 
 ## Purpose And Invocation
 
-Use this Codex-dependent skill as the root control plane for an explicit
-orchestration session across one or more repositories. Use it only when the
-owner invokes `$codex-orchestrator` or asks to run Codex Orchestrator. Do not
-auto-select it for ordinary implementation, planning, triage, GitHub, commit,
-PR, or multi-repo requests.
+Use this Codex-dependent skill only when the owner explicitly invokes
+`$codex-orchestrator` or asks to run Codex Orchestrator in the App. It is the
+App execution adapter and the canonical owner of the shared orchestration
+contracts consumed by `$codex-cli-orchestrator`.
 
-The root always owns source routing, the active-root claim, its root Goal mode
-or ledger fallback, worker lifecycle, permission and strategy decisions,
-ledger state, source closeout, and final status. Every visible Codex App task the
-root creates owns a separate assignment-scoped Goal or recorded runtime
-fallback. Execution ownership depends on the resolved worker mode. When visible
-Codex App tasks are not enabled, workers own only their assigned inspection,
-implementation, validation, and report. When
-`visible_app_task_permission=granted-by-authorized-user`, exactly one visible
-task owns each implementation-eligible Feature Spec through its complete
-merge-ready PR lifecycle; the root becomes orchestration-only for that work.
+The root owns execution-ready intake, the active-root claim, portfolio Goal or ledger
+fallback, scheduling, permission decisions, ledger state, merge decisions,
+source closeout, and final status. Implementation always runs in exactly one
+visible App task per implementation-eligible Feature Spec. That task owns its
+Spec through the fixed terminal target
+`pull-request-ready-for-merge-but-not-merged`.
+
+The App orchestrator never invokes, routes to, or recommends the CLI
+orchestrator. The two public entrypoints are independent runtime surfaces even
+though the CLI package consumes shared contracts owned here.
+
+## Mandatory Runtime Surface Gate
+
+This is the first runtime step. Before the permission gate, source intake,
+claims, Goals, ledger work, or any mutation, inspect the capabilities
+exposed by the current runtime.
+
+- Continue only when the current runtime exposes the visible Codex App task
+  creation and App-managed worktree binding surfaces required by this skill.
+- Treat an interactive Codex CLI session, generic/background subagent tools,
+  filesystem access, or the skill being locally discoverable as insufficient
+  evidence of the App runtime.
+- If the required App surfaces are absent or cannot be verified, abort
+  immediately as unsupported in the current runtime. Do not ask for visible-task
+  permission, create runtime artifacts, invoke or recommend another
+  orchestrator, or begin source intake.
+
+## Mandatory Permission Gate
+
+Run this only after the runtime surface gate passes. Before source intake,
+claiming a ledger, creating a Goal, or performing any mutation, resolve
+`visible_app_task_permission` from the invoking instruction.
+
+- If the instruction explicitly grants creation of visible Codex App tasks for
+  this run, persist
+  `granted-by-authorized-user` and continue.
+- Generic delegation, subagent, background-worker, or task-creation authority
+  does not grant visible App task creation; leave permission unresolved and ask
+  the one required question.
+- If permission is missing or `not-requested`, ask the user once whether to
+  allow creation of exactly one visible App task per implementation-eligible
+  Feature Spec for this run.
+- If the user grants it, continue. If the user denies it, does not answer, or
+  the runtime cannot ask, abort the run without implementation or runtime
+  artifacts.
+
+For an accepted execution-ready bundle, task spawning is mandatory after the
+gate. It is not a strategy knob, and the grant is run-scoped rather than durable
+project configuration. The grant does not make an incomplete source executable.
+
+## Fixed Implementation Conclusion
+
+The only successful App implementation conclusion is
+`pull-request-ready-for-merge-but-not-merged`. This is a runtime invariant, not
+a user option. A draft pull request is an intermediate state. Uncommitted
+changes, local commits, pushes without a pull request, and draft-only delivery
+are never successful App conclusions. Merge still requires separate explicit
+authority.
+
+After registration and before dispatch, run a GitHub PR preflight for every
+affected repository. Require a GitHub repository target, authenticated access,
+branch publication permission, pull-request creation/update capability, and
+the review/CI surfaces required by the fixed conclusion. An incompatible source
+delivery target aborts during intake as `unsupported-app-delivery-target`. A
+failed capability preflight aborts as `pr-preflight-failed`; never downgrade the
+target or continue with a partial delivery mode.
 
 ## Non-Negotiable Invariants
 
-- Load `references/options.md` during **CLAIM**. Resolve session options then;
-  resolve authority and delivery options separately for each stable source or
-  workstream ID after registration and before its dispatch or mutation. Use
-  canonical snake_case fields and lower-kebab values. Preserve owner/source
-  prose only as option-resolution evidence; downstream logic reads canonical
-  values, never phrases or booleans.
-- Resolve `references/ledger.md` before implementation, worker creation, or
-  source mutation. Stop as `needs-owner` when another live root claims an
-  overlapping repo realpath or source id.
-- Workers never become roots: no ledger edits, visible App task or sibling/root
-  worker management, takeover/handoff decisions, source mutation, branch/PR
-  strategy decisions, merge decisions, or final source closeout. An assigned
-  visible Feature Spec task does own the already-decided implementation,
-  integration, validation, publication, Codex-review request and polling,
-  feedback disposition and fixes, CI, parent-closing-keyword preparation, and
-  ready transition required for its selected delivery target. Any worker may
-  create and manage internal background subagents within its assigned scope and
-  action set; those subagents inherit the same authority ceiling and report
-  through their parent.
-- Every orchestrator-created visible Codex App task must establish or resume its
-  own assignment-scoped Goal before starting work. The root supplies the exact
-  objective and terminal delivery target, verifies task-reported Goal
-  evidence, and records a fallback only when the runtime Goal tool is absent.
-  This is an automatic worker invariant, not a user option, and it does not
-  apply to internal background subagents.
-- Reason and report in terms of visible Codex App tasks. Treat owner wording
-  such as "Codex thread" or "Codex threads" as visible Codex App tasks unless
-  the owner explicitly refers to an API/protocol thread object or a GitHub PR
-  review thread. Preserve technical tool names such as `create_thread` and
-  API-returned thread identifiers only at the tool boundary.
-- Default every visible Feature Spec implementation task to its own managed
-  worktree. Only an exact authorized-user instruction to avoid worktrees may
-  select serial caller-checkout execution. That exception never permits
-  implementation on the branch active when orchestration began: the root
-  records and retains run-wide ownership of one dedicated feature branch per
-  Spec and repository, creates or resumes it, switches the clean caller
-  checkout, runs only one Spec task through its complete delivery target,
-  restores and verifies the original caller branch, and only then dispatches
-  the next Spec.
-- Across all execution surfaces, keep at most three nonterminal Feature Spec
-  executions active at once. The root chooses one, two, or three from dependency
-  readiness, isolation, risk, and live capacity; this ceiling is an invariant,
-  not a user option. A Feature Spec consumes one slot until its assigned
-  execution reaches the selected delivery target. Internal subagents
-  inherit their parent Spec's slot and never consume another one. Serial caller-
-  checkout execution remains capped at one Spec.
-- The root resolves `worker_allowed_actions` per workstream. Actions are
-  explicit, independent, and non-cumulative; allowed paths can narrow an action
-  but never grant another one.
-- Keep shared contracts, permission and strategy decisions, merge, ledger
-  closeout, and final source status in the root. Outside mandatory visible
-  Feature Spec task mode, also keep integration and gate decisions in the
-  root. Inside that mode, the assigned task executes the complete decided
-  delivery and gate sequence while the root only monitors and reconciles its
-  evidence.
-- Treat worker status as evidence, not lifecycle or source closeout. Read the
-  latest worker state before steering or lifecycle changes.
-- Preserve user-owned uncommitted changes. Preserve the caller checkout unless
-  the scoped option row is
-  `starting_checkout_branch_handling=branch-switch-authorized`.
-- In the Codex App, every newly created dedicated worker, integration, or
-  publication worktree must belong to a visible App task created for that
-  worktree. If that surface is unavailable, require
-  `unmanaged_git_worktree_fallback_permission=granted-by-authorized-user`
-  before an unmanaged Git worktree fallback.
-  Without visible consent, App root/background work stays in an existing
-  owner-supplied checkout unless the owner grants one of those checkout paths.
-  CLI-only sessions are exempt.
-- Read-only discovery never grants GitHub, release, automation, or other
-  external mutation authority.
-- Treat the ledger `## Recovery Packet` as a compact derived projection, never
-  as authority. On resume, use it only after its repo HEAD/worktree and source
-  fingerprints match current state; otherwise invalidate it and run full
-  reconciliation before mutation or dispatch.
-- After the first full snapshot, carry evidence by path/ref, fingerprint,
-  changed section, proof command/result, and failed-gate excerpt. Do not re-emit
-  complete unchanged ledgers or diffs during ordinary controller iterations.
-- Record exact phase-token deltas only from root-scoped counters over an
-  uncontaminated phase interval. Label interleaved cumulative deltas as
-  `exact-interval`, not phase usage; otherwise use `unavailable`. Usage metrics
-  never weaken gates or block progress.
+- Load `references/core/options.md`, `references/options.md`, and
+  `references/ledger.md` during CLAIM. Resolve only the non-merge fields needed
+  for registration using canonical snake_case fields and lower-kebab values.
+  Keep `pull_request_merge_permission` and
+  `pull_request_merge_confirmation` unresolved during CLAIM, registration, and
+  worker execution. Do not load `references/core/merge-authorization.md` on
+  that path.
+- Use `scripts/orchestrator-claim` as the sole active-root authority. Acquire
+  the canonical repository/source claim before creating the ledger projection,
+  portfolio Goal, task, worktree, or any other runtime artifact. A conflicting
+  claim aborts as `needs-owner`; never emulate the claim with a read-then-write
+  Markdown check.
+- Accept only the execution-ready Feature Spec bundle defined in
+  `references/spec-backed-delivery.md`. Rough intent, a standalone Feature Spec,
+  ad-hoc implementation requests, draft source refs, missing generated issues,
+  and incomplete or contradictory handoffs are not executable App inputs.
+- Require `visible_app_task_permission=granted-by-authorized-user` before
+  any orchestration work. Missing permission follows the mandatory permission
+  gate; denied permission aborts. If the visible task surface cannot represent
+  the assignment after a grant, abort as blocked. Never fall back to root or
+  background implementation.
+- Create exactly one visible task per Feature Spec, not per issue or repository.
+  The task owns implementation, integration, validation, commits, publication,
+  Codex review, fixes, CI, and merge-ready preparation already authorized by
+  the root.
+- Require every registered App workstream to resolve
+  `change_delivery_target=pull-request-ready-for-merge-but-not-merged` and
+  `change_delivery_permission=granted-for-selected-target`. Reject every other
+  delivery tuple before dispatch instead of asking the user to choose a target.
+- Every created or resumed task establishes its assignment-scoped Goal before
+  work. Record an exact objective fallback only when that task runtime exposes
+  no Goal tool. Internal background subagents do not need separate Goals.
+- Use only App-managed worktrees. There is no checkout strategy, caller-branch
+  rotation, unmanaged-worktree permission, raw worktree fallback, or CLI
+  exemption. If the App cannot supply every required managed checkout, abort
+  as blocked and record the exact failure reason.
+- A multi-repository Feature Spec remains one task. The App-managed workspace
+  must expose an isolated checkout for every affected child repository.
+- Keep at most three nonterminal Feature Spec tasks. The root derives one, two,
+  or three from dependency readiness, isolation, risk, and live capacity.
+  Internal subagents remain inside the parent Spec slot.
+- Workers never edit the ledger, manage sibling/root tasks, change authority,
+  choose branch/PR strategy, merge, release, deploy, or close the source. They
+  may use bounded internal subagents within their inherited scope and authority.
+- The root resolves `worker_allowed_actions` per workstream and sends only that
+  exact action set to the assigned visible task.
+- Treat worker status as evidence. Read the latest task state before steering,
+  replacement, lifecycle changes, or closeout.
+- Preserve owner changes. Read-only discovery never grants mutation authority.
+- Recovery packets are derived projections. Validate current source, checkout,
+  task, Goal, and option evidence before resuming mutation.
 
-## Source Routing
+## Execution-Ready Intake
 
-Register every source before scheduling it. Record its stable id/ref, repo,
-acceptance criteria, current state, mutation authority, dependencies, and
-closeout target. The ledger is the runtime projection; the source remains the
-acceptance and closure authority.
+After permission is granted, load `references/spec-backed-delivery.md` and run
+one read-only intake. Accept only a durable Feature Spec plus its complete
+generated implementation-issue graph and Orchestrator Handoffs. Validate stable
+source refs, affected repositories, workstream ids, scope, acceptance,
+dependencies, validation, delivery and issue authority, review requirements,
+closeout, and durable-knowledge handoff before CLAIM.
 
-| Source shape | Route |
-| --- | --- |
-| Rough intent without durable Feature Spec and issues | Run `$plan-feature` `full-flow` before implementation scheduling. |
-| Durable Feature Spec without generated issues | Run `$plan-feature` `issues-from-existing-spec` unless inspect-only. |
-| Feature Spec-backed issue, linked partial Feature Spec, `source_spec_ref`, or `## Orchestrator Handoff` | Load `references/spec-backed-delivery.md`; reject retired vocabulary before registration. |
-| Same-repository Feature Spec dependency explicitly classified as `upstream-merge-ready-head` | After `spec-backed-delivery.md`, load `references/stacked-feature-specs.md`; never infer this path from generic dependency prose. |
-| Generated issue with valid handoff | Register directly; the handoff is its canonical dispatch projection. |
-| Generated issue without valid handoff | Inspect or regenerate through `$plan-feature`; implement only with explicit ad-hoc authority. |
-| PR, review, CI failure, bug, checklist, plan, TODO, implementation request, or other non-Feature-Spec issue | Register directly with `change_delivery_target=validated-changes-left-uncommitted`, `change_delivery_permission=not-required-for-uncommitted-changes`, `issue_update_permission=no-issue-changes`, and local acceptance plus validation closeout. |
+Do not invoke another skill, create, repair, regenerate, or publish planning
+artifacts, infer missing implementation detail, mutate a source or tracker,
+acquire a claim, or create a ledger, Goal, or task during intake. An explicit
+same-repository `upstream-merge-ready-head` dependency additionally loads
+`references/stacked-feature-specs.md`; no other input shape selects another
+route.
 
-For ad-hoc sources, missing publication metadata is not a blocker.
-Commit, push, PR, issue mutation, merge, release, and deployment require
-explicit permission. Authorized Feature Spec delivery defaults to
-`change_delivery_target=pull-request-ready-for-merge-but-not-merged`, which
-never authorizes merge.
+If any required planning or handoff evidence is missing, contradictory, stale,
+or non-durable, abort this invocation with `planning-required`. Return the
+source refs and exact missing or invalid fields, state that no runtime artifact
+or mutation was created, and require planning to be completed separately. Do
+not continue to CLAIM. If the bundle resolves a non-App delivery target, abort
+with `unsupported-app-delivery-target`. A complete bundle finalizes the affected
+repository set and continues to CLAIM.
 
-`$plan-feature` owns Feature Spec and generated-issue publication before scheduling.
-After registration, the root owns authorized issue lifecycle and closeout. For
-`repository_layout=multi-repository-workspace`, expand linked repo-scoped partial
-Feature Specs; no global Feature Spec is required. Register Markdown checklist
-items by stable path and heading.
+Every accepted App implementation uses a pull request ready for merge but not
+merged. Merge, release, deployment, source mutation, and target-repo instruction
+changes each require their exact permission.
 
 ## Controller Loop
 
-Run this deterministic loop:
+0. **SURFACE** — verify the current runtime exposes visible Codex App task
+   creation and App-managed worktree binding; otherwise abort before asking
+   permission or creating artifacts.
+1. **PERMISSION** — run the mandatory permission gate and abort unless task
+   creation is granted for this run.
+2. **INTAKE** — validate the execution-ready bundle read-only and finalize the
+   complete affected-repository set; abort as `planning-required` before CLAIM
+   when any required evidence is missing or invalid.
+3. **CLAIM** — canonicalize the finalized repositories, load the shared ledger,
+   and call `scripts/orchestrator-claim --json claim acquire` to acquire the
+   common active-root claim atomically. Qualify every repository-local source ref,
+   including `#42` and repo-relative Feature Spec paths, as
+   `git:<git-common-dir>::ref:<source-ref>`; the helper rejects unqualified local
+   refs. Preserve URI-shaped hosted or globally durable source ids unchanged so
+   they still conflict across repositories. Only after ownership is established,
+   create the ledger projection, resolve remaining non-merge options, and create
+   the portfolio Goal or exact fallback.
+4. **REGISTER** — snapshot the finalized sources, repositories, acceptance, dependency, authority, and
+   closeout evidence.
+5. **PR-PREFLIGHT** — verify the fixed target, GitHub remote/access,
+   publication authority, PR capability, and required review/CI surfaces for
+   every affected repository; abort as `pr-preflight-failed` on any failure.
+6. **DISPATCH** — load `references/worker.md`, select up to three ready Specs,
+   create one managed visible task per Spec, and verify each task Goal.
+7. **MONITOR** — read current task state, reconcile evidence, and send precise
+   corrections when a task drifts.
+8. **GATE** — require the task to execute the fixed PR delivery and gate
+   sequence. The root observes; it never takes implementation or review back.
+9. **RECONCILE** — rescan sources and dependencies, update the ledger and
+   recovery packet, and dispatch newly ready Specs.
 
-1. **CLAIM** — resolve canonical options, resolve the ledger, canonicalize repo
-   realpaths, acquire or verify the active-root claim, and establish Goal mode
-   or its ledger fallback. Resolve `repository_layout` from project memory, safe
-   repo evidence, or explicit owner input.
-   On recovery, read and validate the compact recovery packet first; when fresh,
-   load only its named active rows, gate rows, sources, and next action.
-2. **REGISTER** — snapshot authorized sources by stable id and preserve their
-   criteria, constraints, authority, dependencies, proof, and closeout target.
-3. **ROUTE** — apply source routing, load only the selected references, choose
-   companion skills, and classify workstreams with ledger vocabulary. Load
-   `references/multi-repo-workspace.md` only for
-   `repository_layout=multi-repository-workspace` or a registered source/handoff
-   with `workspace_context=multi-repository-workspace`.
-4. **DISPATCH** — select one bounded wave and load `references/worker.md` before
-   any delegation. For every created or resumed visible task, require its
-   assignment-scoped Goal or unavailable-tool fallback before work starts. In
-   mandatory visible Feature Spec task mode, create or resume the single
-   assigned task for each eligible Feature Spec; never keep that Spec's
-   implementation or review work in the root.
-5. **INTEGRATE** — read current worker state, revalidate capabilities, accept or
-   reject reported evidence, and record lifecycle decisions. In mandatory
-   visible Feature Spec task mode, the assigned task integrates its own
-   work; the root must not apply, copy, reimplement, validate, or repair it.
-6. **GATE** — apply `references/gates.md`. Outside mandatory visible Feature
-   Spec task mode, run focused validation, `$autoreview` for non-trivial
-   edits, and authorized publication/source mutations in the owning execution
-   surface. Inside that mode, require the assigned task to execute every
-   implementation and PR gate through merge-ready while the root monitors its
-   evidence and sends corrective messages when it drifts. Use
-   status, diff stat/name lists, and focused hunks during iteration; read the
-   complete relevant diff only for review/publication or a failing gate.
-7. **RECONCILE** — rescan due sources, replace stale projections, record the
-   reconciliation result, and return to **REGISTER** while action remains.
+Every wave yields a ledger transition, proof, source update, owner decision, or
+explicit no-progress record. Continue until completion or a real authority,
+access, dependency, tool, gate, or safety blocker stops progress.
 
-Every wave must produce a ledger transition, proof, authorized source update,
-owner decision brief, or explicit no-progress record. Never loop silently.
-Update the recovery packet, delta evidence index, and exact phase metrics (or
-one `unavailable` record) at the same boundary.
-Load `references/recovery-validation.md` only when resuming from a packet. Load
-`references/runtime-efficiency.md` before entering a second wave or recording
-exact counters; a simple first wave need not load either reference.
-Before final closeout, reconcile again and require no active worker,
-`autonomous` candidate, authorized `ready-next` action, due check, or newly
-surfaced source item.
+## Atomic Claim Helper
+
+Normal App runtime uses the shipped `scripts/orchestrator-claim` artifact. Run
+`--json doctor` without creating state, then acquire with the root id,
+`codex-app-task` adapter, every canonical repository realpath, every source id,
+and the absolute ledger ref. Persist its returned claim fingerprint in the
+ledger projection. Use `claim heartbeat` while active and `claim release` only
+after terminal evidence or an explicit durable handoff is recorded. Both
+commands require the fingerprint returned by acquire so a reused root id cannot
+act as the prior owner.
+
+Takeover is never a retry alias. A terminal owner releases its own claim with
+the acquire-epoch fingerprint. Use `claim takeover` only after validating stale
+heartbeat evidence, resolving
+`existing_orchestrator_session_takeover_policy=takeover-authorized`, and naming
+the exact conflicting root ids plus evidence. Pass the canonical takeover
+policy and reason plus every expected claim's current fingerprint and heartbeat.
+The helper atomically verifies that the current conflicts and snapshots equal
+those expected before replacing them and enforces its fixed five-minute
+heartbeat threshold. There is no opaque terminal-evidence takeover path.
 
 ## Goal And Persistence
 
-After **CLAIM** and before edits or dispatch, establish this root objective for
-implementation/publication:
+The root Goal coordinates the portfolio. Each task Goal contains the exact
+Feature Spec assignment and the fixed PR-ready terminal target. A resumed task reuses a
+matching active Goal; a replacement creates a new Goal. A task marks its Goal
+complete only after the terminal target and gates pass.
 
-```text
-Complete <portfolio/source scope> through validated closeout and, when
-authorized for `pull-request-ready-for-merge-but-not-merged`, that exact
-delivery target. Continue until
-completion or a real gate/blocker stops progress.
-```
+The canonical ledger lives under
+`~/.cache/dotagents/skills/codex-orchestrator/ledgers/`. App and CLI adapters
+share the same active-root claim namespace so overlapping runs stop safely.
 
-Use Goal mode when available. Otherwise record the objective and fallback
-reason in the active-root ledger section. Goal mode never expands scope or
-bypasses authority, gates, owner decisions, or source closeout.
+## App Task Adapter
 
-The root Goal coordinates the portfolio; it never substitutes for a visible
-task's own Goal. Each orchestrator-created visible task must use the
-runtime Goal tool in its own context before implementation, with an objective
-derived from its exact assignment and selected delivery target. The root sends
-that instruction in the initial prompt and verifies the task's reported Goal
-state before advancing it beyond `created`. A resumed task reuses its
-matching active Goal; a replacement task creates a new one. The task marks
-its Goal complete only after its assigned terminal target and gates are
-actually satisfied. When the runtime exposes no Goal tool, the task records
-the same objective plus the unavailability reason as its fallback and may
-continue. Internal background subagents do not require independent Goals.
+Load `references/worker.md` before creating, resuming, reading, or steering a
+task. Title the task with the exact Feature Spec title and bind it to the
+App-managed worktree target. Record the task id, title, managed checkout map,
+Goal evidence, capability snapshot, internal subagent topology, lifecycle
+state, validation, PRs, review, CI, and delivery evidence.
 
-Real blockers include missing owner decisions, credentials/access,
-unsafe/contradictory contracts, failed required gates, unresolved dependency
-proof, unavailable required tools, unpollable external checks, or missing
-authority for required closeout. Multi-step work, newly unblocked waves,
-fix/retest cycles, pollable checks, and authorized `ready-next` work are not
-blockers.
+If a task fails or becomes stale, read it, record failure evidence, and resume
+or replace it with one task for the same Spec. Never keep two active tasks for
+one Spec and never transfer its implementation or review work to the root.
 
-## Workers And Runtime Surfaces
+## Delivery And Closeout
 
-Resolve `visible_app_task_permission`, `implementation_checkout_strategy`,
-`unmanaged_git_worktree_fallback_permission`, and `repository_layout` from
-`references/options.md`. Defaults are
-`visible_app_task_permission=not-requested`,
-`implementation_checkout_strategy=managed-worktree-per-feature-spec`, and
-`unmanaged_git_worktree_fallback_permission=not-granted`. Visible user-owned App
-tasks require `visible_app_task_permission=granted-by-authorized-user`. That
-value selects mandatory visible Feature Spec task mode: create exactly one
-visible task per implementation-eligible Feature Spec, title it with the
-exact Feature Spec title, and keep all of that Spec's issue, repo, PR,
-Codex-review, CI, and merge-readiness work in that task. The root chooses only
-when those tasks start and whether they run serially or in parallel from
-dependencies, checkout strategy, and live capacity, subject to the run-wide
-three-Spec ceiling. The root and every spawned Codex App task may use internal
-background subagents within their assigned scope; those subagents remain inside
-the parent Spec's slot, and no user worker-count or topology option exists.
+Load `references/gates.md` before merge-ready or final status. A successful App
+run requires every affected repository PR to be non-draft, current-revision
+review-complete, CI-clean, free of unresolved actionable feedback, and ready to
+merge. The Feature Spec task owns pre-merge PR and parent-closeout preparation;
+the root owns any separately authorized merge, post-merge verification, and
+final source closeout.
 
-Load `references/worker.md` before delegation. It owns current tool mapping,
-surface wording, permission, capability snapshots, worker actions, prompts,
-execution reports, resync, integration, artifacts, and lifecycle. Do not copy
-session worker choices into Feature Specs, issues, project memory, or handoffs.
+Use the smallest matching GitStack workflow for issues, CI, review threads,
+commits, pull requests, releases, or portfolio inspection. `$autoreview`
+remains a required non-trivial edit gate unless the canonical closeout contract
+selects another exact owner.
 
-When mandatory visible Feature Spec task mode is selected, create the task in
-its managed worktree before implementation unless
-`implementation_checkout_strategy=serial-caller-checkout-branches` carries
-exact authorized-user evidence. In that exception, keep only one active Spec
-task, persist its run-wide Spec/repository/branch assignment, prepare that
-dedicated feature branch in the clean caller checkout, and do not switch again
-until that task reaches its complete delivery target and the root restores the
-original caller branch. Title the task, then require and
-verify its task-owned Goal or unavailable-tool fallback. If the visible
-create/read/message surface cannot represent the assignment, stop or replace
-the visible task; never fall back to root-owned or background-only
-implementation, integration, validation, review, or review polling for that
-Feature Spec. Input
-wording may supply option-resolution evidence, but the root must persist the
-resolved fields before creating a visible worker. It must never carry the
-wording itself as a worker permission, count, topology, or scheduling value.
-
-At worker create, reuse, resume-equivalent, or fork—and before any network or
-external mutation—record the capability snapshot required by `worker.md`. A
-fork does not imply broader permissions. Search the current tool registry when
-an operation is missing; record the actual fallback instead of claiming a
-nonexistent resume, close, or scheduling action.
-
-## Delivery, Gates, And Closeout
-
-For Feature Spec-backed sources, load `references/spec-backed-delivery.md`
-before scheduling or delivery. It owns the selected delivery target, delivery
-permission, issue updates, review requirement, and merge permission. For ad hoc
-sources, local acceptance plus validation completes
-`validated-changes-left-uncommitted`; any later commit, push, or PR requires a
-new exact delivery target and permission row.
-
-Load `references/gates.md` before owner-ready, issue-closed, merge-ready,
-release-ready, or final status. It owns gate selection and conditionally routes
-`pull-request-ready-for-merge-but-not-merged` through the canonical current-revision
-Codex review and parent Feature Spec closeout algorithm. Its review default is
-`codex_review_requirement=required-on-current-pull-request-head`; an exact
-scoped authorized-user instruction may select
-`explicitly-skipped-by-authorized-user`, which bypasses only the review request
-and wait. `validated-draft-pull-request-published` never enters that route.
-In mandatory visible Feature Spec task mode, the assigned task owns the
-pre-merge parent-closeout mutation and proof required for its PR to become
-merge-ready. The root owns the ledger watch, any authorized merge, post-merge
-verification, and final source closeout. `armed` is not actual closure, and
-neither the parent Feature Spec nor the ledger completes before merge and
-verified issue closure.
-
-Merge is root-owned and unavailable by default. Set
-`pull_request_merge_permission=granted-for-named-pull-request` only for an
-explicit instruction to merge or land the named PR or PR set. Use
-`pull_request_merge_confirmation=merge-automatically-after-checks` only when
-the same instruction waives another checkpoint; otherwise use
-`ask-authorized-user-after-checks`.
-
-Target-repo `AGENTS.md` changes, source comments/labels/direct closure, merge,
-release, and deployment each require matching authority.
-
-## Companion Routing
-
-| Workstream | GitStack skill |
-| --- | --- |
-| Multi-repo read-only queue | `$gitstack:github-portfolio-triage` |
-| Current-repo issue/PR queue | `$gitstack:github-triage` |
-| Issue creation/lifecycle | `$gitstack:github-issues` |
-| Evidence-first deep review | `$gitstack:github-deep-review` |
-| GitHub Actions | `$gitstack:github-ci` |
-| PR review threads/Codex review | `$gitstack:github-review-threads` |
-| Releases | `$gitstack:github-releases` |
-| Local commit/optional push | `$gitstack:git-commit` |
-| Branch publication/draft PR | `$gitstack:yeet` |
-
-Use the smallest matching workflow. Within GitStack, use the official GitHub
-connector first and authenticated `gh` only for connector gaps or transport
-failure. Never fall back for missing authority, failed gates, unsafe contracts,
-actionable findings, or correctable input. Record the workflow skill, primary
-operation/evidence, fallback reason/operation, reused authority, and result.
+Only after every affected PR reaches the fixed PR-ready conclusion, and only
+when the owner separately requests merge, may the root resolve
+`pull_request_merge_permission` and `pull_request_merge_confirmation`. This is
+a post-conclusion root authorization step, not intake, CLAIM, registration, or
+worker authority. Load `references/core/merge-authorization.md` only for that
+step.
 
 ## Final Report
 
-Return a compact ledger-derived status: reconciled sources, worker evidence,
-edits/validation, publication/source mutations, active-root decision, gates and
-proof, blockers/owner decisions, fallbacks, next safe action, recovery-packet
-freshness, canonical option snapshot/resolution evidence, and phase-token
-evidence (`exact-phase`, `exact-interval`, or `unavailable`). Reference full
-artifacts by path/ref and fingerprint instead of repeating them. Use
-`references/worker.md` and `references/ledger.md` for exact fields.
+For a pre-claim abort, return the intake outcome, source refs, exact missing or
+invalid evidence, and explicit proof that no claim, ledger, Goal, task, tracker
+write, source mutation, or runtime artifact was created. Do not fabricate
+ledger-derived status.
+
+Return ledger-derived source status, task and Goal evidence, managed checkout
+map, edits and validation, pull-request refs and ready state, current review/CI
+proof, blockers, recovery freshness, and next safe action. Success requires the
+fixed PR-ready conclusion for every affected repository. Reference full
+artifacts by path/ref and fingerprint instead of repeating them.
 
 ## References
 
-- `references/options.md`: canonical option fields, values, defaults,
-  cross-field validation, and the strict input boundary.
-- `references/ledger.md`: ledger resolution, claims, state, wave records, and
-  closeout hygiene.
-- `references/worker.md`: worker surfaces, tools, authorization, lifecycle,
-  integration, and reports.
-- `references/multi-repo-workspace.md`: parent/child repo ownership,
-  child-worktree layout, derived serial/parallel dispatch, and cross-repo
-  integration/closeout for `repository_layout=multi-repository-workspace` or
-  `workspace_context=multi-repository-workspace`.
-- `references/spec-backed-delivery.md`: Feature Spec graph, authorities, publication,
-  issue mutation, review, and closeout.
-- `references/stacked-feature-specs.md`: conditional same-repository two-Spec
-  dependency stack from one reviewed upstream head through downstream retarget,
-  final review, and independent closeout.
-- `references/gates.md`: authorization, proof, review, integration, release,
-  and closeout gates.
-- `references/recovery-validation.md`: conditional Recovery Packet freshness
-  validation before resumed mutation or dispatch.
-- `references/runtime-efficiency.md`: conditional multi-wave delta-evidence
-  transport and exact phase-token metrics.
+- `references/core/options.md`: shared non-merge authority and delivery registry.
+- `references/core/merge-authorization.md`: separately loaded post-conclusion
+  merge authority.
+- `references/options.md`: App-only option registry.
+- `references/ledger.md`: shared ledger, claims, execution registry, and state.
+- `references/worker.md`: visible App task adapter.
+- `references/multi-repo-workspace.md`: managed multi-repo App execution.
+- `references/spec-backed-delivery.md`: shared execution-ready bundle, delivery,
+  and authority contract.
+- `references/stacked-feature-specs.md`: shared two-Spec stack.
+- `references/gates.md`: shared proof and closeout gates.
+- `references/codex-review-closeout.md`: adapter-aware PR review closeout.
+- `references/recovery-validation.md`: shared and App recovery validation.
+- `references/runtime-efficiency.md`: multi-wave delta evidence and metrics.
+
+## CLI Maintenance
+
+`scripts/orchestrator-claim` is the only supported atomic-claim artifact. It is
+a standard-library Python script with `__version__` as its semver source of
+truth and no maintenance project. Change it in place, then re-run `--help`,
+`--version`, `--json doctor`, the competing-root fixture, and the focused App
+and CLI contract tests. Use major versions for breaking command or JSON
+contracts, minor versions for backward-compatible commands, and patches for
+fixes.

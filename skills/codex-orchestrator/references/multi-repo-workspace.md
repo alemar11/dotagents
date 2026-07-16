@@ -1,123 +1,37 @@
-# Multi-Repo Workspace Flow
+# Managed Multi-Repository App Workspace
 
-Load this reference only when `repository_layout=multi-repository-workspace` or a
-registered source/handoff has `workspace_context=multi-repository-workspace`.
-Do not load it for ordinary `single-repository` or `monorepo` work.
+Load this reference only for `repository_layout=multi-repository-workspace`.
 
-## Ownership Model
+## Ownership
 
-- The parent workspace owns parent/global Feature Specs, generated issue graph
-  expansion, orchestration ledgers, worker dispatch, dependency gates,
-  cross-repo integration gates, parent issue/spec closeout, and final status.
-- Repo-scoped partial Feature Specs are owned by the child repository that
-  publishes or stores them.
-- Each child repository owns its code, `AGENTS.md`, `CONTEXT.md`, optional
-  `TRANSLATION.md`, `project-memory`, validation, branches, commits, PRs, and
-  repo-local tracker closeout.
-- Parent tracker mode and child tracker mode are independent. Parent local
-  tracking does not downgrade a child GitHub tracker, and child GitHub tracking
-  does not force parent workspace artifacts into GitHub.
+The parent workspace owns the orchestration graph, shared ledger, cross-repo
+dependencies and gates, parent closeout, and final status. Child repositories
+own their code, project memory, validation, branches, commits, pull requests,
+and tracker closeout.
 
-## Worktree Layout
+## Managed Task Workspace
 
-Prefer this layout for child-repo helper worktrees when the parent path is
-safe:
+Create one visible App task per Feature Spec, not per repository. That task owns
+every affected child implementation and repository PR. Before implementation,
+prove that the App-managed task workspace exposes a distinct isolated checkout
+for every required child repository and record repo id, path, branch, Git
+top-level, and baseline.
 
-```text
-<workspace-parent>/.worktrees/<repo-name>/<spec-or-issue-slug>/
-```
+If the App cannot supply the complete managed checkout map, abort the App run
+as blocked before edits. Do not invoke another orchestrator or use owner
+checkouts, raw helper worktrees, branch rotation, or one task per child
+repository as fallback.
 
-Before creating it, prove that `<workspace-parent>/.worktrees/` is outside any
-tracked Git checkout or ignored by the parent checkout. If that cannot be
-proven, use a cache/temp path such as
-`~/.cache/dotagents/skills/codex-orchestrator/worktrees/<workspace-slug>/<repo-name>/<spec-or-issue-slug>/`
-or stop for an owner-approved safe location. Do not dirty a parent coordination
-checkout just to create helper worktrees.
+## Scheduling And Closeout
 
-The original child checkout remains the source of truth for remotes, default
-branch, and project memory. Under the default
-`managed-worktree-per-feature-spec` strategy, worker implementation runs in the
-helper worktree. Under `serial-caller-checkout-branches`, no helper worktree is
-created; the root rotates every affected clean child checkout onto the one
-active Spec's dedicated branch and restores all original branches after
-terminal delivery.
+The run-wide maximum remains three Feature Specs across the workspace. Safe
+parallelism requires isolated managed checkout maps and no conflicting
+repository/branch ownership. Dependencies, dirty or missing checkouts, absent
+authority, and cross-repo gates override parallelism.
 
-## Dispatch And Parallelism
-
-Execution ordering is derived, not separately configured:
-
-- Without mandatory visible Feature Spec task mode, the orchestrator chooses
-  the worker surface, worker count, recursive internal subagent topology, and
-  serial or parallel split for each graph-shaped wave from ownership
-  boundaries, worktree safety, and live tool capacity. The run-wide ceiling is
-  three nonterminal Feature Spec executions across all repositories and worker
-  surfaces, not three per repository; nested subagents stay within their parent
-  Spec slot.
-- With `visible_app_task_permission=granted-by-authorized-user`, create one
-  visible task per Feature Spec, not per repository. That task owns every
-  child-repo implementation and every repo-specific PR required by the Spec.
-  With managed worktrees, the orchestrator still derives task start order and
-  serial or parallel scheduling. With
-  `implementation_checkout_strategy=serial-caller-checkout-branches`, prepare
-  the Spec's exact branch in every affected child caller checkout, run only that
-  Spec task, restore every original child branch after terminal delivery, and
-  only then dispatch the next Spec. Each task derives its internal subagent
-  topology within the selected checkout strategy.
-- Dependencies, dirty worktrees, overlapping path sets, missing authority, and
-  repo/branch/worktree conflicts override requested parallelism.
-
-Safe parallelism requires every active worker to have a unique
-`(repo, branch, worktree)` tuple. Same repo plus same branch must serialize,
-block, or fail safely through Git's branch ownership checks. Never force a
-second worktree checkout of a branch already used by another active worktree.
-Serial caller-checkout mode is stricter: it permits only one active Feature
-Spec task across the workspace even when its child repos or paths do not
-overlap. Different Feature Specs must not share a target branch name within the
-same child repo.
-
-The `upstream-merge-ready-head` stack is a same-single-repository flow and is
-invalid for `multi-repository-workspace` workstreams, partial Specs spanning
-repositories, or any downstream Spec with more than one unmerged upstream.
-Keep those dependency edges blocked until their ordinary cross-repo integration
-proof passes; do not approximate the stack by selecting one child PR as a base.
-
-## Codex App Workers
-
-In a Codex App session, visible worker tasks may remain parent-project-bound
-when the App project is the parent workspace. Child repo isolation still comes
-from the assigned Git worktree. Record:
-
-- visible worker task id/title;
-- parent App workspace root;
-- child repo path;
-- helper worktree path;
-- branch;
-- Git top-level;
-- proof that the original child checkout stayed clean unless explicitly
-  authorized otherwise.
-
-For mandatory Feature Spec task mode, record one task id and exact Feature
-Spec title across all child repo/worktree rows for that Spec. Do not create one
-visible task per child repository, and do not split review polling for the
-Spec's PRs back into the root.
-
-If native child-root worker binding becomes available, treat it as a
-worker-launch adapter improvement. It must not change Feature Spec, project
-memory, dependency, or closeout contracts.
-
-## Integration And Closeout
-
-- Root verifies every worker report from current filesystem/Git evidence before
-  dispatching dependent work.
-- Outside mandatory mode, root-owned integration gates run after the relevant
-  child worker wave completes. In mandatory mode, the assigned Feature Spec
-  task executes cross-repo integration, validation, PR review polling, fixes,
-  and merge-ready closeout; the root reconciles its proof read-only.
-- Child issues close through their child tracker and delivery rules.
-- Parent local issues move to `issues/done/` only after child proof and
-  cross-repo integration proof.
-- Parent GitHub Feature Specs/issues close only after all child outcomes,
-  integration proof, and required PR/review/closeout gates pass.
-- Local/no-remote closeout remains conservative: completed local work does not
-  move a pull-request-mode issue to done unless exact owner-scoped local
-  closeout authority is present.
+The task executes cross-repo integration validation, PR review/fix/CI loops,
+and merge-ready preparation. Successful App completion requires one real,
+non-draft, ready-to-merge PR per affected repository plus cross-repo integration
+proof. The root reconciles proof, owns any authorized
+merge, verifies child and parent issue closure, and closes the parent source
+only after every child outcome and integration gate passes.
