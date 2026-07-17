@@ -45,6 +45,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
             subprocess.run(["git", "-C", str(repository), "commit", "-qm", "base"], check=True)
         self.ledger = self.base / "ledger.md"
+        self.ledger.write_text("# fixture ledger\n")
         self.adoption_index = 0
         self.env = os.environ.copy()
         self.env["HOME"] = str(self.base)
@@ -232,7 +233,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "5.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "6.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -292,6 +293,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     for result in results
                     if result[0] == 0
                 ),
+                "--release-reason",
+                "terminal",
                 "--evidence",
                 "fixture-terminal",
                 env=self.env,
@@ -329,11 +332,36 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "root-a",
             "--expected-fingerprint",
             acquired["fingerprint"],
+            "--release-reason",
+            "terminal",
             "--evidence",
             "fixture-terminal",
             env=self.env,
         )
-        self.assertEqual(json.loads(released.stdout)["state"], "released")
+        released_value = json.loads(released.stdout)
+        self.assertEqual(released_value["state"], "released")
+        receipt = released_value["release_receipt"]
+        self.assertEqual(receipt["root_id"], "root-a")
+        self.assertEqual(receipt["ledger_ref"], str(self.ledger.resolve()))
+        self.assertEqual(receipt["release_reason"], "terminal")
+        self.assertTrue(Path(released_value["release_receipt_ref"]).is_file())
+        repeated_release = json.loads(
+            run_claim(
+                "--json",
+                "claim",
+                "release",
+                "--root-id",
+                "root-a",
+                "--expected-fingerprint",
+                acquired["fingerprint"],
+                "--release-reason",
+                "terminal",
+                "--evidence",
+                "fixture-terminal",
+                env=self.env,
+            ).stdout
+        )
+        self.assertEqual(repeated_release["state"], "already-released")
 
         reacquired = json.loads(
             run_claim(*self.acquire_args("root-a", self.repo, "spec-1"), env=self.env).stdout
@@ -351,6 +379,66 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(stale_heartbeat.returncode, 4)
+
+    def test_pre_register_claim_can_release_to_durable_handoff(self) -> None:
+        missing_ledger = self.base / "not-registered.md"
+        acquired = json.loads(
+            run_claim(
+                *self.acquire_args(
+                    "root-a", self.repo, "spec-1", ledger=missing_ledger
+                ),
+                env=self.env,
+            ).stdout
+        )["claim"]
+
+        released = json.loads(
+            run_claim(
+                "--json",
+                "claim",
+                "release",
+                "--root-id",
+                "root-a",
+                "--expected-fingerprint",
+                acquired["fingerprint"],
+                "--release-reason",
+                "durable-handoff",
+                "--evidence",
+                "pre-register-failure",
+                env=self.env,
+            ).stdout
+        )
+
+        self.assertEqual(released["state"], "released")
+        self.assertIsNone(released["release_receipt"]["ledger_sha256"])
+        self.assertIsNone(released["release_receipt"]["ledger_size_bytes"])
+        status = json.loads(
+            run_claim("--json", "claim", "status", env=self.env).stdout
+        )
+        self.assertEqual(status["claims"], [])
+        receipt_path = Path(released["release_receipt_ref"])
+        self.assertTrue(receipt_path.is_file())
+        run_claim(
+            *self.acquire_args(
+                "root-a", self.repo, "spec-1", ledger=missing_ledger
+            ),
+            env=self.env,
+        )
+        self.assertFalse(receipt_path.exists())
+
+    def test_receipt_cleanup_failure_does_not_persist_new_claim(self) -> None:
+        receipt_root = self.claim_root / "releases"
+        receipt_root.mkdir(parents=True)
+        (self.claim_root / ".lock").touch()
+        (receipt_root / f"root-a--{'0' * 64}.json").write_text("not-json\n")
+
+        acquired = run_claim(
+            *self.acquire_args("root-a", self.repo, "spec-1"),
+            env=self.env,
+            check=False,
+        )
+
+        self.assertEqual(acquired.returncode, 4)
+        self.assertFalse((self.claim_root / "root-a.json").exists())
 
     def test_linked_worktrees_share_one_repository_identity(self) -> None:
         linked = self.base / "repo-linked"
@@ -1348,6 +1436,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "root-b",
                 "--expected-fingerprint",
                 unrelated["fingerprint"],
+                "--release-reason",
+                "terminal",
                 "--evidence",
                 "fixture-terminal",
                 env=self.env,

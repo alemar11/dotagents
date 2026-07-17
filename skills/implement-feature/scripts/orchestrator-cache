@@ -1,0 +1,1212 @@
+#!/usr/bin/env python3
+"""Archive and retain Implement Feature orchestration ledgers."""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import fcntl
+import hashlib
+import json
+import os
+import re
+import secrets
+import shutil
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Iterator
+
+
+__version__ = "1.0.0"
+METADATA_SCHEMA_VERSION = "1.0.0"
+DEFAULT_RETENTION_DAYS = 180
+SIZE_WARNING_BYTES = 25 * 1024 * 1024
+COUNT_WARNING_ENTRIES = 100
+ARCHIVE_REASONS = {"terminal", "legacy-cutover"}
+CLAIM_SCHEMA_VERSIONS = {"3.0.0", "4.0.0", "5.0.0"}
+TAKEOVER_SCHEMA_VERSION = "1.0.0"
+RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
+RELEASE_REASONS = {"terminal", "durable-handoff"}
+ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
+TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
+TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+LEGACY_GROUP_RE = re.compile(r"^legacy-cutover-\d{4}-\d{2}-\d{2}$")
+
+
+class CacheError(Exception):
+    def __init__(self, code: str, message: str, exit_code: int, details: Any = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.exit_code = exit_code
+        self.details = details or {}
+
+
+def cache_root() -> Path:
+    return Path.home() / ".cache/dotagents/skills/implement-feature"
+
+
+def claim_root() -> Path:
+    return cache_root() / "claims"
+
+
+def ledger_root() -> Path:
+    return cache_root() / "ledgers"
+
+
+def archive_root() -> Path:
+    return ledger_root() / "archive"
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def format_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def compact_timestamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+def parse_timestamp(value: Any, field: str) -> datetime:
+    if not isinstance(value, str) or not value.endswith("Z"):
+        raise CacheError("integrity-failure", f"{field} is not a UTC timestamp", 5)
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError as exc:
+        raise CacheError("integrity-failure", f"{field} is invalid", 5) from exc
+    return parsed.astimezone(timezone.utc)
+
+
+def check_id(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not ID_RE.fullmatch(value):
+        raise CacheError("invalid-input", f"{field} is not canonical: {value}", 2)
+    return value
+
+
+def nonempty(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise CacheError("invalid-input", f"{field} is required", 2)
+    return value.strip()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def write_json_durable(path: Path, value: dict[str, Any]) -> None:
+    with path.open("x") as handle:
+        handle.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    sync_directory(path.parent)
+
+
+@contextlib.contextmanager
+def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None]:
+    root = claim_root()
+    if not root.exists() and not create:
+        yield None
+        return
+    if create:
+        root.mkdir(parents=True, exist_ok=True)
+    lock_path = root / ".lock"
+    if lock_path.exists() and (lock_path.is_symlink() or not lock_path.is_file()):
+        raise CacheError("state-conflict", f"unsafe claim-store lock: {lock_path}", 4)
+    mode = "a+" if create else "r"
+    try:
+        lock = lock_path.open(mode)
+    except FileNotFoundError:
+        yield root
+        return
+    with lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        try:
+            yield root
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def extract_ledger_refs(value: Any) -> set[str]:
+    refs: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "ledger_ref" and isinstance(item, str):
+                refs.add(str(Path(item).expanduser().resolve(strict=False)))
+            else:
+                refs.update(extract_ledger_refs(item))
+    elif isinstance(value, list):
+        for item in value:
+            refs.update(extract_ledger_refs(item))
+    return refs
+
+
+def claim_fingerprint(value: dict[str, Any]) -> str:
+    keys = [
+        "root_id",
+        "acquisition_nonce",
+        "repositories",
+        "repository_checkouts",
+        "sources",
+        "ledger_ref",
+    ]
+    if value.get("schema_version") == "3.0.0":
+        keys.insert(2, "execution_adapter")
+    payload = {key: value[key] for key in keys}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def claim_artifact_error(path: Path, value: dict[str, Any]) -> str | None:
+    if path.suffix == ".json":
+        schema = value.get("schema_version")
+        required = {
+            "schema_version",
+            "root_id",
+            "acquisition_nonce",
+            "repositories",
+            "repository_checkouts",
+            "sources",
+            "ledger_ref",
+            "opened_at",
+            "heartbeat_at",
+            "takeover_evidence",
+            "replaced_root_ids",
+            "fingerprint",
+        }
+        if schema == "3.0.0":
+            required.add("execution_adapter")
+        if schema not in CLAIM_SCHEMA_VERSIONS or set(value) != required:
+            return f"unsupported claim schema: {path}"
+        root_id = value.get("root_id")
+        if (
+            not isinstance(root_id, str)
+            or not ID_RE.fullmatch(root_id)
+            or path.name != f"{root_id}.json"
+        ):
+            return f"claim identity mismatch: {path}"
+        try:
+            expected = claim_fingerprint(value)
+        except (KeyError, TypeError, ValueError):
+            return f"claim fingerprint input mismatch: {path}"
+        if value.get("fingerprint") != expected:
+            return f"claim fingerprint mismatch: {path}"
+        return None
+
+    required = {
+        "schema_version",
+        "transaction_id",
+        "candidate_claim",
+        "replaced_claims",
+        "prepared_at",
+        "fingerprint",
+    }
+    candidate = value.get("candidate_claim")
+    replaced = value.get("replaced_claims")
+    if (
+        value.get("schema_version") != TAKEOVER_SCHEMA_VERSION
+        or set(value) != required
+        or not isinstance(value.get("transaction_id"), str)
+        or not TRANSACTION_ID_RE.fullmatch(value["transaction_id"])
+        or not isinstance(candidate, dict)
+        or not isinstance(replaced, list)
+        or not replaced
+        or any(not isinstance(item, dict) for item in replaced)
+    ):
+        return f"unsupported takeover schema: {path}"
+    root_id = candidate.get("root_id")
+    if (
+        not isinstance(root_id, str)
+        or not ID_RE.fullmatch(root_id)
+        or path.name != f"{root_id}.takeover"
+    ):
+        return f"takeover identity mismatch: {path}"
+    payload = {key: item for key, item in value.items() if key != "fingerprint"}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    if value.get("fingerprint") != hashlib.sha256(encoded).hexdigest():
+        return f"takeover fingerprint mismatch: {path}"
+    candidate_error = claim_artifact_error(path.with_suffix(".json"), candidate)
+    if candidate_error:
+        return f"takeover candidate mismatch: {path}"
+    for item in replaced:
+        item_root = item.get("root_id")
+        if not isinstance(item_root, str) or not ID_RE.fullmatch(item_root):
+            return f"takeover snapshot identity mismatch: {path}"
+        snapshot_error = claim_artifact_error(path.parent / f"{item_root}.json", item)
+        if snapshot_error:
+            return f"takeover snapshot mismatch: {path}"
+    return None
+
+
+def validate_release_receipt(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise CacheError("state-conflict", f"unsafe release receipt: {path}", 4)
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CacheError("state-conflict", f"invalid release receipt: {path}", 4) from exc
+    required = {
+        "schema_version",
+        "root_id",
+        "claim_fingerprint",
+        "ledger_ref",
+        "ledger_sha256",
+        "ledger_size_bytes",
+        "release_reason",
+        "evidence_ref",
+        "released_at",
+        "fingerprint",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise CacheError("state-conflict", f"release receipt schema mismatch: {path}", 4)
+    root_id = value.get("root_id")
+    claim_fingerprint = value.get("claim_fingerprint")
+    ledger_ref = value.get("ledger_ref")
+    payload = {key: item for key, item in value.items() if key != "fingerprint"}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    if (
+        value.get("schema_version") != RELEASE_RECEIPT_SCHEMA_VERSION
+        or not isinstance(root_id, str)
+        or not ID_RE.fullmatch(root_id)
+        or not isinstance(claim_fingerprint, str)
+        or not FINGERPRINT_RE.fullmatch(claim_fingerprint)
+        or path.name != f"{root_id}--{claim_fingerprint}.json"
+        or not isinstance(ledger_ref, str)
+        or not Path(ledger_ref).is_absolute()
+        or value.get("release_reason") not in RELEASE_REASONS
+        or not isinstance(value.get("evidence_ref"), str)
+        or not value["evidence_ref"].strip()
+        or parse_timestamp(value.get("released_at"), "released_at") is None
+        or value.get("fingerprint") != hashlib.sha256(encoded).hexdigest()
+    ):
+        raise CacheError("state-conflict", f"release receipt value mismatch: {path}", 4)
+    has_snapshot = (
+        isinstance(value.get("ledger_sha256"), str)
+        and bool(FINGERPRINT_RE.fullmatch(value["ledger_sha256"]))
+        and isinstance(value.get("ledger_size_bytes"), int)
+        and value["ledger_size_bytes"] >= 0
+    )
+    missing_snapshot = (
+        value.get("ledger_sha256") is None and value.get("ledger_size_bytes") is None
+    )
+    if not has_snapshot and not (
+        missing_snapshot and value["release_reason"] == "durable-handoff"
+    ):
+        raise CacheError("state-conflict", f"release receipt ledger mismatch: {path}", 4)
+    canonical_ledger = canonical_active_ledger(ledger_ref)
+    return {**value, "path": str(path), "ledger_ref": str(canonical_ledger)}
+
+
+def inspect_claim_artifacts(root: Path | None) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "safe": True,
+        "ledger_refs": set(),
+        "ownership_root_ids": set(),
+        "claim_files": [],
+        "takeover_files": [],
+        "release_receipts": [],
+        "warnings": [],
+    }
+    if root is None or not root.exists():
+        return result
+    lock_path = root / ".lock"
+    if lock_path.is_symlink() or not lock_path.is_file():
+        result["safe"] = False
+        result["warnings"].append(f"claim-store lock missing or unsafe: {lock_path}")
+    for path in sorted(root.iterdir()):
+        if path.name == ".lock":
+            continue
+        if path.name == "releases":
+            if path.is_symlink() or not path.is_dir():
+                result["safe"] = False
+                result["warnings"].append(f"unsafe release receipt root: {path}")
+                continue
+            for receipt_path in sorted(path.iterdir()):
+                try:
+                    result["release_receipts"].append(
+                        validate_release_receipt(receipt_path)
+                    )
+                except CacheError as exc:
+                    result["safe"] = False
+                    result["warnings"].append(exc.message)
+            continue
+        if path.is_symlink() or not path.is_file():
+            result["safe"] = False
+            result["warnings"].append(f"unknown claim-store artifact: {path}")
+            continue
+        if path.suffix not in {".json", ".takeover"}:
+            result["safe"] = False
+            result["warnings"].append(f"unknown claim-store file: {path}")
+            continue
+        try:
+            value = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            result["safe"] = False
+            result["warnings"].append(f"unreadable claim-store file: {path}")
+            continue
+        if not isinstance(value, dict):
+            result["safe"] = False
+            result["warnings"].append(f"invalid claim-store file: {path}")
+            continue
+        artifact_error = claim_artifact_error(path, value)
+        if artifact_error:
+            result["safe"] = False
+            result["warnings"].append(artifact_error)
+            continue
+        result["ledger_refs"].update(extract_ledger_refs(value))
+        if path.suffix == ".json":
+            result["ownership_root_ids"].add(value["root_id"])
+        else:
+            result["ownership_root_ids"].add(value["candidate_claim"]["root_id"])
+            result["ownership_root_ids"].update(
+                item["root_id"] for item in value["replaced_claims"]
+            )
+        key = "takeover_files" if path.suffix == ".takeover" else "claim_files"
+        result[key].append(str(path))
+    return result
+
+
+def canonical_active_ledger(value: str) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise CacheError("invalid-input", "ledger must be an absolute path", 2)
+    if path.is_symlink():
+        raise CacheError("invalid-input", f"ledger must not be a symlink: {path}", 2)
+    resolved = path.resolve(strict=False)
+    root = ledger_root().resolve(strict=False)
+    if resolved.parent != root or resolved.suffix != ".md":
+        raise CacheError(
+            "invalid-input",
+            "ledger must be a direct Markdown child of the active ledger root",
+            2,
+            {"ledger": str(resolved), "ledger_root": str(root)},
+        )
+    check_id(resolved.stem, "portfolio_key")
+    return resolved
+
+
+def metadata_for(
+    *,
+    ledger: Path,
+    ledger_hash: str,
+    size_bytes: int,
+    archived_at: datetime,
+    archive_reason: str,
+    archive_group: str | None,
+    evidence_ref: str,
+    root_id: str | None,
+) -> dict[str, Any]:
+    archive_id = f"{compact_timestamp(archived_at)}--{ledger.stem}--{ledger_hash[:12]}"
+    return {
+        "schema_version": METADATA_SCHEMA_VERSION,
+        "archive_id": archive_id,
+        "archive_reason": archive_reason,
+        "archive_group": archive_group,
+        "archived_at": format_timestamp(archived_at),
+        "portfolio_key": ledger.stem,
+        "original_ledger_ref": str(ledger),
+        "ledger_sha256": ledger_hash,
+        "size_bytes": size_bytes,
+        "evidence_ref": evidence_ref,
+        "root_id": root_id,
+        "tool_version": __version__,
+    }
+
+
+def archive_parent(metadata: dict[str, Any]) -> Path:
+    if metadata["archive_reason"] == "legacy-cutover":
+        return archive_root() / metadata["archive_group"]
+    archived_at = parse_timestamp(metadata["archived_at"], "archived_at")
+    return archive_root() / archived_at.strftime("%Y") / archived_at.strftime("%m")
+
+
+def validate_metadata(value: Any, entry: Path) -> dict[str, Any]:
+    required = {
+        "schema_version",
+        "archive_id",
+        "archive_reason",
+        "archive_group",
+        "archived_at",
+        "portfolio_key",
+        "original_ledger_ref",
+        "ledger_sha256",
+        "size_bytes",
+        "evidence_ref",
+        "root_id",
+        "tool_version",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise CacheError("integrity-failure", f"archive metadata schema mismatch: {entry}", 5)
+    if value["schema_version"] != METADATA_SCHEMA_VERSION:
+        raise CacheError("integrity-failure", f"unsupported archive metadata: {entry}", 5)
+    check_id(value["archive_id"], "archive_id")
+    check_id(value["portfolio_key"], "portfolio_key")
+    if value["archive_id"] != entry.name:
+        raise CacheError("integrity-failure", f"archive identity mismatch: {entry}", 5)
+    if value["archive_reason"] not in ARCHIVE_REASONS:
+        raise CacheError("integrity-failure", f"archive reason mismatch: {entry}", 5)
+    if value["archive_reason"] == "legacy-cutover":
+        check_id(value["archive_group"], "archive_group")
+        if not LEGACY_GROUP_RE.fullmatch(value["archive_group"]):
+            raise CacheError("integrity-failure", f"legacy archive group mismatch: {entry}", 5)
+        if value["root_id"] is not None:
+            raise CacheError("integrity-failure", f"legacy archive root mismatch: {entry}", 5)
+    else:
+        if value["archive_group"] is not None:
+            raise CacheError("integrity-failure", f"terminal archive group mismatch: {entry}", 5)
+        check_id(value["root_id"], "root_id")
+    parse_timestamp(value["archived_at"], "archived_at")
+    if not isinstance(value["ledger_sha256"], str) or not FINGERPRINT_RE.fullmatch(
+        value["ledger_sha256"]
+    ):
+        raise CacheError("integrity-failure", f"archive checksum mismatch: {entry}", 5)
+    if not isinstance(value["size_bytes"], int) or value["size_bytes"] < 0:
+        raise CacheError("integrity-failure", f"archive size mismatch: {entry}", 5)
+    nonempty(value["evidence_ref"], "evidence_ref")
+    original = Path(value["original_ledger_ref"])
+    if not original.is_absolute() or original.resolve(strict=False).parent != ledger_root().resolve(
+        strict=False
+    ):
+        raise CacheError("integrity-failure", f"archive source mismatch: {entry}", 5)
+    return value
+
+
+def validate_archive_entry(entry: Path, *, verify_hash: bool) -> dict[str, Any]:
+    if entry.is_symlink() or not entry.is_dir():
+        raise CacheError("integrity-failure", f"archive entry is not a directory: {entry}", 5)
+    children = {path.name: path for path in entry.iterdir()}
+    if set(children) != {"ledger.md", "metadata.json"}:
+        raise CacheError("integrity-failure", f"archive entry has unexpected files: {entry}", 5)
+    if any(path.is_symlink() or not path.is_file() for path in children.values()):
+        raise CacheError("integrity-failure", f"archive entry contains unsafe files: {entry}", 5)
+    try:
+        value = json.loads(children["metadata.json"].read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CacheError("integrity-failure", f"archive metadata is unreadable: {entry}", 5) from exc
+    metadata = validate_metadata(value, entry)
+    if archive_parent(metadata).resolve(strict=False) != entry.parent.resolve(strict=False):
+        raise CacheError("integrity-failure", f"archive parent mismatch: {entry}", 5)
+    actual_size = children["ledger.md"].stat().st_size
+    if actual_size != metadata["size_bytes"]:
+        raise CacheError("integrity-failure", f"archive byte count mismatch: {entry}", 5)
+    if verify_hash and sha256_file(children["ledger.md"]) != metadata["ledger_sha256"]:
+        raise CacheError("integrity-failure", f"archive checksum mismatch: {entry}", 5)
+    return {**metadata, "entry_path": str(entry), "ledger_path": str(children["ledger.md"])}
+
+
+def archive_entry_dirs() -> tuple[list[Path], list[dict[str, str]], list[str]]:
+    root = archive_root()
+    if not root.exists():
+        return [], [], []
+    entries: list[Path] = []
+    invalid: list[dict[str, str]] = []
+    warnings: list[str] = []
+
+    def reject(path: Path, message: str) -> None:
+        invalid.append({"entry_path": str(path), "error": message})
+
+    def collect_entries(container: Path, label: str) -> None:
+        children = sorted(container.iterdir())
+        if not children:
+            reject(container, f"orphaned {label} container")
+            return
+        for child in children:
+            if child.is_symlink() or not child.is_dir():
+                reject(child, f"unexpected artifact in {label} container")
+            else:
+                entries.append(child)
+
+    if root.is_symlink() or not root.is_dir():
+        reject(root, "archive root is not a safe directory")
+        return [], invalid, warnings
+    for top in sorted(root.iterdir()):
+        if top.name == ".trash" or top.name.startswith(".tmp-"):
+            if top.is_symlink() or not top.is_dir():
+                reject(top, "archive internal state is unsafe")
+            continue
+        if top.is_symlink() or not top.is_dir():
+            reject(top, "unexpected archive-root artifact")
+            continue
+        if LEGACY_GROUP_RE.fullmatch(top.name):
+            collect_entries(top, "legacy archive group")
+            continue
+        if not re.fullmatch(r"\d{4}", top.name):
+            reject(top, "unrecognized archive container")
+            continue
+        months = sorted(top.iterdir())
+        if not months:
+            reject(top, "orphaned terminal archive year")
+            continue
+        for month in months:
+            if (
+                month.is_symlink()
+                or not month.is_dir()
+                or not re.fullmatch(r"0[1-9]|1[0-2]", month.name)
+            ):
+                reject(month, "invalid terminal archive month")
+                continue
+            collect_entries(month, "terminal archive month")
+    return sorted(set(entries)), invalid, warnings
+
+
+def scan_archives(*, verify_hash: bool) -> dict[str, Any]:
+    entries, invalid, warnings = archive_entry_dirs()
+    valid: list[dict[str, Any]] = []
+    for entry in entries:
+        try:
+            valid.append(validate_archive_entry(entry, verify_hash=verify_hash))
+        except CacheError as exc:
+            invalid.append({"entry_path": str(entry), "error": exc.message})
+    root = archive_root()
+    temporary: list[str] = []
+    trash: list[str] = []
+    if root.exists():
+        temporary = [str(path) for path in sorted(root.glob(".tmp-*"))]
+        trash_root = root / ".trash"
+        if trash_root.is_dir():
+            trash = [str(path) for path in sorted(trash_root.iterdir())]
+    return {
+        "valid": sorted(valid, key=lambda item: item["archive_id"]),
+        "invalid": invalid,
+        "temporary": temporary,
+        "trash": trash,
+        "warnings": warnings,
+    }
+
+
+def find_completed_archive(
+    ledger: Path,
+    *,
+    archive_reason: str,
+    archive_group: str | None,
+    evidence_ref: str,
+    root_id: str | None,
+) -> dict[str, Any] | None:
+    matches = [
+        entry
+        for entry in scan_archives(verify_hash=True)["valid"]
+        if entry["original_ledger_ref"] == str(ledger)
+        and entry["archive_reason"] == archive_reason
+        and entry["archive_group"] == archive_group
+        and entry["evidence_ref"] == evidence_ref
+        and entry["root_id"] == root_id
+    ]
+    if len(matches) > 1:
+        raise CacheError("state-conflict", f"multiple matching archives exist: {ledger}", 4)
+    return matches[0] if matches else None
+
+
+def stage_ledger(source: Path, destination: Path) -> None:
+    with source.open("rb") as input_handle, destination.open("xb") as output_handle:
+        shutil.copyfileobj(input_handle, output_handle)
+        output_handle.flush()
+        os.fsync(output_handle.fileno())
+
+
+def terminal_release_receipt(
+    claim_state: dict[str, Any],
+    *,
+    ledger: Path,
+    root_id: str,
+    evidence_ref: str,
+    ledger_hash: str,
+    size_bytes: int,
+    required: bool,
+) -> Path | None:
+    matches = [
+        item
+        for item in claim_state["release_receipts"]
+        if item["root_id"] == root_id
+        and item["ledger_ref"] == str(ledger)
+        and item["release_reason"] == "terminal"
+        and item["evidence_ref"] == evidence_ref
+    ]
+    if len(matches) > 1:
+        raise CacheError("state-conflict", f"multiple terminal release receipts: {ledger}", 4)
+    if not matches:
+        if required:
+            raise CacheError(
+                "state-conflict",
+                f"terminal release receipt is required: {ledger}",
+                4,
+            )
+        return None
+    receipt = matches[0]
+    if (
+        receipt["ledger_sha256"] != ledger_hash
+        or receipt["ledger_size_bytes"] != size_bytes
+    ):
+        raise CacheError(
+            "state-conflict",
+            f"terminal release receipt does not match ledger content: {ledger}",
+            4,
+        )
+    return Path(receipt["path"])
+
+
+def remove_empty_parents(path: Path, stop: Path) -> None:
+    current = path
+    while current != stop and current.is_dir():
+        try:
+            current.rmdir()
+        except OSError:
+            return
+        current = current.parent
+
+
+def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
+    reason = args.archive_reason
+    evidence_ref = nonempty(args.evidence_ref, "evidence_ref")
+    root_id = args.root_id
+    group = args.archive_group
+    if reason == "terminal":
+        if len(args.ledger) != 1 or group is not None or root_id is None:
+            raise CacheError(
+                "invalid-input",
+                "terminal archive requires one ledger, --root-id, and no --archive-group",
+                2,
+            )
+        root_id = check_id(root_id, "root_id")
+    else:
+        if root_id is not None or group is None:
+            raise CacheError(
+                "invalid-input",
+                "legacy-cutover archive requires --archive-group and no --root-id",
+                2,
+            )
+        group = check_id(group, "archive_group")
+        if not LEGACY_GROUP_RE.fullmatch(group):
+            raise CacheError(
+                "invalid-input",
+                "archive-group must use legacy-cutover-YYYY-MM-DD",
+                2,
+            )
+    ledgers = [canonical_active_ledger(value) for value in args.ledger]
+    if len(ledgers) != len(set(ledgers)):
+        raise CacheError("invalid-input", "duplicate ledger paths are not allowed", 2)
+
+    archived_at = utc_now()
+    completed: list[dict[str, Any]] = []
+    staged: list[dict[str, Any]] = []
+    committed: list[dict[str, Any]] = []
+    duplicate_sources: list[tuple[Path, dict[str, Any]]] = []
+    used_release_receipts: set[Path] = set()
+    with locked_claim_store(create=True, exclusive=True) as claims:
+        claim_state = inspect_claim_artifacts(claims)
+        if not claim_state["safe"]:
+            raise CacheError(
+                "state-conflict",
+                "claim store is not safe for ledger archival",
+                4,
+                {"warnings": claim_state["warnings"]},
+            )
+        if reason == "terminal" and root_id in claim_state["ownership_root_ids"]:
+            raise CacheError(
+                "state-conflict",
+                f"terminal root still has active claim ownership: {root_id}",
+                4,
+            )
+        for ledger in ledgers:
+            existing = find_completed_archive(
+                ledger,
+                archive_reason=reason,
+                archive_group=group,
+                evidence_ref=evidence_ref,
+                root_id=root_id,
+            )
+            if not ledger.exists():
+                if existing:
+                    if reason == "terminal":
+                        receipt = terminal_release_receipt(
+                            claim_state,
+                            ledger=ledger,
+                            root_id=root_id,
+                            evidence_ref=evidence_ref,
+                            ledger_hash=existing["ledger_sha256"],
+                            size_bytes=existing["size_bytes"],
+                            required=False,
+                        )
+                        if receipt is not None:
+                            used_release_receipts.add(receipt)
+                    completed.append(existing)
+                    continue
+                raise CacheError("not-found", f"ledger not found: {ledger}", 3)
+            if ledger.is_symlink() or not ledger.is_file():
+                raise CacheError("invalid-input", f"ledger is not a safe regular file: {ledger}", 2)
+            if str(ledger) in claim_state["ledger_refs"]:
+                raise CacheError(
+                    "state-conflict",
+                    f"ledger is referenced by active claim state: {ledger}",
+                    4,
+                )
+            ledger_hash = sha256_file(ledger)
+            size_bytes = ledger.stat().st_size
+            if reason == "terminal":
+                receipt = terminal_release_receipt(
+                    claim_state,
+                    ledger=ledger,
+                    root_id=root_id,
+                    evidence_ref=evidence_ref,
+                    ledger_hash=ledger_hash,
+                    size_bytes=size_bytes,
+                    required=True,
+                )
+                assert receipt is not None
+                used_release_receipts.add(receipt)
+            if existing:
+                if (
+                    existing["ledger_sha256"] != ledger_hash
+                    or existing["size_bytes"] != size_bytes
+                ):
+                    raise CacheError(
+                        "state-conflict", f"completed archive conflicts with active ledger: {ledger}", 4
+                    )
+                completed.append(existing)
+                duplicate_sources.append((ledger, existing))
+                continue
+            metadata = metadata_for(
+                ledger=ledger,
+                ledger_hash=ledger_hash,
+                size_bytes=size_bytes,
+                archived_at=archived_at,
+                archive_reason=reason,
+                archive_group=group,
+                evidence_ref=evidence_ref,
+                root_id=root_id,
+            )
+            final = archive_parent(metadata) / metadata["archive_id"]
+            if final.exists():
+                raise CacheError("state-conflict", f"archive destination already exists: {final}", 4)
+            staged.append({"source": ledger, "metadata": metadata, "final": final})
+
+        if staged:
+            archive_root().mkdir(parents=True, exist_ok=True)
+            temporary = archive_root() / f".tmp-{secrets.token_hex(16)}"
+            temporary.mkdir()
+            try:
+                for item in staged:
+                    entry = temporary / item["metadata"]["archive_id"]
+                    entry.mkdir()
+                    stage_ledger(item["source"], entry / "ledger.md")
+                    write_json_durable(entry / "metadata.json", item["metadata"])
+                    if sha256_file(entry / "ledger.md") != item["metadata"]["ledger_sha256"]:
+                        raise CacheError(
+                            "integrity-failure", f"staged archive checksum mismatch: {item['source']}", 5
+                        )
+                    sync_directory(entry)
+                    item["stage"] = entry
+                for item in staged:
+                    item["final"].parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(item["stage"], item["final"])
+                    sync_directory(item["final"].parent)
+                    committed.append(item)
+                for item in committed:
+                    item["source"].unlink()
+                    sync_directory(item["source"].parent)
+                    completed.append(
+                        validate_archive_entry(item["final"], verify_hash=True)
+                    )
+                for source, _existing in duplicate_sources:
+                    source.unlink()
+                    sync_directory(source.parent)
+            except Exception:
+                for source, existing in duplicate_sources:
+                    if source.exists():
+                        continue
+                    archive_ledger = Path(existing["ledger_path"])
+                    stage_ledger(archive_ledger, source)
+                    sync_directory(source.parent)
+                for item in reversed(committed):
+                    if item["source"].exists() or not item["final"].exists():
+                        restored = item["source"].exists()
+                    else:
+                        archive_ledger = item["final"] / "ledger.md"
+                        stage_ledger(archive_ledger, item["source"])
+                        sync_directory(item["source"].parent)
+                        restored = True
+                    if restored and item["final"].is_dir():
+                        for name in ("ledger.md", "metadata.json"):
+                            path = item["final"] / name
+                            if path.is_file() and not path.is_symlink():
+                                path.unlink()
+                        try:
+                            item["final"].rmdir()
+                            remove_empty_parents(item["final"].parent, archive_root())
+                        except OSError:
+                            pass
+                raise
+            finally:
+                if temporary.exists():
+                    for entry in list(temporary.iterdir()):
+                        if entry.is_dir():
+                            for name in ("ledger.md", "metadata.json"):
+                                path = entry / name
+                                if path.exists() and path.is_file() and not path.is_symlink():
+                                    path.unlink()
+                            try:
+                                entry.rmdir()
+                            except OSError:
+                                pass
+                    try:
+                        temporary.rmdir()
+                    except OSError:
+                        pass
+            remove_empty_parents(temporary.parent, archive_root())
+        elif duplicate_sources:
+            for source, _existing in duplicate_sources:
+                source.unlink()
+                sync_directory(source.parent)
+        for receipt in sorted(used_release_receipts):
+            if receipt.exists():
+                receipt.unlink()
+                sync_directory(receipt.parent)
+        releases = claim_root() / "releases"
+        if releases.is_dir():
+            try:
+                releases.rmdir()
+                sync_directory(claim_root())
+            except OSError:
+                pass
+
+    return {
+        "ok": True,
+        "command": "ledger.archive",
+        "version": __version__,
+        "archive_reason": reason,
+        "archive_group": group,
+        "archives": sorted(completed, key=lambda item: item["archive_id"]),
+    }
+
+
+def list_archives() -> dict[str, Any]:
+    scan = scan_archives(verify_hash=False)
+    return {
+        "ok": True,
+        "command": "archive.list",
+        "version": __version__,
+        "archives": scan["valid"],
+        "invalid": scan["invalid"],
+        "temporary": scan["temporary"],
+        "trash": scan["trash"],
+        "warnings": scan["warnings"],
+    }
+
+
+def verify_archives(args: argparse.Namespace) -> dict[str, Any]:
+    scan = scan_archives(verify_hash=True)
+    archives = scan["valid"]
+    if args.archive_id:
+        archive_id = check_id(args.archive_id, "archive_id")
+        archives = [item for item in archives if item["archive_id"] == archive_id]
+        if not archives:
+            raise CacheError("not-found", f"archive not found: {archive_id}", 3)
+    if scan["invalid"]:
+        raise CacheError(
+            "integrity-failure",
+            "one or more archives failed verification",
+            5,
+            {"invalid": scan["invalid"]},
+        )
+    return {
+        "ok": True,
+        "command": "archive.verify",
+        "version": __version__,
+        "archives": archives,
+    }
+
+
+def validate_trash_entry(
+    entry: Path, *, claim_refs: set[str], cutoff: datetime
+) -> dict[str, Any]:
+    if entry.is_symlink() or not entry.is_dir():
+        raise CacheError("integrity-failure", f"unsafe trash entry: {entry}", 5)
+    children = {path.name: path for path in entry.iterdir()}
+    if set(children) != {"ledger.md", "metadata.json"} or any(
+        path.is_symlink() or not path.is_file() for path in children.values()
+    ):
+        raise CacheError("integrity-failure", f"unexpected trash entry: {entry}", 5)
+    try:
+        value = json.loads(children["metadata.json"].read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CacheError("integrity-failure", f"trash metadata is unreadable: {entry}", 5) from exc
+    if not isinstance(value, dict) or not isinstance(value.get("archive_id"), str):
+        raise CacheError("integrity-failure", f"trash metadata schema mismatch: {entry}", 5)
+    prefix = f"{value['archive_id']}--"
+    token = entry.name[len(prefix) :] if entry.name.startswith(prefix) else ""
+    if not re.fullmatch(r"[0-9a-f]{16}", token):
+        raise CacheError("integrity-failure", f"trash identity mismatch: {entry}", 5)
+    metadata = validate_metadata(value, entry.parent / value["archive_id"])
+    if children["ledger.md"].stat().st_size != metadata["size_bytes"]:
+        raise CacheError("integrity-failure", f"trash byte count mismatch: {entry}", 5)
+    if sha256_file(children["ledger.md"]) != metadata["ledger_sha256"]:
+        raise CacheError("integrity-failure", f"trash checksum mismatch: {entry}", 5)
+    if parse_timestamp(metadata["archived_at"], "archived_at") > cutoff:
+        raise CacheError("integrity-failure", f"trash retention age mismatch: {entry}", 5)
+    if {metadata["original_ledger_ref"], str(children["ledger.md"])} & claim_refs:
+        raise CacheError("state-conflict", f"trash entry is referenced by claim state: {entry}", 4)
+    return metadata
+
+
+def cleanup_trash(
+    trash_root: Path,
+    warnings: list[str],
+    *,
+    claim_refs: set[str],
+    cutoff: datetime,
+) -> int:
+    reclaimed = 0
+    if not trash_root.exists():
+        return reclaimed
+    if trash_root.is_symlink() or not trash_root.is_dir():
+        warnings.append(f"unsafe trash root preserved: {trash_root}")
+        return reclaimed
+    for entry in sorted(trash_root.iterdir()):
+        try:
+            validate_trash_entry(entry, claim_refs=claim_refs, cutoff=cutoff)
+        except CacheError as exc:
+            warnings.append(f"trash entry preserved: {exc.message}")
+            continue
+        children = {path.name: path for path in entry.iterdir()}
+        reclaimed += sum(path.stat().st_size for path in children.values())
+        children["ledger.md"].unlink()
+        children["metadata.json"].unlink()
+        entry.rmdir()
+    try:
+        trash_root.rmdir()
+    except OSError:
+        pass
+    return reclaimed
+
+
+def prune_archives(args: argparse.Namespace) -> dict[str, Any]:
+    if args.older_than_days < 1:
+        raise CacheError("invalid-input", "older-than-days must be positive", 2)
+    apply = bool(args.apply)
+    now = utc_now()
+    cutoff = now - timedelta(days=args.older_than_days)
+    warnings: list[str] = []
+    deleted: list[dict[str, Any]] = []
+    protected: list[dict[str, Any]] = []
+    eligible: list[dict[str, Any]] = []
+    reclaimed = 0
+
+    with locked_claim_store(create=apply, exclusive=apply) as claims:
+        claim_state = inspect_claim_artifacts(claims)
+        warnings.extend(claim_state["warnings"])
+        scan = scan_archives(verify_hash=True)
+        warnings.extend(scan["warnings"])
+        protected.extend(scan["invalid"])
+        protected.extend({"entry_path": path, "error": "temporary archive"} for path in scan["temporary"])
+        protected.extend({"entry_path": path, "error": "interrupted trash"} for path in scan["trash"])
+        for entry in scan["valid"]:
+            archived_at = parse_timestamp(entry["archived_at"], "archived_at")
+            if archived_at > cutoff:
+                continue
+            if not claim_state["safe"]:
+                protected.append({"archive_id": entry["archive_id"], "error": "claim state unreadable"})
+                continue
+            if {
+                entry["original_ledger_ref"],
+                entry["ledger_path"],
+            } & claim_state["ledger_refs"]:
+                protected.append({"archive_id": entry["archive_id"], "error": "referenced by claim state"})
+                continue
+            eligible.append(entry)
+
+        if apply:
+            trash_root = archive_root() / ".trash"
+            if claim_state["safe"]:
+                reclaimed += cleanup_trash(
+                    trash_root,
+                    warnings,
+                    claim_refs=claim_state["ledger_refs"],
+                    cutoff=cutoff,
+                )
+            for entry in eligible:
+                source = Path(entry["entry_path"])
+                try:
+                    current = validate_archive_entry(source, verify_hash=True)
+                    if parse_timestamp(current["archived_at"], "archived_at") > cutoff:
+                        protected.append({"archive_id": entry["archive_id"], "error": "age changed"})
+                        continue
+                    trash_root.mkdir(parents=True, exist_ok=True)
+                    destination = trash_root / f"{entry['archive_id']}--{secrets.token_hex(8)}"
+                    os.replace(source, destination)
+                    sync_directory(source.parent)
+                    sync_directory(trash_root)
+                    reclaimed += cleanup_trash(
+                        trash_root,
+                        warnings,
+                        claim_refs=claim_state["ledger_refs"],
+                        cutoff=cutoff,
+                    )
+                    if destination.exists():
+                        protected.append(
+                            {
+                                "archive_id": entry["archive_id"],
+                                "error": "interrupted trash preserved",
+                            }
+                        )
+                    else:
+                        deleted.append(entry)
+                    remove_empty_parents(source.parent, archive_root())
+                except (CacheError, OSError) as exc:
+                    warnings.append(f"archive prune failed for {entry['archive_id']}: {exc}")
+
+    return {
+        "ok": True,
+        "command": "archive.prune",
+        "version": __version__,
+        "mutation_mode": "apply" if apply else "dry-run",
+        "older_than_days": args.older_than_days,
+        "cutoff": format_timestamp(cutoff),
+        "eligible": [item["archive_id"] for item in eligible],
+        "deleted": [item["archive_id"] for item in deleted],
+        "protected": protected,
+        "reclaimed_bytes": reclaimed,
+        "warnings": warnings,
+    }
+
+
+def doctor() -> dict[str, Any]:
+    with locked_claim_store(create=False, exclusive=False) as claims:
+        claim_state = inspect_claim_artifacts(claims)
+        scan = scan_archives(verify_hash=True)
+    active_ledgers = []
+    root = ledger_root()
+    if root.is_dir():
+        for path in sorted(root.glob("*.md")):
+            if path.is_file() and not path.is_symlink():
+                active_ledgers.append({"path": str(path), "size_bytes": path.stat().st_size})
+    archive_bytes = sum(item["size_bytes"] for item in scan["valid"])
+    archive_times = [parse_timestamp(item["archived_at"], "archived_at") for item in scan["valid"]]
+    total_bytes = archive_bytes + sum(item["size_bytes"] for item in active_ledgers)
+    warnings = [*claim_state["warnings"], *scan["warnings"]]
+    if scan["invalid"]:
+        warnings.append("one or more archive entries are invalid")
+    if scan["temporary"]:
+        warnings.append("one or more interrupted archive stages exist")
+    if scan["trash"]:
+        warnings.append("one or more interrupted prune entries exist")
+    threshold_warning = total_bytes >= SIZE_WARNING_BYTES or len(scan["valid"]) >= COUNT_WARNING_ENTRIES
+    if threshold_warning:
+        warnings.append("cache retention threshold exceeded")
+    oldest = min(archive_times) if archive_times else None
+    return {
+        "ok": not scan["invalid"] and not scan["temporary"] and not scan["trash"] and claim_state["safe"],
+        "command": "doctor",
+        "version": __version__,
+        "offline": True,
+        "cache_root": str(cache_root()),
+        "claim_root": str(claim_root()),
+        "ledger_root": str(ledger_root()),
+        "archive_root": str(archive_root()),
+        "active_ledgers": active_ledgers,
+        "archive_count": len(scan["valid"]),
+        "archive_bytes": archive_bytes,
+        "total_bytes": total_bytes,
+        "oldest_archived_at": format_timestamp(oldest) if oldest else None,
+        "next_expiry_at": (
+            format_timestamp(oldest + timedelta(days=DEFAULT_RETENTION_DAYS)) if oldest else None
+        ),
+        "claim_files": claim_state["claim_files"],
+        "takeover_files": claim_state["takeover_files"],
+        "release_receipts": claim_state["release_receipts"],
+        "invalid": scan["invalid"],
+        "temporary": scan["temporary"],
+        "trash": scan["trash"],
+        "thresholds": {
+            "size_warning_bytes": SIZE_WARNING_BYTES,
+            "count_warning_entries": COUNT_WARNING_ENTRIES,
+            "warning": threshold_warning,
+        },
+        "warnings": warnings,
+    }
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Archive and retain Implement Feature orchestration ledgers."
+    )
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--json", action="store_true")
+    nouns = parser.add_subparsers(dest="noun", required=True)
+    nouns.add_parser("doctor", help="Inspect cache readiness and integrity without writing state.")
+
+    ledger = nouns.add_parser("ledger", help="Manage active orchestration ledgers.")
+    ledger_verbs = ledger.add_subparsers(dest="verb", required=True)
+    archive = ledger_verbs.add_parser("archive", help="Move completed ledgers into cold storage.")
+    archive.add_argument("--ledger", action="append", required=True)
+    archive.add_argument("--archive-reason", required=True, choices=sorted(ARCHIVE_REASONS))
+    archive.add_argument("--evidence-ref", required=True)
+    archive.add_argument("--root-id")
+    archive.add_argument("--archive-group")
+
+    archive_noun = nouns.add_parser("archive", help="Inspect, verify, or prune archived ledgers.")
+    archive_verbs = archive_noun.add_subparsers(dest="verb", required=True)
+    archive_verbs.add_parser("list", help="List archive entries without verifying checksums.")
+    verify = archive_verbs.add_parser("verify", help="Verify archive metadata and checksums.")
+    verify.add_argument("--archive-id")
+    prune = archive_verbs.add_parser("prune", help="Preview or delete archives older than a TTL.")
+    prune.add_argument("--older-than-days", type=int, default=DEFAULT_RETENTION_DAYS)
+    prune.add_argument("--apply", action="store_true")
+    return parser
+
+
+def dispatch(args: argparse.Namespace) -> dict[str, Any]:
+    if args.noun == "doctor":
+        return doctor()
+    if args.noun == "ledger":
+        return archive_ledgers(args)
+    if args.verb == "list":
+        return list_archives()
+    if args.verb == "verify":
+        return verify_archives(args)
+    return prune_archives(args)
+
+
+def emit(value: dict[str, Any], as_json: bool) -> None:
+    print(json.dumps(value, sort_keys=as_json, indent=None if as_json else 2))
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        emit(dispatch(args), args.json)
+        return 0
+    except CacheError as exc:
+        emit(
+            {"ok": False, "error": {"code": exc.code, "message": exc.message, "details": exc.details}},
+            getattr(args, "json", False),
+        )
+        return exc.exit_code
+    except OSError as exc:
+        emit(
+            {
+                "ok": False,
+                "error": {"code": "io-error", "message": str(exc), "details": {}},
+            },
+            getattr(args, "json", False),
+        )
+        return 6
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

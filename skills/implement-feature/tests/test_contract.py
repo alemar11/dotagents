@@ -22,7 +22,9 @@ def run_app_preclaim_fixture(
     observations.append("intake")
     if not bundle_ready:
         return "planning-required", observations, mutations
-    mutations.extend(["atomic-claim", "ledger-projection", "portfolio-goal"])
+    mutations.extend(
+        ["atomic-claim", "cache-retention", "ledger-projection", "portfolio-goal"]
+    )
     return "accepted", observations, mutations
 
 
@@ -43,8 +45,10 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "SKILL.md",
             "agents/openai.yaml",
             "scripts/orchestrator-claim",
+            "scripts/orchestrator-cache",
             "references/options.md",
             "references/task-model-policy.md",
+            "references/cache-lifecycle.md",
             "references/ledger.md",
             "references/ledger-template.md",
             "references/worker.md",
@@ -172,6 +176,47 @@ class AppOrchestratorContractTests(unittest.TestCase):
         )
         self.assertIn("fixed execution flow", options)
         self.assertIn("Generic delegation or subagent authority never supplies this grant", skill)
+
+    def test_cache_maintenance_is_root_owned_bounded_and_after_claim(self) -> None:
+        skill = self.read("SKILL.md")
+        lifecycle = self.read("references/cache-lifecycle.md")
+        normalized_lifecycle = " ".join(lifecycle.split())
+        ledger = self.read("references/ledger.md")
+        normalized_ledger = " ".join(ledger.split())
+        controller = skill.split("## Controller Loop", 1)[1]
+
+        authorization = " ".join(
+            skill.split("## Mandatory Run Authorization", 1)[1]
+            .split("## Fixed Implementation Contract", 1)[0]
+            .split()
+        )
+        self.assertIn(
+            "automatic deletion of valid archived ledgers older than 180 days after CLAIM",
+            authorization,
+        )
+        self.assertLess(controller.index("3. **CLAIM**"), controller.index("4. **CACHE-MAINTENANCE**"))
+        self.assertLess(controller.index("4. **CACHE-MAINTENANCE**"), controller.index("5. **REGISTER**"))
+        self.assertLess(controller.index("5. **REGISTER**"), controller.index("7. **DISPATCH**"))
+
+        for command in (
+            "scripts/orchestrator-cache --json doctor",
+            "scripts/orchestrator-cache --json archive prune --older-than-days 180 --apply",
+        ):
+            self.assertIn(command, lifecycle)
+        self.assertIn("The root owns cache maintenance", lifecycle)
+        self.assertIn("Never create a visible task, internal subagent", lifecycle)
+        self.assertIn("Run once per controller entry", lifecycle)
+        self.assertIn("strict 180-day TTL", lifecycle)
+        self.assertIn("there is no last-N exception", lifecycle)
+        self.assertIn("warning is nonblocking", normalized_lifecycle)
+        self.assertIn("Archive only after terminal reconciliation and exact claim release", lifecycle)
+        self.assertIn("Monitoring handoffs", normalized_lifecycle)
+        self.assertIn("claim release --release-reason terminal", lifecycle)
+        self.assertIn("claim release --release-reason durable-handoff", lifecycle)
+        self.assertIn("durable receipt binds", normalized_lifecycle)
+        self.assertIn("A durable-handoff receipt never authorizes archival", lifecycle)
+        self.assertIn("Archived ledgers live below `ledgers/archive/` as cold evidence", normalized_ledger)
+        self.assertIn("After terminal release only", normalized_ledger)
 
     def test_fixed_worker_actions_are_not_an_option(self) -> None:
         worker = self.read("references/worker.md")
@@ -530,7 +575,8 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertEqual(outcome, "accepted")
         self.assertEqual(observations, ["surface", "authorization", "intake"])
         self.assertEqual(
-            mutations, ["atomic-claim", "ledger-projection", "portfolio-goal"]
+            mutations,
+            ["atomic-claim", "cache-retention", "ledger-projection", "portfolio-goal"],
         )
 
     def test_multi_repo_requires_one_task_and_all_managed_checkouts(self) -> None:

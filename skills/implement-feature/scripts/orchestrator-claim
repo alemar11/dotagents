@@ -18,10 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "5.0.0"
+__version__ = "6.0.0"
 SCHEMA_VERSION = "5.0.0"
 LEGACY_SCHEMA_VERSIONS = {"3.0.0", "4.0.0"}
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
+RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
+RELEASE_REASONS = {"terminal", "durable-handoff"}
 TASK_MODEL_POLICY_PATH = (
     Path(__file__).resolve().parents[1] / "references/task-model-policy.md"
 )
@@ -50,6 +52,14 @@ def claim_root() -> Path:
 
 def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def check_id(value: str, field: str) -> str:
@@ -167,6 +177,10 @@ def claim_path(root_id: str) -> Path:
 
 def takeover_transaction_path(root_id: str) -> Path:
     return claim_root() / f"{check_id(root_id, 'root_id')}.takeover"
+
+
+def release_receipt_path(root: Path, root_id: str, claim_fingerprint: str) -> Path:
+    return root / "releases" / f"{check_id(root_id, 'root_id')}--{claim_fingerprint}.json"
 
 
 @contextlib.contextmanager
@@ -882,6 +896,143 @@ def write_takeover_transaction(path: Path, value: dict[str, Any]) -> None:
     write_json_atomic(path, value)
 
 
+def release_receipt_fingerprint(value: dict[str, Any]) -> str:
+    payload = {key: value[key] for key in value if key != "fingerprint"}
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def build_release_receipt(
+    claim: dict[str, Any], *, release_reason: str, evidence: str
+) -> dict[str, Any]:
+    ledger = Path(claim["ledger_ref"])
+    if ledger.is_symlink():
+        raise ClaimError("state-conflict", f"claim ledger is not a safe file: {ledger}", 4)
+    if ledger.is_file():
+        ledger_sha256: str | None = sha256_file(ledger)
+        ledger_size_bytes: int | None = ledger.stat().st_size
+    elif release_reason == "durable-handoff" and not ledger.exists():
+        ledger_sha256 = None
+        ledger_size_bytes = None
+    else:
+        raise ClaimError("state-conflict", f"claim ledger is not a safe file: {ledger}", 4)
+    value = {
+        "schema_version": RELEASE_RECEIPT_SCHEMA_VERSION,
+        "root_id": claim["root_id"],
+        "claim_fingerprint": claim["fingerprint"],
+        "ledger_ref": str(ledger),
+        "ledger_sha256": ledger_sha256,
+        "ledger_size_bytes": ledger_size_bytes,
+        "release_reason": release_reason,
+        "evidence_ref": evidence,
+        "released_at": timestamp(),
+    }
+    value["fingerprint"] = release_receipt_fingerprint(value)
+    return value
+
+
+def validate_release_receipt(value: Any, path: Path) -> dict[str, Any]:
+    required = {
+        "schema_version",
+        "root_id",
+        "claim_fingerprint",
+        "ledger_ref",
+        "ledger_sha256",
+        "ledger_size_bytes",
+        "release_reason",
+        "evidence_ref",
+        "released_at",
+        "fingerprint",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise ClaimError("state-conflict", f"release receipt schema mismatch: {path}", 4)
+    root_id = check_id(value["root_id"], "root_id")
+    claim_fingerprint = check_fingerprint(value["claim_fingerprint"])
+    if (
+        value["schema_version"] != RELEASE_RECEIPT_SCHEMA_VERSION
+        or path.name != f"{root_id}--{claim_fingerprint}.json"
+        or not isinstance(value["ledger_ref"], str)
+        or not Path(value["ledger_ref"]).is_absolute()
+        or value["release_reason"] not in RELEASE_REASONS
+        or not isinstance(value["evidence_ref"], str)
+        or not value["evidence_ref"].strip()
+        or not isinstance(value["released_at"], str)
+        or not valid_timestamp(value["released_at"])
+        or value["fingerprint"] != release_receipt_fingerprint(value)
+    ):
+        raise ClaimError("state-conflict", f"release receipt value mismatch: {path}", 4)
+    has_snapshot = (
+        isinstance(value["ledger_sha256"], str)
+        and bool(FINGERPRINT_RE.fullmatch(value["ledger_sha256"]))
+        and isinstance(value["ledger_size_bytes"], int)
+        and value["ledger_size_bytes"] >= 0
+    )
+    missing_snapshot = (
+        value["ledger_sha256"] is None and value["ledger_size_bytes"] is None
+    )
+    if not has_snapshot and not (
+        missing_snapshot and value["release_reason"] == "durable-handoff"
+    ):
+        raise ClaimError("state-conflict", f"release receipt ledger mismatch: {path}", 4)
+    return value
+
+
+def read_release_receipt(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    if path.is_symlink() or not path.is_file():
+        raise ClaimError("state-conflict", f"unsafe release receipt: {path}", 4)
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ClaimError("state-conflict", f"invalid release receipt: {path}", 4) from exc
+    return validate_release_receipt(value, path)
+
+
+def persist_release_receipt(root: Path, value: dict[str, Any]) -> Path:
+    receipt_root = root / "releases"
+    if receipt_root.exists() and (receipt_root.is_symlink() or not receipt_root.is_dir()):
+        raise ClaimError("state-conflict", f"unsafe release receipt root: {receipt_root}", 4)
+    if not receipt_root.exists():
+        receipt_root.mkdir()
+        sync_directory(root)
+    path = release_receipt_path(root, value["root_id"], value["claim_fingerprint"])
+    existing = read_release_receipt(path)
+    if existing is not None:
+        comparable = {
+            key: item for key, item in existing.items() if key not in {"released_at", "fingerprint"}
+        }
+        expected = {
+            key: item for key, item in value.items() if key not in {"released_at", "fingerprint"}
+        }
+        if comparable != expected:
+            raise ClaimError("state-conflict", f"release receipt conflicts: {path}", 4)
+        return path
+    write_json_atomic(path, value)
+    return path
+
+
+def cleanup_durable_handoff_receipts(root: Path, root_id: str) -> None:
+    receipt_root = root / "releases"
+    if not receipt_root.exists():
+        return
+    if receipt_root.is_symlink() or not receipt_root.is_dir():
+        raise ClaimError("state-conflict", f"unsafe release receipt root: {receipt_root}", 4)
+    for path in sorted(receipt_root.iterdir()):
+        receipt = read_release_receipt(path)
+        if (
+            receipt is not None
+            and receipt["root_id"] == root_id
+            and receipt["release_reason"] == "durable-handoff"
+        ):
+            unlink_durable(path)
+    try:
+        receipt_root.rmdir()
+        sync_directory(root)
+    except OSError:
+        pass
+
+
 def delete_replaced_claim(path: Path) -> None:
     unlink_durable(path)
 
@@ -1012,6 +1163,7 @@ def acquire(args: argparse.Namespace) -> dict[str, Any]:
         conflicts = overlapping(candidate, claims)
         if conflicts:
             raise ClaimError("state-conflict", "overlapping active-root claim", 4, {"root_ids": conflicts})
+        cleanup_durable_handoff_receipts(root, candidate["root_id"])
         write_claim(root / f"{candidate['root_id']}.json", candidate)
     return {"ok": True, "command": "claim.acquire", "state": "acquired", "claim": candidate}
 
@@ -1361,6 +1513,7 @@ def heartbeat(args: argparse.Namespace) -> dict[str, Any]:
 def release(args: argparse.Namespace) -> dict[str, Any]:
     root_id = check_id(args.root_id, "root_id")
     expected_fingerprint = check_fingerprint(args.expected_fingerprint)
+    release_reason = args.release_reason
     evidence = args.evidence.strip()
     if not evidence:
         raise ClaimError("invalid-input", "release evidence is required", 2)
@@ -1375,12 +1528,41 @@ def release(args: argparse.Namespace) -> dict[str, Any]:
                 4,
                 {"root_id": root_id, "fingerprint": legacy_claims[root_id]["fingerprint"]},
             )
-        if root_id not in claims or root is None:
+        if root is None:
             raise ClaimError("not-found", f"claim not found: {root_id}", 3)
-        if claims[root_id]["fingerprint"] != expected_fingerprint:
+        claim = claims.get(root_id)
+        receipt_path = release_receipt_path(root, root_id, expected_fingerprint)
+        if claim is None:
+            receipt = read_release_receipt(receipt_path)
+            if (
+                receipt is not None
+                and receipt["release_reason"] == release_reason
+                and receipt["evidence_ref"] == evidence
+            ):
+                return {
+                    "ok": True,
+                    "command": "claim.release",
+                    "state": "already-released",
+                    "root_id": root_id,
+                    "release_receipt_ref": str(receipt_path),
+                    "release_receipt": receipt,
+                }
+            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
+        if claim["fingerprint"] != expected_fingerprint:
             raise ClaimError("state-conflict", "claim ownership fingerprint mismatch", 4)
+        receipt = build_release_receipt(
+            claim, release_reason=release_reason, evidence=evidence
+        )
+        persist_release_receipt(root, receipt)
         unlink_durable(root / f"{root_id}.json")
-    return {"ok": True, "command": "claim.release", "state": "released", "root_id": root_id, "evidence": evidence}
+    return {
+        "ok": True,
+        "command": "claim.release",
+        "state": "released",
+        "root_id": root_id,
+        "release_receipt_ref": str(receipt_path),
+        "release_receipt": receipt,
+    }
 
 
 def retire_legacy(args: argparse.Namespace) -> dict[str, Any]:
@@ -1482,6 +1664,9 @@ def build_parser() -> argparse.ArgumentParser:
     release_parser = verbs.add_parser("release", help="Release one terminal or handed-off claim.")
     release_parser.add_argument("--root-id", required=True)
     release_parser.add_argument("--expected-fingerprint", required=True)
+    release_parser.add_argument(
+        "--release-reason", required=True, choices=sorted(RELEASE_REASONS)
+    )
     release_parser.add_argument("--evidence", required=True)
     retire_parser = verbs.add_parser(
         "retire-legacy", help="Retire one exact legacy claim after terminal or handoff proof."

@@ -42,7 +42,8 @@ the user once whether to create exactly one visible App task per executable
 Feature Spec and run the complete fixed implementation flow.
 
 The question must disclose the exact visible-task model, the bounded adaptive
-thinking policy and its default, and that the flow may inspect, edit, validate,
+thinking policy and its default, automatic deletion of valid archived ledgers
+older than 180 days after CLAIM, and that the flow may inspect, edit, validate,
 commit, push, publish or update pull requests, request and poll current-revision
 Codex review, fix findings, wait for CI, prepare tracker closeout, convert draft
 pull requests to ready-for-review, move completed local Markdown issue files to
@@ -87,6 +88,8 @@ change target-repository instructions.
   affected repository.
 - Keep at most three nonterminal Feature Spec tasks. Internal subagents remain
   inside their parent Spec slot and inherited scope.
+- Run cache maintenance synchronously in the root after CLAIM. Never allocate a
+  visible task, internal subagent, Goal, or worktree for it.
 - This skill never merges a pull request. A later merge request must start a
   separate GitHub workflow.
 
@@ -181,9 +184,12 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    before creating any other runtime artifact. Qualify repository-local source
    refs as `git:<git-common-dir>::ref:<source-ref>` and preserve globally durable
    URI-shaped ids. Never pass GitHub shorthand directly to the helper.
-4. **REGISTER** — create the ledger projection, snapshot authorization and
+4. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`, run the
+   read-only cache doctor, then apply the fixed 180-day archive TTL in the root.
+   Report warnings without blocking implementation; never delegate this step.
+5. **REGISTER** — create the ledger projection, snapshot authorization and
    source fingerprints, and create the portfolio Goal or exact fallback.
-5. **PR-PREFLIGHT** — require a GitHub target, authenticated access, branch
+6. **PR-PREFLIGHT** — require a GitHub target, authenticated access, branch
    publication, PR create/update capability, current-head review, and a
    discoverable CI path expected to produce at least one applicable result for
    every affected repository. Also require read access to PR lifecycle,
@@ -193,16 +199,16 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    implementation. Discover and fix the terminal PR base as that
    repository's default branch, and verify it again during current-head review.
    Abort as `pr-preflight-failed`; never downgrade.
-6. **DISPATCH** — load `references/worker.md`, choose the deterministic ready
+7. **DISPATCH** — load `references/worker.md`, choose the deterministic ready
    set, adopt and resume any exact task refs carried by takeover, otherwise
    create one managed visible task per selected Spec with its resolved task
    profile, and verify its Goal.
-7. **MONITOR** — read current task state, reconcile live evidence, and send only
+8. **MONITOR** — read current task state, reconcile live evidence, and send only
    precise corrections with the recorded task profile. Never take implementation
    or review back into the root.
-8. **GATE** — require the fixed pull-request, review, CI, integration, and
+9. **GATE** — require the fixed pull-request, review, CI, integration, and
    tracker-closeout gates.
-9. **RECONCILE** — refresh sources, claims, dependency merges, task state,
+10. **RECONCILE** — refresh sources, claims, dependency merges, task state,
    review waits, ledger evidence, and recovery state; dispatch the next ready
    wave or emit a concrete blocker or durable handoff.
 
@@ -319,6 +325,10 @@ surface, claim, source fingerprints, repositories, task/Goal evidence, managed
 checkouts, gates, and review waits before mutation. Incompatible pre-hard-cut
 ledgers are not migrated.
 
+Archived ledgers are cold evidence, never recovery input. Cache maintenance is
+root-owned and runs only after a successful claim; load
+`references/cache-lifecycle.md` for its archive, retention, and warning contract.
+
 ## Delivery And Final Report
 
 Load `references/gates.md` before accepting terminal merge-ready state and
@@ -354,14 +364,18 @@ source fingerprints, task/Goal and checkout evidence, changes, validation,
 commits, PR URLs, exact reviewed revisions, CI state, captured domain-closeout
 evidence when present, prepared tracker closeout, current-head mergeability and
 repository-rule evidence, blockers, recovery
-freshness, and the next external action. Release the claim
-after terminal proof or the recorded durable handoff.
+freshness, and the next external action. Release the claim after terminal proof
+or the recorded durable handoff, using `--release-reason terminal` or
+`--release-reason durable-handoff` respectively. After a terminal release only,
+archive the active ledger through `scripts/orchestrator-cache` with the exact
+release evidence; resumable handoffs retain it.
 
 ## References
 
 - `references/options.md`: the two run-scoped authorization fields.
 - `references/task-model-policy.md`: fixed visible-task model and bounded
   per-Spec thinking selection.
+- `references/cache-lifecycle.md`: root-owned archival and automatic retention.
 - `references/spec-backed-delivery.md`: accepted bundle and Execution Contract.
 - `references/ledger.md`: compact claim, task, gate, and recovery persistence.
 - `references/worker.md`: fixed visible-task assignment and actions.
@@ -371,9 +385,13 @@ after terminal proof or the recorded durable handoff.
 - `references/recovery-validation.md`: resume-time hard-cut validation.
 - `references/runtime-efficiency.md`: delta evidence for later waves.
 
-## Claim Helper Maintenance
+## Runtime Helper Maintenance
 
 `scripts/orchestrator-claim` is the only supported atomic-claim artifact. Its
 `__version__` is the command-contract version. After changes, run `--help`,
 `--version`, `--json doctor`, the competing-root tests, and the focused App
 contract suite. Use major versions for breaking command or JSON contracts.
+
+`scripts/orchestrator-cache` is the only supported ledger archive and retention
+artifact. Its `__version__` is independent from the claim schema. Follow
+`references/cache-lifecycle.md` for its safe boundaries and validation lane.

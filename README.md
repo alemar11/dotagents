@@ -80,7 +80,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` when applying GitHub tracker mutations.
-- `implement-feature` requires local `python3` and `git` for its shipped atomic active-root claim helper, `$autoreview`, and the relevant GitStack bundled skills for GitHub-backed issue lifecycle, CI, review, commit, and pull-request work. It accepts only execution-ready Feature Spec bundles and never performs planning or repairs incomplete planning artifacts.
+- `implement-feature` requires local `python3` and `git` for its shipped atomic active-root claim and ledger-cache helpers, `$autoreview`, and the relevant GitStack bundled skills for GitHub-backed issue lifecycle, CI, review, commit, and pull-request work. Its root-owned cache maintenance archives terminal ledgers and automatically expires valid archives older than 180 days. It accepts only execution-ready Feature Spec bundles and never performs planning or repairs incomplete planning artifacts.
 
 ## Project-Local Skills
 

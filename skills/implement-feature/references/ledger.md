@@ -7,6 +7,10 @@ Use one ledger per overlapping repository/source portfolio under
 atomic claim acquisition. A missing ledger loads `ledger-template.md`; an
 incompatible current ledger blocks rather than being migrated.
 
+Archived ledgers live below `ledgers/archive/` as cold evidence and never
+participate in active resolution or recovery. Load `cache-lifecycle.md` after
+CLAIM for automatic retention and before terminal archival.
+
 The ledger is evidence, not a second option registry or concurrency primitive.
 Record only:
 
@@ -142,7 +146,9 @@ settings or resumes the task as current.
 The helper reports schema-3 and schema-4 claims as legacy and permits only exact-owner
 `retire-legacy` with the stored fingerprint plus terminal or durable-handoff
 evidence; it never migrates them. Release after terminal proof or an explicit
-durable handoff.
+durable handoff. For current claims, pass `--release-reason terminal` only after
+terminal proof and `--release-reason durable-handoff` for resumable handoffs;
+the helper persists the exact release receipt before deleting claim ownership.
 
 After takeover, create or verify the new registry from the candidate claim's
 embedded adoption mappings, even when recovery begins before the new ledger was
@@ -217,6 +223,10 @@ handoffs after PR-ready proof. Include exact PR tuples, checks, tracker closeout
 vehicle, due or next action, and evidence. Before final status require no active
 task, due in-run check, newly ready Spec, or unresolved authorized work. Release
 the claim only after terminal evidence or the durable handoff is persisted.
+
+After terminal release only, archive the active ledger with
+`scripts/orchestrator-cache` using the receipt's exact evidence ref; keep
+resumable-handoff ledgers active.
 
 ## Hard Cut
 
