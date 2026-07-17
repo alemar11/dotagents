@@ -113,13 +113,17 @@ time, and heartbeat.
 
 An overlapping claim blocks as `needs-owner`. Before takeover, read the exact
 stale snapshots, complete root scopes, ledgers, recorded task refs, and current
-App state without mutation. Resolve
+App state without mutation. Before asking or stopping tasks, require helper
+status evidence that every conflicting heartbeat is at least the fixed
+five-minute stale threshold. Resolve
 `stale_claim_takeover_permission=granted-by-authorized-user` before interrupting
 or terminating a task. After the grant, require verified non-mutating and
 resumable state or proven task absence, one task-stop evidence ref per root, and
 full candidate coverage of every replaced repository and source. Pass
-`--takeover-permission granted-by-authorized-user`; a stale heartbeat alone is
-insufficient. Every heartbeat and release uses the acquire-time fingerprint.
+`--takeover-permission granted-by-authorized-user` plus one
+`--expected-task-termination <root-id>=<evidence-ref>` per replaced root; a stale
+heartbeat alone is insufficient. Every heartbeat and release uses the
+acquire-time fingerprint.
 
 For each replaced root, pass one absolute JSON file through
 `--expected-task-adoption <root-id>=<path>`. The helper validates and embeds the

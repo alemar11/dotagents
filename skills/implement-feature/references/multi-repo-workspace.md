@@ -1,6 +1,8 @@
 # Managed Multi-Repository App Workspace
 
-Load this reference when one Feature Spec affects more than one Git repository.
+Load this reference when one Feature Spec affects more than one Git repository
+or the bundle contains partial and integration Feature Specs, even when each
+individual Spec is single-repository.
 
 ## Ownership
 

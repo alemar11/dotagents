@@ -136,7 +136,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         authorization = " ".join(
             skill.split("## Mandatory Run Authorization", 1)[1]
-            .split("## Fixed Implementation Contract", 1)[0]
+            .split("## Fixed Contract", 1)[0]
             .split()
         )
         self.assertIn("references/task-model-policy.md", authorization)
@@ -258,7 +258,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         authorization = " ".join(
             skill.split("## Mandatory Run Authorization", 1)[1]
-            .split("## Fixed Implementation Contract", 1)[0]
+            .split("## Fixed Contract", 1)[0]
             .split()
         )
         self.assertIn(
@@ -628,7 +628,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("--expected-task-adoption", runtime)
         self.assertIn("claim recover-takeover", runtime)
         self.assertIn("stale heartbeat alone", runtime.lower())
-        self.assertIn("accepts only current schema-5 claims", runtime)
+        self.assertIn("fixed five-minute stale threshold", compact_runtime)
+        self.assertIn("accepts only current schema-5 claims", compact_runtime)
         self.assertIn("without migration, retirement, or deletion", compact_runtime)
         self.assertNotIn("claim retire-legacy", runtime)
         self.assertNotIn("schema-3 and schema-4", runtime)
@@ -698,6 +699,21 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("candidate claim's validated embedded adoption mapping", worker)
         self.assertIn("prepared-takeover transaction ids", options)
         self.assertNotIn("expected_task_adoption", options)
+
+    def test_reference_load_predicates_cover_takeover_and_partial_bundles(self) -> None:
+        skill = " ".join(self.read("SKILL.md").split())
+        recovery = " ".join(
+            self.read("references/recovery-validation.md").split()
+        )
+        workspace = " ".join(
+            self.read("references/multi-repo-workspace.md").split()
+        )
+
+        self.assertIn("prepared takeover", recovery)
+        self.assertIn("before a new ledger or packet exists", recovery)
+        for text in (skill, workspace):
+            self.assertIn("partial and integration", text)
+            self.assertIn("single-repository", text)
 
     def test_preclaim_fixture_has_zero_mutations_on_early_abort(self) -> None:
         cases = (
@@ -787,7 +803,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("knowledge_delta:", issue_template)
         self.assertIn("A Feature Spec containing", delivery)
         self.assertIn("is incompatible", delivery)
-        self.assertIn("only in the final issue's `## Domain Knowledge Closeout`", skill)
+        self.assertIn("domain-knowledge closeout", skill)
+        self.assertIn("references/spec-backed-delivery.md", skill)
 
     def test_knowledge_targets_must_fit_final_issue_execution_scope(self) -> None:
         delivery = " ".join(
@@ -795,7 +812,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         skill = " ".join(self.read("SKILL.md").split())
 
-        for contents in (delivery, skill):
+        for contents in (delivery,):
             self.assertIn("repository", contents)
             self.assertIn("repo-relative path", contents)
             self.assertIn("`affected_repositories`", contents)
@@ -803,7 +820,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn("`planning-required`", contents)
         self.assertIn("every `target_surfaces` entry", delivery)
         self.assertIn("intake must not widen the Execution Contract", delivery)
-        self.assertIn("intake never widens execution scope", skill)
+        self.assertIn("references/spec-backed-delivery.md", skill)
 
     def test_knowledge_closeout_owner_is_graph_final_and_self_contained(self) -> None:
         delivery = " ".join(
@@ -811,15 +828,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         skill = " ".join(self.read("SKILL.md").split())
 
-        for contents in (delivery, skill):
+        for contents in (delivery,):
             self.assertIn("remaining", contents)
             self.assertIn("dedicated integration partial", contents)
             self.assertIn("memory_slice=domain-memory", contents)
             self.assertIn("domain_operation=implementation-closeout", contents)
             self.assertIn("after integrated behavior", contents)
             self.assertIn("planning-required", contents)
-        self.assertIn("exclude it and its own `dependency_ids`", skill)
-        self.assertIn("no-dependent", skill)
+        self.assertIn("domain-knowledge closeout", skill)
         self.assertIn("nodes with no dependents", delivery)
         self.assertIn("Require exactly one `## Domain Knowledge Closeout` owner", delivery)
         self.assertIn("temporarily remove the owner and its outgoing `dependency_ids`", delivery)
@@ -834,7 +850,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         gates = " ".join(self.read("references/gates.md").split())
         worker = " ".join(self.read("references/worker.md").split())
 
-        for contents in (delivery, skill, gates, worker):
+        for contents in (delivery, gates, worker):
             self.assertIn("capture_outcome=captured", contents)
             self.assertIn("every", contents)
             self.assertIn("named target", contents)
@@ -873,7 +889,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         skill = " ".join(self.read("SKILL.md").split())
 
-        self.assertIn("strictly-earlier intra-Spec dependency IDs", skill)
+        self.assertIn("earlier-only dependencies", skill)
         self.assertIn("strictly earlier generated issue", delivery)
         self.assertIn("reject self, same-ID, and later-ID dependencies", delivery)
 
@@ -1039,7 +1055,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.read("references/multi-repo-workspace.md").split()
         )
 
-        for contents in (skill, delivery, workspace):
+        for contents in (delivery, workspace):
             self.assertIn("(repository, target_branch_name)", contents)
             self.assertIn("implementation-eligible", contents)
             self.assertIn("coordination-only parent/global", contents)
@@ -1049,7 +1065,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn("different repositories", contents)
             self.assertIn("paths are disjoint", contents)
             self.assertIn("`planning-required` before CLAIM", contents)
-        self.assertIn("Never serialize around it", skill)
+        self.assertIn("never serialize around the collision", skill)
         self.assertIn("force-bind", skill)
         self.assertIn("schedule around the collision", workspace)
 
@@ -1085,6 +1101,35 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("merge-ready-but-unmerged pull requests", skill)
         self.assertIn('display_name: "Implement Feature"', metadata)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        skill_bytes = len(skill.encode("utf-8"))
+        self.assertLessEqual(skill_bytes, 16_000)
+        self.assertLessEqual((skill_bytes + 3) // 4, 4_000)
+        successful_path = (
+            "SKILL.md",
+            "references/options.md",
+            "references/task-model-policy.md",
+            "references/spec-backed-delivery.md",
+            "references/ledger.md",
+            "references/ledger-template.md",
+            "references/cache-lifecycle.md",
+            "references/worker.md",
+            "references/gates.md",
+            "references/codex-review-closeout.md",
+        )
+        self.assertLessEqual(
+            sum(len(self.read(path).encode("utf-8")) for path in successful_path),
+            79_436,
+        )
+        multi_repository_path = successful_path + (
+            "references/multi-repo-workspace.md",
+        )
+        self.assertLessEqual(
+            sum(
+                len(self.read(path).encode("utf-8"))
+                for path in multi_repository_path
+            ),
+            84_000,
+        )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE
         )

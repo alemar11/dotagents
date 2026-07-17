@@ -1,6 +1,8 @@
 # Recovery Validation
 
-Load this reference only when resuming from a Recovery Packet.
+Load this reference on every runtime resume, including a Recovery Packet,
+prepared takeover, or embedded task-adoption recovery before a new ledger or
+packet exists.
 
 ## Runtime Surface Revalidation
 
