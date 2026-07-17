@@ -38,6 +38,14 @@ phase and pass `mutation_mode=apply` only for an authorized mutation. These are
 internal call arguments, not Feature Spec fields, worker action lists, or user
 options.
 
+For local commit actions, use `$gitstack:git-commit` and keep
+`commit_kind=regular` unless target-repository instructions require a targeted
+fixup. Review or `$autoreview` feedback alone never selects a fixup. A required
+`commit_kind=fixup|amend-fixup` must name one exact `target_commit`; ambiguous or
+cross-commit corrections stop for owner direction. Never autosquash or rewrite
+the published branch. Any resulting head change invalidates current-revision
+review and CI evidence and repeats the fixed final gates.
+
 ## Managed Checkout
 
 Create the task through the App-managed worktree target before implementation.

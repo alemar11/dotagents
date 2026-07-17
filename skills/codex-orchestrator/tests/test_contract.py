@@ -150,6 +150,17 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertNotIn("worker_allowed_actions", worker)
         self.assertNotIn("worker_allowed_actions", options)
 
+    def test_review_fixes_use_target_repo_fixup_policy_without_autosquash(self) -> None:
+        worker = " ".join(self.read("references/worker.md").split())
+
+        self.assertIn("use `$gitstack:git-commit`", worker)
+        self.assertIn("keep `commit_kind=regular`", worker)
+        self.assertIn("target-repository instructions require a targeted fixup", worker)
+        self.assertIn("feedback alone never selects a fixup", worker)
+        self.assertIn("one exact `target_commit`", worker)
+        self.assertIn("Never autosquash or rewrite the published branch", worker)
+        self.assertIn("invalidates current-revision review and CI evidence", worker)
+
     def test_app_has_one_fixed_successful_conclusion_and_never_merges(self) -> None:
         runtime = self.runtime_text()
         skill = " ".join(self.read("SKILL.md").split())
