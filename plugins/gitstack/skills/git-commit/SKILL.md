@@ -1,13 +1,15 @@
 ---
 name: git-commit
-description: Commit or commit-and-push local changes with explicit staging and direct git; route PR publishing to $gitstack:yeet.
+description: Create regular, targeted fixup, or amend-fixup commits and optionally push them with explicit staging and direct git; route PR publishing to $gitstack:yeet.
 ---
 
 # Git Commit
 
 ## Core Rule
 
-Use direct `git` commands. This skill is scriptless by design.
+Use direct `git` commands. The only bundled helper is the target-aware editor
+adapter for noninteractive amend-fixup messages; it never stages, commits,
+rebases, or pushes.
 
 For the common case of a small cohesive change and a user ask like `commit`,
 `commit this`, or `commit and push`, normalize the phrase once to
@@ -20,18 +22,30 @@ shortest safe path:
 3. `git diff -- <path>` for the intended files
 4. `git add -- <explicit-paths>`
 5. `git diff --staged`
-6. `git commit -F <message-file>`
+6. Run the selected regular or targeted commit command.
 7. `git push` only for `commit_operation=commit-and-push`
 
 Escalate to broader diff review or split commits only when the worktree is
 mixed, generated files are involved, or the staged scope is still unclear.
+
+For a commit-producing operation, resolve
+`commit_kind=regular|fixup|amend-fixup`. Default to `regular`. Select a fixup
+kind only when the user explicitly requests it or target-repository
+instructions require it; review feedback by itself never selects a fixup.
+Require an exact `target_commit`, resolve it to one ancestor commit, and verify
+that the staged refinement maps cleanly to that target. Because Git's generated
+fixup matcher uses the target subject, require that subject to be unique in all
+history reachable from `HEAD`. Stop when the target is missing, ambiguous,
+outside the current history, subject-ambiguous, or does not own the change.
+Never amend the target in place and never autosquash fixup commits.
 
 If the user asks for a PR, draft PR, branch publication, or "publish", use
 `$gitstack:yeet` instead. `commit_operation=push-only` never creates a commit;
 `commit_operation=commit-and-push` does both operations. When the user
 explicitly authorizes direct-to-main issue closure, use issue-closing commit
 trailers such as `Closes #123` only after staging the intended paths and
-verifying the diff. Route GitHub issue comments, labels, type changes,
+verifying the diff and only with `commit_kind=regular`; never add trailers to
+Git-generated fixup messages. Route GitHub issue comments, labels, type changes,
 follow-up issue creation, or manual closure to `$gitstack:github-issues`.
 
 ## Trigger Cues
@@ -44,6 +58,9 @@ Use this skill for short or implicit commit-authoring asks such as:
 - `commit and push`
 - `push-only`
 - `stage only <paths> and commit`
+- `fixup <commit>`
+- `fixup and push <commit>`
+- `amend fixup <commit>`
 
 If the request expands into branch publication or PR creation, route to `$gitstack:yeet`
 instead of stretching this skill.
@@ -59,9 +76,15 @@ git diff --staged --name-status
 git diff -- <path>
 git add -- <explicit-paths>
 git diff --staged
-git commit -F <message-file>
+git commit -F <message-file>                  # regular
+git commit --fixup=<target-sha>               # fixup
+git commit --fixup=amend:<target-sha>         # amend-fixup; edit replacement message
 git log -1 --pretty=fuller
 ```
+
+Run exactly one of the three commit commands. For a targeted kind, first resolve
+and inspect the target as described in `references/workflows.md`. Do not pass
+`commit_kind` or `target_commit` to `commit_operation=push-only`.
 
 For `commit_operation=commit-and-push`, append:
 
@@ -97,16 +120,22 @@ than guessing the base, remote, or target branch.
    is explicit. Do not use path-limited commit isolation for partial-hunk work.
 3. For small cohesive work, inspect only the intended files first. Expand to
    `git diff --stat` or broader review only when the scope is mixed or unclear.
-4. Stage only intended paths with explicit pathspecs such as
+4. For `commit_kind=fixup|amend-fixup`, resolve `target_commit` to a full SHA,
+   prove it is an ancestor of `HEAD`, inspect its subject and diff, and confirm
+   that the intended changes belong to that one logical commit.
+5. Stage only intended paths with explicit pathspecs such as
    `git add -- <path>`.
-5. Re-check `git diff --staged` before committing, and compare its path set with
+6. Re-check `git diff --staged` before committing, and compare its path set with
    the recorded pre-existing staged set and the intended commit scope.
-6. Write a concise imperative subject and a body with summary, rationale, and
-   validation.
-7. Commit with `git commit -F <message-file>`.
-8. Verify with `git status --short --branch` and
+7. For `commit_kind=regular`, write a concise imperative subject and a body with
+   summary, rationale, and validation. For `fixup`, let Git generate the
+   `fixup!` message. For `amend-fixup`, provide the complete replacement subject
+   and body while preserving Git's target-derived `amend!` matcher; use the
+   bundled editor adapter when execution is noninteractive.
+8. Run the command for the selected kind from `references/workflows.md`.
+9. Verify with `git status --short --branch` and
    `git log -1 --pretty=fuller`.
-9. For `commit_operation=commit-and-push`, use `git push` or
+10. For `commit_operation=commit-and-push`, use `git push` or
    `git push -u origin HEAD`; for `push-only`, verify the existing commit range
    and push without staging or committing.
 
@@ -114,3 +143,7 @@ than guessing the base, remote, or target branch.
 
 - `references/workflows.md`: commit, split-commit, and push-only workflows.
 - `../../references/options.md`: shared canonical GitStack options.
+- `scripts/replace-amend-fixup-message`: noninteractive editor adapter that
+  preserves Git's target-derived amend-fixup matcher.
+- `scripts/validate-fixup-target`: resolve one ancestor target and reject a
+  subject that could make a later autosquash ambiguous.

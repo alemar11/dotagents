@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -80,6 +83,127 @@ class GitStackSkillContractTests(unittest.TestCase):
             "`refactor_disposition` is a judgment returned by",
             read("skills/github-deep-review/SKILL.md"),
         )
+
+    def test_git_commit_fixups_are_explicit_targeted_and_never_autosquashed(self) -> None:
+        options = read("references/options.md")
+        skill = read("skills/git-commit/SKILL.md")
+        workflows = read("skills/git-commit/references/workflows.md")
+        metadata = read("skills/git-commit/agents/openai.yaml")
+
+        self.assertRegex(
+            options,
+            r"\| `commit_kind` \| `regular`, `fixup`, `amend-fixup` \| `regular` \|",
+        )
+        self.assertIn("`target_commit` is exact factual input", options)
+        self.assertIn("review feedback by itself never selects a fixup", skill)
+        self.assertIn("require that subject to be unique", skill)
+        self.assertIn("scripts/validate-fixup-target", workflows)
+        self.assertIn("subject shared by another commit reachable from", workflows)
+        self.assertIn("git commit --fixup=\"$target_sha\"", workflows)
+        self.assertIn("git commit --fixup=\"amend:$target_sha\"", workflows)
+        self.assertIn("git commit --only --fixup=\"$target_sha\"", workflows)
+        self.assertIn("git diff --quiet -- <explicit-paths>", workflows)
+        self.assertIn(
+            "Partial staging within an intended file is unsupported",
+            " ".join(workflows.split()),
+        )
+        self.assertIn("GIT_EDITOR=\"$helper\"", workflows)
+        self.assertIn("git commit --fixup=\"amend:$target_sha\"", workflows)
+        self.assertIn("Never replace this command with a plain `git commit -F`", workflows)
+        self.assertIn("Never use `git commit --amend`", workflows)
+        self.assertIn("`git rebase --autosquash`", workflows)
+        self.assertIn("force push", workflows)
+        self.assertIn("never add trailers", skill)
+        self.assertIn("never infer fixup from feedback alone", metadata)
+        self.assertIn("never autosquash", metadata)
+
+        yeet = " ".join(read("skills/yeet/SKILL.md").split())
+        self.assertIn("Do not override Git Commit's `commit_kind` selection", yeet)
+        self.assertIn("target-repository instructions with an exact target", yeet)
+
+    def test_amend_fixup_editor_preserves_git_generated_target_matcher(self) -> None:
+        helper = PLUGIN_ROOT / "skills/git-commit/scripts/replace-amend-fixup-message"
+        self.assertTrue(os.access(helper, os.X_OK))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            edit_path = root / "COMMIT_EDITMSG"
+            replacement_path = root / "replacement.txt"
+            edit_path.write_text(
+                "amend! Original subject\n\nOriginal subject\n\nOriginal body\n",
+                encoding="utf-8",
+            )
+            replacement_path.write_text(
+                "Replacement subject\n\nReplacement body\n",
+                encoding="utf-8",
+            )
+            environment = os.environ.copy()
+            environment["GITSTACK_AMEND_MESSAGE_FILE"] = str(replacement_path)
+
+            subprocess.run(
+                [str(helper), str(edit_path)],
+                check=True,
+                env=environment,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(
+                edit_path.read_text(encoding="utf-8"),
+                "amend! Original subject\n\nReplacement subject\n\nReplacement body\n",
+            )
+
+    def test_fixup_target_validator_rejects_duplicate_reachable_subjects(self) -> None:
+        validator = PLUGIN_ROOT / "skills/git-commit/scripts/validate-fixup-target"
+        self.assertTrue(os.access(validator, os.X_OK))
+
+        with tempfile.TemporaryDirectory() as directory:
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "GIT_AUTHOR_NAME": "Test",
+                    "GIT_AUTHOR_EMAIL": "test@example.com",
+                    "GIT_COMMITTER_NAME": "Test",
+                    "GIT_COMMITTER_EMAIL": "test@example.com",
+                }
+            )
+            subprocess.run(["git", "init", "-q", directory], check=True)
+
+            def commit(subject: str) -> str:
+                subprocess.run(
+                    ["git", "-C", directory, "commit", "--allow-empty", "-m", subject],
+                    check=True,
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                )
+                return subprocess.check_output(
+                    ["git", "-C", directory, "rev-parse", "HEAD"],
+                    text=True,
+                ).strip()
+
+            commit("Base")
+            target_sha = commit("Target subject")
+            unique = subprocess.run(
+                [str(validator), target_sha],
+                cwd=directory,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(unique.returncode, 0, unique.stderr)
+            self.assertEqual(unique.stdout.strip(), target_sha)
+
+            commit("Target subject")
+            duplicate = subprocess.run(
+                [str(validator), target_sha],
+                cwd=directory,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(duplicate.returncode, 0)
+            self.assertIn("subject is not unique", duplicate.stderr)
 
     def test_pure_reads_omit_mutation_mode(self) -> None:
         options = read("references/options.md")

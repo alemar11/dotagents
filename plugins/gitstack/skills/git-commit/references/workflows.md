@@ -9,11 +9,19 @@ Treat these user phrasings as direct entry points into this workflow:
 - `commit and push`
 - `push-only`
 - `stage only these files and commit`
+- `fixup <commit>`
+- `fixup and push <commit>`
+- `amend fixup <commit>`
 
 Normalize them once using the shared registry: commit phrases select
 `commit_operation=commit-only`, `commit and push` selects
 `commit_operation=commit-and-push`, and `push-only` selects
 `commit_operation=push-only`.
+
+For a commit-producing operation, default to `commit_kind=regular`. Select
+`commit_kind=fixup|amend-fixup` only from an explicit user request or a
+target-repository instruction. A review finding alone is not a selection
+signal. Both targeted kinds require exact `target_commit` data.
 
 ## Fast Path
 
@@ -89,11 +97,101 @@ push only for `commit_operation=commit-and-push`.
 Default to splitting when changes touch unrelated top-level roots or mix
 independent concerns. Stage and verify one commit at a time.
 
+## Targeted Fixup And Amend-Fixup
+
+Use this path only after the normal index and diff guards. Resolve
+`<git-commit-skill-root>` from this skill's `SKILL.md`, then validate the target
+before staging:
+
+```bash
+validator=<git-commit-skill-root>/scripts/validate-fixup-target
+target_sha=$("$validator" "$target_commit")
+git show --stat --oneline --decorate --no-renames "$target_sha"
+```
+
+Stop if the reference does not resolve to exactly one commit, is not an
+ancestor of `HEAD`, has a subject shared by another commit reachable from
+`HEAD`, or the refinement does not map cleanly to that commit. The complete
+reachable-history check is intentionally conservative because this workflow
+does not own or know the base of a future autosquash. If independent changes
+belong to different targets, split them by target. If the mapping remains
+ambiguous, ask the user instead of guessing.
+
+For `commit_kind=fixup`, stage and review the intended paths, then run:
+
+```bash
+git commit --fixup="$target_sha"
+```
+
+When the explicitly authorized path-limited workflow must preserve unrelated
+staged entries, require the complete intended files to be staged with no
+remaining unstaged hunks. Immediately before committing, run:
+
+```bash
+git diff --quiet -- <explicit-paths>
+git diff --staged -- <explicit-paths>
+git commit --only --fixup="$target_sha" -- <explicit-paths>
+```
+
+`git diff --quiet` must exit zero. Otherwise stop: `git commit --only` reads the
+named paths from the working tree and would include unstaged changes. Partial
+staging within an intended file is unsupported on this isolation path.
+
+For `commit_kind=amend-fixup`, first re-read the target's complete message. Use
+it only when the refinement makes that message inaccurate. Run:
+
+```bash
+git commit --fixup="amend:$target_sha"
+```
+
+The same path-limited isolation requires the identical quiet and staged-diff
+guards immediately before
+`git commit --only --fixup="amend:$target_sha" -- <explicit-paths>`.
+
+In the editor, keep the generated `amend! <original subject>` matcher as the
+first line and replace the following subject and body with the complete message
+the target should have after a future autosquash.
+
+For noninteractive execution, write a UTF-8 replacement-message file outside
+the repository containing only the complete replacement subject and body:
+
+```text
+<replacement subject>
+
+<replacement body>
+```
+
+Resolve `<git-commit-skill-root>` from this skill's `SKILL.md`, then use the
+bundled target-aware editor adapter while retaining Git's exact-target command:
+
+```bash
+helper=<git-commit-skill-root>/scripts/replace-amend-fixup-message
+GITSTACK_AMEND_MESSAGE_FILE="$replacement_message_file" \
+  GIT_EDITOR="$helper" \
+  git commit --fixup="amend:$target_sha"
+```
+
+The adapter preserves the `amend!` matcher generated from `target_sha` and
+replaces only the following subject and body. It rejects a missing matcher, an
+empty replacement subject, or a replacement file that supplies its own
+`amend!` line. Never replace this command with a plain `git commit -F`.
+
+Verify the new commit message and target relationship with
+`git log -1 --pretty=fuller`. The target commit remains unchanged and the new
+fixup becomes `HEAD`. Push only for `commit_operation=commit-and-push`.
+
+Never use `git commit --amend`, `git rebase --autosquash`, an interactive
+rebase, or a force push as part of this workflow. The user or a separately
+authorized repository workflow owns any later history rewrite. Because a
+fixup creates a new head SHA, callers that require current-head CI or review
+must rerun those gates after pushing it.
+
 ## Issue-Closing Commit And Push
 
 Use for `commit_operation=commit-and-push` when the owner explicitly authorizes
 committing directly to the current branch, pushing, and closing GitHub issues
-through commit trailers instead of a PR. This is never a `push-only` path.
+through commit trailers instead of a PR. This is a
+`commit_kind=regular` workflow, never a fixup or `push-only` path.
 
 ```bash
 git status --short --branch

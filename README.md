@@ -26,7 +26,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | Skill | Purpose |
 | --- | --- |
 | `gitstack:github` | Route mixed GitHub requests to the smallest focused GitStack workflow. |
-| `gitstack:git-commit` | Create intentional local commits and optionally push without publishing a PR. |
+| `gitstack:git-commit` | Create intentional regular or targeted fixup commits and optionally push without publishing a PR. |
 | `gitstack:github-triage` | Inspect current-repository issue and PR queues read-only. |
 | `gitstack:github-issues` | Manage GitHub issue lifecycle, metadata, relationships, and dry-runs. |
 | `gitstack:github-deep-review` | Trace root cause, provenance, proof, and fix quality for issues and PRs. |

@@ -43,7 +43,9 @@ overall user request includes publishing. Do not stage or commit directly in
 Yeet: `$gitstack:git-commit` owns the pre-existing-index guard, explicit staging,
 staged-diff verification, and commit authoring. Do not let the
 delegated `$gitstack:git-commit` call push; Yeet retains sole ownership of push after its
-second publish preflight.
+second publish preflight. Do not force `commit_kind=regular`: let Git Commit
+apply its canonical default and honor an explicit or target-repository fixup
+requirement only with an exact target.
 
 After commit creation, rerun the complete publish preflight above immediately
 before any push. Branch, remote, upstream, authentication, and PR state may

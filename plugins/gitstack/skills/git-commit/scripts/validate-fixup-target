@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Resolve a safe fixup target with an unambiguous autosquash subject."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+
+
+def fail(message: str) -> None:
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def run_git(*arguments: str, check: bool = True) -> subprocess.CompletedProcess[bytes]:
+    result = subprocess.run(
+        ["git", *arguments],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if check and result.returncode != 0:
+        message = result.stderr.decode("utf-8", errors="replace").strip()
+        fail(message or f"git {' '.join(arguments)} failed")
+    return result
+
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        fail("usage: validate-fixup-target <target-commit>")
+
+    target = sys.argv[1]
+    resolved = run_git(
+        "rev-parse",
+        "--verify",
+        "--end-of-options",
+        f"{target}^{{commit}}",
+    ).stdout.strip()
+    target_sha = resolved.decode("ascii")
+
+    ancestry = run_git("merge-base", "--is-ancestor", target_sha, "HEAD", check=False)
+    if ancestry.returncode != 0:
+        fail(f"fixup target is not an ancestor of HEAD: {target_sha}")
+
+    target_subject = run_git("show", "-s", "--format=%s", target_sha).stdout.rstrip(
+        b"\n"
+    )
+    if not target_subject:
+        fail("fixup target must have a non-empty subject")
+
+    fields = run_git("log", "-z", "--format=%H%x00%s", "HEAD").stdout.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    if len(fields) % 2 != 0:
+        fail("could not parse reachable commit subjects")
+
+    matching_hashes = [
+        fields[index].decode("ascii")
+        for index in range(0, len(fields), 2)
+        if fields[index + 1] == target_subject
+    ]
+    if matching_hashes != [target_sha]:
+        matches = ", ".join(matching_hashes) or "none"
+        fail(
+            "fixup target subject is not unique in history reachable from HEAD; "
+            f"matching commits: {matches}"
+        )
+
+    print(target_sha)
+
+
+if __name__ == "__main__":
+    main()

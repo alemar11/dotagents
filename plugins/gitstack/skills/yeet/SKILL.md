@@ -46,8 +46,10 @@ Prefer the shortest publish path that matches the state in front of you:
 2. Inspect worktree state and confirm the intended scope when it is mixed.
 3. Reuse the current commit when it already represents the intended scope.
    Otherwise create one through `$gitstack:git-commit` with
-   `commit_operation=commit-only`; Yeet retains
-   ownership of push.
+   `commit_operation=commit-only`; Yeet retains ownership of push. Do not
+   override Git Commit's `commit_kind` selection: it defaults to `regular` and
+   may select a targeted fixup only from the explicit request or
+   target-repository instructions with an exact target.
 4. Rerun the complete publish preflight immediately before pushing. Use a
    normal push to the verified upstream, or `git push -u origin HEAD` only when
    no upstream exists. Never infer permission to force-push.
