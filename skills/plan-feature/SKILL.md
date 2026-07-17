@@ -135,11 +135,18 @@ Resolve `write_mode` once:
   appending `-integration` to the resolved ordinary partial branch; never reuse
   the ordinary partial's branch in the same repository. With the default
   ordinary branch this yields `feature/<feature_slug>-integration`.
-- Run `$plan-harder` one or more times per generated issue with
+- Before freezing generated IDs or invoking `$plan-harder`, run the structural
+  graph-compression gate from `references/vertical-slices.md` on every
+  implementation-eligible Feature Spec. Compare the complete candidate graph,
+  combine weak or coordination-heavy slices, remove artificial dependencies,
+  and preserve required integration and domain-closeout ownership. Issue count
+  is report data only and never determines whether the graph passes.
+- Run `$plan-harder` one or more times per final retained issue with
   `planning_mode=issue-hardening` and `output_surface=caller`, beginning only
-  after vertical boundaries, scope, and graph have stabilized. Re-harden an
-  issue after any material repair and persist only the final stable result and
-  one provenance line.
+  after vertical boundaries, scope, compression, and graph ownership have
+  stabilized. If hardening exposes a graph-level defect, discard affected
+  hardening results, return to compression, and re-harden every materially
+  changed issue. Persist only the final stable result and one provenance line.
 - Keep worker surfaces, task counts, App permissions, checkout paths, and
   runtime scheduling out of Feature Specs and generated issues.
 - Publish only portable evidence: repo-relative paths, repo-qualified sibling
@@ -152,7 +159,7 @@ Resolve `write_mode` once:
 | --- | --- | --- |
 | `$project-memory` | Tracker routing or repository topology is missing, stale, or contradictory. | Use only `tracker-routing` or `project-layout`; Plan Feature never performs domain closeout. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
-| `$plan-harder` | For every generated implementation issue after its graph and scope stabilize. | At least one issue-hardening call per issue, with only the final stable result persisted; Plan Feature owns artifact writes. |
+| `$plan-harder` | For every final retained implementation issue after structural graph compression. | At least one issue-hardening call per retained issue, with only the final stable result persisted; Plan Feature owns artifact writes. |
 | `$gitstack:github-issues` | `write_mode=apply` and the owning tracker backend is GitHub. | Translate each authorized write to GitStack-owned `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, metadata, relationships, verification, cleanup, and partial recovery. Never invoke it for `write_mode=propose`. |
 
 After implementation begins, issue lifecycle mutations belong to the selected
@@ -241,10 +248,11 @@ Load `references/issue-phase.md`, `references/issue-body-template.md`, and
 source ref, optional knowledge delta, workspace links, and validated cross-Spec
 graph.
 
-The issue phase owns vertical splitting, one or more `$plan-harder` passes per
-issue, mapped metadata, intra-Spec dependency validation, the single Execution
-Contract, tracker writes or proposed output, and final reporting. It persists
-only the final stable hardening result.
+The issue phase owns vertical splitting, structural graph compression, one or
+more `$plan-harder` passes per final retained issue, mapped metadata, intra-Spec
+dependency validation, the single Execution Contract, tracker writes or
+proposed output, and final reporting. It persists only the final stable
+hardening result.
 
 If `knowledge_delta` is present in a single Spec, reuse or add a final
 integration issue, exclude it and its own `dependency_ids` while deriving the
@@ -265,7 +273,9 @@ Return:
 - Feature Spec ref or proposed ref, title, and target location;
 - planning identity and Project Memory facts used;
 - generated issue refs or proposed refs in publication order;
-- graph and verticality validation, including repairs;
+- graph and verticality validation, including candidate and final issue counts,
+  compression repairs, retained-slice reasons, and avoided initial hardening
+  calls;
 - applied tracker metadata when writes occurred;
 - domain closeout owner when present and the derived `capture_outcome`;
 - blockers and withheld artifacts;

@@ -804,12 +804,32 @@ class PlanFeatureReductionTests(unittest.TestCase):
             "completed for this issue."
         )
 
-        self.assertIn("one or more times per generated issue", skill)
+        self.assertIn("one or more times per final retained issue", skill)
         self.assertIn("after vertical boundaries", skill)
-        self.assertIn("at least once for each candidate issue", issue_phase)
-        self.assertIn("persist only the final stable result", issue_phase)
+        self.assertIn("at least once for each final retained issue", issue_phase)
+        self.assertIn("persist only final stable results", issue_phase)
         self.assertEqual(template.count(provenance), 1)
         self.assertEqual(fixture.count(provenance), 2)
+
+    def test_graph_compression_precedes_ids_and_hardening(self) -> None:
+        skill = " ".join(read("SKILL.md").split())
+        issue_phase = read("references/issue-phase.md")
+        vertical = " ".join(read("references/vertical-slices.md").split())
+        fixture = read("references/full-flow-dry-run.md")
+
+        self.assertIn("structural graph-compression gate", skill)
+        self.assertIn("Issue count is report data only", skill)
+        self.assertLess(
+            issue_phase.index("### 5. Compress The Candidate Graph"),
+            issue_phase.index("### 6. Harden Every Retained Issue"),
+        )
+        self.assertIn("before stable IDs or `$plan-harder` calls", vertical)
+        self.assertIn("never a threshold, cap, option, or reason", vertical)
+        self.assertIn("rerun step 4's owner-excluded terminal derivation", issue_phase)
+        self.assertIn("replace that owner's `dependency_ids`", vertical)
+        self.assertIn("## Structural Graph Compression Result", fixture)
+        self.assertIn("Counts are measurements only", fixture)
+        self.assertIn("terminal dependencies are not recomputed", fixture)
 
     def test_integration_partial_uses_a_distinct_derived_branch(self) -> None:
         skill = " ".join(read("SKILL.md").split())

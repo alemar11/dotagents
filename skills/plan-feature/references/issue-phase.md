@@ -26,6 +26,8 @@ deferred domain-memory closeout.
   dependencies are intra-Spec only.
 - Give every issue one Execution Contract table and no duplicate delivery or handoff
   projection.
+- Run structural graph compression before freezing IDs or invoking
+  `$plan-harder`; issue count is report data only.
 - Load `non-app-delivery.md` when the current request explicitly selects its
   target, or when the source Feature Spec contains exactly one target and one
   resolvable `explicit_instruction_ref`.
@@ -102,8 +104,8 @@ not architecture layer. Prefer a small graph in which each issue:
 
 Use provisional generated IDs such as `01`, `02`, and `03` while shaping the
 graph. Freeze stable IDs only after integration and closeout ownership is final
-in step 4. IDs are planning graph identities and remain separate from hosted
-issue numbers.
+and the structural graph-compression gate passes. IDs are planning graph
+identities and remain separate from hosted issue numbers.
 
 For each issue, store only `dependency_ids` pointing to earlier generated IDs.
 Require every ref to exist, reject self-dependencies, and validate the graph is
@@ -197,17 +199,29 @@ If `knowledge_delta` is present:
 Never generate a docs-only closeout issue. The final issue must own real
 integration behavior and validation.
 
-Before hardening, topologically assign or renumber the final generated IDs so
-the closeout owner is last and every `dependency_ids` entry points to a strictly
-earlier generated ID. Freeze those IDs for rendering and publication. Never
-retain a reused ID that would need to depend on the same or a later ID.
+### 5. Compress The Candidate Graph
 
-### 5. Harden Every Issue
+Run the canonical structural graph-compression gate from
+`references/vertical-slices.md` independently for every
+implementation-eligible Feature Spec. Follow its count-neutral retain, repair,
+scope, integration, and closeout rules exactly. Withhold any graph that cannot
+pass without widening the accepted Feature Spec scope.
 
-After vertical boundaries, repository/path scope, dependency graph, integration
-ownership, and domain-closeout ownership have stabilized, invoke `$plan-harder`
-at least once for each candidate issue with `planning_mode=issue-hardening` and
-`output_surface=caller`. Merge the returned brief into the issue template:
+After repairs, rerun step 4's owner-excluded terminal derivation when
+`knowledge_delta` is present, using the repaired remaining graph and replacing
+the closeout owner's `dependency_ids`. Then rerun verticality, overlap,
+dependency, acyclicity, integration, and closeout validation. Topologically
+assign or renumber final generated IDs so the closeout owner is last and every
+`dependency_ids` entry points to a strictly earlier generated ID. Freeze those
+IDs for rendering and publication; never retain a reused ID that would depend
+on the same or a later ID.
+
+### 6. Harden Every Retained Issue
+
+After structural compression and graph ownership have stabilized, invoke
+`$plan-harder` at least once for each final retained issue with
+`planning_mode=issue-hardening` and `output_surface=caller`. Merge the returned
+brief into the issue template:
 
 - implementation approach into `## Implementation Plan`;
 - acceptance details into `## Acceptance Criteria`;
@@ -221,11 +235,13 @@ sections. Preserve exactly one standard hardening provenance line for the final
 stable pass.
 
 Run final verticality, scope-overlap, dependency, validation, and readiness
-gates. If a repair materially changes an issue, run another hardening pass on
-that issue before output. Supersede the earlier brief and persist only the final
-stable result; pass count is derived work, not an option or artifact field.
+gates. If hardening exposes a graph-level defect, discard affected results,
+return to step 5, restabilize the graph and IDs, and re-harden every materially
+changed issue. For an issue-local repair, run another hardening pass on that
+issue before output. Supersede earlier briefs and persist only final stable
+results; pass count is derived work, not an option or artifact field.
 
-### 6. Render The Execution Contract
+### 7. Render The Execution Contract
 
 Use `references/issue-body-template.md`. Every issue has exactly one
 `## Execution Contract` table containing:
@@ -248,7 +264,7 @@ repeat the ID list. Reverse edges are a derived view only. The issue body may
 include cross-repository notes, integration gates, and domain closeout data in
 their dedicated sections; they are not extra knobs.
 
-### 7. Validate Readiness
+### 8. Validate Readiness
 
 An applied issue may receive `ready-for-agent` only when:
 
@@ -262,6 +278,7 @@ An applied issue may receive `ready-for-agent` only when:
   graph is acyclic;
 - named integration gates exist where needed;
 - there are no open human decisions or placeholder questions;
+- the structural graph-compression gate passed before hardening;
 - the domain closeout owner is unique when required;
 - every domain-closeout target surface is contained by that final issue's
   `affected_repositories` and `allowed_paths`;
@@ -272,7 +289,7 @@ mapping after the same content gates pass. Never emit or persist that workflow
 state in a proposed body, label, or queue. Withhold failed issues and return
 their blockers; never downgrade them into a partially agent-ready artifact.
 
-### 8. Apply Or Propose
+### 9. Apply Or Propose
 
 Order output topologically, with the final integration issue last for a
 multi-repository bundle and its domain closeout attached only when a delta
@@ -318,15 +335,17 @@ Use transient body transport outside repositories for hosted writes and remove
 it after verified mutation. Plan Feature owns only the planning-artifact writes
 performed in this phase.
 
-### 9. Report
+### 10. Report
 
 Return:
 
 - Feature Spec ref and `mode` / `write_mode`;
-- issue count, generated IDs, actual or proposed refs, and publication order;
+- candidate and final issue counts, generated IDs, actual or proposed refs, and
+  publication order;
 - affected repositories and tracker route for each issue;
 - dependency graph, topological order, and acyclicity proof;
-- verticality and overlap repairs;
+- verticality, overlap, and compression repairs, retained-slice reasons,
+  removed artificial dependencies, and avoided initial hardening calls;
 - mapped issue type/state applied or proposed;
 - confirmation that every issue has one valid Execution Contract;
 - domain closeout issue and deferred capture result when required;

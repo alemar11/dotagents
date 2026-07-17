@@ -1,0 +1,204 @@
+{
+  "purpose": "Anonymized structural replay patterns. Counts are observations only; candidate shape determines whether compression is valid.",
+  "cases": [
+    {
+      "id": "layered-single-outcome",
+      "candidates": [
+        {"id": "c01", "spec": "main", "title": "Persist export requests", "depends_on": []},
+        {"id": "c02", "spec": "main", "title": "Add export repository operations", "depends_on": ["c01"]},
+        {"id": "c03", "spec": "main", "title": "Orchestrate export creation", "depends_on": ["c02"]},
+        {"id": "c04", "spec": "main", "title": "Expose the authorized export endpoint", "depends_on": ["c03"]},
+        {"id": "c05", "spec": "main", "title": "Test export service behavior", "depends_on": ["c03"]},
+        {"id": "c06", "spec": "main", "title": "Test export endpoint authorization", "depends_on": ["c04"]},
+        {"id": "c07", "spec": "main", "title": "Document the export endpoint", "depends_on": ["c04"]},
+        {"id": "c08", "spec": "main", "title": "Let an account owner download the export", "depends_on": ["c04"]}
+      ],
+      "final_issues": [
+        {
+          "id": "01",
+          "spec": "main",
+          "from": ["c01", "c02", "c03", "c04", "c05", "c06", "c07"],
+          "title": "Provide the authorized export API",
+          "depends_on": [],
+          "role": "vertical",
+          "why": "The API is one independently usable system outcome with one focused authorization proof."
+        },
+        {
+          "id": "02",
+          "spec": "main",
+          "from": ["c08"],
+          "title": "Let account owners download their export",
+          "depends_on": ["01"],
+          "role": "integration-closeout",
+          "why": "The user download path is independently observable and owns final integrated proof."
+        }
+      ],
+      "removed_dependency_edges": [["c02", "c01"], ["c03", "c02"], ["c04", "c03"], ["c05", "c03"], ["c06", "c04"], ["c07", "c04"]],
+      "domain_closeout_owner": "02",
+      "expected": {"candidate_count": 8, "final_count": 2, "minimum_hardening_calls": 2, "avoided_initial_hardening_calls": 6}
+    },
+    {
+      "id": "closeout-terminal-recompute",
+      "candidates": [
+        {"id": "c01", "spec": "main", "title": "Deliver the export API", "depends_on": []},
+        {"id": "c02", "spec": "main", "title": "Deliver the export audit query", "depends_on": ["c01"]},
+        {"id": "c03", "spec": "main", "title": "Prove the integrated export and capture accepted knowledge", "depends_on": ["c02"]}
+      ],
+      "final_issues": [
+        {"id": "01", "spec": "main", "from": ["c01"], "title": "Deliver the export API", "depends_on": [], "role": "vertical", "why": "The API is independently valuable and has distinct contract proof."},
+        {"id": "02", "spec": "main", "from": ["c02"], "title": "Deliver the export audit query", "depends_on": [], "role": "vertical", "why": "The audit query is independently valuable; its candidate ordering behind the API was artificial."},
+        {"id": "03", "spec": "main", "from": ["c03"], "title": "Prove the integrated export and capture accepted knowledge", "depends_on": ["01", "02"], "role": "integration-closeout", "why": "The closeout owner remains final and must wait for every terminal after graph repair."}
+      ],
+      "removed_dependency_edges": [["c02", "c01"]],
+      "domain_closeout_owner": "03",
+      "expected": {"candidate_count": 3, "final_count": 3, "minimum_hardening_calls": 3, "avoided_initial_hardening_calls": 0}
+    },
+    {
+      "id": "overlapping-lifecycle-fragments",
+      "candidates": [
+        {"id": "c01", "spec": "main", "title": "Store workflow drafts", "depends_on": []},
+        {"id": "c02", "spec": "main", "title": "Edit workflow drafts", "depends_on": ["c01"]},
+        {"id": "c03", "spec": "main", "title": "Validate workflow drafts", "depends_on": ["c02"]},
+        {"id": "c04", "spec": "main", "title": "Publish a valid workflow", "depends_on": ["c03"]},
+        {"id": "c05", "spec": "main", "title": "Test publication audit records", "depends_on": ["c04"]}
+      ],
+      "final_issues": [
+        {
+          "id": "01",
+          "spec": "main",
+          "from": ["c01", "c02", "c03"],
+          "title": "Create and maintain a valid workflow draft",
+          "depends_on": [],
+          "role": "vertical",
+          "why": "Draft storage, editing, and validation form one safe authoring outcome over the same lifecycle scope."
+        },
+        {
+          "id": "02",
+          "spec": "main",
+          "from": ["c04", "c05"],
+          "title": "Publish a valid workflow with an audit record",
+          "depends_on": ["01"],
+          "role": "vertical",
+          "why": "Publication is a separately valuable state transition with distinct integration proof."
+        }
+      ],
+      "removed_dependency_edges": [["c02", "c01"], ["c03", "c02"], ["c05", "c04"]],
+      "domain_closeout_owner": null,
+      "expected": {"candidate_count": 5, "final_count": 2, "minimum_hardening_calls": 2, "avoided_initial_hardening_calls": 3}
+    },
+    {
+      "id": "same-size-independent-outcomes",
+      "candidates": [
+        {"id": "c01", "spec": "main", "title": "Validate configuration without applying it", "depends_on": []},
+        {"id": "c02", "spec": "main", "title": "Export a portable configuration snapshot", "depends_on": []},
+        {"id": "c03", "spec": "main", "title": "Inspect configuration drift", "depends_on": []},
+        {"id": "c04", "spec": "main", "title": "Revoke cached credentials", "depends_on": []},
+        {"id": "c05", "spec": "main", "title": "Query the configuration audit history", "depends_on": []}
+      ],
+      "final_issues": [
+        {"id": "01", "spec": "main", "from": ["c01"], "title": "Validate configuration without applying it", "depends_on": [], "role": "vertical", "why": "This command is safely usable alone and has distinct validation proof."},
+        {"id": "02", "spec": "main", "from": ["c02"], "title": "Export a portable configuration snapshot", "depends_on": [], "role": "vertical", "why": "Snapshot export is independently useful and has a separate artifact contract."},
+        {"id": "03", "spec": "main", "from": ["c03"], "title": "Inspect configuration drift", "depends_on": [], "role": "vertical", "why": "Drift inspection has its own observable report and proof."},
+        {"id": "04", "spec": "main", "from": ["c04"], "title": "Revoke cached credentials", "depends_on": [], "role": "vertical", "why": "Credential revocation is an independent security outcome."},
+        {"id": "05", "spec": "main", "from": ["c05"], "title": "Query the configuration audit history", "depends_on": [], "role": "vertical", "why": "Audit history is independently consumable and validated through its query contract."}
+      ],
+      "removed_dependency_edges": [],
+      "domain_closeout_owner": null,
+      "expected": {"candidate_count": 5, "final_count": 5, "minimum_hardening_calls": 5, "avoided_initial_hardening_calls": 0}
+    },
+    {
+      "id": "cross-spec-integration-owner",
+      "candidates": [
+        {"id": "api-c01", "spec": "api", "title": "Expose account export status", "depends_on": []},
+        {"id": "web-c01", "spec": "web", "title": "Show account export status", "depends_on": []},
+        {"id": "integration-c01", "spec": "integration", "title": "Prove the web and API export flow together", "depends_on": []}
+      ],
+      "final_issues": [
+        {"id": "api-01", "spec": "api", "from": ["api-c01"], "title": "Expose account export status", "depends_on": [], "role": "vertical", "why": "The API partial owns one independently verifiable repository outcome."},
+        {"id": "web-01", "spec": "web", "from": ["web-c01"], "title": "Show account export status", "depends_on": [], "role": "vertical", "why": "The web partial owns one independently verifiable repository outcome."},
+        {"id": "integration-01", "spec": "integration", "from": ["integration-c01"], "title": "Prove the integrated account export flow", "depends_on": [], "role": "integration", "why": "The dedicated integration partial owns a bounded change and cross-repository proof after upstream Specs merge."}
+      ],
+      "feature_dependencies": [
+        {"spec": "integration", "upstream_spec": "api", "reason": "Wait for the API partial to merge and pass integration proof."},
+        {"spec": "integration", "upstream_spec": "web", "reason": "Wait for the web partial to merge and pass integration proof."}
+      ],
+      "removed_dependency_edges": [],
+      "domain_closeout_owner": null,
+      "expected": {"candidate_count": 3, "final_count": 3, "minimum_hardening_calls": 3, "avoided_initial_hardening_calls": 0}
+    },
+    {
+      "id": "fragmented-many-candidates",
+      "candidates": [
+        {"id": "c01", "spec": "main", "title": "Add notification preference storage", "depends_on": []},
+        {"id": "c02", "spec": "main", "title": "Add notification preference repository methods", "depends_on": ["c01"]},
+        {"id": "c03", "spec": "main", "title": "Add notification preference service logic", "depends_on": ["c02"]},
+        {"id": "c04", "spec": "main", "title": "Expose notification preference endpoints", "depends_on": ["c03"]},
+        {"id": "c05", "spec": "main", "title": "Test notification preference endpoints", "depends_on": ["c04"]},
+        {"id": "c06", "spec": "main", "title": "Load notification preferences in settings", "depends_on": ["c04"]},
+        {"id": "c07", "spec": "main", "title": "Render notification preference controls", "depends_on": ["c06"]},
+        {"id": "c08", "spec": "main", "title": "Validate notification preference controls", "depends_on": ["c07"]},
+        {"id": "c09", "spec": "main", "title": "Test the notification preference journey", "depends_on": ["c07"]},
+        {"id": "c10", "spec": "main", "title": "Document notification preference behavior", "depends_on": ["c07"]}
+      ],
+      "final_issues": [
+        {
+          "id": "01",
+          "spec": "main",
+          "from": ["c01", "c02", "c03", "c04", "c05"],
+          "title": "Provide the notification preference API",
+          "depends_on": [],
+          "role": "vertical",
+          "why": "The server contract and its proof are one independently usable system outcome."
+        },
+        {
+          "id": "02",
+          "spec": "main",
+          "from": ["c06", "c07", "c08", "c09", "c10"],
+          "title": "Let users manage notification preferences",
+          "depends_on": ["01"],
+          "role": "vertical",
+          "why": "The settings journey is one observable user outcome with integrated validation."
+        }
+      ],
+      "removed_dependency_edges": [["c02", "c01"], ["c03", "c02"], ["c04", "c03"], ["c05", "c04"], ["c07", "c06"], ["c08", "c07"], ["c09", "c07"], ["c10", "c07"]],
+      "domain_closeout_owner": null,
+      "expected": {"candidate_count": 10, "final_count": 2, "minimum_hardening_calls": 2, "avoided_initial_hardening_calls": 8}
+    },
+    {
+      "id": "many-independent-outcomes",
+      "candidates": [
+        {"id": "c01", "spec": "main", "title": "Pause a scheduled job", "depends_on": []},
+        {"id": "c02", "spec": "main", "title": "Resume a scheduled job", "depends_on": []},
+        {"id": "c03", "spec": "main", "title": "Clone a scheduled job", "depends_on": []},
+        {"id": "c04", "spec": "main", "title": "Preview a job's next runs", "depends_on": []},
+        {"id": "c05", "spec": "main", "title": "Run a job immediately", "depends_on": []},
+        {"id": "c06", "spec": "main", "title": "Cancel one queued run", "depends_on": []},
+        {"id": "c07", "spec": "main", "title": "Retry one failed run", "depends_on": []},
+        {"id": "c08", "spec": "main", "title": "Download one run's logs", "depends_on": []},
+        {"id": "c09", "spec": "main", "title": "Set a job concurrency limit", "depends_on": []},
+        {"id": "c10", "spec": "main", "title": "Set a job timeout", "depends_on": []},
+        {"id": "c11", "spec": "main", "title": "Mute failure notifications", "depends_on": []},
+        {"id": "c12", "spec": "main", "title": "Route failure notifications", "depends_on": []},
+        {"id": "c13", "spec": "main", "title": "Inspect a job's execution history", "depends_on": []}
+      ],
+      "final_issues": [
+        {"id": "01", "spec": "main", "from": ["c01"], "title": "Pause a scheduled job", "depends_on": [], "role": "vertical", "why": "Pausing is independently usable and has distinct state-transition proof."},
+        {"id": "02", "spec": "main", "from": ["c02"], "title": "Resume a scheduled job", "depends_on": [], "role": "vertical", "why": "Resuming is independently usable and has distinct state-transition proof."},
+        {"id": "03", "spec": "main", "from": ["c03"], "title": "Clone a scheduled job", "depends_on": [], "role": "vertical", "why": "Cloning produces an independently valuable new job."},
+        {"id": "04", "spec": "main", "from": ["c04"], "title": "Preview a job's next runs", "depends_on": [], "role": "vertical", "why": "Run preview is a read-only outcome with its own report contract."},
+        {"id": "05", "spec": "main", "from": ["c05"], "title": "Run a job immediately", "depends_on": [], "role": "vertical", "why": "Immediate execution is a distinct user action with separate proof."},
+        {"id": "06", "spec": "main", "from": ["c06"], "title": "Cancel one queued run", "depends_on": [], "role": "vertical", "why": "Queue cancellation is a bounded lifecycle outcome."},
+        {"id": "07", "spec": "main", "from": ["c07"], "title": "Retry one failed run", "depends_on": [], "role": "vertical", "why": "Retry is a bounded lifecycle outcome with distinct validation."},
+        {"id": "08", "spec": "main", "from": ["c08"], "title": "Download one run's logs", "depends_on": [], "role": "vertical", "why": "Log download produces an independently consumable artifact."},
+        {"id": "09", "spec": "main", "from": ["c09"], "title": "Set a job concurrency limit", "depends_on": [], "role": "vertical", "why": "Concurrency policy is independently configurable and provable."},
+        {"id": "10", "spec": "main", "from": ["c10"], "title": "Set a job timeout", "depends_on": [], "role": "vertical", "why": "Timeout policy is independently configurable and provable."},
+        {"id": "11", "spec": "main", "from": ["c11"], "title": "Mute failure notifications", "depends_on": [], "role": "vertical", "why": "Muting is an independently useful notification outcome."},
+        {"id": "12", "spec": "main", "from": ["c12"], "title": "Route failure notifications", "depends_on": [], "role": "vertical", "why": "Routing has a separate destination contract and proof."},
+        {"id": "13", "spec": "main", "from": ["c13"], "title": "Inspect a job's execution history", "depends_on": [], "role": "vertical", "why": "Execution history is an independently consumable read outcome."}
+      ],
+      "removed_dependency_edges": [],
+      "domain_closeout_owner": null,
+      "expected": {"candidate_count": 13, "final_count": 13, "minimum_hardening_calls": 13, "avoided_initial_hardening_calls": 0}
+    }
+  ]
+}

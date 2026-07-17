@@ -78,7 +78,8 @@ delta.
 
 ## Dependency Graph
 
-Use stable generated IDs and one forward list per issue:
+Use provisional generated IDs and one forward list per issue while shaping the
+graph. Freeze those IDs as stable only after structural compression passes:
 
 ```text
 01: dependency_ids: none
@@ -116,6 +117,53 @@ contracts do not create unsafe concurrent edits. When overlap exists:
 
 Do not introduce a selectable scheduling field. Independence is derived from
 the graph and actual path scope by the eventual orchestrator.
+
+## Structural Graph Compression Gate
+
+Run this gate on every complete candidate issue graph after repository scope,
+integration ownership, and domain-closeout ownership are assigned, but before
+stable IDs or `$plan-harder` calls. Evaluate structure rather than issue count;
+the number of candidates is measurement data, never a threshold, cap, option,
+or reason to block publication.
+
+Retain an issue only when it has:
+
+- an independently valuable user or system outcome;
+- a safe landing state once its real dependencies finish;
+- acceptance and validation proof distinct from sibling issues; and
+- enough independent value to justify another dependency, hardening pass,
+  tracker item, and execution boundary.
+
+Repair the graph when any candidate is only an architecture layer, test batch,
+documentation update, tracker action, or fragment of the same observable
+outcome as a sibling. Fold an invalid enabling slice into its first consumer,
+combine candidates that share one outcome and substantially the same scope or
+proof, narrow unsafe overlap, and remove dependencies that encode preferred
+order rather than technical necessity. Add a dependency instead of combining
+only when both outcomes remain independently valuable and ordered ownership is
+required.
+
+Never compress across Feature Specs. Run the gate independently for each
+implementation-eligible Spec and exclude coordination-only parent artifacts.
+Preserve every required repo-owned integration partial, its real integration
+issue, and the unique final domain-closeout owner. A repair must stay inside the
+accepted Feature Spec scope; otherwise return a planning blocker instead of
+widening the source.
+
+After repairs, rerun the owner-excluded terminal derivation from `Domain
+Knowledge Closeout` when a closeout owner exists, and replace that owner's
+`dependency_ids` with every terminal in the repaired remaining graph. Then
+revalidate verticality, overlap, dependencies, acyclicity, integration
+ownership, and domain-closeout ownership. Freeze generated IDs only after the
+gate passes. Report the candidate count, final count, combined or removed
+slices, removed artificial dependencies, retained enabling or integration
+reasons, and avoided initial `$plan-harder` calls, calculated as candidate count
+minus final count. Report later repair passes separately. Persist none of this
+as an option, Feature Spec field, Execution Contract row, or issue-body section.
+
+If later issue hardening exposes a graph-level defect, discard the affected
+hardening results, return to this gate, restabilize the graph and IDs, and
+re-harden every materially changed final issue.
 
 ## Domain Knowledge Closeout
 
@@ -156,6 +204,7 @@ Every agent-ready issue must have:
 - valid generated dependency IDs and an acyclic graph;
 - portable source and evidence refs;
 - no unresolved human decision or placeholder question;
+- a passed structural graph-compression gate before IDs were frozen;
 - a completed final stable `$plan-harder` issue-hardening pass, after graph and
   scope stabilization;
 - domain closeout only on the unique final issue when required.
@@ -173,10 +222,11 @@ When validation fails, repair in this order:
 1. feature scope and acceptance ambiguity;
 2. vertical slice boundaries;
 3. repository/path overlap;
-4. dependency graph;
-5. validation and integration proof;
-6. domain closeout ownership;
-7. template and metadata consistency.
+4. structural graph compression;
+5. dependency graph;
+6. validation and integration proof;
+7. domain closeout ownership;
+8. template and metadata consistency.
 
 Re-run `$plan-harder` for any issue materially changed by repairs, keep only the
 final stable result and one provenance line, then repeat the readiness gate.

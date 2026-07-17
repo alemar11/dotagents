@@ -60,6 +60,19 @@ planning_blockers: []
 - Intended tracker metadata after apply: mapped type `task`, state
   `ready-for-agent`
 
+## Structural Graph Compression Result
+
+- Candidate issues: `2`.
+- Final retained issues: `2`.
+- Combined or removed slices: none.
+- Removed artificial dependencies: none.
+- Retention reasons: issue `01` owns the independently useful authorized archive
+  contract and focused proof; issue `02` owns the product download path,
+  integrated proof, and final domain closeout.
+- Avoided initial `$plan-harder` calls: `0`.
+- Gate result: passed. Counts are measurements only and did not determine the
+  result.
+
 ## Proposed Feature Spec
 
 ```markdown
@@ -398,14 +411,16 @@ be the durable owner.
    evidence leave a material blocker; defer domain capture.
 3. Produce the complete Feature Spec body and deterministic proposed source
    ref without writing.
-4. Split vertical issues, stabilize scope and graph, run one or more
-   `$plan-harder` passes per issue, persist only each final stable result,
-   validate the graph, and render exactly one Execution Contract per issue.
-5. Return bodies, intended repositories, mapped metadata, and topological
+4. Split candidate vertical issues, assign scope plus integration and closeout
+   ownership, run structural graph compression, then freeze final IDs.
+5. Run one or more `$plan-harder` passes per final retained issue, persist only
+   each final stable result, validate the graph, and render exactly one
+   Execution Contract per issue.
+6. Return bodies, intended repositories, mapped metadata, and topological
    publication order using the deterministic single- or multi-repository
    proposed issue refs from `options.md`. Return no executable publication
    command.
-6. State that proposed refs are non-executable and must be replaced by durable
+7. State that proposed refs are non-executable and must be replaced by durable
    refs during a later `write_mode=apply` run.
 
 ## Expected Publication Order
@@ -436,6 +451,10 @@ This sequence is descriptive output only; it contains no executable command.
   required normal fields.
 - Reverse dependency edges are persisted instead of derived.
 - Cross-Feature-Spec dependencies appear in issue dependency IDs.
+- Candidate issues are hardened before the structural graph-compression gate
+  passes, or issue count is used as a threshold or cap.
+- Compression changes the remaining graph but the final domain-closeout
+  owner's terminal dependencies are not recomputed.
 - A Feature Spec body persists `knowledge_delta` or a
   `## Domain Knowledge Handoff` section.
 - A multi-repository bundle omits its distinct integration partial or emits a
