@@ -18,9 +18,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "6.0.0"
+__version__ = "7.0.0"
 SCHEMA_VERSION = "5.0.0"
-LEGACY_SCHEMA_VERSIONS = {"3.0.0", "4.0.0"}
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
 RELEASE_REASONS = {"terminal", "durable-handoff"}
@@ -141,23 +140,6 @@ def fingerprint(value: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def legacy_fingerprint(value: dict[str, Any]) -> str:
-    payload = {
-        key: value[key]
-        for key in (
-            "root_id",
-            "acquisition_nonce",
-            "execution_adapter",
-            "repositories",
-            "repository_checkouts",
-            "sources",
-            "ledger_ref",
-        )
-    }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
-
-
 def ownership_scope(value: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value[key]
@@ -244,98 +226,24 @@ def validate_current_claim(
     return value
 
 
-def validate_legacy_claim(value: dict[str, Any], path: Path) -> dict[str, Any]:
-    schema_version = value.get("schema_version")
-    schema_three_required = {
-        "schema_version",
-        "root_id",
-        "acquisition_nonce",
-        "execution_adapter",
-        "repositories",
-        "repository_checkouts",
-        "sources",
-        "ledger_ref",
-        "opened_at",
-        "heartbeat_at",
-        "takeover_evidence",
-        "replaced_root_ids",
-        "fingerprint",
-    }
-    schema_four_required = schema_three_required - {"execution_adapter"}
-    if schema_version == "3.0.0":
-        valid = set(value) == schema_three_required and value["fingerprint"] == legacy_fingerprint(value)
-    elif schema_version == "4.0.0":
-        valid = set(value) == schema_four_required and value["fingerprint"] == fingerprint(value)
-    else:
-        valid = False
-    if not valid:
-        raise ClaimError("state-conflict", f"legacy claim fingerprint mismatch: {path}", 4)
-    return value
-
-
-def inspect_claim(path: Path) -> tuple[str, dict[str, Any]]:
+def inspect_claim(path: Path) -> dict[str, Any]:
     value = read_claim_value(path)
-    if value.get("schema_version") == SCHEMA_VERSION:
-        return "active", validate_current_claim(value, path)
-    if value.get("schema_version") in LEGACY_SCHEMA_VERSIONS:
-        legacy = validate_legacy_claim(value, path)
-        if legacy["schema_version"] == "4.0.0":
-            validate_takeover_evidence(legacy, path, legacy_schema_four=True)
-        return "legacy", legacy
-    raise ClaimError("state-conflict", f"unsupported claim schema: {path}", 4)
+    if value.get("schema_version") != SCHEMA_VERSION:
+        raise ClaimError("state-conflict", f"unsupported claim schema: {path}", 4)
+    return validate_current_claim(value, path)
 
 
-def load_claim_sets(
-    root: Path | None,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+def load_claims(root: Path | None) -> dict[str, dict[str, Any]]:
     if root is None:
-        return {}, {}
+        return {}
     claims: dict[str, dict[str, Any]] = {}
-    legacy_claims: dict[str, dict[str, Any]] = {}
     for path in sorted(root.glob("*.json")):
-        state, claim = inspect_claim(path)
+        claim = inspect_claim(path)
         root_id = check_id(claim["root_id"], "root_id")
-        if (
-            path.name != f"{root_id}.json"
-            or root_id in claims
-            or root_id in legacy_claims
-        ):
+        if path.name != f"{root_id}.json" or root_id in claims:
             raise ClaimError("state-conflict", f"claim identity mismatch: {path}", 4)
-        target = claims if state == "active" else legacy_claims
-        target[root_id] = claim
-    return claims, legacy_claims
-
-
-def legacy_conflicts(
-    candidate: dict[str, Any], legacy_claims: dict[str, dict[str, Any]]
-) -> list[str]:
-    conflicts = set(overlapping(candidate, legacy_claims))
-    if candidate["root_id"] in legacy_claims:
-        conflicts.add(candidate["root_id"])
-    return sorted(conflicts)
-
-
-def reject_legacy_conflicts(
-    candidate: dict[str, Any], legacy_claims: dict[str, dict[str, Any]]
-) -> None:
-    conflicts = legacy_conflicts(candidate, legacy_claims)
-    if conflicts:
-        raise ClaimError(
-            "legacy-claim",
-            "overlapping legacy claim requires exact-owner retirement",
-            4,
-            {
-                "root_ids": conflicts,
-                "claims": [
-                    {
-                        "root_id": root_id,
-                        "schema_version": legacy_claims[root_id]["schema_version"],
-                        "fingerprint": legacy_claims[root_id]["fingerprint"],
-                    }
-                    for root_id in conflicts
-                ],
-            },
-        )
+        claims[root_id] = claim
+    return claims
 
 
 def nonempty_string(value: Any, field: str) -> str:
@@ -682,8 +590,6 @@ def takeover_evidence_fingerprint(value: dict[str, Any]) -> str:
 def validate_takeover_evidence(
     value: dict[str, Any],
     path: Path,
-    *,
-    legacy_schema_four: bool = False,
 ) -> None:
     evidence = value["takeover_evidence"]
     replaced = value["replaced_root_ids"]
@@ -722,22 +628,15 @@ def validate_takeover_evidence(
             "task_adoption",
         }:
             raise ClaimError("state-conflict", f"takeover snapshot mismatch: {path}", 4)
-        if legacy_schema_four:
-            snapshot = validate_legacy_claim(item["claim_snapshot"], path)
-            if snapshot["schema_version"] != "4.0.0":
-                raise ClaimError(
-                    "state-conflict", f"takeover snapshot mismatch: {path}", 4
-                )
-        else:
-            snapshot = validate_current_claim(
-                item["claim_snapshot"], path, validate_takeover=False
-            )
+        snapshot = validate_current_claim(
+            item["claim_snapshot"], path, validate_takeover=False
+        )
         try:
             adoption = validate_task_adoption(
                 item["task_adoption"],
                 snapshot,
                 verify_checkouts=False,
-                require_task_profile=not legacy_schema_four,
+                require_task_profile=True,
             )
         except ClaimError as exc:
             raise ClaimError("state-conflict", f"takeover adoption mismatch: {path}", 4) from exc
@@ -793,35 +692,17 @@ def validate_takeover_transaction(value: Any, path: Path) -> dict[str, Any]:
         or value["fingerprint"] != takeover_transaction_fingerprint(value)
     ):
         raise ClaimError("state-conflict", f"takeover transaction fingerprint mismatch: {path}", 4)
-    candidate_value = value["candidate_claim"]
-    legacy_schema_four = (
-        isinstance(candidate_value, dict)
-        and candidate_value.get("schema_version") == "4.0.0"
-    )
-    if legacy_schema_four:
-        candidate = validate_legacy_claim(candidate_value, path)
-        validate_takeover_evidence(candidate, path, legacy_schema_four=True)
-    else:
-        candidate = validate_current_claim(candidate_value, path)
+    candidate = validate_current_claim(value["candidate_claim"], path)
     if path.name != f"{candidate['root_id']}.takeover":
         raise ClaimError("state-conflict", f"takeover transaction identity mismatch: {path}", 4)
     if candidate["takeover_evidence"]["transaction_id"] != value["transaction_id"]:
         raise ClaimError("state-conflict", f"takeover transaction id mismatch: {path}", 4)
     if not isinstance(value["replaced_claims"], list) or not value["replaced_claims"]:
         raise ClaimError("state-conflict", f"takeover transaction snapshots missing: {path}", 4)
-    if legacy_schema_four:
-        snapshots = [
-            validate_legacy_claim(item, path) for item in value["replaced_claims"]
-        ]
-        if any(item["schema_version"] != "4.0.0" for item in snapshots):
-            raise ClaimError(
-                "state-conflict", f"takeover transaction snapshots mismatch: {path}", 4
-            )
-    else:
-        snapshots = [
-            validate_current_claim(item, path, validate_takeover=False)
-            for item in value["replaced_claims"]
-        ]
+    snapshots = [
+        validate_current_claim(item, path, validate_takeover=False)
+        for item in value["replaced_claims"]
+    ]
     root_ids = [item["root_id"] for item in snapshots]
     if sorted(root_ids) != candidate["replaced_root_ids"] or len(root_ids) != len(set(root_ids)):
         raise ClaimError("state-conflict", f"takeover transaction roots mismatch: {path}", 4)
@@ -1045,23 +926,11 @@ def finalize_takeover_transaction(root: Path, value: dict[str, Any]) -> dict[str
     path = root / f"{value['candidate_claim']['root_id']}.takeover"
     transaction = validate_takeover_transaction(value, path)
     candidate = transaction["candidate_claim"]
-    legacy_schema_four = candidate["schema_version"] == "4.0.0"
     snapshots = {
         snapshot["root_id"]: snapshot for snapshot in transaction["replaced_claims"]
     }
-    claims, legacy_claims = load_claim_sets(root)
-    if legacy_schema_four:
-        if overlapping(candidate, claims):
-            raise ClaimError(
-                "state-conflict",
-                "legacy takeover recovery overlaps a current claim",
-                4,
-            )
-        claim_store = legacy_claims
-    else:
-        reject_legacy_conflicts(candidate, legacy_claims)
-        claim_store = claims
-    current_candidate = claim_store.get(candidate["root_id"])
+    claims = load_claims(root)
+    current_candidate = claims.get(candidate["root_id"])
     if current_candidate is not None and current_candidate != candidate:
         raise ClaimError(
             "state-conflict",
@@ -1071,7 +940,7 @@ def finalize_takeover_transaction(root: Path, value: dict[str, Any]) -> dict[str
         )
     existing_replaced: list[str] = []
     for root_id, snapshot in snapshots.items():
-        current = claim_store.get(root_id)
+        current = claims.get(root_id)
         if current is None:
             continue
         if current != snapshot:
@@ -1082,7 +951,7 @@ def finalize_takeover_transaction(root: Path, value: dict[str, Any]) -> dict[str
                 {"root_id": root_id},
             )
         existing_replaced.append(root_id)
-    actual_conflicts = overlapping(candidate, claim_store)
+    actual_conflicts = overlapping(candidate, claims)
     if actual_conflicts != sorted(existing_replaced):
         raise ClaimError(
             "state-conflict",
@@ -1153,8 +1022,7 @@ def acquire(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=True, exclusive=True) as root:
         assert root is not None
         recover_pending_takeovers(root)
-        claims, legacy_claims = load_claim_sets(root)
-        reject_legacy_conflicts(candidate, legacy_claims)
+        claims = load_claims(root)
         current = claims.get(candidate["root_id"])
         if current:
             if ownership_scope(current) != ownership_scope(candidate):
@@ -1206,8 +1074,7 @@ def takeover(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=True, exclusive=True) as root:
         assert root is not None
         recover_pending_takeovers(root)
-        claims, legacy_claims = load_claim_sets(root)
-        reject_legacy_conflicts(candidate, legacy_claims)
+        claims = load_claims(root)
         conflicts = overlapping(candidate, claims)
         if conflicts != expected:
             raise ClaimError(
@@ -1373,7 +1240,7 @@ def keyed_values(
 
 def status(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=False, exclusive=False) as root:
-        claims, legacy_claims = load_claim_sets(root)
+        claims = load_claims(root)
         transactions = load_takeover_transactions(root)
     if args.root_id:
         root_id = check_id(args.root_id, "root_id")
@@ -1410,15 +1277,11 @@ def status(args: argparse.Namespace) -> dict[str, Any]:
         claim = claims.get(root_id)
         if claim:
             return {"ok": True, "command": "claim.status", "state": "active", "claim": claim}
-        legacy = legacy_claims.get(root_id)
-        if legacy:
-            return {"ok": True, "command": "claim.status", "state": "legacy", "claim": legacy}
         raise ClaimError("not-found", f"claim not found: {root_id}", 3)
     return {
         "ok": True,
         "command": "claim.status",
         "claims": list(claims.values()),
-        "legacy_claims": list(legacy_claims.values()),
         "takeover_transactions": list(transactions.values()),
     }
 
@@ -1446,15 +1309,11 @@ def recover_takeover(args: argparse.Namespace) -> dict[str, Any]:
             return {
                 "ok": True,
                 "command": "claim.recover-takeover",
-                "state": (
-                    "recovered-legacy"
-                    if claim["schema_version"] == "4.0.0"
-                    else "recovered"
-                ),
+                "state": "recovered",
                 "transaction_id": expected_transaction_id,
                 "claim": claim,
             }
-        claims, legacy_claims = load_claim_sets(root)
+        claims = load_claims(root)
         claim = claims.get(root_id)
         if (
             claim
@@ -1468,21 +1327,6 @@ def recover_takeover(args: argparse.Namespace) -> dict[str, Any]:
                 "transaction_id": expected_transaction_id,
                 "claim": claim,
             }
-        legacy_claim = legacy_claims.get(root_id)
-        if (
-            legacy_claim
-            and legacy_claim["schema_version"] == "4.0.0"
-            and isinstance(legacy_claim["takeover_evidence"], dict)
-            and legacy_claim["takeover_evidence"].get("transaction_id")
-            == expected_transaction_id
-        ):
-            return {
-                "ok": True,
-                "command": "claim.recover-takeover",
-                "state": "already-finalized-legacy",
-                "transaction_id": expected_transaction_id,
-                "claim": legacy_claim,
-            }
         raise ClaimError("not-found", f"takeover transaction not found: {root_id}", 3)
 
 
@@ -1492,14 +1336,7 @@ def heartbeat(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=False, exclusive=True) as root:
         if root is not None:
             recover_pending_takeovers(root)
-        claims, legacy_claims = load_claim_sets(root)
-        if root_id in legacy_claims:
-            raise ClaimError(
-                "legacy-claim",
-                f"legacy claim requires exact-owner retirement: {root_id}",
-                4,
-                {"root_id": root_id, "fingerprint": legacy_claims[root_id]["fingerprint"]},
-            )
+        claims = load_claims(root)
         claim = claims.get(root_id)
         if not claim or root is None:
             raise ClaimError("not-found", f"claim not found: {root_id}", 3)
@@ -1520,14 +1357,7 @@ def release(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=False, exclusive=True) as root:
         if root is not None:
             recover_pending_takeovers(root)
-        claims, legacy_claims = load_claim_sets(root)
-        if root_id in legacy_claims:
-            raise ClaimError(
-                "legacy-claim",
-                f"legacy claim requires exact-owner retirement: {root_id}",
-                4,
-                {"root_id": root_id, "fingerprint": legacy_claims[root_id]["fingerprint"]},
-            )
+        claims = load_claims(root)
         if root is None:
             raise ClaimError("not-found", f"claim not found: {root_id}", 3)
         claim = claims.get(root_id)
@@ -1562,34 +1392,6 @@ def release(args: argparse.Namespace) -> dict[str, Any]:
         "root_id": root_id,
         "release_receipt_ref": str(receipt_path),
         "release_receipt": receipt,
-    }
-
-
-def retire_legacy(args: argparse.Namespace) -> dict[str, Any]:
-    root_id = check_id(args.root_id, "root_id")
-    expected_fingerprint = check_fingerprint(args.expected_fingerprint)
-    evidence = args.evidence.strip()
-    if not evidence:
-        raise ClaimError("invalid-input", "legacy retirement evidence is required", 2)
-    with locked_claim_store(create=False, exclusive=True) as root:
-        if root is None:
-            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
-        recover_pending_takeovers(root)
-        path = root / f"{root_id}.json"
-        if not path.is_file():
-            raise ClaimError("not-found", f"claim not found: {root_id}", 3)
-        state, claim = inspect_claim(path)
-        if state != "legacy":
-            raise ClaimError("state-conflict", "retire-legacy accepts only a legacy claim", 4)
-        if claim["fingerprint"] != expected_fingerprint:
-            raise ClaimError("state-conflict", "legacy claim ownership fingerprint mismatch", 4)
-        unlink_durable(path)
-    return {
-        "ok": True,
-        "command": "claim.retire-legacy",
-        "state": "retired",
-        "root_id": root_id,
-        "evidence": evidence,
     }
 
 
@@ -1648,7 +1450,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("doctor", help="Check local atomic-claim readiness without writing state.")
     claim = subcommands.add_parser(
         "claim",
-        help="Acquire, inspect, recover, heartbeat, release, retire a legacy claim, or take over a claim.",
+        help="Acquire, inspect, recover, heartbeat, release, or take over a claim.",
     )
     verbs = claim.add_subparsers(dest="verb", required=True)
     acquire_parser = verbs.add_parser("acquire", help="Atomically acquire a non-overlapping active-root claim.")
@@ -1670,12 +1472,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--release-reason", required=True, choices=sorted(RELEASE_REASONS)
     )
     release_parser.add_argument("--evidence", required=True)
-    retire_parser = verbs.add_parser(
-        "retire-legacy", help="Retire one exact legacy claim after terminal or handoff proof."
-    )
-    retire_parser.add_argument("--root-id", required=True)
-    retire_parser.add_argument("--expected-fingerprint", required=True)
-    retire_parser.add_argument("--evidence", required=True)
     takeover_parser = verbs.add_parser("takeover", help="Replace the exact verified-stale conflicting roots.")
     add_claim_identity(takeover_parser)
     takeover_parser.add_argument("--expected-root-id", action="append", required=True)
@@ -1711,8 +1507,6 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         return heartbeat(args)
     if args.verb == "release":
         return release(args)
-    if args.verb == "retire-legacy":
-        return retire_legacy(args)
     return takeover(args)
 
 

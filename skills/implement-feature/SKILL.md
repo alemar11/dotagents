@@ -308,11 +308,10 @@ candidate recovery root even when that replaced claim was already deleted.
 After acquisition, rebuild or verify the new ledger registry from the embedded
 adoption data, adopt those exact tasks, and resume them as needed. Never create a
 new task for a Spec that has recorded or embedded task evidence; if adoption or
-resume fails, stop as blocked. The helper detects legacy schema-3 and schema-4 claims
-read-only; an exact legacy owner may retire one only with `claim retire-legacy`,
-its stored fingerprint, and terminal or durable-handoff evidence. Never migrate
-or silently delete a legacy active claim. A terminal current owner releases its
-own claim; takeover is never a retry alias.
+resume fails, stop as blocked. The helper accepts only current schema-5 claims
+and fails closed on every unsupported claim or takeover schema without migration,
+retirement, or deletion. A terminal current owner releases its own claim;
+takeover is never a retry alias.
 
 ## Task, Ledger, And Recovery
 

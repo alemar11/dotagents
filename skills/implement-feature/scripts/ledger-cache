@@ -18,13 +18,13 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 METADATA_SCHEMA_VERSION = "1.0.0"
 DEFAULT_RETENTION_DAYS = 180
 SIZE_WARNING_BYTES = 25 * 1024 * 1024
 COUNT_WARNING_ENTRIES = 100
-ARCHIVE_REASONS = {"terminal", "legacy-cutover"}
-CLAIM_SCHEMA_VERSIONS = {"3.0.0", "4.0.0", "5.0.0"}
+READ_ARCHIVE_REASONS = {"terminal", "legacy-cutover"}
+CLAIM_SCHEMA_VERSION = "5.0.0"
 TAKEOVER_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
 RELEASE_REASONS = {"terminal", "durable-handoff"}
@@ -32,7 +32,7 @@ ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
-LEGACY_GROUP_RE = re.compile(r"^legacy-cutover-\d{4}-\d{2}-\d{2}$")
+RETAINED_LEGACY_GROUP = "legacy-cutover-2026-07-17"
 
 
 class CacheError(Exception):
@@ -166,8 +166,6 @@ def claim_fingerprint(value: dict[str, Any]) -> str:
         "sources",
         "ledger_ref",
     ]
-    if value.get("schema_version") == "3.0.0":
-        keys.insert(2, "execution_adapter")
     payload = {key: value[key] for key in keys}
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
@@ -190,9 +188,7 @@ def claim_artifact_error(path: Path, value: dict[str, Any]) -> str | None:
             "replaced_root_ids",
             "fingerprint",
         }
-        if schema == "3.0.0":
-            required.add("execution_adapter")
-        if schema not in CLAIM_SCHEMA_VERSIONS or set(value) != required:
+        if schema != CLAIM_SCHEMA_VERSION or set(value) != required:
             return f"unsupported claim schema: {path}"
         root_id = value.get("root_id")
         if (
@@ -459,11 +455,11 @@ def validate_metadata(value: Any, entry: Path) -> dict[str, Any]:
     check_id(value["portfolio_key"], "portfolio_key")
     if value["archive_id"] != entry.name:
         raise CacheError("integrity-failure", f"archive identity mismatch: {entry}", 5)
-    if value["archive_reason"] not in ARCHIVE_REASONS:
+    if value["archive_reason"] not in READ_ARCHIVE_REASONS:
         raise CacheError("integrity-failure", f"archive reason mismatch: {entry}", 5)
     if value["archive_reason"] == "legacy-cutover":
         check_id(value["archive_group"], "archive_group")
-        if not LEGACY_GROUP_RE.fullmatch(value["archive_group"]):
+        if value["archive_group"] != RETAINED_LEGACY_GROUP:
             raise CacheError("integrity-failure", f"legacy archive group mismatch: {entry}", 5)
         if value["root_id"] is not None:
             raise CacheError("integrity-failure", f"legacy archive root mismatch: {entry}", 5)
@@ -543,7 +539,7 @@ def archive_entry_dirs() -> tuple[list[Path], list[dict[str, str]], list[str]]:
         if top.is_symlink() or not top.is_dir():
             reject(top, "unexpected archive-root artifact")
             continue
-        if LEGACY_GROUP_RE.fullmatch(top.name):
+        if top.name == RETAINED_LEGACY_GROUP:
             collect_entries(top, "legacy archive group")
             continue
         if not re.fullmatch(r"\d{4}", top.name):
@@ -671,32 +667,12 @@ def remove_empty_parents(path: Path, stop: Path) -> None:
 
 
 def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
-    reason = args.archive_reason
+    reason = "terminal"
     evidence_ref = nonempty(args.evidence_ref, "evidence_ref")
-    root_id = args.root_id
-    group = args.archive_group
-    if reason == "terminal":
-        if len(args.ledger) != 1 or group is not None or root_id is None:
-            raise CacheError(
-                "invalid-input",
-                "terminal archive requires one ledger, --root-id, and no --archive-group",
-                2,
-            )
-        root_id = check_id(root_id, "root_id")
-    else:
-        if root_id is not None or group is None:
-            raise CacheError(
-                "invalid-input",
-                "legacy-cutover archive requires --archive-group and no --root-id",
-                2,
-            )
-        group = check_id(group, "archive_group")
-        if not LEGACY_GROUP_RE.fullmatch(group):
-            raise CacheError(
-                "invalid-input",
-                "archive-group must use legacy-cutover-YYYY-MM-DD",
-                2,
-            )
+    root_id = check_id(args.root_id, "root_id")
+    group = None
+    if len(args.ledger) != 1:
+        raise CacheError("invalid-input", "terminal archive requires one ledger", 2)
     ledgers = [canonical_active_ledger(value) for value in args.ledger]
     if len(ledgers) != len(set(ledgers)):
         raise CacheError("invalid-input", "duplicate ledger paths are not allowed", 2)
@@ -716,7 +692,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 4,
                 {"warnings": claim_state["warnings"]},
             )
-        if reason == "terminal" and root_id in claim_state["ownership_root_ids"]:
+        if root_id in claim_state["ownership_root_ids"]:
             raise CacheError(
                 "state-conflict",
                 f"terminal root still has active claim ownership: {root_id}",
@@ -732,18 +708,17 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
             )
             if not ledger.exists():
                 if existing:
-                    if reason == "terminal":
-                        receipt = terminal_release_receipt(
-                            claim_state,
-                            ledger=ledger,
-                            root_id=root_id,
-                            evidence_ref=evidence_ref,
-                            ledger_hash=existing["ledger_sha256"],
-                            size_bytes=existing["size_bytes"],
-                            required=False,
-                        )
-                        if receipt is not None:
-                            used_release_receipts.add(receipt)
+                    receipt = terminal_release_receipt(
+                        claim_state,
+                        ledger=ledger,
+                        root_id=root_id,
+                        evidence_ref=evidence_ref,
+                        ledger_hash=existing["ledger_sha256"],
+                        size_bytes=existing["size_bytes"],
+                        required=False,
+                    )
+                    if receipt is not None:
+                        used_release_receipts.add(receipt)
                     completed.append(existing)
                     continue
                 raise CacheError("not-found", f"ledger not found: {ledger}", 3)
@@ -757,18 +732,17 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 )
             ledger_hash = sha256_file(ledger)
             size_bytes = ledger.stat().st_size
-            if reason == "terminal":
-                receipt = terminal_release_receipt(
-                    claim_state,
-                    ledger=ledger,
-                    root_id=root_id,
-                    evidence_ref=evidence_ref,
-                    ledger_hash=ledger_hash,
-                    size_bytes=size_bytes,
-                    required=True,
-                )
-                assert receipt is not None
-                used_release_receipts.add(receipt)
+            receipt = terminal_release_receipt(
+                claim_state,
+                ledger=ledger,
+                root_id=root_id,
+                evidence_ref=evidence_ref,
+                ledger_hash=ledger_hash,
+                size_bytes=size_bytes,
+                required=True,
+            )
+            assert receipt is not None
+            used_release_receipts.add(receipt)
             if existing:
                 if (
                     existing["ledger_sha256"] != ledger_hash
@@ -1153,10 +1127,8 @@ def build_parser() -> argparse.ArgumentParser:
     ledger_verbs = ledger.add_subparsers(dest="verb", required=True)
     archive = ledger_verbs.add_parser("archive", help="Move completed ledgers into cold storage.")
     archive.add_argument("--ledger", action="append", required=True)
-    archive.add_argument("--archive-reason", required=True, choices=sorted(ARCHIVE_REASONS))
     archive.add_argument("--evidence-ref", required=True)
-    archive.add_argument("--root-id")
-    archive.add_argument("--archive-group")
+    archive.add_argument("--root-id", required=True)
 
     archive_noun = nouns.add_parser("archive", help="Inspect, verify, or prune archived ledgers.")
     archive_verbs = archive_noun.add_subparsers(dest="verb", required=True)

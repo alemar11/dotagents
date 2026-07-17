@@ -97,21 +97,34 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
         path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
         return path
 
-    def archive_legacy(self, *ledgers: Path, evidence: str = "fixture-cutover") -> dict:
-        args = ["--json", "ledger", "archive"]
-        for ledger in ledgers:
-            args.extend(["--ledger", str(ledger)])
-        args.extend(
-            [
-                "--archive-reason",
-                "legacy-cutover",
-                "--archive-group",
-                "legacy-cutover-2026-07-17",
-                "--evidence-ref",
-                evidence,
-            ]
-        )
-        return json.loads(run_cache(*args, env=self.env).stdout)
+    def make_retained_archive(
+        self, ledger: Path, evidence: str = "fixture-cutover"
+    ) -> dict:
+        with mock.patch.dict(os.environ, {"HOME": str(self.base)}):
+            archived_at = CACHE_RUNTIME.utc_now()
+            canonical_ledger = ledger.resolve()
+            metadata = CACHE_RUNTIME.metadata_for(
+                ledger=canonical_ledger,
+                ledger_hash=CACHE_RUNTIME.sha256_file(ledger),
+                size_bytes=ledger.stat().st_size,
+                archived_at=archived_at,
+                archive_reason="legacy-cutover",
+                archive_group=CACHE_RUNTIME.RETAINED_LEGACY_GROUP,
+                evidence_ref=evidence,
+                root_id=None,
+            )
+            entry = (
+                self.archive_root
+                / CACHE_RUNTIME.RETAINED_LEGACY_GROUP
+                / metadata["archive_id"]
+            )
+            entry.mkdir(parents=True)
+            (entry / "ledger.md").write_bytes(ledger.read_bytes())
+            (entry / "metadata.json").write_text(
+                json.dumps(metadata, indent=2, sort_keys=True) + "\n"
+            )
+            ledger.unlink()
+            return CACHE_RUNTIME.validate_archive_entry(entry, verify_hash=True)
 
     def rewrite_archived_at(self, entry: Path, value: datetime) -> None:
         metadata_path = entry / "metadata.json"
@@ -128,11 +141,15 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
         env["HOME"] = empty.name
         root = Path(empty.name) / ".cache/dotagents/skills/implement-feature"
 
-        self.assertEqual(run_cache("--version", env=env).stdout.strip(), "1.0.0")
+        self.assertEqual(run_cache("--version", env=env).stdout.strip(), "2.0.0")
         help_text = run_cache("--help", env=env).stdout
         self.assertIn("doctor", help_text)
         self.assertIn("ledger", help_text)
         self.assertIn("archive", help_text)
+        archive_help = run_cache("ledger", "archive", "--help", env=env).stdout
+        self.assertNotIn("--archive-reason", archive_help)
+        self.assertNotIn("--archive-group", archive_help)
+        self.assertIn("--root-id", archive_help)
         doctor = json.loads(run_cache("--json", "doctor", env=env).stdout)
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
@@ -155,18 +172,16 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
         self.assertEqual(len(doctor["invalid"]), 2)
         self.assertEqual(verified.returncode, 5)
 
-    def test_legacy_batch_archive_is_lossless_and_verifiable(self) -> None:
+    def test_retained_legacy_archives_are_readable_and_verifiable(self) -> None:
         first = self.make_ledger("first", "# first\nα\n")
         second = self.make_ledger("second", "# second\nβ\n")
         expected = {first.name: first.read_bytes(), second.name: second.read_bytes()}
 
-        result = self.archive_legacy(first, second)
+        archives = [self.make_retained_archive(first), self.make_retained_archive(second)]
 
-        self.assertEqual(result["archive_reason"], "legacy-cutover")
-        self.assertEqual(len(result["archives"]), 2)
         self.assertFalse(first.exists())
         self.assertFalse(second.exists())
-        for archive in result["archives"]:
+        for archive in archives:
             entry = Path(archive["entry_path"])
             self.assertEqual((entry / "ledger.md").read_bytes(), expected[f"{archive['portfolio_key']}.md"])
             self.assertEqual(archive["archive_group"], "legacy-cutover-2026-07-17")
@@ -175,6 +190,28 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             run_cache("--json", "archive", "verify", env=self.env).stdout
         )
         self.assertEqual(len(verified["archives"]), 2)
+
+    def test_legacy_archive_creation_options_are_rejected(self) -> None:
+        ledger = self.make_ledger("rejected-legacy-writer")
+        result = run_cache(
+            "--json",
+            "ledger",
+            "archive",
+            "--ledger",
+            str(ledger),
+            "--archive-reason",
+            "legacy-cutover",
+            "--archive-group",
+            CACHE_RUNTIME.RETAINED_LEGACY_GROUP,
+            "--root-id",
+            "root-a",
+            "--evidence-ref",
+            "fixture",
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertTrue(ledger.exists())
 
     def test_staged_ledger_is_an_independent_durable_snapshot(self) -> None:
         source = self.make_ledger("snapshot", "original\n")
@@ -196,8 +233,6 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(ledger),
-            "--archive-reason",
-            "terminal",
             "--root-id",
             "root-a",
             "--evidence-ref",
@@ -233,8 +268,6 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
                 "archive",
                 "--ledger",
                 str(ledger),
-                "--archive-reason",
-                "terminal",
                 "--root-id",
                 "root-a",
                 "--evidence-ref",
@@ -254,8 +287,6 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(ledger),
-            "--archive-reason",
-            "terminal",
             "--root-id",
             "root-a",
             "--evidence-ref",
@@ -293,8 +324,6 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(ledger),
-            "--archive-reason",
-            "terminal",
             "--root-id",
             "root-a",
             "--evidence-ref",
@@ -317,8 +346,6 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(requested),
-            "--archive-reason",
-            "terminal",
             "--root-id",
             "root-a",
             "--evidence-ref",
@@ -333,8 +360,35 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
     def test_archive_is_idempotent_for_the_same_evidence(self) -> None:
         ledger = self.make_ledger("idempotent")
-        first = self.archive_legacy(ledger, evidence="same-cutover")["archives"][0]
-        second = self.archive_legacy(ledger, evidence="same-cutover")["archives"][0]
+        claim = self.make_claim("root-a", ledger)
+        fingerprint = json.loads(claim.read_text())["fingerprint"]
+        run_claim(
+            "--json",
+            "claim",
+            "release",
+            "--root-id",
+            "root-a",
+            "--expected-fingerprint",
+            fingerprint,
+            "--release-reason",
+            "terminal",
+            "--evidence",
+            "same-terminal",
+            env=self.env,
+        )
+        command = (
+            "--json",
+            "ledger",
+            "archive",
+            "--ledger",
+            str(ledger),
+            "--root-id",
+            "root-a",
+            "--evidence-ref",
+            "same-terminal",
+        )
+        first = json.loads(run_cache(*command, env=self.env).stdout)["archives"][0]
+        second = json.loads(run_cache(*command, env=self.env).stdout)["archives"][0]
         self.assertEqual(first["archive_id"], second["archive_id"])
 
     def test_archive_rejects_outside_paths_symlinks_and_malformed_claim_state(self) -> None:
@@ -346,10 +400,8 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(outside),
-            "--archive-reason",
-            "legacy-cutover",
-            "--archive-group",
-            "legacy-cutover-2026-07-17",
+            "--root-id",
+            "root-a",
             "--evidence-ref",
             "fixture",
             env=self.env,
@@ -365,10 +417,8 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(symlink),
-            "--archive-reason",
-            "legacy-cutover",
-            "--archive-group",
-            "legacy-cutover-2026-07-17",
+            "--root-id",
+            "root-a",
             "--evidence-ref",
             "fixture",
             env=self.env,
@@ -385,10 +435,8 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(same_directory_symlink),
-            "--archive-reason",
-            "legacy-cutover",
-            "--archive-group",
-            "legacy-cutover-2026-07-17",
+            "--root-id",
+            "root-a",
             "--evidence-ref",
             "fixture",
             env=self.env,
@@ -408,10 +456,8 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(ledger),
-            "--archive-reason",
-            "legacy-cutover",
-            "--archive-group",
-            "legacy-cutover-2026-07-17",
+            "--root-id",
+            "root-a",
             "--evidence-ref",
             "fixture",
             env=self.env,
@@ -420,40 +466,31 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
         self.assertEqual(rejected.returncode, 4)
         self.assertTrue(ledger.exists())
 
-    def test_batch_failure_restores_sources_and_removes_committed_entries(self) -> None:
+    def test_terminal_archive_rejects_multiple_ledgers(self) -> None:
         first = self.make_ledger("rollback-a")
         second = self.make_ledger("rollback-b")
-        args = argparse.Namespace(
-            ledger=[str(first), str(second)],
-            archive_reason="legacy-cutover",
-            evidence_ref="fixture-rollback",
-            root_id=None,
-            archive_group="legacy-cutover-2026-07-17",
+        result = run_cache(
+            "--json",
+            "ledger",
+            "archive",
+            "--ledger",
+            str(first),
+            "--ledger",
+            str(second),
+            "--root-id",
+            "root-a",
+            "--evidence-ref",
+            "fixture",
+            env=self.env,
+            check=False,
         )
-        original_replace = CACHE_RUNTIME.os.replace
-        calls = 0
-
-        def fail_second(source: Path, destination: Path) -> None:
-            nonlocal calls
-            calls += 1
-            if calls == 2:
-                raise OSError("injected rename failure")
-            original_replace(source, destination)
-
-        with mock.patch.dict(os.environ, {"HOME": str(self.base)}), mock.patch.object(
-            CACHE_RUNTIME.os, "replace", side_effect=fail_second
-        ):
-            with self.assertRaises(OSError):
-                CACHE_RUNTIME.archive_ledgers(args)
-
+        self.assertEqual(result.returncode, 2)
         self.assertTrue(first.exists())
         self.assertTrue(second.exists())
-        with mock.patch.dict(os.environ, {"HOME": str(self.base)}):
-            self.assertEqual(CACHE_RUNTIME.scan_archives(verify_hash=True)["valid"], [])
 
     def test_strict_ttl_includes_legacy_and_exact_180_day_boundary(self) -> None:
         ledger = self.make_ledger("ttl")
-        archive = self.archive_legacy(ledger)["archives"][0]
+        archive = self.make_retained_archive(ledger)
         entry = Path(archive["entry_path"])
         fixed_now = datetime(2026, 7, 17, 12, 0, tzinfo=timezone.utc)
         self.rewrite_archived_at(entry, fixed_now - timedelta(days=180))
@@ -475,7 +512,7 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
     def test_younger_archive_is_not_pruned(self) -> None:
         ledger = self.make_ledger("young")
-        archive = self.archive_legacy(ledger)["archives"][0]
+        archive = self.make_retained_archive(ledger)
         entry = Path(archive["entry_path"])
         fixed_now = datetime(2026, 7, 17, 12, 0, tzinfo=timezone.utc)
         self.rewrite_archived_at(entry, fixed_now - timedelta(days=179, hours=23))
@@ -490,7 +527,10 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
     def test_checksum_mismatch_is_protected_while_valid_peer_is_deleted(self) -> None:
         bad_ledger = self.make_ledger("bad")
         good_ledger = self.make_ledger("good")
-        archives = self.archive_legacy(bad_ledger, good_ledger)["archives"]
+        archives = [
+            self.make_retained_archive(bad_ledger),
+            self.make_retained_archive(good_ledger),
+        ]
         fixed_now = datetime(2026, 7, 17, 12, 0, tzinfo=timezone.utc)
         entries = {item["portfolio_key"]: Path(item["entry_path"]) for item in archives}
         for entry in entries.values():
@@ -509,7 +549,7 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
     def test_preserved_trash_is_not_reported_as_deleted(self) -> None:
         ledger = self.make_ledger("preserved-trash-report")
-        archive = self.archive_legacy(ledger)["archives"][0]
+        archive = self.make_retained_archive(ledger)
         entry = Path(archive["entry_path"])
         fixed_now = datetime(2026, 7, 17, 12, 0, tzinfo=timezone.utc)
         self.rewrite_archived_at(entry, fixed_now - timedelta(days=181))
@@ -531,7 +571,7 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
     def test_claim_reference_protects_archive_by_original_ledger_path(self) -> None:
         ledger = self.make_ledger("claimed-archive")
-        archive = self.archive_legacy(ledger)["archives"][0]
+        archive = self.make_retained_archive(ledger)
         entry = Path(archive["entry_path"])
         fixed_now = datetime(2026, 7, 17, 12, 0, tzinfo=timezone.utc)
         self.rewrite_archived_at(entry, fixed_now - timedelta(days=181))
@@ -565,10 +605,8 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
             "archive",
             "--ledger",
             str(ledger),
-            "--archive-reason",
-            "legacy-cutover",
-            "--archive-group",
-            "legacy-cutover-2026-07-17",
+            "--root-id",
+            "root-a",
             "--evidence-ref",
             "fixture",
             env=self.env,
@@ -654,7 +692,7 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
     def test_apply_resumes_safe_interrupted_trash_cleanup(self) -> None:
         ledger = self.make_ledger("interrupted-prune")
-        archive = self.archive_legacy(ledger)["archives"][0]
+        archive = self.make_retained_archive(ledger)
         entry = Path(archive["entry_path"])
         self.rewrite_archived_at(
             entry, datetime.now(timezone.utc) - timedelta(days=181)
@@ -700,7 +738,7 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
     def test_claim_referenced_interrupted_trash_is_preserved(self) -> None:
         ledger = self.make_ledger("claimed-interrupted-prune")
-        archive = self.archive_legacy(ledger)["archives"][0]
+        archive = self.make_retained_archive(ledger)
         entry = Path(archive["entry_path"])
         self.rewrite_archived_at(
             entry, datetime.now(timezone.utc) - timedelta(days=181)

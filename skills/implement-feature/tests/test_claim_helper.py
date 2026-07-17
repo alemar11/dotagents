@@ -90,24 +90,14 @@ class AtomicClaimHelperTests(unittest.TestCase):
         path = self.claim_root / f"{claim['root_id']}.json"
         path.write_text(json.dumps(claim, indent=2, sort_keys=True) + "\n")
 
-    def make_legacy(self, claim: dict[str, object]) -> dict[str, object]:
-        legacy = dict(claim)
-        legacy["schema_version"] = "3.0.0"
-        legacy["execution_adapter"] = "codex-app-task"
-        legacy["fingerprint"] = CLAIM_RUNTIME.legacy_fingerprint(legacy)
-        path = self.claim_root / f"{legacy['root_id']}.json"
-        path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n")
-        return legacy
-
-    def make_schema_four_legacy(
-        self, claim: dict[str, object]
-    ) -> dict[str, object]:
-        legacy = dict(claim)
-        legacy["schema_version"] = "4.0.0"
-        legacy["fingerprint"] = CLAIM_RUNTIME.fingerprint(legacy)
-        path = self.claim_root / f"{legacy['root_id']}.json"
-        path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n")
-        return legacy
+    def write_unsupported_claim(
+        self, claim: dict[str, object], schema_version: str
+    ) -> Path:
+        unsupported = dict(claim)
+        unsupported["schema_version"] = schema_version
+        path = self.claim_root / f"{unsupported['root_id']}.json"
+        path.write_text(json.dumps(unsupported, indent=2, sort_keys=True) + "\n")
+        return path
 
     def make_task_adoption(
         self,
@@ -233,7 +223,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "6.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "7.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -244,7 +234,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertIn(
             "recover-takeover", run_claim("claim", "--help", env=self.env).stdout
         )
-        self.assertIn(
+        self.assertNotIn(
             "retire-legacy", run_claim("claim", "--help", env=self.env).stdout
         )
         doctor = json.loads(run_claim("--json", "doctor", env=self.env).stdout)
@@ -1253,89 +1243,6 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(no_task["goal_evidence_ref"], "none")
         self.assertEqual(no_task["managed_checkouts"], [])
 
-    def test_schema_one_prepared_takeover_recovers_to_legacy_owner(self) -> None:
-        current = json.loads(
-            run_claim(
-                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
-            ).stdout
-        )["claim"]
-        legacy = self.make_schema_four_legacy(current)
-        termination = "root-a-stopped"
-        adoption_path = self.make_task_adoption(legacy, termination)
-        adoption = json.loads(adoption_path.read_text())
-        for spec in adoption["specs"]:
-            spec.pop("task_model")
-            spec.pop("task_thinking")
-            spec.pop("thinking_reason")
-
-        transaction_id = "a" * 32
-        candidate = dict(legacy)
-        candidate.update(
-            {
-                "root_id": "root-b",
-                "acquisition_nonce": "b" * 32,
-                "ledger_ref": str((self.base / "ledger-new.md").resolve()),
-                "opened_at": "2026-07-16T00:00:00Z",
-                "heartbeat_at": "2026-07-16T00:00:00Z",
-                "replaced_root_ids": ["root-a"],
-            }
-        )
-        takeover_evidence = {
-            "stale_claim_takeover_permission": "granted-by-authorized-user",
-            "takeover_reason": "verified-stale",
-            "evidence": "schema-one-recovery-fixture",
-            "transaction_id": transaction_id,
-            "replaced_claims": [
-                {
-                    "claim_snapshot": legacy,
-                    "task_termination_evidence": termination,
-                    "task_adoption": adoption,
-                }
-            ],
-        }
-        takeover_evidence["evidence_fingerprint"] = (
-            CLAIM_RUNTIME.takeover_evidence_fingerprint(takeover_evidence)
-        )
-        candidate["takeover_evidence"] = takeover_evidence
-        candidate["fingerprint"] = CLAIM_RUNTIME.fingerprint(candidate)
-        transaction = {
-            "schema_version": "1.0.0",
-            "transaction_id": transaction_id,
-            "candidate_claim": candidate,
-            "replaced_claims": [legacy],
-            "prepared_at": "2026-07-16T00:00:00Z",
-        }
-        transaction["fingerprint"] = CLAIM_RUNTIME.takeover_transaction_fingerprint(
-            transaction
-        )
-        (self.claim_root / "root-b.takeover").write_text(
-            json.dumps(transaction, indent=2, sort_keys=True) + "\n"
-        )
-        (self.claim_root / "root-a.json").unlink()
-
-        recovered = json.loads(
-            run_claim(
-                "--json",
-                "claim",
-                "recover-takeover",
-                "--root-id",
-                "root-b",
-                "--expected-transaction-id",
-                transaction_id,
-                env=self.env,
-            ).stdout
-        )
-
-        self.assertEqual(recovered["state"], "recovered-legacy")
-        self.assertEqual(recovered["claim"]["schema_version"], "4.0.0")
-        self.assertFalse((self.claim_root / "root-b.takeover").exists())
-        status = json.loads(
-            run_claim(
-                "--json", "claim", "status", "--root-id", "root-b", env=self.env
-            ).stdout
-        )
-        self.assertEqual(status["state"], "legacy")
-
     def test_recovery_rejects_changed_replaced_snapshot_and_keeps_journal(self) -> None:
         claim = json.loads(
             run_claim(*self.acquire_args("root-a", self.repo, "spec-1"), env=self.env).stdout
@@ -1388,121 +1295,32 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(blocked.returncode, 4)
         self.assertIn("changed after takeover preparation", blocked.stdout)
 
-    def test_schema_three_claim_is_detected_and_exact_owner_can_retire_it(self) -> None:
-        acquired = json.loads(
-            run_claim(*self.acquire_args("root-a", self.repo, "spec-1"), env=self.env).stdout
-        )["claim"]
-        legacy = self.make_legacy(acquired)
+    def test_previous_claim_schemas_fail_closed_without_mutation(self) -> None:
+        for schema_version in ("3.0.0", "4.0.0"):
+            with self.subTest(schema_version=schema_version):
+                if self.claim_root.exists():
+                    for path in self.claim_root.iterdir():
+                        if path.name != ".lock":
+                            path.unlink()
+                acquired = json.loads(
+                    run_claim(
+                        *self.acquire_args("root-a", self.repo, "spec-1"),
+                        env=self.env,
+                    ).stdout
+                )["claim"]
+                path = self.write_unsupported_claim(acquired, schema_version)
+                before = path.read_bytes()
 
-        status = json.loads(
-            run_claim("--json", "claim", "status", env=self.env).stdout
-        )
-        self.assertEqual(status["claims"], [])
-        self.assertEqual(
-            [claim["root_id"] for claim in status["legacy_claims"]], ["root-a"]
-        )
-        one = json.loads(
-            run_claim(
-                "--json", "claim", "status", "--root-id", "root-a", env=self.env
-            ).stdout
-        )
-        self.assertEqual(one["state"], "legacy")
-
-        unrelated = json.loads(
-            run_claim(
-                *self.acquire_args("root-b", self.other_repo, "spec-2"),
-                env=self.env,
-            ).stdout
-        )["claim"]
-        heartbeat = json.loads(
-            run_claim(
-                "--json",
-                "claim",
-                "heartbeat",
-                "--root-id",
-                "root-b",
-                "--expected-fingerprint",
-                unrelated["fingerprint"],
-                env=self.env,
-            ).stdout
-        )
-        self.assertEqual(heartbeat["state"], "active")
-        released = json.loads(
-            run_claim(
-                "--json",
-                "claim",
-                "release",
-                "--root-id",
-                "root-b",
-                "--expected-fingerprint",
-                unrelated["fingerprint"],
-                "--release-reason",
-                "terminal",
-                "--evidence",
-                "fixture-terminal",
-                env=self.env,
-            ).stdout
-        )
-        self.assertEqual(released["state"], "released")
-
-        blocked = run_claim(
-            *self.acquire_args("root-c", self.repo, "spec-3"),
-            env=self.env,
-            check=False,
-        )
-        self.assertEqual(blocked.returncode, 4)
-        self.assertEqual(json.loads(blocked.stdout)["error"]["code"], "legacy-claim")
-
-        wrong = run_claim(
-            "--json",
-            "claim",
-            "retire-legacy",
-            "--root-id",
-            "root-a",
-            "--expected-fingerprint",
-            "0" * 64,
-            "--evidence",
-            "fixture-terminal",
-            env=self.env,
-            check=False,
-        )
-        self.assertEqual(wrong.returncode, 4)
-        retired = json.loads(
-            run_claim(
-                "--json",
-                "claim",
-                "retire-legacy",
-                "--root-id",
-                "root-a",
-                "--expected-fingerprint",
-                legacy["fingerprint"],
-                "--evidence",
-                "fixture-terminal",
-                env=self.env,
-            ).stdout
-        )
-        self.assertEqual(retired["state"], "retired")
-        reacquired = json.loads(
-            run_claim(*self.acquire_args("root-c", self.repo, "spec-3"), env=self.env).stdout
-        )
-        self.assertEqual(reacquired["state"], "acquired")
-
-    def test_schema_four_claim_is_detected_as_legacy(self) -> None:
-        acquired = json.loads(
-            run_claim(
-                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
-            ).stdout
-        )["claim"]
-        legacy = self.make_schema_four_legacy(acquired)
-
-        status = json.loads(
-            run_claim(
-                "--json", "claim", "status", "--root-id", "root-a", env=self.env
-            ).stdout
-        )
-        self.assertEqual(status["state"], "legacy")
-        self.assertEqual(status["claim"]["schema_version"], "4.0.0")
-        self.assertEqual(status["claim"]["fingerprint"], legacy["fingerprint"])
+                for command in (
+                    ("--json", "claim", "status"),
+                    (*self.acquire_args("root-b", self.other_repo, "spec-2"),),
+                ):
+                    blocked = run_claim(*command, env=self.env, check=False)
+                    self.assertEqual(blocked.returncode, 4)
+                    error = json.loads(blocked.stdout)["error"]
+                    self.assertEqual(error["code"], "state-conflict")
+                    self.assertIn("unsupported claim schema", error["message"])
+                    self.assertEqual(path.read_bytes(), before)
 
 
 if __name__ == "__main__":

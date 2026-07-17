@@ -49,7 +49,6 @@ Run terminal archival with:
 ```text
 scripts/ledger-cache --json ledger archive \
   --ledger <absolute-active-ledger> \
-  --archive-reason terminal \
   --root-id <released-root-id> \
   --evidence-ref <terminal-evidence-ref>
 ```
@@ -68,8 +67,10 @@ ledgers/archive/YYYY/MM/<timestamp>--<portfolio>--<sha12>/
   metadata.json
 ```
 
-Legacy cutover entries use
-`ledgers/archive/legacy-cutover-2026-07-17/<portfolio-and-hash>/`.
+The nine retained legacy cutover entries use
+`ledgers/archive/legacy-cutover-2026-07-17/<portfolio-and-hash>/`. The helper may
+list, verify, and prune this exact frozen group but cannot create more legacy
+entries.
 Metadata schema `1.0.0` owns these fields:
 
 | field | contract |
@@ -88,8 +89,8 @@ Metadata schema `1.0.0` owns these fields:
 
 The helper serializes mutations through the existing claim-store lock, requires
 the exact terminal release receipt, refuses active claim or takeover references,
-rejects unsafe paths and symlinks, stages the complete batch before unlinking
-active ledgers, and never changes claim JSON or takeover journals.
+rejects unsafe paths and symlinks, stages the ledger before unlinking it, and
+never changes claim JSON or takeover journals.
 
 ## Automatic Retention
 

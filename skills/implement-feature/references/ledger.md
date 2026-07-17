@@ -177,15 +177,10 @@ among, or after claim deletions and after candidate creation. A live replaced
 claim that differs from the prepared snapshot blocks replay and remains intact.
 `claim status --root-id <replaced-root>` returns the prepared transaction plus
 its candidate recovery root, including after that replaced claim was deleted.
-A schema-1 journal carrying a schema-4 candidate remains replayable after this
-hard cut. Because its adoption evidence has no canonical task profile, recovery
-finalizes it only as a schema-4 legacy ownership claim; it never invents model
-settings or resumes the task as current.
-
-The helper reports schema-3 and schema-4 claims as legacy and permits only exact-owner
-`retire-legacy` with the stored fingerprint plus terminal or durable-handoff
-evidence; it never migrates them. Release after terminal proof or an explicit
-durable handoff. For current claims, pass `--release-reason terminal` only after
+The helper accepts only schema-5 claims and schema-1 takeover journals whose
+candidate and snapshots are schema 5. Unsupported state blocks every mutation
+without migration, retirement, or deletion. Release after terminal proof or an
+explicit durable handoff. Pass `--release-reason terminal` only after
 terminal proof and `--release-reason durable-handoff` for resumable handoffs;
 the helper persists the exact release receipt before deleting claim ownership.
 

@@ -149,11 +149,7 @@ dispatched-task Goal evidence. An undispatched `no-task` record may retain
 `goal_evidence_ref: "none"`. Start a fresh compatible run only after the old
 owner releases its claim.
 
-The claim helper may report an exact schema-3 or schema-4 claim as `legacy`. Do
-not load it as current runtime state or migrate it. A prepared schema-1 takeover
-journal containing a schema-4 candidate is still recoverable: finalize its exact
-snapshots into that schema-4 legacy ownership claim, but never infer the missing
-task profile or resume it as current. After the legacy task is verified terminal
-or a durable handoff exists, only that exact owner may run `claim retire-legacy`
-with the stored fingerprint and evidence. Until then the legacy claim remains a
-blocking owner.
+The claim helper accepts only schema-5 claims and schema-1 takeover journals
+whose candidate and snapshots are schema 5. Any unsupported state blocks every
+mutation without migration, retirement, or deletion. Start a fresh compatible
+run only after that state is resolved outside this runtime.
