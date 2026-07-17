@@ -184,7 +184,7 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    each verified GitHub `owner/repository#N` Feature Spec ref to canonical
    `https://github.com/owner/repository/issues/N`; preserve the authored ref as
    authoritative source evidence and use the URL as the claim/task source id.
-3. **CLAIM** — run `scripts/orchestrator-claim --json doctor`; canonicalize the
+3. **CLAIM** — run `scripts/active-root-claim --json doctor`; canonicalize the
    finalized repositories and source ids; then atomically acquire the claim
    before creating any other runtime artifact. Qualify repository-local source
    refs as `git:<git-common-dir>::ref:<source-ref>` and preserve globally durable
@@ -241,7 +241,7 @@ every wave; parallelism and task count are never user options.
 
 ## Atomic Claim And Takeover
 
-Use `scripts/orchestrator-claim` as the sole active-root authority. Persist the
+Use `scripts/active-root-claim` as the sole active-root authority. Persist the
 acquire-time claim fingerprint, heartbeat while active, and provide that
 fingerprint for every heartbeat and release. Release only after terminal proof
 or an explicit durable handoff is recorded.
@@ -277,7 +277,7 @@ no-task Spec awaiting a later dispatch wave.
 This file is runtime evidence, not a user option:
 
 ```text
-scripts/orchestrator-claim --json claim takeover \
+scripts/active-root-claim --json claim takeover \
   --takeover-permission granted-by-authorized-user \
   --expected-task-termination <root-id>=<evidence-ref> \
   --expected-task-adoption <root-id>=<absolute-json-path> \
@@ -373,7 +373,7 @@ closeout, current-head mergeability and repository-rule evidence, blockers, reco
 freshness, and the next external action. Release the claim after terminal proof
 or the recorded durable handoff, using `--release-reason terminal` or
 `--release-reason durable-handoff` respectively. After a terminal release only,
-archive the active ledger through `scripts/orchestrator-cache` with the exact
+archive the active ledger through `scripts/ledger-cache` with the exact
 release evidence; resumable handoffs retain it.
 
 ## References
@@ -393,11 +393,11 @@ release evidence; resumable handoffs retain it.
 
 ## Runtime Helper Maintenance
 
-`scripts/orchestrator-claim` is the only supported atomic-claim artifact. Its
+`scripts/active-root-claim` is the only supported atomic-claim artifact. Its
 `__version__` is the command-contract version. After changes, run `--help`,
 `--version`, `--json doctor`, the competing-root tests, and the focused App
 contract suite. Use major versions for breaking command or JSON contracts.
 
-`scripts/orchestrator-cache` is the only supported ledger archive and retention
+`scripts/ledger-cache` is the only supported ledger archive and retention
 artifact. Its `__version__` is independent from the claim schema. Follow
 `references/cache-lifecycle.md` for its safe boundaries and validation lane.

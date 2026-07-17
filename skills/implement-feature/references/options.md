@@ -1,4 +1,4 @@
-# App Orchestrator Authorization Contract
+# Implement Feature Authorization Contract
 
 ## Syntax And Hard Cut
 

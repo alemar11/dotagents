@@ -1,4 +1,4 @@
-# Orchestration Cache Lifecycle
+# Ledger Cache Lifecycle
 
 ## Ownership And Timing
 
@@ -14,8 +14,8 @@ Run once per controller entry after an acquired, already-owned, or recovered
 takeover claim:
 
 ```text
-scripts/orchestrator-cache --json doctor
-scripts/orchestrator-cache --json archive prune --older-than-days 180 --apply
+scripts/ledger-cache --json doctor
+scripts/ledger-cache --json archive prune --older-than-days 180 --apply
 ```
 
 Do not rerun maintenance for every scheduling wave. A doctor or prune warning is
@@ -47,7 +47,7 @@ same-root acquire removes obsolete durable-handoff receipts.
 Run terminal archival with:
 
 ```text
-scripts/orchestrator-cache --json ledger archive \
+scripts/ledger-cache --json ledger archive \
   --ledger <absolute-active-ledger> \
   --archive-reason terminal \
   --root-id <released-root-id> \
@@ -84,7 +84,7 @@ Metadata schema `1.0.0` owns these fields:
 | `size_bytes` | Ledger byte count. |
 | `evidence_ref` | Terminal or cutover authorization evidence. |
 | `root_id` | Released terminal owner or `null` for cutover. |
-| `tool_version` | `orchestrator-cache` command-contract version. |
+| `tool_version` | `ledger-cache` command-contract version. |
 
 The helper serializes mutations through the existing claim-store lock, requires
 the exact terminal release receipt, refuses active claim or takeover references,
@@ -110,7 +110,7 @@ interrupted operations, and informational warnings at 25 MiB or 100 archives.
 
 ## Helper Maintenance
 
-`scripts/orchestrator-cache` is the shipped local/offline artifact and keeps one
+`scripts/ledger-cache` is the shipped local/offline artifact and keeps one
 `__version__` semver source of truth. It has no config, auth, network, raw escape
 hatch, or maintenance project. After changes, run `--help`, `--version`,
 `--json doctor`, focused cache-helper tests, a dry-run fixture, and the complete

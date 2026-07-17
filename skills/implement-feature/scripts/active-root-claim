@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Atomically coordinate overlapping Codex App orchestrator roots."""
+"""Coordinate overlapping active-root claims for Implement Feature runs."""
 
 from __future__ import annotations
 
@@ -1639,7 +1639,9 @@ def add_claim_identity(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Atomically coordinate overlapping Codex App orchestrator roots.")
+    parser = argparse.ArgumentParser(
+        description="Coordinate overlapping active-root claims for Implement Feature runs."
+    )
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--json", action="store_true")
     subcommands = parser.add_subparsers(dest="noun", required=True)

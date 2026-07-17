@@ -28,7 +28,7 @@ def run_app_preclaim_fixture(
     return "accepted", observations, mutations
 
 
-class AppOrchestratorContractTests(unittest.TestCase):
+class ImplementFeatureContractTests(unittest.TestCase):
     def read(self, relative: str) -> str:
         return (ROOT / relative).read_text()
 
@@ -44,8 +44,8 @@ class AppOrchestratorContractTests(unittest.TestCase):
         required = {
             "SKILL.md",
             "agents/openai.yaml",
-            "scripts/orchestrator-claim",
-            "scripts/orchestrator-cache",
+            "scripts/active-root-claim",
+            "scripts/ledger-cache",
             "references/options.md",
             "references/task-model-policy.md",
             "references/cache-lifecycle.md",
@@ -160,7 +160,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
         template = self.read("references/ledger-template.md")
         recovery = self.read("references/recovery-validation.md")
         options = self.read("references/options.md")
-        claim_helper = self.read("scripts/orchestrator-claim")
+        claim_helper = self.read("scripts/active-root-claim")
         compact_ledger = " ".join(ledger.split())
 
         surface = " ".join(
@@ -263,8 +263,8 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertLess(controller.index("5. **REGISTER**"), controller.index("7. **DISPATCH**"))
 
         for command in (
-            "scripts/orchestrator-cache --json doctor",
-            "scripts/orchestrator-cache --json archive prune --older-than-days 180 --apply",
+            "scripts/ledger-cache --json doctor",
+            "scripts/ledger-cache --json archive prune --older-than-days 180 --apply",
         ):
             self.assertIn(command, lifecycle)
         self.assertIn("The root owns cache maintenance", lifecycle)
@@ -546,7 +546,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
         discovery = skill.index("perform read-only discovery first")
         permission = skill.index("Then resolve `stale_claim_takeover_permission`")
         stop = skill.index("may the root stop the tasks through the App runtime")
-        takeover = skill.index("scripts/orchestrator-claim --json claim takeover")
+        takeover = skill.index("scripts/active-root-claim --json claim takeover")
         self.assertLess(discovery, permission)
         self.assertLess(permission, stop)
         self.assertLess(stop, takeover)
@@ -1000,11 +1000,18 @@ class AppOrchestratorContractTests(unittest.TestCase):
                 app_feature_executors.append(path.name)
         self.assertEqual(sorted(app_feature_executors), ["implement-feature"])
 
-    def test_retired_public_skill_name_is_absent(self) -> None:
+    def test_retired_package_facing_names_are_absent(self) -> None:
         retired = (
             "codex" + "-orchestrator",
             "Codex App " + "Orchestrator",
             "Codex " + "Orchestrator",
+            "orchestrator" + "-claim",
+            "orchestrator" + "-cache",
+            "App" + "OrchestratorContractTests",
+            "# App " + "Orchestrator Authorization Contract",
+            "# Codex App " + "Orchestration Ledger",
+            "# Codex App " + "Orchestration Gates",
+            "# " + "Orchestration Cache Lifecycle",
         )
         findings = []
         for root in (REPO / "AGENTS.md", REPO / "README.md", REPO / ".agents", REPO / "skills"):
@@ -1020,6 +1027,8 @@ class AppOrchestratorContractTests(unittest.TestCase):
                     if token in text:
                         findings.append(f"{path.relative_to(REPO)}: {token}")
         self.assertEqual(findings, [])
+        self.assertFalse((ROOT / ("scripts/orchestrator" + "-claim")).exists())
+        self.assertFalse((ROOT / ("scripts/orchestrator" + "-cache")).exists())
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "scripts/orchestrator-claim"
+TOOL = ROOT / "scripts/active-root-claim"
 LOADER = importlib.machinery.SourceFileLoader("claim_helper_runtime", str(TOOL))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 assert SPEC is not None

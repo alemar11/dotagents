@@ -1,4 +1,4 @@
-# Codex App Orchestration Gates
+# Implement Feature Gates
 
 ## Run Authorization Gate
 

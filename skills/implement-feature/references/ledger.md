@@ -1,4 +1,4 @@
-# Codex App Orchestration Ledger
+# Implement Feature Ledger
 
 ## Resolution
 
@@ -66,7 +66,7 @@ until the bundle is revalidated.
 
 ## Active Root Claim
 
-The Markdown section is a projection. Use `scripts/orchestrator-claim`, which
+The Markdown section is a projection. Use `scripts/active-root-claim`, which
 serializes overlap checks under one filesystem lock in
 `~/.cache/dotagents/skills/implement-feature/claims/`. Acquire before ledger,
 Goal, task, managed checkout, or mutation. Persist the returned claim ref,
@@ -237,7 +237,7 @@ task, due in-run check, newly ready Spec, or unresolved authorized work. Release
 the claim only after terminal evidence or the durable handoff is persisted.
 
 After terminal release only, archive the active ledger with
-`scripts/orchestrator-cache` using the receipt's exact evidence ref; keep
+`scripts/ledger-cache` using the receipt's exact evidence ref; keep
 resumable-handoff ledgers active.
 
 ## Hard Cut

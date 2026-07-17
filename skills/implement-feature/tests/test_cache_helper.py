@@ -14,13 +14,13 @@ from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TOOL = ROOT / "scripts/orchestrator-cache"
+TOOL = ROOT / "scripts/ledger-cache"
 LOADER = importlib.machinery.SourceFileLoader("cache_helper_runtime", str(TOOL))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 assert SPEC is not None
 CACHE_RUNTIME = importlib.util.module_from_spec(SPEC)
 LOADER.exec_module(CACHE_RUNTIME)
-CLAIM_TOOL = ROOT / "scripts/orchestrator-claim"
+CLAIM_TOOL = ROOT / "scripts/active-root-claim"
 CLAIM_LOADER = importlib.machinery.SourceFileLoader(
     "cache_helper_claim_runtime", str(CLAIM_TOOL)
 )
