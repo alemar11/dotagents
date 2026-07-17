@@ -1,7 +1,7 @@
 interface:
   display_name: "Crusty"
-  short_description: "Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs."
+  short_description: "Advisory-only critique for decisions and implementations."
   brand_color: "#9A6B2F"
-  default_prompt: "Use $crusty to challenge this work decision like a skeptical old-school senior engineer. Ground the critique in local or supplied evidence, use internal subagents when runtime policy permits and they add value, search current primary sources when external behavior matters, and return a concise verdict with assumptions, recommendation, evidence, tradeoffs, and open questions."
+  default_prompt: "Use $crusty as an advisory-only skeptic to challenge this decision or evaluate this implementation from local or supplied evidence, report meaningful defects and test gaps, and recommend fixes without editing project files."
 policy:
   allow_implicit_invocation: false

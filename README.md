@@ -43,7 +43,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | --- | --- |
 | `autoreview` | Run Codex-only structured closeout review before final, commit, PR, or ship. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
-| `crusty` | Direct-only skeptical critique for work decisions, plans, architecture, naming, and tradeoffs. |
+| `crusty` | Direct-only advisory critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |
 | `grill-me-with-context` | Stress-test repo-backed plans and capture or hand off durable decisions. |
 | `improve-codebase-architecture` | Find evidence-backed architecture candidates, then pressure-test the selected refactor before implementation. |
