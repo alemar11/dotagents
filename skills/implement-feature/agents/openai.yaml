@@ -2,6 +2,6 @@ interface:
   display_name: "Implement Feature"
   short_description: "Implement ready Feature Specs as merge-ready App PRs."
   brand_color: "#6A7F3F"
-  default_prompt: "Use $implement-feature to execute an execution-ready Feature Spec bundle in visible Codex App tasks through the fixed reviewed, CI-clean, pull-request-ready-for-merge-but-not-merged flow."
+  default_prompt: "Use $implement-feature to execute an execution-ready Feature Spec bundle in visible ChatGPT desktop app tasks through the fixed reviewed, CI-clean, pull-request-ready-for-merge-but-not-merged flow."
 policy:
   allow_implicit_invocation: false

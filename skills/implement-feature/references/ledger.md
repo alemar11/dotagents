@@ -18,8 +18,9 @@ Record only:
 - authoritative source refs, derived canonical claim/task source ids, and
   root-computed fingerprints;
 - active-root claim ownership;
-- visible task, derived display-title, Goal, managed-checkout, and resolved
-  task-profile state;
+- portfolio Goal evidence and objective fingerprint;
+- visible task, derived display-title, assignment Goal, managed-checkout, and
+  resolved task-profile state;
 - PR revision, mergeability/repository rules, review, CI, validation,
   domain-knowledge closeout, and
   tracker-closeout proof;
@@ -32,6 +33,43 @@ Persist `visible_app_task_permission=granted-by-authorized-user` with its exact
 run-scoped evidence. Add `stale_claim_takeover_permission` only when a takeover
 question is actually resolved. Do not store fixed policy, derived state, bundle
 data, or retired option rows as authorization.
+
+## Portfolio Goal
+
+After CLAIM and ledger creation, persist the exact objective, its fingerprint,
+and `portfolio_goal_state=pending` before creating a Goal. Call `get_goal`
+first. If no unfinished Goal exists, call `create_goal` with the recorded
+objective and without `token_budget`; if the matching Goal already exists,
+adopt it as interrupted registration. Atomically persist the returned or
+observed evidence ref with `portfolio_goal_state=active`. A different unfinished
+Goal blocks as `needs-owner` without replacing it.
+
+Only after the complete read-only freshness pass and any full reconciliation
+succeed may recovery complete `pending` registration idempotently: a matching
+active Goal is recorded, and absence of an active Goal permits one `create_goal`
+retry with the recorded objective. An `active` row requires matching `get_goal`
+evidence and never recreates a missing Goal. This controlled pending-state
+completion is not a fallback or ledger migration.
+
+Call `update_goal` with `status=complete` only after every Feature Spec reaches
+`pull-request-ready-for-merge-but-not-merged`. Persist the completion evidence
+and `portfolio_goal_state=complete` before terminal claim release or archival.
+If either operation fails, retain the claim and active ledger. Temporary
+blockers and resumable handoffs leave the Goal active. Missing tooling or
+fallback-only evidence never degrades to a ledger objective.
+
+If a crash leaves an active ledger at `portfolio_goal_state=complete`, recovery
+verifies the completed portfolio and task Goals plus every terminal gate, then
+idempotently finishes the terminal claim release and ledger archival. It never
+reopens implementation or recreates a Goal.
+
+If terminal proof was persisted before a task or portfolio Goal completion
+transition finished, recovery first revalidates that complete proof. It may
+then call `update_goal` with `status=complete` for an active terminal task or
+active terminal portfolio Goal, or accept an already-completed matching Goal
+whose completion evidence was not yet persisted. Persist every completed Goal
+transition before release or archival; never resume implementation to repair
+this closeout window.
 
 ## Source Snapshots
 

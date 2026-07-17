@@ -1,4 +1,4 @@
-# Visible Codex App Feature Spec Task
+# Visible ChatGPT Desktop App Feature Spec Task
 
 ## Assignment
 
@@ -104,13 +104,31 @@ root or background implementation.
 
 ## Goal Contract
 
-The initial prompt requires the task to create or resume an
-assignment-scoped Goal before work. The Goal contains the exact Feature Spec,
-repositories and paths, acceptance criteria, validation, and fixed terminal
-result `pull-request-ready-for-merge-but-not-merged`. The root verifies Goal
-evidence and the exact live task title before advancing beyond `created`.
-Record an exact objective fallback only when the task runtime reports no Goal
-tool.
+The initial prompt requires a newly created task to call `create_goal` before
+work. Its assignment-scoped objective contains the exact Feature Spec,
+repositories and allowed paths, acceptance criteria, validation, and fixed
+terminal result `pull-request-ready-for-merge-but-not-merged`. Do not pass
+`token_budget`.
+
+On recovery, call `get_goal`. A nonterminal task requires an active objective
+and fingerprint matching the recorded Goal evidence before implementation
+resumes. A task already recorded at the fixed terminal result requires matching
+completed Goal evidence and must not resume implementation. Never call
+`create_goal` for either recovery path. The root verifies that evidence and the
+exact live task title before advancing beyond `created` or resuming a
+nonterminal task. If any required Goal tool is unexpectedly absent after task
+creation, report an
+`unsupported-runtime` blocker on that same task. Never record an objective
+fallback or create a replacement task.
+
+Call `update_goal` with `status=complete` only after the fixed terminal result
+is proven. Temporary blockers and resumable handoffs leave nonterminal task
+Goals active; already-terminal task Goals remain complete. If recovery finds
+the terminal proof recorded while this Goal is still active, revalidate that
+proof, call `update_goal` with `status=complete`, persist the evidence, and
+report without resuming implementation. If the Goal already completed but its
+evidence write was interrupted, verify and persist that result without calling
+`update_goal` again.
 
 ## Execution
 
@@ -183,11 +201,17 @@ Dependencies: <verified merged cross-Spec dependencies>
 Validation and integration gates: <commands and proof>
 Knowledge closeout: <exact final-issue delta or none>
 
-Create or resume the assignment Goal before implementation. Work only in the
+If this is a new task, call `create_goal` with the exact assignment objective
+before implementation and omit `token_budget`. If this is a resumed task, call
+`get_goal` and verify the active objective before continuing nonterminal work.
+If this task is already terminal, verify its completed Goal and report without
+resuming implementation; if its recorded terminal proof precedes an unfinished
+Goal completion transition, finish that transition only. Work only in the
 managed checkouts. Use the fixed action set and report any internal subagents.
 Do not edit the ledger, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
-every affected PR is ready to merge or report a concrete blocker.
+every affected PR is ready to merge or report a concrete blocker. Call
+`update_goal` with `status=complete` only after the terminal result is proven.
 ```
 
 ## Report

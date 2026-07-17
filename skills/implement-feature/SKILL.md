@@ -1,6 +1,6 @@
 ---
 name: implement-feature
-description: Execute execution-ready Feature Spec bundles in visible Codex App tasks through reviewed, CI-clean, merge-ready-but-unmerged pull requests. Use only when the user explicitly invokes $implement-feature or asks to run Implement Feature in the Codex App.
+description: Execute execution-ready Feature Spec bundles in visible ChatGPT desktop app tasks through reviewed, CI-clean, merge-ready-but-unmerged pull requests. Use only when the user explicitly invokes $implement-feature or asks to run Implement Feature in the ChatGPT desktop app.
 ---
 
 # Implement Feature
@@ -8,7 +8,7 @@ description: Execute execution-ready Feature Spec bundles in visible Codex App t
 ## Purpose
 
 Use this Codex-dependent skill only when the owner explicitly invokes
-`$implement-feature` or asks to run Implement Feature in the Codex App. It is the
+`$implement-feature` or asks to run Implement Feature in the ChatGPT desktop app. It is the
 single App-only implementation adapter. It never plans work and never invokes
 another orchestrator.
 
@@ -22,9 +22,12 @@ through the fixed terminal result
 
 This is the first runtime step. Before asking permission, reading source
 artifacts, acquiring a claim, creating persistence, or performing any mutation,
-verify that the current runtime exposes visible Codex App task creation,
+verify that the current runtime exposes visible ChatGPT desktop app task creation,
 App-managed worktree binding, task-title mutation through
-`codex_app__set_thread_title`, and live task-title observation.
+`codex_app__set_thread_title`, live task-title observation, and `create_goal`,
+`get_goal`, and `update_goal` in the root plus general visible-task Goal-tool
+support. This pre-authorization gate proves platform capability; it does not
+create a task to inspect task-local tools.
 
 Generic or background subagents, filesystem access, an interactive CLI, and
 local skill discovery do not prove this surface. If any required App capability is
@@ -193,7 +196,11 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    read-only cache doctor, then apply the fixed 180-day archive TTL in the root.
    Report warnings without blocking implementation; never delegate this step.
 5. **REGISTER** — create the ledger projection, snapshot authorization and
-   source fingerprints, and create the portfolio Goal or exact fallback.
+   source fingerprints, and persist the exact portfolio objective and
+   `portfolio_goal_state=pending`. Reconcile any matching existing Goal through
+   `get_goal`; otherwise call `create_goal`, then atomically persist its evidence,
+   objective fingerprint, and `portfolio_goal_state=active`. Never set
+   `token_budget` for this fixed workflow.
 6. **PR-PREFLIGHT** — require a GitHub target, authenticated access, branch
    publication, PR create/update capability, current-head review, and a
    discoverable CI path expected to produce at least one applicable result for
@@ -208,7 +215,8 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    set, adopt and resume any exact task refs carried by takeover, otherwise
    derive and persist each selected Spec's display title, create one managed
    visible task with its resolved task profile, resolve its concrete thread id,
-   set and observe the exact title, and verify its Goal.
+   set and observe the exact title, verify that exact task's Goal tools, and
+   verify its Goal before advancing beyond `created`.
 8. **MONITOR** — read current task state, reconcile live evidence, and send only
    precise corrections with the recorded task profile. Never take implementation
    or review back into the root.
@@ -315,9 +323,13 @@ authorization evidence, source fingerprints, claim ownership, task/Goal and
 managed-checkout state, the derived per-Spec task display title, the resolved
 task profile, PR/review/CI proof, recovery state, and external handoffs.
 
-Every created or resumed task establishes its assignment-scoped Goal before
-work. Record an exact objective fallback only if that task runtime exposes no
-Goal tool. Worker reports are evidence; only the root changes portfolio state.
+Every newly created task calls `create_goal` for its exact assignment before
+work. On recovery, a nonterminal task calls `get_goal` and requires the active
+objective to match the recorded evidence; a terminal task requires matching
+completed Goal evidence and is verified without resuming implementation.
+Neither path creates another Goal. Missing Goal tooling is an App-runtime
+invariant violation, never an objective-ledger fallback. Worker reports are
+evidence; only the root changes portfolio state.
 A stale or failed task is read, recorded, and resumed in that same visible App
 task. If the original task cannot be resumed, abort as blocked; never create a
 replacement task for the same Spec.
@@ -328,8 +340,9 @@ original task or block.
 
 On resume, load `references/recovery-validation.md` and revalidate the runtime
 surface, claim, source fingerprints, repositories, task display title,
-task/Goal evidence, managed checkouts, gates, and review waits before mutation.
-Incompatible pre-hard-cut ledgers are not migrated.
+portfolio and task Goal evidence, managed checkouts, gates, and review waits
+before mutation. Incompatible pre-hard-cut ledgers, including fallback-only
+Goal evidence, are not migrated.
 
 Archived ledgers are cold evidence, never recovery input. Cache maintenance is
 root-owned and runs only after a successful claim; load
@@ -371,10 +384,22 @@ evidence, changes, validation, commits, PR URLs, exact reviewed revisions, CI
 state, captured domain-closeout evidence when present, prepared tracker
 closeout, current-head mergeability and repository-rule evidence, blockers, recovery
 freshness, and the next external action. Release the claim after terminal proof
-or the recorded durable handoff, using `--release-reason terminal` or
-`--release-reason durable-handoff` respectively. After a terminal release only,
-archive the active ledger through `scripts/ledger-cache` with the exact
-release evidence; resumable handoffs retain it.
+or the recorded durable handoff. Before a terminal release, require every task
+to call `update_goal` with `status=complete`, then have the root do the same for
+the portfolio and persist `portfolio_goal_state=complete` plus the completion
+evidence. Only after that write may the root release with
+`--release-reason terminal` and archive through `scripts/ledger-cache`. If Goal
+completion or evidence persistence fails, retain the claim and active ledger
+with the exact blocker. A resumable handoff releases with
+`--release-reason durable-handoff` and retains the active ledger; the portfolio
+and every nonterminal task Goal remain active while already-terminal task Goals
+remain complete. Recovery of
+an already persisted `portfolio_goal_state=complete` verifies the terminal
+evidence and idempotently finishes any outstanding terminal release and
+archival. Recovery may also finish an interrupted task or portfolio
+`update_goal` transition after revalidating the complete terminal proof, then
+persist the completed evidence before release. Neither path resumes
+implementation.
 
 ## References
 

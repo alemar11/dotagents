@@ -10,11 +10,15 @@ REPO = ROOT.parents[1]
 
 
 def run_app_preclaim_fixture(
-    *, surface_available: bool, permission: str, bundle_ready: bool
+    *,
+    surface_available: bool,
+    permission: str,
+    bundle_ready: bool,
+    goal_surface_available: bool = True,
 ) -> tuple[str, list[str], list[str]]:
     observations = ["surface"]
     mutations: list[str] = []
-    if not surface_available:
+    if not surface_available or not goal_surface_available:
         return "unsupported-runtime", observations, mutations
     observations.append("authorization")
     if permission != "granted-by-authorized-user":
@@ -73,7 +77,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertLess(intake, controller)
         surface_text = " ".join(skill[surface:authorization].split())
         self.assertIn("This is the first runtime step", surface_text)
-        self.assertIn("visible Codex App task creation", surface_text)
+        self.assertIn("visible ChatGPT desktop app task creation", surface_text)
         self.assertIn("App-managed worktree binding", surface_text)
         self.assertIn("without asking permission", surface_text)
         self.assertIn("0. **SURFACE**", skill[controller:])
@@ -83,7 +87,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.read("references/recovery-validation.md").split()
         )
         self.assertIn("Before reading the packet", recovery)
-        self.assertIn("visible Codex App task creation", recovery)
+        self.assertIn("visible ChatGPT desktop app task creation", recovery)
         self.assertIn("App-managed worktree binding", recovery)
         self.assertIn("without asking permission", recovery)
 
@@ -171,6 +175,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for token in (
             "codex_app__set_thread_title",
             "live task-title observation",
+            "`create_goal`",
+            "`get_goal`",
+            "`update_goal`",
             "Before asking permission",
             "unsupported-runtime",
         ):
@@ -457,6 +464,96 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("resumed or replaced", normalized)
         self.assertNotIn("`replaced`", self.read("references/worker.md"))
 
+    def test_goal_tools_are_mandatory_without_objective_fallback(self) -> None:
+        skill = self.read("SKILL.md")
+        worker = self.read("references/worker.md")
+        ledger = self.read("references/ledger.md")
+        template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        normalized_recovery = " ".join(recovery.split())
+
+        for text in (skill, worker, ledger, recovery):
+            for tool in ("`create_goal`", "`get_goal`", "`update_goal`"):
+                self.assertIn(tool, text)
+
+        self.assertIn("Never set", skill)
+        self.assertIn("Do not pass", worker)
+        self.assertIn("`token_budget`", skill)
+        self.assertIn("`token_budget`", worker)
+        self.assertIn("exact Feature Spec", worker)
+        self.assertIn("repositories and allowed paths", worker)
+        self.assertIn("acceptance criteria", worker)
+        self.assertIn("validation", worker)
+        self.assertIn("pull-request-ready-for-merge-but-not-merged", worker)
+        self.assertIn("Objective fingerprint", template)
+        self.assertIn("portfolio_goal_state", template)
+        self.assertIn("portfolio_goal_evidence_ref", template)
+        self.assertIn('goal_evidence_ref: "none"', recovery)
+        self.assertIn("read only the packet and ledger fields", normalized_recovery)
+        self.assertIn(
+            "Before any mutation, read each exact task", normalized_recovery
+        )
+        self.assertIn("portfolio_goal_state=pending", recovery)
+        self.assertIn("portfolio_goal_state=complete", recovery)
+        self.assertIn("Do not persist adoption or call `create_goal`", normalized_recovery)
+        self.assertIn("Only after the complete freshness pass", normalized_recovery)
+        self.assertIn("complete `pending` Goal registration", normalized_recovery)
+        self.assertIn("never repair or resume implementation", normalized_recovery)
+        self.assertIn("idempotently release it", normalized_recovery)
+        self.assertIn("if it is not already archived", normalized_recovery)
+        self.assertIn("active matching Goal evidence", normalized_recovery)
+        self.assertIn("completed matching Goal evidence", normalized_recovery)
+        self.assertIn("interrupted completion transition", normalized_recovery)
+        self.assertIn("terminal-closeout recovery mutations", normalized_recovery)
+        self.assertIn("persist the matching completion evidence", normalized_recovery)
+        normalized_worker = " ".join(worker.split())
+        self.assertIn("already recorded at the fixed terminal result", normalized_worker)
+        self.assertIn("must not resume implementation", normalized_worker)
+        self.assertIn("finish that transition only", normalized_worker)
+
+        surface = " ".join(
+            skill.split("## Mandatory Runtime Surface Gate", 1)[1]
+            .split("## Mandatory Run Authorization", 1)[0]
+            .split()
+        )
+        self.assertIn("general visible-task Goal-tool support", surface)
+        self.assertIn("does not create a task to inspect task-local tools", surface)
+        dispatch = " ".join(
+            skill.split("7. **DISPATCH**", 1)[1].split("8. **MONITOR**", 1)[0].split()
+        )
+        self.assertIn("verify that exact task's Goal tools", dispatch)
+        self.assertIn("before advancing beyond `created`", dispatch)
+
+        register = " ".join(
+            skill.split("5. **REGISTER**", 1)[1].split("6. **PR-PREFLIGHT**", 1)[0].split()
+        )
+        self.assertLess(
+            register.index("portfolio_goal_state=pending"),
+            register.index("otherwise call `create_goal`"),
+        )
+
+        delivery = " ".join(skill.split("## Delivery And Final Report", 1)[1].split())
+        self.assertLess(
+            delivery.index("`update_goal`"),
+            delivery.index("portfolio_goal_state=complete"),
+        )
+        self.assertLess(
+            delivery.index("portfolio_goal_state=complete"),
+            delivery.index("`--release-reason terminal`"),
+        )
+        self.assertLess(
+            delivery.index("`--release-reason terminal`"),
+            delivery.index("`scripts/ledger-cache`"),
+        )
+
+        runtime = self.runtime_text()
+        for retired in (
+            "create the portfolio Goal or exact fallback",
+            "Record an exact objective fallback only if",
+            "or recorded unavailable fallback",
+        ):
+            self.assertNotIn(retired, runtime)
+
     def test_review_is_mandatory_with_one_fixed_thirty_minute_deadline(self) -> None:
         closeout = self.read("references/codex-review-closeout.md")
         gates = self.read("references/gates.md")
@@ -604,8 +701,24 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_preclaim_fixture_has_zero_mutations_on_early_abort(self) -> None:
         cases = (
-            (False, "not-requested", False, "unsupported-runtime", ["surface"]),
             (
+                False,
+                True,
+                "not-requested",
+                False,
+                "unsupported-runtime",
+                ["surface"],
+            ),
+            (
+                True,
+                False,
+                "not-requested",
+                False,
+                "unsupported-runtime",
+                ["surface"],
+            ),
+            (
+                True,
                 True,
                 "denied-by-authorized-user",
                 True,
@@ -614,16 +727,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
             ),
             (
                 True,
+                True,
                 "granted-by-authorized-user",
                 False,
                 "planning-required",
                 ["surface", "authorization", "intake"],
             ),
         )
-        for surface, permission, ready, expected, observations in cases:
+        for surface, goal_surface, permission, ready, expected, observations in cases:
             with self.subTest(expected=expected):
                 outcome, observed, mutations = run_app_preclaim_fixture(
                     surface_available=surface,
+                    goal_surface_available=goal_surface,
                     permission=permission,
                     bundle_ready=ready,
                 )

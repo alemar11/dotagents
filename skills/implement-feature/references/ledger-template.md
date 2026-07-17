@@ -1,8 +1,11 @@
-# Codex App Ledger Template
+# ChatGPT Desktop App Ledger Template
 
 ## Scope
 
 Objective: <exact objective>
+Objective fingerprint: <sha256>
+portfolio_goal_state: <pending, active, or complete>
+portfolio_goal_evidence_ref: <none while pending or exact Goal evidence ref>
 Repositories: <canonical Git common directories>
 Sources: <stable ids and refs>
 
@@ -60,6 +63,7 @@ evidence, and next action.
 Source fingerprints: <refs>
 Repository fingerprints: <refs>
 Atomic claim fingerprint: <sha256>
+Portfolio Goal evidence: <state, ref, objective fingerprint, and current get_goal observation>
 Active task refs: <refs or none>
 Managed checkout evidence: <refs>
 Task titles: <source Spec, exact task_title, and live observation evidence>

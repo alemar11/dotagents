@@ -16,7 +16,7 @@ This file owns every user-controlled App orchestration field.
 | `stale_claim_takeover_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Exceptional run-scoped consent to stop the disclosed conflicting tasks, replace their complete verified-stale root scopes, and adopt the same task refs. |
 
 Resolve `visible_app_task_permission` only after the mandatory runtime surface
-gate proves visible Codex App task creation and App-managed worktree binding.
+gate proves visible ChatGPT desktop app task creation and App-managed worktree binding.
 When missing, ask once. Denial, no answer, or inability to ask aborts without
 runtime artifacts.
 

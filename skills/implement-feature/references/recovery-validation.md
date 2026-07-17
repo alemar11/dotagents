@@ -5,11 +5,19 @@ Load this reference only when resuming from a Recovery Packet.
 ## Runtime Surface Revalidation
 
 Before reading the packet, ledger projection, or recorded task, verify visible
-Codex App task creation, App-managed worktree binding, task-title mutation
-through `codex_app__set_thread_title`, and live task-title observation again.
-Prior evidence, task readability, generic subagents, and filesystem access are
-insufficient. If any required surface is absent or unverifiable, abort as
-`unsupported-runtime` without asking permission or touching runtime artifacts.
+ChatGPT desktop app task creation, App-managed worktree binding, task-title mutation
+through `codex_app__set_thread_title`, live task-title observation, and
+`create_goal`, `get_goal`, and `update_goal` in the root plus general
+visible-task Goal-tool support again. Prior evidence, generic subagents, and
+filesystem access are insufficient. If any required general surface is absent
+or unverifiable, abort as `unsupported-runtime` without asking permission or
+touching existing runtime artifacts.
+
+After that general gate, read only the packet and ledger fields needed to
+resolve the recorded task refs and Goal evidence. Before any mutation, read
+each exact task and require its runtime to expose the same Goal tools. A missing
+task-local tool is an `unsupported-runtime` blocker on the existing task; never
+create a replacement or objective fallback.
 
 ## Freshness Validation
 
@@ -39,12 +47,23 @@ insufficient. If any required surface is absent or unverifiable, abort as
    after its original claim was deleted. A mismatched replaced snapshot blocks.
 5. Require at most one live task per Feature Spec and three nonterminal tasks
    across the portfolio.
-6. Read every current task and validate its recorded `task_title`, model,
-   thinking value, profile decision reason, Goal, App-managed checkouts,
+6. Call `get_goal` in the root. For `portfolio_goal_state=pending`, require the
+   observed active Goal to match the recorded objective, or record that no
+   active Goal exists. Do not persist adoption or call `create_goal` during the
+   freshness pass. A different unfinished Goal blocks as `needs-owner`. For an
+   `active` state, require the objective, fingerprint, and evidence to match;
+   never recreate a missing Goal. For `portfolio_goal_state=complete`, require
+   matching completed Goal evidence and continue the full freshness pass
+   without resuming implementation. Read every current task and validate its recorded `task_title`,
+   model, thinking value, profile decision reason, assignment Goal, App-managed checkouts,
    lifecycle, changes, PR revision tuples, review, CI, required domain-closeout
    evidence, and blockers. Use the recorded profile for every resume or steering
    message. Record task-title drift without mutating it during freshness
-   validation. For a captured closeout, recompute the delta fingerprint,
+   validation. Require active matching Goal evidence for every nonterminal task
+   and completed matching Goal evidence for every task already at the fixed
+   terminal result. A terminal task may temporarily retain an active matching
+   Goal only as an interrupted completion transition; do not resume its
+   implementation. For a captured closeout, recompute the delta fingerprint,
    verified destinations, documentation-diff fingerprint, and relevant
    implementation revision tuples.
 7. Recompute merged dependencies, path conflicts, deterministic ready order,
@@ -56,19 +75,45 @@ insufficient. If any required surface is absent or unverifiable, abort as
 Any mismatch invalidates the compact packet. Run full source and ledger
 reconciliation before mutation; do not repair the packet in place.
 Only after the complete freshness pass and any required full reconciliation
-succeed may the root repair recorded task-title drift through
+succeed may the root complete `pending` Goal registration: persist a matching
+observed Goal as `active`, or, if none existed during the pass, call
+`create_goal` once with the recorded objective and atomically persist its
+evidence as `active`. Then the root may repair recorded task-title drift through
 `codex_app__set_thread_title` on the same task, observe the exact result, update
 the ledger evidence, and resume implementation.
+
+For `portfolio_goal_state=complete`, instead require every task Goal and fixed
+terminal gate to be complete, verify the terminal release evidence or current
+claim ownership, and never repair or resume implementation. If the claim is
+still active, idempotently release it with `--release-reason terminal`; then
+archive the ledger with that exact release evidence if it is not already
+archived. A mismatch blocks without reopening the completed Goal.
+
+For interrupted terminal closeout while `portfolio_goal_state=active`, first
+require every fixed task and portfolio terminal gate to pass. For each terminal
+task whose matching Goal is still active, call `update_goal` with
+`status=complete` and persist the result; if it is already completed, persist
+the matching completion evidence without calling the tool again. After every
+task Goal is complete, apply the same rule to the portfolio Goal, persist
+`portfolio_goal_state=complete`, and continue through the completed-state
+release and archival path above. These are terminal-closeout recovery mutations,
+not implementation resume.
 
 ## Task Recovery
 
 Require the exact Feature Spec assignment, one task, an assignment-scoped Goal
-or recorded unavailable fallback, exact task display title, exact task model and
+created through `create_goal`, exact task display title, exact task model and
 thinking profile, complete managed checkout map, and the fixed PR-ready flow.
-Resume only the original visible task with its recorded title and profile after
-recording stale or failure evidence. If that task or a managed checkout cannot
-be recovered, abort as blocked; never create a replacement for the same Spec or
-substitute root/background implementation or raw worktree machinery.
+The task calls `get_goal` and verifies its objective against the recorded
+fingerprint before implementation resumes. A terminal task instead verifies
+its completed Goal, or finishes only an interrupted completion transition, and
+remains stopped. Missing or mismatched Goal evidence
+blocks recovery; there is no unavailable-tool or objective-ledger fallback.
+Resume only the original visible task when it is nonterminal, using its recorded
+title and profile after recording stale or failure evidence. If that task or a
+managed checkout cannot be recovered, abort as blocked; never create a
+replacement for the same Spec or substitute root/background implementation or
+raw worktree machinery.
 
 For an otherwise current pre-title ledger, missing `task_title` is recoverable
 derived UI evidence, not ownership evidence. Read the live task without using
@@ -99,8 +144,10 @@ Reject and do not migrate ledgers or packets containing delivery or issue
 permissions, review skips, worker action options, parallelization, repository
 layout copies, checkout strategies, adapter or lifecycle-owner fields, stacked
 states, PR-count strategies, completion methods, closeout enums, or
-source-provided option fingerprints. Start a fresh compatible run only after
-the old owner releases its claim.
+source-provided option fingerprints. Also reject fallback-only portfolio or
+dispatched-task Goal evidence. An undispatched `no-task` record may retain
+`goal_evidence_ref: "none"`. Start a fresh compatible run only after the old
+owner releases its claim.
 
 The claim helper may report an exact schema-3 or schema-4 claim as `legacy`. Do
 not load it as current runtime state or migrate it. A prepared schema-1 takeover

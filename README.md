@@ -53,7 +53,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `plan-feature` | Manually plan Feature Spec bundles and agent-ready issues in apply or proposal mode. |
-| `implement-feature` | Execute execution-ready Feature Spec bundles in visible Codex App tasks through one fixed GitHub PR-ready flow. |
+| `implement-feature` | Execute execution-ready Feature Spec bundles in visible ChatGPT desktop app tasks through one fixed GitHub PR-ready flow. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
 | `project-memory` | Maintain tracker routing, domain language, ADRs, context, and localization memory. |

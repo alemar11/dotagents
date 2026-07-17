@@ -3,7 +3,7 @@
 ## Ownership
 
 This file is the canonical owner of the model and reasoning policy for visible
-Codex App tasks created or steered by `$implement-feature`. The policy is fixed
+ChatGPT desktop app tasks created or steered by `$implement-feature`. The policy is fixed
 runtime behavior, not a user option, Feature Spec field, Project Memory value,
 or tracker artifact. Update model generations and the bounded reasoning set
 here instead of duplicating them across the runtime docs.
