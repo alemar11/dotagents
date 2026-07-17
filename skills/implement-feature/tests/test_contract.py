@@ -153,6 +153,70 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertIn("recorded per-Spec task profile", recovery)
         self.assertIn("Use the recorded profile", recovery)
 
+    def test_visible_task_title_is_required_semantic_and_recoverable(self) -> None:
+        skill = self.read("SKILL.md")
+        worker = self.read("references/worker.md")
+        ledger = self.read("references/ledger.md")
+        template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        options = self.read("references/options.md")
+        claim_helper = self.read("scripts/orchestrator-claim")
+        compact_ledger = " ".join(ledger.split())
+
+        surface = " ".join(
+            skill.split("## Mandatory Runtime Surface Gate", 1)[1]
+            .split("## Mandatory Run Authorization", 1)[0]
+            .split()
+        )
+        for token in (
+            "codex_app__set_thread_title",
+            "live task-title observation",
+            "Before asking permission",
+            "unsupported-runtime",
+        ):
+            self.assertIn(token, surface)
+
+        title_contract = worker.split("## Task Display Title", 1)[1].split(
+            "## Fixed Actions", 1
+        )[0]
+        compact_title_contract = " ".join(title_contract.split())
+        for token in (
+            "semantically relevant emoji",
+            "dominant user-facing goal",
+            "`🛠️`",
+            "<emoji> <exact authored Feature Spec title>",
+            "one emoji grapheme followed by one space",
+            "not a user option",
+            "clientThreadId",
+            "threadId",
+            "codex_app__set_thread_title",
+            "never create another task",
+        ):
+            self.assertIn(token, title_contract)
+        self.assertLess(
+            compact_title_contract.index("Resolve and persist `task_title`"),
+            compact_title_contract.index("codex_app__create_thread"),
+        )
+        self.assertLess(
+            compact_title_contract.index("codex_app__create_thread"),
+            compact_title_contract.index("codex_app__set_thread_title"),
+        )
+        self.assertLess(
+            compact_title_contract.index("codex_app__set_thread_title"),
+            compact_title_contract.index("observe the exact live title"),
+        )
+
+        for text in (ledger, template):
+            self.assertIn("task_title", text)
+        self.assertIn("Missing `task_title` alone", compact_ledger)
+        self.assertIn("derived UI evidence, not ownership evidence", recovery)
+        self.assertIn("Record task-title drift without mutating it", recovery)
+        self.assertIn("Only after the complete freshness pass", recovery)
+        self.assertIn("never accept an arbitrary emoji", recovery)
+        self.assertIn("same task", recovery)
+        self.assertNotIn("task_title", options)
+        self.assertNotIn('"task_title"', claim_helper)
+
     def test_one_consent_covers_the_complete_fixed_flow(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
         options = " ".join(self.read("references/options.md").split())

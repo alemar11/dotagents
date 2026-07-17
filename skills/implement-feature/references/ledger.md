@@ -18,7 +18,8 @@ Record only:
 - authoritative source refs, derived canonical claim/task source ids, and
   root-computed fingerprints;
 - active-root claim ownership;
-- visible task, Goal, managed-checkout, and resolved task-profile state;
+- visible task, derived display-title, Goal, managed-checkout, and resolved
+  task-profile state;
 - PR revision, mergeability/repository rules, review, CI, validation,
   domain-knowledge closeout, and
   tracker-closeout proof;
@@ -163,8 +164,8 @@ the taken-over root.
 
 Keep one row per implementation-eligible Feature Spec:
 
-| source_spec_ref | feature_spec_title | task_ref | task_model | task_thinking | thinking_reason | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| source_spec_ref | feature_spec_title | task_title | task_ref | task_model | task_thinking | thinking_reason | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 A Spec has at most one live task. At most three rows are nonterminal. The task
 registry's `source_spec_ref` is the canonical claim/task source id and points
@@ -172,7 +173,18 @@ back to the Source Snapshots row that preserves the authoritative authored ref.
 The task row points to fixed worker actions; only affected repositories and
 allowed paths vary. `task_model`, `task_thinking`, and `thinking_reason` are the
 exact resolved evidence from `task-model-policy.md`, not another option
-registry. Every creation, steering, and resume call must preserve them.
+registry. `task_title` is the root-resolved `<emoji> <exact authored Feature
+Spec title>` UI value and never supplies identity; `source_spec_ref` and
+`task_ref` remain authoritative. Every creation, steering, and resume call must
+preserve the recorded profile and title.
+
+A no-task row may hold its selected `task_title` before creation. Missing
+`task_title` alone does not make an otherwise current pre-title ledger
+incompatible. For a recorded task, read its live title, select and apply the
+canonical title on that same task when needed, then record the observed value
+before further execution. For a no-task row, resolve it at DISPATCH. This
+backfill is permitted only for derived UI evidence and never repairs identity,
+scope, profile, Goal, checkout, or gate state.
 
 ## Scheduling
 
@@ -211,8 +223,8 @@ Unknown or pending state never passes.
 
 The packet is a compact derived projection containing source and repository
 fingerprints, claim fingerprint, active task refs, managed-checkout evidence,
-recorded task profiles, current PR tuples, current domain-closeout evidence ref
-when required, due review/CI checks, next action, and evidence refs. On
+recorded task titles and profiles, current PR tuples, current domain-closeout
+evidence ref when required, due review/CI checks, next action, and evidence refs. On
 resume, validate every item before mutation. Any mismatch triggers full source
 and ledger reconciliation.
 

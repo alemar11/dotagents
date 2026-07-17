@@ -22,11 +22,12 @@ through the fixed terminal result
 
 This is the first runtime step. Before asking permission, reading source
 artifacts, acquiring a claim, creating persistence, or performing any mutation,
-verify that the current runtime exposes both visible Codex App task creation and
-App-managed worktree binding.
+verify that the current runtime exposes visible Codex App task creation,
+App-managed worktree binding, task-title mutation through
+`codex_app__set_thread_title`, and live task-title observation.
 
 Generic or background subagents, filesystem access, an interactive CLI, and
-local skill discovery do not prove this surface. If either App capability is
+local skill discovery do not prove this surface. If any required App capability is
 absent or unverifiable, abort as `unsupported-runtime` without asking
 permission, recommending another orchestrator, or creating artifacts.
 
@@ -81,6 +82,10 @@ change target-repository instructions.
 - Every created, steered, or resumed visible task uses the per-Spec profile
   resolved from `references/task-model-policy.md`; the root never substitutes or
   omits its model or thinking value.
+- Every created visible task has one root-owned display title formatted as one
+  semantically relevant emoji, one space, and the exact authored Feature Spec
+  title. The root always selects an emoji, uses `🛠️` when no clearer choice
+  exists, and never uses the display title as task identity.
 - Create exactly one visible task per Feature Spec, including a multi-repository
   Spec. The task owns implementation, validation, commits, publication,
   `$autoreview`, current-revision review/fixes, CI, tracker-closeout preparation,
@@ -201,8 +206,9 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    Abort as `pr-preflight-failed`; never downgrade.
 7. **DISPATCH** — load `references/worker.md`, choose the deterministic ready
    set, adopt and resume any exact task refs carried by takeover, otherwise
-   create one managed visible task per selected Spec with its resolved task
-   profile, and verify its Goal.
+   derive and persist each selected Spec's display title, create one managed
+   visible task with its resolved task profile, resolve its concrete thread id,
+   set and observe the exact title, and verify its Goal.
 8. **MONITOR** — read current task state, reconcile live evidence, and send only
    precise corrections with the recorded task profile. Never take implementation
    or review back into the root.
@@ -306,8 +312,8 @@ Load `references/ledger.md` during CLAIM and `references/worker.md` before task
 creation, resume, read, or steering. The canonical ledger lives under
 `~/.cache/dotagents/skills/implement-feature/ledgers/` and records only
 authorization evidence, source fingerprints, claim ownership, task/Goal and
-managed-checkout state, the resolved per-Spec task profile, PR/review/CI proof,
-recovery state, and external handoffs.
+managed-checkout state, the derived per-Spec task display title, the resolved
+task profile, PR/review/CI proof, recovery state, and external handoffs.
 
 Every created or resumed task establishes its assignment-scoped Goal before
 work. Record an exact objective fallback only if that task runtime exposes no
@@ -321,9 +327,9 @@ continuation state, not permission to spawn again. Adopt and resume the exact
 original task or block.
 
 On resume, load `references/recovery-validation.md` and revalidate the runtime
-surface, claim, source fingerprints, repositories, task/Goal evidence, managed
-checkouts, gates, and review waits before mutation. Incompatible pre-hard-cut
-ledgers are not migrated.
+surface, claim, source fingerprints, repositories, task display title,
+task/Goal evidence, managed checkouts, gates, and review waits before mutation.
+Incompatible pre-hard-cut ledgers are not migrated.
 
 Archived ledgers are cold evidence, never recovery input. Cache maintenance is
 root-owned and runs only after a successful claim; load
@@ -360,10 +366,10 @@ post-merge verification, or final tracker closure.
 
 For a pre-claim abort, report intake evidence and explicitly state that no
 runtime artifacts or mutations were created. Otherwise return ledger-derived
-source fingerprints, task/Goal and checkout evidence, changes, validation,
-commits, PR URLs, exact reviewed revisions, CI state, captured domain-closeout
-evidence when present, prepared tracker closeout, current-head mergeability and
-repository-rule evidence, blockers, recovery
+source fingerprints, task display-title evidence, task/Goal and checkout
+evidence, changes, validation, commits, PR URLs, exact reviewed revisions, CI
+state, captured domain-closeout evidence when present, prepared tracker
+closeout, current-head mergeability and repository-rule evidence, blockers, recovery
 freshness, and the next external action. Release the claim after terminal proof
 or the recorded durable handoff, using `--release-reason terminal` or
 `--release-reason durable-handoff` respectively. After a terminal release only,

@@ -24,6 +24,38 @@ task; they never create a replacement to change it.
 This profile governs the root-owned visible task. It does not create a separate
 model-selection contract for the task's bounded internal subagents.
 
+## Task Display Title
+
+Give every created task exactly one root-owned display-title prefix. Resolve one
+semantically relevant emoji from the validated Feature Spec title and its
+dominant user-facing goal, use `🛠️` when no clearer choice exists, then
+format `task_title` as `<emoji> <exact authored Feature Spec title>`. The prefix
+is one emoji grapheme followed by one space; preserve the authored title
+unchanged even when it already contains emoji. This is fixed derived UI
+evidence, not a user option, Feature Spec field, source fingerprint, claim key,
+scheduling key, branch component, or recovery identity.
+
+Resolve and persist `task_title` once after the Spec enters the selected
+DISPATCH set and before calling `codex_app__create_thread`. Reuse that exact
+value for the task's lifetime; never recompute it during monitoring, steering,
+recovery, or takeover. Apply the title through the root-owned App surface, not
+through the worker prompt:
+
+1. Create the managed visible task with `codex_app__create_thread` and its exact
+   task profile.
+2. If worktree setup returns only `clientThreadId`, record that creation evidence
+   and wait for the existing managed-creation flow to expose the concrete
+   `threadId`; never create another task.
+3. Record the concrete task ref, call `codex_app__set_thread_title` with the
+   persisted `task_title`, and observe the exact live title.
+4. Advance beyond `created` only after both the title and assignment Goal are
+   verified.
+
+If creation fails before a task exists, retain the resolved title for the same
+dispatch retry. If title mutation or observation fails after creation, record
+the task ref, desired title, and blocker; resume and repair that same task
+instead of creating a replacement. The worker must never rename its own task.
+
 ## Fixed Actions
 
 Every task receives the same action set:
@@ -76,8 +108,9 @@ The initial prompt requires the task to create or resume an
 assignment-scoped Goal before work. The Goal contains the exact Feature Spec,
 repositories and paths, acceptance criteria, validation, and fixed terminal
 result `pull-request-ready-for-merge-but-not-merged`. The root verifies Goal
-evidence before advancing beyond `created`. Record an exact objective fallback
-only when the task runtime reports no Goal tool.
+evidence and the exact live task title before advancing beyond `created`.
+Record an exact objective fallback only when the task runtime reports no Goal
+tool.
 
 ## Execution
 
@@ -113,7 +146,8 @@ and `needs-owner`.
 
 The root reads current task evidence before steering. A correction names the
 observed drift, expected next state, and preserved scope. A stale or failed task
-is resumed in the same visible task only after evidence is recorded. If it
+is resumed in the same visible task only after evidence is recorded. Restore
+the recorded `task_title` on that same task when its live title drifts. If it
 cannot be resumed, stop as blocked; never create a replacement task for that
 Spec.
 
@@ -159,12 +193,13 @@ every affected PR is ready to merge or report a concrete blocker.
 ## Report
 
 Report task and Goal evidence, state, managed checkouts, changed files,
-the exact task model, thinking value, and profile decision reason, validation,
-commits, PR URLs, full current revision tuples, review disposition, CI, current
-PR lifecycle/conflict/mergeability state, required base-freshness, approval
-state, merge-queue eligibility, and the observation tuple/time (or exact
-blocker), prepared tracker closeout, internal subagents, blockers, drift, and
-next action. When a knowledge delta exists,
+the exact task display title and observation evidence, task model, thinking
+value, and profile decision reason, validation, commits, PR URLs, full current
+revision tuples, review disposition, CI, current PR
+lifecycle/conflict/mergeability state, required base-freshness, approval state,
+merge-queue eligibility, and the observation tuple/time (or exact blocker),
+prepared tracker closeout, internal subagents, blockers, drift, and next action.
+When a knowledge delta exists,
 report its actual `capture_outcome`, delta fingerprint, every verified named
 destination, documentation-diff fingerprint, and relevant implementation
 revision tuples, or the exact closeout blocker. Only the root accepts lifecycle

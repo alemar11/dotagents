@@ -5,10 +5,11 @@ Load this reference only when resuming from a Recovery Packet.
 ## Runtime Surface Revalidation
 
 Before reading the packet, ledger projection, or recorded task, verify visible
-Codex App task creation and App-managed worktree binding again. Prior evidence,
-task readability, generic subagents, and filesystem access are insufficient. If
-either surface is absent or unverifiable, abort as `unsupported-runtime`
-without asking permission or touching runtime artifacts.
+Codex App task creation, App-managed worktree binding, task-title mutation
+through `codex_app__set_thread_title`, and live task-title observation again.
+Prior evidence, task readability, generic subagents, and filesystem access are
+insufficient. If any required surface is absent or unverifiable, abort as
+`unsupported-runtime` without asking permission or touching runtime artifacts.
 
 ## Freshness Validation
 
@@ -38,12 +39,14 @@ without asking permission or touching runtime artifacts.
    after its original claim was deleted. A mismatched replaced snapshot blocks.
 5. Require at most one live task per Feature Spec and three nonterminal tasks
    across the portfolio.
-6. Read every current task and validate its recorded model, thinking value,
-   profile decision reason, Goal, App-managed checkouts, lifecycle, changes, PR
-   revision tuples, review, CI, required domain-closeout evidence, and blockers.
-   Use the recorded profile for every resume or steering message. For a captured
-   closeout, recompute the delta fingerprint, verified destinations,
-   documentation-diff fingerprint, and relevant implementation revision tuples.
+6. Read every current task and validate its recorded `task_title`, model,
+   thinking value, profile decision reason, Goal, App-managed checkouts,
+   lifecycle, changes, PR revision tuples, review, CI, required domain-closeout
+   evidence, and blockers. Use the recorded profile for every resume or steering
+   message. Record task-title drift without mutating it during freshness
+   validation. For a captured closeout, recompute the delta fingerprint,
+   verified destinations, documentation-diff fingerprint, and relevant
+   implementation revision tuples.
 7. Recompute merged dependencies, path conflicts, deterministic ready order,
    due checks, gates, and next action from live evidence. A material code,
    evidence, target, documentation, or revision-tuple change invalidates domain
@@ -52,16 +55,30 @@ without asking permission or touching runtime artifacts.
 
 Any mismatch invalidates the compact packet. Run full source and ledger
 reconciliation before mutation; do not repair the packet in place.
+Only after the complete freshness pass and any required full reconciliation
+succeed may the root repair recorded task-title drift through
+`codex_app__set_thread_title` on the same task, observe the exact result, update
+the ledger evidence, and resume implementation.
 
 ## Task Recovery
 
 Require the exact Feature Spec assignment, one task, an assignment-scoped Goal
-or recorded unavailable fallback, exact task model and thinking profile,
-complete managed checkout map, and the fixed PR-ready flow. Resume only the
-original visible task with its recorded profile after recording stale or failure
-evidence. If that task or a managed checkout cannot be recovered, abort as
-blocked; never create a replacement for the same Spec or substitute
-root/background implementation or raw worktree machinery.
+or recorded unavailable fallback, exact task display title, exact task model and
+thinking profile, complete managed checkout map, and the fixed PR-ready flow.
+Resume only the original visible task with its recorded title and profile after
+recording stale or failure evidence. If that task or a managed checkout cannot
+be recovered, abort as blocked; never create a replacement for the same Spec or
+substitute root/background implementation or raw worktree machinery.
+
+For an otherwise current pre-title ledger, missing `task_title` is recoverable
+derived UI evidence, not ownership evidence. Read the live task without using
+its title as identity. Derive the canonical title from the validated Feature
+Spec title and dominant user-facing goal using the same semantic rule and
+mandatory `🛠️` fallback as first dispatch; never accept an arbitrary emoji
+prefix as canonical. Compare the complete live value with that derived title.
+After the complete freshness pass and any required reconciliation succeed,
+record an exact match or rename that same task, observe the exact result, and
+record it. Never use a title to discover, adopt, or replace a task.
 
 For a taken-over root, validate the candidate claim's embedded full prior-claim
 snapshots and per-Spec task-adoption mappings. Cross-check every available prior

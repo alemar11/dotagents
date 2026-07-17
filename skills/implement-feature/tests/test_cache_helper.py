@@ -448,7 +448,8 @@ class OrchestratorCacheHelperTests(unittest.TestCase):
 
         self.assertTrue(first.exists())
         self.assertTrue(second.exists())
-        self.assertEqual(CACHE_RUNTIME.scan_archives(verify_hash=True)["valid"], [])
+        with mock.patch.dict(os.environ, {"HOME": str(self.base)}):
+            self.assertEqual(CACHE_RUNTIME.scan_archives(verify_hash=True)["valid"], [])
 
     def test_strict_ttl_includes_legacy_and_exact_180_day_boundary(self) -> None:
         ledger = self.make_ledger("ttl")
