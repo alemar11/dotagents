@@ -12,7 +12,11 @@ without asking permission or touching runtime artifacts.
 
 ## Freshness Validation
 
-1. Revalidate the recorded run authorization and reject unknown fields.
+1. Revalidate the recorded run authorization, the canonical
+   `task-model-policy.md` surface, and every recorded per-Spec task profile;
+   this includes no-task Specs awaiting dispatch. Reject unknown fields, missing
+   profile evidence, unavailable model or thinking values, and silent
+   substitutions.
 2. Recompute every authoritative source and issue fingerprint and rederive every
    canonical claim/task source id. A verified GitHub
    `owner/repository#N` must still map to
@@ -34,11 +38,12 @@ without asking permission or touching runtime artifacts.
    after its original claim was deleted. A mismatched replaced snapshot blocks.
 5. Require at most one live task per Feature Spec and three nonterminal tasks
    across the portfolio.
-6. Read every current task and validate its Goal, App-managed checkouts,
-   lifecycle, changes, PR revision tuples, review, CI, required domain-closeout
-   evidence, and blockers. For a captured closeout, recompute the delta
-   fingerprint, verified destinations, documentation-diff fingerprint, and
-   relevant implementation revision tuples.
+6. Read every current task and validate its recorded model, thinking value,
+   profile decision reason, Goal, App-managed checkouts, lifecycle, changes, PR
+   revision tuples, review, CI, required domain-closeout evidence, and blockers.
+   Use the recorded profile for every resume or steering message. For a captured
+   closeout, recompute the delta fingerprint, verified destinations,
+   documentation-diff fingerprint, and relevant implementation revision tuples.
 7. Recompute merged dependencies, path conflicts, deterministic ready order,
    due checks, gates, and next action from live evidence. A material code,
    evidence, target, documentation, or revision-tuple change invalidates domain
@@ -51,10 +56,11 @@ reconciliation before mutation; do not repair the packet in place.
 ## Task Recovery
 
 Require the exact Feature Spec assignment, one task, an assignment-scoped Goal
-or recorded unavailable fallback, complete managed checkout map, and the fixed
-PR-ready flow. Resume only the original visible task after recording stale or
-failure evidence. If that task or a managed checkout cannot be recovered, abort
-as blocked; never create a replacement for the same Spec or substitute
+or recorded unavailable fallback, exact task model and thinking profile,
+complete managed checkout map, and the fixed PR-ready flow. Resume only the
+original visible task with its recorded profile after recording stale or failure
+evidence. If that task or a managed checkout cannot be recovered, abort as
+blocked; never create a replacement for the same Spec or substitute
 root/background implementation or raw worktree machinery.
 
 For a taken-over root, validate the candidate claim's embedded full prior-claim
@@ -62,6 +68,8 @@ snapshots and per-Spec task-adoption mappings. Cross-check every available prior
 ledger through its embedded `ledger_ref`. If the new ledger or registry was not
 written before a crash, rebuild only that exact projection from the embedded
 mapping after claim recovery; do not infer it from task titles or source prose.
+For an embedded schema-5 no-task Spec, preserve the resolved profile and use it
+unchanged when its deterministic dispatch wave creates the first task.
 Require one owner per recorded task ref and managed checkout, then revalidate
 each checkout's repository, target branch, and baseline commit before resuming
 those exact visible tasks. Missing, contradictory,
@@ -77,8 +85,11 @@ states, PR-count strategies, completion methods, closeout enums, or
 source-provided option fingerprints. Start a fresh compatible run only after
 the old owner releases its claim.
 
-The claim helper may report an exact schema-3 claim as `legacy`. Do not load it
-as current runtime state or migrate it. After the legacy task is verified
-terminal or a durable handoff exists, only that exact owner may run
-`claim retire-legacy` with the stored fingerprint and evidence. Until then the
-legacy claim remains a blocking owner.
+The claim helper may report an exact schema-3 or schema-4 claim as `legacy`. Do
+not load it as current runtime state or migrate it. A prepared schema-1 takeover
+journal containing a schema-4 candidate is still recoverable: finalize its exact
+snapshots into that schema-4 legacy ownership claim, but never infer the missing
+task profile or resume it as current. After the legacy task is verified terminal
+or a durable handoff exists, only that exact owner may run `claim retire-legacy`
+with the stored fingerprint and evidence. Until then the legacy claim remains a
+blocking owner.

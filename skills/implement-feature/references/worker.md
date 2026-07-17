@@ -4,12 +4,25 @@
 
 Create exactly one visible App task per implementation-eligible Feature Spec.
 Record its Spec ref and title, task id and title, managed repository checkout
-map, allowed paths, Goal evidence, lifecycle state, changed files, validation,
-commits, PRs, current-revision review, CI, tracker-closeout preparation,
-blockers, and next action.
+map, resolved task model and thinking, profile decision reason, allowed paths,
+Goal evidence, lifecycle state, changed files, validation, commits, PRs,
+current-revision review, CI, tracker-closeout preparation, blockers, and next
+action.
 
 Task ids, managed checkouts, Goals, PR count, and internal subagent topology are
 derived runtime evidence. They are not user options.
+
+## Task Model Profile
+
+Use the exact per-Spec profile resolved under `task-model-policy.md`. Pass its
+model and thinking value to `codex_app__create_thread` when creating the visible
+task and to every `codex_app__send_message_to_thread` call used to steer or
+resume it. Never omit, substitute, or recompute either value after task
+creation. Recovery and takeover preserve the recorded profile on the original
+task; they never create a replacement to change it.
+
+This profile governs the root-owned visible task. It does not create a separate
+model-selection contract for the task's bounded internal subagents.
 
 ## Fixed Actions
 
@@ -109,8 +122,10 @@ embedded adoption mapping and cross-check any available prior ledger. Adopt the
 exact original task ref for every previously dispatched Spec and resume it after
 verifying its Goal and managed checkouts. Across the adopted set, no task ref or
 managed `(repository, checkout)` pair may belong to two Specs. An explicit
-embedded no-task entry is required before first creation. Do not create a task
-when embedded, prior-ledger, or live App evidence records one for the Spec;
+embedded no-task entry with the exact pre-CLAIM profile is required before first
+creation, and that first creation must use the embedded profile without
+reclassification. Do not create a task when embedded, prior-ledger, or live App
+evidence records one for the Spec;
 inability to adopt or resume it is a blocker.
 
 ## Internal Subagents
@@ -144,11 +159,12 @@ every affected PR is ready to merge or report a concrete blocker.
 ## Report
 
 Report task and Goal evidence, state, managed checkouts, changed files,
-validation, commits, PR URLs, full current revision tuples, review disposition,
-CI, current PR lifecycle/conflict/mergeability state, required base-freshness,
-approval state, merge-queue eligibility, and the observation tuple/time (or
-exact blocker), prepared tracker closeout, internal subagents, blockers, drift,
-and next action. When a knowledge delta exists,
+the exact task model, thinking value, and profile decision reason, validation,
+commits, PR URLs, full current revision tuples, review disposition, CI, current
+PR lifecycle/conflict/mergeability state, required base-freshness, approval
+state, merge-queue eligibility, and the observation tuple/time (or exact
+blocker), prepared tracker closeout, internal subagents, blockers, drift, and
+next action. When a knowledge delta exists,
 report its actual `capture_outcome`, delta fingerprint, every verified named
 destination, documentation-diff fingerprint, and relevant implementation
 revision tuples, or the exact closeout blocker. Only the root accepts lifecycle

@@ -14,7 +14,7 @@ Record only:
 - authoritative source refs, derived canonical claim/task source ids, and
   root-computed fingerprints;
 - active-root claim ownership;
-- visible task, Goal, and managed-checkout state;
+- visible task, Goal, managed-checkout, and resolved task-profile state;
 - PR revision, mergeability/repository rules, review, CI, validation,
   domain-knowledge closeout, and
   tracker-closeout proof;
@@ -92,6 +92,9 @@ file before deleting any claim. Its exact shape is:
       "source_spec_ref": "<exact claimed source>",
       "task_state": "recorded",
       "task_ref": "<exact visible App task ref>",
+      "task_model": "<exact canonical model>",
+      "task_thinking": "<medium, high, or xhigh>",
+      "thinking_reason": "<evidence-backed policy decision>",
       "goal_evidence_ref": "<exact Goal evidence ref>",
       "managed_checkouts": [
         {
@@ -111,14 +114,15 @@ file before deleting any claim. Its exact shape is:
 
 Use one `specs` entry for every claimed source exactly once. For a Spec with no
 created task, use `task_state: "no-task"`, `task_ref: "none"`,
+the exact already-resolved `task_model`, `task_thinking`, and `thinking_reason`,
 `goal_evidence_ref: "none"`, an empty `managed_checkouts` list, and an explicit
 absence `evidence_ref`. A root may mix recorded and no-task entries. The helper
-requires every recorded task ref and managed `(repository, checkout)` pair to
-have one owner across the complete takeover candidate. It verifies each
-recorded checkout against the replaced repository identity, requires its
-current branch to equal `target_branch_name`, proves `baseline_revision`
-resolves as a commit, and requires the JSON termination evidence to match the
-separate CLI evidence.
+loads `task-model-policy.md`, validates every per-Spec task profile, and requires
+every recorded task ref and managed `(repository, checkout)` pair to have one
+owner across the complete takeover candidate. It verifies each recorded
+checkout against the replaced repository identity, requires its current branch
+to equal `target_branch_name`, proves `baseline_revision` resolves as a commit,
+and requires the JSON termination evidence to match the separate CLI evidence.
 
 Before any replaced claim is deleted, the helper atomically persists
 `<candidate-root>.takeover` with the complete candidate, full replaced claims,
@@ -130,8 +134,12 @@ among, or after claim deletions and after candidate creation. A live replaced
 claim that differs from the prepared snapshot blocks replay and remains intact.
 `claim status --root-id <replaced-root>` returns the prepared transaction plus
 its candidate recovery root, including after that replaced claim was deleted.
+A schema-1 journal carrying a schema-4 candidate remains replayable after this
+hard cut. Because its adoption evidence has no canonical task profile, recovery
+finalizes it only as a schema-4 legacy ownership claim; it never invents model
+settings or resumes the task as current.
 
-The helper reports schema-3 claims as legacy and permits only exact-owner
+The helper reports schema-3 and schema-4 claims as legacy and permits only exact-owner
 `retire-legacy` with the stored fingerprint plus terminal or durable-handoff
 evidence; it never migrates them. Release after terminal proof or an explicit
 durable handoff.
@@ -139,7 +147,9 @@ durable handoff.
 After takeover, create or verify the new registry from the candidate claim's
 embedded adoption mappings, even when recovery begins before the new ledger was
 written. Cross-check an available prior ledger through its embedded
-`ledger_ref`. Resume the same task and never allocate a second task for that
+`ledger_ref`. A schema-5 no-task mapping preserves the profile resolved before
+CLAIM so a later wave creates its first task with that exact profile rather than
+recomputing it. Resume the same task and never allocate a second task for that
 Spec. Missing or contradictory embedded evidence and an unadoptable task block
 the taken-over root.
 
@@ -147,14 +157,16 @@ the taken-over root.
 
 Keep one row per implementation-eligible Feature Spec:
 
-| source_spec_ref | feature_spec_title | task_ref | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| source_spec_ref | feature_spec_title | task_ref | task_model | task_thinking | thinking_reason | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 A Spec has at most one live task. At most three rows are nonterminal. The task
 registry's `source_spec_ref` is the canonical claim/task source id and points
 back to the Source Snapshots row that preserves the authoritative authored ref.
 The task row points to fixed worker actions; only affected repositories and
-allowed paths vary.
+allowed paths vary. `task_model`, `task_thinking`, and `thinking_reason` are the
+exact resolved evidence from `task-model-policy.md`, not another option
+registry. Every creation, steering, and resume call must preserve them.
 
 ## Scheduling
 
@@ -193,8 +205,8 @@ Unknown or pending state never passes.
 
 The packet is a compact derived projection containing source and repository
 fingerprints, claim fingerprint, active task refs, managed-checkout evidence,
-current PR tuples, current domain-closeout evidence ref when required, due
-review/CI checks, next action, and evidence refs. On
+recorded task profiles, current PR tuples, current domain-closeout evidence ref
+when required, due review/CI checks, next action, and evidence refs. On
 resume, validate every item before mutation. Any mismatch triggers full source
 and ledger reconciliation.
 

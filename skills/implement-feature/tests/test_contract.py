@@ -44,6 +44,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
             "agents/openai.yaml",
             "scripts/orchestrator-claim",
             "references/options.md",
+            "references/task-model-policy.md",
             "references/ledger.md",
             "references/ledger-template.md",
             "references/worker.md",
@@ -98,6 +99,55 @@ class AppOrchestratorContractTests(unittest.TestCase):
             ):
                 self.assertIn(value, row)
         self.assertIn("This file owns every user-controlled App orchestration field", options)
+
+    def test_visible_task_model_policy_is_canonical_bounded_and_recoverable(self) -> None:
+        skill = self.read("SKILL.md")
+        policy = self.read("references/task-model-policy.md")
+        options = self.read("references/options.md")
+        worker = self.read("references/worker.md")
+        ledger = self.read("references/ledger.md")
+        template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+
+        def values(field: str) -> list[str]:
+            row = next(
+                line
+                for line in policy.splitlines()
+                if line.startswith(f"| `{field}` |")
+            )
+            return re.findall(r"`([^`]+)`", row)[1:]
+
+        self.assertEqual(values("model"), ["gpt-5.6-sol"])
+        self.assertEqual(values("thinking_default"), ["high"])
+        self.assertEqual(
+            values("thinking_allowed"), ["medium", "high", "xhigh"]
+        )
+        for excluded in ("none", "minimal", "low", "max", "ultra"):
+            self.assertIn(f"`{excluded}`", policy)
+        self.assertIn("Never pass", policy)
+
+        authorization = " ".join(
+            skill.split("## Mandatory Run Authorization", 1)[1]
+            .split("## Fixed Implementation Contract", 1)[0]
+            .split()
+        )
+        self.assertIn("references/task-model-policy.md", authorization)
+        self.assertIn("exact visible-task model", authorization)
+        self.assertIn("bounded adaptive thinking policy", authorization)
+        self.assertIn("not another user-controlled field", options)
+
+        for text in (policy, worker):
+            self.assertIn("codex_app__create_thread", text)
+            self.assertIn("codex_app__send_message_to_thread", text)
+        self.assertIn("Never omit", policy)
+        self.assertIn("never reclassify", policy)
+        self.assertIn("`planning-required`", policy)
+
+        for text in (ledger, template):
+            for field in ("task_model", "task_thinking", "thinking_reason"):
+                self.assertIn(field, text)
+        self.assertIn("recorded per-Spec task profile", recovery)
+        self.assertIn("Use the recorded profile", recovery)
 
     def test_one_consent_covers_the_complete_fixed_flow(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
@@ -365,6 +415,7 @@ class AppOrchestratorContractTests(unittest.TestCase):
 
     def test_takeover_contract_uses_renamed_permission(self) -> None:
         runtime = self.runtime_text()
+        compact_runtime = " ".join(runtime.split())
         self.assertIn("stale_claim_takeover_permission", runtime)
         self.assertIn("--takeover-permission granted-by-authorized-user", runtime)
         self.assertIn("--expected-task-termination", runtime)
@@ -372,7 +423,9 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertIn("claim recover-takeover", runtime)
         self.assertIn("stale heartbeat alone", runtime.lower())
         self.assertIn("claim retire-legacy", runtime)
-        self.assertIn("schema-3", runtime)
+        self.assertIn("schema-3 and schema-4", runtime)
+        self.assertIn("schema-1 journal", runtime)
+        self.assertIn("never infer the missing task profile", compact_runtime)
         self.assertNotIn("--takeover-policy", runtime)
         self.assertNotIn("takeover-authorized", runtime)
 
@@ -421,6 +474,8 @@ class AppOrchestratorContractTests(unittest.TestCase):
         self.assertIn("Every mutating helper command first replays", ledger)
         self.assertIn("one `specs` entry for every claimed source exactly once", ledger)
         self.assertIn("task_state: \"no-task\"", ledger)
+        self.assertIn("exact already-resolved `task_model`", ledger)
+        self.assertIn("no-task mapping preserves the profile", ledger)
         self.assertIn("one owner across the complete takeover candidate", ledger)
         self.assertIn("current branch to equal `target_branch_name`", ledger)
         self.assertIn("`baseline_revision` resolves as a commit", ledger)

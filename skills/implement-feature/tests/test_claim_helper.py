@@ -98,6 +98,16 @@ class AtomicClaimHelperTests(unittest.TestCase):
         path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n")
         return legacy
 
+    def make_schema_four_legacy(
+        self, claim: dict[str, object]
+    ) -> dict[str, object]:
+        legacy = dict(claim)
+        legacy["schema_version"] = "4.0.0"
+        legacy["fingerprint"] = CLAIM_RUNTIME.fingerprint(legacy)
+        path = self.claim_root / f"{legacy['root_id']}.json"
+        path.write_text(json.dumps(legacy, indent=2, sort_keys=True) + "\n")
+        return legacy
+
     def make_task_adoption(
         self,
         claim: dict[str, object],
@@ -138,6 +148,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 }
             )
         specs = []
+        task_policy = CLAIM_RUNTIME.load_task_model_policy()
         for index, source in enumerate(claim["sources"], start=1):
             source_recorded = recorded and index == 1
             specs.append(
@@ -147,6 +158,9 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "task_ref": (
                         f"task-{claim['root_id']}-{index}" if source_recorded else "none"
                     ),
+                    "task_model": task_policy["model"],
+                    "task_thinking": task_policy["thinking_default"],
+                    "thinking_reason": "default-high-fixture",
                     "goal_evidence_ref": (
                         f"goal-{claim['root_id']}-{index}" if source_recorded else "none"
                     ),
@@ -218,7 +232,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "4.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "5.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -236,6 +250,10 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertTrue(doctor["git"]["available"])
+        self.assertTrue(doctor["task_model_policy"]["available"])
+        self.assertEqual(
+            doctor["task_model_policy"]["profile"]["model"], "gpt-5.6-sol"
+        )
         self.assertFalse(doctor["claim_root_exists"])
         self.assertFalse(self.claim_root.exists())
 
@@ -359,7 +377,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             acquired["claim"]["repository_checkouts"][0]["checkout"],
             str(self.repo.resolve()),
         )
-        self.assertEqual(acquired["claim"]["schema_version"], "4.0.0")
+        self.assertEqual(acquired["claim"]["schema_version"], "5.0.0")
         self.assertNotIn("execution_adapter", acquired["claim"])
 
     def test_bare_repository_local_source_ref_is_rejected(self) -> None:
@@ -705,6 +723,35 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertFalse((self.claim_root / "root-c.takeover").exists())
         self.assertFalse((self.claim_root / "root-c.json").exists())
 
+    def test_takeover_rejects_task_profile_outside_canonical_policy(self) -> None:
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        self.make_stale(claim)
+        termination = "root-a-stopped"
+        adoption = self.make_task_adoption(claim, termination)
+        adoption_value = json.loads(adoption.read_text())
+        adoption_value["specs"][0]["task_thinking"] = "ultra"
+        adoption.write_text(
+            json.dumps(adoption_value, indent=2, sort_keys=True) + "\n"
+        )
+
+        result = run_claim(
+            "--json",
+            *self.takeover_args("root-b", [claim], [adoption], [termination]),
+            env=self.env,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(
+            "task_thinking is invalid",
+            json.loads(result.stdout)["error"]["message"],
+        )
+        self.assertFalse((self.claim_root / "root-b.takeover").exists())
+
     def test_takeover_rejects_duplicate_checkout_across_specs(self) -> None:
         acquire = self.acquire_args(
             "root-a", self.repo, "spec-1", self.base / "ledger-a.md"
@@ -723,6 +770,9 @@ class AtomicClaimHelperTests(unittest.TestCase):
             {
                 "task_state": "recorded",
                 "task_ref": "task-root-a-2",
+                "task_model": first_spec["task_model"],
+                "task_thinking": first_spec["task_thinking"],
+                "thinking_reason": "default-high-fixture-2",
                 "goal_evidence_ref": "goal-root-a-2",
                 "managed_checkouts": json.loads(
                     json.dumps(first_spec["managed_checkouts"])
@@ -1058,7 +1108,11 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(
             embedded["claim_snapshot"]["ledger_ref"], str(old_ledger.resolve())
         )
-        self.assertEqual(embedded["task_adoption"]["specs"][0]["task_ref"], "task-root-a-1")
+        embedded_spec = embedded["task_adoption"]["specs"][0]
+        self.assertEqual(embedded_spec["task_ref"], "task-root-a-1")
+        self.assertEqual(embedded_spec["task_model"], "gpt-5.6-sol")
+        self.assertEqual(embedded_spec["task_thinking"], "high")
+        self.assertEqual(embedded_spec["thinking_reason"], "default-high-fixture")
         recovered = json.loads(
             run_claim(
                 "--json",
@@ -1078,6 +1132,121 @@ class AtomicClaimHelperTests(unittest.TestCase):
             ],
             embedded["task_adoption"],
         )
+
+    def test_takeover_preserves_resolved_profile_for_no_task_spec(self) -> None:
+        acquire = self.acquire_args(
+            "root-a", self.repo, "spec-1", self.base / "ledger-old.md"
+        )
+        second = self.acquire_args("unused", self.repo, "spec-2")
+        acquire.extend(["--source", second[second.index("--source") + 1]])
+        claim = json.loads(run_claim(*acquire, env=self.env).stdout)["claim"]
+        self.make_stale(claim)
+        termination = "root-a-stopped"
+        adoption = self.make_task_adoption(claim, termination)
+
+        takeover = json.loads(
+            run_claim(
+                "--json",
+                *self.takeover_args(
+                    "root-b", [claim], [adoption], [termination]
+                ),
+                env=self.env,
+            ).stdout
+        )
+
+        specs = takeover["claim"]["takeover_evidence"]["replaced_claims"][0][
+            "task_adoption"
+        ]["specs"]
+        no_task = next(spec for spec in specs if spec["task_state"] == "no-task")
+        self.assertEqual(no_task["task_ref"], "none")
+        self.assertEqual(no_task["task_model"], "gpt-5.6-sol")
+        self.assertEqual(no_task["task_thinking"], "high")
+        self.assertEqual(no_task["thinking_reason"], "default-high-fixture")
+        self.assertEqual(no_task["goal_evidence_ref"], "none")
+        self.assertEqual(no_task["managed_checkouts"], [])
+
+    def test_schema_one_prepared_takeover_recovers_to_legacy_owner(self) -> None:
+        current = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        legacy = self.make_schema_four_legacy(current)
+        termination = "root-a-stopped"
+        adoption_path = self.make_task_adoption(legacy, termination)
+        adoption = json.loads(adoption_path.read_text())
+        for spec in adoption["specs"]:
+            spec.pop("task_model")
+            spec.pop("task_thinking")
+            spec.pop("thinking_reason")
+
+        transaction_id = "a" * 32
+        candidate = dict(legacy)
+        candidate.update(
+            {
+                "root_id": "root-b",
+                "acquisition_nonce": "b" * 32,
+                "ledger_ref": str((self.base / "ledger-new.md").resolve()),
+                "opened_at": "2026-07-16T00:00:00Z",
+                "heartbeat_at": "2026-07-16T00:00:00Z",
+                "replaced_root_ids": ["root-a"],
+            }
+        )
+        takeover_evidence = {
+            "stale_claim_takeover_permission": "granted-by-authorized-user",
+            "takeover_reason": "verified-stale",
+            "evidence": "schema-one-recovery-fixture",
+            "transaction_id": transaction_id,
+            "replaced_claims": [
+                {
+                    "claim_snapshot": legacy,
+                    "task_termination_evidence": termination,
+                    "task_adoption": adoption,
+                }
+            ],
+        }
+        takeover_evidence["evidence_fingerprint"] = (
+            CLAIM_RUNTIME.takeover_evidence_fingerprint(takeover_evidence)
+        )
+        candidate["takeover_evidence"] = takeover_evidence
+        candidate["fingerprint"] = CLAIM_RUNTIME.fingerprint(candidate)
+        transaction = {
+            "schema_version": "1.0.0",
+            "transaction_id": transaction_id,
+            "candidate_claim": candidate,
+            "replaced_claims": [legacy],
+            "prepared_at": "2026-07-16T00:00:00Z",
+        }
+        transaction["fingerprint"] = CLAIM_RUNTIME.takeover_transaction_fingerprint(
+            transaction
+        )
+        (self.claim_root / "root-b.takeover").write_text(
+            json.dumps(transaction, indent=2, sort_keys=True) + "\n"
+        )
+        (self.claim_root / "root-a.json").unlink()
+
+        recovered = json.loads(
+            run_claim(
+                "--json",
+                "claim",
+                "recover-takeover",
+                "--root-id",
+                "root-b",
+                "--expected-transaction-id",
+                transaction_id,
+                env=self.env,
+            ).stdout
+        )
+
+        self.assertEqual(recovered["state"], "recovered-legacy")
+        self.assertEqual(recovered["claim"]["schema_version"], "4.0.0")
+        self.assertFalse((self.claim_root / "root-b.takeover").exists())
+        status = json.loads(
+            run_claim(
+                "--json", "claim", "status", "--root-id", "root-b", env=self.env
+            ).stdout
+        )
+        self.assertEqual(status["state"], "legacy")
 
     def test_recovery_rejects_changed_replaced_snapshot_and_keeps_journal(self) -> None:
         claim = json.loads(
@@ -1227,6 +1396,23 @@ class AtomicClaimHelperTests(unittest.TestCase):
             run_claim(*self.acquire_args("root-c", self.repo, "spec-3"), env=self.env).stdout
         )
         self.assertEqual(reacquired["state"], "acquired")
+
+    def test_schema_four_claim_is_detected_as_legacy(self) -> None:
+        acquired = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        legacy = self.make_schema_four_legacy(acquired)
+
+        status = json.loads(
+            run_claim(
+                "--json", "claim", "status", "--root-id", "root-a", env=self.env
+            ).stdout
+        )
+        self.assertEqual(status["state"], "legacy")
+        self.assertEqual(status["claim"]["schema_version"], "4.0.0")
+        self.assertEqual(status["claim"]["fingerprint"], legacy["fingerprint"])
 
 
 if __name__ == "__main__":

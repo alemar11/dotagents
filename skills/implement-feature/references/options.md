@@ -12,7 +12,7 @@ This file owns every user-controlled App orchestration field.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent to create one visible App task per executable Feature Spec and perform the complete fixed flow. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent to create one visible App task per executable Feature Spec with the disclosed fixed model and adaptive thinking policy, then perform the complete fixed flow. |
 | `stale_claim_takeover_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Exceptional run-scoped consent to stop the disclosed conflicting tasks, replace their complete verified-stale root scopes, and adopt the same task refs. |
 
 Resolve `visible_app_task_permission` only after the mandatory runtime surface
@@ -29,6 +29,11 @@ and push the moves, rerun final current-head gates, convert draft pull requests
 to ready-for-review, and report. It never
 authorizes scope expansion, merge, release, deployment, or target-repository
 instruction changes.
+
+Visible-task model and thinking behavior is fixed policy owned only by
+`task-model-policy.md`. It is disclosed by the authorization question but is not
+another user-controlled field, Feature Spec field, or project configuration
+value.
 
 Resolve `stale_claim_takeover_permission` after read-only discovery proves an
 atomic claim conflict, stale-heartbeat evidence, every replaced root's complete

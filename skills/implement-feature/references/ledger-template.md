@@ -34,8 +34,8 @@ Takeover evidence: <none or permission plus full replaced-claim snapshots, prior
 
 ## Feature Spec Task Registry
 
-| source_spec_ref | feature_spec_title | task_ref | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| source_spec_ref | feature_spec_title | task_ref | task_model | task_thinking | thinking_reason | goal_evidence_ref | managed_checkout_ref | affected_scope_ref | pull_request_refs | state | last_observed |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Codex Review Wait Registry
 
@@ -62,6 +62,7 @@ Repository fingerprints: <refs>
 Atomic claim fingerprint: <sha256>
 Active task refs: <refs or none>
 Managed checkout evidence: <refs>
+Task profiles: <source Spec, exact model, thinking, decision reason, and creation evidence>
 Current PR tuples: <refs or none>
 Domain closeout evidence: <none or captured gate evidence ref bound to delta fingerprint, destinations, docs diff, and implementation revision tuples>
 Due checks: <refs or none>

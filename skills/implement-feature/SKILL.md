@@ -32,18 +32,23 @@ permission, recommending another orchestrator, or creating artifacts.
 
 ## Mandatory Run Authorization
 
-After the surface gate, load `references/options.md` and resolve
+After the surface gate, load `references/options.md` and
+`references/task-model-policy.md`. Verify the canonical model and allowed
+thinking values against both visible-task creation and follow-up steering before
+asking permission. If that support is absent or unverifiable, abort as
+`unsupported-runtime` without runtime artifacts. Then resolve
 `visible_app_task_permission` from the invocation. If it is `not-requested`, ask
 the user once whether to create exactly one visible App task per executable
 Feature Spec and run the complete fixed implementation flow.
 
-The question must disclose that the flow may inspect, edit, validate, commit,
-push, publish or update pull requests, request and poll current-revision Codex
-review, fix findings, wait for CI, prepare tracker closeout, convert draft pull
-requests to ready-for-review, move completed local Markdown issue files to their
-configured done folder on the delivery branch after substantive proof, commit
-and push those moves, rerun the resulting current-head gates, and report without
-merging. Continue only with
+The question must disclose the exact visible-task model, the bounded adaptive
+thinking policy and its default, and that the flow may inspect, edit, validate,
+commit, push, publish or update pull requests, request and poll current-revision
+Codex review, fix findings, wait for CI, prepare tracker closeout, convert draft
+pull requests to ready-for-review, move completed local Markdown issue files to
+their configured done folder on the delivery branch after substantive proof,
+commit and push those moves, rerun the resulting current-head gates, and report
+without merging. Continue only with
 `visible_app_task_permission=granted-by-authorized-user`. Denial, no answer, or
 inability to ask aborts without implementation or runtime artifacts. Generic
 delegation or subagent authority never supplies this grant.
@@ -72,6 +77,9 @@ change target-repository instructions.
   mergeability. That transition is not the terminal result.
 - Use only App-managed worktrees. Never create or repair raw Git worktrees,
   rotate the caller checkout, or implement in the root or a background worker.
+- Every created, steered, or resumed visible task uses the per-Spec profile
+  resolved from `references/task-model-policy.md`; the root never substitutes or
+  omits its model or thinking value.
 - Create exactly one visible task per Feature Spec, including a multi-repository
   Spec. The task owns implementation, validation, commits, publication,
   `$autoreview`, current-revision review/fixes, CI, tracker-closeout preparation,
@@ -144,6 +152,13 @@ branch, or force-bind an App-managed worktree.
 Reject retired handoff fields, delivery tuples, review skips, worker action
 lists, parallelization fields, and non-App delivery markers as incompatible.
 
+After the complete bundle passes intake, resolve one visible-task thinking level
+per implementation-eligible Feature Spec from
+`references/task-model-policy.md`. This is read-only derived runtime evidence,
+not Feature Spec data or a user option. Resolve it before CLAIM; incomplete
+evidence remains `planning-required` instead of receiving a stronger model
+profile.
+
 Never create, repair, regenerate, or publish planning artifacts; infer missing
 implementation detail; mutate trackers; or invoke a planning skill during
 intake. Missing, contradictory, stale, or non-durable evidence aborts as
@@ -154,8 +169,10 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
 ## Controller Loop
 
 0. **SURFACE** — verify visible task creation and App-managed worktree binding.
-1. **AUTHORIZE** — obtain the one disclosed fixed-flow grant or abort.
-2. **INTAKE** — validate and fingerprint the complete bundle read-only. Resolve
+1. **AUTHORIZE** — verify and disclose the fixed model plus bounded adaptive
+   thinking policy, then obtain the one fixed-flow grant or abort.
+2. **INTAKE** — validate and fingerprint the complete bundle read-only, then
+   resolve and record each Spec's task profile before CLAIM. Resolve
    each verified GitHub `owner/repository#N` Feature Spec ref to canonical
    `https://github.com/owner/repository/issues/N`; preserve the authored ref as
    authoritative source evidence and use the URL as the claim/task source id.
@@ -178,9 +195,11 @@ no claim, ledger, Goal, task, tracker write, or source mutation was created.
    Abort as `pr-preflight-failed`; never downgrade.
 6. **DISPATCH** — load `references/worker.md`, choose the deterministic ready
    set, adopt and resume any exact task refs carried by takeover, otherwise
-   create one managed visible task per selected Spec, and verify its Goal.
+   create one managed visible task per selected Spec with its resolved task
+   profile, and verify its Goal.
 7. **MONITOR** — read current task state, reconcile live evidence, and send only
-   precise corrections. Never take implementation or review back into the root.
+   precise corrections with the recorded task profile. Never take implementation
+   or review back into the root.
 8. **GATE** — require the fixed pull-request, review, CI, integration, and
    tracker-closeout gates.
 9. **RECONCILE** — refresh sources, claims, dependency merges, task state,
@@ -241,6 +260,8 @@ the root created none. Also supply one
 `--expected-task-adoption <root-id>=<absolute-json-path>` whose validated
 per-Spec entries cover every claimed source exactly once and contain the exact
 task ref, Goal evidence, and managed-checkout map, or explicit no-task evidence.
+Every entry also carries the exact profile resolved before CLAIM, including a
+no-task Spec awaiting a later dispatch wave.
 This file is runtime evidence, not a user option:
 
 ```text
@@ -267,7 +288,7 @@ candidate recovery root even when that replaced claim was already deleted.
 After acquisition, rebuild or verify the new ledger registry from the embedded
 adoption data, adopt those exact tasks, and resume them as needed. Never create a
 new task for a Spec that has recorded or embedded task evidence; if adoption or
-resume fails, stop as blocked. The helper detects legacy schema-3 claims
+resume fails, stop as blocked. The helper detects legacy schema-3 and schema-4 claims
 read-only; an exact legacy owner may retire one only with `claim retire-legacy`,
 its stored fingerprint, and terminal or durable-handoff evidence. Never migrate
 or silently delete a legacy active claim. A terminal current owner releases its
@@ -279,8 +300,8 @@ Load `references/ledger.md` during CLAIM and `references/worker.md` before task
 creation, resume, read, or steering. The canonical ledger lives under
 `~/.cache/dotagents/skills/implement-feature/ledgers/` and records only
 authorization evidence, source fingerprints, claim ownership, task/Goal and
-managed-checkout state, PR/review/CI proof, recovery state, and external
-handoffs.
+managed-checkout state, the resolved per-Spec task profile, PR/review/CI proof,
+recovery state, and external handoffs.
 
 Every created or resumed task establishes its assignment-scoped Goal before
 work. Record an exact objective fallback only if that task runtime exposes no
@@ -339,6 +360,8 @@ after terminal proof or the recorded durable handoff.
 ## References
 
 - `references/options.md`: the two run-scoped authorization fields.
+- `references/task-model-policy.md`: fixed visible-task model and bounded
+  per-Spec thinking selection.
 - `references/spec-backed-delivery.md`: accepted bundle and Execution Contract.
 - `references/ledger.md`: compact claim, task, gate, and recovery persistence.
 - `references/worker.md`: fixed visible-task assignment and actions.
