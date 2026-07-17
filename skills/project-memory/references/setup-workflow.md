@@ -26,7 +26,7 @@ Use `Unknown` only when a value is absent or ambiguous. If the user only asked
 to view current settings, stop after the summary.
 
 Reject runtime-only worker configuration in project-memory setup files; those
-fields belong to Codex Orchestrator.
+fields belong to Implement Feature.
 
 ## Settings Editor
 
@@ -119,7 +119,7 @@ For orchestrator workspace mode, preserve these points in the draft:
 - setup is config-only and must not create project or feature folders;
 - child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional
   `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs;
-- `codex-orchestrator` owns runtime worker state and ledgers.
+- `implement-feature` owns runtime worker state and ledgers.
 - project memory must not carry worker surfaces, worker counts, approval state,
   or runtime worker progress.
 
@@ -187,7 +187,7 @@ exists or is authorized; never create a broken pointer:
 
 Keep this block concise. Do not paste domain vocabulary, tracker procedures,
 implementation policy, localization rules, worker-dispatch rules, or context seed
-material into `AGENTS.md`. `$codex-orchestrator` owns its session worker
+material into `AGENTS.md`. `$implement-feature` owns its session worker
 questions, checkpoint, dispatch, and ledger progress record. For orchestrator
 workspaces, explicitly say the workspace coordinates external repos and child
 repos keep their own project memory and code ownership.

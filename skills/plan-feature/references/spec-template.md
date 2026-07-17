@@ -93,7 +93,7 @@ schema, version, migration, fixture, deployment, or compatibility contract.]
 current request or a canonical durable source that already carries exactly one
 target and one resolvable instruction ref. Use each canonical line exactly once
 and state that this Feature Spec bundle is incompatible with
-`$codex-orchestrator`.]
+`$implement-feature`.]
 
 non_app_delivery_target: [canonical value]
 explicit_instruction_ref: [portable resolvable authorized-user instruction ref]

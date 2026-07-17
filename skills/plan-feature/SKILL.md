@@ -93,7 +93,7 @@ Resolve `write_mode` once:
   never claim the same pair, even when their paths are disjoint or dependencies
   would serialize them. Resolve collisions before publishing a new bundle; for
   an immutable existing source, stop instead of renaming its branch.
-- Make ordinary output compatible with the App orchestrator's fixed reviewed,
+- Make ordinary output compatible with `$implement-feature`'s fixed reviewed,
   CI-clean, pull-request-ready flow. Do not select or grant implementation,
   publication, review, issue-mutation, or merge authority.
 - Load `references/non-app-delivery.md` before drafting only when the current
@@ -101,7 +101,7 @@ Resolve `write_mode` once:
   source Spec carries exactly one target and one resolvable
   `explicit_instruction_ref`. The instruction ref is evidence data, not a run
   option or issue field. Artifacts carrying `non_app_delivery_target` are
-  incompatible with `$codex-orchestrator`.
+  incompatible with `$implement-feature`.
 - Carry an optional `knowledge_delta` data object with `decisions`,
   `target_surfaces`, and `evidence` lists. Absence means no durable change.
   Keep unresolved planning questions in a separate `planning_blockers` list.

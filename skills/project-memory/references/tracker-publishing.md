@@ -90,7 +90,7 @@ the parent or write the canonical local file first.
   applying hosted publication.
 - `$plan-feature` carries the same `tracker_backend`, `write_mode`, planning
   identity, and `source_spec_ref` through both phases.
-- `$codex-orchestrator` consumes only a durable hosted or local Feature Spec
+- `$implement-feature` consumes only a durable hosted or local Feature Spec
   ref, globally qualified for multi-repository work, never proposed output.
 
 ## Durable Targets

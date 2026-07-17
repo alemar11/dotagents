@@ -1,7 +1,7 @@
 # Non-App Delivery Exception
 
 Load this reference when the current user explicitly requests an implementation
-stopping point outside the App orchestrator's fixed pull-request-ready flow, or
+stopping point outside `$implement-feature`'s fixed pull-request-ready flow, or
 when a canonical durable source Feature Spec already carries exactly one
 `non_app_delivery_target` and exactly one resolvable
 `explicit_instruction_ref` that selected it. Do not load it for normal
@@ -41,7 +41,7 @@ owning Feature Spec so it cannot drift across issues.
 ## Boundary
 
 - The presence of `non_app_delivery_target` makes the complete Feature Spec
-  bundle incompatible with `$codex-orchestrator`; state that prominently in
+  bundle incompatible with `$implement-feature`; state that prominently in
   the Feature Spec and issue-phase report.
 - The field describes an intended observable stopping point. It does not grant
   commit, push, pull-request, tracker-mutation, or merge authority.

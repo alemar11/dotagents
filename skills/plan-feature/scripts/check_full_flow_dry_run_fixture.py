@@ -186,7 +186,7 @@ class PlanFeatureReductionTests(unittest.TestCase):
 
         self.assertIn("current request and any\ndurable source Feature Spec", skill)
         self.assertIn("incompatible with", skill)
-        self.assertIn("`$codex-orchestrator`", skill)
+        self.assertIn("`$implement-feature`", skill)
         self.assertIn("Before validating selectable fields", skill)
         self.assertIn("before structured option validation", options)
         self.assertIn("default-path run registry", skill)

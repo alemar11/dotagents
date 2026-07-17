@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "3.0.0"
+__version__ = "4.0.0"
 SCHEMA_VERSION = "4.0.0"
 LEGACY_SCHEMA_VERSION = "3.0.0"
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
@@ -42,7 +42,7 @@ class ClaimError(Exception):
 
 
 def claim_root() -> Path:
-    return Path.home() / ".cache/dotagents/skills/codex-orchestrator/claims"
+    return Path.home() / ".cache/dotagents/skills/implement-feature/claims"
 
 
 def timestamp() -> str:

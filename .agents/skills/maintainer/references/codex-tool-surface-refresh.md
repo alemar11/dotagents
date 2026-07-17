@@ -2,7 +2,7 @@
 
 Use this playbook when explicitly asked to check whether Codex changed how
 subagents are spawned or Codex App tasks are created and managed. This task
-keeps the App orchestrator current.
+keeps `$implement-feature` current.
 
 ## Scope
 
@@ -12,7 +12,7 @@ Review only Codex worker and thread orchestration surfaces:
   and UI visibility;
 - Codex App task creation, project/worktree targets, task read/write,
   title, archive, handoff, fork, pin, and listing behavior;
-- `codex-orchestrator` App task requirements and managed-worktree behavior.
+- `implement-feature` App task requirements and managed-worktree behavior.
 
 Do not use this task to redesign generic orchestration behavior, add new
 workers to a live task, or update unrelated skills.
@@ -29,10 +29,10 @@ workers to a live task, or update unrelated skills.
    - note whether each surface is a subagent surface, visible Codex App task
      surface, or unavailable in the current runtime.
 2. Compare the discovered surface against:
-   - `skills/codex-orchestrator/SKILL.md`;
-   - `skills/codex-orchestrator/references/worker.md`;
-   - `skills/codex-orchestrator/references/ledger.md`;
-   - `skills/codex-orchestrator/references/gates.md` only when tool changes
+   - `skills/implement-feature/SKILL.md`;
+   - `skills/implement-feature/references/worker.md`;
+   - `skills/implement-feature/references/ledger.md`;
+   - `skills/implement-feature/references/gates.md` only when tool changes
      affect authorization, proof, or closeout behavior.
 3. Check whether current docs still answer these questions precisely:
    - What creates a subagent?

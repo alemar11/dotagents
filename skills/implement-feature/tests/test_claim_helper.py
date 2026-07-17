@@ -33,7 +33,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.base = Path(self.temporary.name)
         self.claim_root = (
             self.base
-            / ".cache/dotagents/skills/codex-orchestrator/claims"
+            / ".cache/dotagents/skills/implement-feature/claims"
         )
         self.repo = self.base / "repo"
         self.other_repo = self.base / "other-repo"
@@ -218,7 +218,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "3.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "4.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout

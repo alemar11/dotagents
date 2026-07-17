@@ -183,7 +183,7 @@ implementation-facing:
 
 The normal Feature Spec does not carry selectable delivery, review,
 permission, pull-request-count, scheduling, or tracker-closeout fields. Its
-generated issues are compatible with the App orchestrator's fixed flow.
+generated issues are compatible with `$implement-feature`'s fixed flow.
 
 When the explicit non-App exception applies, include exactly one selected
 `non_app_delivery_target`, exactly one resolvable `explicit_instruction_ref`,

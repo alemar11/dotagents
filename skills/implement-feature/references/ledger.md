@@ -3,7 +3,7 @@
 ## Resolution
 
 Use one ledger per overlapping repository/source portfolio under
-`~/.cache/dotagents/skills/codex-orchestrator/ledgers/`. Create it only after
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
 atomic claim acquisition. A missing ledger loads `ledger-template.md`; an
 incompatible current ledger blocks rather than being migrated.
 
@@ -63,7 +63,7 @@ until the bundle is revalidated.
 
 The Markdown section is a projection. Use `scripts/orchestrator-claim`, which
 serializes overlap checks under one filesystem lock in
-`~/.cache/dotagents/skills/codex-orchestrator/claims/`. Acquire before ledger,
+`~/.cache/dotagents/skills/implement-feature/claims/`. Acquire before ledger,
 Goal, task, managed checkout, or mutation. Persist the returned claim ref,
 fingerprint, canonical Git-common-directory repositories, source ids, opened
 time, and heartbeat.

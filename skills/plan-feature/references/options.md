@@ -162,7 +162,7 @@ The section is the single execution projection. Do not duplicate its fields in
 a delivery section, handoff section, or option table. Derive reverse dependency
 edges by scanning `dependency_ids`; never persist a second reverse-edge list.
 
-Normal artifacts are App-compatible and rely on the App orchestrator's fixed
+Normal artifacts are App-compatible and rely on `$implement-feature`'s fixed
 reviewed, CI-clean pull-request-ready flow. Plan Feature does not select or
 grant implementation, publication, review, merge, or issue-mutation authority.
 

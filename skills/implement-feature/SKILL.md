@@ -1,14 +1,14 @@
 ---
-name: codex-orchestrator
-description: Execute execution-ready Feature Spec bundles in visible Codex App tasks through one mandatory GitHub pull-request-ready implementation flow.
+name: implement-feature
+description: Execute execution-ready Feature Spec bundles in visible Codex App tasks through reviewed, CI-clean, merge-ready-but-unmerged pull requests. Use only when the user explicitly invokes $implement-feature or asks to run Implement Feature in the Codex App.
 ---
 
-# Codex App Orchestrator
+# Implement Feature
 
 ## Purpose
 
 Use this Codex-dependent skill only when the owner explicitly invokes
-`$codex-orchestrator` or asks to run Codex Orchestrator in the App. It is the
+`$implement-feature` or asks to run Implement Feature in the Codex App. It is the
 single App-only implementation adapter. It never plans work and never invokes
 another orchestrator.
 
@@ -277,7 +277,7 @@ own claim; takeover is never a retry alias.
 
 Load `references/ledger.md` during CLAIM and `references/worker.md` before task
 creation, resume, read, or steering. The canonical ledger lives under
-`~/.cache/dotagents/skills/codex-orchestrator/ledgers/` and records only
+`~/.cache/dotagents/skills/implement-feature/ledgers/` and records only
 authorization evidence, source fingerprints, claim ownership, task/Goal and
 managed-checkout state, PR/review/CI proof, recovery state, and external
 handoffs.

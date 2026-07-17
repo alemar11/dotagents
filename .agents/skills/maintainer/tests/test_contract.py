@@ -375,7 +375,7 @@ class MaintainerContractTests(unittest.TestCase):
         expected = {
             REPO_ROOT / "plugins/gitstack/references/options.md",
             REPO_ROOT / "skills/code-wiki/references/options.md",
-            REPO_ROOT / "skills/codex-orchestrator/references/options.md",
+            REPO_ROOT / "skills/implement-feature/references/options.md",
             REPO_ROOT / "skills/improve-codebase-architecture/references/options.md",
             REPO_ROOT / "skills/plan-feature/references/options.md",
             REPO_ROOT / "skills/plan-harder/references/options.md",

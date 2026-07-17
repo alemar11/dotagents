@@ -1,7 +1,0 @@
-interface:
-  display_name: "Codex App Orchestrator"
-  short_description: "Execute ready Feature Spec bundles as merge-ready App PRs."
-  brand_color: "#6A7F3F"
-  default_prompt: "Use $codex-orchestrator to execute an execution-ready Feature Spec bundle in visible Codex App tasks through the fixed reviewed, CI-clean, pull-request-ready-for-merge-but-not-merged flow."
-policy:
-  allow_implicit_invocation: false

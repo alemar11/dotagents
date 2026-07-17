@@ -797,24 +797,64 @@ class AppOrchestratorContractTests(unittest.TestCase):
             self.assertLess(segment.index("CI"), segment.index("terminal merge-ready"), path)
 
     def test_metadata_is_manual_and_compact(self) -> None:
+        skill = self.read("SKILL.md")
         metadata = self.read("agents/openai.yaml")
-        self.assertIn('display_name: "Codex App Orchestrator"', metadata)
+        self.assertEqual(ROOT.name, "implement-feature")
+        self.assertIn("name: implement-feature", skill)
+        self.assertIn("explicitly invokes $implement-feature", skill)
+        self.assertIn("merge-ready-but-unmerged pull requests", skill)
+        self.assertIn('display_name: "Implement Feature"', metadata)
         self.assertIn("allow_implicit_invocation: false", metadata)
+        short_description = re.search(
+            r'^  short_description: "(.+)"$', metadata, re.MULTILINE
+        )
+        self.assertIsNotNone(short_description)
+        assert short_description is not None
+        self.assertGreaterEqual(len(short_description.group(1)), 25)
+        self.assertLessEqual(len(short_description.group(1)), 64)
         prompt = re.search(r'^  default_prompt: "(.+)"$', metadata, re.MULTILINE)
         self.assertIsNotNone(prompt)
         assert prompt is not None
         self.assertEqual(prompt.group(1).count("."), 1)
         self.assertLess(len(prompt.group(1)), 240)
 
-    def test_app_is_the_only_orchestrator_package(self) -> None:
-        orchestrators = sorted(
-            path.name
-            for path in (REPO / "skills").iterdir()
-            if path.is_dir()
-            and path.name.endswith("orchestrator")
-            and (path / "SKILL.md").is_file()
+    def test_implement_feature_is_the_only_app_feature_executor(self) -> None:
+        app_feature_executors = []
+        for path in (REPO / "skills").iterdir():
+            skill_path = path / "SKILL.md"
+            metadata_path = path / "agents/openai.yaml"
+            if not path.is_dir() or not skill_path.is_file() or not metadata_path.is_file():
+                continue
+            skill = skill_path.read_text(encoding="utf-8")
+            metadata = metadata_path.read_text(encoding="utf-8")
+            if (
+                "single App-only implementation adapter" in skill
+                and "Feature Spec" in skill
+                and "allow_implicit_invocation: false" in metadata
+            ):
+                app_feature_executors.append(path.name)
+        self.assertEqual(sorted(app_feature_executors), ["implement-feature"])
+
+    def test_retired_public_skill_name_is_absent(self) -> None:
+        retired = (
+            "codex" + "-orchestrator",
+            "Codex App " + "Orchestrator",
+            "Codex " + "Orchestrator",
         )
-        self.assertEqual(orchestrators, ["codex-orchestrator"])
+        findings = []
+        for root in (REPO / "AGENTS.md", REPO / "README.md", REPO / ".agents", REPO / "skills"):
+            paths = [root] if root.is_file() else root.rglob("*")
+            for path in paths:
+                if not path.is_file() or "__pycache__" in path.parts:
+                    continue
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    continue
+                for token in retired:
+                    if token in text:
+                        findings.append(f"{path.relative_to(REPO)}: {token}")
+        self.assertEqual(findings, [])
 
 
 if __name__ == "__main__":
