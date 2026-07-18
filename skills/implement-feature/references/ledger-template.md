@@ -34,6 +34,8 @@ Opened at: <RFC3339>
 Heartbeat at: <RFC3339>
 Takeover transaction: <none or transaction id and prepared-journal ref>
 Takeover evidence: <none or permission plus full replaced-claim snapshots, prior ledger refs, and validated per-Spec task/Goal/managed-checkout or no-task mappings>
+root_task_title: <derived exact calling-task title>
+root_task_title_evidence_ref: <pending or exact live observation evidence>
 
 ## Feature Spec Task Registry
 
@@ -63,6 +65,7 @@ evidence, and next action.
 Source fingerprints: <refs>
 Repository fingerprints: <refs>
 Atomic claim fingerprint: <sha256>
+Root task title: <exact root_task_title and live observation evidence>
 Portfolio Goal evidence: <state, ref, objective fingerprint, and current get_goal observation>
 Active task refs: <refs or none>
 Managed checkout evidence: <refs>

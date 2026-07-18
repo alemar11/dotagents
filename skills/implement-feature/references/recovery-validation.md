@@ -16,7 +16,7 @@ or unverifiable, abort as `unsupported-runtime` without asking permission or
 touching existing runtime artifacts.
 
 After that general gate, read only the packet and ledger fields needed to
-resolve the recorded task refs and Goal evidence. Before any mutation, read
+resolve the root title, task refs, and Goal evidence. Before any mutation, read
 each exact task and require its runtime to expose the same Goal tools. A missing
 task-local tool is an `unsupported-runtime` blocker on the existing task; never
 create a replacement or objective fallback.
@@ -47,8 +47,10 @@ create a replacement or objective fallback.
    path against the reported candidate recovery root before any other mutation.
    A status query by a replaced root must still expose that prepared transaction
    after its original claim was deleted. A mismatched replaced snapshot blocks.
-5. Require at most one live task per Feature Spec and three nonterminal tasks
-   across the portfolio.
+5. Rebuild the complete implementation-eligible Feature Spec registry and
+   recompute the canonical root title for the current calling task. Record
+   missing evidence or live drift without mutation. Require at most one live
+   task per Feature Spec and three nonterminal tasks across the portfolio.
 6. Call `get_goal` in the root. For `portfolio_goal_state=pending`, require the
    observed active Goal to match the recorded objective, or record that no
    active Goal exists. Do not persist adoption or call `create_goal` during the
@@ -77,17 +79,19 @@ create a replacement or objective fallback.
 Any mismatch invalidates the compact packet. Run full source and ledger
 reconciliation before mutation; do not repair the packet in place.
 Only after the complete freshness pass and any required full reconciliation
-succeed may the root complete `pending` Goal registration: persist a matching
-observed Goal as `active`, or, if none existed during the pass, call
-`create_goal` once with the recorded objective and atomically persist its
-evidence as `active`. Then the root may repair recorded task-title drift through
+succeed may the root repair or backfill its title as defined below. It may then
+complete `pending` Goal registration: persist a matching observed Goal as
+`active`, or, if none existed during the pass, call `create_goal` once with the
+recorded objective and atomically persist its evidence as `active`. After that,
+the root may repair recorded task-title drift through
 `codex_app__set_thread_title` on the same task, observe the exact result, update
 the ledger evidence, and resume implementation.
 
 For `portfolio_goal_state=complete`, instead require every task Goal and fixed
 terminal gate to be complete, verify the terminal release evidence or current
-claim ownership, and never repair or resume implementation. If the claim is
-still active, idempotently release it with `--release-reason terminal`; then
+claim ownership, and never repair or resume implementation through a worker.
+Recovery may repair only root-task title evidence before closeout. If the claim
+is still active, idempotently release it with `--release-reason terminal`; then
 archive the ledger with that exact release evidence if it is not already
 archived. A mismatch blocks without reopening the completed Goal.
 
@@ -100,6 +104,29 @@ task Goal is complete, apply the same rule to the portfolio Goal, persist
 `portfolio_goal_state=complete`, and continue through the completed-state
 release and archival path above. These are terminal-closeout recovery mutations,
 not implementation resume.
+
+## Root Task Title Recovery
+
+Missing `root_task_title` or `root_task_title_evidence_ref` alone is recoverable
+derived UI evidence for an otherwise compatible active ledger under a schema-5
+claim, including pending, active, and interrupted-complete Goal states. This
+backfill neither bumps claim schema nor migrates the ledger. After the complete
+freshness pass, recompute the canonical root title from the implementation-eligible
+registry, excluding coordination-only artifacts. Never infer identity from a
+title or modify a cold archived ledger.
+
+Persist the desired title with pending evidence, call
+`codex_app__set_thread_title` while omitting `threadId`, observe the calling task,
+and persist exact evidence before Goal registration, resumed dispatch, or final
+release. If the live title already matches, record the observation without a
+redundant mutation. A changed title with missing evidence is observed and
+adopted only when canonical; otherwise restore it. Failure retains the claim and
+ledger as a recoverable blocker.
+
+For a new invocation, use its new accepted registry. For takeover, use the
+candidate mapping to derive the title for the new calling root and never copy a
+replaced root's title. Worker completion, blocking, and dispatch do not change
+the stable title.
 
 ## Task Recovery
 

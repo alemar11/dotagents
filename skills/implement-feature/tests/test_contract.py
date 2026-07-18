@@ -27,9 +27,121 @@ def run_app_preclaim_fixture(
     if not bundle_ready:
         return "planning-required", observations, mutations
     mutations.extend(
-        ["atomic-claim", "cache-retention", "ledger-projection", "portfolio-goal"]
+        [
+            "atomic-claim",
+            "cache-retention",
+            "ledger-projection",
+            "root-task-title",
+            "portfolio-goal",
+        ]
     )
     return "accepted", observations, mutations
+
+
+def derive_root_task_title(registry_rows: list[dict[str, bool]]) -> str:
+    total_spec_count = sum(
+        row["implementation_eligible"] for row in registry_rows
+    )
+    if total_spec_count == 0:
+        raise ValueError("no executable Feature Spec")
+    if total_spec_count == 1:
+        return "👨🏻‍💻 Feature Orchestrator"
+    return "👨🏻‍💻 Multi-Feature Orchestrator"
+
+
+def run_root_title_registration_fixture(
+    registry_rows: list[dict[str, bool]],
+    *,
+    stop_after: str | None = None,
+) -> tuple[dict[str, object], list[str]]:
+    desired = derive_root_task_title(registry_rows)
+    transitions = [
+        "claim",
+        "cache",
+        "ledger-registry",
+        "persist-desired-title",
+    ]
+    state: dict[str, object] = {
+        "claim_retained": True,
+        "root_task_title": desired,
+        "root_task_title_evidence_ref": "pending",
+        "live_title": "previous title",
+        "portfolio_goal_state": "pending",
+        "goal_registered": False,
+        "dispatched": False,
+    }
+    if stop_after == "before-mutation":
+        return state, transitions
+
+    transitions.append("set-title")
+    state["live_title"] = desired
+    if stop_after == "after-mutation":
+        return state, transitions
+    if stop_after == "observation-failure":
+        transitions.append("observe-title-failed")
+        return state, transitions
+    if stop_after is not None:
+        raise ValueError(f"unknown stop_after: {stop_after}")
+
+    transitions.extend(["observe-title", "persist-title-evidence"])
+    state["root_task_title_evidence_ref"] = f"observed:{desired}"
+    transitions.append("portfolio-goal")
+    state["portfolio_goal_state"] = "active"
+    state["goal_registered"] = True
+    transitions.append("dispatch")
+    state["dispatched"] = True
+    return state, transitions
+
+
+def recover_root_title_fixture(
+    registry_rows: list[dict[str, bool]],
+    *,
+    live_title: str,
+    portfolio_goal_state: str,
+    recorded_title: str | None = None,
+    evidence_ref: str | None = None,
+) -> tuple[dict[str, object], list[str]]:
+    desired = derive_root_task_title(registry_rows)
+    expected_evidence = f"observed:{desired}"
+    transitions = ["freshness-pass"]
+    if (
+        recorded_title != desired
+        or evidence_ref != expected_evidence
+        or live_title != desired
+    ):
+        transitions.append("persist-desired-title")
+        evidence_ref = "pending"
+    if live_title != desired:
+        transitions.append("set-title")
+        live_title = desired
+    transitions.extend(["observe-title", "persist-title-evidence"])
+    evidence_ref = expected_evidence
+    return (
+        {
+            "claim_retained": True,
+            "root_task_title": desired,
+            "root_task_title_evidence_ref": evidence_ref,
+            "live_title": live_title,
+            "portfolio_goal_state": portfolio_goal_state,
+        },
+        transitions,
+    )
+
+
+def terminal_release_allowed(
+    state: dict[str, object],
+    *,
+    goals_complete: bool,
+    gates_complete: bool,
+) -> bool:
+    desired = state["root_task_title"]
+    return (
+        goals_complete
+        and gates_complete
+        and state["portfolio_goal_state"] == "complete"
+        and state["live_title"] == desired
+        and state["root_task_title_evidence_ref"] == f"observed:{desired}"
+    )
 
 
 class ImplementFeatureContractTests(unittest.TestCase):
@@ -278,6 +390,304 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("same task", recovery)
         self.assertNotIn("task_title", options)
         self.assertNotIn('"task_title"', claim_helper)
+
+    def test_root_task_title_is_stable_adaptive_and_recoverable(self) -> None:
+        skill = self.read("SKILL.md")
+        ledger = self.read("references/ledger.md")
+        template = self.read("references/ledger-template.md")
+        recovery = self.read("references/recovery-validation.md")
+        worker = self.read("references/worker.md")
+        options = self.read("references/options.md")
+        claim_helper = self.read("scripts/active-root-claim")
+        cache_helper = self.read("scripts/ledger-cache")
+        delivery = self.read("references/spec-backed-delivery.md")
+
+        executable = {"implementation_eligible": True}
+        coordination_only = {"implementation_eligible": False}
+        self.assertEqual(
+            derive_root_task_title([executable]),
+            "👨🏻‍💻 Feature Orchestrator",
+        )
+        for registry in (
+            [executable, executable],
+            [executable, executable, executable],
+        ):
+            self.assertEqual(
+                derive_root_task_title(registry),
+                "👨🏻‍💻 Multi-Feature Orchestrator",
+            )
+        self.assertEqual(
+            derive_root_task_title([coordination_only, executable]),
+            "👨🏻‍💻 Feature Orchestrator",
+        )
+        self.assertEqual(
+            [
+                derive_root_task_title(registry)
+                for registry in (
+                    [executable],
+                    [executable, executable],
+                    [executable],
+                )
+            ],
+            [
+                "👨🏻‍💻 Feature Orchestrator",
+                "👨🏻‍💻 Multi-Feature Orchestrator",
+                "👨🏻‍💻 Feature Orchestrator",
+            ],
+        )
+        with self.assertRaises(ValueError):
+            derive_root_task_title([coordination_only])
+
+        contract = ledger.split("## Root Task Display Title", 1)[1].split(
+            "## Portfolio Goal", 1
+        )[0]
+        compact_contract = " ".join(contract.split())
+        for token in (
+            "`total_spec_count`",
+            "implementation-eligible Feature Spec",
+            "coordination-only parent/global",
+            "`👨🏻‍💻 Feature Orchestrator`",
+            "`👨🏻‍💻 Multi-Feature Orchestrator`",
+            "`total_spec_count=1`",
+            "`total_spec_count>=2`",
+            "Do not append a counter or progress suffix",
+            "omit `threadId`",
+            "new invocation",
+            "stable for the accepted run",
+            "derived UI evidence",
+            "source field or fingerprint",
+            "claim key",
+            "scheduling input",
+            "branch component",
+        ):
+            self.assertIn(token, compact_contract)
+
+        ordered_contract = compact_contract.lower()
+        self.assertLess(
+            ordered_contract.index("complete feature spec registry"),
+            ordered_contract.index("persist `root_task_title`"),
+        )
+        self.assertLess(
+            ordered_contract.index("persist `root_task_title`"),
+            ordered_contract.index("codex_app__set_thread_title"),
+        )
+        self.assertLess(
+            ordered_contract.index("codex_app__set_thread_title"),
+            ordered_contract.index("observe the exact live title"),
+        )
+        self.assertLess(
+            ordered_contract.index("observe the exact live title"),
+            ordered_contract.index("persist its evidence"),
+        )
+        self.assertLess(
+            ordered_contract.index("persist its evidence"),
+            ordered_contract.index("`get_goal` adoption"),
+        )
+
+        register = " ".join(
+            skill.split("5. **REGISTER**", 1)[1]
+            .split("6. **PR-PREFLIGHT**", 1)[0]
+            .split()
+        )
+        for token in (
+            "complete Spec registry",
+            "root_task_title",
+            "set and observe the calling task title",
+            "portfolio_goal_state=pending",
+        ):
+            self.assertIn(token, register)
+        self.assertLess(
+            register.index("root_task_title"),
+            register.index("get_goal"),
+        )
+        self.assertLess(register.index("get_goal"), register.index("create_goal"))
+
+        for text in (ledger, template):
+            self.assertIn("root_task_title", text)
+            self.assertIn("root_task_title_evidence_ref", text)
+        self.assertIn("`root_task_title_evidence_ref=pending`", compact_contract)
+        self.assertIn("after the title changed but before", compact_contract)
+        self.assertIn("crash before mutation", compact_contract)
+        self.assertIn("Mutation or observation failure", compact_contract)
+        self.assertIn("leave evidence pending", compact_contract)
+        self.assertIn("retain the claim and ledger", compact_contract)
+        self.assertIn("forbid Goal creation or dispatch", compact_contract)
+
+        compact_recovery = " ".join(recovery.split())
+        for token in (
+            "Missing `root_task_title` or `root_task_title_evidence_ref` alone",
+            "complete freshness pass",
+            "recompute the canonical root title",
+            "new calling root",
+            "never copy a replaced root's title",
+            "repair only root-task title evidence",
+            "pending, active, and interrupted-complete Goal states",
+            "under a schema-5 claim",
+            "neither bumps claim schema nor migrates the ledger",
+        ):
+            self.assertIn(token, compact_recovery)
+        self.assertIn("singular, plural, or singular again", compact_contract)
+        self.assertIn("worker lifecycle changes never alter", compact_contract)
+        self.assertIn("repairs drift", compact_contract)
+        self.assertIn("pre-CLAIM run leaves the current title unchanged", compact_contract)
+
+        source_schema = ledger.split("## Source Snapshots", 1)[1].split(
+            "## Active Root Claim", 1
+        )[0]
+        fingerprint_contract = delivery.split(
+            "## Canonical Execution Contract", 1
+        )[1].split("## Intake Validation", 1)[0]
+        for text in (
+            options,
+            claim_helper,
+            cache_helper,
+            source_schema,
+            fingerprint_contract,
+        ):
+            self.assertNotIn("root_task_title", text)
+            self.assertNotIn("total_spec_count", text)
+        self.assertNotIn("Root Task Display Title", worker)
+
+        terminal_contract = " ".join(
+            skill.split("Before terminal release", 1)[1].split()
+        )
+        self.assertLess(
+            terminal_contract.index("exact root-title evidence"),
+            terminal_contract.index("`update_goal`"),
+        )
+        self.assertLess(
+            terminal_contract.index("`update_goal`"),
+            terminal_contract.index("portfolio_goal_state=complete"),
+        )
+
+    def test_root_title_state_transitions_are_crash_safe_and_closeout_gated(
+        self,
+    ) -> None:
+        executable = {"implementation_eligible": True}
+        singular = [executable]
+        plural = [executable, executable]
+
+        success, transitions = run_root_title_registration_fixture(plural)
+        self.assertEqual(
+            transitions,
+            [
+                "claim",
+                "cache",
+                "ledger-registry",
+                "persist-desired-title",
+                "set-title",
+                "observe-title",
+                "persist-title-evidence",
+                "portfolio-goal",
+                "dispatch",
+            ],
+        )
+        self.assertTrue(success["goal_registered"])
+        self.assertTrue(success["dispatched"])
+
+        for stop_after, last_transition in (
+            ("before-mutation", "persist-desired-title"),
+            ("after-mutation", "set-title"),
+            ("observation-failure", "observe-title-failed"),
+        ):
+            with self.subTest(stop_after=stop_after):
+                state, stopped = run_root_title_registration_fixture(
+                    plural,
+                    stop_after=stop_after,
+                )
+                self.assertEqual(stopped[-1], last_transition)
+                self.assertEqual(
+                    state["root_task_title_evidence_ref"],
+                    "pending",
+                )
+                self.assertTrue(state["claim_retained"])
+                self.assertFalse(state["goal_registered"])
+                self.assertFalse(state["dispatched"])
+                self.assertNotIn("portfolio-goal", stopped)
+                self.assertNotIn("dispatch", stopped)
+
+        drifted, recovery_transitions = recover_root_title_fixture(
+            singular,
+            live_title="manually renamed",
+            portfolio_goal_state="active",
+            recorded_title="👨🏻‍💻 Feature Orchestrator",
+            evidence_ref="observed:stale",
+        )
+        self.assertEqual(
+            recovery_transitions,
+            [
+                "freshness-pass",
+                "persist-desired-title",
+                "set-title",
+                "observe-title",
+                "persist-title-evidence",
+            ],
+        )
+        self.assertEqual(drifted["live_title"], "👨🏻‍💻 Feature Orchestrator")
+
+        for goal_state in ("pending", "active", "complete"):
+            with self.subTest(goal_state=goal_state):
+                backfilled, backfill_transitions = recover_root_title_fixture(
+                    singular,
+                    live_title="👨🏻‍💻 Feature Orchestrator",
+                    portfolio_goal_state=goal_state,
+                )
+                self.assertEqual(backfill_transitions[0], "freshness-pass")
+                self.assertIn("persist-desired-title", backfill_transitions)
+                self.assertNotIn("set-title", backfill_transitions)
+                self.assertEqual(
+                    backfilled["root_task_title_evidence_ref"],
+                    "observed:👨🏻‍💻 Feature Orchestrator",
+                )
+                self.assertEqual(backfilled["portfolio_goal_state"], goal_state)
+
+        takeover, takeover_transitions = recover_root_title_fixture(
+            plural,
+            live_title="👨🏻‍💻 Feature Orchestrator",
+            portfolio_goal_state="pending",
+            recorded_title="👨🏻‍💻 Feature Orchestrator",
+            evidence_ref="observed:👨🏻‍💻 Feature Orchestrator",
+        )
+        self.assertEqual(
+            takeover["root_task_title"],
+            "👨🏻‍💻 Multi-Feature Orchestrator",
+        )
+        self.assertIn("persist-desired-title", takeover_transitions)
+        self.assertIn("set-title", takeover_transitions)
+
+        terminal = dict(success)
+        self.assertFalse(
+            terminal_release_allowed(
+                terminal,
+                goals_complete=True,
+                gates_complete=True,
+            )
+        )
+        terminal["portfolio_goal_state"] = "complete"
+        self.assertTrue(
+            terminal_release_allowed(
+                terminal,
+                goals_complete=True,
+                gates_complete=True,
+            )
+        )
+        terminal["live_title"] = "manual drift"
+        self.assertFalse(
+            terminal_release_allowed(
+                terminal,
+                goals_complete=True,
+                gates_complete=True,
+            )
+        )
+        terminal["live_title"] = terminal["root_task_title"]
+        terminal["root_task_title_evidence_ref"] = "pending"
+        self.assertFalse(
+            terminal_release_allowed(
+                terminal,
+                goals_complete=True,
+                gates_complete=True,
+            )
+        )
 
     def test_one_consent_covers_the_complete_fixed_flow(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
@@ -551,6 +961,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertIn("portfolio_goal_state=pending", recovery)
         self.assertIn("portfolio_goal_state=complete", recovery)
+        self.assertIn("atomically persist its evidence", ledger)
         self.assertIn("Do not persist adoption or call `create_goal`", normalized_recovery)
         self.assertIn("Only after the complete freshness pass", normalized_recovery)
         self.assertIn("complete `pending` Goal registration", normalized_recovery)
@@ -743,6 +1154,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("current branch to equal `target_branch_name`", ledger)
         self.assertIn("`baseline_revision` resolves as a commit", ledger)
         self.assertIn("candidate recovery root", ledger)
+        self.assertIn("non-mutating and resumable state or proven task absence", ledger)
         for field in (
             '"source_spec_ref"',
             '"task_ref"',
@@ -827,7 +1239,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertEqual(observations, ["surface", "authorization", "intake"])
         self.assertEqual(
             mutations,
-            ["atomic-claim", "cache-retention", "ledger-projection", "portfolio-goal"],
+            [
+                "atomic-claim",
+                "cache-retention",
+                "ledger-projection",
+                "root-task-title",
+                "portfolio-goal",
+            ],
         )
 
     def test_multi_repo_requires_one_task_and_all_managed_checkouts(self) -> None:

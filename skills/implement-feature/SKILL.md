@@ -65,6 +65,9 @@ merge, release, or deployment.
 - Create exactly one visible task per Feature Spec, including a multi-repository
   Spec, and at most three nonterminal Spec tasks. Every created, resumed, or
   steered task uses the recorded per-Spec model profile.
+- After CLAIM, give the calling task the stable root title defined by
+  `references/ledger.md`: `👨🏻‍💻 Feature Orchestrator` for one executable Spec
+  or `👨🏻‍💻 Multi-Feature Orchestrator` for more than one, with no counter.
 - Give every task a root-owned display title: one relevant emoji, one space, and
   the exact authored Feature Spec title. Use `🛠️` only when nothing is clearer;
   the title is UI evidence, not identity.
@@ -115,10 +118,11 @@ Goal, task, tracker write, or source mutation was created.
    helper.
 4. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
    and fixed 180-day prune once in the root. Warnings are nonblocking.
-5. **REGISTER** — create the ledger and authorization/source snapshots; persist
-   the portfolio objective and `portfolio_goal_state=pending`; reconcile with
-   `get_goal`; otherwise call `create_goal`, then persist active evidence. Never set
-   `token_budget`.
+5. **REGISTER** — create the ledger, authorization/source snapshots, and complete
+   Spec registry with the portfolio objective and `portfolio_goal_state=pending`;
+   persist `root_task_title`, then set and observe the calling task title. Only
+   then reconcile with `get_goal`; otherwise call `create_goal`. Persist active
+   evidence. Never set `token_budget`.
 6. **PR-PREFLIGHT** — for every repository prove GitHub access, branch/PR
    publication, current-head review, CI expected to produce at least one
    applicable result, and read
@@ -190,9 +194,9 @@ visible task; never create another Goal or replacement task. Workers report
 evidence; only the root changes portfolio state.
 
 On resume, load `references/recovery-validation.md` before mutation and
-revalidate the runtime surface, claim, source fingerprints, repositories, title,
-Goals, managed checkouts, gates, and review waits. Archived ledgers are cold
-evidence, never recovery input.
+revalidate the runtime surface, claim, source fingerprints, repositories, root
+and task titles, Goals, managed checkouts, gates, and review waits. Archived
+ledgers are cold evidence, never recovery input.
 
 ## Delivery And Final Report
 
@@ -215,10 +219,11 @@ changes, validation, commits, PR URLs, reviewed revisions, CI, captured
 domain-closeout evidence, prepared tracker closeout, current-head mergeability
 and repository-rule evidence, blockers, recovery freshness, and next action.
 
-Before terminal release, every task and the root call `update_goal` with
-`status=complete`; persist `portfolio_goal_state=complete` and its evidence, release with
+Before terminal release, revalidate exact root-title evidence; every task and the
+root then call `update_goal` with `status=complete`. Persist
+`portfolio_goal_state=complete` and its evidence, release with
 `--release-reason terminal`, then archive through `scripts/ledger-cache`. A
-failed completion or evidence write retains the claim and active ledger. A
+failed title, completion, or evidence write retains the claim and active ledger. A
 resumable handoff uses `--release-reason durable-handoff` and retains its ledger
 and active nonterminal Goals. Recovery may idempotently finish only a fully
 revalidated completion, release, or archive transition; it never resumes
@@ -226,15 +231,5 @@ implementation after terminal proof.
 
 ## Reference Routing
 
-- Authorization: `references/options.md`, `references/task-model-policy.md`.
-- Intake: `references/spec-backed-delivery.md`; add
-  `references/multi-repo-workspace.md` for multi-repository work.
-- CLAIM/persistence/takeover: `references/ledger.md` and
-  `references/ledger-template.md`.
-- Post-CLAIM cache work: `references/cache-lifecycle.md`.
-- Task creation, resume, reading, or steering: `references/worker.md`.
-- Review/terminal evidence: `references/gates.md` and
-  `references/codex-review-closeout.md`.
-- Resume: `references/recovery-validation.md` before mutation.
-- Later-wave optimization: `references/runtime-efficiency.md` only after its
-  predicate is met.
+Use the load predicates above. When loading `references/ledger.md`, also load
+`references/ledger-template.md`.

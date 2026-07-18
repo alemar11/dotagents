@@ -3,29 +3,18 @@
 ## Resolution
 
 Use one ledger per overlapping repository/source portfolio under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
+`~/.cache/dotagents/skills/implement-feature/ledgers/`, created only after
 atomic claim acquisition. A missing ledger loads `ledger-template.md`; an
-incompatible current ledger blocks rather than being migrated.
+incompatible current ledger blocks without migration.
 
 Archived ledgers live below `ledgers/archive/` as cold evidence and never
 participate in active resolution or recovery. Load `cache-lifecycle.md` after
-CLAIM for automatic retention and before terminal archival.
+CLAIM and before terminal archival.
 
-The ledger is evidence, not a second option registry or concurrency primitive.
-Record only:
-
-- run authorization and exceptional takeover evidence;
-- authoritative source refs, derived canonical claim/task source ids, and
-  root-computed fingerprints;
-- active-root claim ownership;
-- portfolio Goal evidence and objective fingerprint;
-- visible task, derived display-title, assignment Goal, managed-checkout, and
-  resolved task-profile state;
-- PR revision, mergeability/repository rules, review, CI, validation,
-  domain-knowledge closeout, and
-  tracker-closeout proof;
-- deterministic scheduling waves and recovery state;
-- external monitoring, merge, and closeout handoffs.
+The ledger is evidence, not an option registry or concurrency primitive. It
+records authorization/takeover, sources and fingerprints, claim/root-title/Goal
+evidence, task title/profile/checkout state, gates and scheduling/recovery state,
+and external handoffs.
 
 ## Authorization
 
@@ -34,22 +23,42 @@ run-scoped evidence. Add `stale_claim_takeover_permission` only when a takeover
 question is actually resolved. Do not store fixed policy, derived state, bundle
 data, or retired option rows as authorization.
 
+## Root Task Display Title
+
+After CLAIM and cache maintenance, REGISTER creates the ledger and complete
+Feature Spec registry. `total_spec_count` counts its implementation-eligible
+Feature Spec rows, excluding coordination-only parent/global artifacts; zero is
+invalid. Use exactly `👨🏻‍💻 Feature Orchestrator` when
+`total_spec_count=1` and `👨🏻‍💻 Multi-Feature Orchestrator` when
+`total_spec_count>=2`.
+Do not append a counter or progress suffix. This is derived UI evidence, never
+an option, source field or fingerprint, claim key, task identity, scheduling
+input, or branch component.
+
+Persist `root_task_title` with `root_task_title_evidence_ref=pending`, call
+`codex_app__set_thread_title` with only the title and omit `threadId`, then
+observe the exact live title and persist its evidence. Finish this before the
+`get_goal` adoption, any `create_goal` call, or dispatch. Mutation or observation failure must leave evidence
+pending, retain the claim and ledger, and forbid Goal creation or dispatch. Recovery handles a
+crash before mutation or after the title changed but before evidence persisted.
+
+The root title is stable for the accepted run; worker lifecycle changes never
+alter it. Each new invocation derives it from its accepted registry, allowing
+singular, plural, or singular again. A denied, unsupported, or planning-required
+pre-CLAIM run leaves the current title unchanged. Resume recomputes after the
+complete freshness pass and repairs drift. Takeover uses the rebuilt candidate
+registry for the new calling root and never copies a replaced root's title.
+
 ## Portfolio Goal
 
-After CLAIM and ledger creation, persist the exact objective, its fingerprint,
-and `portfolio_goal_state=pending` before creating a Goal. Call `get_goal`
-first. If no unfinished Goal exists, call `create_goal` with the recorded
-objective and without `token_budget`; if the matching Goal already exists,
-adopt it as interrupted registration. Atomically persist the returned or
-observed evidence ref with `portfolio_goal_state=active`. A different unfinished
-Goal blocks as `needs-owner` without replacing it.
-
-Only after the complete read-only freshness pass and any full reconciliation
-succeed may recovery complete `pending` registration idempotently: a matching
-active Goal is recorded, and absence of an active Goal permits one `create_goal`
-retry with the recorded objective. An `active` row requires matching `get_goal`
-evidence and never recreates a missing Goal. This controlled pending-state
-completion is not a fallback or ledger migration.
+Ledger creation persists the objective, fingerprint, and
+`portfolio_goal_state=pending` as registration intent. After exact root-title
+observation, call `get_goal`; adopt a matching interrupted registration or call
+`create_goal` with the recorded objective and without `token_budget` when none
+exists, then atomically persist its evidence with
+`portfolio_goal_state=active`. A different unfinished Goal is `needs-owner`.
+Recovery may complete pending registration only after its full freshness pass;
+an active row requires matching evidence and never recreates a missing Goal.
 
 Call `update_goal` with `status=complete` only after every Feature Spec reaches
 `pull-request-ready-for-merge-but-not-merged`. Persist the completion evidence
@@ -58,18 +67,10 @@ If either operation fails, retain the claim and active ledger. Temporary
 blockers and resumable handoffs leave the Goal active. Missing tooling or
 fallback-only evidence never degrades to a ledger objective.
 
-If a crash leaves an active ledger at `portfolio_goal_state=complete`, recovery
-verifies the completed portfolio and task Goals plus every terminal gate, then
-idempotently finishes the terminal claim release and ledger archival. It never
-reopens implementation or recreates a Goal.
-
-If terminal proof was persisted before a task or portfolio Goal completion
-transition finished, recovery first revalidates that complete proof. It may
-then call `update_goal` with `status=complete` for an active terminal task or
-active terminal portfolio Goal, or accept an already-completed matching Goal
-whose completion evidence was not yet persisted. Persist every completed Goal
-transition before release or archival; never resume implementation to repair
-this closeout window.
+For interrupted terminal closeout, revalidate root-title evidence, all Goals,
+and every gate. Recovery may finish an active terminal Goal with `update_goal`
+or record matching completion evidence, then release and archive idempotently;
+it never reopens implementation or recreates a Goal.
 
 ## Source Snapshots
 
@@ -79,51 +80,41 @@ authored ref separately from the canonical runtime id:
 | authoritative_source_ref | canonical_source_id | planned_done_ref | source_state | artifact_kind | canonical_repository | content_fingerprint | acceptance_ref | observed_at |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
-For a verified GitHub `owner/repository#N` Feature Spec, store that shorthand in
-`authoritative_source_ref` and
-`https://github.com/owner/repository/issues/N` in `canonical_source_id`. Use the
-canonical id for claims, scheduling, task identity, and takeover. For a local
-ref, store the authored path separately from its
-`git:<git-common-dir>::ref:<source-ref>` canonical id.
+For verified GitHub `owner/repository#N`, preserve the shorthand in
+`authoritative_source_ref` and use
+`https://github.com/owner/repository/issues/N` as `canonical_source_id` for
+claims, scheduling, task identity, and takeover. A local ref similarly preserves
+its path beside `git:<git-common-dir>::ref:<source-ref>`.
 
-For a local generated issue, record its exact predeclared destination in
-`planned_done_ref` and start with `source_state=active`. After substantive
-acceptance, integration, and any required captured domain-knowledge closeout,
-permit exactly one
-active-path-to-planned-done-path transition. The task performs the tracked move;
-then atomically replace the row's authoritative ref and git-qualified canonical
-id with the done-path forms and set `source_state=done`, while recording move
-evidence in Gate Evidence. The body fingerprint must remain identical; no
-current canonical closeout metadata mutation is allowed. The missing old path is
-therefore expected only for this exact transition. Both paths existing, neither
-path existing, another destination, or any body change is source drift.
-
-The root computes fingerprints from complete current artifacts during intake
-and reconciliation. A changed fingerprint invalidates dispatch or recovery
-until the bundle is revalidated.
+A local generated issue records `planned_done_ref` and begins
+`source_state=active`. After substantive acceptance, integration, and required
+captured domain closeout, permit one tracked active-to-done move. Atomically replace both
+refs with their done-path forms, set `source_state=done`, and record Gate
+Evidence. Its body fingerprint stays identical; canonical body metadata cannot
+change, and only that move permits a missing old path. Both paths, neither path,
+a different destination, or a changed body is drift. The root fingerprints
+complete current artifacts at intake and reconciliation; changes block dispatch
+or recovery until revalidated.
 
 ## Active Root Claim
 
-The Markdown section is a projection. Use `scripts/active-root-claim`, which
-serializes overlap checks under one filesystem lock in
-`~/.cache/dotagents/skills/implement-feature/claims/`. Acquire before ledger,
-Goal, task, managed checkout, or mutation. Persist the returned claim ref,
-fingerprint, canonical Git-common-directory repositories, source ids, opened
-time, and heartbeat.
+This section projects `scripts/active-root-claim`, which serializes overlaps in
+`~/.cache/dotagents/skills/implement-feature/claims/`. Acquire before any ledger,
+Goal, task, checkout, or mutation; persist its ref, fingerprint, canonical
+Git-common-directory repositories, source ids, opened time, and heartbeat.
 
-An overlapping claim blocks as `needs-owner`. Before takeover, read the exact
-stale snapshots, complete root scopes, ledgers, recorded task refs, and current
-App state without mutation. Before asking or stopping tasks, require helper
-status evidence that every conflicting heartbeat is at least the fixed
+An overlap is `needs-owner`. Before takeover, read every stale snapshot, root
+scope, ledger, task ref, and current App state without mutation. Before asking
+or stopping tasks, helper status must prove each heartbeat passed the fixed
 five-minute stale threshold. Resolve
-`stale_claim_takeover_permission=granted-by-authorized-user` before interrupting
-or terminating a task. After the grant, require verified non-mutating and
-resumable state or proven task absence, one task-stop evidence ref per root, and
-full candidate coverage of every replaced repository and source. Pass
-`--takeover-permission granted-by-authorized-user` plus one
-`--expected-task-termination <root-id>=<evidence-ref>` per replaced root; a stale
-heartbeat alone is insufficient. Every heartbeat and release uses the
-acquire-time fingerprint.
+`stale_claim_takeover_permission=granted-by-authorized-user` first. Then require
+verified non-mutating and resumable state or proven task absence, one
+stop-evidence ref per root, and candidate coverage of every replaced repository
+and source. Pass
+`--takeover-permission granted-by-authorized-user` and
+one `--expected-task-termination <root-id>=<evidence-ref>` per root; a stale
+heartbeat alone is insufficient. Heartbeat and release use the acquire-time
+fingerprint.
 
 For each replaced root, pass one absolute JSON file through
 `--expected-task-adoption <root-id>=<path>`. The helper validates and embeds the
@@ -259,8 +250,8 @@ Unknown or pending state never passes.
 ## Recovery Packet
 
 The packet is a compact derived projection containing source and repository
-fingerprints, claim fingerprint, active task refs, managed-checkout evidence,
-recorded task titles and profiles, current PR tuples, current domain-closeout
+fingerprints, claim fingerprint, root-title evidence, active task refs,
+managed-checkout evidence, recorded task titles and profiles, current PR tuples, current domain-closeout
 evidence ref when required, due review/CI checks, next action, and evidence refs. On
 resume, validate every item before mutation. Any mismatch triggers full source
 and ledger reconciliation.
