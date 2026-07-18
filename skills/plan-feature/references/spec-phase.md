@@ -73,8 +73,9 @@ Read the minimum evidence needed to establish the contract:
   pointer;
 - relevant ADRs, product documentation, source, and tests when they constrain
   the feature;
-- orchestrator workspace project, repository, and integration-gate documents
-  when the selected scope is a multi-repository workspace.
+- coordination-root context, an accepted parent Feature Spec when one exists,
+  repo-owned partial Feature Specs, and named integration-gate evidence when
+  the selected scope is a multi-repository workspace.
 
 Do not broadly scan unrelated domain or localization material. Widen evidence
 only when the current sources are incomplete or contradictory.
@@ -97,7 +98,8 @@ Use Project Memory facts to choose locations:
 Do not invent a global workspace Feature Spec. Use one only when it is the
 accepted planning source. Resolve every affected child repository's tracker
 and topology facts independently. A GitHub child gets a repo-scoped hosted
-Feature Spec; a local child gets its configured local path.
+Feature Spec; a local child gets
+`planning/features/<feature-slug>/SPEC.md` inside that repository.
 
 For multi-repository work:
 
@@ -108,10 +110,11 @@ For multi-repository work:
    partial; never reuse the parent ref for a child.
    In apply mode, make every multi-repository ref globally unambiguous: use
    `owner/repository#<number>` or a canonical hosted URL for GitHub and
-   `<repository_slug>/<repo-relative-spec-path>` for local Markdown. Use those
-   same refs in the repo-to-child mapping, sibling links, and Feature
-   Dependencies; bare `#<number>` and bare repo-relative paths are invalid in a
-   multi-repository bundle.
+   `<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
+   `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` for
+   local Markdown. Use those same refs in the repo-to-child mapping, sibling
+   links, and Feature Dependencies; bare `#<number>` and bare repo-relative
+   paths are invalid in a multi-repository bundle.
 3. Choose the one repository that owns post-merge cross-repository integration
    proof from accepted scope and evidence;
    stop if that owner is ambiguous. Create a dedicated integration partial with proposed ref
@@ -134,8 +137,8 @@ For multi-repository work:
    `Partial role: integration` in its Planning Identity, and use its own
    `owner/repository#<number>` ref or canonical hosted URL as the applied
    `source_spec_ref`. With the local backend, write it to
-   `planning/features/<feature-slug>/integration/SPEC.md` or the configured
-   equivalent, expose its applied source ref with the owning repository slug,
+   `planning/features/<feature-slug>/integration/SPEC.md` in the owning
+   repository, expose its applied source ref with the owning repository slug,
    and keep its issues under the matching `integration/issues/` subtree.
 5. Validate every implementation-eligible partial as one bundle: each
    `(affected_repository, target_branch_name)` pair must have exactly one
@@ -212,7 +215,8 @@ For every edge:
   `write_mode=propose`;
 - in a multi-repository applied bundle, require every upstream ref to identify
   its owning repository through `owner/repository#<number>`, a canonical hosted
-  URL, or `<repository_slug>/<repo-relative-spec-path>`;
+  URL, `<repository-slug>/planning/features/<feature-slug>/SPEC.md`, or
+  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`;
 - reject self, duplicate, missing, and ambiguous refs;
 - require a concrete portable reason;
 - normalize upstream-to-downstream edges and validate the reachable Feature
@@ -294,11 +298,16 @@ Read tracker and type mappings immediately before output.
   verify every mutation, and retain the hosted issue number or URL as
   `source_spec_ref`. In multi-repository work, store `owner/repository#<number>`
   or the canonical URL, never a bare issue number.
-- `write_mode=apply`, local: write the resolved Feature Spec path and use that
-  durable path as `source_spec_ref`. Prefix it with `<repository_slug>/` in a
-  multi-repository bundle. A dedicated integration partial and its issues use
-  the distinct `integration/SPEC.md` and `integration/issues/` subtrees beneath
-  the resolved feature directory.
+- `write_mode=apply`, local: write the ordinary Feature Spec to
+  `planning/features/<feature-slug>/SPEC.md` inside its owning repository and
+  use that path as `source_spec_ref`. In a multi-repository bundle, use
+  `<repository-slug>/planning/features/<feature-slug>/SPEC.md` as the qualified
+  ref. Write a dedicated integration partial to
+  `planning/features/<feature-slug>/integration/SPEC.md` inside its owning
+  repository, keep its issues under
+  `planning/features/<feature-slug>/integration/issues/`, and use
+  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` as
+  its qualified multi-repository ref.
 - `write_mode=propose`: write nothing. Return the sanitized body, intended
   location, mapped metadata, and deterministic source identity:
   `proposed-spec:<feature_slug>` for a single Feature Spec,

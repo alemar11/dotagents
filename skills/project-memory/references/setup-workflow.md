@@ -128,10 +128,12 @@ Before writing, show only applicable items from this list:
 For orchestrator workspace mode, preserve these points in the draft:
 
 - selected local or GitHub tracker backend;
-- linked partial Feature Specs, local project folders, vertical issues, repo pointer
-  sheets, and integration gates are durable planning artifacts only when
-  `$plan-feature` writes them for real feature planning;
-- setup is config-only and must not create project or feature folders;
+- accepted parent Feature Specs, linked repo-scoped partial Feature Specs,
+  repo-owned local planning subtrees, vertical issues, sibling mappings, and
+  integration partials or gates are durable planning artifacts only when
+  `$plan-feature` handles them during real feature planning;
+- setup is config-only and must not create Feature Spec or issue subtrees;
+- local planning artifacts remain inside their owning child repositories;
 - child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional
   `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs;
 - `implement-feature` owns runtime worker state and ledgers.

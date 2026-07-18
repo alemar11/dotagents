@@ -84,8 +84,10 @@ Carry only the data needed to connect planning artifacts:
   repo-scoped partial;
 - applied multi-repository source identity: use `owner/repository#<number>` or a
   canonical hosted URL for every GitHub partial, and
-  `<repository_slug>/<repo-relative-spec-path>` for every local partial. Use the
-  same globally unambiguous refs in sibling maps and Feature Dependencies;
+  `<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
+  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` for
+  every local partial. Use the same globally unambiguous refs in sibling maps
+  and Feature Dependencies;
 - issue scope: `affected_repositories`, `allowed_paths`, and one
   `target_branch_name` shared by all affected repositories inside the current
   Feature Spec. For a local

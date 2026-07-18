@@ -73,7 +73,9 @@ Read the Feature Spec and verify:
   acyclic;
 - every applied multi-repository source and dependency ref is globally
   unambiguous: `owner/repository#<number>` or a canonical hosted URL for GitHub,
-  and `<repository_slug>/<repo-relative-spec-path>` for local Markdown;
+  and `<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
+  `<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md` for
+  local Markdown;
 - the complete parent/child Feature Spec mapping exists for multi-repository
   work;
 - portable evidence contains no developer-machine absolute path;
@@ -302,10 +304,10 @@ exists.
   the Feature Spec when supported, verify every mutation, and retain the hosted
   ref separately from its generated ID.
 - `write_mode=apply`, local: write
-  `planning/features/<feature-slug>/issues/<NN>-<slug>.md` or the configured
-  workspace equivalent. Issues owned by a dedicated integration partial use
-  `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` or the
-  configured equivalent. Insert canonical `issue_type: task` and
+  `planning/features/<feature-slug>/issues/<NN>-<slug>.md` in the owning
+  repository. Issues owned by a dedicated integration partial use
+  `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` in that
+  repository. Insert canonical `issue_type: task` and
   `workflow_state: ready-for-agent` header lines. Preserve generated IDs in
   filenames and dependency data. Render completion into the matching subtree:
   ordinary issues move to `planning/features/<feature-slug>/issues/done/`,

@@ -465,8 +465,15 @@ class PlanFeatureReductionTests(unittest.TestCase):
         ):
             self.assertIn(ref, projection)
         self.assertIn("owner/repository#<number>", spec_phase)
-        self.assertIn("<repository_slug>/<repo-relative-spec-path>", spec_phase)
-        self.assertIn("same globally unambiguous refs", options)
+        self.assertIn(
+            "<repository-slug>/planning/features/<feature-slug>/SPEC.md",
+            spec_phase,
+        )
+        self.assertIn(
+            "<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md",
+            spec_phase,
+        )
+        self.assertIn("same globally unambiguous refs", " ".join(options.split()))
         self.assertIn("Bare `#<number>`", projection)
         self.assertIn("does\nnot publish or enqueue", projection)
         self.assertIn("globally unambiguous durable ref", fixture)

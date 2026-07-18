@@ -10,8 +10,8 @@ Use `tracker_backend` to choose the durable artifact target:
 
 - `github`: Feature Specs and implementation issues are GitHub issues managed
   through `$gitstack:github-issues`;
-- `local`: Feature Specs and implementation issues are Markdown files in the
-  configured local conventions.
+- `local`: Feature Specs and implementation issues are Markdown files under
+  `planning/features/<feature-slug>/` inside each owning repository.
 
 Reject tracker configuration without a canonical `tracker_backend`. Do not
 store current-run mutation intent, implementation delivery policy, branch
@@ -44,16 +44,17 @@ Every handoff from a Feature Spec to generated issues carries
 - applied hosted partial in a multi-repository bundle:
   `source_spec_ref=owner/repository#<spec-number>` or its canonical hosted URL;
 - applied local Feature Spec in one repository:
-  `source_spec_ref=<repo-relative-spec-path>`;
+  `source_spec_ref=planning/features/<feature-slug>/SPEC.md`;
 - applied local partial in a multi-repository bundle:
-  `source_spec_ref=<repository-slug>/<repo-relative-spec-path>`;
+  `source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md`;
 - applied hosted integration partial: its own
   `source_spec_ref=owner/repository#<integration-spec-number>` or canonical URL
   in a multi-repository bundle, produced by the distinct title `Feature Spec:
   <Feature Name> - Integration` and body marker `Partial role: integration`;
 - applied local integration partial:
   `source_spec_ref=<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`
-  in a multi-repository bundle, or the unqualified configured path only in one
+  in a multi-repository bundle, or
+  `source_spec_ref=planning/features/<feature-slug>/integration/SPEC.md` in one
   repository; never the implementation partial's `SPEC.md`;
 - proposed output before publication:
   `source_spec_ref=proposed-spec:<feature-slug>` for one Feature Spec,
@@ -73,9 +74,10 @@ when present, create every implementation partial, create the integration
 partial after its upstream refs are durable, update repo-to-child mappings,
 sibling links, and Feature Dependencies with the same globally unambiguous
 `owner/repository#<number>`, hosted URL, or
-`<repository-slug>/<repo-relative-spec-path>` identities, then create issues
-under their owning Specs. Bare issue numbers and bare repo-relative paths are
-repository-local and invalid across siblings.
+`<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
+`<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`
+identities, then create issues under their owning Specs. Bare issue numbers and
+bare repo-relative paths are repository-local and invalid across siblings.
 
 A `proposed-spec:<...>` ref is non-executable. It cannot dispatch an
 implementation worker or become durable through permission metadata; publish
@@ -98,7 +100,7 @@ the parent or write the canonical local file first.
 | Tracker backend | Feature Spec | Implementation issues |
 | --- | --- | --- |
 | `github` | GitHub Feature Spec issue; multi-repository refs use `owner/repository#<number>` or canonical URLs, and a dedicated integration partial uses a separate `Feature Spec: <Feature Name> - Integration` issue in its owner repository | GitHub sub-issues under their owning Feature Spec; integration issues use the integration partial's distinct globally qualified hosted ref |
-| `local` | `planning/features/<feature-slug>/SPEC.md` or `orchestration/<project-slug>/features/<feature-slug>/SPEC.md`; multi-repository refs prefix the owning repository slug, and an integration partial appends `/integration/SPEC.md` beneath the feature directory | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` or its configured equivalent; integration issues append `/integration/issues/<NN>-<slug>.md` and complete under `/integration/issues/done/` beneath the feature directory |
+| `local` | `planning/features/<feature-slug>/SPEC.md` inside each owning repository; multi-repository refs prefix that repo-relative path with the owning repository slug, and an integration partial uses `planning/features/<feature-slug>/integration/SPEC.md` in its owner repository | `planning/features/<feature-slug>/issues/<NN>-<slug>.md` inside the owning repository; integration issues use `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` and complete under the matching `/done/` directory |
 
 Lower-kebab-case values are canonical. Reject noncanonical option values
 instead of rewriting them.

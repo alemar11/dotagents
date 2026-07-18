@@ -163,10 +163,106 @@ class ProjectMemoryContractTests(unittest.TestCase):
             self.assertIn("owner/repository#<spec-number>", text)
             self.assertIn("canonical hosted URL", text)
         for text in (local, publishing):
-            self.assertIn("<repository-slug>/<repo-relative-spec-path>", text)
+            self.assertIn(
+                "<repository-slug>/planning/features/<feature-slug>/SPEC.md",
+                text,
+            )
             self.assertIn("Feature Dependencies", text)
         self.assertIn("Bare issue numbers", publishing)
         self.assertIn("bare repo-relative paths", publishing)
+
+    def test_runtime_docs_have_no_retired_coordination_tree(self) -> None:
+        roots = (
+            REPO_ROOT / "AGENTS.md",
+            REPO_ROOT / "skills" / "project-memory",
+            REPO_ROOT / "skills" / "plan-feature",
+        )
+        candidates: list[Path] = []
+        for root in roots:
+            if root.is_file():
+                candidates.append(root)
+                continue
+            candidates.extend(
+                path
+                for path in root.rglob("*")
+                if path.is_file() and path.suffix in {".md", ".yaml"}
+            )
+
+        normalized = {
+            path: " ".join(path.read_text(encoding="utf-8").split())
+            for path in candidates
+        }
+
+        retired = (
+            "orchestration/" + "<project",
+            "project or feature " + "folders",
+            "orchestration runtime " + "config files",
+            "local project " + "folders",
+            "repo pointer " + "sheets",
+            "configured " + "equivalent",
+            "configured workspace " + "equivalent",
+            "configured local " + "conventions",
+            "configured local " + "path",
+            "unqualified configured " + "path",
+            "configured `planning/" + "features",
+            "planning/features/" + "<feature>/",
+            "repo-relative-spec-" + "path",
+            "repo_relative_spec_" + "path",
+            "`/integration/SPEC.md` " + "child",
+            "resolved Feature Spec " + "path",
+            "resolved feature " + "directory",
+            "<repository_" + "slug>/planning",
+            "distinct `integration/" + "SPEC.md`",
+            "orchestrator workspace "
+            + "project, repository, and integration-gate documents",
+        )
+        stale = {
+            token: [
+                str(path.relative_to(REPO_ROOT))
+                for path in candidates
+                if token in normalized[path]
+            ]
+            for token in retired
+        }
+        self.assertEqual(stale, {token: [] for token in retired})
+
+        publishing = (
+            SKILL_ROOT / "references" / "tracker-publishing.md"
+        ).read_text(encoding="utf-8")
+        setup = (SKILL_ROOT / "references" / "setup-workflow.md").read_text(
+            encoding="utf-8"
+        )
+        spec_phase = (
+            REPO_ROOT
+            / "skills"
+            / "plan-feature"
+            / "references"
+            / "spec-phase.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("inside each owning repository", publishing)
+        self.assertIn(
+            "source_spec_ref=planning/features/<feature-slug>/SPEC.md",
+            publishing,
+        )
+        self.assertIn("repo-owned local planning subtrees", setup)
+        self.assertIn("coordination-root context", spec_phase)
+        self.assertIn("repo-owned partial Feature Specs", spec_phase)
+        self.assertIn(
+            "`planning/features/<feature-slug>/SPEC.md` inside that repository",
+            spec_phase,
+        )
+        local_apply = spec_phase.split("- `write_mode=apply`, local:", 1)[1].split(
+            "- `write_mode=propose`", 1
+        )[0]
+        for path in (
+            "planning/features/<feature-slug>/SPEC.md",
+            "<repository-slug>/planning/features/<feature-slug>/SPEC.md",
+            "planning/features/<feature-slug>/integration/SPEC.md",
+            "<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md",
+            "planning/features/<feature-slug>/integration/issues/",
+        ):
+            self.assertIn(path, local_apply)
 
     def test_retired_tracker_policy_is_absent_from_project_memory_docs(self) -> None:
         markdown = "\n".join(

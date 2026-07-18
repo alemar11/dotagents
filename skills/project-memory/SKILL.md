@@ -205,10 +205,10 @@ contexts remain optional and evidence-backed. A child-repository root selected
 by the authorized setup scope follows the same mandatory root-context rule;
 child repositories outside that scope remain optional and untouched.
 
-In orchestrator-workspace setup, do not create project or feature folders. Do
-not create orchestration runtime config files. Before completing a touched
-`issue-tracker.md`, reject unknown configuration keys rather than rewriting or
-removing them implicitly.
+In orchestrator-workspace setup, do not create Feature Spec or issue subtrees,
+and do not create runtime worker configuration or state. Before completing a
+touched `issue-tracker.md`, reject unknown configuration keys rather than
+rewriting or removing them implicitly.
 
 ### 6. Report
 

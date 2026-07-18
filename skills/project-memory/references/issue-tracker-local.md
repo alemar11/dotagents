@@ -33,8 +33,8 @@ be used as a durable `ready-for-agent` source.
 
 Applied single-repository refs use the repo-relative durable path. Applied
 multi-repository partials prefix that path with the owning repository slug,
-using the canonical `<repository-slug>/<repo-relative-spec-path>` shape. For
-example,
+using the canonical
+`<repository-slug>/planning/features/<feature-slug>/SPEC.md` shape. For example,
 `source_spec_ref=<repository-slug>/planning/features/<feature-slug>/SPEC.md` or
 `source_spec_ref=<repository-slug>/planning/features/<feature-slug>/integration/SPEC.md`.
 Use the same qualified refs in repo-to-child mappings, sibling links, and
