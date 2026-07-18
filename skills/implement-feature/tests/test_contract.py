@@ -49,6 +49,11 @@ def derive_root_task_title(registry_rows: list[dict[str, bool]]) -> str:
     return "👨🏻‍💻 Multi-Feature Orchestrator"
 
 
+def derive_provider_timeout_seconds(*, wait_deadline: int, wait_invoked_at: int) -> int | None:
+    remaining = wait_deadline - wait_invoked_at
+    return remaining if remaining > 0 else None
+
+
 def run_root_title_registration_fixture(
     registry_rows: list[dict[str, bool]],
     *,
@@ -746,12 +751,32 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("strict 180-day TTL", lifecycle)
         self.assertIn("there is no last-N exception", lifecycle)
         self.assertIn("warning is nonblocking", normalized_lifecycle)
-        self.assertIn("Archive only after terminal reconciliation and exact claim release", lifecycle)
-        self.assertIn("Monitoring handoffs", normalized_lifecycle)
-        self.assertIn("claim release --release-reason terminal", lifecycle)
-        self.assertIn("claim release --release-reason durable-handoff", lifecycle)
-        self.assertIn("durable receipt binds", normalized_lifecycle)
-        self.assertIn("A durable-handoff receipt never authorizes archival", lifecycle)
+        self.assertIn("After terminal reconciliation", lifecycle)
+        self.assertIn("recorded resumable handoff", normalized_lifecycle)
+        self.assertIn("raw 64-hex", lifecycle)
+        self.assertIn("never a `sha256:` value", normalized_lifecycle)
+        handoff = lifecycle.split("For a recorded", 1)[1].split("Stop;", 1)[0]
+        terminal = lifecycle.split("After terminal reconciliation", 1)[1].split("The receipt binds", 1)[0]
+        for token in (
+            "--root-id '<root-id>'",
+            "--expected-fingerprint '<claim-fingerprint>'",
+            "--release-reason durable-handoff",
+            "--evidence '<durable-handoff-evidence-ref>'",
+        ):
+            self.assertIn(token, handoff)
+        self.assertNotIn("ledger archive", handoff)
+        for token in (
+            "--root-id '<root-id>'",
+            "--expected-fingerprint '<claim-fingerprint>'",
+            "--release-reason terminal",
+            "--evidence '<terminal-evidence-ref>'",
+            "--root-id '<same-root-id>'",
+            "--evidence-ref '<same-terminal-evidence-ref>'",
+        ):
+            self.assertIn(token, terminal)
+        self.assertLess(terminal.index("claim release"), terminal.index("ledger archive"))
+        self.assertIn("same root and terminal evidence", normalized_lifecycle)
+        self.assertIn("receipt never authorizes archive", normalized_lifecycle)
         self.assertIn("Archived ledgers live below `ledgers/archive/` as cold evidence", normalized_ledger)
         self.assertIn("After terminal release only", normalized_ledger)
 
@@ -966,8 +991,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("Only after the complete freshness pass", normalized_recovery)
         self.assertIn("complete `pending` Goal registration", normalized_recovery)
         self.assertIn("never repair or resume implementation", normalized_recovery)
-        self.assertIn("idempotently release it", normalized_recovery)
-        self.assertIn("if it is not already archived", normalized_recovery)
+        self.assertIn("complete terminal release/archive sequence", normalized_recovery)
+        self.assertIn("finish its archive idempotently with the same root and evidence", normalized_recovery)
         self.assertIn("active matching Goal evidence", normalized_recovery)
         self.assertIn("completed matching Goal evidence", normalized_recovery)
         self.assertIn("interrupted completion transition", normalized_recovery)
@@ -1006,11 +1031,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLess(
             delivery.index("portfolio_goal_state=complete"),
-            delivery.index("`--release-reason terminal`"),
-        )
-        self.assertLess(
-            delivery.index("`--release-reason terminal`"),
-            delivery.index("`scripts/ledger-cache`"),
+            delivery.index("complete terminal release/archive sequence"),
         )
 
         runtime = self.runtime_text()
@@ -1023,18 +1044,58 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_review_is_mandatory_with_one_fixed_thirty_minute_deadline(self) -> None:
         closeout = self.read("references/codex-review-closeout.md")
+        normalized_closeout = " ".join(closeout.split())
         gates = self.read("references/gates.md")
+        worker = self.read("references/worker.md")
+        template = self.read("references/ledger-template.md")
         for token in ("head SHA", "base ref", "merge-base SHA"):
-            self.assertIn(token, closeout)
+            self.assertIn(token, normalized_closeout)
         self.assertIn("entire tuple matches", closeout)
         self.assertIn("one 30-minute total active-wait deadline", closeout)
+        for token in (
+            "`revision_key`",
+            "`wait_started_at`",
+            "`wait_deadline`",
+            "`wait_invoked_at`",
+            "`provider_timeout=floor(wait_deadline-now)`",
+            "`--timeout <provider_timeout>s --interval 10s --max-interval 30s`",
+            "unchanged deadline",
+        ):
+            self.assertIn(token, normalized_closeout)
+        self.assertLess(
+            normalized_closeout.index("worker reports"),
+            normalized_closeout.index("root atomically records"),
+        )
+        self.assertLess(
+            normalized_closeout.index("root atomically records"),
+            normalized_closeout.index("At launch"),
+        )
+        self.assertLess(
+            normalized_closeout.index("starts GitStack"),
+            normalized_closeout.index("Report actual invocation/timeout afterward"),
+        )
+        self.assertIn("Before `poll-review`", worker)
+        self.assertIn("require root-issued", worker)
+        self.assertIn("At launch set", worker)
+        self.assertIn("never reuse", worker)
+        self.assertLess(worker.index("start GitStack"), worker.index("Report invocation/timeout afterward"))
+        self.assertIn("provider_timeout", template)
+        self.assertIn("wait_invoked_at", template)
+        self.assertEqual(
+            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=120),
+            1_680,
+        )
+        self.assertIsNone(
+            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=1_800)
+        )
         self.assertIn("monitoring-required", closeout)
-        self.assertIn("Do not extend the deadline", " ".join(closeout.split()))
+        self.assertIn("Do not extend", " ".join(closeout.split()))
         self.assertIn("`review_operation`", closeout)
         self.assertIn("`mutation_mode=apply`", closeout)
         self.assertIn("never expose the translation as a user option", closeout)
         self.assertIn("Review has no skip", gates)
         self.assertNotIn("15-minute", closeout)
+        self.assertNotIn("--timeout 15m", self.runtime_text())
         self.assertNotIn("extended profile", closeout)
         self.assertNotIn("explicitly-skipped-by-authorized-user", self.runtime_text())
 
@@ -1497,6 +1558,20 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertIn(token, report)
 
+    def test_ready_transition_resolves_and_reuses_exact_pr_identity(self) -> None:
+        worker = " ".join(self.read("references/worker.md").split())
+        for token in (
+            "Outside the ready mutation's shell chain",
+            "exact number and URL",
+            "`gh pr ready <number> --repo <owner/repo>`",
+            "Selectorless or branch inference is forbidden",
+            "Re-read the same number; require unchanged URL and `isDraft=false`",
+        ):
+            self.assertIn(token, worker)
+        self.assertLess(worker.index("exact number and URL"), worker.index("gh pr ready <number>"))
+        self.assertLess(worker.index("gh pr ready <number>"), worker.index("Re-read the same number"))
+        self.assertNotIn("gh pr ready --repo", self.runtime_text())
+
     def test_integration_partial_uses_a_distinct_per_spec_branch(self) -> None:
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
@@ -1556,7 +1631,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for path, start in clauses.items():
             contents = " ".join(self.read(path).split())
             self.assertIn(start, contents, path)
-            segment = contents.split(start, 1)[1][:900]
+            segment = contents.split(start, 1)[1][:1200]
             self.assertLess(segment.index("$autoreview"), segment.index("ready-for-review"), path)
             self.assertLess(
                 segment.index("ready-for-review"),

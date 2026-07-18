@@ -44,8 +44,8 @@ root_task_title_evidence_ref: <pending or exact live observation evidence>
 
 ## Codex Review Wait Registry
 
-| revision_key | request_ref | provider_state | observation_fingerprint | disposition | wait_started_at | wait_deadline | due_at | poll_owner |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| revision_key | request_ref | provider_state | observation_fingerprint | disposition | wait_started_at | wait_deadline | wait_invoked_at | provider_timeout | due_at | poll_owner |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 
 ## Gate Evidence
 

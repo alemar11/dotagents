@@ -174,10 +174,9 @@ claim that differs from the prepared snapshot blocks replay and remains intact.
 its candidate recovery root, including after that replaced claim was deleted.
 The helper accepts only schema-5 claims and schema-1 takeover journals whose
 candidate and snapshots are schema 5. Unsupported state blocks every mutation
-without migration, retirement, or deletion. Release after terminal proof or an
-explicit durable handoff. Pass `--release-reason terminal` only after
-terminal proof and `--release-reason durable-handoff` for resumable handoffs;
-the helper persists the exact release receipt before deleting claim ownership.
+without migration, retirement, or deletion. Release only with the complete
+terminal or durable-handoff command in `cache-lifecycle.md`; the helper persists
+its receipt before deleting ownership.
 
 After takeover, create or verify the new registry from the candidate claim's
 embedded adoption mappings, even when recovery begins before the new ledger was
@@ -226,8 +225,8 @@ persists user-selected parallelism.
 ## Codex Review Wait Registry
 
 Keep one row per exact PR/head/base/merge-base tuple with its fixed 30-minute
-deadline, request evidence, provider state, disposition, due time, and poll
-owner.
+deadline, request/provider state, `wait_invoked_at`, `provider_timeout`,
+disposition, due time, and poll owner.
 
 ## Gate Evidence
 

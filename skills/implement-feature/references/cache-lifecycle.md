@@ -30,32 +30,28 @@ Keep resumable ledgers directly under
 cache evidence only and live below `ledgers/archive/`; never load, restore, or
 migrate them as active recovery state.
 
-Archive only after terminal reconciliation and exact claim release. Release the
-claim with `claim release --release-reason terminal`; its durable receipt binds
-the root, claim fingerprint, ledger path, checksum, byte count, and terminal
-evidence. Pass that same evidence ref to the archive command. The helper
-requires and then consumes the matching receipt.
+Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire
+fingerprint, never a `sha256:` value or receipt fingerprint.
 
-Monitoring handoffs, dependency waits, blockers, active tasks, due checks, and
-other resumable states use `claim release --release-reason durable-handoff` and
-keep their active ledger. A durable-handoff receipt never authorizes archival.
-If failure occurs after CLAIM but before REGISTER creates the ledger, this
-release reason may persist a receipt with null checksum and byte count so claim
-ownership is never stranded.
-The receipt remains only for idempotent release proof; the next successful
-same-root acquire removes obsolete durable-handoff receipts.
-Run terminal archival with:
+For a recorded resumable handoff:
 
 ```text
-scripts/ledger-cache --json ledger archive \
-  --ledger <absolute-active-ledger> \
-  --root-id <released-root-id> \
-  --evidence-ref <terminal-evidence-ref>
+scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-fingerprint '<claim-fingerprint>' --release-reason durable-handoff --evidence '<durable-handoff-evidence-ref>'
 ```
 
-If terminal archival fails, preserve the active ledger and report cache
-maintenance as incomplete without changing the already-proven implementation
-result.
+Stop; keep the ledger; the receipt never authorizes archive. Pre-REGISTER may
+have a null snapshot; reacquire clears it.
+
+After terminal reconciliation, run in order with the same root and terminal
+evidence:
+
+```text
+scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-fingerprint '<claim-fingerprint>' --release-reason terminal --evidence '<terminal-evidence-ref>'
+scripts/ledger-cache --json ledger archive --ledger '<absolute-active-ledger>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
+```
+
+The receipt binds root/fingerprint/ledger/evidence; archive verifies/consumes it.
+Failure keeps the ledger/result and reports cache incomplete.
 
 ## Archive Contract
 

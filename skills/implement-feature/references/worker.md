@@ -77,11 +77,13 @@ For a local Markdown issue, the move action is legal only when its tracker-ownin
 repository and exact active plus derived `done/` paths are already present in
 the Execution Contract and exposed by the App-managed checkout.
 
-Provider skills receive only provider-owned primitives. For GitStack review
-operations, derive the exact PR and `review_operation` from the current fixed
-phase and pass `mutation_mode=apply` only for an authorized mutation. These are
-internal call arguments, not Feature Spec fields, worker action lists, or user
-options.
+Give GitStack only exact PR, `review_operation`, and `mutation_mode=apply` for an
+authorized mutation. Before `poll-review`, report tuple/request evidence and
+require root-issued `revision_key`, `wait_started_at`, and `wait_deadline`.
+At launch set `wait_invoked_at=now`, compute
+`provider_timeout=floor(wait_deadline-now)`, and start GitStack with 10s/30s
+bounds in one local step with no root round-trip. If nonpositive, check once.
+Report invocation/timeout afterward; never reuse, default, or segment it.
 
 For local commit actions, use `$gitstack:git-commit` and keep
 `commit_kind=regular` unless target-repository instructions require a targeted
@@ -143,10 +145,12 @@ planning/implementation correction. For local tracker
 artifacts, move each issue to its scoped `done/` path on the delivery branch.
 Report the exact tracked rename so the root can atomically advance the issue
 source snapshot from its active ref to the predeclared done ref; do not edit the
-body during the move. Commit and push the complete change set, publish or update
-every repository PR against its discovered default branch, then rerun final
-validation and non-trivial `$autoreview` at the resulting head, then convert any
-draft to ready-for-review (`isDraft=false`).
+body during the move. Commit/push and publish/update each PR against the
+discovered default branch. Outside the ready mutation's shell chain, record its
+exact number and URL. Rerun validation and `$autoreview`, then convert any draft
+to ready-for-review only by exact identity; a `gh` fallback is
+`gh pr ready <number> --repo <owner/repo>`. Selectorless or branch inference is
+forbidden. Re-read the same number; require unchanged URL and `isDraft=false`.
 After that nonterminal transition, request mandatory current-revision review
 through Codex, fix actionable findings, pass CI, prepare derived tracker
 closeout, and check current GitHub mergeability. Declare terminal merge-ready
@@ -207,7 +211,8 @@ before implementation and omit `token_budget`. If this is a resumed task, call
 If this task is already terminal, verify its completed Goal and report without
 resuming implementation; if its recorded terminal proof precedes an unfinished
 Goal completion transition, finish that transition only. Work only in the
-managed checkouts. Use the fixed action set and report any internal subagents.
+managed checkouts. Use fixed actions and the root-issued review deadline; report its
+arguments and any internal subagents.
 Do not edit the ledger, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
 every affected PR is ready to merge or report a concrete blocker. Call
@@ -219,7 +224,7 @@ every affected PR is ready to merge or report a concrete blocker. Call
 Report task and Goal evidence, state, managed checkouts, changed files,
 the exact task display title and observation evidence, task model, thinking
 value, and profile decision reason, validation, commits, PR URLs, full current
-revision tuples, review disposition, CI, current PR
+revision tuples, review disposition and wait assignment/invocation, CI, current PR
 lifecycle/conflict/mergeability state, required base-freshness, approval state,
 merge-queue eligibility, and the observation tuple/time (or exact blocker),
 prepared tracker closeout, internal subagents, blockers, drift, and next action.

@@ -221,11 +221,11 @@ and repository-rule evidence, blockers, recovery freshness, and next action.
 
 Before terminal release, revalidate exact root-title evidence; every task and the
 root then call `update_goal` with `status=complete`. Persist
-`portfolio_goal_state=complete` and its evidence, release with
-`--release-reason terminal`, then archive through `scripts/ledger-cache`. A
+`portfolio_goal_state=complete` and its evidence, then run the complete terminal
+release/archive sequence in `references/cache-lifecycle.md`. A
 failed title, completion, or evidence write retains the claim and active ledger. A
-resumable handoff uses `--release-reason durable-handoff` and retains its ledger
-and active nonterminal Goals. Recovery may idempotently finish only a fully
+resumable handoff uses that reference's complete durable-handoff release and
+retains its ledger and active nonterminal Goals. Recovery may finish only a fully
 revalidated completion, release, or archive transition; it never resumes
 implementation after terminal proof.
 

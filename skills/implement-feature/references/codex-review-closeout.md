@@ -38,8 +38,9 @@ terminal `merge-ready`.
 The ledger's Codex Review Wait Registry is the sole request and timing owner.
 Keep exactly one row keyed by
 `<owner>/<repo>#<number>@<head-sha>@<base-ref>@<merge-base-sha>`. Store request
-evidence, provider state, observation fingerprint, result and disposition,
-`wait_started_at`, `wait_deadline`, `due_at`, and poll owner.
+and provider/result/disposition evidence, observation fingerprint,
+`wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
+`due_at`, and poll owner.
 
 Before review request, resume, or terminal merge-ready acceptance, recompute the
 full revision tuple
@@ -57,21 +58,23 @@ fields to GitStack, and never expose the translation as a user option.
 
 ## Fixed Wait Deadline
 
-Use one 30-minute total active-wait deadline per exact revision tuple. The first
-waiter atomically records `wait_started_at` and `wait_deadline`; every concurrent
-or resumed consumer reuses that row and waits only for the remaining time. Use
-one bounded GitStack waiter with 10-second initial polling and a 30-second
-maximum interval. Never wrap it in another polling loop.
+The registry owns one 30-minute total active-wait deadline per tuple. The worker
+reports tuple/request evidence; the root atomically records
+`wait_started_at`/`wait_deadline` and returns `revision_key`/timestamps.
+At launch, the worker sets `wait_invoked_at=now`, computes
+`provider_timeout=floor(wait_deadline-now)`, and starts GitStack in the same
+local step with no root round-trip. If nonpositive, check once. Report actual
+invocation/timeout afterward for root persistence.
 
-At the deadline, recompute the tuple and check once. Record a terminal result if
-available. If the same request remains pollable and pending, persist one
-`monitoring-required` handoff with a single `due_at`, stop active polling, and
-release the claim only after that durable handoff is recorded. Do not extend the
-deadline, create another wait tier, submit another request, or rewrite unchanged
-timestamps. A later explicit resume reacquires ownership, revalidates the tuple,
-and checks the same registry row before any mutation.
+Use one GitStack waiter for it:
+`--timeout <provider_timeout>s --interval 10s --max-interval 30s`. Never use a
+provider default/example, hardcode `15m`, segment, or wrap it. Interrupted
+recovery recomputes from the unchanged deadline; it never reuses a timeout.
 
-An unpollable provider or access failure is a blocker, not a review skip.
+At deadline, check the tuple once. If pending, persist one `monitoring-required`
+handoff and `due_at`, stop, then release. Do not extend, re-request, or rewrite
+timestamps. Resume checks the row before mutation. Unpollable access blocks; it
+is not a review skip.
 
 ## Tracker Closeout
 

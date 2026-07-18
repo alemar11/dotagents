@@ -91,9 +91,9 @@ For `portfolio_goal_state=complete`, instead require every task Goal and fixed
 terminal gate to be complete, verify the terminal release evidence or current
 claim ownership, and never repair or resume implementation through a worker.
 Recovery may repair only root-task title evidence before closeout. If the claim
-is still active, idempotently release it with `--release-reason terminal`; then
-archive the ledger with that exact release evidence if it is not already
-archived. A mismatch blocks without reopening the completed Goal.
+is still active, run the complete terminal release/archive sequence in
+`cache-lifecycle.md`; if already released, finish its archive idempotently with
+the same root and evidence. A mismatch blocks without reopening the Goal.
 
 For interrupted terminal closeout while `portfolio_goal_state=active`, first
 require every fixed task and portfolio terminal gate to pass. For each terminal
