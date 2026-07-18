@@ -25,7 +25,9 @@ Before the first hosted mutation:
 
 1. Resolve the exact `owner/repository` target for every accepted candidate.
 2. Read Project Memory's concrete Idea-marker and optional workflow-state label
-   mappings. Do not invent or hard-code a parallel taxonomy.
+   mappings. Require explicit transport `label` for every consumed row; reject
+   missing or incompatible transport. Do not invent or hard-code a parallel
+   taxonomy.
 3. Search open issues for exact and near title matches, then inspect candidate
    bodies, labels, state, and `issueType`.
 4. Reuse only a canonical exact equivalent with the same substantive proposal,

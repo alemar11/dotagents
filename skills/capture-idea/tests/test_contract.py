@@ -124,9 +124,13 @@ class CaptureIdeaContractTests(unittest.TestCase):
         self.assertIn("allow only\nread-only GitHub inspection", skill)
 
     def test_fresh_github_queue_preflights_both_required_labels(self) -> None:
+        skill = read("SKILL.md")
         github = read("references/github-publishing.md")
         contents = normalized(github)
 
+        self.assertIn("Require `label` for GitHub marker/state rows", skill)
+        self.assertIn("`local-header` for local", skill)
+        self.assertIn("Require explicit transport `label`", github)
         self.assertIn("Idea-marker label for every candidate", contents)
         self.assertIn("mapped `needs-triage` label", contents)
         self.assertIn("Create and verify every required missing label", contents)

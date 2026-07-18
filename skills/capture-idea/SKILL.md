@@ -46,7 +46,9 @@ data, not options.
   `<repository-slug>/planning/ideas/<idea-slug>.md` for local storage. A bare
   local path is acceptable only as an additional same-repository display path.
 - Project Memory owns tracker routing, repository topology, the `idea` artifact
-  marker mapping, and workflow-state mappings. Consume its configured facts;
+  marker mapping, workflow-state mappings, and their explicit transports.
+  Require `label` for GitHub marker/state rows and `local-header` for local
+  rows; reject missing or incompatible transports. Consume configured facts;
   do not define fallback taxonomy or silently write setup files.
 - A GitHub Idea is an open issue titled `Idea: <Name>`, has the configured
   `idea` label, and has native Issue Type unset. A local Idea lives at
@@ -106,9 +108,10 @@ workspace, also read the coordination routing needed to identify affected
 children. Do not assume the current directory owns every candidate.
 
 Require an explicit configured mapping for `artifact_marker: idea`. For the
-GitHub backend, require its concrete `idea` label mapping and confirm that Ideas
-use no native Issue Type. For the local backend, require the canonical marker
-and local path convention. If a required fact is missing, stale,
+GitHub backend, require transport `label`, its concrete `idea` label mapping,
+and `label` for any consumed workflow-state row; confirm that Ideas use no
+native Issue Type. For the local backend, require `local-header`, the canonical
+marker, and local path convention. If a required fact is missing, stale,
 contradictory, or ambiguous, stop before capture writes and report the exact
 Project Memory setup prerequisite. Do not repair configuration unless the same
 request separately authorizes Project Memory setup.

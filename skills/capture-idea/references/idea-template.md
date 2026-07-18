@@ -46,7 +46,8 @@ artifact marker only when the user explicitly queues this Idea for evaluation.
 The local header metadata region starts after the H1 and ends at the first
 `##` heading. It must contain exactly one
 `artifact_marker: idea`, zero or one workflow-state line, and no `issue_type`
-line.
+line. The consumed Project Memory marker and state mappings must use
+`local-header`.
 
 For GitHub, the issue title supplies `# Idea: <Name>`. Render the same seven
 `##` sections in the issue body, but omit local header metadata. Apply the
