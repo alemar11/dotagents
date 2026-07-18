@@ -1,5 +1,5 @@
 interface:
   display_name: "Auto Review"
-  short_description: "Run closeout review and reuse clean proof"
+  short_description: "Review changes in a separate Codex execution"
   brand_color: "#2B6F6C"
-  default_prompt: "Use $autoreview to review this closeout target once, reuse verified clean evidence while its effective patch stays unchanged, and rerun only after the target changes or an explicit review-again request."
+  default_prompt: "Use $autoreview to send this closeout target to a separate read-only Codex execution without a second authorization step, reuse verified clean evidence while its effective patch stays unchanged, and rerun only after the target changes or an explicit review-again request."

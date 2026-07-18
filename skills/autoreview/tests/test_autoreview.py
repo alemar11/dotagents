@@ -57,11 +57,45 @@ class AutoreviewContractTests(unittest.TestCase):
         metadata = OPENAI_YAML_PATH.read_text(encoding="utf-8")
 
         self.assertIn("reusing verified clean evidence for an unchanged target", skill)
+        self.assertIn("separate read-only Codex execution", skill)
+        self.assertIn("separate read-only Codex execution", metadata)
         self.assertIn("reuse verified clean evidence", metadata)
         self.assertIn("unchanged", metadata)
         self.assertNotIn(
             'short_description: "Run structured closeout review before final, commit, PR, or ship."',
             metadata,
+        )
+
+    def test_codex_transfer_is_intrinsic_without_a_second_authorization(self) -> None:
+        skill = SKILL_PATH.read_text(encoding="utf-8")
+        normalized_skill = " ".join(skill.split())
+
+        self.assertIn("## Codex Data Transfer", skill)
+        for disclosed_content in (
+            "Git status",
+            "staged and unstaged diffs",
+            "non-ignored untracked file",
+            "a NUL byte replaces the contents with an omission marker",
+            "all other bytes are decoded as text with replacement characters",
+            "--prompt-file",
+            "--dataset",
+        ):
+            self.assertIn(disclosed_content, normalized_skill)
+        self.assertIn(
+            "This transfer is intrinsic read-only runtime behavior, not a separate permission boundary.",
+            normalized_skill,
+        )
+        self.assertIn(
+            "run without a separate authorization question, acknowledgement flag, or user-controlled option",
+            normalized_skill,
+        )
+        self.assertIn(
+            "treat that single grant as covering later Auto Review reruns required by a changed target",
+            normalized_skill,
+        )
+        self.assertIn(
+            "--no-web-search` disables reviewer web search, not the Codex engine transfer",
+            normalized_skill,
         )
 
     def test_version(self) -> None:

@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: Run Codex-only structured closeout review when an explicit or meaningful review is needed before final, commit, PR, or ship, while reusing verified clean evidence for an unchanged target.
+description: Run Codex-only structured closeout review by sending the selected change bundle to a separate read-only Codex execution when an explicit or meaningful review is needed before final, commit, PR, or ship, while reusing verified clean evidence for an unchanged target.
 ---
 
 # Auto Review
@@ -58,6 +58,25 @@ formatting or generated refreshes alter it, an accepted finding fix changes it,
 the branch/base/commit scope expands, the previous result or target cannot be
 verified, or the user explicitly asks to review again. A commit, push, PR, ship,
 or final-response boundary alone is not a rerun reason.
+
+## Codex Data Transfer
+
+Running the helper sends the selected review bundle to a separate ephemeral
+Codex engine execution. This transfer is intrinsic read-only runtime behavior,
+not a separate permission boundary. Local mode sends Git status, staged and
+unstaged diffs, and every non-ignored untracked file. For untracked files, a NUL
+byte replaces the contents with an omission marker; all other bytes are decoded
+as text with replacement characters. Branch and commit modes send the selected
+diff and stat. Any `--prompt`, `--prompt-file`, or `--dataset` content is also
+sent.
+
+After the user explicitly invokes Auto Review or authorizes a calling workflow
+that includes it, run without a separate authorization question, acknowledgement
+flag, or user-controlled option. A calling workflow with one initial
+authorization must disclose this transfer there and treat that single grant as
+covering later Auto Review reruns required by a changed target. `read-only`
+prohibits mutation; it does not mean offline. `--no-web-search` disables reviewer
+web search, not the Codex engine transfer.
 
 ## Canonical Closeout Sequence
 
