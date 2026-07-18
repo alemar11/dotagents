@@ -27,8 +27,10 @@ is too vague, return the smallest blocking question set through the caller.
 - Load `non-app-delivery.md` only when its current-request predicate is true or
   a canonical durable source Spec carries exactly one target and one resolvable
   `explicit_instruction_ref`.
-- Load `idea-source.md` only when `source_idea_refs` are supplied. Ideas are
-  immutable source evidence for `full-flow` or `spec-only`, never another mode.
+- Load `idea-source.md` when selected `source_idea_refs` are supplied. Explicit
+  discovery must already have completed and produced that selection before
+  this phase begins. Ideas are immutable source evidence for `full-flow` or
+  `spec-only`, never another mode.
 
 ## Phase Inputs
 
@@ -44,8 +46,10 @@ Receive:
 - affected repositories, allowed paths, per-Spec target branch, and any
   parent/child workspace links;
 - existing or pending `source_spec_ref` state;
-- optional explicitly selected `source_idea_refs`, already constrained to one
-  bounded feature;
+- optional explicitly selected `source_idea_refs`, their normalized canonical
+  section evidence, verified prior partial-outcome refs, transient per-element
+  durable coverage maps or report-only intended projections, and per-Spec
+  relevance mapping, already constrained to one bounded feature;
 - authored Feature Spec dependency rows;
 - optional `knowledge_delta` with `decisions`, `target_surfaces`, and
   `evidence` lists, plus a separate `planning_blockers` list;
@@ -84,11 +88,17 @@ Read the minimum evidence needed to establish the contract:
 Do not broadly scan unrelated domain or localization material. Widen evidence
 only when the current sources are incomplete or contradictory.
 
-When `source_idea_refs` are present, validate every durable artifact and its
-tracker owner through `idea-source.md` before drafting. Reject proposed refs,
-missing marker mappings, closed or typed GitHub Ideas, malformed local Idea
-headers, and ambiguous repository ownership. A missing Idea marker mapping
-does not block planning runs that supplied no Idea refs.
+When `source_idea_refs` are present, run ordinary durable-artifact validation
+through `idea-source.md` before drafting. Read every canonical Idea section and
+planning outcome, validate tracker ownership and prior partial Feature Spec
+refs, and derive the cumulative covered and remaining scope. Reject proposed
+refs, missing marker mappings, consumed or typed GitHub Ideas, malformed local
+Ideas, and ambiguous repository ownership. A missing Idea marker mapping does
+not block planning runs that supplied no Idea refs.
+
+Do not apply that ordinary consumed-source rejection to source-only recovery.
+Plan Feature must route reconciliation-only recovery before this phase; a
+recovery invocation never drafts or republishes a Feature Spec.
 
 When root context routes multiple products or workspaces, resolve the selected
 product, workspace path, applicable context files, and feature slug before
@@ -207,10 +217,18 @@ implementation-facing:
 - cross-repository contracts and integration gates;
 - risks, open questions, and issue-splitting notes.
 
-When durable Idea refs were supplied, render each relevant ref exactly once as
-`- Source Idea: <durable-ref>` in `## Source`. In a multi-repository bundle,
-include a ref in every parent or partial whose scope derives from that Idea,
-and omit it from unrelated partials. Preserve the Idea body and keep these refs
+When durable Idea refs were supplied, transform their normalized evidence
+through the mapping in `idea-source.md`. Before publication, trace every
+material accepted element to a candidate Feature Spec section, explicit
+non-goal, deferred remaining-scope item, or blocking question. Do not convert
+tentative direction or expected value into accepted requirements without
+evidence or clarification, and do not treat a candidate destination as durable
+coverage.
+
+Render each relevant ref exactly once as `- Source Idea: <durable-ref>` in
+`## Source`. In a multi-repository bundle, include a ref in every parent or
+partial whose scope derives from that Idea, and omit it from unrelated
+partials. Preserve the Idea body and keep its refs and transient coverage maps
 out of generated implementation issues.
 
 The normal Feature Spec does not carry selectable delivery, review,
@@ -289,9 +307,12 @@ Then verify:
   present, exactly one target and one `explicit_instruction_ref` exist in the
   owning section, and the ref resolves to an authorized-user instruction that
   selects the same target and scope;
-- the body contains no workflow status field such as `Status: Draft`.
+- the body contains no workflow status field such as `Status: Draft`;
 - every selected Idea ref appears only in the `## Source` section of each
-  relevant Feature Spec and nowhere in generated issue contracts.
+  relevant Feature Spec and nowhere in generated issue contracts;
+- every material selected-Idea element has exactly one candidate destination:
+  a current Spec section, explicit non-goal, remaining-scope item, or blocking
+  question; any blocking destination withholds the artifact.
 
 Withhold the artifact and return blockers when the gate fails.
 
@@ -340,7 +361,18 @@ Read tracker and type mappings immediately before output.
   Return publication order and state that every proposed source is
   non-executable until applied.
 
-`write_mode=propose` never invokes GitStack. GitStack does not interpret Plan
+After `write_mode=apply` publication succeeds, verify each selected-Idea
+candidate section or non-goal through the final durable Feature Spec ref before
+converting it to `covered` or `excluded`. If any destination cannot be resolved
+durably, withhold the coverage result and source reconciliation as an
+incomplete publication. With `write_mode=propose`, or any other non-durable
+preview, keep durable coverage unchanged and return only the report-only
+intended projection with `intended_coverage`, `intended_covered_scope`, and
+`intended_remaining_scope`; do not render a canonical planning outcome block.
+
+`write_mode=propose` never invokes GitStack for publication or mutation. Exact
+GitHub Idea discovery and source validation may still use read-only GitStack
+operations with mutation fields omitted. GitStack does not interpret Plan
 Feature's tracker or write policy.
 
 For hosted publication, use transient transport outside the repository and
@@ -359,7 +391,10 @@ Return:
 - workspace parent/child refs and publication order when applicable;
 - issue type applied or proposed;
 - open blockers and withheld output;
-- selected durable Idea refs and the per-Idea intended coverage result;
+- selected durable Idea refs, verified prior outcome refs, and each per-Idea
+  cumulative durable `coverage`, `covered_scope`, and `remaining_scope`, or the
+  distinct report-only `intended_coverage`, `intended_covered_scope`, and
+  `intended_remaining_scope`;
 - derived domain capture outcome and future closeout owner;
 - explicit App incompatibility when a non-App target is present.
 

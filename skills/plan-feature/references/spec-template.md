@@ -116,6 +116,13 @@ only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no
 Idea is consumed, and never copy Idea refs into generated implementation issue
 Execution Contracts.
 
+Use `idea-source.md`'s section mapping to transform the complete Idea body into
+planning evidence. Do not copy the tentative Idea sections wholesale or treat
+Proposed Direction and Expected Value as accepted requirements without
+evidence. Keep the transient per-element coverage map out of the Feature Spec;
+persist only the source refs here and the canonical cumulative outcome on the
+Idea after the complete applied planning result is durable and verified.
+
 No Feature Spec body persists `knowledge_delta` or a domain-knowledge handoff
 section. The optional delta remains run/phase data
 until the issue phase places its exact payload on the sole final

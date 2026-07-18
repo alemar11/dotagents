@@ -64,12 +64,14 @@ options and must not appear in the Run Registry:
 - issue type and workflow-state mappings from
   `project-memory/config/triage-labels.md`;
 - the `artifact_marker=idea` mapping from that same file only when
-  `source_idea_refs` are supplied.
+  `source_idea_refs` are supplied or the user explicitly requests captured-Idea
+  discovery.
 
 If a required fact is absent, stale, or contradictory, route to the matching
 Project Memory slice before planning. Do not turn a missing fact into another
-Plan Feature option. A missing Idea marker mapping blocks only Idea capture or
-Idea consumption; it does not invalidate an unrelated Plan Feature run.
+Plan Feature option. A missing Idea marker mapping blocks only Idea capture,
+discovery, or consumption; it does not invalidate an unrelated Plan Feature
+run.
 
 ## Execution Data
 
@@ -80,10 +82,23 @@ Carry only the data needed to connect planning artifacts:
   available context used for planning: the current or coordination root,
   affected child-repository roots, and scoped contexts matched by affected
   paths. Omit roots and routes with no context file;
+- optional explicit Idea-discovery intent: when exact refs are absent, a direct
+  request to find, list, or plan from captured Ideas authorizes read-only
+  discovery through `idea-discovery.md`. It is invocation evidence, not a field
+  in the Run Registry. Discovery may load `idea-source.md` in validation-only
+  mode and produces candidate refs but no planning write; only an explicit user
+  selection produces `source_idea_refs` and activates that source contract for
+  planning;
 - optional `source_idea_refs`: explicitly selected durable GitHub or local Idea
   refs consumed only by `full-flow` or `spec-only`. Multiple refs must describe
   one bounded feature. Reject `proposed-idea:` refs and never accept this data
-  in `issues-from-existing-spec`; load `idea-source.md` when it is present;
+  in `issues-from-existing-spec`; load `idea-source.md` when these refs are
+  present;
+- optional prior Idea planning outcomes, transient durable coverage maps, and
+  report-only proposal projections: load and validate every canonical prior
+  partial result, its cumulative Feature Spec refs, covered scope, and
+  remaining scope. These values are source evidence and derived run data, never
+  options or Feature Spec fields;
 - source identity: a durable `source_spec_ref`, or in `write_mode=propose`
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,
