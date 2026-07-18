@@ -53,7 +53,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
 | `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
-| `plan-feature` | Manually plan Feature Spec bundles and agent-ready issues in apply or proposal mode. |
+| `plan-feature` | Manually converge feature intent or an existing Spec into a complete applied or proposed planning bundle. |
 | `implement-feature` | Execute execution-ready Feature Spec bundles in visible ChatGPT desktop app tasks through one fixed GitHub PR-ready flow. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
 | `learn` | Capture confirmed durable corrections or preferences and write them only to `AGENTS.md`. |
@@ -81,7 +81,7 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
 - `capture-idea` requires `$project-memory` for tracker routing and the canonical Idea marker mapping. It uses `$gitstack:github-issues` for exact GitHub preflight reads and applied Idea mutations.
-- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact GitHub Idea-source reads and applied tracker mutations.
+- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact paginated GitHub Idea and planning-bundle convergence reads in both write modes, plus applied tracker mutations.
 - `implement-feature` requires local `python3` and `git` for its shipped atomic active-root claim and typed run-state helper, `$autoreview`, and the relevant GitStack bundled skills for GitHub-backed issue lifecycle, CI, review, commit, and pull-request work. Its root-owned cache maintenance archives terminal JSON plus a deterministic Markdown audit projection and expires valid archives older than 180 days. It accepts only execution-ready Feature Spec bundles and never performs planning or repairs incomplete planning artifacts.
 
 ## Project-Local Skills
