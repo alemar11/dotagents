@@ -13,11 +13,13 @@ tracker mutation.
 1. Resolve every candidate tracker-owning repository from Project Memory
    routing and repository topology before listing artifacts.
 2. For GitHub, use `$gitstack:github-issues` read operations with no mutation
-   fields to list open issues carrying the configured Idea-marker label. Read
-   title, body, state, labels, native Issue Type, comments, and qualified URL.
+   fields to list open issues carrying the configured Idea-marker label. Require
+   explicit transport `label` for the marker and every consumed workflow row;
+   reject missing or incompatible transport. Read title, body, state, labels,
+   native Issue Type, comments, and qualified URL.
 3. For local tracking, inspect only canonical
    `planning/ideas/<idea-slug>.md` files inside the resolved owning
-   repositories.
+   repositories after requiring `local-header` for marker and workflow rows.
 4. Load `idea-source.md` in validation-only mode to validate each candidate's
    durable identity, complete outcome-comment history, and canonical prior
    outcomes. Exclude malformed or fully consumed artifacts from ordinary

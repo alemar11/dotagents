@@ -13,10 +13,11 @@ deferred domain-memory closeout.
 
 - Do not change Feature Spec scope or invent requirements.
 - Do not perform implementation or domain-memory writes.
-- Use the incoming `mode` and `write_mode`; do not create phase-specific
-  choices.
-- Treat tracker routing, repository topology, issue types, and workflow states
-  as Project Memory facts.
+- Use the incoming `write_mode` and derived `source_route`; do not create
+  phase-specific choices.
+- Treat tracker routing, repository topology, issue types, workflow states, and
+  their explicit transports as Project Memory facts. Reject missing, unknown,
+  or backend-incompatible transports instead of inferring them.
 - Publish only with `write_mode=apply`. With `write_mode=propose`, write
   nothing and return bodies, locations, metadata, and publication order rather
   than executable commands.
@@ -27,7 +28,7 @@ deferred domain-memory closeout.
 - Give every issue one Execution Contract table and no duplicate delivery or handoff
   projection.
 - Run structural graph compression before freezing IDs or invoking
-  `$plan-harder`; issue count is report data only.
+  `$plan-harder` for missing issues; issue count is report data only.
 - Load `non-app-delivery.md` when the current request explicitly selects its
   target, or when the source Feature Spec contains exactly one target and one
   resolvable `explicit_instruction_ref`.
@@ -36,6 +37,7 @@ deferred domain-memory closeout.
 
 Receive:
 
+- `write_mode` and the frozen derived `source_route`;
 - a durable `source_spec_ref`, or a proposed ref only with
   `write_mode=propose`;
 - the complete Feature Spec body and validated cross-Spec dependency graph;
@@ -43,15 +45,29 @@ Receive:
   branch;
 - tracker backend and repository layout facts for every owning repository;
 - workspace parent/child refs when applicable;
-- optional `knowledge_delta` plus separate `planning_blockers`. In
-  `issues-from-existing-spec`, accept the delta only as explicit accepted
-  invocation data separate from the unchanged source;
+- current durable implementation-issue bodies, generated IDs, refs, metadata,
+  relationships, and verification evidence when any exist;
+- optional `knowledge_delta` plus separate `planning_blockers`. On the
+  existing-source route, accept the delta only as explicit accepted invocation
+  data or an exact continuation handoff, always separate from the unchanged
+  source;
+- optional exact continuation handoff from an incomplete apply, containing
+  `feature_slug`, every staged or durable Spec ref, multi-repository publication
+  transaction identity plus reconstructable templates when present, selected
+  `source_idea_refs` plus verified prior outcome refs, and the complete
+  `knowledge_delta` until its final owner issue is durable;
 - `non_app_delivery_target` and its non-option `explicit_instruction_ref` only
   when the conditional reference was loaded.
 
 Stop when an apply run lacks a durable source ref, when proposed and durable
 refs are mixed ambiguously, or when the source still has blocking open
 questions.
+
+When a continuation handoff is present, compare its identity, Spec refs,
+transaction state, and exact delta with current durable state before graph
+work. Resume only when they match. If the handoff says a nonempty delta still
+lacks a durable owner, omission or any changed delta item blocks; never treat
+that retry as `no-durable-change`.
 
 ## Workflow
 
@@ -61,8 +77,8 @@ Read the Feature Spec and verify:
 
 - exactly one `## Feature Dependencies` section exists and its table has
   exactly the `upstream_feature_spec_ref` and `dependency_reason` columns, even
-  for `mode=issues-from-existing-spec`; reject absence, duplicates, extra
-  columns, or prose-derived edges before issue generation;
+  on the existing-source route; reject absence, duplicates, extra columns, or
+  prose-derived edges before issue generation;
 - problem, goals, requirements, acceptance criteria, repository scope, and
   validation expectations are complete;
 - affected repositories and allowed paths resolve to real planning scope;
@@ -86,17 +102,47 @@ Read the Feature Spec and verify:
   `## Domain Knowledge Handoff`;
 - a present phase-level knowledge delta contains decisions, target surfaces,
   and evidence. Normalize every target to one affected repository plus one
-  portable repo-relative path. In `issues-from-existing-spec`, require every
+  portable repo-relative path. On the existing-source route, require every
   target to be contained by the unchanged source repository/path scope and
   reject the explicit invocation data otherwise. Never infer it from Feature
   Spec prose, rewrite the source, or widen immutable scope to carry it.
 
 Return blockers without output when these checks fail.
 
-### 2. Build Vertical Slices
+### 2. Discover Durable State And Seed Vertical Slices
 
-Load `references/vertical-slices.md`. Split by independently valuable behavior,
-not architecture layer. Prefer a small graph in which each issue:
+Before synthesizing a graph, enumerate the complete current durable issue state
+for every implementation-eligible Feature Spec. For GitHub, use pure read
+operations through `$gitstack:github-issues` in either write mode, with mutation
+fields omitted. Read every open or closed implementation issue attached to the
+Feature Spec and every candidate carrying its durable `source_spec_ref`,
+following pagination through the complete result set. If the connector cannot
+prove all-state enumeration and pagination completeness, require GitStack's
+read-only gap fallback to use paginated `gh api` reads. A fixed-limit
+`gh issue list` result is never completeness proof. For local tracking, inspect
+the complete active and `done/` subtrees. If neither backend can prove complete
+state, block before graph synthesis, absence claims, no-op, or proposal output.
+
+Parse every durable candidate's generated ID, title, source ref, Execution
+Contract, scope, dependencies, hardening provenance, metadata, and parent
+relationship. Validate its vertical outcome against the current immutable
+Feature Spec. A durable candidate with stale source identity, missing or
+contradictory obligations inside its claimed vertical outcome or scope, widened
+scope, invalid provenance, malformed dependencies, or duplicate identity is a
+conflict; do not ignore it and draft a replacement. Obligations outside that
+claimed slice remain eligible uncovered behavior for new missing slices.
+
+Seed the candidate graph with every valid durable issue. Its generated ID,
+vertical outcome, title, scope, dependencies, integration/closeout role, and
+body contract are fixed inputs, not suggestions for model regeneration. Derive
+which current Spec obligations those retained slices cover, then synthesize
+only independently valuable uncovered behavior. If retained slices cover the
+complete Spec, synthesize nothing. If no durable issue exists, build the graph
+normally from the complete Spec.
+
+Load `references/vertical-slices.md`. Split uncovered scope by independently
+valuable behavior, not architecture layer. Prefer a small graph in which each
+issue:
 
 - delivers a testable user or system outcome;
 - owns a bounded set of allowed paths and affected repositories;
@@ -104,10 +150,16 @@ not architecture layer. Prefer a small graph in which each issue:
 - can merge safely once its dependencies finish;
 - avoids duplicating another issue's scope.
 
-Use provisional generated IDs such as `01`, `02`, and `03` while shaping the
-graph. Freeze stable IDs only after integration and closeout ownership is final
-and the structural graph-compression gate passes. IDs are planning graph
-identities and remain separate from hosted issue numbers.
+Use provisional candidate keys while shaping missing slices. Reserve every
+retained generated ID and never renumber it. Assign final IDs to missing slices
+only after integration and closeout ownership is final and the structural
+graph-compression gate passes. IDs are planning graph identities and remain
+separate from hosted issue numbers.
+
+Require a nonempty final graph for every implementation-eligible Feature Spec.
+A coordination-only parent never enters this phase. If the source has no
+implementable vertical outcome, return a planning blocker rather than an empty
+successful bundle.
 
 For each issue, store only `dependency_ids` pointing to earlier generated IDs.
 Require every ref to exist, reject self-dependencies, and validate the graph is
@@ -167,8 +219,10 @@ If `knowledge_delta` is present:
    remove that owner and its outgoing `dependency_ids`, derive the nodes with no
    dependents in the remaining intra-Spec graph, and require the owner's final
    `dependency_ids` to include every such node. Reject any graph in which
-   another issue depends on the owner. Reuse a candidate only when it can remain
-   topologically last after these dependencies; otherwise append a new owner.
+   another issue depends on the owner. Reuse an unpublished candidate only when
+   it can remain topologically last after these dependencies; reuse a durable
+   seed only when its existing closeout payload and dependencies are already
+   exact. Otherwise append a new owner without modifying the retained issue.
 2. For a multi-repository bundle, accept the delta as phase data only while
    generating the dedicated integration partial's issues. Require that
    partial's Feature Dependencies to cover every implementation partial and
@@ -176,9 +230,10 @@ If `knowledge_delta` is present:
    coordination parent or an ordinary implementation partial. Within the
    integration partial, reuse or append the closeout owner and apply the same
    owner-excluded terminal algorithm only to that partial. Reject a dependent
-   of the owner and never copy sibling-partial issue IDs. Reuse is valid only
-   when the owner can remain topologically last inside that partial; otherwise
-   append a new owner.
+   of the owner and never copy sibling-partial issue IDs. Reuse an unpublished
+   candidate only when it can remain topologically last inside that partial;
+   reuse a durable seed only when its existing closeout payload and dependencies
+   are already exact. Otherwise append a new owner.
 3. Copy the exact decisions, portable targets, and evidence into that final
    issue's `## Domain Knowledge Closeout` section.
 4. Before hardening, require every target repository in that payload to appear
@@ -209,19 +264,85 @@ implementation-eligible Feature Spec. Follow its count-neutral retain, repair,
 scope, integration, and closeout rules exactly. Withhold any graph that cannot
 pass without widening the accepted Feature Spec scope.
 
+Treat every durable seed from step 2 as fixed. Compression may combine, remove,
+or reshape unpublished candidates, but it must not renumber, merge, rewrite, or
+change dependencies or scope on a retained durable issue. If the gate can pass
+only by changing a durable node, stop on a graph conflict and require a
+separately authorized replacement rather than synthesizing a parallel graph.
+
 After repairs, rerun step 4's owner-excluded terminal derivation when
 `knowledge_delta` is present, using the repaired remaining graph and replacing
-the closeout owner's `dependency_ids`. Then rerun verticality, overlap,
+an unpublished closeout owner's `dependency_ids`; a retained owner must already
+match the result. Then rerun verticality, overlap,
 dependency, acyclicity, integration, and closeout validation. Topologically
-assign or renumber final generated IDs so the closeout owner is last and every
-`dependency_ids` entry points to a strictly earlier generated ID. Freeze those
-IDs for rendering and publication; never retain a reused ID that would depend
-on the same or a later ID.
+assign unused final generated IDs only to missing slices so the closeout owner
+is last and every `dependency_ids` entry points to a strictly earlier generated
+ID. Never renumber a durable seed. If no unused ID placement can satisfy the
+forward-dependency contract without changing a retained issue, stop on a graph
+conflict. Freeze the resulting IDs for rendering and publication.
 
-### 6. Harden Every Retained Issue
+### 6. Converge With Durable Issue State
 
-After structural compression and graph ownership have stabilized, invoke
-`$plan-harder` at least once for each final retained issue with
+After the complete structural graph and stable generated IDs are known, compare
+it with the complete durable snapshot enumerated before synthesis in step 2.
+Compare by generated ID, owning Feature Spec, title, canonical body contract,
+target branch, dependencies, tracker metadata, and parent/sub-issue attachment.
+Do not perform a fresh model split merely to recreate comparison prose.
+
+Do not rerun `$plan-harder` to synthesize comparison prose for a durable issue.
+Treat its body as contract-equivalent only when the generated ID, title,
+`source_spec_ref`, Execution Contract fields, and `dependency_ids` exactly match
+the stable desired graph; required sections occur exactly once; every current
+source requirement, acceptance criterion, and validation obligation is covered
+without contradiction or scope widening; no blocker or placeholder remains;
+and the final hardening provenance is valid. Explanatory prose need not be
+byte-regenerated. Any missing obligation, contradictory edit, or structured
+field drift is a body conflict.
+
+Then reconcile:
+
+- retain an existing issue only when its identity and body match the stable
+  desired inputs and it carries valid final hardening provenance;
+- treat an absent desired issue as missing and continue to hardening for that
+  issue only;
+- when a contract-equivalent issue exists but mapped tracker metadata or its
+  parent/sub-issue attachment is missing, record only that supported missing
+  reconciliation operation;
+- when every desired issue, metadata value, and parent/sub-issue attachment is
+  exact, record a candidate no-op without hardening or mutation; after the
+  final fresh read in step 10, return a no-op without hardening or mutation; and
+- stop on duplicates, extra linked implementation issues, changed bodies,
+  conflicting generated IDs, stale source refs, invalid provenance, or any
+  graph mismatch. Do not rewrite, close, replace, renumber, or silently adopt a
+  conflicting artifact.
+
+For a contract-equivalent GitHub issue, open or closed, an absent mapped
+`native-type` or label-backed task type is repairable because type is not
+executor lifecycle state; a different mapped type is a conflict. Only on an
+open issue that has not progressed beyond planning is an absent label-backed
+`ready-for-agent` state repairable; a conflicting canonical workflow state is a
+conflict. Resolve each configured GitHub metadata transport before recording
+the repair: `native-type` uses `set-type` and `label` uses `add-label`. A configured
+`body-field` is part of the immutable body contract, not repairable tracker
+metadata: it must already match, and a missing or different body field is a body
+conflict that blocks convergence until a separately authorized replacement
+lands. Never attempt a native type operation when types are disabled. Unrelated
+repository labels are not Plan Feature metadata. A closed issue or local
+`done/` issue with a contract-equivalent body is valid progressed lifecycle
+state owned by the executor: after any safe GitHub type-only repair, retain it
+without restoring `ready-for-agent` or reopening it. Never repair header
+metadata on a local `done/` issue.
+
+An implementation issue already in the `done/` subtree or closed state remains
+part of durable state. It must match the same contract; never create a duplicate
+active issue for it. Partial-publication recovery resumes only missing issue,
+mapped metadata, and parent/sub-issue operations after the comparison passes.
+
+### 7. Harden Every Missing Issue
+
+After structural compression, graph ownership, and durable-state reconciliation
+have stabilized, invoke `$plan-harder` at least once for each missing final
+issue with
 `planning_mode=issue-hardening` and `output_surface=caller`. Merge the returned
 brief into the issue template:
 
@@ -240,10 +361,11 @@ Run final verticality, scope-overlap, dependency, validation, and readiness
 gates. If hardening exposes a graph-level defect, discard affected results,
 return to step 5, restabilize the graph and IDs, and re-harden every materially
 changed issue. For an issue-local repair, run another hardening pass on that
-issue before output. Supersede earlier briefs and persist only final stable
-results; pass count is derived work, not an option or artifact field.
+issue before output. Never use hardening to rewrite an existing durable issue.
+Supersede earlier briefs and persist only final stable results; pass count is
+derived work, not an option or artifact field.
 
-### 7. Render The Execution Contract
+### 8. Render The Execution Contract
 
 Use `references/issue-body-template.md`. Every issue has exactly one
 `## Execution Contract` table containing:
@@ -266,7 +388,7 @@ repeat the ID list. Reverse edges are a derived view only. The issue body may
 include cross-repository notes, integration gates, and domain closeout data in
 their dedicated sections; they are not extra knobs.
 
-### 8. Validate Readiness
+### 9. Validate Readiness
 
 An applied issue may receive `ready-for-agent` only when:
 
@@ -291,19 +413,48 @@ mapping after the same content gates pass. Never emit or persist that workflow
 state in a proposed body, label, or queue. Withhold failed issues and return
 their blockers; never downgrade them into a partially agent-ready artifact.
 
-### 9. Apply Or Propose
+### 10. Apply Or Propose
+
+Immediately before returning a proposal, no-op, or performing the first
+mutation, re-read the owning Feature Spec body and ref, the current Project
+Memory transport mappings, and the complete all-state issue, metadata, and
+parent/sub-issue set with the same pagination proof as step 2. Compare that
+fresh state with the frozen graph and prior snapshot. If any source, mapping,
+body, ID, metadata, relationship, or candidate absence changed during graph
+work or hardening, discard the stale projection and restart convergence from
+fresh source/state evidence; block when the change is foreign, conflicting, or
+cannot be proved completely. This final read is mandatory in both write modes.
+
+For every GitHub repository, revalidate the external task-type transport/value
+and collect the exact configured labels required by missing operations. A
+`native-type` must still be enabled and expose the mapped task value; otherwise
+block for a Project Memory mapping update and never switch transport during
+recovery. Collect a task-type label only when that row uses `label`, and require
+the `ready-for-agent` workflow row to use `label`. Verify each label exists.
+Under `write_mode=apply`, create and verify only a missing exact configured
+label through `issue_operation=create-label` before the first issue or metadata
+mutation. Under `write_mode=propose`, report each missing label creation as an
+intended operation and perform no mutation. Preserve verified label creations
+in partial-failure recovery and retry only a still-missing operation.
 
 Order output topologically, with the final integration issue last for a
 multi-repository bundle and its domain closeout attached only when a delta
 exists.
 
-- `write_mode=apply`, GitHub: publish each issue through
+- `write_mode=apply`, GitHub: retain exact existing issues and publish only
+  missing issues through
   `$gitstack:github-issues`. Translate each write to GitStack-owned
   `mutation_mode=apply`, its exact target, and one canonical `issue_operation`;
-  apply the mapped task type and agent-ready state, attach it as a sub-issue of
-  the Feature Spec when supported, verify every mutation, and retain the hosted
-  ref separately from its generated ID.
-- `write_mode=apply`, local: write
+  resolve the configured task-type and agent-ready transports independently.
+  Require `label` for the GitHub workflow state. Render a configured task-type
+  `body-field` into the final applied body before creation; apply `native-type`
+  or `label` transports only after that body verifies. Attach the issue as a
+  sub-issue of the Feature Spec when supported,
+  repair only verified-missing mapped metadata or parent/sub-issue attachment
+  through the matching canonical GitStack operation, verify every mutation,
+  and retain the hosted ref separately from its generated ID. Never attempt a
+  native type mutation when GitHub Issue Types are disabled.
+- `write_mode=apply`, local: retain exact existing files and write only missing
   `planning/features/<feature-slug>/issues/<NN>-<slug>.md` in the owning
   repository. Issues owned by a dedicated integration partial use
   `planning/features/<feature-slug>/integration/issues/<NN>-<slug>.md` in that
@@ -315,18 +466,29 @@ exists.
   `planning/features/<feature-slug>/integration/issues/done/`. Before output,
   include the tracker-owning repository and both exact source and destination
   paths in each issue's Execution Contract.
-- `write_mode=propose`: write nothing. Return every body, intended path or
-  repository, mapped metadata, and the topological publication order. Use
+  For a contract-equivalent existing active file with only missing canonical
+  `issue_type: task` or `workflow_state: ready-for-agent`, repair exactly those
+  header lines and verify the rest of the file is byte-identical. Never perform
+  this repair on a file in `done/`, restore an executor-owned lifecycle state,
+  or edit a conflicting body.
+- `write_mode=propose`: write nothing. Return retained durable artifacts plus
+  every missing proposed body, intended path or repository, mapped metadata,
+  relationship operation, and the topological publication order. Use
   deterministic `proposed-issue:<feature_slug>/<NN>` refs, or
   `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/<NN>` for an
   issue owned by a multi-repository implementation partial. An issue owned by
   the dedicated integration partial uses
   `proposed-issue:<project_slug>/<feature_slug>/<repository_slug>/integration/<NN>`.
-  State that neither source nor issues are executable until applied, and keep
-  the intended workflow state out of the proposed bodies.
+  On the new-source route, state that neither proposed source nor proposed
+  issues are executable until applied. On the existing-source route, preserve
+  the supplied source as durable and state that only the proposed issue or
+  relationship remainder is non-executable. Keep the intended workflow state
+  out of the proposed bodies.
 
-`write_mode=propose` never invokes GitStack. GitStack does not interpret Plan
-Feature's tracker or write policy.
+`write_mode=propose` never invokes GitStack for publication or mutation. It may
+use pure read operations with mutation fields omitted to prove current hosted
+state and convergence safety. GitStack does not interpret Plan Feature's tracker
+or write policy.
 
 In a multi-repository workspace, publish each issue through its owning
 repository's configured tracker. Preserve source links to sibling partial
@@ -337,12 +499,33 @@ Use transient body transport outside repositories for hosted writes and remove
 it after verified mutation. Plan Feature owns only the planning-artifact writes
 performed in this phase.
 
-### 10. Report
+Immediately before each hosted create or local file create, re-read the exact
+target plus the owning Feature Spec and mapping rows and prove that the frozen
+artifact is still absent. Stop and restart or block if a foreign issue/file,
+source edit, mapping change, or ambiguous mutation result appears; never create
+a duplicate or overwrite a newly created local path. Verify every successful
+create before moving to the next operation.
+
+When no issue, metadata, or relationship operation is missing, perform no
+mutation and report the verified complete bundle as a no-op only after the
+final fresh comparison above remains exact.
+
+If apply exits before the final issue carrying a nonempty `knowledge_delta` is
+durable and verified, the result is incomplete and must include the exact
+continuation handoff received or constructed by this run: `feature_slug`, all
+staged or durable Spec refs, any multi-repository publication-transaction
+identity and its role map plus reconstructable templates, selected Idea refs and
+prior outcomes, the complete delta, verified completed operations, and exact
+missing operations. Do not report `capture_outcome=no-durable-change` or omit
+the delta.
+
+### 11. Report
 
 Return:
 
-- Feature Spec ref and `mode` / `write_mode`;
-- candidate and final issue counts, generated IDs, actual or proposed refs, and
+- Feature Spec ref, `write_mode`, and derived `source_route`;
+- candidate and final issue counts, retained, created, missing, or proposed
+  generated IDs and refs, repaired metadata or relationships, no-op state, and
   publication order;
 - affected repositories and tracker route for each issue;
 - dependency graph, topological order, and acyclicity proof;
@@ -352,6 +535,9 @@ Return:
 - confirmation that every issue has one valid Execution Contract;
 - domain closeout issue and deferred capture result when required;
 - withheld issues and blockers;
+- exact continuation handoff for any partial apply whose domain-closeout owner
+  is not yet durable, including the complete `knowledge_delta` and missing
+  operation list;
 - explicit App incompatibility when a non-App target is present.
 
 When `knowledge_delta` is present, report `capture_outcome=deferred` and the

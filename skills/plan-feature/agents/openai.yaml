@@ -1,7 +1,7 @@
 interface:
   display_name: "Plan Feature"
-  short_description: "Plan Feature Spec bundles and agent-ready issues."
+  short_description: "Converge complete applied or proposed planning bundles."
   brand_color: "#10B981"
-  default_prompt: "Use $plan-feature for planning only: choose a mode and apply or propose, consume Project Memory routing, harden each vertical issue, and defer any knowledge delta to the final integration issue."
+  default_prompt: "Use $plan-feature to converge feature intent or a durable Feature Spec into one complete planning bundle, applying it with agent-ready issue metadata or returning a non-executable proposal through Project Memory routing."
 policy:
   allow_implicit_invocation: false

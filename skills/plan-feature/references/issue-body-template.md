@@ -123,11 +123,16 @@ knowledge_delta:
   owns authorization and tracker lifecycle. Planning grants neither.
 ```
 
-Tracker metadata is rendered by mode and backend rather than duplicated in the
-base body:
+Tracker metadata is rendered by `write_mode` and backend rather than duplicated
+in the base body:
 
-- GitHub `write_mode=apply`: apply the mapped task Issue Type and
-  `ready-for-agent` label as tracker metadata; do not copy them into the body.
+- GitHub `write_mode=apply`: resolve the mapped task type and
+  `ready-for-agent` state transports independently. Require `label` for the
+  workflow state. For task-type `native-type` or `label`, mutate tracker
+  metadata and do not copy that value into the body. For task-type `body-field`,
+  insert the exact configured field in the header metadata region after the H1
+  and before the first `##` heading before publication; do not invent a key or
+  value.
 - Local `write_mode=apply`: insert canonical `issue_type: task` and
   `workflow_state: ready-for-agent` lines below the H1 title.
 - `write_mode=propose`: leave both lines out of the proposed body and return the

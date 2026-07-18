@@ -78,8 +78,9 @@ delta.
 
 ## Dependency Graph
 
-Use provisional generated IDs and one forward list per issue while shaping the
-graph. Freeze those IDs as stable only after structural compression passes:
+Durable seeds keep their generated IDs and forward lists unchanged. Use
+provisional candidate keys only for missing slices while shaping the graph, then
+assign unused IDs to those slices after structural compression passes:
 
 ```text
 01: dependency_ids: none
@@ -122,7 +123,9 @@ the graph and actual path scope by the eventual orchestrator.
 
 Run this gate on every complete candidate issue graph after repository scope,
 integration ownership, and domain-closeout ownership are assigned, but before
-stable IDs or `$plan-harder` calls. Evaluate structure rather than issue count;
+stable IDs or `$plan-harder` calls for missing slices. Durable seed IDs are
+already stable.
+Evaluate structure rather than issue count;
 the number of candidates is measurement data, never a threshold, cap, option,
 or reason to block publication.
 
@@ -143,6 +146,11 @@ order rather than technical necessity. Add a dependency instead of combining
 only when both outcomes remain independently valuable and ordered ownership is
 required.
 
+A durable seed is fixed input. Never merge, remove, renumber, rewrite, or change
+scope/dependencies on it through compression. Apply repairs only to unpublished
+candidates; when the gate requires a durable-node change, stop on a graph
+conflict and require separately authorized replacement.
+
 Never compress across Feature Specs. Run the gate independently for each
 implementation-eligible Spec and exclude coordination-only parent artifacts.
 Preserve every required repo-owned integration partial, its real integration
@@ -152,10 +160,12 @@ widening the source.
 
 After repairs, rerun the owner-excluded terminal derivation from `Domain
 Knowledge Closeout` when a closeout owner exists, and replace that owner's
-`dependency_ids` with every terminal in the repaired remaining graph. Then
+`dependency_ids` with every terminal in the repaired remaining graph only when
+the owner is unpublished; a durable owner must already match. Then
 revalidate verticality, overlap, dependencies, acyclicity, integration
 ownership, and domain-closeout ownership. Freeze generated IDs only after the
-gate passes. Report the candidate count, final count, combined or removed
+gate passes: freeze only missing IDs and never renumber durable seeds. Report
+the candidate count, final count, combined or removed
 slices, removed artificial dependencies, retained enabling or integration
 reasons, and avoided initial `$plan-harder` calls, calculated as candidate count
 minus final count. Report later repair passes separately. Persist none of this
@@ -163,7 +173,8 @@ as an option, Feature Spec field, Execution Contract row, or issue-body section.
 
 If later issue hardening exposes a graph-level defect, discard the affected
 hardening results, return to this gate, restabilize the graph and IDs, and
-re-harden every materially changed final issue.
+re-harden every materially changed unpublished issue. Never use hardening to
+rewrite a durable seed.
 
 ## Domain Knowledge Closeout
 

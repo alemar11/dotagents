@@ -3,21 +3,28 @@
 These read-only fixtures define representative Plan Feature outcomes. They do
 not authorize tracker or repository mutation.
 
-## Explicit Local Idea To Spec-Only Full Coverage
+## New-Source Local Idea To Complete Applied Bundle
 
 Input:
 
-- `mode=spec-only`;
+- no durable `source_spec_ref` exists, so Plan Feature derives the new-source
+  route;
 - `write_mode=apply`;
 - one selected `current-repository/planning/ideas/export-settings.md` Idea;
 - no prior planning outcome;
-- every material Idea element resolves to `covered` or `excluded`.
+- every material Idea element resolves to `covered` or `excluded`;
+- the requested applied bundle contains one Feature Spec, its final hardened
+  implementation issues, mapped metadata, and parent/issue relationships.
 
 Expected:
 
 - read and normalize all seven canonical Idea sections;
 - publish and verify `planning/features/export-settings/SPEC.md`;
+- publish and verify every generated implementation issue, its mapped metadata,
+  dependencies, and parent relationship;
 - keep the exact Idea ref only in the Spec's `## Source` section;
+- wait until the complete applied bundle is durable and verified before
+  reconciling the Idea;
 - append one canonical local outcome with `coverage: full`, the durable Spec
   ref, cumulative `covered_scope`, and `remaining_scope` containing only
   `none`;
@@ -42,11 +49,27 @@ Expected:
 - perform no comment, label, type, close, Feature Spec, or issue mutation;
 - stop when the user asked only to inspect or has not selected a ref.
 
-## Proposal Mode Reads Without Mutation
+## Proposed Idea Ref Is Rejected
 
 Input:
 
-- `mode=spec-only`;
+- no durable `source_spec_ref` exists;
+- `source_idea_refs` contains `proposed-idea:export-settings`.
+
+Expected:
+
+- reject the proposed ref before drafting or mutation;
+- create no Feature Spec, implementation issue, planning outcome, label change,
+  or local file;
+- require a durable, marker-valid Idea ref before the new-source route can
+  continue.
+
+## New-Source Proposal Leaves Idea Unchanged
+
+Input:
+
+- no durable `source_spec_ref` exists, so Plan Feature derives the new-source
+  route;
 - `write_mode=propose`;
 - one selected GitHub Idea.
 
@@ -59,8 +82,54 @@ Expected:
   `intended_remaining_scope` projection;
 - keep the durable coverage map unchanged and render no canonical planning
   outcome block;
+- leave the selected Idea unchanged, including its open/closed state and every
+  workflow label;
 - perform no GitStack publication, dry-run mutation, outcome comment, label
   change, or close operation.
+
+## Existing-Source Route Rejects Unbound Idea Refs
+
+Input:
+
+- one durable `source_spec_ref` already exists, so Plan Feature derives the
+  existing-source route;
+- its immutable `## Source` contains one exact `- Source Idea:` ref;
+- the invocation also supplies a different or additional `source_idea_refs`
+  value.
+
+Expected:
+
+- derive the complete `bound_source_idea_refs` set from the immutable Spec;
+- reject the explicit `source_idea_refs` because it is not exactly set-equal to
+  the bound refs, before issue generation or mutation;
+- preserve the durable Feature Spec and its existing `## Source` evidence
+  unchanged;
+- perform no Idea read, outcome, workflow-state, or close operation.
+
+## Partial New-Source Publication Retries Through Bound Ideas
+
+Input:
+
+- an earlier `write_mode=apply` run published a Feature Spec whose `## Source`
+  contains the selected Idea ref;
+- that run failed before every implementation issue and Idea reconciliation
+  completed;
+- the retry discovers the durable Spec and therefore derives the
+  existing-source route;
+- the Idea remains open with no outcome for that incomplete bundle.
+
+Expected:
+
+- derive `bound_source_idea_refs` from the immutable Spec without requiring the
+  caller to reselect the Idea;
+- accept an explicitly repeated `source_idea_refs` value only when it is exactly
+  set-equal to the bound set;
+- validate the Idea, unchanged Spec, prior outcomes, and coverage without
+  drafting from the Idea again;
+- converge only the missing issues and relationships;
+- after the complete applied bundle verifies, reconcile and close or triage the
+  bound Idea in the same retry;
+- require no separate third reconciliation invocation.
 
 ## Multiple Ideas Stay Bounded
 
@@ -118,7 +187,7 @@ Expected:
 
 Input:
 
-- the complete requested planning result is already durable;
+- the complete applied bundle is already durable and verified;
 - the exact canonical full outcome comment exists;
 - label cleanup succeeded but the GitHub close operation did not.
 
@@ -146,17 +215,19 @@ Expected:
 - replace stale `needs-info` with `needs-triage` at terminal reconciliation;
 - report the technical blocker.
 
-## Full-Flow Completion Precedes PR Delivery
+## Complete Applied Bundle Precedes Idea Closure
 
 Input:
 
-- `mode=full-flow`;
+- no durable `source_spec_ref` existed when the new-source route began;
+- `write_mode=apply`;
 - cumulative Idea coverage is full;
 - every requested Feature Spec, implementation issue, metadata mutation, and
   relationship is durable and verified.
 
 Expected:
 
+- wait until the complete applied bundle is durable and verified;
 - write the canonical full outcome and close the GitHub Idea at planning
   closeout;
 - leave implementation issue and Feature Spec delivery lifecycle to the

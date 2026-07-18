@@ -2,7 +2,7 @@
 
 Use this shape unless the project already has a stronger local Feature Spec
 format. Keep option selection out of the body; `references/options.md` owns the
-two run choices.
+single run choice.
 
 ```markdown
 # Feature Spec: [Feature Name]
@@ -108,6 +108,14 @@ Feature Spec. Keep the heading and table header with no data rows when there
 are no authored edges. Every edge waits for upstream merge and integration
 proof; no start-condition field exists.
 
+For a GitHub `write_mode=apply` publication, resolve the configured `feature`
+transport before rendering the final body. Apply `native-type` or `label`
+outside the body after publication verifies. When Project Memory instead maps
+`feature` to `body-field`, insert that exact configured field in the
+header metadata region after the H1 and before `## Source`; include it in the
+final body hash and do not invent a key or value. In `write_mode=propose`, omit
+applied metadata from the body and report the intended mapping separately.
+
 Omit the optional Non-App Delivery section when its predicate is false. Do not
 leave placeholder text in a published body.
 
@@ -126,12 +134,10 @@ Idea after the complete applied planning result is durable and verified.
 No Feature Spec body persists `knowledge_delta` or a domain-knowledge handoff
 section. The optional delta remains run/phase data
 until the issue phase places its exact payload on the sole final
-implementation/integration issue. For `spec-only` with a nonempty
-`knowledge_delta`,
-withhold every write and return only a blocked non-durable preview plus the
-exact delta; no durable Feature Spec source exists. Only a later explicit
-`full-flow` run carrying that exact delta may publish it and create its final
-issue. A later `issues-from-existing-spec` run must never consume the preview.
+implementation/integration issue in the same complete bundle. On the
+existing-source route, explicit accepted delta data remains separate from the
+immutable source and every target must already fit that source's repository and
+path scope.
 
 Every multi-repository bundle has exactly one repo-owned integration partial
 with its distinct backend-owned title or

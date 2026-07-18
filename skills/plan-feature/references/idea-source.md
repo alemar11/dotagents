@@ -4,7 +4,9 @@ Load this reference in exactly two cases:
 
 - from `idea-discovery.md` for validation-only candidate inspection before
   selection; or
-- after the caller explicitly selects one or more durable `source_idea_refs`.
+- after the caller explicitly selects one or more durable `source_idea_refs`
+  on the new-source route, or the existing-source route derives one or more
+  `bound_source_idea_refs` from its immutable Feature Spec set.
 
 Validation-only discovery may use only durable identity, current-state, and
 prior-outcome classification. It must stop before intent normalization,
@@ -14,10 +16,15 @@ implementation issue, or another Plan Feature mode.
 
 ## Activation And Eligibility
 
-- Keep explicit `source_idea_refs` as the fast path. Accept them only with
-  `mode=full-flow` or `mode=spec-only`.
-- Reject Idea input with `mode=issues-from-existing-spec`; that mode consumes
-  its existing Feature Spec and source section unchanged.
+- Keep explicit `source_idea_refs` as the fast path on the new-source route.
+  Accept them as planning input only when there is no durable
+  `source_spec_ref`.
+- On the existing-source route, derive `bound_source_idea_refs` only as the
+  union of exact `- Source Idea:` refs in the immutable intake Spec and every
+  required linked partial. Use them only to continue validation and reconcile
+  lifecycle after the complete bundle converges. If explicit
+  `source_idea_refs` are also supplied, require exact set equality with the
+  bound refs; reject additional, missing, different, or unbound refs.
 - Treat selected refs as execution data, never as selectable options.
 - Reject chat previews, temporary files, and every `proposed-idea:` ref. Only a
   durable, marker-valid artifact can be selected.
@@ -40,39 +47,57 @@ Use these durable ref shapes:
 For ordinary planning input, verify that a GitHub Idea is open, carries the
 configured `artifact_marker=idea` label, has no native Issue Type, and has at
 most one of the mapped `needs-triage` or `needs-info` workflow labels, with no
-other mapped canonical workflow-state label. Read the complete body and the
-complete comment history, following pagination until every marker-bearing
-planning-outcome comment has been inspected.
+other mapped canonical workflow-state label. Require explicit Project Memory
+transport `label` for the marker and every consumed workflow row. Read the
+complete body and the complete comment history, following pagination until
+every marker-bearing planning-outcome comment has been inspected.
 
 For a local Idea, verify the canonical path, an H1 beginning `# Idea:`, exactly
 one `artifact_marker: idea` line in the header metadata region, no `issue_type`
 line, at most one `workflow_state` whose value is `needs-triage` or
-`needs-info`, and the complete canonical Idea body.
+`needs-info`, and the complete canonical Idea body. Require `local-header` for
+the marker and consumed workflow-state rows.
+
+For existing-source continuation, first verify every bound ref appears in the
+unchanged Spec set and no `- Source Idea:` ref was omitted. Then read each
+bound Idea and its complete outcome history. Accept an open marker-valid,
+untyped source, or a closed or consumed source only when its latest canonical
+full outcome exactly matches the verified cumulative Spec set and scope.
+Derive coverage from the Idea's accepted material elements and the unchanged
+Specs; never infer full coverage from the source link alone. Any marker,
+identity, scope, outcome, or linkage mismatch blocks both bundle continuation
+and Idea mutation.
 
 Perform GitHub source reads through `$gitstack:github-issues` in both write
 modes, omitting mutation fields. `write_mode=propose` still validates current
 hosted state but never requests a dry-run mutation or surfaces executable
 commands.
 
-The Project Memory marker mapping is required only for Idea capture,
-discovery, or consumption. A missing mapping blocks only those Idea paths.
+The Project Memory marker mapping and its compatible transport are required
+only for Idea capture, discovery, or consumption. A missing or incompatible
+mapping blocks only those Idea paths.
 Stop with the exact tracker-routing prerequisite; do not invalidate an
 unrelated Plan Feature run or silently rewrite Project Memory configuration.
 
 ## Prior Outcomes And Consumed State
 
-Before drafting, inspect every canonical planning-outcome record already
-attached to the selected Idea. Validate records from oldest to newest as a
+Before new-source drafting or existing-source continuation, inspect every
+canonical planning-outcome record already attached to the active Idea. Validate
+records from oldest to newest as a
 monotonic cumulative history within the active planning cycle: every later
 successful result must retain all earlier Feature Spec refs and covered
 material scope, and must not return previously covered scope to
 `remaining_scope`.
 
-- With no prior record, plan from the complete accepted Idea intent.
+- With no prior record, a new-source run plans from the complete accepted Idea
+  intent. Existing-source continuation instead derives coverage from the Idea
+  plus the unchanged bound Spec set and never drafts remaining scope.
 - With one or more `coverage: partial` records, load and validate every listed
   durable Feature Spec. Require each Spec to link back to the selected Idea,
-  derive the cumulatively covered scope from those Specs, and plan only the
-  remaining scope unless the user explicitly requests a re-plan. Missing,
+  derive the cumulatively covered scope from those Specs, and on a new-source
+  run plan only the remaining scope unless the user explicitly requests a
+  re-plan. Existing-source continuation only validates the unchanged cumulative
+  set and current coverage. Missing,
   malformed, ambiguous, or unrelated prior refs block the run instead of being
   ignored.
 - Absent an explicitly authorized re-plan, any Idea whose latest canonical
@@ -155,6 +180,9 @@ generated implementation issue.
 
 ## Feature Spec Projection
 
+This section applies only to the new-source route. Existing-source continuation
+never projects or edits a Feature Spec from bound Idea evidence.
+
 - Preserve every captured Idea section unchanged in its source artifact.
 - Draft the Feature Spec from the normalized Idea evidence, repository and
   Project Memory evidence, and accepted clarification results.
@@ -170,7 +198,8 @@ generated implementation issue.
 ## Per-Idea Exit Reconciliation
 
 For `write_mode=apply`, determine durable coverage independently for each
-selected Idea and reconcile state once when the Plan Feature run exits. For
+selected new-source Idea or bound existing-source Idea and reconcile state once
+when the Plan Feature run exits. For
 `write_mode=propose`, derive only the independent intended projection. Do not
 add or remove workflow labels while an interactive clarification question is
 still active.
@@ -182,18 +211,17 @@ still active.
 | Failure after a supplied answer resolved `needs-info` | Keep the Idea open, replace stale `needs-info` with `needs-triage`, and report the technical blocker. |
 | Cumulative durable planning covers only part of the Idea | Record a canonical partial outcome, keep the Idea open, add `needs-triage`, and remove `needs-info`. |
 | Cumulative durable planning fully covers the Idea | Record a canonical full outcome, clear `needs-triage` and `needs-info`, then close the GitHub Idea as completed or mark the local Idea consumed. |
-| `write_mode=propose` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave durable coverage unchanged and request no GitStack mutation. |
+| `write_mode=propose` | Report `intended_coverage`, `intended_covered_scope`, `intended_remaining_scope`, and intended transitions only; leave every selected Idea unchanged, leave durable coverage unchanged and request no GitStack mutation. |
 
 If requester input resumes planning, remove `needs-info` only as part of the
 next terminal reconciliation. If planning is intentionally deferred after the
 answer or fails for a non-requester reason, reconcile to `needs-triage`. The two
 workflow states are mutually exclusive.
 
-For `spec-only`, a planning result is durable only after every requested
-Feature Spec is published and verified. For `full-flow`, wait until every
-Feature Spec, implementation issue, metadata mutation, and relationship in the
-requested result is durable and verified. A blocked or partially published run
-never records coverage or closes an Idea.
+A planning result is complete only after every Feature Spec, implementation
+issue, metadata mutation, and relationship in the complete applied bundle is
+durable and verified. A blocked or partially published run never records
+coverage or closes an Idea.
 
 ## Canonical Planning Outcome
 
@@ -264,8 +292,8 @@ per-Idea coverage are recovery evidence, not a new mode or option.
 ## Backend Mutations
 
 Before a GitHub `write_mode=apply` reconciliation that adds a workflow state,
-resolve the exact configured label for that state and verify that the label
-exists in every affected repository. When a required mapping exists but its
+require its configured transport to be `label`, resolve that exact label, and
+verify that it exists in every affected repository. When a required mapping exists but its
 concrete label does not, create and verify only that exact configured label
 through `$gitstack:github-issues` before mutating any affected Idea:
 
@@ -293,7 +321,9 @@ only the optional `workflow_state` header according to the exit table. The Idea
 file stays at its canonical path; a latest canonical full outcome marks it
 consumed.
 
-Apply lifecycle operations only for explicitly selected `source_idea_refs`.
+Apply lifecycle operations only for explicitly selected new-source
+`source_idea_refs` or existing-source `bound_source_idea_refs` proven by the
+immutable Feature Spec set.
 Delay every coverage outcome and closeout until the complete requested planning
 result passes its final publication checkpoint. If source reconciliation
 partially fails, preserve verified completed operations, report exact missing

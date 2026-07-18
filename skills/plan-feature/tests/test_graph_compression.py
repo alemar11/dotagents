@@ -164,7 +164,11 @@ class GraphCompressionReplayTests(unittest.TestCase):
 
         self.assertLess(
             issue_phase.index("### 5. Compress The Candidate Graph"),
-            issue_phase.index("### 6. Harden Every Retained Issue"),
+            issue_phase.index("### 6. Converge With Durable Issue State"),
+        )
+        self.assertLess(
+            issue_phase.index("### 6. Converge With Durable Issue State"),
+            issue_phase.index("### 7. Harden Every Missing Issue"),
         )
         normalized_skill = " ".join(skill.split()).lower()
         self.assertIn("structural graph-compression", normalized_skill)
