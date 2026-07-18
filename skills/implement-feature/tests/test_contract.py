@@ -108,6 +108,61 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 self.assertIn(value, row)
         self.assertIn("This file owns every user-controlled App orchestration field", options)
 
+    def test_standard_authorization_prompt_is_exact_and_user_friendly(self) -> None:
+        skill = self.read("SKILL.md")
+        options = self.read("references/options.md")
+        disclosure = (
+            "Here, feature means each executable Feature Spec, so one planned "
+            "feature may create multiple visible tasks. This run may change and "
+            "validate code, push commits, create or update pull requests, address "
+            "Codex review, wait for CI, prepare hosted issue closeout, and move, "
+            "commit, and push completed local issue files when used. Tasks use "
+            "`gpt-5.6-sol`: `medium` only for routine localized work, `xhigh` for "
+            "risky or cross-system work, and `high` otherwise. After Codex reserves "
+            "the work, it automatically deletes valid archived run ledgers older "
+            "than 180 days; it never plans new work, expands scope, merges pull "
+            "requests, releases, or deploys."
+        )
+        prompt = (
+            "Start implementation? Codex will create one visible task per feature "
+            "and prepare merge-ready pull requests."
+        )
+
+        normalized_skill = " ".join(skill.split())
+        normalized_options = " ".join(
+            line.removeprefix("> ") for line in options.splitlines()
+        )
+        normalized_options = " ".join(normalized_options.split())
+        self.assertIn("standard disclosure, exact question", normalized_skill)
+        self.assertIn("do not improvise them", normalized_skill)
+        self.assertIn(disclosure, normalized_options)
+        self.assertIn("| Header | `Start work?` |", options)
+        self.assertIn(
+            "| Question id | `visible_app_task_permission` |", options
+        )
+        self.assertIn(f"| Question | {prompt} |", options)
+        self.assertIn(
+            "| 1 | `Start implementation (Recommended)` | Use this workflow "
+            "for the ready specs found in this run. | "
+            "`granted-by-authorized-user` |",
+            options,
+        )
+        self.assertIn(
+            "| 2 | `Cancel` | Stop here without starting implementation or "
+            "changing anything. | "
+            "`denied-by-authorized-user` |",
+            options,
+        )
+        fixed_answers = re.findall(r"^\| ([12]) \|", options, re.MULTILINE)
+        self.assertEqual(fixed_answers, ["1", "2"])
+        self.assertIn("The App owns the free-form", options)
+        self.assertIn("never an implicit grant", normalized_options)
+        self.assertLessEqual(len(prompt), 140)
+        self.assertIn("one visible task per feature", prompt)
+        self.assertNotIn("CLAIM", prompt)
+        self.assertNotIn("executable", prompt)
+        self.assertNotIn("(", prompt)
+
     def test_visible_task_model_policy_is_canonical_bounded_and_recoverable(self) -> None:
         skill = self.read("SKILL.md")
         policy = self.read("references/task-model-policy.md")
@@ -226,26 +281,27 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_one_consent_covers_the_complete_fixed_flow(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
-        options = " ".join(self.read("references/options.md").split())
+        options = " ".join(
+            line.removeprefix("> ")
+            for line in self.read("references/options.md").splitlines()
+        )
+        options = " ".join(options.split())
         for token in (
-            "inspect",
-            "edit",
-            "validate",
-            "commit",
-            "push",
-            "publish or update pull requests",
-            "current-revision Codex review",
-            "fix findings",
+            "change and validate code",
+            "push commits",
+            "create or update pull requests",
+            "address Codex review",
             "wait for CI",
-            "prepare tracker closeout",
-            "move completed local Markdown issue files",
-            "convert draft pull requests to ready-for-review",
+            "prepare hosted issue closeout",
+            "move, commit, and push completed local issue files",
+            "prepare merge-ready pull requests",
+            "never plans new work, expands scope, merges pull requests, releases, or deploys",
         ):
-            self.assertIn(token, skill)
+            self.assertIn(token, options)
         self.assertIn(
             "visible_app_task_permission=granted-by-authorized-user", skill
         )
-        self.assertIn("fixed execution flow", options)
+        self.assertIn("fixed model, reasoning policy, and execution flow", options)
         self.assertIn("Generic delegation or subagent authority never supplies this grant", skill)
 
     def test_cache_maintenance_is_root_owned_bounded_and_after_claim(self) -> None:
@@ -256,14 +312,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         normalized_ledger = " ".join(ledger.split())
         controller = skill.split("## Controller Loop", 1)[1]
 
-        authorization = " ".join(
-            skill.split("## Mandatory Run Authorization", 1)[1]
-            .split("## Fixed Contract", 1)[0]
-            .split()
+        options = " ".join(
+            line.removeprefix("> ")
+            for line in self.read("references/options.md").splitlines()
         )
+        options = " ".join(options.split())
         self.assertIn(
-            "automatic deletion of valid archived ledgers older than 180 days after CLAIM",
-            authorization,
+            "automatically deletes valid archived run ledgers older than 180 days",
+            options,
         )
         self.assertLess(controller.index("3. **CLAIM**"), controller.index("4. **CACHE-MAINTENANCE**"))
         self.assertLess(controller.index("4. **CACHE-MAINTENANCE**"), controller.index("5. **REGISTER**"))

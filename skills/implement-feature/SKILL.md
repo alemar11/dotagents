@@ -35,15 +35,12 @@ After the surface gate, load `references/options.md` and
 steering support the exact model and bounded adaptive thinking policy. Otherwise
 return `unsupported-runtime` without artifacts.
 
-Resolve `visible_app_task_permission`. When `not-requested`, ask once for
-permission to create exactly one visible task per executable Feature Spec and
-run the fixed flow. Disclose its exact visible-task model and thinking default;
-automatic deletion of valid archived ledgers older than 180 days after CLAIM; and that
-tasks may inspect, edit, validate, commit, push, publish or update pull requests,
-run current-revision Codex review, fix findings, wait for CI, prepare tracker
-closeout, convert draft pull requests to ready-for-review, and move completed
-local Markdown issue files, commit, and push before rerunning invalidated gates. State that the flow
-reports without merging.
+Resolve `visible_app_task_permission`. When `not-requested`, ask once using the
+standard disclosure, exact question, and two fixed answers in
+`references/options.md`. Together they disclose the exact visible-task model,
+thinking policy, fixed flow, retention, and no-merge boundary. Keep them
+adjacent; do not improvise them, expose controller terms, or define the
+App-owned free-form response.
 
 Continue only with
 `visible_app_task_permission=granted-by-authorized-user`. Denial, silence, or

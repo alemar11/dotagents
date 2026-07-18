@@ -27,7 +27,7 @@ the canonical model and every allowed thinking value. If that support is absent
 or unverifiable, abort as `unsupported-runtime` before asking permission,
 claiming scope, creating a ledger, or creating a task.
 
-The mandatory authorization question discloses this exact model and adaptive
+The mandatory authorization step discloses this exact model and adaptive
 thinking policy. A grant of
 `visible_app_task_permission=granted-by-authorized-user` therefore supplies the
 explicit user request required to pass the model and thinking arguments.

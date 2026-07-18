@@ -12,28 +12,40 @@ This file owns every user-controlled App orchestration field.
 
 | Field | Allowed values | Default | Meaning |
 | --- | --- | --- | --- |
-| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent to create one visible App task per executable Feature Spec with the disclosed fixed model and adaptive thinking policy, then perform the complete fixed flow. |
-| `stale_claim_takeover_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Exceptional run-scoped consent to stop the disclosed conflicting tasks, replace their complete verified-stale root scopes, and adopt the same task refs. |
+| `visible_app_task_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent for one visible task per executable Feature Spec using the fixed model, reasoning policy, and execution flow. |
+| `stale_claim_takeover_permission` | `not-requested`, `granted-by-authorized-user`, `denied-by-authorized-user` | `not-requested` | Run-scoped consent to replace complete verified-stale claim scopes and adopt their task refs. |
 
-Resolve `visible_app_task_permission` only after the mandatory runtime surface
-gate proves visible ChatGPT desktop app task creation and App-managed worktree binding.
-When missing, ask once. Denial, no answer, or inability to ask aborts without
-runtime artifacts.
+## Standard Run Authorization
 
-The visible-task grant authorizes only the disclosed fixed execution flow:
-inspect, edit, validate, commit, push, publish or update pull requests, request
-and poll current-revision Codex review, fix actionable findings, wait for CI,
-prepare tracker closeout, move completed local Markdown issue files to the
-configured done folder on the delivery branch after substantive proof, commit
-and push the moves, rerun final current-head gates, convert draft pull requests
-to ready-for-review, and report. It never
-authorizes scope expansion, merge, release, deployment, or target-repository
-instruction changes.
+For `visible_app_task_permission=not-requested`, state this exact disclosure:
 
-Visible-task model and thinking behavior is fixed policy owned only by
-`task-model-policy.md`. It is disclosed by the authorization question but is not
-another user-controlled field, Feature Spec field, or project configuration
-value.
+> Here, feature means each executable Feature Spec, so one planned feature may
+> create multiple visible tasks. This run may change and validate code, push
+> commits, create or update pull requests, address Codex review, wait for CI,
+> prepare hosted issue closeout, and move, commit, and push completed local issue
+> files when used. Tasks use `gpt-5.6-sol`: `medium` only for routine localized
+> work, `xhigh` for risky or cross-system work, and `high` otherwise. After Codex
+> reserves the work, it automatically deletes valid archived run ledgers older
+> than 180 days; it never plans new work, expands scope, merges pull requests,
+> releases, or deploys.
+
+Then use one `request_user_input`:
+
+| UI field | Exact value |
+| --- | --- |
+| Header | `Start work?` |
+| Question id | `visible_app_task_permission` |
+| Question | Start implementation? Codex will create one visible task per feature and prepare merge-ready pull requests. |
+
+| Order | Label | Description | Canonical value |
+| --- | --- | --- | --- |
+| 1 | `Start implementation (Recommended)` | Use this workflow for the ready specs found in this run. | `granted-by-authorized-user` |
+| 2 | `Cancel` | Stop here without starting implementation or changing anything. | `denied-by-authorized-user` |
+
+Define only these answers. The App owns the free-form response; it is never an
+implicit grant. Ask after the runtime surface gate. Denial or no answer aborts
+without artifacts. The grant never changes target-repository instructions;
+model policy stays fixed by `task-model-policy.md`.
 
 Resolve `stale_claim_takeover_permission` after read-only discovery proves an
 atomic claim conflict, stale-heartbeat evidence, every replaced root's complete
