@@ -13,7 +13,8 @@ memory:
 - lean project-memory pointers in `AGENTS.md`;
 - tracker routing in `project-memory/config/issue-tracker.md`;
 - durable project topology in `project-memory/config/project-layout.md`;
-- canonical issue type/state vocabulary and repository mappings in
+- canonical artifact-marker, issue-type, and workflow-state vocabulary and
+  repository mappings in
   `project-memory/config/triage-labels.md`;
 - root-first domain routing through `CONTEXT.md`, with optional scoped
   `CONTEXT.md` files;
@@ -32,7 +33,7 @@ structured fields in current handoffs and reports.
 
 | `memory_slice` | Owns |
 | --- | --- |
-| `tracker-routing` | Tracker backend plus canonical issue-type and workflow-state vocabulary and mappings. |
+| `tracker-routing` | Tracker backend plus canonical artifact-marker, issue-type, and workflow-state vocabulary and mappings. |
 | `project-layout` | Durable project topology: `single-repository`, `monorepo`, or `multi-repository-workspace`. |
 | `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
@@ -80,6 +81,9 @@ when the selected scope has write authority.
   unresolved.
 - Create `TRANSLATION.md` only when localization support or durable translation
   rules are evidenced or confirmed. Do not create empty ADR directories.
+- Project Memory setup configures Idea routing and marker mappings but never
+  creates Idea issues or files. Idea artifacts belong to an explicitly invoked
+  Idea-capture workflow.
 - Explicit setup/configure/initialize/update/refresh instructions authorize
   only the requested `memory_slice`. A ready implementation-closeout task authorizes
   only its named decisions, evidence, and target surfaces.
@@ -111,10 +115,14 @@ values are invalid input; configuration must already use this schema before the
 runtime consumes it.
 
 `references/triage-labels.md` is the sole reusable registry for canonical
-`issue_type` and `workflow_state` values. The generated
+`artifact_marker`, `issue_type`, and `workflow_state` values. The generated
 `project-memory/config/triage-labels.md` is the repository-specific source of
 truth for their tracker mappings. Consuming skills must load that mapping and
 must not define parallel enums or aliases.
+The `artifact_marker: idea` mapping is required only for Idea capture and
+Idea-source consumption. If it is absent, stop those Idea-specific operations
+with a setup prerequisite while leaving unrelated planning and implementation
+workflows valid.
 Do not add durable keys for Codex runtime workspace shape, source-root lists,
 worktree paths, setup flow, GitHub repo, coordination repo, workers,
 implementation delivery, publication/issue-mutation authority, scheduled
@@ -159,8 +167,8 @@ persisting run intent as configuration.
 
 ### 2. Inspect Focused Evidence
 
-- tracker: current setup, remotes/config, templates, tracker docs, and relevant
-  local/workspace conventions;
+- tracker: current setup, remotes/config, templates, tracker docs, artifact
+  marker labels, and relevant local/workspace conventions;
 - project layout: Git root shape, package/workspace manifests, child repository
   evidence, and existing project-memory topology config;
 - domain: current pointers, README/docs/manifests, relevant source/tests/schema,
@@ -205,10 +213,11 @@ contexts remain optional and evidence-backed. A child-repository root selected
 by the authorized setup scope follows the same mandatory root-context rule;
 child repositories outside that scope remain optional and untouched.
 
-In orchestrator-workspace setup, do not create Feature Spec or issue subtrees,
-and do not create runtime worker configuration or state. Before completing a
-touched `issue-tracker.md`, reject unknown configuration keys rather than
-rewriting or removing them implicitly.
+In orchestrator-workspace setup, do not create Feature Spec, Idea, or issue
+subtrees, and do not create runtime worker configuration or state. Project
+Memory setup never creates Idea artifacts in any repository layout. Before
+completing a touched `issue-tracker.md`, reject unknown configuration keys
+rather than rewriting or removing them implicitly.
 
 ### 6. Report
 
@@ -236,8 +245,8 @@ it never counts as captured.
   first-time-user ambiguity prompts and internal answer mapping.
 - `project-layout.md`: durable `repository_layout` configuration and topology
   detection boundaries.
-- `triage-labels.md`: sole reusable canonical issue-type/workflow-state registry
-  and repository mapping template.
+- `triage-labels.md`: sole reusable canonical artifact-marker,
+  issue-type/workflow-state registry and repository mapping template.
 - `issue-tracker-*.md`, `tracker-publishing.md`: tracker artifact, source-ref,
   publication, and completion contracts.
 - `domain.md`: root/scoped context discovery, routing, and ownership.

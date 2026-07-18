@@ -91,7 +91,9 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("execution context", setup)
         self.assertNotIn("- setup flow;", setup)
         self.assertIn("`workflow-state-mapping`", setup)
+        self.assertIn("`artifact-marker-mapping`", setup)
         self.assertNotIn("triage-state-mapping", setup)
+        self.assertIn("artifact-marker mapping", setup)
         self.assertIn("workflow-state mapping", setup)
 
     def test_proposed_ref_terminology_has_no_draft_alias(self) -> None:
@@ -439,6 +441,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
                 "Overlapping Project Ownership",
                 "Workspace Or Repository Rule",
                 "Localization Conventions",
+                "Artifact-Marker Mapping",
                 "Issue-Type Mapping",
                 "Workflow-State Mapping",
                 "Questions Setup Must Not Ask",
@@ -510,6 +513,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
             "Which project should define the rules",
             "Where does it apply?",
             "Does this project maintain translation",
+            "Ideas saved for possible later planning",
             "Is this mapping correct?",
         ):
             self.assertIn(prompt_fragment, questions)
@@ -565,7 +569,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
                 self.assertIn("current Git repository", normalized)
                 self.assertIn("available", normalized)
 
-    def test_project_memory_owns_issue_type_and_workflow_state_registry(self) -> None:
+    def test_project_memory_owns_artifact_issue_type_and_state_registry(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         labels = (SKILL_ROOT / "references" / "triage-labels.md").read_text(
             encoding="utf-8"
@@ -578,6 +582,8 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("sole reusable owner", labels)
         self.assertIn("project-memory/config/triage-labels.md", labels)
         for value in (
+            "`artifact_marker`",
+            "`idea`",
             "`bug`",
             "`feature`",
             "`task`",
@@ -590,7 +596,8 @@ class ProjectMemoryContractTests(unittest.TestCase):
             self.assertIn(value, labels)
 
         self.assertIn(
-            "Require exactly one `issue_type` and one `workflow_state`", labels
+            "require exactly one `issue_type` and one `workflow_state`",
+            " ".join(labels.split()),
         )
         self.assertIn("`proposed-spec:`", labels)
         self.assertIn("only from\n`references/triage-labels.md`", github)
@@ -627,8 +634,75 @@ class ProjectMemoryContractTests(unittest.TestCase):
             options = options_path.read_text(encoding="utf-8")
             with self.subTest(options_path=options_path):
                 self.assertNotRegex(
-                    options, r"(?m)^\| `(?:issue_type|workflow_state)` \|"
+                    options,
+                    r"(?m)^\| `(?:artifact_marker|issue_type|workflow_state)` \|",
                 )
+
+    def test_idea_marker_contract_is_orthogonal_and_setup_scoped(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+        labels = (SKILL_ROOT / "references" / "triage-labels.md").read_text(
+            encoding="utf-8"
+        )
+        github = (SKILL_ROOT / "references" / "issue-tracker-github.md").read_text(
+            encoding="utf-8"
+        )
+        local = (SKILL_ROOT / "references" / "issue-tracker-local.md").read_text(
+            encoding="utf-8"
+        )
+        setup = (SKILL_ROOT / "references" / "setup-workflow.md").read_text(
+            encoding="utf-8"
+        )
+        options = (SKILL_ROOT / "references" / "options.md").read_text(
+            encoding="utf-8"
+        )
+        labels_normalized = " ".join(labels.split())
+        github_normalized = " ".join(github.split())
+        local_normalized = " ".join(local.split())
+        setup_normalized = " ".join(setup.split())
+        skill_normalized = " ".join(skill.split())
+
+        self.assertIn("orthogonal dimensions", labels_normalized)
+        self.assertIn("| `idea` | `idea` |", labels)
+        self.assertIn("leave the native GitHub Issue Type unset", labels)
+        self.assertIn("missing mapping blocks only Idea capture", labels_normalized)
+        self.assertIn(
+            "unrelated planning or implementation workflows", labels_normalized
+        )
+        self.assertIn("`needs-triage` or `needs-info`", labels_normalized)
+        self.assertIn("those states are mutually exclusive", labels)
+
+        self.assertIn("`Idea: <Name>`", github)
+        self.assertIn("`idea` label", github)
+        self.assertIn(
+            "leave the native GitHub Issue Type unset", github_normalized
+        )
+        self.assertIn(
+            "Feature Spec and implementation-issue workflows remain valid",
+            github_normalized,
+        )
+        self.assertIn(
+            "This implementation-proof convention applies to Feature Specs and implementation issues",
+            github_normalized,
+        )
+        self.assertIn("Plan Feature may close an Idea", github_normalized)
+        self.assertIn("A partially covered Idea remains open", github_normalized)
+
+        self.assertIn("`planning/ideas/<idea-slug>.md`", local)
+        self.assertIn("exactly one `artifact_marker: idea`", local_normalized)
+        self.assertIn("zero `issue_type` lines", local)
+        self.assertIn("zero or one `workflow_state` line", local_normalized)
+
+        self.assertIn("`artifact-marker-mapping`", setup)
+        self.assertIn(
+            "include the canonical `artifact_marker: idea` mapping",
+            setup_normalized,
+        )
+        self.assertIn("do not invalidate or block unrelated workflows", setup)
+        self.assertIn("Do not create Idea tracker artifacts", setup_normalized)
+        self.assertIn("never creates Idea issues or files", skill_normalized)
+        self.assertNotRegex(
+            options, r"(?m)^\| `artifact_marker` \|"
+        )
 
     def test_local_integration_completion_uses_matching_subtree(self) -> None:
         local = (SKILL_ROOT / "references" / "issue-tracker-local.md").read_text(

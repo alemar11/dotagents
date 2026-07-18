@@ -51,8 +51,9 @@ When the project root is clear but the requested area is not, ask:
 > - A specific area
 
 If the user selects a specific area, ask which one: issue tracking and workflow
-labels, project structure, project context, localization conventions, or agent
-pointers. Translate the answer to the corresponding `memory_slice` internally.
+labels, Idea labels, project structure, project context, localization
+conventions, or agent pointers. Translate the answer to the corresponding
+`memory_slice` internally.
 
 ## Project Structure
 
@@ -160,6 +161,27 @@ internal memory feature.
 resolves localization as not applicable. `Not yet` creates no translation file
 and reports the missing durable guidance explicitly.
 
+## Artifact-Marker Mapping
+
+Ask only when the active GitHub tracker already uses the proposed Idea label
+for a conflicting purpose or exposes a different established label for saved
+proposals. Show the evidence-backed proposal before requesting correction.
+
+> I found these labels for saved proposals in `<tracker-name>`:
+> `<available-labels>`. I propose using:
+>
+> - Ideas saved for possible later planning -> `<tracker-value>`
+>
+> Is this mapping correct?
+>
+> - Use the proposed mapping (Recommended)
+> - Change the mapping
+
+Map that row internally to canonical `artifact_marker: idea`. If the user
+chooses to change it, ask only for the replacement GitHub label. Local
+Markdown's canonical `idea` marker and an unmodified GitHub `idea` label
+require no question.
+
 ## Issue-Type Mapping
 
 Ask only when the active tracker exposes customized or conflicting issue types.
@@ -214,6 +236,7 @@ Do not ask:
 - whether root `CONTEXT.md` should be created during authorized setup;
 - how deeply to seed root context;
 - whether repository evidence is sufficient;
+- whether setup should create any Idea issue or file;
 - which execution context, write mode, or capture outcome to use;
 - whether to choose a context-creation mode; or
 - which abstract domain-layout classification the user prefers after project

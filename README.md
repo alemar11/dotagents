@@ -52,6 +52,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 | `codex-changelog` | Print installed Codex CLI and Codex App changelogs from GitHub Releases and the OpenAI Codex changelog page. |
 | `xcode-changelog` | Resolve active Xcode notes, include latest notes when behind, look up a version, or list Apple Xcode release notes. |
 | `plan-harder` | Create higher-rigor implementation plans or harden single issues before coding. |
+| `capture-idea` | Manually save one or more discussed proposals as durable Ideas for later feature planning. |
 | `plan-feature` | Manually plan Feature Spec bundles and agent-ready issues in apply or proposal mode. |
 | `implement-feature` | Execute execution-ready Feature Spec bundles in visible ChatGPT desktop app tasks through one fixed GitHub PR-ready flow. |
 | `grill-me` | Stress-test plans, decisions, drafts, workflows, and coding approaches on explicit request. |
@@ -79,7 +80,8 @@ This repository ships one broad reusable `tanstack` skill rather than separate u
 - `maintainer` uses `$skill-audit` conditionally when health diagnosis or workflow hardening needs portfolio, prompt-quality, overlap, or session evidence; requires `$skill-creator` or `$plugin-creator` for substantial package reshapes; and requires `$autoreview` for non-trivial implementation closeout.
 - `grill-me-with-context` requires `$grill-me` and `$project-memory` so it can run the questioning loop, update project context docs or ADRs through the `domain-memory` slice for direct use, or return a deferred domain-knowledge handoff to a parent workflow.
 - `improve-codebase-architecture` requires `$grill-me-with-context` to pressure-test the selected architecture candidate before implementation.
-- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` when applying GitHub tracker mutations.
+- `capture-idea` requires `$project-memory` for tracker routing and the canonical Idea marker mapping. It uses `$gitstack:github-issues` for exact GitHub preflight reads and applied Idea mutations.
+- `plan-feature` requires `$project-memory`, `$grill-me-with-context`, and `$plan-harder` for setup, repo-backed clarification, Feature Spec writing, issue hardening, and deferred knowledge closeout. It uses `$gitstack:github-issues` for exact GitHub Idea-source reads and applied tracker mutations.
 - `implement-feature` requires local `python3` and `git` for its shipped atomic active-root claim and ledger-cache helpers, `$autoreview`, and the relevant GitStack bundled skills for GitHub-backed issue lifecycle, CI, review, commit, and pull-request work. Its root-owned cache maintenance archives terminal ledgers and automatically expires valid archives older than 180 days. It accepts only execution-ready Feature Spec bundles and never performs planning or repairs incomplete planning artifacts.
 
 ## Project-Local Skills
@@ -149,7 +151,7 @@ This helper only links reusable skills. It does not install, mirror, or rewrite 
 Inside Codex, install all reusable skills with:
 
 ```text
-Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/plan-feature skills/implement-feature skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
+Use $skill-installer to install skills from alemar11/dotagents --path skills/autoreview skills/code-wiki skills/crusty skills/okf skills/grill-me-with-context skills/improve-codebase-architecture skills/skill-cli-creator skills/tanstack skills/codex-changelog skills/xcode-changelog skills/plan-harder skills/capture-idea skills/plan-feature skills/implement-feature skills/grill-me skills/learn skills/project-memory skills/postgres skills/skill-audit skills/swift-api-design skills/swift-docc
 ```
 
 Install one reusable skill by passing only its path:
@@ -185,6 +187,7 @@ npx skills add alemar11/dotagents -a codex -g -y \
   --skill codex-changelog \
   --skill xcode-changelog \
   --skill plan-harder \
+  --skill capture-idea \
   --skill plan-feature \
   --skill implement-feature \
   --skill grill-me \

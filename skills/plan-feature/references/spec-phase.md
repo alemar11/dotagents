@@ -27,6 +27,8 @@ is too vague, return the smallest blocking question set through the caller.
 - Load `non-app-delivery.md` only when its current-request predicate is true or
   a canonical durable source Spec carries exactly one target and one resolvable
   `explicit_instruction_ref`.
+- Load `idea-source.md` only when `source_idea_refs` are supplied. Ideas are
+  immutable source evidence for `full-flow` or `spec-only`, never another mode.
 
 ## Phase Inputs
 
@@ -42,6 +44,8 @@ Receive:
 - affected repositories, allowed paths, per-Spec target branch, and any
   parent/child workspace links;
 - existing or pending `source_spec_ref` state;
+- optional explicitly selected `source_idea_refs`, already constrained to one
+  bounded feature;
 - authored Feature Spec dependency rows;
 - optional `knowledge_delta` with `decisions`, `target_surfaces`, and
   `evidence` lists, plus a separate `planning_blockers` list;
@@ -79,6 +83,12 @@ Read the minimum evidence needed to establish the contract:
 
 Do not broadly scan unrelated domain or localization material. Widen evidence
 only when the current sources are incomplete or contradictory.
+
+When `source_idea_refs` are present, validate every durable artifact and its
+tracker owner through `idea-source.md` before drafting. Reject proposed refs,
+missing marker mappings, closed or typed GitHub Ideas, malformed local Idea
+headers, and ambiguous repository ownership. A missing Idea marker mapping
+does not block planning runs that supplied no Idea refs.
 
 When root context routes multiple products or workspaces, resolve the selected
 product, workspace path, applicable context files, and feature slug before
@@ -180,6 +190,10 @@ source's unchanged affected repositories and allowed paths. An out-of-scope or
 ambiguously owned target blocks issue generation; never widen the immutable
 source or a future issue to accommodate it.
 
+Reject `source_idea_refs` in `mode=issues-from-existing-spec`. The immutable
+Feature Spec must already contain its source evidence, and this mode never
+mutates an Idea lifecycle.
+
 For `full-flow` and `spec-only`, draft with `references/spec-template.md` unless
 the repository has a stronger Feature Spec format. Keep it
 implementation-facing:
@@ -192,6 +206,12 @@ implementation-facing:
 - acceptance criteria and validation expectations;
 - cross-repository contracts and integration gates;
 - risks, open questions, and issue-splitting notes.
+
+When durable Idea refs were supplied, render each relevant ref exactly once as
+`- Source Idea: <durable-ref>` in `## Source`. In a multi-repository bundle,
+include a ref in every parent or partial whose scope derives from that Idea,
+and omit it from unrelated partials. Preserve the Idea body and keep these refs
+out of generated implementation issues.
 
 The normal Feature Spec does not carry selectable delivery, review,
 permission, pull-request-count, scheduling, or tracker-closeout fields. Its
@@ -270,6 +290,8 @@ Then verify:
   owning section, and the ref resolves to an authorized-user instruction that
   selects the same target and scope;
 - the body contains no workflow status field such as `Status: Draft`.
+- every selected Idea ref appears only in the `## Source` section of each
+  relevant Feature Spec and nowhere in generated issue contracts.
 
 Withhold the artifact and return blockers when the gate fails.
 
@@ -337,6 +359,7 @@ Return:
 - workspace parent/child refs and publication order when applicable;
 - issue type applied or proposed;
 - open blockers and withheld output;
+- selected durable Idea refs and the per-Idea intended coverage result;
 - derived domain capture outcome and future closeout owner;
 - explicit App incompatibility when a non-App target is present.
 

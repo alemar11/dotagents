@@ -1,13 +1,14 @@
 # Issue Tracker: GitHub
 
-Feature Specs and implementation issues for this repo live as GitHub issues.
+Feature Specs, implementation issues, and captured Ideas for this repo live as
+GitHub issues.
 Use `$gitstack:github-issues` for GitHub issue lifecycle operations.
 
 ## Configuration
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs and implementation issues are routed to GitHub. |
+| `tracker_backend` | enum | `github` | `github`, `local` | Feature Specs, implementation issues, and Ideas are routed to GitHub. |
 
 GitHub is the authoritative artifact store in this mode. Project Memory stores
 only tracker routing and conventions; implementation delivery, branch/PR
@@ -69,16 +70,35 @@ that registry. If GitHub issue types are disabled or customized for the
 organization, record the actual available values or fallback label convention
 in the repository mapping file.
 
+Load canonical artifact markers from the same registry and repository mapping.
+If the `idea` marker mapping is missing, block only Idea capture and Idea-source
+consumption; Feature Spec and implementation-issue workflows remain valid.
+
 ## Title Format
 
 - Feature Spec issue: `Feature Spec: <Feature Name>`
 - Integration Feature Spec issue: `Feature Spec: <Feature Name> - Integration`
 - Implementation issue: `<feature-slug>: <NN> <vertical outcome>`
+- Idea issue: `Idea: <Name>`
 
 Use the accepted lowercase kebab-case `<feature-slug>` from `$plan-feature`,
 the Feature Spec planning identity, or the Feature Spec source path. Derive it
 from the title only when no accepted slug exists. Use two-digit ordering
 (`01`, `02`, `03`) for implementation issues.
+
+## Idea Capture
+
+Represent a durable Idea as an open, untyped GitHub issue titled
+`Idea: <Name>`. Apply the repository mapping for `artifact_marker: idea`, whose
+default tracker value is the `idea` label, and leave the native GitHub Issue
+Type unset.
+
+A dormant Idea has the marker label and no workflow-state label. An Idea that
+is queued for evaluation or waiting on requester input may carry exactly one
+Idea-compatible mapped workflow-state label from `triage-labels.md`. Those
+states are mutually exclusive; no other canonical workflow state is valid for
+an Idea. Project Memory setup configures these mappings but does not create
+Idea issues.
 
 ## Feature Planning
 
@@ -118,6 +138,13 @@ has proved that the referenced issue is satisfied. The issue closes when the
 closing change reaches the default branch. Do not close a parent Feature Spec
 from an individual child issue; a final integration change may close it only
 after all Feature Spec gates pass.
+
+This implementation-proof convention applies to Feature Specs and
+implementation issues. A source Idea follows the separate Plan Feature
+consumption contract: after the complete requested planning result is durable
+and verified, Plan Feature may close an Idea that it determined was fully
+covered, retaining the Idea marker and recording the authoritative Feature
+Spec refs. A partially covered Idea remains open.
 
 Project Memory records this tracker convention but does not choose the
 implementation stopping point, grant issue-mutation authority, or prescribe a

@@ -15,6 +15,7 @@ review:
   precedence from `options.md`, not a stored key or option)
 - `repository_layout`
 - `tracker_backend`
+- `artifact_marker` mapping
 - `issue_type` mapping
 - `workflow_state` mapping
 - root/scoped context routing
@@ -39,6 +40,7 @@ Editable sections:
 
 - `issue-tracker`
 - `project-layout`
+- `artifact-marker-mapping`
 - `issue-type-mapping`
 - `workflow-state-mapping`
 - `domain-memory`
@@ -52,6 +54,8 @@ For each selected configuration section, show the current value first, then
 - `issue-tracker`: `github` or `local`.
 - `project-layout`: `single-repository`, `monorepo`, or
   `multi-repository-workspace`.
+- `artifact-marker-mapping`: default GitHub `idea` label, canonical local
+  `idea` marker, or a custom GitHub label for the canonical `idea` marker.
 - `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
   custom per canonical type.
 - `workflow-state-mapping`: default GitHub lowercase labels, canonical local
@@ -91,6 +95,9 @@ prompt.
   not durable issue-tracker configuration.
 - Do not define durable worker assignments, worker-count limits, scheduled
   checks, publication policy, or issue mutation policy in project memory.
+- Default the canonical `idea` artifact marker to the GitHub `idea` label or
+  local `artifact_marker: idea`. Ask only when tracker evidence shows that the
+  label is conflicting or customized.
 - Read root `CONTEXT.md` first when it exists. During authorized domain
   setup/bootstrap, always create or update it at every memory-owning root
   selected by the setup scope. Populate only evidence-backed purpose,
@@ -133,6 +140,8 @@ For orchestrator workspace mode, preserve these points in the draft:
   integration partials or gates are durable planning artifacts only when
   `$plan-feature` handles them during real feature planning;
 - setup is config-only and must not create Feature Spec or issue subtrees;
+- setup must not create Idea issues, Idea files, or `planning/ideas/`
+  subtrees;
 - local planning artifacts remain inside their owning child repositories;
 - child repos keep their own `AGENTS.md`, `CONTEXT.md`, optional
   `TRANSLATION.md`, `project-memory`, validation, branches, commits, and PRs;
@@ -153,6 +162,12 @@ After direct write authority or separate affirmative confirmation:
 - Keep behavior-affecting setup fields in typed configuration tables with
   `Key`, `Type`, `Value`, `Allowed values`, and `Meaning` columns before
   explanatory prose.
+- When tracker-routing or full setup creates or refreshes
+  `project-memory/config/triage-labels.md`, include the canonical
+  `artifact_marker: idea` mapping alongside the issue-type and workflow-state
+  mappings. If an existing repository lacks only that marker mapping, report
+  Idea capture and Idea-source consumption as unavailable until setup adds it;
+  do not invalidate or block unrelated workflows.
 - Keep `issue-tracker.md` limited to `tracker_backend` plus human-readable
   tracker conventions. Implementation delivery policy belongs to Feature Specs
   and executors.
@@ -169,6 +184,9 @@ After direct write authority or separate affirmative confirmation:
   scope before writing any scoped context or completing setup.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
+- Do not create Idea tracker artifacts during setup. Configuring the marker
+  mapping does not authorize writing GitHub Idea issues, local Idea files, or
+  `planning/ideas/` directories.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
   `TRANSLATION.md`, ADRs, and project docs.
 - Do not duplicate moved project context in both `AGENTS.md` and project
@@ -191,9 +209,9 @@ exists or is authorized; never create a broken pointer:
 
 [one-line summary of project topology]. See `project-memory/config/project-layout.md`.
 
-### Issue types and workflow states
+### Artifact markers, issue types, and workflow states
 
-[one-line summary of the canonical issue type/workflow state vocabulary and its tracker mappings]. See `project-memory/config/triage-labels.md`.
+[one-line summary of the canonical artifact-marker, issue-type, and workflow-state vocabulary and its tracker mappings]. See `project-memory/config/triage-labels.md`.
 
 ### Domain memory
 
@@ -220,6 +238,7 @@ Summarize only the applicable fields:
 - settings reviewed and changed;
 - selected issue tracker;
 - project topology;
+- artifact-marker mapping;
 - issue-type and workflow-state mapping;
 - root/scoped context routing;
 - localization-memory decision and evidence;
@@ -240,7 +259,8 @@ leave a material ambiguity, load
 evidence-first template. Its canonical question set covers setup target,
 conflicting project structure, conflicting issue locations, separate project
 contexts, overlapping project ownership, workspace-versus-repository rules,
-localization conventions, issue-type mappings, and workflow-state mappings.
+localization conventions, artifact-marker mappings, issue-type mappings, and
+workflow-state mappings.
 
 Keep Project Memory internals out of user-facing prompts. Ask about concrete
 projects, repositories, paths, trackers, rules, and localization behavior, then

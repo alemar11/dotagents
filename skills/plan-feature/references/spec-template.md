@@ -11,6 +11,8 @@ two run choices.
 
 - Conversation, issue, document, or repository evidence used to create this
   Feature Spec.
+- Source Idea: [durable Idea ref; include one line per selected Idea whose
+  scope this Feature Spec represents, otherwise omit].
 - Use only repo-relative, repo-qualified, hosted, or descriptive references.
 
 ## Planning Identity
@@ -108,6 +110,11 @@ proof; no start-condition field exists.
 
 Omit the optional Non-App Delivery section when its predicate is false. Do not
 leave placeholder text in a published body.
+
+When Plan Feature receives `source_idea_refs`, render their exact durable refs
+only in `## Source` as defined by `idea-source.md`. Omit the placeholder when no
+Idea is consumed, and never copy Idea refs into generated implementation issue
+Execution Contracts.
 
 No Feature Spec body persists `knowledge_delta` or a domain-knowledge handoff
 section. The optional delta remains run/phase data

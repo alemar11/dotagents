@@ -62,11 +62,14 @@ options and must not appear in the Run Registry:
   `multi-repository-workspace`, from
   `project-memory/config/project-layout.md`;
 - issue type and workflow-state mappings from
-  `project-memory/config/triage-labels.md`.
+  `project-memory/config/triage-labels.md`;
+- the `artifact_marker=idea` mapping from that same file only when
+  `source_idea_refs` are supplied.
 
 If a required fact is absent, stale, or contradictory, route to the matching
 Project Memory slice before planning. Do not turn a missing fact into another
-Plan Feature option.
+Plan Feature option. A missing Idea marker mapping blocks only Idea capture or
+Idea consumption; it does not invalidate an unrelated Plan Feature run.
 
 ## Execution Data
 
@@ -77,6 +80,10 @@ Carry only the data needed to connect planning artifacts:
   available context used for planning: the current or coordination root,
   affected child-repository roots, and scoped contexts matched by affected
   paths. Omit roots and routes with no context file;
+- optional `source_idea_refs`: explicitly selected durable GitHub or local Idea
+  refs consumed only by `full-flow` or `spec-only`. Multiple refs must describe
+  one bounded feature. Reject `proposed-idea:` refs and never accept this data
+  in `issues-from-existing-spec`; load `idea-source.md` when it is present;
 - source identity: a durable `source_spec_ref`, or in `write_mode=propose`
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,

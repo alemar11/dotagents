@@ -1,13 +1,14 @@
 # Issue Tracker: Local Markdown
 
 Feature Specs and implementation issues for this repo live as durable Markdown
-files under each `planning/features/<feature-slug>/` subtree.
+files under each `planning/features/<feature-slug>/` subtree. Captured Ideas
+live as durable Markdown files under `planning/ideas/`.
 
 ## Configuration
 
 | Key | Type | Value | Allowed values | Meaning |
 | --- | --- | --- | --- | --- |
-| `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs and implementation issues are routed to local Markdown files. |
+| `tracker_backend` | enum | `local` | `github`, `local` | Feature Specs, implementation issues, and Ideas are routed to local Markdown files. |
 
 Project Memory stores only tracker routing and conventions. Implementation
 delivery, branch/PR strategy, and executor permissions belong to Feature Specs
@@ -15,8 +16,8 @@ and executing workflows.
 
 ## Publication
 
-- `write_mode=apply`: create or update durable Feature Spec and issue files at
-  their canonical paths.
+- `write_mode=apply`: create or update durable Feature Spec, implementation
+  issue, and Idea files at their canonical paths.
 - `write_mode=propose`: return proposed bodies, canonical target paths,
   metadata, relationships, and publication order without writing files.
 
@@ -83,8 +84,21 @@ repositories because identical tracker paths can exist in more than one child.
 - When a Feature Spec has an accepted Planning Identity, use its
   `feature_slug` rather than deriving a new slug from the title.
 
-Durable local tracker artifacts live under `planning/features/`, not
-`planning/tmp/`, `.scratch/`, or `project-memory/features/`. Keep
+### Idea Files
+
+- Store one captured Idea at `planning/ideas/<idea-slug>.md`.
+- Use the heading `# Idea: <Name>`.
+- In the header metadata region, require exactly one
+  `artifact_marker: idea`, zero `issue_type` lines, and zero or one
+  `workflow_state` line.
+- When present, the Idea workflow state must be one of the two Idea-compatible
+  states defined by `triage-labels.md`; the states are mutually exclusive.
+- Project Memory setup configures the mapping but never creates an Idea file or
+  the `planning/ideas/` directory.
+
+Durable local tracker artifacts live under `planning/features/` or
+`planning/ideas/`, not `planning/tmp/`, `.scratch/`, or
+`project-memory/features/`. Keep
 `project-memory/` for routing, domain, and ADR memory. Temporary artifacts are
 caller-owned working data and never durable source references.
 
@@ -127,6 +141,11 @@ For `write_mode=apply`, create or update the durable artifact under
 it. A dedicated integration partial uses the distinct `integration/` subtree
 in the evidence-derived owner repository; it does not require a coordination
 repository.
+
+For an authorized Idea-capture `write_mode=apply`, create the durable artifact
+at `planning/ideas/<idea-slug>.md`; Project Memory setup alone never authorizes
+that write. An Idea proposal returns its would-be path and body without writing
+it.
 
 To fetch an issue, read the referenced Markdown file. The user normally passes
 the path or feature/issue number directly.

@@ -13,7 +13,7 @@ the durable parent contract for one bounded product or system change.
 
 The public pipeline is:
 
-`Project Memory routing -> repo-backed clarification -> Feature Spec phase -> issue phase -> deferred domain-memory closeout`
+`Project Memory routing -> optional Idea source validation -> repo-backed clarification -> Feature Spec phase -> issue phase -> source reconciliation -> deferred domain-memory closeout`
 
 Use it only when the user invokes `$plan-feature`, asks to run Plan Feature, or
 a manually invoked parent workflow routes here. Do not auto-select it for an
@@ -62,6 +62,10 @@ Resolve `write_mode` once:
 - Treat `tracker_backend` and `repository_layout` as Project Memory facts. Run
   the matching Project Memory routing slice when either fact is missing,
   stale, or contradictory.
+- When explicitly selected `source_idea_refs` are present, load
+  `references/idea-source.md`. Accept durable marker-valid Ideas only in
+  `full-flow` or `spec-only`; reject proposed refs and reject Idea input in
+  `issues-from-existing-spec`. Keep the refs as execution data, not options.
 - Resolve one planning identity: `feature_slug` plus any selected product,
   workspace, context, or orchestrator-project identity.
 - Withhold incomplete artifacts. Return concrete blockers instead of
@@ -157,13 +161,15 @@ Resolve `write_mode` once:
 
 | Skill | Load when | Boundary |
 | --- | --- | --- |
-| `$project-memory` | Tracker routing or repository topology is missing, stale, or contradictory. | Use only `tracker-routing` or `project-layout`; Plan Feature never performs domain closeout. |
+| `$project-memory` | Tracker routing, repository topology, or an explicitly required Idea marker mapping is missing, stale, or contradictory. | Use only `tracker-routing` or `project-layout`; a missing Idea mapping blocks only Idea consumption, and Plan Feature never performs domain closeout. |
 | `$grill-me-with-context` | Repo-backed clarification is materially needed. | Always defer capture to the caller and consume its structured delta. |
 | `$plan-harder` | For every final retained implementation issue after structural graph compression. | At least one issue-hardening call per retained issue, with only the final stable result persisted; Plan Feature owns artifact writes. |
-| `$gitstack:github-issues` | `write_mode=apply` and the owning tracker backend is GitHub. | Translate each authorized write to GitStack-owned `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, metadata, relationships, verification, cleanup, and partial recovery. Never invoke it for `write_mode=propose`. |
+| `$gitstack:github-issues` | The owning tracker backend is GitHub and an explicitly selected Idea needs exact read validation, or `write_mode=apply` authorizes a tracker write. | Pure Idea reads are allowed in either write mode and omit mutation fields. For writes, translate each operation to `mutation_mode=apply`, the exact target, and one `issue_operation`; own safe transport, metadata, relationships, verification, cleanup, and partial recovery. Proposal mode never requests dry-run mutations or returns executable commands. |
 
-After implementation begins, issue lifecycle mutations belong to the selected
-executor, not Plan Feature.
+After implementation begins, generated implementation-issue lifecycle
+mutations belong to the selected executor, not Plan Feature. Terminal
+source-Idea reconciliation remains planning closeout and occurs before
+implementation begins.
 
 ## Workflow
 
@@ -194,6 +200,13 @@ and any product/workspace identity from accepted input and repository evidence.
 For a multi-repository workspace, derive workspace behavior from
 `repository_layout`; do not ask for another workspace-mode option.
 
+When the invocation supplies `source_idea_refs`, load
+`references/idea-source.md`, validate every durable ref and tracker owner, and
+require explicit selection before combining multiple Ideas. Stop when the
+selected Ideas do not describe one bounded feature. Do not route a missing Idea
+marker through implicit Project Memory writes; return the exact setup
+prerequisite unless the user separately authorized that setup.
+
 If an accepted parent/global Feature Spec is needed, produce it first. Resolve
 each affected child repository's tracker and topology facts independently and
 link every repo-scoped partial. Do not generate combined implementation issues
@@ -205,6 +218,10 @@ non-executable.
 In `full-flow` and `spec-only`, run `$grill-me-with-context` only when supplied
 intent plus repository evidence cannot support a complete Feature Spec or safe
 issue graph. Resolve one blocking decision at a time.
+
+Do not mutate an Idea merely because an interactive clarification is active.
+Only a terminal run exit waiting for one specific requester answer may
+reconcile that Idea to `needs-info` under `write_mode=apply`.
 
 For `issues-from-existing-spec`, inspect open questions only to validate whether
 the durable source can be consumed unchanged. Accept `knowledge_delta` only as
@@ -233,6 +250,7 @@ pass:
 - `mode`, `write_mode`, and Project Memory facts;
 - planning identity and repository scope;
 - source-ref state and cross-Spec dependency rows;
+- optional validated `source_idea_refs` and their per-Spec relevance mapping;
 - optional `knowledge_delta` plus separate `planning_blockers`;
 - `non_app_delivery_target` and `explicit_instruction_ref` only after explicitly
   loading the conditional reference; keep the latter as source evidence data.
@@ -245,7 +263,9 @@ only a blocked non-durable preview and the exact delta, and require a later
 explicit `full-flow` run for durable publication. Never persist a delta marker
 in the Spec or silently downgrade `write_mode`. Route new blockers back through clarification. In
 `full-flow`, pass the optional delta directly to the issue phase without adding
-it to any Feature Spec body. Stop after the phase report for `spec-only`.
+it to any Feature Spec body. For `spec-only`, continue only to terminal Idea
+source reconciliation and the completion report after every requested Feature
+Spec is durable and verified.
 
 ### 4. Run The Issue Phase
 
@@ -271,7 +291,28 @@ issue dependencies local. Attach the delta only to the final integration issue
 when present. Harden and validate the selected final issue like every other
 issue.
 
-### 5. Report Completion
+### 5. Reconcile Selected Idea Sources
+
+Skip this step when no `source_idea_refs` were supplied. Otherwise load
+`references/idea-source.md` and determine `partial` or `full` coverage
+separately for every selected Idea.
+
+With `write_mode=propose`, report intended transitions without mutation. With
+`write_mode=apply`, a terminal wait for one specific requester answer may
+reconcile the affected Ideas to `needs-info` before a planning result exists.
+Reconcile coverage only after the complete requested result is durable and
+verified: every requested Feature Spec for `spec-only`, or every Feature Spec,
+implementation issue, metadata mutation, and relationship for `full-flow`. A
+technical, validation, configuration, or partial publication failure preserves
+each Idea's prior state. Partial coverage records a backlink and returns the
+Idea to `needs-triage`; full coverage records a backlink, clears actionable
+states, and closes the GitHub Idea or records a full local outcome. Apply each
+decision independently and retry only missing operations after partial source
+reconciliation. On resume, treat a closed GitHub Idea or local full outcome as
+already reconciled only when its recorded authoritative Feature Spec refs
+exactly match this result; do not reject or replay that completed operation.
+
+### 6. Report Completion
 
 Return:
 
@@ -283,6 +324,8 @@ Return:
   compression repairs, retained-slice reasons, and avoided initial hardening
   calls;
 - applied tracker metadata when writes occurred;
+- selected Idea refs, per-Idea coverage, applied or proposed lifecycle
+  transitions, and any missing reconciliation operations;
 - domain closeout owner when present and the derived `capture_outcome`;
 - blockers and withheld artifacts;
 - explicit App incompatibility when `non_app_delivery_target` is present.
@@ -302,6 +345,8 @@ captured.
 
 - `references/options.md`: the complete default-path run registry and execution
   data shape.
+- `references/idea-source.md`: durable Idea validation, Feature Spec source
+  projection, per-Idea coverage, and terminal lifecycle reconciliation.
 - `references/non-app-delivery.md`: load for an explicitly requested non-App
   stopping point or a canonical durable source carrying exactly one target and
   one resolvable `explicit_instruction_ref`.
