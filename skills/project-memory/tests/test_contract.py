@@ -592,8 +592,20 @@ class ProjectMemoryContractTests(unittest.TestCase):
             "`ready-for-agent`",
             "`ready-for-human`",
             "`wontfix`",
+            "`native-type`",
+            "`label`",
+            "`body-field`",
+            "`local-header`",
         ):
             self.assertIn(value, labels)
+
+        self.assertIn("| Canonical type | Transport | Tracker value | Meaning |", labels)
+        self.assertIn("| Canonical state | Transport | Tracker value | Meaning |", labels)
+        self.assertIn("missing transport column", labels)
+        self.assertIn(
+            "never infer transport from the tracker value",
+            " ".join(github.lower().split()),
+        )
 
         self.assertIn(
             "require exactly one `issue_type` and one `workflow_state`",
@@ -662,7 +674,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
         skill_normalized = " ".join(skill.split())
 
         self.assertIn("orthogonal dimensions", labels_normalized)
-        self.assertIn("| `idea` | `idea` |", labels)
+        self.assertIn("| `idea` | `label` | `idea` |", labels)
         self.assertIn("leave the native GitHub Issue Type unset", labels)
         self.assertIn("missing mapping blocks only Idea capture", labels_normalized)
         self.assertIn(
@@ -693,6 +705,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("zero or one `workflow_state` line", local_normalized)
 
         self.assertIn("`artifact-marker-mapping`", setup)
+        self.assertIn("`Transport`, `Tracker value`, and `Meaning` columns", setup)
         self.assertIn(
             "include the canonical `artifact_marker: idea` mapping",
             setup_normalized,

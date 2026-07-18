@@ -14,7 +14,7 @@ memory:
 - tracker routing in `project-memory/config/issue-tracker.md`;
 - durable project topology in `project-memory/config/project-layout.md`;
 - canonical artifact-marker, issue-type, and workflow-state vocabulary and
-  repository mappings in
+  repository mappings plus explicit transport in
   `project-memory/config/triage-labels.md`;
 - root-first domain routing through `CONTEXT.md`, with optional scoped
   `CONTEXT.md` files;
@@ -115,10 +115,15 @@ values are invalid input; configuration must already use this schema before the
 runtime consumes it.
 
 `references/triage-labels.md` is the sole reusable registry for canonical
-`artifact_marker`, `issue_type`, and `workflow_state` values. The generated
-`project-memory/config/triage-labels.md` is the repository-specific source of
-truth for their tracker mappings. Consuming skills must load that mapping and
-must not define parallel enums or aliases.
+`artifact_marker`, `issue_type`, and `workflow_state` values plus their mapping
+transports. The generated `project-memory/config/triage-labels.md` is the
+repository-specific source of truth for tracker values and transport. Marker
+rows use `label` on GitHub or `local-header` locally; issue types use
+`native-type`, `label`, or `body-field` on GitHub and `local-header` locally;
+workflow states use `label` on GitHub or `local-header` locally. These are
+mapping data, not run options. Consuming skills must load them, reject missing,
+unknown, or backend-incompatible transports, and must not define parallel enums
+or aliases.
 The `artifact_marker: idea` mapping is required only for Idea capture and
 Idea-source consumption. If it is absent, stop those Idea-specific operations
 with a setup prerequisite while leaving unrelated planning and implementation

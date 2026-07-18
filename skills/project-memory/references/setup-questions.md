@@ -200,9 +200,22 @@ Show an evidence-backed proposal before requesting correction.
 > - Change the mapping
 
 Map those rows internally to canonical `bug`, `feature`, and `task`. If the
-user chooses to change the mapping, ask only for the incorrect row or rows.
-Local Markdown's canonical mapping and an unmodified GitHub default require no
-question.
+user chooses to change the mapping, ask only for the incorrect row or rows and
+record both the concrete mechanism and value. Map GitHub Issue Types to
+`native-type`, GitHub labels to `label`, an exact line near the top of the issue
+body to `body-field`, and local header lines to `local-header`.
+
+When GitHub Issue Types are disabled and repository evidence establishes no
+fallback, ask one concrete follow-up before asking for values:
+
+> GitHub Issue Types are disabled for `<tracker-name>`, and I found no existing
+> issue-category convention. Where should issue categories be recorded?
+>
+> - GitHub labels (Recommended when suitable labels exist)
+> - An exact field near the top of each issue body
+
+Then ask only for the missing labels or complete body lines. Local Markdown's
+canonical mapping and an unmodified GitHub default require no question.
 
 ## Workflow-State Mapping
 
@@ -226,8 +239,10 @@ correction.
 
 Map those rows internally to `needs-triage`, `needs-info`, `ready-for-agent`,
 `ready-for-human`, and `wontfix`. If the user chooses to change the mapping,
-ask only for the incorrect row or rows. Canonical local values and an
-unmodified GitHub default require no question.
+ask only for the incorrect row or rows. Record GitHub workflow states with
+transport `label` and local header lines with `local-header`; do not map workflow
+states to Issue Types or body fields. Canonical local values and an unmodified
+GitHub default require no question.
 
 ## Questions Setup Must Not Ask
 

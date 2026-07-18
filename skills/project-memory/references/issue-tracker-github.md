@@ -66,9 +66,11 @@ authority and must not be upgraded at this boundary.
 Load canonical issue types and workflow states only from
 `references/triage-labels.md`, then use the concrete tracker mappings in
 `project-memory/config/triage-labels.md`. This tracker reference does not repeat
-that registry. If GitHub issue types are disabled or customized for the
-organization, record the actual available values or fallback label convention
-in the repository mapping file.
+that registry. Require every consumed mapping row to declare transport. If
+GitHub issue types are disabled or customized for the organization, record the
+exact available `native-type`, fallback `label`, or complete `body-field`
+convention in the repository mapping file; never infer transport from the
+tracker value.
 
 Load canonical artifact markers from the same registry and repository mapping.
 If the `idea` marker mapping is missing, block only Idea capture and Idea-source
@@ -104,8 +106,9 @@ Idea issues.
 
 - Resolve every artifact's issue type by role from
   `references/triage-labels.md` and the repository mapping immediately before
-  publication. Do not hard-code canonical or tracker-specific type values in
-  this reference.
+  publication. Dispatch through that row's explicit transport and exact tracker
+  value. Do not hard-code canonical or tracker-specific type values in this
+  reference.
 - Publish the Feature Spec as a GitHub issue titled
   `Feature Spec: <Feature Name>`.
 - Publish a dedicated integration partial, when present, as a separate GitHub
@@ -127,9 +130,9 @@ Idea issues.
 When a caller classifies an existing issue, load the canonical issue types,
 workflow states, and their selection semantics from
 `references/triage-labels.md`, then resolve their concrete GitHub mappings from
-`project-memory/config/triage-labels.md`. Workflow state belongs in the mapped
-labels, not the GitHub issue type. This reference defines no additional type or
-state values.
+`project-memory/config/triage-labels.md`. Workflow state requires its mapped
+`label` transport and never belongs in the GitHub issue type or body field. This
+reference defines no additional type, state, or transport values.
 
 ## Completion Convention
 

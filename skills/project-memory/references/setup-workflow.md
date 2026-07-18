@@ -15,9 +15,9 @@ review:
   precedence from `options.md`, not a stored key or option)
 - `repository_layout`
 - `tracker_backend`
-- `artifact_marker` mapping
-- `issue_type` mapping
-- `workflow_state` mapping
+- `artifact_marker` transport and mapping
+- `issue_type` transport and mapping
+- `workflow_state` transport and mapping
 - root/scoped context routing
 - translation memory decision
 - `AGENTS.md` setup block state
@@ -54,12 +54,13 @@ For each selected configuration section, show the current value first, then
 - `issue-tracker`: `github` or `local`.
 - `project-layout`: `single-repository`, `monorepo`, or
   `multi-repository-workspace`.
-- `artifact-marker-mapping`: default GitHub `idea` label, canonical local
-  `idea` marker, or a custom GitHub label for the canonical `idea` marker.
-- `issue-type-mapping`: default GitHub mapping, canonical local mapping, or
-  custom per canonical type.
-- `workflow-state-mapping`: default GitHub lowercase labels, canonical local
-  mapping, or custom per canonical state.
+- `artifact-marker-mapping`: default or custom GitHub `label`, or canonical
+  local `local-header`, for the `idea` marker.
+- `issue-type-mapping`: default GitHub `native-type`, evidence-backed GitHub
+  fallback `label` or exact `body-field`, or canonical local `local-header`,
+  with one transport and exact tracker value per canonical type.
+- `workflow-state-mapping`: default or custom GitHub `label`, or canonical local
+  `local-header`, with one transport and exact tracker value per state.
 - `domain-memory`: show the current root `CONTEXT.md`, scoped routes, workspace
   repository registry when applicable, and centralized ADR root. Refresh those
   surfaces from evidence; during authorized setup/bootstrap, always create or
@@ -165,7 +166,10 @@ After direct write authority or separate affirmative confirmation:
 - When tracker-routing or full setup creates or refreshes
   `project-memory/config/triage-labels.md`, include the canonical
   `artifact_marker: idea` mapping alongside the issue-type and workflow-state
-  mappings. If an existing repository lacks only that marker mapping, report
+  mappings. Require each mapping table to contain its canonical identity,
+  `Transport`, `Tracker value`, and `Meaning` columns. Reject a missing,
+  unknown, or backend-incompatible transport instead of inferring it or reading
+  retired column shapes. If an existing repository lacks only that marker mapping, report
   Idea capture and Idea-source consumption as unavailable until setup adds it;
   do not invalidate or block unrelated workflows.
 - Keep `issue-tracker.md` limited to `tracker_backend` plus human-readable
@@ -238,8 +242,8 @@ Summarize only the applicable fields:
 - settings reviewed and changed;
 - selected issue tracker;
 - project topology;
-- artifact-marker mapping;
-- issue-type and workflow-state mapping;
+- artifact-marker transport and mapping;
+- issue-type and workflow-state transport and mapping;
 - root/scoped context routing;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;

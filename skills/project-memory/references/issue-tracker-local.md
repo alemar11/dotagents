@@ -62,10 +62,10 @@ repositories because identical tracker paths can exist in more than one child.
   first completed issue into it.
 - Issue type is recorded as an `issue_type:` line near the top of each issue
   file, using the canonical value loaded from `triage-labels.md` and the
-  repository mapping.
+  repository mapping. Require transport `local-header`.
 - Workflow state is recorded as a `workflow_state:` line near the top of each
   issue file, using the canonical value loaded from `triage-labels.md` and the
-  repository mapping.
+  repository mapping. Require transport `local-header`.
 - In a Plan-generated implementation issue, the Feature Spec pointer is
   recorded only in the canonical `## Execution Contract` `source_spec_ref`
   row, never as duplicate header metadata.
