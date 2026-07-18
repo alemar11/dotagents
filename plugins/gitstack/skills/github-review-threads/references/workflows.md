@@ -7,8 +7,11 @@ wait. Always pass the intended PR head SHA when freshness matters:
 
 ```bash
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
-<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout 15m
+<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout <caller-owned-duration>
 ```
+
+For composition, `<caller-owned-duration>` is the remaining time derived from
+the caller's deadline. GitStack does not select, extend, or segment that bound.
 
 `check` reads once. `wait` polls with bounded backoff until it sees `clean` or
 `findings`, detects `not-requested` or `stale`, or reaches its timeout. The

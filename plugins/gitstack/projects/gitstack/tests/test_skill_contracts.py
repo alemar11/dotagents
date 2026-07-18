@@ -69,6 +69,23 @@ class GitStackSkillContractTests(unittest.TestCase):
         self.assertIn("review_operation=wait", yeet)
         self.assertIn("one operation per", yeet)
 
+    def test_review_wait_duration_is_caller_owned(self) -> None:
+        paths = (
+            "skills/github-review-threads/SKILL.md",
+            "skills/github-review-threads/references/script-summary.md",
+            "skills/github-review-threads/references/workflows.md",
+        )
+
+        for relative in paths:
+            text = read(relative)
+            with self.subTest(relative=relative):
+                self.assertIn("--timeout <caller-owned-duration>", text)
+                self.assertNotIn("--timeout 15m", text)
+
+        owner = " ".join(read("skills/github-review-threads/references/script-summary.md").split())
+        self.assertIn("composing caller that owns a deadline", owner)
+        self.assertIn("GitStack never replaces, extends, or segments it", owner)
+
     def test_invocation_registry_excludes_result_and_judgment_fields(self) -> None:
         options = read("references/options.md")
 

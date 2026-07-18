@@ -27,7 +27,7 @@ Resolve `<plugin-root>` as two directories above the directory containing this
 <plugin-root>/scripts/gitstack --json doctor
 <plugin-root>/scripts/gitstack --json reviews address --repo <owner/repo> --pr <number>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
-<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout 15m
+<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout <caller-owned-duration>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
 ```
 
@@ -66,6 +66,8 @@ reactions into one current-head state and one stable observation fingerprint.
    continued monitoring is authorized, return the pending state to the caller;
    scheduling or heartbeat ownership remains with that caller. Callers must use
    the bounded waiter instead of wrapping one-shot checks in manual sleep loops.
+   A composing caller owns and passes its duration; GitStack never selects,
+   extends, or segments that caller's deadline.
 
 For a composed workflow, require the exact PR target and one canonical
 `review_operation`. Mutating operations additionally require

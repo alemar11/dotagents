@@ -11,7 +11,7 @@
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number> --comment-ids <ids> --reply-body-file <message-file>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
-<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout 15m
+<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout <caller-owned-duration>
 ```
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning
@@ -67,6 +67,9 @@ terminal provider error or API/configuration failure, `64` for invalid arguments
 
 `wait` accepts `--timeout`, `--interval`, and `--max-interval` durations using
 seconds, minutes, or hours, such as `30s`, `15m`, or `1h`.
+`--timeout` bounds one invocation. A composing caller that owns a deadline
+derives and passes `<caller-owned-duration>`; GitStack never replaces, extends,
+or segments it.
 `--head` accepts a full hexadecimal commit SHA or an unambiguous prefix of at
 least seven characters. Review-request comments must include that SHA or prefix
 for acknowledgement and reaction evidence to count toward the target head.
