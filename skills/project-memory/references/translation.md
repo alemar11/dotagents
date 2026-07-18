@@ -24,12 +24,12 @@ localization pointer.
 
 Place `TRANSLATION.md` beside the relevant `CONTEXT.md`:
 
-- single-context repos: root `TRANSLATION.md`,
-- multi-context repos: context-specific `TRANSLATION.md` beside the selected
-  context `CONTEXT.md`,
-- orchestrator workspaces: only create root `TRANSLATION.md` when the
-  coordination workspace itself has localization rules. Child repos keep their
-  own translation memory.
+- repository root: root `TRANSLATION.md` for shared localization rules;
+- scoped monorepo context: scoped `TRANSLATION.md` beside the selected scoped
+  `CONTEXT.md` when that scope has independent localization rules;
+- multi-repository coordination workspace: root `TRANSLATION.md` only when the
+  workspace itself has localization rules. Child repositories keep their own
+  translation memory.
 
 Use product vocabulary from the neighboring `CONTEXT.md`; do not duplicate the
 project glossary here. `CONTEXT.md` may include a one-line pointer to this file

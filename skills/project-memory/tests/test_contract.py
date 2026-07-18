@@ -217,10 +217,140 @@ class ProjectMemoryContractTests(unittest.TestCase):
             "project-memory/config/issue-tracker.md",
             "project-memory/config/project-layout.md",
             "project-memory/config/triage-labels.md",
-            "project-memory/config/domain.md",
         ):
             self.assertIn(relative_path, skill)
             self.assertIn(relative_path, setup)
+
+        retired_domain_config = "project-memory/config/" + "domain.md"
+        self.assertNotIn(retired_domain_config, skill)
+        self.assertNotIn(retired_domain_config, setup)
+
+    def test_context_routing_uses_one_root_entrypoint(self) -> None:
+        domain = (SKILL_ROOT / "references" / "domain.md").read_text(
+            encoding="utf-8"
+        )
+        modeling = (SKILL_ROOT / "references" / "domain-modeling.md").read_text(
+            encoding="utf-8"
+        )
+        setup = (SKILL_ROOT / "references" / "setup-workflow.md").read_text(
+            encoding="utf-8"
+        )
+        translation = (SKILL_ROOT / "references" / "translation.md").read_text(
+            encoding="utf-8"
+        )
+        domain_normalized = " ".join(domain.split())
+
+        self.assertIn(
+            "root `CONTEXT.md` is the single entry point", domain_normalized
+        )
+        self.assertIn(
+            "coordination-workspace root and every available selected child-repository root context apply",
+            domain_normalized,
+        )
+        self.assertIn("## Scoped Contexts", domain)
+        self.assertIn("| Scope | Owned paths | Context |", domain)
+        self.assertIn("Multiple non-overlapping matches are valid", domain)
+        self.assertIn("optional context path", domain)
+        self.assertIn("use `—` otherwise", domain_normalized)
+        self.assertIn("Rows must be non-overlapping", domain)
+        retired_overlap_rule = "explicit " + "precedence"
+        self.assertNotIn(retired_overlap_rule, domain)
+        self.assertIn("## Repository Registry", domain)
+        self.assertIn("| Repository | Role | Location | Context |", domain)
+        self.assertIn(
+            "use its `## Repository Registry` to select every affected child",
+            domain_normalized,
+        )
+        self.assertIn("read each available child root `CONTEXT.md`", domain_normalized)
+        self.assertIn("The `Context` cell is optional", domain)
+        self.assertIn(
+            "do not invent child vocabulary or create a dangling pointer",
+            domain_normalized,
+        )
+        self.assertIn("Use exactly one `project-memory/` directory", domain)
+        self.assertIn("must not create\n  a nested `project-memory/` directory", domain)
+        self.assertIn("read its `CONTEXT.md` first", modeling)
+        self.assertIn("Standard Ambiguity Questions", setup)
+        self.assertIn("routing-only", setup)
+        self.assertIn("evidence-free single repository", setup)
+        self.assertIn("write no `CONTEXT.md`", setup)
+        self.assertIn("scoped monorepo context", translation)
+
+        plan_options = (
+            REPO_ROOT / "skills" / "plan-feature" / "references" / "options.md"
+        ).read_text(encoding="utf-8")
+        spec_phase = (
+            REPO_ROOT
+            / "skills"
+            / "plan-feature"
+            / "references"
+            / "spec-phase.md"
+        ).read_text(encoding="utf-8")
+        retired_context_field = "`context_" + "file`"
+        for contents in (plan_options, spec_phase):
+            normalized = " ".join(contents.split())
+            self.assertIn("`context_files`", contents)
+            self.assertNotIn(retired_context_field, contents)
+            self.assertIn("applicable available", normalized)
+            self.assertIn("root", normalized)
+            self.assertIn("scoped context", normalized)
+        plan_skill = (
+            REPO_ROOT / "skills" / "plan-feature" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        for contents in (plan_skill, spec_phase):
+            normalized = " ".join(contents.split()).lower()
+            self.assertIn("read every available matched context before drafting", normalized)
+
+    def test_runtime_consumers_have_no_retired_context_routing(self) -> None:
+        roots = [
+            REPO_ROOT / "AGENTS.md",
+            REPO_ROOT / "skills" / "project-memory",
+            REPO_ROOT / "skills" / "plan-feature",
+            REPO_ROOT / "skills" / "grill-me-with-context",
+            REPO_ROOT / "skills" / "improve-codebase-architecture",
+        ]
+        candidates: list[Path] = []
+        for root in roots:
+            if root.is_file():
+                candidates.append(root)
+                continue
+            candidates.extend(
+                path
+                for path in root.rglob("*")
+                if path.is_file() and path.suffix in {".md", ".yaml"}
+            )
+
+        retired = (
+            "CONTEXT-" + "MAP.md",
+            "project-memory/config/" + "domain.md",
+            "single-" + "context",
+            "multi-" + "context",
+            "orchestrator-" + "context",
+        )
+        stale = {
+            token: [
+                str(path.relative_to(REPO_ROOT))
+                for path in candidates
+                if token in path.read_text(encoding="utf-8")
+            ]
+            for token in retired
+        }
+        self.assertEqual(stale, {token: [] for token in retired})
+
+        for relative_path in (
+            "skills/grill-me-with-context/SKILL.md",
+            "skills/improve-codebase-architecture/SKILL.md",
+            "skills/plan-feature/SKILL.md",
+            "skills/plan-feature/references/spec-phase.md",
+        ):
+            contents = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+            normalized = " ".join(contents.split())
+            with self.subTest(relative_path=relative_path):
+                self.assertIn("root `CONTEXT.md`", normalized)
+                self.assertIn("Scoped Contexts", normalized)
+                self.assertIn("Repository Registry", normalized)
+                self.assertIn("current Git repository", normalized)
+                self.assertIn("available", normalized)
 
     def test_project_memory_owns_issue_type_and_workflow_state_registry(self) -> None:
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")

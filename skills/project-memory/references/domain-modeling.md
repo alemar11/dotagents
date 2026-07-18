@@ -41,15 +41,33 @@ an enum or treat its presence as write authority.
 
 ### 1. Inspect existing context
 
-- Look for `CONTEXT.md`, `CONTEXT-MAP.md`,
-  `project-memory/config/domain.md`, `project-memory/adr/`, `README.md`,
-  project docs, product specs, issue templates, and nearby source or tests that
-  define the vocabulary already in use.
-- If `CONTEXT-MAP.md` exists, choose the relevant context-specific
-  `CONTEXT.md` before editing domain language.
+- Resolve the current memory-owning root and read its `CONTEXT.md` first when
+  it exists. If it is intentionally absent, use repository evidence and create
+  it only with authorized durable content or verified topology-routing
+  evidence. In a multi-repository coordination workspace, follow its
+  `Repository Registry`
+  to every affected child repository and read each available child root
+  `CONTEXT.md`. An empty registry context cell means no child context exists;
+  inspect that child's repository evidence without inventing or creating a
+  context unless separately authorized. Also inspect the relevant
+  `project-memory/adr/` trees, `README.md`, project docs, product specs, issue
+  templates, and nearby source or tests that define the vocabulary already in
+  use.
+- When a selected repository's root `CONTEXT.md` contains
+  `## Scoped Contexts`, select every non-overlapping row matched by the
+  affected paths or accepted product identities, then read each available
+  scoped `CONTEXT.md`. The coordination root and selected repository root
+  remain applicable after selection. For a matched row without a context file,
+  inspect its owned paths directly and create the scoped file only when
+  authorized evidence supports durable scope-specific content.
+- Stop and ask only when scoped routes overlap or ownership remains
+  indeterminate. Do not guess, and do not mistake legitimate cross-scope work
+  for routing ambiguity.
 - Prefer updating an existing relevant file over creating a new one.
-- If no context file exists and an authorized durable term or rule needs a
-  home, create `CONTEXT.md` at the selected project root.
+- If no root context exists and an authorized durable term or rule needs a
+  home, create `CONTEXT.md` at the memory-owning root. For a verified monorepo
+  or multi-repository workspace, create the minimal root routing surface before
+  creating any scoped context.
 - If no suitable authorized destination exists, defer capture and name the
   missing file or surface explicitly.
 
@@ -70,10 +88,13 @@ names appear synonymous, resolve whether they are aliases or distinct concepts.
 
 ### 3. Update the smallest durable surface
 
-- Add or revise glossary entries and shared rules in `CONTEXT.md`.
+- Add or revise shared glossary entries and rules in root `CONTEXT.md`; put
+  only scope-specific deltas in the selected scoped `CONTEXT.md`.
 - Add workflow or behavioral detail to the closest relevant project doc.
-- Add an ADR under `project-memory/adr/` only for an accepted, load-bearing
-  decision future agents would otherwise reopen.
+- Add an ADR beneath the memory-owning root's `project-memory/adr/` only for an
+  accepted, load-bearing decision future agents would otherwise reopen. Use a
+  scope subdirectory when useful; never create nested scoped
+  `project-memory/` directories.
 - Leave unresolved questions explicit rather than smoothing them over.
 - Use project vocabulary and link durable repo sources such as source files,
   tests, schemas, project docs, or ADRs when available.

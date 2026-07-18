@@ -174,8 +174,14 @@ Read:
 - `project-memory/config/issue-tracker.md`;
 - `project-memory/config/project-layout.md`;
 - `project-memory/config/triage-labels.md`;
-- `project-memory/config/domain.md`, `CONTEXT.md`, or `CONTEXT-MAP.md` only when
-  context selection or terminology is material.
+- root `CONTEXT.md` first when it exists, treating the current Git repository
+  as a selected root; in a coordination workspace, also select affected child
+  roots from its `Repository Registry` and read each available child root
+  context; then
+  select every available scoped `CONTEXT.md` matched by affected paths in each
+  selected root's `Scoped Contexts` table. Read every available matched context
+  before drafting. For a root or matched route with no context, use repository
+  evidence without inventing terminology or a dangling context pointer.
 
 Run only the relevant Project Memory routing slice when setup is incomplete.
 Do not bootstrap unrelated domain, localization, ADR, or agent-instruction

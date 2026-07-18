@@ -15,8 +15,10 @@ memory:
 - durable project topology in `project-memory/config/project-layout.md`;
 - canonical issue type/state vocabulary and repository mappings in
   `project-memory/config/triage-labels.md`;
-- domain layout in `project-memory/config/domain.md`;
-- `CONTEXT.md`, domain docs, and ADRs under `project-memory/adr/`;
+- root-first domain routing through `CONTEXT.md`, with optional scoped
+  `CONTEXT.md` files;
+- domain docs and centralized ADRs under the memory-owning root's
+  `project-memory/adr/`;
 - optional `TRANSLATION.md` when localization rules are real.
 
 Use the smallest requested `memory_slice`. Tracker routing does not require
@@ -32,7 +34,7 @@ structured fields in current handoffs and reports.
 | --- | --- |
 | `tracker-routing` | Tracker backend plus canonical issue-type and workflow-state vocabulary and mappings. |
 | `project-layout` | Durable project topology: `single-repository`, `monorepo`, or `multi-repository-workspace`. |
-| `domain-memory` | Domain layout plus context/domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
+| `domain-memory` | Root/scoped context routing plus domain-doc/ADR setup, inline update, implementation closeout, or periodic review. |
 | `translation-memory` | Localization memory only. |
 | `agents-pointers` | Missing or stale project-memory pointers only. |
 | `full-setup` | All applicable slices, only when explicitly requested. |
@@ -56,8 +58,17 @@ when the selected scope has write authority.
   planning history, localization rules, and accepted decisions live in their
   dedicated memory surfaces.
 - Load `references/domain-modeling.md` before creating, updating, reviewing, or
-  reconciling `CONTEXT.md`, domain docs, or ADRs. Reading
-  `project-memory/config/domain.md` is not equivalent.
+  reconciling `CONTEXT.md`, domain docs, or ADRs. Read the current
+  memory-owning root's `CONTEXT.md` when it exists; otherwise use repository
+  evidence until authorized durable content or verified topology routing
+  warrants creation. Treat the current Git repository as a selected root; in a
+  coordination workspace also follow its repository registry to affected
+  child roots and read each available child root context. Then select every
+  matched available scoped `CONTEXT.md` from each selected repository root.
+- Use one `project-memory/` directory per memory-owning root: one at a Git
+  repository root, or one at a non-Git coordination-workspace root. Internal
+  monorepo projects use scoped `CONTEXT.md` files and centralized root ADRs,
+  not nested `project-memory/` directories.
 - Seed durable memory only from strong repo evidence, committed behavior,
   accepted tracker decisions, final session evidence, or explicit user
   acceptance. Exclude tentative/rejected ideas, secrets, raw logs, and weak
@@ -141,11 +152,10 @@ persisting run intent as configuration.
 
 - tracker: current setup, remotes/config, templates, tracker docs, and relevant
   local/workspace conventions;
-- project layout: Git root shape, package/workspace manifests,
-  `CONTEXT-MAP.md`, child repository evidence, and existing project-memory
-  topology config;
+- project layout: Git root shape, package/workspace manifests, child repository
+  evidence, and existing project-memory topology config;
 - domain: current pointers, README/docs/manifests, relevant source/tests/schema,
-  context files, domain layout, and ADRs;
+  root and scoped context files, context routing, and ADRs;
 - translation: translation memory, locale catalogs/config, copy guidance, and
   market requirements;
 - pointers: `AGENTS.md` and the files it should index.
@@ -213,7 +223,7 @@ it never counts as captured.
   and repository mapping template.
 - `issue-tracker-*.md`, `tracker-publishing.md`: tracker artifact, source-ref,
   publication, and completion contracts.
-- `domain.md`: domain-memory layout and ownership.
+- `domain.md`: root/scoped context discovery, routing, and ownership.
 - `domain-modeling.md`: domain setup, inline update, implementation closeout,
   and periodic review semantics.
 - `documentation-shapes.md`: fallback context and ADR shapes.

@@ -36,7 +36,9 @@ Receive:
 - `tracker_backend`, `repository_layout`, and issue-type mappings from Project
   Memory;
 - planning identity: `feature_slug` and any selected `product_slug`,
-  `project_slug`, `workspace_path`, or `context_file`;
+  `project_slug`, `workspace_path`, or `context_files`, containing every
+  applicable available root, child-root, and matched scoped context used for
+  planning;
 - affected repositories, allowed paths, per-Spec target branch, and any
   parent/child workspace links;
 - existing or pending `source_spec_ref` state;
@@ -60,8 +62,15 @@ Read the minimum evidence needed to establish the contract:
 - `project-memory/config/issue-tracker.md`;
 - `project-memory/config/project-layout.md`;
 - `project-memory/config/triage-labels.md`;
-- `project-memory/config/domain.md` and the selected `CONTEXT.md` when
-  terminology or ownership requires them;
+- root `CONTEXT.md` first when it exists, treating the current Git repository
+  as a selected root; in a coordination workspace, also select affected child
+  roots from its `Repository Registry` and read each available child root
+  context; then
+  select every available scoped `CONTEXT.md` matched by affected paths in each
+  selected root's `Scoped Contexts` table and read every available matched
+  context before drafting. For a root or matched route with no context, use
+  repository evidence without inventing terminology or a dangling context
+  pointer;
 - relevant ADRs, product documentation, source, and tests when they constrain
   the feature;
 - orchestrator workspace project, repository, and integration-gate documents
@@ -70,8 +79,8 @@ Read the minimum evidence needed to establish the contract:
 Do not broadly scan unrelated domain or localization material. Widen evidence
 only when the current sources are incomplete or contradictory.
 
-When a context map describes multiple products or workspaces, resolve the
-selected product, workspace path, context file, and feature slug before
+When root context routes multiple products or workspaces, resolve the selected
+product, workspace path, applicable context files, and feature slug before
 drafting. Stop rather than guess when more than one owner remains plausible.
 
 ### 2. Resolve Artifact Targets

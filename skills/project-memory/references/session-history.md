@@ -54,8 +54,9 @@ Reject weak signals:
 Use `references/domain-modeling.md` for the actual `CONTEXT.md`, domain-doc,
 and ADR content.
 
-- Put stable terminology, boundaries, workflows, rules, and open questions in
-  `CONTEXT.md`.
+- Put shared stable terminology, boundaries, workflows, rules, and open
+  questions in root `CONTEXT.md`; put only a selected scope's delta in its
+  scoped `CONTEXT.md` after following root routing.
 - Create ADRs under `project-memory/adr/` only for load-bearing accepted
   decisions that future agents or maintainers would otherwise reopen.
 - Cite evidence briefly with paths, issue numbers, commit hashes, or session

@@ -78,7 +78,7 @@ repositories because identical tracker paths can exist in more than one child.
   resolve inside that repository. A tracker artifact at a non-Git workspace root
   or outside every affected Git repository is non-App-executable; do not invent
   a tracker owner.
-- In multi-context repos or monorepos, include the accepted product or
+- In scoped-context monorepos, include the accepted product or
   workspace slug when needed to avoid collisions.
 - When a Feature Spec has an accepted Planning Identity, use its
   `feature_slug` rather than deriving a new slug from the title.

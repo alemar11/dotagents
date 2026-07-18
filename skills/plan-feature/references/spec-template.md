@@ -19,8 +19,10 @@ two run choices.
 - Partial role: integration. [Include only for the dedicated multi-repository
   integration partial; omit it from the parent and implementation partials.]
 - Product or project slug: [include only for monorepos or orchestrator workspaces].
-- Workspace path: [include only for monorepos or multi-context repositories].
-- Context file: [include only when a context map selects one].
+- Workspace path: [include only for monorepos or multi-repository workspaces].
+- Context files: [include every applicable available current/coordination root,
+  affected child-repository root, and matched scoped context used for planning;
+  omit roots and routes with no context file].
 - Repository layout: [Project Memory fact].
 
 ## Problem
@@ -51,7 +53,7 @@ two run choices.
 - Allowed paths: [repo-relative or repo-qualified scope].
 - Spec target branch: [valid branch shared by this Spec's generated issues; use
   the distinct derived integration branch for an integration partial].
-- [For monorepos, include the selected workspace and context.]
+- [For monorepos, include the selected workspace and optional scoped contexts.]
 - [For multi-repository work, state each repository's role and cross-repo
   contract.]
 

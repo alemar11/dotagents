@@ -64,9 +64,16 @@ explicit override, direct invocation preserves `capture_mode=inline`.
 
 ### 1. Ground in the project
 
-- Inspect the relevant repo files, existing docs, `CONTEXT.md`,
-  `CONTEXT-MAP.md`, `project-memory/config/domain.md`, and
-  `project-memory/adr/` before asking questions.
+- Inspect the relevant repository files and existing docs. Read root
+  `CONTEXT.md` when it exists and treat the current Git repository as a
+  selected root. In a coordination workspace, also follow its
+  `Repository Registry` to affected child-repository roots and read each
+  available child root context. Then read
+  every available scoped `CONTEXT.md` matched by affected paths in each
+  selected root's `Scoped Contexts` table and the relevant root
+  `project-memory/adr/` trees before asking questions. When a root or matched
+  route has no context, inspect its repository paths directly without
+  inventing one.
 - Load and follow `$grill-me` for the one-question-at-a-time interrogation
   loop.
 - With `capture_mode=inline`, load and follow `$project-memory domain-memory`

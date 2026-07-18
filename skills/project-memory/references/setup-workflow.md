@@ -17,7 +17,7 @@ review:
 - `tracker_backend`
 - `issue_type` mapping
 - `workflow_state` mapping
-- domain memory layout
+- root/scoped context routing
 - context seed decision
 - translation memory decision
 - `AGENTS.md` setup block state
@@ -47,8 +47,8 @@ Editable sections:
 - `agents-pointers`
 - `done`
 
-For each selected section, show the current value first, then `keep-current`
-and the relevant alternatives:
+For each selected configuration section, show the current value first, then
+`keep-current` and the relevant alternatives:
 
 - `issue-tracker`: `github` or `local`.
 - `project-layout`: `single-repository`, `monorepo`, or
@@ -57,9 +57,13 @@ and the relevant alternatives:
   custom per canonical type.
 - `workflow-state-mapping`: default GitHub lowercase labels, canonical local
   mapping, or custom per canonical state.
-- `domain-memory`: `single-context`, `multi-context`, `orchestrator-context`.
+- `domain-memory`: show the current root `CONTEXT.md`, scoped routes, workspace
+  repository registry when applicable, and centralized ADR root. Refresh those
+  surfaces from evidence; do not present or persist a domain-layout enum.
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
-- `context-seed`: `seed-context`, `routing-only`.
+- `context-seed`: `seed-context`; `routing-only` only when verified monorepo or
+  workspace topology supports real routes; otherwise explain why no context
+  should be written.
 - `agents-pointers`: create missing pointer block, refresh stale pointer block,
   or minimize copied setup detail into project-memory pointers.
 
@@ -87,10 +91,16 @@ through unrelated editable sections.
   not durable issue-tracker configuration.
 - Do not define durable worker assignments, worker-count limits, scheduled
   checks, publication policy, or issue mutation policy in project memory.
-- Default domain layout to `single-context` unless `CONTEXT-MAP.md`, repo
-  evidence, or orchestrator mode implies otherwise.
-- Recommend `seed-context` only when non-empty repo evidence supports useful
-  domain memory; otherwise use `routing-only`.
+- Read root `CONTEXT.md` first when it exists. For a verified monorepo or
+  multi-repository workspace, topology supports a minimal root routing context
+  even when richer domain seeding remains `routing-only`. For an
+  evidence-free single repository, continue from repository evidence without
+  creating an empty root context.
+- Recommend `seed-context` only when non-empty repository evidence supports
+  useful vocabulary, rules, boundaries, or scoped deltas. Use `routing-only`
+  only when verified monorepo or multi-repository workspace topology supports
+  stable scope or repository routes. For an evidence-free single repository,
+  write no `CONTEXT.md` and report the missing evidence.
 - Recommend enabled translation memory only when localization support and
   durable translation rules are confirmed by evidence or the user.
 
@@ -105,8 +115,11 @@ Before writing, show only applicable items from this list:
 - intended `project-memory/config/project-layout.md`;
 - intended `project-memory/config/issue-tracker.md`;
 - intended `project-memory/config/triage-labels.md`;
-- intended `project-memory/config/domain.md`;
-- intended `CONTEXT.md` seed, or why none should be written;
+- intended root `CONTEXT.md` routing and evidence-backed seed, or why no root
+  context should be written for an evidence-free single repository;
+- intended workspace repository-registry context pointers, omitting child
+  context paths that do not exist and are not authorized for creation;
+- intended scoped `CONTEXT.md` files, or why root-only routing is sufficient;
 - intended `TRANSLATION.md`, or why localization memory should not be written;
 - intended ADR drafts, if any.
 
@@ -146,8 +159,10 @@ After direct write authority or separate affirmative confirmation:
   configuration keys instead of silently deleting them.
 - Create or update `AGENTS.md` pointer block and apply only authorized
   minimization.
-- Create or update `CONTEXT.md` through `references/domain-modeling.md` when
-  seed/bootstrap is accepted.
+- Create or update root and scoped `CONTEXT.md` through
+  `references/domain-modeling.md`. For a verified monorepo or
+  multi-repository workspace, ensure the root routing context exists before
+  writing a scoped context.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
@@ -178,7 +193,7 @@ exists or is authorized; never create a broken pointer:
 
 ### Domain memory
 
-[one-line summary of single-context, multi-context, or orchestrator layout]. See `project-memory/config/domain.md`.
+[one-line summary of shared context and any scoped routing]. Read `CONTEXT.md` first, then follow its `Scoped Contexts` table when relevant.
 
 ### Localization
 
@@ -202,7 +217,7 @@ Summarize only the applicable fields:
 - selected issue tracker;
 - project topology;
 - issue-type and workflow-state mapping;
-- domain-memory layout;
+- root/scoped context routing;
 - localization-memory decision and evidence;
 - `AGENTS.md` minimization outcome;
 - workspace mode, if applicable;
@@ -211,3 +226,27 @@ Summarize only the applicable fields:
 - `TRANSLATION.md` audience, locale, terminology, or open questions seeded;
 - ADRs created or updated;
 - workflows that can now consume setup.
+
+## Standard Ambiguity Questions
+
+Ask only after repository and workspace evidence cannot resolve the target.
+Keep candidate paths concrete and ask one question at a time:
+
+- **Scoped-context candidates:** when several independently meaningful internal
+  projects are visible but scope boundaries are unclear, ask which candidate
+  paths should become distinct routes and which have enough evidence for a
+  scoped `CONTEXT.md`. Recommend an optional-pointer route when topology is
+  clear but distinct vocabulary or rules are not.
+- **Overlapping ownership:** when two scoped rows could own the affected path,
+  ask which scope is authoritative or how the paths should be split. Do not
+  persist overlapping routes.
+- **Workspace ownership:** when a coordination rule could belong either to the
+  workspace or a child repository, ask which memory-owning root owns it.
+  Recommend the child repository unless the rule is genuinely cross-repo.
+- **Seed depth:** when topology proves a root routing surface but richer domain
+  evidence is weak, ask whether to keep routing-only or seed the named
+  evidence-backed terms and rules. Recommend routing-only.
+
+These questions resolve target data and evidence, not new behavior-affecting
+configuration fields. Do not ask the user to classify the project as a domain
+layout after `repository_layout` is known.

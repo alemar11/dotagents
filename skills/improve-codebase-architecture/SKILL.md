@@ -33,9 +33,14 @@ Load `references/options.md` before classifying candidate strength.
 
 ### 1. Ground in repo evidence
 
-- Inspect project docs, `CONTEXT.md`, `CONTEXT-MAP.md`,
-  `project-memory/config/domain.md`, `project-memory/adr/`, package
-  boundaries, public APIs, tests, and the files near the requested area.
+- Inspect project docs and root `CONTEXT.md` when it exists, treating the
+  current Git repository as a selected root. In a coordination workspace, also
+  follow its `Repository Registry` to affected child-repository roots and read
+  each available child root context. Then read every available scoped `CONTEXT.md`
+  matched by affected paths in each selected root's `Scoped Contexts` table,
+  the relevant root `project-memory/adr/` trees, package boundaries, public
+  APIs, tests, and the files near the requested area. When a root or matched
+  route has no context, inspect its repository paths directly.
 - If subagents are available and the repo is large, use bounded read-only
   exploration slices; otherwise inspect sequentially.
 - Prefer source-backed call paths and concrete file references over broad

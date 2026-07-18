@@ -73,7 +73,10 @@ Plan Feature option.
 Carry only the data needed to connect planning artifacts:
 
 - planning identity: `feature_slug` and any applicable `product_slug`,
-  `project_slug`, `workspace_path`, or `context_file`;
+  `project_slug`, `workspace_path`, or `context_files`; include every applicable
+  available context used for planning: the current or coordination root,
+  affected child-repository roots, and scoped contexts matched by affected
+  paths. Omit roots and routes with no context file;
 - source identity: a durable `source_spec_ref`, or in `write_mode=propose`
   `proposed-spec:<feature_slug>` for a single Feature Spec,
   `proposed-spec:<project_slug>/<feature_slug>` for a multi-repository parent,

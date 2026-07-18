@@ -31,8 +31,8 @@ ask when evidence is contradictory.
   strong evidence of multiple independently planned internal contexts.
 - Select `monorepo` when one Git repository contains multiple internal
   projects or packages that can be planned separately, such as workspace
-  manifests, multiple app/package roots, `CONTEXT-MAP.md`, or established
-  project-memory multi-context layout.
+  manifests, multiple app/package roots, independently released packages, or
+  established scoped planning boundaries.
 - Select `multi-repository-workspace` when the current root coordinates multiple
   child Git repositories, especially when the parent root is not itself the
   implementation repository or when child repos keep their own project memory,
@@ -48,8 +48,9 @@ ask when evidence is contradictory.
   unless a current Codex product contract proves otherwise.
 - Keep tracker routing in `project-memory/config/issue-tracker.md`; topology
   does not decide whether Feature Specs are local Markdown or GitHub issues.
-- Keep domain layout in `project-memory/config/domain.md`; topology may inform
-  whether multiple contexts exist, but it is not domain vocabulary.
+- Keep context discovery and scope routing in root `CONTEXT.md`; topology may
+  prove that a minimal routing surface is needed, but it is not domain
+  vocabulary.
 
 ## Consumers
 
