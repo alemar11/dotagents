@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "3.0.0"
-LEDGER_SCHEMA_VERSION = "1.0.0"
-REGISTRATION_SCHEMA_VERSION = "1.0.0"
+__version__ = "4.0.0"
+LEDGER_SCHEMA_VERSION = "2.0.0"
+REGISTRATION_SCHEMA_VERSION = "2.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -32,24 +32,30 @@ COUNT_WARNING_ENTRIES = 100
 MAX_TEXT_LENGTH = 4096
 MAX_SOURCES = 64
 MAX_REPOSITORIES_PER_TASK = 8
+MAX_PORTFOLIO_REPOSITORIES = 64
 MAX_ALLOWED_PATHS_PER_REPOSITORY = 128
 MAX_EVENTS_PER_BATCH = 64
 MAX_OPERATIONS = 512
 MAX_REVIEWS = 256
 MAX_REVIEW_OBSERVATIONS = 64
+MAX_GATES = 2048
+MAX_HANDOFFS = 512
 MAX_OUTPUT_BYTES = 128 * 1024
 MAX_PACKET_BYTES = 1024 * 1024
 READ_ARCHIVE_REASONS = {"terminal", "legacy-cutover"}
 CLAIM_SCHEMA_VERSION = "5.0.0"
 TAKEOVER_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
-RELEASE_REASONS = {"terminal", "durable-handoff"}
+RELEASE_REASONS = {"terminal"}
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 LOWER_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+REVISION_RE = re.compile(r"^[0-9a-f]{40,64}$")
 RETAINED_LEGACY_GROUP = "legacy-cutover-2026-07-17"
+TAKEOVER_PERMISSION = "granted-by-authorized-user"
+TAKEOVER_REASONS = {"verified-stale"}
 ROOT_TITLES = {
     "single": "👨🏻‍💻 Feature Orchestrator",
     "multiple": "👨🏻‍💻 Multi-Feature Orchestrator",
@@ -69,6 +75,7 @@ TASK_STATES = {
     "ci",
     "preparing-tracker-closeout",
     "checking-mergeability",
+    "terminal-sealed",
     "blocked",
     "needs-owner",
     "merge-ready",
@@ -85,33 +92,38 @@ TASK_TRANSITIONS = {
     "merge-ready": {"merge-ready"},
     "failed": {"failed"},
 }
-TASK_GOAL_TRANSITIONS = {
-    "pending": {"pending", "active"},
-    "active": {"active", "complete"},
-    "paused": {"paused"},
-    "complete": {"complete"},
-}
 EVENT_TYPES = {
-    "claim-rebound",
     "root-title-observed",
     "portfolio-goal-activated",
     "portfolio-goal-paused",
     "portfolio-goal-resumed",
     "portfolio-goal-completed",
+    "managed-checkouts-observed",
     "task-observed",
     "source-moved",
     "revision-observed",
+    "delivery-observed",
     "review-wait-started",
     "review-wait-invoked",
     "review-observed",
     "review-monitoring-scheduled",
-    "review-monitoring-resumed",
+    "task-monitoring-paused",
+    "task-monitoring-resumed",
     "gate-observed",
-    "external-handoff-recorded",
+    "task-terminal-sealed",
+    "task-goal-completed",
+    "terminal-handoff-recorded",
+    "portfolio-terminal-verified",
+    "post-terminal-drift-recorded",
 }
-STATIC_GATES = {"pr-preflight", "dependency-integration"}
-REVISION_GATES = {
+TASK_STATIC_GATES = {"dependency-integration"}
+DELIVERY_STATIC_GATES = {"pr-preflight"}
+TASK_REVISION_SET_GATES = {
     "scope-acceptance",
+    "integration-validation",
+    "domain-closeout",
+}
+DELIVERY_REVISION_GATES = {
     "focused-validation",
     "full-validation",
     "autoreview",
@@ -120,10 +132,10 @@ REVISION_GATES = {
     "ci",
     "pr-ready",
     "tracker-closeout",
-    "domain-closeout",
     "mergeability",
-    "terminal",
 }
+STATIC_GATES = TASK_STATIC_GATES | DELIVERY_STATIC_GATES
+REVISION_GATES = TASK_REVISION_SET_GATES | DELIVERY_REVISION_GATES
 GATE_STATES = {"passed", "failed"}
 REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
 REVIEW_DISPOSITIONS = {"pending", "fix-required", "accepted", "blocked"}
@@ -308,7 +320,8 @@ def replace_json_durable(path: Path, value: dict[str, Any]) -> None:
 def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None]:
     root = claim_root()
     ensure_safe_cache_chain(root, "claim-store path")
-    if not root.exists() and not create:
+    root_preexisted = root.exists()
+    if not root_preexisted and not create:
         yield None
         return
     if create:
@@ -316,7 +329,9 @@ def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None
     lock_path = root / ".lock"
     if lock_path.exists() and (lock_path.is_symlink() or not lock_path.is_file()):
         raise CacheError("state-conflict", f"unsafe claim-store lock: {lock_path}", 4)
-    mode = "a+" if create else "r"
+    if exclusive and root_preexisted and not lock_path.exists():
+        raise CacheError("state-conflict", f"claim-store lock is missing: {lock_path}", 4)
+    mode = "a+" if create and not root_preexisted else "r"
     try:
         lock = lock_path.open(mode)
     except FileNotFoundError:
@@ -360,7 +375,9 @@ def claim_fingerprint(value: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def claim_artifact_error(path: Path, value: dict[str, Any]) -> str | None:
+def claim_artifact_error(
+    path: Path, value: dict[str, Any], *, validate_takeover: bool = True
+) -> str | None:
     if path.suffix == ".json":
         schema = value.get("schema_version")
         required = {
@@ -392,6 +409,11 @@ def claim_artifact_error(path: Path, value: dict[str, Any]) -> str | None:
             return f"claim fingerprint input mismatch: {path}"
         if value.get("fingerprint") != expected:
             return f"claim fingerprint mismatch: {path}"
+        if validate_takeover:
+            try:
+                takeover_adoptions(value)
+            except CacheError:
+                return f"claim takeover evidence mismatch: {path}"
         return None
 
     required = {
@@ -433,7 +455,9 @@ def claim_artifact_error(path: Path, value: dict[str, Any]) -> str | None:
         item_root = item.get("root_id")
         if not isinstance(item_root, str) or not ID_RE.fullmatch(item_root):
             return f"takeover snapshot identity mismatch: {path}"
-        snapshot_error = claim_artifact_error(path.parent / f"{item_root}.json", item)
+        snapshot_error = claim_artifact_error(
+            path.parent / f"{item_root}.json", item, validate_takeover=False
+        )
         if snapshot_error:
             return f"takeover snapshot mismatch: {path}"
     return None
@@ -487,12 +511,7 @@ def validate_release_receipt(path: Path) -> dict[str, Any]:
         and isinstance(value.get("ledger_size_bytes"), int)
         and value["ledger_size_bytes"] >= 0
     )
-    missing_snapshot = (
-        value.get("ledger_sha256") is None and value.get("ledger_size_bytes") is None
-    )
-    if not has_snapshot and not (
-        missing_snapshot and value["release_reason"] == "durable-handoff"
-    ):
+    if not has_snapshot:
         raise CacheError("state-conflict", f"release receipt ledger mismatch: {path}", 4)
     canonical_ledger = canonical_claim_ledger(ledger_ref)
     return {**value, "path": str(path), "ledger_ref": str(canonical_ledger)}
@@ -576,7 +595,7 @@ def canonical_claim_ledger(value: str) -> Path:
     ensure_safe_cache_chain(ledger_root(), "ledger root")
     canonical = Path(os.path.abspath(os.fspath(path)))
     root = Path(os.path.abspath(os.fspath(ledger_root())))
-    if canonical.parent != root or canonical.suffix not in {".json", ".md"}:
+    if canonical.parent != root or canonical.suffix != ".json":
         raise CacheError(
             "invalid-input",
             "ledger must be a direct child of the active ledger root",
@@ -606,6 +625,8 @@ def read_json_file(value: str, field: str) -> Any:
         raise CacheError("invalid-input", f"{field} must be an absolute path", 2)
     if path.is_symlink() or not path.is_file():
         raise CacheError("invalid-input", f"{field} is not a safe regular file: {path}", 2)
+    if path.stat().st_size > MAX_PACKET_BYTES:
+        raise CacheError("invalid-input", f"{field} exceeds the packet size limit", 2)
     try:
         return json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
@@ -629,6 +650,270 @@ def active_claim(root: Path | None, root_id: str, fingerprint: str, ledger: Path
     if claim["ledger_ref"] != str(ledger):
         raise CacheError("state-conflict", "active claim ledger reference changed", 4)
     return claim
+
+
+def takeover_adoptions(claim: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return the candidate claim's immutable per-source takeover evidence."""
+    evidence = claim.get("takeover_evidence")
+    replaced_root_ids = claim.get("replaced_root_ids")
+    candidate_sources = claim.get("sources")
+    if (
+        not isinstance(replaced_root_ids, list)
+        or any(not isinstance(item, str) or not ID_RE.fullmatch(item) for item in replaced_root_ids)
+        or replaced_root_ids != sorted(set(replaced_root_ids))
+        or not isinstance(candidate_sources, list)
+        or not candidate_sources
+        or any(not isinstance(item, str) or not item.strip() for item in candidate_sources)
+        or len(candidate_sources) != len(set(candidate_sources))
+    ):
+        raise CacheError("state-conflict", "candidate takeover root set is invalid", 4)
+    if evidence == "none":
+        if replaced_root_ids:
+            raise CacheError("state-conflict", "candidate takeover evidence is inconsistent", 4)
+        return {}
+    evidence_required = {
+        "stale_claim_takeover_permission",
+        "takeover_reason",
+        "evidence",
+        "transaction_id",
+        "replaced_claims",
+        "evidence_fingerprint",
+    }
+    if not isinstance(evidence, dict) or set(evidence) != evidence_required:
+        raise CacheError("state-conflict", "candidate takeover evidence is invalid", 4)
+    evidence_payload = {
+        key: value for key, value in evidence.items() if key != "evidence_fingerprint"
+    }
+    if (
+        evidence["stale_claim_takeover_permission"] != TAKEOVER_PERMISSION
+        or evidence["takeover_reason"] not in TAKEOVER_REASONS
+        or not isinstance(evidence["evidence"], str)
+        or not evidence["evidence"].strip()
+        or not isinstance(evidence["transaction_id"], str)
+        or not TRANSACTION_ID_RE.fullmatch(evidence["transaction_id"])
+        or not isinstance(evidence["replaced_claims"], list)
+        or not evidence["replaced_claims"]
+        or evidence["evidence_fingerprint"] != request_fingerprint(evidence_payload)
+    ):
+        raise CacheError("state-conflict", "candidate takeover evidence is invalid", 4)
+    result: dict[str, dict[str, Any]] = {}
+    observed_roots: list[str] = []
+    observed_task_refs: set[str] = set()
+    observed_checkouts: set[tuple[str, str]] = set()
+    for replaced in evidence["replaced_claims"]:
+        if not isinstance(replaced, dict) or set(replaced) != {
+            "claim_snapshot",
+            "task_termination_evidence",
+            "task_adoption",
+        }:
+            raise CacheError("state-conflict", "candidate takeover adoption is invalid", 4)
+        snapshot = replaced.get("claim_snapshot")
+        adoption = replaced.get("task_adoption")
+        if not isinstance(snapshot, dict) or not isinstance(adoption, dict):
+            raise CacheError("state-conflict", "candidate takeover adoption is invalid", 4)
+        snapshot_root = snapshot.get("root_id")
+        if not isinstance(snapshot_root, str) or not ID_RE.fullmatch(snapshot_root):
+            raise CacheError("state-conflict", "candidate takeover snapshot is invalid", 4)
+        if claim_artifact_error(
+            claim_root() / f"{snapshot_root}.json",
+            snapshot,
+            validate_takeover=False,
+        ):
+            raise CacheError("state-conflict", "candidate takeover snapshot is invalid", 4)
+        try:
+            if str(canonical_claim_ledger(snapshot["ledger_ref"])) != snapshot["ledger_ref"]:
+                raise CacheError("state-conflict", "candidate takeover snapshot is invalid", 4)
+        except CacheError as exc:
+            raise CacheError("state-conflict", "candidate takeover snapshot is invalid", 4) from exc
+        adoption_required = {
+            "root_id",
+            "claim_fingerprint",
+            "task_termination_evidence",
+            "specs",
+        }
+        if set(adoption) != adoption_required:
+            raise CacheError("state-conflict", "candidate takeover adoption is invalid", 4)
+        if adoption.get("root_id") != snapshot.get("root_id") or adoption.get(
+            "claim_fingerprint"
+        ) != snapshot.get("fingerprint"):
+            raise CacheError("state-conflict", "candidate takeover adoption identity changed", 4)
+        termination_raw = adoption.get("task_termination_evidence")
+        termination = termination_raw.strip() if isinstance(termination_raw, str) else None
+        if (
+            termination is None
+            or not termination
+            or replaced.get("task_termination_evidence") != termination
+        ):
+            raise CacheError("state-conflict", "candidate takeover termination changed", 4)
+        specs = adoption.get("specs")
+        if not isinstance(specs, list) or not specs:
+            raise CacheError("state-conflict", "candidate takeover adoption specs are invalid", 4)
+        snapshot_sources = snapshot.get("sources")
+        snapshot_repositories = snapshot.get("repositories")
+        if (
+            not isinstance(snapshot_sources, list)
+            or not snapshot_sources
+            or any(not isinstance(item, str) or not item.strip() for item in snapshot_sources)
+            or len(snapshot_sources) != len(set(snapshot_sources))
+            or not isinstance(snapshot_repositories, list)
+            or not snapshot_repositories
+            or any(not isinstance(item, str) or not item.strip() for item in snapshot_repositories)
+            or len(snapshot_repositories) != len(set(snapshot_repositories))
+        ):
+            raise CacheError("state-conflict", "candidate takeover snapshot is invalid", 4)
+        observed_sources: set[str] = set()
+        for spec in specs:
+            spec_required = {
+                "source_spec_ref",
+                "task_state",
+                "task_ref",
+                "task_model",
+                "task_thinking",
+                "thinking_reason",
+                "goal_evidence_ref",
+                "managed_checkouts",
+                "evidence_ref",
+            }
+            if not isinstance(spec, dict) or set(spec) != spec_required:
+                raise CacheError("state-conflict", "candidate takeover adoption spec is invalid", 4)
+            source_value = spec.get("source_spec_ref")
+            source_ref = source_value.strip() if isinstance(source_value, str) else None
+            if (
+                source_ref is None
+                or not source_ref
+                or source_ref in observed_sources
+                or source_ref in result
+            ):
+                raise CacheError("state-conflict", "candidate takeover adoption source is invalid", 4)
+            observed_sources.add(source_ref)
+            task_state = spec.get("task_state")
+            thinking_value = spec.get("thinking_reason")
+            thinking_reason = thinking_value.strip() if isinstance(thinking_value, str) else None
+            evidence_value = spec.get("evidence_ref")
+            evidence_ref = evidence_value.strip() if isinstance(evidence_value, str) else None
+            if (
+                task_state not in {"recorded", "no-task"}
+                or spec.get("task_model") != "gpt-5.6-sol"
+                or spec.get("task_thinking") not in {"medium", "high", "xhigh"}
+                or not thinking_reason
+                or thinking_reason == "none"
+                or not evidence_ref
+                or not isinstance(spec.get("managed_checkouts"), list)
+            ):
+                raise CacheError("state-conflict", "candidate takeover adoption spec is invalid", 4)
+            checkouts = spec["managed_checkouts"]
+            task_ref = spec.get("task_ref")
+            goal_ref = spec.get("goal_evidence_ref")
+            normalized_checkouts: list[dict[str, str]] = []
+            if task_state == "no-task":
+                if (
+                    task_ref != "none"
+                    or goal_ref != "none"
+                    or checkouts
+                ):
+                    raise CacheError("state-conflict", "candidate no-task adoption is invalid", 4)
+            else:
+                task_ref = task_ref.strip() if isinstance(task_ref, str) else None
+                goal_ref = goal_ref.strip() if isinstance(goal_ref, str) else None
+                if (
+                    not task_ref
+                    or task_ref == "none"
+                    or task_ref in observed_task_refs
+                    or not goal_ref
+                    or goal_ref == "none"
+                    or not checkouts
+                ):
+                    raise CacheError("state-conflict", "candidate recorded adoption is invalid", 4)
+                observed_task_refs.add(task_ref)
+                local_checkouts: set[tuple[str, str]] = set()
+                for checkout in checkouts:
+                    checkout_required = {
+                        "repository",
+                        "checkout",
+                        "target_branch_name",
+                        "git_top_level",
+                        "baseline_revision",
+                        "isolation_evidence_ref",
+                    }
+                    if not isinstance(checkout, dict) or set(checkout) != checkout_required:
+                        raise CacheError("state-conflict", "candidate adopted checkout is invalid", 4)
+                    repository_value = checkout.get("repository")
+                    repository = (
+                        repository_value.strip()
+                        if isinstance(repository_value, str)
+                        else None
+                    )
+                    try:
+                        checkout_path = canonical_absolute_path(
+                            checkout.get("checkout"), "takeover.checkout"
+                        )
+                        git_top_level = canonical_absolute_path(
+                            checkout.get("git_top_level"), "takeover.git_top_level"
+                        )
+                    except CacheError as exc:
+                        raise CacheError("state-conflict", "candidate adopted checkout is invalid", 4) from exc
+                    branch_value = checkout.get("target_branch_name")
+                    target_branch = (
+                        branch_value.strip() if isinstance(branch_value, str) else None
+                    )
+                    revision_value = checkout.get("baseline_revision")
+                    baseline_revision = (
+                        revision_value.strip() if isinstance(revision_value, str) else None
+                    )
+                    isolation_value = checkout.get("isolation_evidence_ref")
+                    isolation_evidence_ref = (
+                        isolation_value.strip()
+                        if isinstance(isolation_value, str)
+                        else None
+                    )
+                    checkout_key = (repository, checkout_path)
+                    if (
+                        repository not in snapshot_repositories
+                        or checkout_key in local_checkouts
+                        or checkout_key in observed_checkouts
+                        or not target_branch
+                        or baseline_revision is None
+                        or not REVISION_RE.fullmatch(baseline_revision)
+                        or not isolation_evidence_ref
+                    ):
+                        raise CacheError("state-conflict", "candidate adopted checkout is invalid", 4)
+                    local_checkouts.add(checkout_key)
+                    observed_checkouts.add(checkout_key)
+                    normalized_checkouts.append(
+                        {
+                            "repository": repository,
+                            "checkout": checkout_path,
+                            "target_branch_name": target_branch,
+                            "git_top_level": git_top_level,
+                            "baseline_revision": baseline_revision,
+                            "isolation_evidence_ref": isolation_evidence_ref,
+                        }
+                    )
+            result[source_ref] = {
+                "origin_root_id": snapshot["root_id"],
+                "origin_claim_fingerprint": snapshot["fingerprint"],
+                "task_state": task_state,
+                "task_ref": task_ref,
+                "task_model": spec.get("task_model"),
+                "task_thinking": spec.get("task_thinking"),
+                "thinking_reason": thinking_reason,
+                "goal_evidence_ref": goal_ref,
+                "managed_checkouts": normalized_checkouts,
+                "evidence_ref": evidence_ref,
+                "task_termination_evidence": termination,
+            }
+        if observed_sources != set(snapshot_sources):
+            raise CacheError("state-conflict", "candidate takeover adoption source set changed", 4)
+        observed_roots.append(snapshot_root)
+    if sorted(observed_roots) != replaced_root_ids or len(observed_roots) != len(set(observed_roots)):
+        raise CacheError("state-conflict", "candidate takeover root set changed", 4)
+    if set(result) != set(candidate_sources):
+        raise CacheError(
+            "state-conflict",
+            "candidate takeover adoption does not cover the live claim",
+            4,
+        )
+    return result
 
 
 def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> dict[str, Any]:
@@ -661,23 +946,32 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     checkouts = registration["repository_checkouts"]
     if repositories != claim["repositories"] or checkouts != claim["repository_checkouts"]:
         raise CacheError("state-conflict", "registration repository claim does not match", 4)
-    if not isinstance(repositories, list) or not repositories:
+    if (
+        not isinstance(repositories, list)
+        or not repositories
+        or len(repositories) > MAX_PORTFOLIO_REPOSITORIES
+        or len(repositories) != len(set(repositories))
+    ):
         raise CacheError("invalid-input", "registration.repositories is invalid", 2)
-    if not isinstance(registration["sources"], list) or not registration["sources"]:
+    if (
+        not isinstance(registration["sources"], list)
+        or not registration["sources"]
+        or len(registration["sources"]) > MAX_SOURCES
+    ):
         raise CacheError("invalid-input", "registration.sources is invalid", 2)
+    adoptions = takeover_adoptions(claim)
     source_required = {
         "task_key",
         "source_id",
         "source_spec_ref",
         "feature_spec_title",
         "feature_slug",
-        "repository",
         "source_state",
         "source_fingerprint",
         "planned_done_ref",
         "tracker_backend",
-        "target_branch",
-        "allowed_paths",
+        "tracker_repository",
+        "deliveries",
         "dependency_ids",
         "requires_domain_closeout",
         "task_model",
@@ -693,24 +987,90 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         item = exact_object(raw, source_required, field)
         task_key = check_lower_kebab(item["task_key"], f"{field}.task_key")
         source_id = nonempty(item["source_id"], f"{field}.source_id")
+        source_ref = nonempty(item["source_spec_ref"], f"{field}.source_spec_ref")
         if task_key in task_keys or source_id in source_ids:
             raise CacheError("invalid-input", f"{field} duplicates an identity", 2)
         task_keys.add(task_key)
         source_ids.add(source_id)
-        repository = nonempty(item["repository"], f"{field}.repository")
-        if repository not in claim["repositories"]:
-            raise CacheError("state-conflict", f"{field}.repository is outside the claim", 4)
         if item["source_state"] != "ready-for-agent":
             raise CacheError("invalid-input", f"{field}.source_state must be ready-for-agent", 2)
         tracker = item["tracker_backend"]
         if tracker not in TRACKER_BACKENDS:
             raise CacheError("invalid-input", f"{field}.tracker_backend is invalid", 2)
         fingerprint = canonical_fingerprint(item["source_fingerprint"], f"{field}.source_fingerprint")
-        if not isinstance(item["allowed_paths"], list) or not item["allowed_paths"]:
-            raise CacheError("invalid-input", f"{field}.allowed_paths is invalid", 2)
-        allowed_paths = [nonempty(path, f"{field}.allowed_paths") for path in item["allowed_paths"]]
-        if len(allowed_paths) != len(set(allowed_paths)):
-            raise CacheError("invalid-input", f"{field}.allowed_paths contains duplicates", 2)
+        deliveries_raw = item["deliveries"]
+        if (
+            not isinstance(deliveries_raw, list)
+            or not deliveries_raw
+            or len(deliveries_raw) > MAX_REPOSITORIES_PER_TASK
+        ):
+            raise CacheError("invalid-input", f"{field}.deliveries is invalid", 2)
+        delivery_required = {
+            "delivery_key",
+            "repository",
+            "target_branch",
+            "allowed_paths",
+        }
+        deliveries: list[dict[str, Any]] = []
+        delivery_keys: set[str] = set()
+        delivery_repositories: set[str] = set()
+        for delivery_index, delivery_raw in enumerate(deliveries_raw):
+            delivery_field = f"{field}.deliveries[{delivery_index}]"
+            delivery = exact_object(delivery_raw, delivery_required, delivery_field)
+            delivery_key = check_lower_kebab(
+                delivery["delivery_key"], f"{delivery_field}.delivery_key"
+            )
+            repository = nonempty(
+                delivery["repository"], f"{delivery_field}.repository"
+            )
+            if repository not in claim["repositories"]:
+                raise CacheError(
+                    "state-conflict",
+                    f"{delivery_field}.repository is outside the claim",
+                    4,
+                )
+            if delivery_key in delivery_keys or repository in delivery_repositories:
+                raise CacheError("invalid-input", f"{delivery_field} duplicates a delivery", 2)
+            delivery_keys.add(delivery_key)
+            delivery_repositories.add(repository)
+            allowed_raw = delivery["allowed_paths"]
+            if (
+                not isinstance(allowed_raw, list)
+                or not allowed_raw
+                or len(allowed_raw) > MAX_ALLOWED_PATHS_PER_REPOSITORY
+            ):
+                raise CacheError(
+                    "invalid-input", f"{delivery_field}.allowed_paths is invalid", 2
+                )
+            allowed_paths = [
+                canonical_allowed_path(
+                    path, f"{delivery_field}.allowed_paths[{path_index}]"
+                )
+                for path_index, path in enumerate(allowed_raw)
+            ]
+            if len(allowed_paths) != len(set(allowed_paths)):
+                raise CacheError(
+                    "invalid-input",
+                    f"{delivery_field}.allowed_paths contains normalized duplicates",
+                    2,
+                )
+            deliveries.append(
+                {
+                    "delivery_key": delivery_key,
+                    "repository": repository,
+                    "target_branch": nonempty(
+                        delivery["target_branch"], f"{delivery_field}.target_branch"
+                    ),
+                    "allowed_paths": allowed_paths,
+                }
+            )
+        tracker_repository = nonempty(
+            item["tracker_repository"], f"{field}.tracker_repository"
+        )
+        if tracker_repository not in delivery_repositories:
+            raise CacheError(
+                "invalid-input", f"{field}.tracker_repository has no delivery", 2
+            )
         if not isinstance(item["dependency_ids"], list):
             raise CacheError("invalid-input", f"{field}.dependency_ids is invalid", 2)
         dependencies = [
@@ -732,31 +1092,109 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
             item["task_goal_objective_fingerprint"],
             f"{field}.task_goal_objective_fingerprint",
         )
+        # Takeover adoption keys come from the replaced claim's canonical
+        # source set. The authored source_spec_ref may legitimately differ (or
+        # even be shared), so consume each embedded adoption by source_id.
+        adoption = adoptions.pop(source_id, None)
+        if adoption is None:
+            adoption = {
+                "origin_root_id": claim["root_id"],
+                "origin_claim_fingerprint": claim["fingerprint"],
+                "task_state": "no-task",
+                "task_ref": "none",
+                "task_model": task_model,
+                "task_thinking": task_thinking,
+                "thinking_reason": thinking_reason,
+                "goal_evidence_ref": "none",
+                "managed_checkouts": [],
+                "evidence_ref": "claim-acquisition://no-prior-task",
+                "task_termination_evidence": "none",
+            }
+        if adoption["task_state"] not in {"recorded", "no-task"}:
+            raise CacheError("state-conflict", f"{field} takeover task state is invalid", 4)
+        check_id(adoption["origin_root_id"], f"{field}.adoption.origin_root_id")
+        canonical_fingerprint(
+            adoption["origin_claim_fingerprint"],
+            f"{field}.adoption.origin_claim_fingerprint",
+        )
+        nonempty(adoption["evidence_ref"], f"{field}.adoption.evidence_ref")
+        if (
+            adoption["task_model"] != task_model
+            or adoption["task_thinking"] != task_thinking
+            or adoption["thinking_reason"] != thinking_reason
+        ):
+            raise CacheError(
+                "state-conflict", f"{field} conflicts with embedded task adoption", 4
+            )
+        if adoption["task_state"] == "no-task":
+            if (
+                adoption["task_ref"] != "none"
+                or adoption["goal_evidence_ref"] != "none"
+                or adoption["managed_checkouts"] != []
+            ):
+                raise CacheError(
+                    "state-conflict", f"{field} embedded no-task adoption is inconsistent", 4
+                )
+        else:
+            if adoption["task_ref"] == root_task_ref:
+                raise CacheError(
+                    "state-conflict", f"{field} adopted task collides with the root task", 4
+                )
+            nonempty(adoption["task_ref"], f"{field}.adoption.task_ref")
+            nonempty(adoption["goal_evidence_ref"], f"{field}.adoption.goal_evidence_ref")
+            adopted = adoption["managed_checkouts"]
+            if not isinstance(adopted, list) or not adopted:
+                raise CacheError("state-conflict", f"{field} adopted checkout map is invalid", 4)
+            adopted_by_repository = {
+                checkout.get("repository"): checkout for checkout in adopted
+                if isinstance(checkout, dict)
+            }
+            if set(adopted_by_repository) != delivery_repositories:
+                raise CacheError(
+                    "state-conflict",
+                    f"{field} delivery scope conflicts with embedded task adoption",
+                    4,
+                )
+            for delivery in deliveries:
+                adopted_checkout = adopted_by_repository[delivery["repository"]]
+                if adopted_checkout.get("target_branch_name") != delivery["target_branch"]:
+                    raise CacheError(
+                        "state-conflict",
+                        f"{field} target branch conflicts with embedded task adoption",
+                        4,
+                    )
         normalized_sources.append(
             {
                 "task_key": task_key,
                 "source_id": source_id,
-                "source_spec_ref": nonempty(item["source_spec_ref"], f"{field}.source_spec_ref"),
+                "source_spec_ref": source_ref,
                 "feature_spec_title": nonempty(
                     item["feature_spec_title"], f"{field}.feature_spec_title"
                 ),
                 "feature_slug": check_lower_kebab(
                     item["feature_slug"], f"{field}.feature_slug"
                 ),
-                "repository": repository,
                 "source_state": item["source_state"],
                 "source_fingerprint": fingerprint,
                 "planned_done_ref": nonempty(item["planned_done_ref"], f"{field}.planned_done_ref"),
                 "tracker_backend": tracker,
-                "target_branch": nonempty(item["target_branch"], f"{field}.target_branch"),
-                "allowed_paths": allowed_paths,
+                "tracker_repository": tracker_repository,
+                "deliveries": sorted(deliveries, key=lambda value: value["delivery_key"]),
                 "dependency_ids": dependencies,
                 "requires_domain_closeout": item["requires_domain_closeout"],
                 "task_model": task_model,
                 "task_thinking": task_thinking,
                 "thinking_reason": thinking_reason,
                 "task_goal_objective_fingerprint": task_goal_fingerprint,
+                "adoption": adoption,
             }
+        )
+    if adoptions:
+        raise CacheError(
+            "state-conflict",
+            "registration did not consume every takeover adoption exactly once",
+            4,
+            {"source_ids": sorted(adoptions)},
         )
     if sorted(source_ids) != sorted(claim["sources"]):
         raise CacheError("state-conflict", "registration source claim does not match", 4)
@@ -781,6 +1219,21 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
 
     for task_key in graph:
         visit(task_key)
+    registered_repositories = {
+        delivery["repository"]
+        for source in normalized_sources
+        for delivery in source["deliveries"]
+    }
+    if registered_repositories != set(repositories):
+        raise CacheError(
+            "state-conflict",
+            "registration deliveries must cover the live claim repository scope",
+            4,
+            {
+                "expected": sorted(repositories),
+                "actual": sorted(registered_repositories),
+            },
+        )
     if ledger.stem != check_id(ledger.stem, "portfolio_key"):
         raise CacheError("invalid-input", "ledger portfolio key is invalid", 2)
     return {
@@ -823,9 +1276,12 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
         "gates",
         "handoffs",
         "operations",
+        "closeout",
     }
     try:
         value = exact_object(state, required, "run_state")
+        if len(stable_json_bytes(value)) > MAX_PACKET_BYTES:
+            raise CacheError("integrity-failure", "run-state exceeds the state size bound", 5)
         if value["schema_version"] != LEDGER_SCHEMA_VERSION:
             raise CacheError("integrity-failure", "run-state schema is unsupported", 5)
         if not isinstance(value["generation"], int) or value["generation"] < 1:
@@ -887,6 +1343,26 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
         for field in ("sources", "tasks", "reviews", "gates", "handoffs", "operations"):
             if not isinstance(value[field], list):
                 raise CacheError("integrity-failure", f"run-state {field} is invalid", 5)
+        limits = {
+            "sources": MAX_SOURCES,
+            "tasks": MAX_SOURCES,
+            "reviews": MAX_REVIEWS,
+            "gates": MAX_GATES,
+            "handoffs": MAX_HANDOFFS,
+            "operations": MAX_OPERATIONS,
+        }
+        for field, limit in limits.items():
+            if len(value[field]) > limit:
+                raise CacheError("integrity-failure", f"run-state {field} exceeds its bound", 5)
+        exact_object(
+            value["closeout"],
+            {
+                "portfolio_terminal_verification_fingerprint",
+                "portfolio_terminal_evidence_ref",
+                "post_terminal_drift",
+            },
+            "run_state.closeout",
+        )
         source_keys = {
             "task_key",
             "source_id",
@@ -896,7 +1372,11 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             "state",
             "fingerprint",
             "tracker_backend",
+            "tracker_repository",
             "move_evidence_ref",
+            "move_revision_set_key",
+            "dirty_delivery_key",
+            "dirty_after_revision_key",
         }
         task_keys = {
             "task_key",
@@ -904,13 +1384,11 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             "source_spec_ref",
             "feature_spec_title",
             "feature_slug",
-            "repository",
-            "target_branch",
-            "allowed_paths",
             "dependency_ids",
             "requires_domain_closeout",
+            "adoption",
             "task_ref",
-            "checkout",
+            "managed_checkouts_evidence_ref",
             "model",
             "reasoning_effort",
             "thinking_reason",
@@ -922,72 +1400,193 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             "goal_pause_evidence_ref",
             "goal_resume_evidence_ref",
             "goal_completion_evidence_ref",
+            "monitoring_schedule_fingerprint",
             "state",
             "outcome",
             "attention_reason",
             "summary_ref",
-            "pr",
-            "revision",
+            "deliveries",
+            "seal",
+            "post_terminal_drift",
         }
         for index, item in enumerate(value["sources"]):
             exact_object(item, source_keys, f"run_state.sources[{index}]")
+            check_lower_kebab(item["task_key"], f"run_state.sources[{index}].task_key")
+            nonempty(item["source_id"], f"run_state.sources[{index}].source_id")
+            nonempty(item["source_spec_ref"], f"run_state.sources[{index}].source_spec_ref")
+            nonempty(item["current_ref"], f"run_state.sources[{index}].current_ref")
+            nonempty(item["planned_done_ref"], f"run_state.sources[{index}].planned_done_ref")
+            canonical_fingerprint(item["fingerprint"], f"run_state.sources[{index}].fingerprint")
+            if item["state"] not in SOURCE_STATES or item["tracker_backend"] not in TRACKER_BACKENDS:
+                raise CacheError("integrity-failure", "run-state source state is invalid", 5)
         for index, item in enumerate(value["tasks"]):
             exact_object(item, task_keys, f"run_state.tasks[{index}]")
+            check_lower_kebab(item["task_key"], f"run_state.tasks[{index}].task_key")
             if item["state"] not in TASK_STATES:
                 raise CacheError("integrity-failure", "run-state task state is invalid", 5)
-            if item["revision"] is not None:
-                exact_object(
-                    item["revision"],
-                    {
-                        "head_sha",
-                        "base_ref",
-                        "merge_base_sha",
-                        "repository",
-                        "pr_number",
-                        "pr_url",
-                        "revision_key",
-                        "evidence_ref",
-                        "observed_at",
-                    },
-                    f"run_state.tasks[{index}].revision",
+            schedule_fingerprint = item["monitoring_schedule_fingerprint"]
+            if schedule_fingerprint is not None:
+                canonical_fingerprint(
+                    schedule_fingerprint,
+                    f"run_state.tasks[{index}].monitoring_schedule_fingerprint",
                 )
-                revision = item["revision"]
-                if revision["repository"] != item["repository"] or revision[
-                    "revision_key"
-                ] != revision_key(
-                    revision["repository"],
-                    revision["pr_number"],
-                    revision["pr_url"],
-                    revision["head_sha"],
-                    revision["base_ref"],
-                    revision["merge_base_sha"],
+            if (item["state"] == "review-monitoring") != (schedule_fingerprint is not None):
+                raise CacheError("integrity-failure", "run-state worker monitoring epoch is invalid", 5)
+            if item["goal_state"] not in {"pending", "active", "paused", "complete"}:
+                raise CacheError("integrity-failure", "run-state task Goal state is invalid", 5)
+            if item["task_ref"] is not None:
+                nonempty(item["task_ref"], f"run_state.tasks[{index}].task_ref")
+            exact_object(
+                item["adoption"],
+                {
+                    "origin_root_id",
+                    "origin_claim_fingerprint",
+                    "task_state",
+                    "task_ref",
+                    "task_model",
+                    "task_thinking",
+                    "thinking_reason",
+                    "goal_evidence_ref",
+                    "managed_checkouts",
+                    "evidence_ref",
+                    "task_termination_evidence",
+                },
+                f"run_state.tasks[{index}].adoption",
+            )
+            if (
+                not isinstance(item["deliveries"], list)
+                or not item["deliveries"]
+                or len(item["deliveries"]) > MAX_REPOSITORIES_PER_TASK
+            ):
+                raise CacheError("integrity-failure", "run-state deliveries are invalid", 5)
+            delivery_keys: set[str] = set()
+            repositories: set[str] = set()
+            for delivery_index, delivery in enumerate(item["deliveries"]):
+                delivery_field = f"run_state.tasks[{index}].deliveries[{delivery_index}]"
+                exact_object(
+                    delivery,
+                    {
+                        "delivery_key",
+                        "repository",
+                        "target_branch",
+                        "allowed_paths",
+                        "managed_checkout",
+                        "revision",
+                        "pr",
+                        "committed",
+                        "published",
+                        "observation_evidence_ref",
+                        "tracker_dirty_after_revision_key",
+                    },
+                    delivery_field,
+                )
+                if delivery["delivery_key"] in delivery_keys or delivery["repository"] in repositories:
+                    raise CacheError("integrity-failure", "run-state delivery identity is duplicated", 5)
+                check_lower_kebab(delivery["delivery_key"], f"{delivery_field}.delivery_key")
+                nonempty(delivery["repository"], f"{delivery_field}.repository")
+                nonempty(delivery["target_branch"], f"{delivery_field}.target_branch")
+                delivery_keys.add(delivery["delivery_key"])
+                repositories.add(delivery["repository"])
+                if (
+                    not isinstance(delivery["allowed_paths"], list)
+                    or not delivery["allowed_paths"]
+                    or len(delivery["allowed_paths"]) > MAX_ALLOWED_PATHS_PER_REPOSITORY
                 ):
-                    raise CacheError(
-                        "integrity-failure", "run-state revision identity is invalid", 5
+                    raise CacheError("integrity-failure", "run-state allowed paths are invalid", 5)
+                normalized_paths = [
+                    canonical_allowed_path(path, f"{delivery_field}.allowed_paths")
+                    for path in delivery["allowed_paths"]
+                ]
+                if normalized_paths != delivery["allowed_paths"] or len(normalized_paths) != len(set(normalized_paths)):
+                    raise CacheError("integrity-failure", "run-state allowed paths are not canonical", 5)
+                if delivery["managed_checkout"] is not None:
+                    exact_object(
+                        delivery["managed_checkout"],
+                        {
+                            "checkout",
+                            "git_top_level",
+                            "baseline_revision",
+                            "isolation_evidence_ref",
+                        },
+                        f"{delivery_field}.managed_checkout",
                     )
-            if item["pr"] is not None:
+                    canonical_absolute_path(
+                        delivery["managed_checkout"]["checkout"],
+                        f"{delivery_field}.managed_checkout.checkout",
+                    )
+                if delivery["revision"] is not None:
+                    exact_object(
+                        delivery["revision"],
+                        {
+                            "head_sha",
+                            "base_ref",
+                            "merge_base_sha",
+                            "repository",
+                            "pr_number",
+                            "pr_url",
+                            "revision_key",
+                            "evidence_ref",
+                            "observed_at",
+                        },
+                        f"{delivery_field}.revision",
+                    )
+                    revision = delivery["revision"]
+                    if revision["repository"] != delivery["repository"] or revision[
+                        "revision_key"
+                    ] != revision_key(
+                        revision["repository"],
+                        revision["pr_number"],
+                        revision["pr_url"],
+                        revision["head_sha"],
+                        revision["base_ref"],
+                        revision["merge_base_sha"],
+                    ):
+                        raise CacheError("integrity-failure", "run-state revision identity is invalid", 5)
+                if delivery["pr"] is not None:
+                    if validate_pr(delivery["pr"], delivery, f"{delivery_field}.pr") != delivery["pr"]:
+                        raise CacheError("integrity-failure", "run-state pull request is not canonical", 5)
+                if not isinstance(delivery["committed"], bool) or not isinstance(delivery["published"], bool):
+                    raise CacheError("integrity-failure", "run-state delivery publication state is invalid", 5)
+            if item["seal"] is not None:
                 exact_object(
-                    item["pr"],
-                    {
-                        "repository",
-                        "number",
-                        "url",
-                        "state",
-                        "is_draft",
-                        "head_sha",
-                        "base_ref",
-                        "merge_base_sha",
-                        "mergeable",
-                        "merge_state",
-                        "closing_refs",
-                    },
-                    f"run_state.tasks[{index}].pr",
+                    item["seal"],
+                    {"revision_set_key", "seal_fingerprint", "evidence_ref", "sealed_at"},
+                    f"run_state.tasks[{index}].seal",
                 )
+            if item["post_terminal_drift"] is not None:
+                exact_object(
+                    item["post_terminal_drift"],
+                    {
+                        "delivery_key",
+                        "seal_fingerprint",
+                        "drift_fingerprint",
+                        "reason",
+                        "evidence_ref",
+                        "recorded_at",
+                    },
+                    f"run_state.tasks[{index}].post_terminal_drift",
+                )
+        seen_task_refs: set[str] = {value["portfolio"]["root_task_ref"]}
+        seen_checkouts: set[tuple[str, str]] = set()
+        for task in value["tasks"]:
+            if task["task_ref"] is not None:
+                if task["task_ref"] in seen_task_refs:
+                    raise CacheError("integrity-failure", "run-state task ref is duplicated", 5)
+                seen_task_refs.add(task["task_ref"])
+            for delivery in task["deliveries"]:
+                checkout = delivery["managed_checkout"]
+                if checkout is None:
+                    continue
+                key = (delivery["repository"], checkout["checkout"])
+                if key in seen_checkouts:
+                    raise CacheError("integrity-failure", "run-state managed checkout is duplicated", 5)
+                seen_checkouts.add(key)
         for index, item in enumerate(value["reviews"]):
             exact_object(
                 item,
                 {
                     "task_key",
+                    "delivery_key",
                     "revision_key",
                     "request_ref",
                     "wait_started_at",
@@ -1005,16 +1604,40 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             )
             if not isinstance(item["observations"], list):
                 raise CacheError("integrity-failure", "run-state review observations are invalid", 5)
+            check_lower_kebab(item["task_key"], f"run_state.reviews[{index}].task_key")
+            check_lower_kebab(item["delivery_key"], f"run_state.reviews[{index}].delivery_key")
+            canonical_fingerprint(item["revision_key"], f"run_state.reviews[{index}].revision_key")
+            wait_started_at = parse_timestamp(item["wait_started_at"], "wait_started_at")
+            wait_deadline = parse_timestamp(item["wait_deadline"], "wait_deadline")
+            wait_invoked_at = item["wait_invoked_at"]
+            provider_timeout = item["provider_timeout"]
+            if (wait_invoked_at is None) != (provider_timeout is None):
+                raise CacheError("integrity-failure", "run-state review invocation is incomplete", 5)
+            if wait_invoked_at is not None:
+                invoked_at = parse_timestamp(wait_invoked_at, "wait_invoked_at")
+                if (
+                    invoked_at < wait_started_at
+                    or not isinstance(provider_timeout, int)
+                    or isinstance(provider_timeout, bool)
+                    or provider_timeout < 0
+                    or provider_timeout
+                    != max(0, int((wait_deadline - invoked_at).total_seconds()))
+                ):
+                    raise CacheError("integrity-failure", "run-state review timeout is invalid", 5)
+            if len(item["observations"]) > MAX_REVIEW_OBSERVATIONS:
+                raise CacheError("integrity-failure", "run-state review observations exceed their bound", 5)
             if item["monitoring_state"] not in REVIEW_MONITORING_STATES:
                 raise CacheError("integrity-failure", "run-state review monitoring state is invalid", 5)
             if not isinstance(item["monitoring_cycle"], int) or item["monitoring_cycle"] < 0:
                 raise CacheError("integrity-failure", "run-state review monitoring cycle is invalid", 5)
             if item["due_at"] is not None:
                 parse_timestamp(item["due_at"], "due_at")
+            observed_cycles: set[int] = set()
             for observation in item["observations"]:
                 exact_object(
                     observation,
                     {
+                        "monitoring_cycle",
                         "provider_state",
                         "observation_fingerprint",
                         "disposition",
@@ -1023,24 +1646,63 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     },
                     "run_state.review.observation",
                 )
+                cycle = observation["monitoring_cycle"]
+                if (
+                    not isinstance(cycle, int)
+                    or isinstance(cycle, bool)
+                    or cycle < 0
+                    or cycle > item["monitoring_cycle"]
+                    or cycle in observed_cycles
+                ):
+                    raise CacheError("integrity-failure", "run-state review observation cycle is invalid", 5)
+                observed_cycles.add(cycle)
         for index, item in enumerate(value["gates"]):
             exact_object(
                 item,
-                {"task_key", "gate", "state", "revision_key", "evidence_ref", "observed_at"},
+                {"task_key", "delivery_key", "gate", "state", "binding_key", "evidence_ref", "observed_at"},
                 f"run_state.gates[{index}]",
             )
+            if item["gate"] not in STATIC_GATES | REVISION_GATES or item["state"] not in GATE_STATES:
+                raise CacheError("integrity-failure", "run-state gate state is invalid", 5)
+            if item["gate"] in TASK_STATIC_GATES:
+                valid_binding = item["delivery_key"] is None and item["binding_key"] is None
+            elif item["gate"] in DELIVERY_STATIC_GATES:
+                valid_binding = item["delivery_key"] is not None and item["binding_key"] is None
+            elif item["gate"] in TASK_REVISION_SET_GATES:
+                valid_binding = item["delivery_key"] is None and isinstance(item["binding_key"], str) and bool(FINGERPRINT_RE.fullmatch(item["binding_key"]))
+            else:
+                valid_binding = item["delivery_key"] is not None and isinstance(item["binding_key"], str) and bool(FINGERPRINT_RE.fullmatch(item["binding_key"]))
+            if not valid_binding:
+                raise CacheError("integrity-failure", "run-state gate binding is invalid", 5)
         for index, item in enumerate(value["handoffs"]):
             exact_object(
                 item,
-                {"task_key", "handoff_kind", "evidence_ref", "next_action", "recorded_at"},
+                {
+                    "task_key",
+                    "delivery_key",
+                    "revision_key",
+                    "seal_fingerprint",
+                    "handoff_kind",
+                    "authority",
+                    "evidence_ref",
+                    "next_action",
+                    "deadline",
+                    "recorded_at",
+                },
                 f"run_state.handoffs[{index}]",
             )
+            if item["handoff_kind"] != "pull-request-ready":
+                raise CacheError("integrity-failure", "run-state handoff kind is invalid", 5)
+            if item["authority"] != "external-merge-required":
+                raise CacheError("integrity-failure", "run-state handoff authority is invalid", 5)
         for index, item in enumerate(value["operations"]):
             exact_object(
                 item,
                 {"operation_id", "request_fingerprint", "event_types", "generation", "applied_at"},
                 f"run_state.operations[{index}]",
             )
+            check_operation_id(item["operation_id"])
+            canonical_fingerprint(item["request_fingerprint"], "request_fingerprint")
         if state_payload_fingerprint(value) != value["content_fingerprint"]:
             raise CacheError("integrity-failure", "run-state fingerprint mismatch", 5)
         return value
@@ -1055,6 +1717,8 @@ def load_state(ledger: Path) -> dict[str, Any]:
         raise CacheError("not-found", f"run state not found: {ledger}", 3)
     if ledger.is_symlink() or not ledger.is_file():
         raise CacheError("invalid-input", f"run state is not a safe regular file: {ledger}", 2)
+    if ledger.stat().st_size > MAX_PACKET_BYTES:
+        raise CacheError("integrity-failure", f"run state exceeds the size bound: {ledger}", 5)
     try:
         raw = json.loads(ledger.read_text())
     except (OSError, json.JSONDecodeError) as exc:
@@ -1069,66 +1733,192 @@ def task_by_key(state: dict[str, Any], task_key: str) -> dict[str, Any]:
     return matches[0]
 
 
-def current_gate(state: dict[str, Any], task: dict[str, Any], gate: str) -> dict[str, Any] | None:
-    revision_key = task["revision"]["revision_key"] if task["revision"] else None
-    expected_revision = None if gate in STATIC_GATES else revision_key
+def delivery_by_key(task: dict[str, Any], delivery_key: str) -> dict[str, Any]:
+    matches = [item for item in task["deliveries"] if item["delivery_key"] == delivery_key]
+    if len(matches) != 1:
+        raise CacheError("invalid-input", f"unknown delivery_key: {delivery_key}", 2)
+    return matches[0]
+
+
+def current_revision_set_key(task: dict[str, Any]) -> str | None:
+    if any(delivery["revision"] is None for delivery in task["deliveries"]):
+        return None
+    return request_fingerprint(
+        [
+            {
+                "delivery_key": delivery["delivery_key"],
+                "revision_key": delivery["revision"]["revision_key"],
+            }
+            for delivery in sorted(task["deliveries"], key=lambda item: item["delivery_key"])
+        ]
+    )
+
+
+def gate_binding(
+    task: dict[str, Any], gate: str, delivery: dict[str, Any] | None
+) -> tuple[str | None, str | None]:
+    if gate in TASK_STATIC_GATES:
+        if delivery is not None:
+            raise CacheError("invalid-input", f"{gate} is task-scoped", 2)
+        return None, None
+    if gate in DELIVERY_STATIC_GATES:
+        if delivery is None:
+            raise CacheError("invalid-input", f"{gate} is delivery-scoped", 2)
+        return delivery["delivery_key"], None
+    if gate in TASK_REVISION_SET_GATES:
+        if delivery is not None:
+            raise CacheError("invalid-input", f"{gate} is revision-set-scoped", 2)
+        revision_set = current_revision_set_key(task)
+        if revision_set is None:
+            raise CacheError("state-conflict", f"{gate} requires a complete revision set", 4)
+        return None, revision_set
+    if gate in DELIVERY_REVISION_GATES:
+        if delivery is None or delivery["revision"] is None:
+            raise CacheError("state-conflict", f"{gate} requires a delivery revision", 4)
+        return delivery["delivery_key"], delivery["revision"]["revision_key"]
+    raise CacheError("invalid-input", f"unknown gate: {gate}", 2)
+
+
+def current_gate(
+    state: dict[str, Any],
+    task: dict[str, Any],
+    gate: str,
+    delivery: dict[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    try:
+        delivery_key, binding_key = gate_binding(task, gate, delivery)
+    except CacheError as exc:
+        if exc.code == "state-conflict":
+            return None
+        raise
     matches = [
         item
         for item in state["gates"]
         if item["task_key"] == task["task_key"]
+        and item["delivery_key"] == delivery_key
         and item["gate"] == gate
-        and item["revision_key"] == expected_revision
+        and item["binding_key"] == binding_key
     ]
     return matches[-1] if matches else None
 
 
-def current_review(state: dict[str, Any], task: dict[str, Any]) -> dict[str, Any] | None:
-    if not task["revision"]:
+def current_review(
+    state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
+) -> dict[str, Any] | None:
+    revision = delivery["revision"]
+    if revision is None:
         return None
     matches = [
         item
         for item in state["reviews"]
         if item["task_key"] == task["task_key"]
-        and item["revision_key"] == task["revision"]["revision_key"]
+        and item["delivery_key"] == delivery["delivery_key"]
+        and item["revision_key"] == revision["revision_key"]
     ]
     return matches[-1] if matches else None
 
 
+def current_scheduled_reviews(
+    state: dict[str, Any],
+) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]]:
+    scheduled: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = []
+    for task in state["tasks"]:
+        for delivery in task["deliveries"]:
+            review = current_review(state, task, delivery)
+            if (
+                review is not None
+                and review["monitoring_state"] == "scheduled"
+                and review["due_at"] is not None
+            ):
+                scheduled.append((task, delivery, review))
+    return sorted(
+        scheduled,
+        key=lambda item: parse_timestamp(item[2]["due_at"], "due_at"),
+    )
+
+
+def task_monitoring_schedule_fingerprint(
+    state: dict[str, Any], task: dict[str, Any]
+) -> str | None:
+    scheduled = [
+        {
+            "delivery_key": delivery["delivery_key"],
+            "revision_key": review["revision_key"],
+            "request_ref": review["request_ref"],
+            "monitoring_cycle": review["monitoring_cycle"],
+            "due_at": review["due_at"],
+        }
+        for candidate_task, delivery, review in current_scheduled_reviews(state)
+        if candidate_task is task
+    ]
+    return request_fingerprint(scheduled) if scheduled else None
+
+
+def task_dispatch_ready(state: dict[str, Any], task: dict[str, Any]) -> bool:
+    if (
+        state["portfolio"]["root_task_title_evidence_ref"] is None
+        or state["goal"]["state"] != "active"
+    ):
+        return False
+    dependency = current_gate(state, task, "dependency-integration")
+    if not dependency or dependency["state"] != "passed":
+        return False
+    return all(
+        (gate := current_gate(state, task, "pr-preflight", delivery))
+        and gate["state"] == "passed"
+        for delivery in task["deliveries"]
+    )
+
+
+def paths_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    for left_delivery in left["deliveries"]:
+        for right_delivery in right["deliveries"]:
+            if left_delivery["repository"] != right_delivery["repository"]:
+                continue
+            for left_path in left_delivery["allowed_paths"]:
+                for right_path in right_delivery["allowed_paths"]:
+                    if any(character in left_path + right_path for character in "*?["):
+                        return True
+                    if (
+                        left_path == "."
+                        or right_path == "."
+                        or left_path == right_path
+                        or left_path.startswith(right_path + "/")
+                        or right_path.startswith(left_path + "/")
+                    ):
+                        return True
+    return False
+
+
 def portfolio_pause_blockers(state: dict[str, Any], now: datetime) -> list[str]:
-    """Return work that prevents the root Goal from becoming quiescent."""
     blockers: list[str] = []
     for task in state["tasks"]:
-        if task["state"] in {"merge-ready", "failed"}:
-            continue
-        if task["state"] == "pending":
+        if task["state"] in {"merge-ready", "failed"} or task["state"] == "pending":
             continue
         if task["state"] != "review-monitoring":
             blockers.append(f"{task['task_key']}:controller-action-required")
             continue
         if task["goal_state"] != "paused" or task["goal_pause_evidence_ref"] is None:
             blockers.append(f"{task['task_key']}:task-goal-not-paused")
-        review = current_review(state, task)
-        if not review or review["monitoring_state"] != "scheduled" or review["due_at"] is None:
-            blockers.append(f"{task['task_key']}:monitoring-not-scheduled")
-        elif parse_timestamp(review["due_at"], "due_at") <= now:
-            blockers.append(f"{task['task_key']}:review-check-due")
+        for delivery in task["deliveries"]:
+            review = current_review(state, task, delivery)
+            if review and review["monitoring_state"] == "complete":
+                continue
+            if not review or review["monitoring_state"] != "scheduled" or review["due_at"] is None:
+                blockers.append(
+                    f"{task['task_key']}:{delivery['delivery_key']}:controller-action-required"
+                )
+                continue
+            if parse_timestamp(review["due_at"], "due_at") <= now:
+                blockers.append(f"{task['task_key']}:{delivery['delivery_key']}:review-check-due")
     active = [
-        task
-        for task in state["tasks"]
+        task for task in state["tasks"]
         if task["task_ref"] is not None and task["state"] not in {"merge-ready", "failed"}
     ]
     capacity = max(0, 3 - len(active))
     selected: list[dict[str, Any]] = []
     for candidate in sorted(
-        (
-            task
-            for task in state["tasks"]
-            if task["state"] == "pending"
-            and current_gate(state, task, "pr-preflight")
-            and current_gate(state, task, "pr-preflight")["state"] == "passed"
-            and current_gate(state, task, "dependency-integration")
-            and current_gate(state, task, "dependency-integration")["state"] == "passed"
-        ),
+        (task for task in state["tasks"] if task["state"] == "pending" and task_dispatch_ready(state, task)),
         key=lambda task: task["source_id"],
     ):
         if len(selected) >= capacity:
@@ -1140,35 +1930,30 @@ def portfolio_pause_blockers(state: dict[str, Any], now: datetime) -> list[str]:
     return blockers
 
 
-def task_terminal_blockers(
-    state: dict[str, Any], task: dict[str, Any], *, require_task_state: bool
+def delivery_proof_blockers(
+    state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
 ) -> list[str]:
     blockers: list[str] = []
-    if task["task_title"] is None or task["task_title_evidence_ref"] is None:
-        blockers.append("missing-task-title-evidence")
-    if task["goal_state"] != "complete" or task["goal_completion_evidence_ref"] is None:
-        blockers.append("task-goal-not-complete")
-    if task["revision"] is None:
+    if delivery["managed_checkout"] is None:
+        blockers.append("missing-managed-checkout")
+    if delivery["revision"] is None:
         blockers.append("missing-current-revision")
-    required_gates = set(STATIC_GATES) | (REVISION_GATES - {"domain-closeout"})
-    if task["requires_domain_closeout"]:
-        required_gates.add("domain-closeout")
-    for gate in sorted(required_gates):
-        evidence = current_gate(state, task, gate)
+    static = current_gate(state, task, "pr-preflight", delivery)
+    if not static or static["state"] != "passed":
+        blockers.append("gate:pr-preflight")
+    for gate in sorted(DELIVERY_REVISION_GATES):
+        evidence = current_gate(state, task, gate, delivery)
         if not evidence or evidence["state"] != "passed":
             blockers.append(f"gate:{gate}")
-    review = current_review(state, task)
+    review = current_review(state, task, delivery)
     if not review or not review["observations"]:
         blockers.append("missing-current-review")
     else:
         observation = review["observations"][-1]
         if observation["provider_state"] != "clean" or observation["disposition"] != "accepted":
             blockers.append("review-not-clean")
-    pr = task["pr"]
-    revision = task["revision"]
-    source = next(item for item in state["sources"] if item["task_key"] == task["task_key"])
-    if source["tracker_backend"] == "local" and source["state"] != "done":
-        blockers.append("local-source-not-done")
+    revision = delivery["revision"]
+    pr = delivery["pr"]
     if pr is None:
         blockers.append("missing-pull-request")
     elif (
@@ -1177,55 +1962,185 @@ def task_terminal_blockers(
         or not pr["mergeable"]
         or pr["merge_state"] != "clean"
         or revision is None
+        or pr["repository"] != revision["repository"]
+        or pr["number"] != revision["pr_number"]
+        or pr["url"] != revision["pr_url"]
         or pr["head_sha"] != revision["head_sha"]
         or pr["base_ref"] != revision["base_ref"]
         or pr["merge_base_sha"] != revision["merge_base_sha"]
     ):
         blockers.append("pull-request-not-ready")
+    if not delivery["committed"] or not delivery["published"]:
+        blockers.append("delivery-not-published")
+    if delivery["tracker_dirty_after_revision_key"] is not None:
+        blockers.append("tracker-delivery-dirty")
+    return blockers
+
+
+def task_proof_blockers(state: dict[str, Any], task: dict[str, Any]) -> list[str]:
+    blockers: list[str] = []
+    if task["task_title"] is None or task["task_title_evidence_ref"] is None:
+        blockers.append("missing-task-title-evidence")
+    if task["task_ref"] is None or task["managed_checkouts_evidence_ref"] is None:
+        blockers.append("missing-managed-checkout-map")
+    dependency = current_gate(state, task, "dependency-integration")
+    if not dependency or dependency["state"] != "passed":
+        blockers.append("gate:dependency-integration")
+    revision_set = current_revision_set_key(task)
+    if revision_set is None:
+        blockers.append("missing-current-revision-set")
+    for gate in sorted(TASK_REVISION_SET_GATES):
+        if gate == "domain-closeout" and not task["requires_domain_closeout"]:
+            continue
+        evidence = current_gate(state, task, gate)
+        if not evidence or evidence["state"] != "passed":
+            blockers.append(f"gate:{gate}")
+    for delivery in task["deliveries"]:
+        blockers.extend(
+            f"{delivery['delivery_key']}:{blocker}"
+            for blocker in delivery_proof_blockers(state, task, delivery)
+        )
+    source = next(item for item in state["sources"] if item["task_key"] == task["task_key"])
+    if source["tracker_backend"] == "local" and source["state"] != "done":
+        blockers.append("local-source-not-done")
+    if source["tracker_backend"] == "github":
+        tracker_delivery = next(
+            item for item in task["deliveries"] if item["repository"] == source["tracker_repository"]
+        )
+        if tracker_delivery["pr"] is None or source["source_spec_ref"] not in tracker_delivery["pr"]["closing_refs"]:
+            blockers.append("github-source-not-closing")
+    return blockers
+
+
+def seal_candidate_fingerprint(state: dict[str, Any], task: dict[str, Any]) -> str | None:
+    if task_proof_blockers(state, task):
+        return None
+    revision_set = current_revision_set_key(task)
+    return request_fingerprint(
+        {
+            "task_key": task["task_key"],
+            "revision_set_key": revision_set,
+            "source": next(item for item in state["sources"] if item["task_key"] == task["task_key"]),
+            "deliveries": [
+                {
+                    "delivery_key": item["delivery_key"],
+                    "revision": item["revision"],
+                    "pr": item["pr"],
+                    "committed": item["committed"],
+                    "published": item["published"],
+                }
+                for item in task["deliveries"]
+            ],
+            "gates": [
+                item for item in state["gates"] if item["task_key"] == task["task_key"]
+            ],
+            "reviews": [
+                item for item in state["reviews"] if item["task_key"] == task["task_key"]
+            ],
+        }
+    )
+
+
+def terminal_handoff(state: dict[str, Any], task: dict[str, Any]) -> dict[str, Any] | None:
+    seal = task["seal"]
+    if seal is None:
+        return None
+    matches = [
+        item for item in state["handoffs"]
+        if item["task_key"] == task["task_key"]
+        and item["handoff_kind"] == "pull-request-ready"
+        and item["seal_fingerprint"] == seal["seal_fingerprint"]
+    ]
+    return matches[-1] if matches else None
+
+
+def portfolio_verification_candidate(state: dict[str, Any]) -> str | None:
+    if any(
+        task["state"] != "merge-ready"
+        or task["goal_state"] != "complete"
+        or task["post_terminal_drift"] is not None
+        or terminal_handoff(state, task) is None
+        for task in state["tasks"]
+    ):
+        return None
+    return request_fingerprint(
+        [
+            {
+                "task_key": task["task_key"],
+                "seal_fingerprint": task["seal"]["seal_fingerprint"],
+                "goal_completion_evidence_ref": task["goal_completion_evidence_ref"],
+                "handoff": terminal_handoff(state, task),
+            }
+            for task in sorted(state["tasks"], key=lambda item: item["task_key"])
+        ]
+    )
+
+
+def task_terminal_blockers(
+    state: dict[str, Any], task: dict[str, Any], *, require_task_state: bool
+) -> list[str]:
+    blockers = task_proof_blockers(state, task)
+    if task["seal"] is None:
+        blockers.append("task-not-sealed")
+    if task["goal_state"] != "complete" or task["goal_completion_evidence_ref"] is None:
+        blockers.append("task-goal-not-complete")
+    if terminal_handoff(state, task) is None:
+        blockers.append("missing-terminal-handoff")
+    if task["post_terminal_drift"] is not None:
+        blockers.append("post-terminal-drift")
     if require_task_state and task["state"] != "merge-ready":
         blockers.append("task-not-merge-ready")
     return blockers
 
 
 def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
-    tasks = []
+    tasks: list[dict[str, Any]] = []
     blockers: list[str] = []
     for task in state["tasks"]:
+        proof_blockers = task_proof_blockers(state, task)
         task_blockers = task_terminal_blockers(state, task, require_task_state=True)
         tasks.append(
             {
                 "task_key": task["task_key"],
                 "state": task["state"],
-                "revision_key": task["revision"]["revision_key"] if task["revision"] else None,
+                "revision_set_key": current_revision_set_key(task),
+                "seal_candidate_fingerprint": seal_candidate_fingerprint(state, task),
+                "sealed": task["seal"] is not None,
+                "proof_ready": not proof_blockers,
                 "blockers": task_blockers,
             }
         )
         blockers.extend(f"{task['task_key']}:{item}" for item in task_blockers)
-        if not any(item["task_key"] == task["task_key"] for item in state["handoffs"]):
-            blockers.append(f"{task['task_key']}:missing-external-handoff")
+    verification_candidate = portfolio_verification_candidate(state)
+    verified = (
+        verification_candidate is not None
+        and state["closeout"]["portfolio_terminal_verification_fingerprint"]
+        == verification_candidate
+    )
+    drifted = state["closeout"]["post_terminal_drift"] is not None
+    archive_ready = verified and state["goal"]["state"] == "complete" and not drifted
+    if not verified:
+        blockers.append("portfolio-terminal-not-verified")
     if state["goal"]["state"] != "complete":
         blockers.append("portfolio-goal-not-complete")
-    return {"eligible": not blockers, "blockers": blockers, "tasks": tasks}
-
-
-def paths_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
-    if left["repository"] != right["repository"]:
-        return False
-    for left_path in left["allowed_paths"]:
-        for right_path in right["allowed_paths"]:
-            if any(character in left_path + right_path for character in "*?["):
-                return True
-            normalized_left = left_path.strip("/") or "."
-            normalized_right = right_path.strip("/") or "."
-            if (
-                normalized_left == "."
-                or normalized_right == "."
-                or normalized_left == normalized_right
-                or normalized_left.startswith(normalized_right + "/")
-                or normalized_right.startswith(normalized_left + "/")
-            ):
-                return True
-    return False
+    if drifted:
+        blockers.append("post-terminal-drift")
+    phase = (
+        "drifted" if drifted else
+        "archive-ready" if archive_ready else
+        "portfolio-goal-ready" if verified else
+        "portfolio-verification-ready" if verification_candidate is not None else
+        "running"
+    )
+    return {
+        "eligible": archive_ready,
+        "archive_ready": archive_ready,
+        "phase": phase,
+        "blockers": sorted(set(blockers)),
+        "portfolio_verification_candidate": verification_candidate,
+        "portfolio_verified": verified,
+        "tasks": tasks,
+    }
 
 
 def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
@@ -1242,32 +2157,21 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
         "root_task_title_evidence_ref": state["portfolio"]["root_task_title_evidence_ref"],
         "goal": copy.deepcopy(state["goal"]),
         "monitoring": copy.deepcopy(state["monitoring"]),
+        "phase": terminal["phase"],
     }
     if projection == "terminal":
         return {**base, **terminal}
     if projection == "dispatch":
         active = [
-            task
-            for task in state["tasks"]
-            if task["task_ref"] is not None
-            and task["state"] not in {"merge-ready", "failed"}
+            task for task in state["tasks"]
+            if task["task_ref"] is not None and task["state"] not in {"merge-ready", "failed"}
         ]
         capacity = max(0, 3 - len(active))
-        candidates = sorted(
-            (
-                task
-                for task in state["tasks"]
-                if task["state"] == "pending"
-                and current_gate(state, task, "pr-preflight")
-                and current_gate(state, task, "pr-preflight")["state"] == "passed"
-                and current_gate(state, task, "dependency-integration")
-                and current_gate(state, task, "dependency-integration")["state"]
-                == "passed"
-            ),
-            key=lambda task: task["source_id"],
-        )
         selected: list[dict[str, Any]] = []
-        for candidate in candidates:
+        for candidate in sorted(
+            (task for task in state["tasks"] if task["state"] == "pending" and task_dispatch_ready(state, task)),
+            key=lambda task: task["source_id"],
+        ):
             if len(selected) >= capacity:
                 break
             if any(paths_overlap(candidate, other) for other in [*active, *selected]):
@@ -1278,16 +2182,45 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
             "ready_task_keys": [task["task_key"] for task in selected],
             "available_capacity": capacity,
         }
-    tasks = []
-    due_reviews = []
-    now = utc_now()
+    tasks: list[dict[str, Any]] = []
+    due_reviews: list[dict[str, Any]] = []
     for task in state["tasks"]:
-        revision_key = task["revision"]["revision_key"] if task["revision"] else None
-        gate_summary = {
-            gate: current_gate(state, task, gate)["state"]
-            for gate in sorted(STATIC_GATES | REVISION_GATES)
-            if current_gate(state, task, gate)
-        }
+        gate_summary: dict[str, str] = {}
+        for gate in sorted(TASK_STATIC_GATES | TASK_REVISION_SET_GATES):
+            evidence = current_gate(state, task, gate)
+            if evidence:
+                gate_summary[gate] = evidence["state"]
+        deliveries = []
+        for delivery in task["deliveries"]:
+            delivery_gates: dict[str, str] = {}
+            for gate in sorted(DELIVERY_STATIC_GATES | DELIVERY_REVISION_GATES):
+                evidence = current_gate(state, task, gate, delivery)
+                if evidence:
+                    delivery_gates[gate] = evidence["state"]
+            revision = delivery["revision"]
+            deliveries.append(
+                {
+                    "delivery_key": delivery["delivery_key"],
+                    "repository": delivery["repository"],
+                    "revision_key": revision["revision_key"] if revision else None,
+                    "pr": copy.deepcopy(delivery["pr"]),
+                    "gates": delivery_gates,
+                    "tracker_dirty": delivery["tracker_dirty_after_revision_key"] is not None,
+                }
+            )
+            review = current_review(state, task, delivery)
+            if review and review["monitoring_state"] != "complete":
+                due_reviews.append(
+                    {
+                        "task_key": task["task_key"],
+                        "delivery_key": delivery["delivery_key"],
+                        "request_ref": review["request_ref"],
+                        "wait_deadline": review["wait_deadline"],
+                        "monitoring_state": review["monitoring_state"],
+                        "due_at": review["due_at"] or review["wait_deadline"],
+                        "monitoring_cycle": review["monitoring_cycle"],
+                    }
+                )
         tasks.append(
             {
                 "task_key": task["task_key"],
@@ -1295,29 +2228,19 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                 "task_title": task["task_title"],
                 "state": task["state"],
                 "goal_state": task["goal_state"],
-                "revision_key": revision_key,
+                "revision_set_key": current_revision_set_key(task),
                 "gates": gate_summary,
-                "terminal_blockers": task_terminal_blockers(
-                    state, task, require_task_state=False
-                ),
+                "deliveries": deliveries,
+                "terminal_blockers": task_terminal_blockers(state, task, require_task_state=False),
             }
         )
-        review = current_review(state, task)
-        if review and review["monitoring_state"] != "complete":
-            due_at = review["due_at"] or review["wait_deadline"]
-            deadline = parse_timestamp(due_at, "due_at")
-            due_reviews.append(
-                {
-                    "task_key": task["task_key"],
-                    "request_ref": review["request_ref"],
-                    "wait_deadline": review["wait_deadline"],
-                    "monitoring_state": review["monitoring_state"],
-                    "due_at": due_at,
-                    "monitoring_cycle": review["monitoring_cycle"],
-                    "overdue": deadline <= now,
-                }
-            )
-    base.update({"tasks": tasks, "due_reviews": due_reviews, "terminal_eligible": terminal["eligible"]})
+    base.update(
+        {
+            "tasks": tasks,
+            "due_reviews": due_reviews,
+            "terminal_eligible": terminal["eligible"],
+        }
+    )
     if projection == "recovery":
         base["sources"] = [
             {
@@ -1329,6 +2252,10 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
             for item in state["sources"]
         ]
         base["handoffs"] = copy.deepcopy(state["handoffs"])
+        base["adoptions"] = [
+            {"task_key": task["task_key"], **copy.deepcopy(task["adoption"])}
+            for task in state["tasks"]
+        ]
     return base
 
 
@@ -1347,23 +2274,36 @@ def render_markdown(state: dict[str, Any]) -> str:
         "",
         "## Feature Spec Tasks",
         "",
-        "| task | source | state | revision | pull request |",
+        "| task | source | state | revisions | pull requests |",
         "| --- | --- | --- | --- | --- |",
     ]
     for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
-        revision = task["revision"]["revision_key"] if task["revision"] else "none"
-        pr = task["pr"]["url"] if task["pr"] else "none"
+        revisions = ", ".join(
+            delivery["revision"]["revision_key"] if delivery["revision"] else "none"
+            for delivery in task["deliveries"]
+        )
+        prs = ", ".join(
+            delivery["pr"]["url"] if delivery["pr"] else "none"
+            for delivery in task["deliveries"]
+        )
         lines.append(
-            f"| `{task['task_key']}` | {task['source_spec_ref']} | `{task['state']}` | `{revision}` | {pr} |"
+            f"| `{task['task_key']}` | {task['source_spec_ref']} | `{task['state']}` | `{revisions}` | {prs} |"
         )
     lines.extend(["", "## Current Gate Evidence", "", "| task | gate | state | evidence |", "| --- | --- | --- | --- |"])
     for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
-        for gate in sorted(STATIC_GATES | REVISION_GATES):
+        for gate in sorted(TASK_STATIC_GATES | TASK_REVISION_SET_GATES):
             item = current_gate(state, task, gate)
             if item:
                 lines.append(
                     f"| `{task['task_key']}` | `{gate}` | `{item['state']}` | {item['evidence_ref']} |"
                 )
+        for delivery in task["deliveries"]:
+            for gate in sorted(DELIVERY_STATIC_GATES | DELIVERY_REVISION_GATES):
+                item = current_gate(state, task, gate, delivery)
+                if item:
+                    lines.append(
+                        f"| `{task['task_key']}:{delivery['delivery_key']}` | `{gate}` | `{item['state']}` | {item['evidence_ref']} |"
+                    )
     lines.extend(["", "## External Handoffs", ""])
     if state["handoffs"]:
         for item in state["handoffs"]:
@@ -1398,9 +2338,55 @@ def new_state(
                 "state": item["source_state"],
                 "fingerprint": item["source_fingerprint"],
                 "tracker_backend": item["tracker_backend"],
+                "tracker_repository": item["tracker_repository"],
                 "move_evidence_ref": None,
+                "move_revision_set_key": None,
+                "dirty_delivery_key": None,
+                "dirty_after_revision_key": None,
             }
         )
+        adoption = copy.deepcopy(item["adoption"])
+        adopted_checkouts: dict[str, dict[str, Any]] = {}
+        if adoption["task_state"] == "recorded":
+            adoption_task = {"deliveries": item["deliveries"]}
+            for checkout_index, checkout in enumerate(adoption["managed_checkouts"]):
+                repository = nonempty(checkout.get("repository"), "adoption.repository")
+                delivery = next(
+                    delivery
+                    for delivery in item["deliveries"]
+                    if delivery["repository"] == repository
+                )
+                _, verified_checkout = validate_managed_checkout(
+                    {
+                        "delivery_key": delivery["delivery_key"],
+                        "repository": repository,
+                        "target_branch": checkout.get("target_branch_name"),
+                        "checkout": checkout.get("checkout"),
+                        "git_top_level": checkout.get("git_top_level"),
+                        "baseline_revision": checkout.get("baseline_revision"),
+                        "isolation_evidence_ref": checkout.get(
+                            "isolation_evidence_ref"
+                        ),
+                    },
+                    task=adoption_task,
+                    field=f"adoption.managed_checkouts[{checkout_index}]",
+                )
+                adopted_checkouts[repository] = verified_checkout
+        deliveries = [
+            {
+                **delivery,
+                "managed_checkout": copy.deepcopy(
+                    adopted_checkouts.get(delivery["repository"])
+                ),
+                "revision": None,
+                "pr": None,
+                "committed": False,
+                "published": False,
+                "observation_evidence_ref": None,
+                "tracker_dirty_after_revision_key": None,
+            }
+            for delivery in item["deliveries"]
+        ]
         tasks.append(
             {
                 "task_key": item["task_key"],
@@ -1408,13 +2394,19 @@ def new_state(
                 "source_spec_ref": item["source_spec_ref"],
                 "feature_spec_title": item["feature_spec_title"],
                 "feature_slug": item["feature_slug"],
-                "repository": item["repository"],
-                "target_branch": item["target_branch"],
-                "allowed_paths": item["allowed_paths"],
                 "dependency_ids": item["dependency_ids"],
                 "requires_domain_closeout": item["requires_domain_closeout"],
-                "task_ref": None,
-                "checkout": None,
+                "adoption": adoption,
+                "task_ref": (
+                    nonempty(adoption["task_ref"], "adoption.task_ref")
+                    if adoption["task_state"] == "recorded"
+                    else None
+                ),
+                "managed_checkouts_evidence_ref": (
+                    nonempty(adoption["evidence_ref"], "adoption.evidence_ref")
+                    if adoption["task_state"] == "recorded"
+                    else None
+                ),
                 "model": item["task_model"],
                 "reasoning_effort": item["task_thinking"],
                 "thinking_reason": item["thinking_reason"],
@@ -1424,18 +2416,26 @@ def new_state(
                     "task_goal_objective_fingerprint"
                 ],
                 "goal_state": "pending",
-                "goal_evidence_ref": None,
+                "goal_evidence_ref": (
+                    nonempty(adoption["goal_evidence_ref"], "adoption.goal_evidence_ref")
+                    if adoption["task_state"] == "recorded"
+                    else None
+                ),
                 "goal_pause_evidence_ref": None,
                 "goal_resume_evidence_ref": None,
                 "goal_completion_evidence_ref": None,
-                "state": "pending",
+                "monitoring_schedule_fingerprint": None,
+                "state": "created" if adoption["task_state"] == "recorded" else "pending",
                 "outcome": None,
                 "attention_reason": None,
                 "summary_ref": None,
-                "pr": None,
-                "revision": None,
+                "deliveries": deliveries,
+                "seal": None,
+                "post_terminal_drift": None,
             }
         )
+        if adoption["task_state"] == "recorded":
+            tasks[-1]["goal_state"] = "active"
     title = ROOT_TITLES["single" if len(tasks) == 1 else "multiple"]
     registration_fingerprint = request_fingerprint(registration)
     state = {
@@ -1490,8 +2490,14 @@ def new_state(
                 "applied_at": now,
             }
         ],
+        "closeout": {
+            "portfolio_terminal_verification_fingerprint": None,
+            "portfolio_terminal_evidence_ref": None,
+            "post_terminal_drift": None,
+        },
     }
     seal_state_fingerprint(state)
+    validate_state(state, ledger)
     return state
 
 
@@ -1579,28 +2585,110 @@ def validate_pr(value: Any, task: dict[str, Any], field: str) -> dict[str, Any] 
     }
 
 
+def validate_managed_checkout(
+    raw: Any,
+    *,
+    task: dict[str, Any],
+    field: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    item = exact_object(
+        raw,
+        {
+            "delivery_key",
+            "repository",
+            "target_branch",
+            "checkout",
+            "git_top_level",
+            "baseline_revision",
+            "isolation_evidence_ref",
+        },
+        field,
+    )
+    delivery_key = check_lower_kebab(item["delivery_key"], f"{field}.delivery_key")
+    delivery = delivery_by_key(task, delivery_key)
+    repository = nonempty(item["repository"], f"{field}.repository")
+    target_branch = nonempty(item["target_branch"], f"{field}.target_branch")
+    if repository != delivery["repository"] or target_branch != delivery["target_branch"]:
+        raise CacheError("state-conflict", f"{field} delivery identity changed", 4)
+    checkout = canonical_absolute_path(item["checkout"], f"{field}.checkout")
+    git_top_level = canonical_absolute_path(item["git_top_level"], f"{field}.git_top_level")
+    checkout_path = Path(checkout)
+    if checkout_path.is_symlink() or not checkout_path.is_dir():
+        raise CacheError("invalid-input", f"{field}.checkout is not a safe directory", 2)
+    commands = {
+        "git_top_level": ["git", "-C", checkout, "rev-parse", "--show-toplevel"],
+        "repository": ["git", "-C", checkout, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        "target_branch": ["git", "-C", checkout, "branch", "--show-current"],
+    }
+    observed: dict[str, str] = {}
+    for key, command in commands.items():
+        result = subprocess.run(command, text=True, capture_output=True)
+        if result.returncode:
+            raise CacheError("invalid-input", f"{field} is not a managed Git checkout", 2)
+        observed[key] = result.stdout.strip()
+    observed["git_top_level"] = str(Path(observed["git_top_level"]).resolve())
+    observed["repository"] = str(Path(observed["repository"]).resolve())
+    if (
+        observed["git_top_level"] != git_top_level
+        or observed["repository"] != str(Path(repository).resolve())
+        or observed["target_branch"] != target_branch
+    ):
+        raise CacheError("state-conflict", f"{field} Git checkout evidence changed", 4)
+    baseline = nonempty(item["baseline_revision"], f"{field}.baseline_revision")
+    baseline_check = subprocess.run(
+        ["git", "-C", checkout, "cat-file", "-e", f"{baseline}^{{commit}}"],
+        text=True,
+        capture_output=True,
+    )
+    if baseline_check.returncode:
+        raise CacheError("invalid-input", f"{field}.baseline_revision is not a commit", 2)
+    return delivery, {
+        "checkout": checkout,
+        "git_top_level": git_top_level,
+        "baseline_revision": baseline,
+        "isolation_evidence_ref": nonempty(
+            item["isolation_evidence_ref"], f"{field}.isolation_evidence_ref"
+        ),
+    }
+
+
+def source_move_blockers(
+    state: dict[str, Any], task: dict[str, Any]
+) -> list[str]:
+    blockers: list[str] = []
+    dependency = current_gate(state, task, "dependency-integration")
+    if not dependency or dependency["state"] != "passed":
+        blockers.append("gate:dependency-integration")
+    for gate in sorted(TASK_REVISION_SET_GATES):
+        if gate == "domain-closeout" and not task["requires_domain_closeout"]:
+            continue
+        evidence = current_gate(state, task, gate)
+        if not evidence or evidence["state"] != "passed":
+            blockers.append(f"gate:{gate}")
+    for delivery in task["deliveries"]:
+        preflight = current_gate(state, task, "pr-preflight", delivery)
+        if not preflight or preflight["state"] != "passed":
+            blockers.append(f"{delivery['delivery_key']}:gate:pr-preflight")
+        for gate in sorted(DELIVERY_REVISION_GATES - {"tracker-closeout", "mergeability"}):
+            evidence = current_gate(state, task, gate, delivery)
+            if not evidence or evidence["state"] != "passed":
+                blockers.append(f"{delivery['delivery_key']}:gate:{gate}")
+        review = current_review(state, task, delivery)
+        if (
+            not review
+            or not review["observations"]
+            or review["observations"][-1]["provider_state"] != "clean"
+            or review["observations"][-1]["disposition"] != "accepted"
+        ):
+            blockers.append(f"{delivery['delivery_key']}:review-not-clean")
+    return blockers
+
+
 def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if not isinstance(raw, dict) or raw.get("type") not in EVENT_TYPES:
         raise CacheError("invalid-input", "event type is missing or unsupported", 2)
     event_type = raw["type"]
     observed_at = format_timestamp(now)
-    if event_type == "claim-rebound":
-        event = exact_object(
-            raw,
-            {"type", "previous_claim_fingerprint", "claim_fingerprint", "evidence_ref"},
-            event_type,
-        )
-        previous = canonical_fingerprint(
-            event["previous_claim_fingerprint"], "previous_claim_fingerprint"
-        )
-        replacement = canonical_fingerprint(event["claim_fingerprint"], "claim_fingerprint")
-        nonempty(event["evidence_ref"], "evidence_ref")
-        if state["claim"]["fingerprint"] != previous:
-            raise CacheError("state-conflict", "claim-rebound previous fingerprint is stale", 4)
-        if previous == replacement:
-            return False
-        state["claim"]["fingerprint"] = replacement
-        return True
 
     if event_type == "root-title-observed":
         event = exact_object(raw, {"type", "title", "evidence_ref"}, event_type)
@@ -1613,9 +2701,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         return True
 
     if event_type == "portfolio-goal-activated":
-        event = exact_object(
-            raw, {"type", "goal_evidence_ref", "objective_fingerprint"}, event_type
-        )
+        event = exact_object(raw, {"type", "goal_evidence_ref", "objective_fingerprint"}, event_type)
         if event["objective_fingerprint"] != state["portfolio"]["objective_fingerprint"]:
             raise CacheError("invalid-input", "Goal objective fingerprint does not match", 2)
         if state["portfolio"]["root_task_title_evidence_ref"] is None:
@@ -1639,14 +2725,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "portfolio-goal-paused":
         event = exact_object(
             raw,
-            {
-                "type",
-                "goal_evidence_ref",
-                "pause_evidence_ref",
-                "heartbeat_id",
-                "target_thread_id",
-                "due_at",
-            },
+            {"type", "goal_evidence_ref", "pause_evidence_ref", "heartbeat_id", "target_thread_id", "due_at"},
             event_type,
         )
         if state["goal"]["state"] != "active" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
@@ -1661,89 +2740,84 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 4,
                 {"blockers": blockers},
             )
-        scheduled_due = sorted(
-            review["due_at"]
-            for review in state["reviews"]
-            if review["monitoring_state"] == "scheduled" and review["due_at"] is not None
-        )
+        scheduled = current_scheduled_reviews(state)
         due_at = nonempty(event["due_at"], "due_at")
         due = parse_timestamp(due_at, "due_at")
-        if not scheduled_due or due_at != scheduled_due[0] or due <= now:
+        if not scheduled or due_at != scheduled[0][2]["due_at"] or due <= now:
             raise CacheError("invalid-input", "heartbeat due_at is not the earliest future review check", 2)
-        target_thread_id = nonempty(event["target_thread_id"], "target_thread_id")
-        if target_thread_id != state["portfolio"]["root_task_ref"]:
+        target = nonempty(event["target_thread_id"], "target_thread_id")
+        if target != state["portfolio"]["root_task_ref"]:
             raise CacheError("invalid-input", "heartbeat target does not match the root task", 2)
+        pause_evidence = nonempty(event["pause_evidence_ref"], "pause_evidence_ref")
         state["goal"]["state"] = "paused"
-        state["goal"]["pause_evidence_ref"] = nonempty(
-            event["pause_evidence_ref"], "pause_evidence_ref"
-        )
+        state["goal"]["pause_evidence_ref"] = pause_evidence
         state["monitoring"].update(
             {
                 "state": "armed",
                 "heartbeat_id": nonempty(event["heartbeat_id"], "heartbeat_id"),
-                "target_thread_id": target_thread_id,
+                "target_thread_id": target,
                 "due_at": due_at,
-                "suspension_evidence_ref": state["goal"]["pause_evidence_ref"],
+                "suspension_evidence_ref": pause_evidence,
                 "resume_evidence_ref": None,
             }
         )
         return True
 
     if event_type == "portfolio-goal-resumed":
-        event = exact_object(
-            raw,
-            {
-                "type",
-                "goal_evidence_ref",
-                "heartbeat_id",
-                "resume_evidence_ref",
-            },
-            event_type,
-        )
+        event = exact_object(raw, {"type", "goal_evidence_ref", "heartbeat_id", "resume_evidence_ref"}, event_type)
         if state["goal"]["state"] != "paused" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
             raise CacheError("state-conflict", "portfolio Goal resume is out of order", 4)
-        if (
-            state["monitoring"]["state"] != "armed"
-            or state["monitoring"]["heartbeat_id"] != event["heartbeat_id"]
-        ):
+        if state["monitoring"]["state"] != "armed" or state["monitoring"]["heartbeat_id"] != event["heartbeat_id"]:
             raise CacheError("state-conflict", "portfolio heartbeat identity changed", 4)
-        resume_evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
+        evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
         state["goal"]["state"] = "active"
-        state["goal"]["resume_evidence_ref"] = resume_evidence
-        state["monitoring"]["state"] = "inactive"
-        state["monitoring"]["resume_evidence_ref"] = resume_evidence
+        state["goal"]["resume_evidence_ref"] = evidence
+        state["monitoring"].update({"state": "inactive", "resume_evidence_ref": evidence})
+        return True
+
+    if event_type == "portfolio-terminal-verified":
+        event = exact_object(raw, {"type", "verification_fingerprint", "evidence_ref"}, event_type)
+        if state["goal"]["state"] != "active" or state["monitoring"]["state"] != "inactive":
+            raise CacheError("state-conflict", "portfolio verification requires an active root Goal", 4)
+        candidate = portfolio_verification_candidate(state)
+        fingerprint = canonical_fingerprint(event["verification_fingerprint"], "verification_fingerprint")
+        if candidate is None or fingerprint != candidate:
+            raise CacheError("state-conflict", "portfolio terminal verification is stale", 4)
+        evidence = nonempty(event["evidence_ref"], "evidence_ref")
+        if (
+            state["closeout"]["portfolio_terminal_verification_fingerprint"] == fingerprint
+            and state["closeout"]["portfolio_terminal_evidence_ref"] == evidence
+        ):
+            return False
+        if state["closeout"]["portfolio_terminal_verification_fingerprint"] is not None:
+            raise CacheError("state-conflict", "portfolio terminal verification changed", 4)
+        state["closeout"]["portfolio_terminal_verification_fingerprint"] = fingerprint
+        state["closeout"]["portfolio_terminal_evidence_ref"] = evidence
         return True
 
     if event_type == "portfolio-goal-completed":
         event = exact_object(
-            raw, {"type", "goal_evidence_ref", "completion_evidence_ref"}, event_type
+            raw,
+            {"type", "goal_evidence_ref", "completion_evidence_ref", "verification_fingerprint"},
+            event_type,
         )
+        verification = canonical_fingerprint(event["verification_fingerprint"], "verification_fingerprint")
+        if (
+            state["closeout"]["portfolio_terminal_verification_fingerprint"] != verification
+            or portfolio_verification_candidate(state) != verification
+        ):
+            raise CacheError("state-conflict", "portfolio Goal completion lacks current verification", 4)
         if state["goal"]["state"] == "complete":
             if (
-                state["goal"]["evidence_ref"] != event["goal_evidence_ref"]
-                or state["goal"]["completion_evidence_ref"]
-                != event["completion_evidence_ref"]
+                state["goal"]["evidence_ref"] == event["goal_evidence_ref"]
+                and state["goal"]["completion_evidence_ref"] == event["completion_evidence_ref"]
             ):
-                raise CacheError(
-                    "state-conflict", "portfolio Goal completion evidence changed", 4
-                )
-            return False
+                return False
+            raise CacheError("state-conflict", "portfolio Goal completion evidence changed", 4)
         if state["goal"]["state"] != "active" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
             raise CacheError("state-conflict", "portfolio Goal completion is out of order", 4)
         if state["monitoring"]["state"] != "inactive":
             raise CacheError("state-conflict", "portfolio Goal cannot complete with an armed heartbeat", 4)
-        blockers = []
-        for task in state["tasks"]:
-            blockers.extend(
-                f"{task['task_key']}:{item}"
-                for item in task_terminal_blockers(state, task, require_task_state=True)
-            )
-            if not any(
-                item["task_key"] == task["task_key"] for item in state["handoffs"]
-            ):
-                blockers.append(f"{task['task_key']}:missing-external-handoff")
-        if blockers:
-            raise CacheError("state-conflict", "portfolio Goal cannot complete before terminal gates", 4, {"blockers": blockers})
         state["goal"]["state"] = "complete"
         state["goal"]["completion_evidence_ref"] = nonempty(
             event["completion_evidence_ref"], "completion_evidence_ref"
@@ -1753,222 +2827,277 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     task_key = check_lower_kebab(raw.get("task_key"), "task_key")
     task = task_by_key(state, task_key)
 
+    if task["seal"] is not None and event_type not in {
+        "task-goal-completed",
+        "terminal-handoff-recorded",
+        "post-terminal-drift-recorded",
+    }:
+        raise CacheError("state-conflict", "sealed task state is immutable", 4)
+
+    if event_type == "managed-checkouts-observed":
+        event = exact_object(raw, {"type", "task_key", "task_ref", "managed_checkouts", "evidence_ref"}, event_type)
+        task_ref = nonempty(event["task_ref"], "task_ref")
+        if task_ref == state["portfolio"]["root_task_ref"]:
+            raise CacheError("state-conflict", "worker task_ref collides with the root task", 4)
+        if any(other is not task and other["task_ref"] == task_ref for other in state["tasks"]):
+            raise CacheError("state-conflict", "task_ref is already owned by another task", 4)
+        raw_checkouts = event["managed_checkouts"]
+        if not isinstance(raw_checkouts, list) or len(raw_checkouts) != len(task["deliveries"]):
+            raise CacheError("invalid-input", "managed checkout map must be complete", 2)
+        normalized: dict[str, dict[str, Any]] = {}
+        for index, raw_checkout in enumerate(raw_checkouts):
+            delivery, checkout = validate_managed_checkout(
+                raw_checkout, task=task, field=f"managed_checkouts[{index}]"
+            )
+            if delivery["delivery_key"] in normalized:
+                raise CacheError("invalid-input", "managed checkout map duplicates a delivery", 2)
+            normalized[delivery["delivery_key"]] = checkout
+        if set(normalized) != {item["delivery_key"] for item in task["deliveries"]}:
+            raise CacheError("invalid-input", "managed checkout map must cover every delivery", 2)
+        global_keys = {
+            (delivery["repository"], delivery["managed_checkout"]["checkout"])
+            for other in state["tasks"] if other is not task
+            for delivery in other["deliveries"] if delivery["managed_checkout"] is not None
+        }
+        candidate_keys = {
+            (delivery["repository"], normalized[delivery["delivery_key"]]["checkout"])
+            for delivery in task["deliveries"]
+        }
+        if len(candidate_keys) != len(task["deliveries"]) or candidate_keys & global_keys:
+            raise CacheError("state-conflict", "managed checkout is already owned", 4)
+        evidence = nonempty(event["evidence_ref"], "evidence_ref")
+        if task["task_ref"] is not None:
+            if (
+                task["task_ref"] == task_ref
+                and task["managed_checkouts_evidence_ref"] == evidence
+                and all(
+                    delivery["managed_checkout"] == normalized[delivery["delivery_key"]]
+                    for delivery in task["deliveries"]
+                )
+            ):
+                return False
+            raise CacheError("state-conflict", "managed checkout identity is immutable", 4)
+        task["task_ref"] = task_ref
+        task["managed_checkouts_evidence_ref"] = evidence
+        for delivery in task["deliveries"]:
+            delivery["managed_checkout"] = normalized[delivery["delivery_key"]]
+        return True
+
     if event_type == "task-observed":
         event = exact_object(
             raw,
             {
-                "type",
-                "task_key",
-                "task_ref",
-                "checkout",
-                "model",
-                "reasoning_effort",
-                "thinking_reason",
-                "task_title",
-                "task_title_evidence_ref",
-                "goal_objective_fingerprint",
-                "goal_state",
-                "goal_evidence_ref",
-                "goal_completion_evidence_ref",
-                "state",
-                "outcome",
-                "attention_reason",
-                "summary_ref",
-                "pr",
+                "type", "task_key", "model", "reasoning_effort", "thinking_reason",
+                "task_title", "task_title_evidence_ref", "goal_objective_fingerprint",
+                "goal_state", "goal_evidence_ref", "state", "outcome",
+                "attention_reason", "summary_ref",
             },
             event_type,
         )
-        task_ref = nonempty(event["task_ref"], "task_ref")
-        checkout = canonical_absolute_path(event["checkout"], "checkout")
-        model = nonempty(event["model"], "model")
-        effort = event["reasoning_effort"]
-        if effort not in {"medium", "high", "xhigh"}:
-            raise CacheError("invalid-input", "reasoning_effort is invalid", 2)
-        for field, candidate in (
-            ("task_ref", task_ref),
-            ("checkout", checkout),
-            ("model", model),
-            ("reasoning_effort", effort),
-            ("thinking_reason", nonempty(event["thinking_reason"], "thinking_reason")),
+        if task["task_ref"] is None or task["managed_checkouts_evidence_ref"] is None:
+            raise CacheError("state-conflict", "task cannot be observed before its complete checkout map", 4)
+        if (
+            event["model"] != task["model"]
+            or event["reasoning_effort"] != task["reasoning_effort"]
+            or nonempty(event["thinking_reason"], "thinking_reason") != task["thinking_reason"]
         ):
-            if task[field] is not None and task[field] != candidate:
-                raise CacheError("state-conflict", f"task identity field changed: {field}", 4)
-        task_title = nonempty(event["task_title"], "task_title")
-        if task["task_title"] is not None and task["task_title"] != task_title:
-            raise CacheError("state-conflict", "task title changed", 4)
+            raise CacheError("state-conflict", "task execution profile changed", 4)
+        title = nonempty(event["task_title"], "task_title")
         title_evidence = event["task_title_evidence_ref"]
         if title_evidence is not None:
             title_evidence = nonempty(title_evidence, "task_title_evidence_ref")
+        if task["task_title"] is not None and task["task_title"] != title:
+            raise CacheError("state-conflict", "task title changed", 4)
         if event["goal_objective_fingerprint"] != task["goal_objective_fingerprint"]:
             raise CacheError("state-conflict", "task Goal objective fingerprint changed", 4)
         goal_state = event["goal_state"]
+        if goal_state not in {"pending", "active"}:
+            raise CacheError("invalid-input", "task-observed cannot complete or pause a Goal", 2)
+        if task["goal_state"] == "pending" and goal_state == "active":
+            goal_evidence = nonempty(event["goal_evidence_ref"], "goal_evidence_ref")
+        elif task["goal_state"] == goal_state:
+            goal_evidence = event["goal_evidence_ref"]
+            if goal_evidence is not None:
+                goal_evidence = nonempty(goal_evidence, "goal_evidence_ref")
+        else:
+            raise CacheError("state-conflict", "task Goal transition is out of order", 4)
         if (
-            goal_state not in TASK_GOAL_TRANSITIONS
-            or goal_state not in TASK_GOAL_TRANSITIONS[task["goal_state"]]
+            task["goal_evidence_ref"] is not None
+            and goal_evidence != task["goal_evidence_ref"]
         ):
-            raise CacheError(
-                "state-conflict",
-                f"invalid task Goal transition: {task['goal_state']} -> {goal_state}",
-                4,
-            )
-        goal_evidence = event["goal_evidence_ref"]
-        if goal_evidence is not None:
-            goal_evidence = nonempty(goal_evidence, "goal_evidence_ref")
-        goal_completion = event["goal_completion_evidence_ref"]
-        if goal_completion is not None:
-            goal_completion = nonempty(
-                goal_completion, "goal_completion_evidence_ref"
-            )
-        if goal_state in {"active", "complete"} and goal_evidence is None:
-            raise CacheError("invalid-input", "active task Goal requires evidence", 2)
-        if goal_state == "complete" and goal_completion is None:
-            raise CacheError("invalid-input", "complete task Goal requires completion evidence", 2)
+            raise CacheError("state-conflict", "task Goal evidence changed", 4)
         state_value = event["state"]
+        if state_value in {"merge-ready", "terminal-sealed", "review-monitoring"}:
+            raise CacheError("invalid-input", "task-observed cannot perform managed transitions", 2)
         if state_value not in TASK_STATES or state_value not in TASK_TRANSITIONS[task["state"]]:
             raise CacheError("state-conflict", f"invalid task transition: {task['state']} -> {state_value}", 4)
-        outcome = event["outcome"]
-        if outcome is not None:
-            outcome = nonempty(outcome, "outcome")
-        attention = event["attention_reason"]
-        if attention is not None:
-            attention = nonempty(attention, "attention_reason")
-        summary_ref = event["summary_ref"]
-        if summary_ref is not None:
-            summary_ref = nonempty(summary_ref, "summary_ref")
-        pr = validate_pr(event["pr"], task, "pr")
-        if task["pr"] is not None:
-            if pr is None:
-                raise CacheError("state-conflict", "pull request identity cannot be removed", 4)
-            for identity_field in ("repository", "number", "url"):
-                if task["pr"][identity_field] != pr[identity_field]:
-                    raise CacheError(
-                        "state-conflict",
-                        f"pull request identity changed: {identity_field}",
-                        4,
-                    )
-        if pr is not None and task["revision"] is not None and (
-            pr["repository"] != task["revision"]["repository"]
-            or pr["number"] != task["revision"]["pr_number"]
-            or pr["url"] != task["revision"]["pr_url"]
-            or pr["head_sha"] != task["revision"]["head_sha"]
-            or pr["base_ref"] != task["revision"]["base_ref"]
-            or pr["merge_base_sha"] != task["revision"]["merge_base_sha"]
-        ):
-            raise CacheError("state-conflict", "task PR tuple differs from current revision", 4)
+        if state_value in ACTIVE_TASK_STATES and (title_evidence is None or goal_state != "active"):
+            raise CacheError("state-conflict", "task cannot run before title and Goal evidence", 4)
+        if state_value in ACTIVE_TASK_STATES and state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "task cannot run before the root Goal is active", 4)
         candidate = {
-            "task_ref": task_ref,
-            "checkout": checkout,
-            "model": model,
-            "reasoning_effort": effort,
-            "thinking_reason": task["thinking_reason"],
-            "task_title": task_title,
+            "task_title": title,
             "task_title_evidence_ref": title_evidence,
             "goal_state": goal_state,
             "goal_evidence_ref": goal_evidence,
-            "goal_completion_evidence_ref": goal_completion,
             "state": state_value,
-            "outcome": outcome,
-            "attention_reason": attention,
-            "summary_ref": summary_ref,
-            "pr": pr,
+            "outcome": nonempty(event["outcome"], "outcome") if event["outcome"] is not None else None,
+            "attention_reason": nonempty(event["attention_reason"], "attention_reason") if event["attention_reason"] is not None else None,
+            "summary_ref": nonempty(event["summary_ref"], "summary_ref") if event["summary_ref"] is not None else None,
         }
         changed = any(task[field] != value for field, value in candidate.items())
-        for field, value in candidate.items():
-            task[field] = value
-        if state_value in ACTIVE_TASK_STATES | {"merge-ready"} and (
-            task["task_title_evidence_ref"] is None
-            or task["goal_state"] not in {"active", "complete"}
-        ):
-            raise CacheError(
-                "state-conflict",
-                "task cannot run before title and assignment Goal evidence",
-                4,
-            )
-        if goal_state == "complete":
-            goal_blockers = task_terminal_blockers(
-                state, task, require_task_state=False
-            )
-            if goal_blockers:
-                raise CacheError(
-                    "state-conflict",
-                    "task Goal cannot complete before terminal proof",
-                    4,
-                    {"blockers": goal_blockers},
-                )
-        if state_value == "merge-ready":
-            blockers = task_terminal_blockers(state, task, require_task_state=False)
-            if blockers:
-                raise CacheError("state-conflict", "task cannot become merge-ready", 4, {"blockers": blockers})
+        task.update(candidate)
         return changed
 
-    if event_type == "source-moved":
+    if event_type == "task-monitoring-paused":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "schedule_fingerprint", "pause_evidence_ref"},
+            event_type,
+        )
+        if state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "root Goal must remain active while pausing a worker", 4)
+        if task["state"] != "review-polling" or task["goal_state"] != "active":
+            raise CacheError("state-conflict", "task is not active for review monitoring pause", 4)
+        scheduled: list[dict[str, Any]] = []
+        for candidate_delivery in task["deliveries"]:
+            candidate_review = current_review(state, task, candidate_delivery)
+            if candidate_review is None or candidate_review["monitoring_state"] not in {"complete", "scheduled"}:
+                raise CacheError(
+                    "state-conflict",
+                    "every current delivery review must be complete or scheduled before worker pause",
+                    4,
+                )
+            if candidate_review["monitoring_state"] == "complete":
+                observation = candidate_review["observations"][-1] if candidate_review["observations"] else None
+                if (
+                    observation is None
+                    or observation["provider_state"] != "clean"
+                    or observation["disposition"] != "accepted"
+                ):
+                    raise CacheError(
+                        "state-conflict",
+                        "non-clean review result requires controller action before worker pause",
+                        4,
+                    )
+            if candidate_review["monitoring_state"] == "scheduled":
+                if (
+                    candidate_review["due_at"] is None
+                    or parse_timestamp(candidate_review["due_at"], "due_at") <= now
+                ):
+                    raise CacheError("state-conflict", "a scheduled review check is already due", 4)
+                scheduled.append(candidate_review)
+        if not scheduled:
+            raise CacheError("state-conflict", "worker pause requires a future review schedule", 4)
+        schedule_fingerprint = canonical_fingerprint(
+            event["schedule_fingerprint"], "schedule_fingerprint"
+        )
+        if schedule_fingerprint != task_monitoring_schedule_fingerprint(state, task):
+            raise CacheError("state-conflict", "worker monitoring schedule changed before pause", 4)
+        evidence = nonempty(event["pause_evidence_ref"], "pause_evidence_ref")
+        for candidate_review in scheduled:
+            candidate_review["pause_evidence_ref"] = evidence
+        task["state"] = "review-monitoring"
+        task["goal_state"] = "paused"
+        task["goal_pause_evidence_ref"] = evidence
+        task["monitoring_schedule_fingerprint"] = schedule_fingerprint
+        return True
+
+    if event_type == "task-monitoring-resumed":
         event = exact_object(
             raw,
             {
-                "type",
-                "task_key",
-                "from_ref",
-                "to_ref",
-                "source_fingerprint",
-                "evidence_ref",
+                "type", "task_key", "schedule_fingerprint", "resume_reason",
+                "resume_evidence_ref",
             },
             event_type,
         )
-        source = next(item for item in state["sources"] if item["task_key"] == task_key)
+        if state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "root Goal must resume before a worker Goal", 4)
+        paused_worker = task["state"] == "review-monitoring" and task["goal_state"] == "paused"
+        active_worker = task["state"] == "review-polling" and task["goal_state"] == "active"
+        if not paused_worker and not active_worker:
+            raise CacheError("state-conflict", "task is not available for review monitoring", 4)
+        schedule_fingerprint = canonical_fingerprint(
+            event["schedule_fingerprint"], "schedule_fingerprint"
+        )
         if (
-            source["state"] == "done"
-            and event["to_ref"] == source["planned_done_ref"]
-            and event["source_fingerprint"] == source["fingerprint"]
+            (paused_worker and schedule_fingerprint != task["monitoring_schedule_fingerprint"])
+            or schedule_fingerprint != task_monitoring_schedule_fingerprint(state, task)
         ):
-            return False
-        if event["from_ref"] != source["current_ref"]:
-            raise CacheError("state-conflict", "source-moved from_ref is stale", 4)
-        if event["to_ref"] != source["planned_done_ref"]:
-            raise CacheError("invalid-input", "source-moved target is not the planned done ref", 2)
-        if event["source_fingerprint"] != source["fingerprint"]:
-            raise CacheError("state-conflict", "source fingerprint changed during move", 4)
-        source["current_ref"] = source["planned_done_ref"]
-        source["state"] = "done"
-        source["move_evidence_ref"] = nonempty(event["evidence_ref"], "evidence_ref")
+            raise CacheError("state-conflict", "worker monitoring schedule changed before resume", 4)
+        reason = event["resume_reason"]
+        if reason not in {"due-review", "controller-action"}:
+            raise CacheError("invalid-input", "review monitoring resume reason is invalid", 2)
+        if active_worker and reason != "due-review":
+            raise CacheError("state-conflict", "an active worker can only activate a due review", 4)
+        scheduled = [
+            review
+            for candidate_delivery in task["deliveries"]
+            if (review := current_review(state, task, candidate_delivery)) is not None
+            and review["monitoring_state"] == "scheduled"
+            and review["due_at"] is not None
+        ]
+        if not scheduled:
+            raise CacheError("state-conflict", "task has no current review schedule", 4)
+        due = [
+            review
+            for review in scheduled
+            if parse_timestamp(review["due_at"], "due_at") <= now
+        ]
+        if reason == "due-review" and not due:
+            raise CacheError("state-conflict", "review monitoring check is not due", 4)
+        evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
+        if reason == "due-review":
+            for review in due:
+                review["monitoring_state"] = "checking"
+                review["resume_evidence_ref"] = evidence
+        if paused_worker:
+            task["state"] = "review-polling"
+            task["goal_state"] = "active"
+            task["goal_resume_evidence_ref"] = evidence
+            task["monitoring_schedule_fingerprint"] = None
         return True
+
+    if event_type in {
+        "revision-observed", "delivery-observed", "review-wait-started",
+        "review-wait-invoked", "review-observed", "review-monitoring-scheduled",
+    }:
+        delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
+        delivery = delivery_by_key(task, delivery_key)
+    else:
+        delivery = None
 
     if event_type == "revision-observed":
         event = exact_object(
             raw,
             {
-                "type",
-                "task_key",
-                "head_sha",
-                "base_ref",
-                "merge_base_sha",
-                "repository",
-                "pr_number",
-                "pr_url",
-                "evidence_ref",
+                "type", "task_key", "delivery_key", "head_sha", "base_ref",
+                "merge_base_sha", "repository", "pr_number", "pr_url", "evidence_ref",
             },
             event_type,
         )
+        assert delivery is not None
+        if state["goal"]["state"] != "active" or task["goal_state"] != "active":
+            raise CacheError("state-conflict", "revision observation requires active Goals", 4)
         if state["goal"]["state"] == "paused" or task["goal_state"] == "paused":
-            raise CacheError(
-                "state-conflict",
-                "resume root and worker Goals before changing revision",
-                4,
-            )
-        head = nonempty(event["head_sha"], "head_sha")
-        base = nonempty(event["base_ref"], "base_ref")
-        merge_base = nonempty(event["merge_base_sha"], "merge_base_sha")
+            raise CacheError("state-conflict", "resume root and worker Goals before changing revision", 4)
         repository = nonempty(event["repository"], "repository")
-        if repository != task["repository"]:
-            raise CacheError("invalid-input", "revision repository does not match task", 2)
+        if repository != delivery["repository"]:
+            raise CacheError("invalid-input", "revision repository does not match delivery", 2)
         if not isinstance(event["pr_number"], int) or event["pr_number"] < 1:
             raise CacheError("invalid-input", "revision pr_number is invalid", 2)
         pr_url = nonempty(event["pr_url"], "pr_url")
-        if task["pr"] is not None and (
-            task["pr"]["repository"] != repository
-            or task["pr"]["number"] != event["pr_number"]
-            or task["pr"]["url"] != pr_url
+        if delivery["pr"] is not None and any(
+            delivery["pr"][field] != expected
+            for field, expected in (
+                ("repository", repository), ("number", event["pr_number"]), ("url", pr_url)
+            )
         ):
             raise CacheError("state-conflict", "revision PR identity changed", 4)
+        head = nonempty(event["head_sha"], "head_sha")
+        base = nonempty(event["base_ref"], "base_ref")
+        merge_base = nonempty(event["merge_base_sha"], "merge_base_sha")
         candidate = {
             "repository": repository,
             "pr_number": event["pr_number"],
@@ -1976,57 +3105,139 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             "head_sha": head,
             "base_ref": base,
             "merge_base_sha": merge_base,
-            "revision_key": revision_key(
-                repository, event["pr_number"], pr_url, head, base, merge_base
-            ),
+            "revision_key": revision_key(repository, event["pr_number"], pr_url, head, base, merge_base),
             "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
             "observed_at": observed_at,
         }
-        if task["revision"] and all(
-            task["revision"][field] == candidate[field]
-            for field in (
-                "head_sha",
-                "base_ref",
-                "merge_base_sha",
-                "repository",
-                "pr_number",
-                "pr_url",
-                "revision_key",
-                "evidence_ref",
-            )
-        ):
+        current = delivery["revision"]
+        if current and all(current[field] == candidate[field] for field in candidate if field != "observed_at"):
             return False
-        if task["state"] == "merge-ready":
-            raise CacheError("state-conflict", "terminal task revision cannot change", 4)
-        task["revision"] = candidate
+        delivery["revision"] = candidate
+        delivery["committed"] = False
+        delivery["published"] = False
+        delivery["observation_evidence_ref"] = None
         return True
 
-    if task["revision"] is None and event_type in {
-        "review-wait-started",
-        "review-wait-invoked",
-        "review-observed",
-        "review-monitoring-scheduled",
-        "review-monitoring-resumed",
-        "gate-observed",
-    }:
-        raise CacheError("state-conflict", f"{event_type} requires a current revision", 4)
+    if event_type == "delivery-observed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "revision_key", "pr", "committed", "published", "evidence_ref"},
+            event_type,
+        )
+        assert delivery is not None
+        if state["goal"]["state"] != "active" or task["goal_state"] != "active":
+            raise CacheError("state-conflict", "delivery observation requires active Goals", 4)
+        revision = delivery["revision"]
+        if revision is None or event["revision_key"] != revision["revision_key"]:
+            raise CacheError("state-conflict", "delivery observation revision is stale", 4)
+        if not isinstance(event["committed"], bool) or not isinstance(event["published"], bool):
+            raise CacheError("invalid-input", "delivery publication state is invalid", 2)
+        if event["published"] and not event["committed"]:
+            raise CacheError("invalid-input", "published delivery must be committed", 2)
+        pr = validate_pr(event["pr"], delivery, "pr")
+        if pr is None:
+            raise CacheError("invalid-input", "delivery observation requires a pull request", 2)
+        if (
+            pr["repository"] != revision["repository"]
+            or pr["number"] != revision["pr_number"]
+            or pr["url"] != revision["pr_url"]
+            or pr["head_sha"] != revision["head_sha"]
+            or pr["base_ref"] != revision["base_ref"]
+            or pr["merge_base_sha"] != revision["merge_base_sha"]
+        ):
+            raise CacheError("state-conflict", "delivery PR tuple differs from current revision", 4)
+        evidence = nonempty(event["evidence_ref"], "evidence_ref")
+        candidate = (pr, event["committed"], event["published"], evidence)
+        current = (
+            delivery["pr"], delivery["committed"], delivery["published"], delivery["observation_evidence_ref"]
+        )
+        if current == candidate:
+            return False
+        delivery["pr"] = pr
+        delivery["committed"] = event["committed"]
+        delivery["published"] = event["published"]
+        delivery["observation_evidence_ref"] = evidence
+        dirty = delivery["tracker_dirty_after_revision_key"]
+        if dirty is not None and revision["revision_key"] != dirty and event["committed"] and event["published"]:
+            delivery["tracker_dirty_after_revision_key"] = None
+            source = next(item for item in state["sources"] if item["task_key"] == task_key)
+            source["dirty_delivery_key"] = None
+            source["dirty_after_revision_key"] = None
+        return True
+
+    if event_type == "source-moved":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "from_ref", "to_ref", "source_fingerprint",
+                "tracker_repository", "revision_set_key", "evidence_ref",
+            },
+            event_type,
+        )
+        source = next(item for item in state["sources"] if item["task_key"] == task_key)
+        if source["tracker_backend"] != "local":
+            raise CacheError("invalid-input", "source-moved is only valid for local trackers", 2)
+        if state["goal"]["state"] != "active" or task["goal_state"] != "active":
+            raise CacheError("state-conflict", "source move requires active root and worker Goals", 4)
+        if event["tracker_repository"] != source["tracker_repository"]:
+            raise CacheError("state-conflict", "source tracker repository changed", 4)
+        if source["state"] == "done":
+            if (
+                event["from_ref"] == source["source_spec_ref"]
+                and event["to_ref"] == source["planned_done_ref"]
+                and event["source_fingerprint"] == source["fingerprint"]
+                and event["revision_set_key"] == source["move_revision_set_key"]
+            ):
+                return False
+            raise CacheError("state-conflict", "source move evidence changed", 4)
+        revision_set = current_revision_set_key(task)
+        if revision_set is None or event["revision_set_key"] != revision_set:
+            raise CacheError("state-conflict", "source move revision set is stale", 4)
+        blockers = source_move_blockers(state, task)
+        if blockers:
+            raise CacheError("state-conflict", "source cannot move before current proof", 4, {"blockers": blockers})
+        if event["from_ref"] != source["current_ref"] or event["to_ref"] != source["planned_done_ref"]:
+            raise CacheError("state-conflict", "source move refs changed", 4)
+        if event["source_fingerprint"] != source["fingerprint"]:
+            raise CacheError("state-conflict", "source fingerprint changed during move", 4)
+        tracker_delivery = next(
+            item for item in task["deliveries"] if item["repository"] == source["tracker_repository"]
+        )
+        if tracker_delivery["revision"] is None:
+            raise CacheError("state-conflict", "tracker delivery has no revision", 4)
+        dirty_revision = tracker_delivery["revision"]["revision_key"]
+        source.update(
+            {
+                "current_ref": source["planned_done_ref"],
+                "state": "done",
+                "move_evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+                "move_revision_set_key": revision_set,
+                "dirty_delivery_key": tracker_delivery["delivery_key"],
+                "dirty_after_revision_key": dirty_revision,
+            }
+        )
+        tracker_delivery["tracker_dirty_after_revision_key"] = dirty_revision
+        return True
 
     if event_type == "review-wait-started":
-        event = exact_object(
-            raw, {"type", "task_key", "revision_key", "request_ref"}, event_type
-        )
-        if event["revision_key"] != task["revision"]["revision_key"]:
+        event = exact_object(raw, {"type", "task_key", "delivery_key", "revision_key", "request_ref"}, event_type)
+        assert delivery is not None
+        revision = delivery["revision"]
+        if revision is None or event["revision_key"] != revision["revision_key"]:
             raise CacheError("state-conflict", "review request revision is stale", 4)
         request_ref = nonempty(event["request_ref"], "request_ref")
-        existing = current_review(state, task)
+        existing = current_review(state, task, delivery)
         if existing:
             if existing["request_ref"] == request_ref:
                 return False
-            raise CacheError("state-conflict", "current revision already has a review request", 4)
+            raise CacheError("state-conflict", "current delivery revision already has a review request", 4)
+        if len(state["reviews"]) >= MAX_REVIEWS:
+            raise CacheError("state-conflict", "review history bound reached", 4)
         state["reviews"].append(
             {
                 "task_key": task_key,
-                "revision_key": task["revision"]["revision_key"],
+                "delivery_key": delivery["delivery_key"],
+                "revision_key": revision["revision_key"],
                 "request_ref": request_ref,
                 "wait_started_at": observed_at,
                 "wait_deadline": format_timestamp(now + timedelta(minutes=30)),
@@ -2042,41 +3253,39 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         )
         return True
 
-    review = current_review(state, task)
     if event_type in {
-        "review-wait-invoked",
-        "review-observed",
-        "review-monitoring-scheduled",
-        "review-monitoring-resumed",
-    } and review is None:
-        raise CacheError("state-conflict", f"{event_type} requires a review request", 4)
+        "review-wait-invoked", "review-observed", "review-monitoring-scheduled",
+    }:
+        assert delivery is not None
+        review = current_review(state, task, delivery)
+        if review is None:
+            raise CacheError("state-conflict", f"{event_type} requires a current review request", 4)
 
     if event_type == "review-wait-invoked":
         event = exact_object(
             raw,
-            {
-                "type",
-                "task_key",
-                "revision_key",
-                "request_ref",
-                "wait_invoked_at",
-                "provider_timeout",
-            },
+            {"type", "task_key", "delivery_key", "revision_key", "request_ref", "wait_invoked_at", "provider_timeout"},
             event_type,
         )
         assert review is not None
         if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
             raise CacheError("state-conflict", "review waiter identity changed", 4)
         invoked = parse_timestamp(event["wait_invoked_at"], "wait_invoked_at")
+        started = parse_timestamp(review["wait_started_at"], "wait_started_at")
         deadline = parse_timestamp(review["wait_deadline"], "wait_deadline")
-        remaining = int((deadline - invoked).total_seconds())
-        if remaining <= 0 or event["provider_timeout"] != remaining:
+        if invoked < started or invoked > now:
+            raise CacheError("invalid-input", "review waiter invocation time is invalid", 2)
+        remaining = max(0, int((deadline - invoked).total_seconds()))
+        provider_timeout = event["provider_timeout"]
+        if (
+            not isinstance(provider_timeout, int)
+            or isinstance(provider_timeout, bool)
+            or provider_timeout < 0
+            or provider_timeout != remaining
+        ):
             raise CacheError("invalid-input", "provider_timeout is not the exact remaining deadline", 2)
         if review["wait_invoked_at"] is not None:
-            if (
-                review["wait_invoked_at"] == event["wait_invoked_at"]
-                and review["provider_timeout"] == remaining
-            ):
+            if review["wait_invoked_at"] == event["wait_invoked_at"] and review["provider_timeout"] == remaining:
                 return False
             raise CacheError("state-conflict", "review waiter already launched", 4)
         review["wait_invoked_at"] = event["wait_invoked_at"]
@@ -2087,14 +3296,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         event = exact_object(
             raw,
             {
-                "type",
-                "task_key",
-                "revision_key",
-                "request_ref",
-                "provider_state",
-                "observation_fingerprint",
-                "disposition",
-                "evidence_ref",
+                "type", "task_key", "delivery_key", "revision_key", "request_ref",
+                "monitoring_cycle", "provider_state", "observation_fingerprint",
+                "disposition", "evidence_ref",
             },
             event_type,
         )
@@ -2103,27 +3307,48 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("state-conflict", "review observation identity changed", 4)
         if review["wait_invoked_at"] is None:
             raise CacheError("state-conflict", "review observation precedes waiter launch", 4)
-        provider_state = event["provider_state"]
+        cycle = event["monitoring_cycle"]
+        if (
+            not isinstance(cycle, int)
+            or isinstance(cycle, bool)
+            or cycle != review["monitoring_cycle"]
+            or review["monitoring_state"] not in {"active-wait", "checking"}
+        ):
+            raise CacheError("state-conflict", "review observation check cycle is stale", 4)
+        provider = event["provider_state"]
         disposition = event["disposition"]
-        if provider_state not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
+        if provider not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
             raise CacheError("invalid-input", "review observation state is invalid", 2)
-        if provider_state == "clean" and disposition != "accepted":
+        if provider == "clean" and disposition != "accepted":
             raise CacheError("invalid-input", "clean review must be accepted", 2)
-        fingerprint = canonical_fingerprint(
-            event["observation_fingerprint"], "observation_fingerprint"
+        fingerprint = canonical_fingerprint(event["observation_fingerprint"], "observation_fingerprint")
+        evidence_ref = nonempty(event["evidence_ref"], "evidence_ref")
+        prior_cycle = next(
+            (item for item in review["observations"] if item["monitoring_cycle"] == cycle),
+            None,
         )
-        if any(item["observation_fingerprint"] == fingerprint for item in review["observations"]):
-            return False
+        if prior_cycle is not None:
+            if (
+                prior_cycle["provider_state"] == provider
+                and prior_cycle["observation_fingerprint"] == fingerprint
+                and prior_cycle["disposition"] == disposition
+                and prior_cycle["evidence_ref"] == evidence_ref
+            ):
+                return False
+            raise CacheError("state-conflict", "review check cycle already has an observation", 4)
+        if len(review["observations"]) >= MAX_REVIEW_OBSERVATIONS:
+            raise CacheError("state-conflict", "review observation bound reached", 4)
         review["observations"].append(
             {
-                "provider_state": provider_state,
+                "monitoring_cycle": cycle,
+                "provider_state": provider,
                 "observation_fingerprint": fingerprint,
                 "disposition": disposition,
-                "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+                "evidence_ref": evidence_ref,
                 "observed_at": observed_at,
             }
         )
-        if provider_state != "waiting":
+        if provider != "waiting":
             review["monitoring_state"] = "complete"
             review["due_at"] = None
         return True
@@ -2131,151 +3356,212 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "review-monitoring-scheduled":
         event = exact_object(
             raw,
-            {
-                "type",
-                "task_key",
-                "revision_key",
-                "request_ref",
-                "pause_evidence_ref",
-            },
+            {"type", "task_key", "delivery_key", "revision_key", "request_ref"},
             event_type,
         )
         assert review is not None
         if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
             raise CacheError("state-conflict", "review monitoring identity changed", 4)
-        if review["monitoring_state"] not in {"active-wait", "checking"}:
-            raise CacheError("state-conflict", "review monitoring schedule is out of order", 4)
-        if not review["observations"]:
-            raise CacheError("state-conflict", "review monitoring requires a final pending observation", 4)
-        observation = review["observations"][-1]
-        if observation["provider_state"] != "waiting" or observation["disposition"] != "pending":
-            raise CacheError("state-conflict", "review monitoring requires a pending provider result", 4)
-        observation_time = parse_timestamp(observation["observed_at"], "observed_at")
-        check_due = parse_timestamp(
-            review["wait_deadline"] if review["monitoring_state"] == "active-wait" else review["due_at"],
-            "review_check_due_at",
-        )
-        if now < check_due or observation_time < check_due:
-            raise CacheError("state-conflict", "review schedule lacks a due-time pending check", 4)
         if task["state"] != "review-polling" or task["goal_state"] != "active":
-            raise CacheError("state-conflict", "task is not ready to pause for review monitoring", 4)
-        pause_evidence = nonempty(event["pause_evidence_ref"], "pause_evidence_ref")
-        review["monitoring_state"] = "scheduled"
-        review["due_at"] = format_timestamp(now + timedelta(minutes=30))
-        review["monitoring_cycle"] += 1
-        review["pause_evidence_ref"] = pause_evidence
-        task["state"] = "review-monitoring"
-        task["goal_state"] = "paused"
-        task["goal_pause_evidence_ref"] = pause_evidence
-        return True
-
-    if event_type == "review-monitoring-resumed":
-        event = exact_object(
-            raw,
-            {
-                "type",
-                "task_key",
-                "revision_key",
-                "request_ref",
-                "resume_evidence_ref",
-            },
-            event_type,
-        )
-        assert review is not None
-        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
-            raise CacheError("state-conflict", "review monitoring identity changed", 4)
-        if state["goal"]["state"] != "active":
-            raise CacheError("state-conflict", "root Goal must resume before a worker Goal", 4)
-        if review["monitoring_state"] != "scheduled" or review["due_at"] is None:
-            raise CacheError("state-conflict", "review monitoring resume is out of order", 4)
-        if parse_timestamp(review["due_at"], "due_at") > now:
+            raise CacheError("state-conflict", "task is not active for review monitoring schedule", 4)
+        if review["monitoring_state"] not in {"active-wait", "checking"} or not review["observations"]:
+            raise CacheError("state-conflict", "review monitoring schedule is out of order", 4)
+        observation = review["observations"][-1]
+        if (
+            observation["monitoring_cycle"] != review["monitoring_cycle"]
+            or observation["provider_state"] != "waiting"
+            or observation["disposition"] != "pending"
+        ):
+            raise CacheError("state-conflict", "review monitoring requires a pending result", 4)
+        due_source = review["wait_deadline"] if review["monitoring_state"] == "active-wait" else review["due_at"]
+        due = parse_timestamp(due_source, "review_check_due_at") if due_source is not None else None
+        observation_time = parse_timestamp(observation["observed_at"], "observed_at")
+        if due is None or now < due or observation_time < due:
             raise CacheError("state-conflict", "review monitoring check is not due", 4)
-        if task["state"] != "review-monitoring" or task["goal_state"] != "paused":
-            raise CacheError("state-conflict", "task is not paused for review monitoring", 4)
-        resume_evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
-        review["monitoring_state"] = "checking"
-        review["resume_evidence_ref"] = resume_evidence
-        task["state"] = "review-polling"
-        task["goal_state"] = "active"
-        task["goal_resume_evidence_ref"] = resume_evidence
+        next_due = observation_time + timedelta(minutes=30)
+        review["monitoring_state"] = "scheduled" if next_due > now else "checking"
+        review["due_at"] = format_timestamp(next_due)
+        review["monitoring_cycle"] += 1
+        review["pause_evidence_ref"] = None
+        review["resume_evidence_ref"] = None
         return True
 
     if event_type == "gate-observed":
         event = exact_object(
             raw,
-            {"type", "task_key", "gate", "state", "revision_key", "evidence_ref"},
+            {"type", "task_key", "delivery_key", "gate", "state", "binding_key", "evidence_ref"},
             event_type,
         )
         gate = event["gate"]
         if gate not in STATIC_GATES | REVISION_GATES or event["state"] not in GATE_STATES:
             raise CacheError("invalid-input", "gate observation is invalid", 2)
-        expected_revision = None if gate in STATIC_GATES else task["revision"]["revision_key"]
-        if event["revision_key"] != expected_revision:
-            raise CacheError("state-conflict", "gate observation revision is stale", 4)
+        if gate in REVISION_GATES and (
+            state["goal"]["state"] != "active" or task["goal_state"] != "active"
+        ):
+            raise CacheError("state-conflict", "revision-bound gate requires active Goals", 4)
+        scoped_delivery = None
+        if event["delivery_key"] is not None:
+            scoped_delivery = delivery_by_key(task, check_lower_kebab(event["delivery_key"], "delivery_key"))
+        expected_delivery, expected_binding = gate_binding(task, gate, scoped_delivery)
+        if event["delivery_key"] != expected_delivery or event["binding_key"] != expected_binding:
+            raise CacheError("state-conflict", "gate observation binding is stale", 4)
         if gate == "domain-closeout" and not task["requires_domain_closeout"]:
             raise CacheError("invalid-input", "domain-closeout is not required for this task", 2)
-        if gate == "terminal" and event["state"] == "passed":
-            prerequisites = (
-                set(STATIC_GATES)
-                | (REVISION_GATES - {"terminal", "domain-closeout"})
-                | ({"domain-closeout"} if task["requires_domain_closeout"] else set())
-            )
-            missing = [
-                item
-                for item in sorted(prerequisites)
-                if not current_gate(state, task, item)
-                or current_gate(state, task, item)["state"] != "passed"
-            ]
-            if missing:
-                raise CacheError("state-conflict", "terminal gate prerequisites are missing", 4, {"gates": missing})
         evidence = nonempty(event["evidence_ref"], "evidence_ref")
-        existing = [
-            item
-            for item in state["gates"]
-            if item["task_key"] == task_key
-            and item["gate"] == gate
-            and item["revision_key"] == expected_revision
-        ]
         candidate = {
             "task_key": task_key,
+            "delivery_key": expected_delivery,
             "gate": gate,
             "state": event["state"],
-            "revision_key": expected_revision,
+            "binding_key": expected_binding,
             "evidence_ref": evidence,
             "observed_at": observed_at,
         }
+        existing = [
+            item for item in state["gates"]
+            if item["task_key"] == task_key
+            and item["delivery_key"] == expected_delivery
+            and item["gate"] == gate
+            and item["binding_key"] == expected_binding
+        ]
         if existing:
             current = existing[-1]
-            if all(current[field] == candidate[field] for field in ("state", "revision_key", "evidence_ref")):
+            if all(current[field] == candidate[field] for field in ("state", "binding_key", "evidence_ref")):
                 return False
             current.update(candidate)
         else:
+            if len(state["gates"]) >= MAX_GATES:
+                raise CacheError("state-conflict", "gate history bound reached", 4)
             state["gates"].append(candidate)
         return True
 
-    if event_type == "external-handoff-recorded":
+    if event_type == "task-terminal-sealed":
         event = exact_object(
             raw,
-            {"type", "task_key", "handoff_kind", "evidence_ref", "next_action"},
+            {"type", "task_key", "revision_set_key", "seal_fingerprint", "evidence_ref"},
             event_type,
         )
-        if task["state"] != "merge-ready":
-            raise CacheError("state-conflict", "external handoff requires merge-ready state", 4)
+        if task["goal_state"] != "active":
+            raise CacheError("state-conflict", "task must have an active Goal before sealing", 4)
+        if state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "root Goal must be active before sealing", 4)
+        revision_set = current_revision_set_key(task)
+        candidate = seal_candidate_fingerprint(state, task)
+        fingerprint = canonical_fingerprint(event["seal_fingerprint"], "seal_fingerprint")
+        if revision_set is None or event["revision_set_key"] != revision_set or candidate != fingerprint:
+            raise CacheError("state-conflict", "task terminal seal proof is stale", 4)
+        task["seal"] = {
+            "revision_set_key": revision_set,
+            "seal_fingerprint": fingerprint,
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "sealed_at": observed_at,
+        }
+        task["state"] = "terminal-sealed"
+        return True
+
+    if event_type == "task-goal-completed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "seal_fingerprint", "goal_evidence_ref", "completion_evidence_ref"},
+            event_type,
+        )
+        seal = task["seal"]
+        if seal is None or event["seal_fingerprint"] != seal["seal_fingerprint"]:
+            raise CacheError("state-conflict", "task Goal completion seal is stale", 4)
+        if task["goal_state"] == "complete":
+            if (
+                task["goal_evidence_ref"] == event["goal_evidence_ref"]
+                and task["goal_completion_evidence_ref"] == event["completion_evidence_ref"]
+            ):
+                return False
+            raise CacheError("state-conflict", "task Goal completion evidence changed", 4)
+        if task["goal_state"] != "active" or task["goal_evidence_ref"] != event["goal_evidence_ref"]:
+            raise CacheError("state-conflict", "task Goal completion is out of order", 4)
+        task["goal_state"] = "complete"
+        task["goal_completion_evidence_ref"] = nonempty(
+            event["completion_evidence_ref"], "completion_evidence_ref"
+        )
+        task["state"] = "merge-ready"
+        task["outcome"] = "pull-request-ready-for-merge-but-not-merged"
+        return True
+
+    if event_type == "terminal-handoff-recorded":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "seal_fingerprint", "handoff_kind", "authority", "evidence_ref", "next_action"},
+            event_type,
+        )
+        seal = task["seal"]
+        if (
+            task["state"] != "merge-ready"
+            or task["goal_state"] != "complete"
+            or seal is None
+            or task["post_terminal_drift"] is not None
+        ):
+            raise CacheError(
+                "state-conflict",
+                "terminal handoff requires a completed task Goal without post-terminal drift",
+                4,
+            )
+        if event["seal_fingerprint"] != seal["seal_fingerprint"]:
+            raise CacheError("state-conflict", "terminal handoff seal is stale", 4)
+        if event["handoff_kind"] != "pull-request-ready":
+            raise CacheError("invalid-input", "terminal handoff kind is invalid", 2)
+        if event["authority"] != "external-merge-required":
+            raise CacheError("invalid-input", "terminal handoff authority is invalid", 2)
         candidate = {
             "task_key": task_key,
-            "handoff_kind": nonempty(event["handoff_kind"], "handoff_kind"),
+            "delivery_key": None,
+            "revision_key": None,
+            "seal_fingerprint": seal["seal_fingerprint"],
+            "handoff_kind": "pull-request-ready",
+            "authority": "external-merge-required",
             "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
             "next_action": nonempty(event["next_action"], "next_action"),
+            "deadline": None,
             "recorded_at": observed_at,
         }
-        if any(
-            item["task_key"] == task_key
-            and item["handoff_kind"] == candidate["handoff_kind"]
-            and item["evidence_ref"] == candidate["evidence_ref"]
-            for item in state["handoffs"]
-        ):
-            return False
+        if terminal_handoff(state, task):
+            current = terminal_handoff(state, task)
+            if current and all(current[field] == candidate[field] for field in ("seal_fingerprint", "evidence_ref", "next_action")):
+                return False
+            raise CacheError("state-conflict", "terminal handoff evidence changed", 4)
+        if len(state["handoffs"]) >= MAX_HANDOFFS:
+            raise CacheError("state-conflict", "handoff history bound reached", 4)
         state["handoffs"].append(candidate)
+        return True
+
+    if event_type == "post-terminal-drift-recorded":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "seal_fingerprint",
+                "drift_fingerprint", "reason", "evidence_ref",
+            },
+            event_type,
+        )
+        seal = task["seal"]
+        if seal is None or event["seal_fingerprint"] != seal["seal_fingerprint"]:
+            raise CacheError("state-conflict", "post-terminal drift requires a sealed task", 4)
+        delivery_key = check_lower_kebab(event["delivery_key"], "delivery_key")
+        delivery_by_key(task, delivery_key)
+        drift = {
+            "delivery_key": delivery_key,
+            "seal_fingerprint": seal["seal_fingerprint"],
+            "drift_fingerprint": canonical_fingerprint(event["drift_fingerprint"], "drift_fingerprint"),
+            "reason": nonempty(event["reason"], "reason"),
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "recorded_at": observed_at,
+        }
+        if task["post_terminal_drift"] is not None:
+            if all(task["post_terminal_drift"][field] == drift[field] for field in drift if field != "recorded_at"):
+                return False
+            raise CacheError("state-conflict", "post-terminal drift evidence changed", 4)
+        task["post_terminal_drift"] = drift
+        state["closeout"]["post_terminal_drift"] = {
+            "task_key": task_key,
+            **drift,
+        }
         return True
 
     raise CacheError("invalid-input", f"unsupported event type: {event_type}", 2)
@@ -2345,7 +3631,7 @@ def apply_ledger(args: argparse.Namespace) -> dict[str, Any]:
     if args.expected_generation < 1:
         raise CacheError("invalid-input", "expected_generation must be positive", 2)
     events = read_json_file(args.events_file, "events_file")
-    if not isinstance(events, list) or not events:
+    if not isinstance(events, list) or not events or len(events) > MAX_EVENTS_PER_BATCH:
         raise CacheError("invalid-input", "events_file must contain a nonempty JSON array", 2)
     event_types = []
     for event in events:
@@ -2385,17 +3671,10 @@ def apply_ledger(args: argparse.Namespace) -> dict[str, Any]:
                 4,
                 {"expected": args.expected_generation, "actual": state["generation"]},
             )
-        rebound_events = [event for event in events if event["type"] == "claim-rebound"]
+        if len(state["operations"]) >= MAX_OPERATIONS:
+            raise CacheError("state-conflict", "operation history bound reached", 4)
         if state["claim"]["fingerprint"] != expected_fingerprint:
-            if (
-                len(rebound_events) != 1
-                or rebound_events[0].get("previous_claim_fingerprint")
-                != state["claim"]["fingerprint"]
-                or rebound_events[0].get("claim_fingerprint") != expected_fingerprint
-            ):
-                raise CacheError("state-conflict", "run-state claim binding is stale", 4)
-        elif rebound_events:
-            raise CacheError("invalid-input", "claim-rebound is not required", 2)
+            raise CacheError("state-conflict", "run-state claim binding is stale", 4)
         candidate = copy.deepcopy(state)
         now = utc_now()
         changed = False
@@ -2613,6 +3892,7 @@ def validate_archive_entry(entry: Path, *, verify_hash: bool) -> dict[str, Any]:
 
 def archive_entry_dirs() -> tuple[list[Path], list[dict[str, str]], list[str]]:
     root = archive_root()
+    ensure_safe_cache_chain(root, "archive root")
     if not root.exists():
         return [], [], []
     entries: list[Path] = []
@@ -2789,6 +4069,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
     root_id = check_id(args.root_id, "root_id")
     ledger_value = args.ledger[0] if isinstance(args.ledger, list) else args.ledger
     ledger = canonical_active_ledger(ledger_value)
+    ensure_safe_cache_chain(archive_root(), "archive root")
     completed: dict[str, Any] | None = None
     receipt_path: Path | None = None
     with locked_claim_store(create=True, exclusive=True) as claims:
@@ -2889,6 +4170,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 )
                 final = archive_parent(metadata) / metadata["archive_id"]
                 archive_root().mkdir(parents=True, exist_ok=True)
+                ensure_safe_cache_chain(final.parent, "archive destination")
                 temporary = archive_root() / f".tmp-{secrets.token_hex(16)}"
                 stage = temporary / metadata["archive_id"]
                 try:
@@ -3298,7 +4580,10 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def emit(value: dict[str, Any], as_json: bool) -> None:
-    print(json.dumps(value, sort_keys=as_json, indent=None if as_json else 2))
+    rendered = json.dumps(value, sort_keys=as_json, indent=None if as_json else 2)
+    if len(rendered.encode()) > MAX_OUTPUT_BYTES:
+        raise CacheError("state-conflict", "command output exceeds the bounded projection size", 4)
+    print(rendered)
 
 
 def main() -> int:

@@ -18,6 +18,17 @@ assert SPEC is not None
 CLAIM_RUNTIME = importlib.util.module_from_spec(SPEC)
 LOADER.exec_module(CLAIM_RUNTIME)
 
+CACHE_TEST_PATH = Path(__file__).with_name("test_cache_helper.py")
+CACHE_TEST_LOADER = importlib.machinery.SourceFileLoader(
+    "claim_terminal_cache_test_runtime", str(CACHE_TEST_PATH)
+)
+CACHE_TEST_SPEC = importlib.util.spec_from_loader(
+    CACHE_TEST_LOADER.name, CACHE_TEST_LOADER
+)
+assert CACHE_TEST_SPEC is not None
+CACHE_TEST_RUNTIME = importlib.util.module_from_spec(CACHE_TEST_SPEC)
+CACHE_TEST_LOADER.exec_module(CACHE_TEST_RUNTIME)
+
 
 def run_claim(*args: str, env: dict[str, str], check: bool = True) -> subprocess.CompletedProcess[str]:
     result = subprocess.run([str(TOOL), *args], env=env, text=True, capture_output=True)
@@ -105,6 +116,101 @@ class AtomicClaimHelperTests(unittest.TestCase):
         path = self.claim_root / f"{unsupported['root_id']}.json"
         path.write_text(json.dumps(unsupported, indent=2, sort_keys=True) + "\n")
         return path
+
+    def write_legacy_durable_receipt(self) -> tuple[Path, dict[str, object]]:
+        root_id = "legacy-root"
+        claim_fingerprint = "0" * 64
+        receipt_root = self.claim_root / "releases"
+        receipt_root.mkdir(parents=True, exist_ok=True)
+        (self.claim_root / ".lock").touch(exist_ok=True)
+        receipt: dict[str, object] = {
+            "schema_version": CLAIM_RUNTIME.RELEASE_RECEIPT_SCHEMA_VERSION,
+            "root_id": root_id,
+            "claim_fingerprint": claim_fingerprint,
+            "ledger_ref": str((self.ledger_root / "legacy-durable.json").resolve()),
+            "ledger_sha256": None,
+            "ledger_size_bytes": None,
+            "release_reason": "durable-handoff",
+            "evidence_ref": "legacy-pre-register-failure",
+            "released_at": "2026-07-17T00:00:00Z",
+        }
+        receipt["fingerprint"] = CLAIM_RUNTIME.release_receipt_fingerprint(receipt)
+        path = CLAIM_RUNTIME.release_receipt_path(
+            self.claim_root, root_id, claim_fingerprint
+        )
+        path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+        return path, receipt
+
+    def write_terminal_ledger(
+        self, claim: dict[str, object], *, ledger: Path | None = None
+    ) -> bytes:
+        ledger = ledger or self.ledger
+        checkout = Path(claim["repository_checkouts"][0]["checkout"])
+        branch = subprocess.run(
+            ["git", "-C", str(checkout), "branch", "--show-current"],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        baseline = subprocess.run(
+            ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV3Tests(methodName="runTest")
+        helper.home = self.base
+        helper.cache_root = self.claim_root.parent
+        helper.claim_root = self.claim_root
+        helper.ledger_root = self.ledger_root
+        helper.archive_root = self.ledger_root / "archive"
+        helper.packet_root = self.base / f"terminal-packets-{claim['root_id']}"
+        helper.env = self.env
+        helper.packet_index = 0
+        helper.operation_index = 0
+        helper.ledger = ledger
+        helper.claim = claim
+        helper.registration = None
+        helper.source_ref = claim["sources"][0]
+        helper.task_goal_fingerprint = hashlib.sha256(
+            helper.task_goal_objective.encode()
+        ).hexdigest()
+
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV3Tests.registration_for(
+            helper, claim
+        )
+        registration["root_checkout"] = str(checkout)
+        registration["sources"][0]["deliveries"][0]["target_branch"] = branch
+        delivery = registration["sources"][0]["deliveries"][0]
+        checkout_event = {
+            "type": "managed-checkouts-observed",
+            "task_key": helper.task_key,
+            "task_ref": "app-task://worker-232",
+            "managed_checkouts": [
+                {
+                    "delivery_key": delivery["delivery_key"],
+                    "repository": delivery["repository"],
+                    "target_branch": branch,
+                    "checkout": str(checkout),
+                    "git_top_level": str(checkout),
+                    "baseline_revision": baseline,
+                    "isolation_evidence_ref": "app-task://worker-232/worktree",
+                }
+            ],
+            "evidence_ref": "app-task://worker-232/checkout-map",
+        }
+        helper.acquire = lambda **_kwargs: claim
+        helper.registration_for = lambda _claim=None: registration
+        helper.checkout_event = lambda: checkout_event
+        ledger.unlink(missing_ok=True)
+        state = helper.make_terminal_state()
+        self.assertTrue(
+            CACHE_TEST_RUNTIME.CACHE_RUNTIME.terminal_projection(state)[
+                "archive_ready"
+            ]
+        )
+        return ledger.read_bytes()
 
     def make_task_adoption(
         self,
@@ -230,7 +336,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "8.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "9.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -253,6 +359,34 @@ class AtomicClaimHelperTests(unittest.TestCase):
             doctor["task_model_policy"]["profile"]["model"], "gpt-5.6-sol"
         )
         self.assertFalse(doctor["claim_root_exists"])
+        self.assertFalse(self.claim_root.exists())
+
+    def test_release_cli_rejects_retired_durable_handoff_choice(self) -> None:
+        release_help = run_claim(
+            "claim", "release", "--help", env=self.env
+        ).stdout
+        self.assertIn("{terminal}", release_help)
+        self.assertNotIn("durable-handoff", release_help)
+
+        rejected = run_claim(
+            "--json",
+            "claim",
+            "release",
+            "--root-id",
+            "root-a",
+            "--expected-fingerprint",
+            "0" * 64,
+            "--release-reason",
+            "durable-handoff",
+            "--evidence",
+            "retired-release-choice",
+            env=self.env,
+            check=False,
+        )
+
+        self.assertEqual(rejected.returncode, 2)
+        self.assertIn("invalid choice", rejected.stderr)
+        self.assertIn("durable-handoff", rejected.stderr)
         self.assertFalse(self.claim_root.exists())
 
     def test_competing_roots_have_exactly_one_winner(self) -> None:
@@ -280,6 +414,10 @@ class AtomicClaimHelperTests(unittest.TestCase):
 
         status = json.loads(run_claim("--json", "claim", "status", env=self.env).stdout)
         self.assertEqual([claim["root_id"] for claim in status["claims"]], [winner])
+        winner_claim = next(
+            result[1]["claim"] for result in results if result[0] == 0
+        )
+        self.write_terminal_ledger(winner_claim)
         released = json.loads(
             run_claim(
                 "--json",
@@ -288,15 +426,11 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "--root-id",
                 winner,
                 "--expected-fingerprint",
-                next(
-                    result[1]["claim"]["fingerprint"]
-                    for result in results
-                    if result[0] == 0
-                ),
+                winner_claim["fingerprint"],
                 "--release-reason",
                 "terminal",
                 "--evidence",
-                "fixture-terminal",
+                "proof://portfolio-terminal/232",
                 env=self.env,
             ).stdout
         )
@@ -324,6 +458,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(heartbeat.returncode, 4)
+        self.write_terminal_ledger(acquired)
         released = run_claim(
             "--json",
             "claim",
@@ -335,7 +470,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "--release-reason",
             "terminal",
             "--evidence",
-            "fixture-terminal",
+            "proof://portfolio-terminal/232",
             env=self.env,
         )
         released_value = json.loads(released.stdout)
@@ -344,7 +479,9 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(receipt["root_id"], "root-a")
         self.assertEqual(receipt["ledger_ref"], str(self.ledger.resolve()))
         self.assertEqual(receipt["release_reason"], "terminal")
-        self.assertTrue(Path(released_value["release_receipt_ref"]).is_file())
+        receipt_path = Path(released_value["release_receipt_ref"])
+        self.assertTrue(receipt_path.is_file())
+        receipt_bytes = receipt_path.read_bytes()
         repeated_release = json.loads(
             run_claim(
                 "--json",
@@ -357,11 +494,13 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "--release-reason",
                 "terminal",
                 "--evidence",
-                "fixture-terminal",
+                "proof://portfolio-terminal/232",
                 env=self.env,
             ).stdout
         )
         self.assertEqual(repeated_release["state"], "already-released")
+        self.assertEqual(repeated_release["release_receipt"], receipt)
+        self.assertEqual(receipt_path.read_bytes(), receipt_bytes)
 
         reacquired = json.loads(
             run_claim(*self.acquire_args("root-a", self.repo, "spec-1"), env=self.env).stdout
@@ -529,14 +668,35 @@ class AtomicClaimHelperTests(unittest.TestCase):
 
     def test_terminal_release_receipt_binds_json_run_state_bytes(self) -> None:
         run_state = self.ledger_root / "run-state.json"
-        payload = b'{"schema_version":"1.0.0"}\n'
-        run_state.write_bytes(payload)
+        run_state.write_text('{"schema_version":"fixture"}\n')
         claim = json.loads(
             run_claim(
                 *self.acquire_args("root-json", self.repo, "spec-json", ledger=run_state),
                 env=self.env,
             ).stdout
         )["claim"]
+        payload = self.write_terminal_ledger(claim, ledger=run_state)
+        claim_path = self.claim_root / "root-json.json"
+        claim_bytes = claim_path.read_bytes()
+        mismatched = run_claim(
+            "--json",
+            "claim",
+            "release",
+            "--root-id",
+            "root-json",
+            "--expected-fingerprint",
+            claim["fingerprint"],
+            "--release-reason",
+            "terminal",
+            "--evidence",
+            "proof://stale-terminal-evidence",
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(mismatched.returncode, 4)
+        self.assertIn("does not match the verified ledger", mismatched.stdout)
+        self.assertEqual(claim_path.read_bytes(), claim_bytes)
+        self.assertFalse((self.claim_root / "releases").exists())
         released = json.loads(
             run_claim(
                 "--json",
@@ -549,7 +709,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "--release-reason",
                 "terminal",
                 "--evidence",
-                "json-terminal-proof",
+                "proof://portfolio-terminal/232",
                 env=self.env,
             ).stdout
         )
@@ -558,52 +718,139 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(receipt["ledger_sha256"], hashlib.sha256(payload).hexdigest())
         self.assertEqual(receipt["ledger_size_bytes"], len(payload))
 
-    def test_pre_register_claim_can_release_to_durable_handoff(self) -> None:
-        missing_ledger = self.ledger_root / "not-registered.json"
-        acquired = json.loads(
+    def test_release_rejects_nonterminal_ledger_without_dropping_claim(self) -> None:
+        claim = json.loads(
             run_claim(
-                *self.acquire_args(
-                    "root-a", self.repo, "spec-1", ledger=missing_ledger
-                ),
-                env=self.env,
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
             ).stdout
         )["claim"]
+        claim_path = self.claim_root / "root-a.json"
+        claim_bytes = claim_path.read_bytes()
+        ledger_bytes = self.ledger.read_bytes()
 
-        released = json.loads(
-            run_claim(
-                "--json",
-                "claim",
-                "release",
-                "--root-id",
-                "root-a",
-                "--expected-fingerprint",
-                acquired["fingerprint"],
-                "--release-reason",
-                "durable-handoff",
-                "--evidence",
-                "pre-register-failure",
-                env=self.env,
-            ).stdout
-        )
-
-        self.assertEqual(released["state"], "released")
-        self.assertIsNone(released["release_receipt"]["ledger_sha256"])
-        self.assertIsNone(released["release_receipt"]["ledger_size_bytes"])
-        status = json.loads(
-            run_claim("--json", "claim", "status", env=self.env).stdout
-        )
-        self.assertEqual(status["claims"], [])
-        receipt_path = Path(released["release_receipt_ref"])
-        self.assertTrue(receipt_path.is_file())
-        run_claim(
-            *self.acquire_args(
-                "root-a", self.repo, "spec-1", ledger=missing_ledger
-            ),
+        release = run_claim(
+            "--json",
+            "claim",
+            "release",
+            "--root-id",
+            "root-a",
+            "--expected-fingerprint",
+            claim["fingerprint"],
+            "--release-reason",
+            "terminal",
+            "--evidence",
+            "premature-terminal-release",
             env=self.env,
+            check=False,
         )
-        self.assertFalse(receipt_path.exists())
 
-    def test_receipt_cleanup_failure_does_not_persist_new_claim(self) -> None:
+        self.assertEqual(release.returncode, 4)
+        self.assertIn("not valid terminal state", release.stdout)
+        self.assertEqual(claim_path.read_bytes(), claim_bytes)
+        self.assertEqual(self.ledger.read_bytes(), ledger_bytes)
+        self.assertFalse((self.claim_root / "releases").exists())
+
+    def test_receipt_snapshot_uses_one_nofollow_regular_file_descriptor(self) -> None:
+        run_state = self.ledger_root / "descriptor-state.json"
+        payload = b'{"state":"terminal"}\n'
+        run_state.write_bytes(payload)
+        with mock.patch.object(
+            Path, "open", side_effect=AssertionError("pathname open is forbidden")
+        ), mock.patch.object(
+            Path, "stat", side_effect=AssertionError("pathname stat is forbidden")
+        ):
+            digest, size = CLAIM_RUNTIME.snapshot_stable_regular_file(run_state)
+        self.assertEqual(digest, hashlib.sha256(payload).hexdigest())
+        self.assertEqual(size, len(payload))
+
+        outside = self.base / "descriptor-outside.json"
+        outside.write_bytes(payload)
+        run_state.unlink()
+        run_state.symlink_to(outside)
+        with self.assertRaises(OSError):
+            CLAIM_RUNTIME.snapshot_stable_regular_file(run_state)
+
+    def test_release_rejects_ledger_replaced_by_symlink_without_dropping_claim(self) -> None:
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        outside = self.base / "outside-terminal-state.json"
+        outside.write_text('{"state":"terminal"}\n')
+        self.ledger.unlink()
+        self.ledger.symlink_to(outside)
+
+        release = run_claim(
+            "--json",
+            "claim",
+            "release",
+            "--root-id",
+            "root-a",
+            "--expected-fingerprint",
+            claim["fingerprint"],
+            "--release-reason",
+            "terminal",
+            "--evidence",
+            "must-not-follow-ledger-link",
+            env=self.env,
+            check=False,
+        )
+
+        self.assertEqual(release.returncode, 4)
+        self.assertIn("ledger_ref must not be a symlink", release.stdout)
+        self.assertTrue((self.claim_root / "root-a.json").is_file())
+        self.assertFalse((self.claim_root / "releases").exists())
+
+    def test_status_rejects_symlinked_claim_json_without_following_it(self) -> None:
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        claim_path = self.claim_root / "root-a.json"
+        outside = self.base / "outside-claim.json"
+        claim_path.replace(outside)
+        before = outside.read_bytes()
+        claim_path.symlink_to(outside)
+
+        status = run_claim(
+            "--json", "claim", "status", "--root-id", "root-a", env=self.env, check=False
+        )
+
+        self.assertEqual(status.returncode, 4)
+        self.assertIn("invalid claim file", status.stdout)
+        self.assertEqual(outside.read_bytes(), before)
+        self.assertEqual(json.loads(outside.read_text()), claim)
+
+    def test_legacy_durable_receipt_blocks_all_new_claims_without_migration(self) -> None:
+        receipt_path, receipt = self.write_legacy_durable_receipt()
+        receipt_bytes = receipt_path.read_bytes()
+
+        acquired = run_claim(
+            *self.acquire_args("root-new", self.repo, "spec-new"),
+            env=self.env,
+            check=False,
+        )
+
+        self.assertEqual(acquired.returncode, 4)
+        error = json.loads(acquired.stdout)["error"]
+        self.assertEqual(error["code"], "state-conflict")
+        self.assertIn("unsupported nonterminal release receipt", error["message"])
+        self.assertIn(receipt["root_id"], error["message"])
+        self.assertIn(str(receipt_path), error["message"])
+        self.assertEqual(error["details"]["root_id"], receipt["root_id"])
+        self.assertEqual(error["details"]["receipt_ref"], str(receipt_path))
+        self.assertEqual(error["details"]["release_reason"], "durable-handoff")
+        self.assertFalse((self.claim_root / "root-new.json").exists())
+        self.assertEqual(receipt_path.read_bytes(), receipt_bytes)
+        doctor = json.loads(run_claim("--json", "doctor", env=self.env).stdout)
+        self.assertFalse(doctor["ok"])
+        self.assertIn(receipt["root_id"], doctor["claim_store_error"])
+        self.assertIn(str(receipt_path), doctor["claim_store_error"])
+        self.assertEqual(receipt_path.read_bytes(), receipt_bytes)
+
+    def test_invalid_receipt_store_does_not_persist_new_claim(self) -> None:
         receipt_root = self.claim_root / "releases"
         receipt_root.mkdir(parents=True)
         (self.claim_root / ".lock").touch()

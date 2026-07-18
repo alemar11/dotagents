@@ -122,33 +122,34 @@ Goal, task, tracker write, or source mutation was created.
    helper.
 4. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
    and fixed 180-day prune once in the root. Warnings are nonblocking.
-5. **REGISTER** — initialize the direct-child JSON run state through
-   `scripts/ledger-cache ledger create`, including authorization/source snapshots,
-   the complete Spec registry, portfolio objective, and
+5. **REGISTER** — call `ledger create` with authorization/sources, complete Spec
+   registry, one delivery per affected repository, portfolio objective, and
    `portfolio_goal_state=pending`;
    persist `root_task_title`, then set and observe the calling task title. Only
    then reconcile with `get_goal`; otherwise call `create_goal`. Persist active
    evidence. Never set `token_budget`.
-6. **PR-PREFLIGHT** — for every repository prove GitHub access, branch/PR
+6. **PR-PREFLIGHT** — per delivery prove GitHub access, branch/PR
    publication, current-head review, CI expected to produce at least one
    applicable result, and read
    access to PR lifecycle, mergeability/conflicts, branch rules, approvals,
    base-freshness, and merge-queue eligibility. Discover the default base.
    Otherwise return `pr-preflight-failed`; never downgrade.
-7. **DISPATCH** — load `references/worker.md`; choose the deterministic ready
-   set; adopt exact takeover tasks or create one managed visible task per Spec
-   with its recorded profile; set and observe its title; verify that exact task's Goal tools
-   and assignment Goal before advancing beyond `created`.
+7. **DISPATCH** — load `references/worker.md`; choose the deterministic static
+   ready set; adopt/create one managed task per Spec with its profile; observe
+   title, Goal tools/objective, and complete delivery checkout map before
+   advancing beyond `created`.
 8. **MONITOR** — take one full task snapshot after dispatch, then consume compact
    deltas until a material transition, attention request, claim-heartbeat
    deadline, heartbeat wake, or hard workflow deadline. Steer precise corrections with the
    recorded profile. Never pull implementation or review into the root.
 9. **GATE** — load `references/gates.md` and
-   `references/codex-review-closeout.md`; require every fixed terminal gate.
+   `references/codex-review-closeout.md`; apply task-static, delivery-static,
+   delivery-revision, and complete task-revision-set evidence at its canonical
+   scope.
 10. **RECONCILE** — read the smallest `ledger-cache ledger read` projection,
     refresh only changed external evidence, and atomically apply the resulting
-    events; dispatch another wave, schedule a due review check, or record the
-    blocker or terminal external handoff.
+    events; dispatch another wave, schedule and pause typed review monitoring,
+    or advance one staged terminal closeout transition.
 
 An unchanged wait timeout performs only a required claim heartbeat. It creates
 no run-state event or no-progress record. Use a full task read only for startup
@@ -159,11 +160,13 @@ paused review-monitoring task remains nonterminal and consumes one of the three 
 
 ## Scheduling
 
-A Spec is ready only when every upstream ref in its parent
-`## Feature Dependencies` table is merged, its managed checkouts are available,
-and its paths do not overlap a running or selected Spec. A merge-ready but
-unmerged upstream does not make a downstream ready. Record the external merge handoff; if all work
-waits on it, release through a durable handoff and require an explicit resume.
+A Spec is ready when every upstream ref is merged, static gates pass, and its
+registered paths do not overlap a running/selected Spec. Managed checkouts are
+post-creation evidence; requiring them here would deadlock dispatch. A merge-ready but
+unmerged upstream does not make a downstream ready. Record the dependency wait
+and exact external merge action. If all work waits on it, retain the claim and
+active state and require explicit same-root resume; do not fabricate a review
+schedule, handoff, or release.
 
 Sort ready candidates by canonical claim/task source id ascending. Greedily
 select up to the remaining three-task capacity with pairwise disjoint canonical
@@ -174,8 +177,8 @@ parallelism are not options.
 ## Claim, Takeover, And Recovery
 
 `scripts/active-root-claim` is the sole ownership authority. Persist the claim
-fingerprint, heartbeat while active, and use it for heartbeat and release.
-Release only after terminal proof or a recorded durable handoff.
+fingerprint, heartbeat while active, and use it for heartbeat and terminal
+release. Review monitoring and dependency waits retain ownership.
 
 An overlapping live claim returns `needs-owner`. For a stale claim, perform
   read-only discovery first and load the takeover contract in
@@ -198,6 +201,10 @@ for a Spec that has recorded or embedded task evidence. The helper accepts only
 current schema-5 claims and fails closed on unsupported claim or takeover state
 without migration, retirement, or deletion.
 
+Missing candidate state is created only from complete claim-embedded task/no-task
+and delivery-checkout mappings. Creation binds that exact claim. Never add an
+adoption event, rebind an existing state, or infer identity.
+
 Before task creation, resume, read, or steering, load `references/worker.md`.
 Every new task calls `create_goal` for its exact assignment. Recovery calls
 `get_goal`, verifies the recorded objective and evidence, and resumes the same
@@ -218,11 +225,12 @@ CI, tracker-closeout preparation, ready-for-review transition, and merge-ready
 proof for every affected repository. The root verifies the evidence and never
 enqueues or merges.
 
-For a local source, after substantive acceptance, integration, and domain
-closeout, move issues to the configured done folder, commit and push, rerun
-validation and `$autoreview`, convert drafts to ready-for-review, obtain
-current-revision review, then CI and terminal merge-ready proof. Hosted and local
-issues remain open until a later default-branch merge.
+For a local source, after current task-set acceptance/integration/domain proof,
+move only predeclared refs in their deliveries. The move dirties delivery state
+and invalidates old evidence. Commit/push, observe the new revision, rerun
+validation and `$autoreview`, convert drafts to
+ready-for-review, obtain current-revision review, then CI and terminal proof.
+Hosted and local issues remain open until a later default-branch merge.
 
 For pre-CLAIM aborts, report the evidence and zero-mutation result. Otherwise
 return run-state-derived source fingerprints, title, task/Goal and checkout proof,
@@ -230,17 +238,16 @@ changes, validation, commits, PR URLs, reviewed revisions, CI, captured
 domain-closeout evidence, prepared tracker closeout, current-head mergeability
 and repository-rule evidence, blockers, recovery freshness, and next action.
 
-Before terminal release, revalidate exact root-title evidence; every task and the
-root then call `update_goal` with `status=complete`. Persist
-`portfolio_goal_state=complete` and its evidence, then run the complete terminal
-release/archive sequence in `references/cache-lifecycle.md`. A
-failed title, completion, or evidence write retains the claim and active run state. A
-resumable review handoff first pauses and readbacks each waiting worker Goal,
-arms one earliest-due root heartbeat, pauses and readbacks the root Goal, then
-uses that reference's complete durable-handoff release. It retains the run state
-and paused nonterminal Goals. Recovery may finish only a fully
-revalidated completion, release, or archive transition; it never resumes
-implementation after terminal proof.
+After root-title revalidation, close out only in this order:
+`task-terminal-sealed`, worker Goal/readback, `task-goal-completed`,
+`terminal-handoff-recorded`, `portfolio-terminal-verified`, root Goal/readback,
+`portfolio-goal-completed`, release and archive. Failure retains active state.
+
+Review monitoring schedules every pending delivery, pauses each worker once
+against its complete schedule fingerprint, and only when the portfolio is
+quiescent arms the earliest root heartbeat and pauses root. It keeps claim,
+state, and paused Goals; no handoff or release.
+Post-terminal drift blocks archive and never reopens Goals or implementation.
 
 ## Reference Routing
 

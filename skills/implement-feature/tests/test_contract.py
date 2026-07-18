@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 import unittest
 from pathlib import Path
@@ -56,9 +57,9 @@ def derive_root_task_title(registry_rows: list[dict[str, bool]]) -> str:
     return "👨🏻‍💻 Multi-Feature Orchestrator"
 
 
-def derive_provider_timeout_seconds(*, wait_deadline: int, wait_invoked_at: int) -> int | None:
+def derive_provider_timeout_seconds(*, wait_deadline: int, wait_invoked_at: int) -> int:
     remaining = wait_deadline - wait_invoked_at
-    return remaining if remaining > 0 else None
+    return max(0, remaining)
 
 
 def run_root_title_registration_fixture(
@@ -183,6 +184,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/gates.md",
             "references/spec-backed-delivery.md",
             "references/codex-review-closeout.md",
+            "references/review-monitoring.md",
             "references/recovery-validation.md",
             "references/multi-repo-workspace.md",
         }
@@ -407,7 +409,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         self.assertIn("task_title", packets)
         self.assertIn(
-            "title and Goal observation evidence may refresh",
+            "bound identities are immutable",
             " ".join(packets.split()),
         )
         self.assertIn("never display titles", compact_run_state)
@@ -544,16 +546,19 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("Root Task Display Title", worker)
 
         terminal_contract = " ".join(
-            skill.split("Before terminal release", 1)[1].split()
+            skill[skill.index("After root-title revalidation") :].split()
         )
-        self.assertLess(
-            terminal_contract.index("exact root-title evidence"),
-            terminal_contract.index("`update_goal`"),
+        closeout_order = (
+            "root-title revalidation",
+            "`task-terminal-sealed`",
+            "`task-goal-completed`",
+            "`terminal-handoff-recorded`",
+            "`portfolio-terminal-verified`",
+            "`portfolio-goal-completed`",
+            "release and archive",
         )
-        self.assertLess(
-            terminal_contract.index("`update_goal`"),
-            terminal_contract.index("portfolio_goal_state=complete"),
-        )
+        offsets = [terminal_contract.index(token) for token in closeout_order]
+        self.assertEqual(offsets, sorted(offsets))
 
     def test_root_title_state_transitions_are_crash_safe_and_closeout_gated(
         self,
@@ -742,19 +747,15 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("there is no last-N exception", lifecycle)
         self.assertIn("warning is nonblocking", normalized_lifecycle)
         self.assertIn("After the terminal projection passes", lifecycle)
-        self.assertIn("recorded resumable handoff", normalized_lifecycle)
+        self.assertIn("For review monitoring, retain", normalized_lifecycle)
+        self.assertIn("Dependency-only waits also retain", normalized_lifecycle)
         self.assertIn("raw 64-hex", lifecycle)
         self.assertIn("never a `sha256:` value", normalized_lifecycle)
-        handoff = lifecycle.split("For a recorded", 1)[1].split("Stop and retain", 1)[0]
+        monitoring = lifecycle.split("For review monitoring", 1)[1].split("After the terminal", 1)[0]
         terminal = lifecycle.split("After the terminal projection passes", 1)[1].split("The release receipt binds", 1)[0]
-        for token in (
-            "--root-id '<root-id>'",
-            "--expected-fingerprint '<claim-fingerprint>'",
-            "--release-reason durable-handoff",
-            "--evidence '<durable-handoff-evidence-ref>'",
-        ):
-            self.assertIn(token, handoff)
-        self.assertNotIn("ledger archive", handoff)
+        self.assertIn("Do not release ownership", monitoring)
+        self.assertNotIn("claim release", monitoring)
+        self.assertIn("do not fabricate", monitoring)
         for token in (
             "--root-id '<root-id>'",
             "--expected-fingerprint '<claim-fingerprint>'",
@@ -765,8 +766,17 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertIn(token, terminal)
         self.assertLess(terminal.index("claim release"), terminal.index("ledger archive"))
-        self.assertIn("release receipt binds the exact root", normalized_lifecycle.lower())
-        self.assertIn("receipt never authorizes archive", normalized_lifecycle)
+        self.assertIn(
+            "an archive-ready terminal projection before receipt or claim deletion",
+            normalized_lifecycle,
+        )
+        self.assertIn(
+            "Rejection leaves claim and ledger unchanged",
+            normalized_lifecycle,
+        )
+        self.assertIn("bind validated JSON bytes", normalized_lifecycle)
+        self.assertIn("ledger's exact terminal evidence", normalized_lifecycle)
+        self.assertIn("`terminal` is the only active release reason", lifecycle)
         self.assertIn("Frozen archive-v1 entries remain readable evidence", normalized_ledger)
         self.assertIn("deterministic Markdown audit report is rendered only during archival", normalized_ledger)
 
@@ -899,14 +909,17 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_scheduling_is_deterministic_path_disjoint_and_merge_gated(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
+        delivery = " ".join(
+            self.read("references/spec-backed-delivery.md").split()
+        )
         self.assertIn("Sort ready candidates by canonical claim/task source id ascending", skill)
-        self.assertIn("`## Feature Dependencies` table", skill)
+        self.assertIn("`## Feature Dependencies` table", delivery)
         self.assertIn("Greedily select", skill)
         self.assertIn("remaining three-task capacity", skill)
         self.assertIn("pairwise disjoint", skill)
         self.assertIn("ancestor/descendant path scopes as overlapping", skill)
         self.assertIn(
-            "every upstream ref in its parent `## Feature Dependencies` table is merged",
+            "every upstream ref is merged",
             skill,
         )
         self.assertIn("merge-ready but unmerged upstream does not make a downstream ready", skill)
@@ -976,7 +989,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("portfolio-goal-resumed", packets)
         self.assertIn("portfolio-goal-completed", packets)
         self.assertIn("review-monitoring-scheduled", packets)
-        self.assertIn("review-monitoring-resumed", packets)
+        self.assertIn("task-monitoring-paused", packets)
+        self.assertIn("task-monitoring-resumed", packets)
         self.assertIn("goal_evidence_ref", packets)
         self.assertIn("Before any mutation, read each exact recorded task", normalized_recovery)
         self.assertIn("portfolio_goal_state=pending", recovery)
@@ -1012,7 +1026,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         dispatch = " ".join(
             skill.split("7. **DISPATCH**", 1)[1].split("8. **MONITOR**", 1)[0].split()
         )
-        self.assertIn("verify that exact task's Goal tools", dispatch)
+        self.assertIn("observe title, Goal tools/objective", dispatch)
         self.assertIn("before advancing beyond `created`", dispatch)
 
         register = " ".join(
@@ -1024,14 +1038,16 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
 
         delivery = " ".join(skill.split("## Delivery And Final Report", 1)[1].split())
-        self.assertLess(
-            delivery.index("`update_goal`"),
-            delivery.index("portfolio_goal_state=complete"),
+        closeout_order = (
+            "`task-terminal-sealed`",
+            "`task-goal-completed`",
+            "`terminal-handoff-recorded`",
+            "`portfolio-terminal-verified`",
+            "`portfolio-goal-completed`",
+            "release and archive",
         )
-        self.assertLess(
-            delivery.index("portfolio_goal_state=complete"),
-            delivery.index("complete terminal release/archive sequence"),
-        )
+        offsets = [delivery.index(token) for token in closeout_order]
+        self.assertEqual(offsets, sorted(offsets))
 
         runtime = self.runtime_text()
         for retired in (
@@ -1057,7 +1073,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "`wait_started_at`",
             "`wait_deadline`",
             "`wait_invoked_at`",
-            "`provider_timeout=floor(wait_deadline-now)`",
+            "`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`",
             "`--timeout <provider_timeout>s --interval 10s --max-interval 30s`",
             "unchanged deadline",
         ):
@@ -1068,34 +1084,44 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLess(
             normalized_closeout.index("root atomically records"),
-            normalized_closeout.index("At launch"),
+            normalized_closeout.index("Before launch"),
         )
         self.assertLess(
-            normalized_closeout.index("starts GitStack"),
-            normalized_closeout.index("Report actual invocation/timeout afterward"),
+            normalized_closeout.index("root must persist"),
+            normalized_closeout.index("worker calls GitStack"),
         )
         self.assertIn("Before `poll-review`", worker)
         self.assertIn("require root-issued", worker)
-        self.assertIn("At launch set", worker)
-        self.assertIn("never reuse", worker)
-        self.assertLess(worker.index("start GitStack"), worker.index("Report invocation/timeout afterward"))
+        self.assertIn("Before launch set", worker)
+        self.assertIn("single-launch authority", worker)
+        self.assertIn("Start GitStack only after the root persists", worker)
         self.assertIn("provider_timeout", packets)
         self.assertIn("wait_invoked_at", packets)
+        self.assertIn("monitoring_cycle", packets)
+        self.assertIn("schedule_fingerprint", packets)
         self.assertEqual(
             derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=120),
             1_680,
         )
-        self.assertIsNone(
-            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=1_800)
+        self.assertEqual(
+            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=1_800),
+            0,
+        )
+        self.assertEqual(
+            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=1_900),
+            0,
         )
         for token in (
             "`review-monitoring-scheduled`",
+            "`task-monitoring-paused`",
+            "`task-monitoring-resumed`",
             "`portfolio-goal-paused`",
             "`portfolio-goal-resumed`",
-            "performs one canonical review check",
-            "never launches a second waiter",
+            "retains the active claim",
+            "never starts another waiter",
         ):
-            self.assertIn(token, closeout + monitoring)
+            self.assertIn(token, " ".join((closeout + monitoring + packets).split()))
+        self.assertNotIn("monitoring-handoff-recorded", closeout + monitoring + packets)
         self.assertIn("terminal-only", closeout)
         self.assertIn("Never start another waiter or change the original active-wait timestamps", " ".join(closeout.split()))
         self.assertIn("`review_operation`", closeout)
@@ -1156,12 +1182,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Frozen archive-v1 entries remain readable evidence",
         ):
             self.assertIn(token, run_state)
-        self.assertIn("Use exactly these fields", packets)
+        self.assertIn("Use exactly these top-level fields", packets)
         self.assertIn(
-            "Every object uses exactly the fields listed below",
+            "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "3.0.0"', helper)
+        self.assertIn('__version__ = "4.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1171,6 +1197,178 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertFalse((ROOT / removed).exists())
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
+
+    def test_v2_event_packet_registry_matches_the_v4_runtime(self) -> None:
+        helper = self.read("scripts/ledger-cache")
+        packets = self.read("references/run-state-packets.md")
+        run_state = " ".join(self.read("references/run-state.md").split())
+
+        for constant in (
+            '__version__ = "4.0.0"',
+            'LEDGER_SCHEMA_VERSION = "2.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "2.0.0"',
+        ):
+            self.assertIn(constant, helper)
+        self.assertIn("| `schema_version` | `2.0.0` |", packets)
+        self.assertIn("Active state accepts only ledger schema `2.0.0`", run_state)
+        self.assertIn("active JSON `1.0.0`", run_state)
+        self.assertIn("Do not import, migrate", run_state)
+
+        module = ast.parse(helper)
+        apply_event = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef) and node.name == "apply_event"
+        )
+        runtime_fields: dict[str, set[str]] = {}
+        for node in ast.walk(apply_event):
+            if not isinstance(node, ast.If):
+                continue
+            test = node.test
+            if not (
+                isinstance(test, ast.Compare)
+                and isinstance(test.left, ast.Name)
+                and test.left.id == "event_type"
+                and len(test.ops) == 1
+                and isinstance(test.ops[0], ast.Eq)
+                and len(test.comparators) == 1
+                and isinstance(test.comparators[0], ast.Constant)
+                and isinstance(test.comparators[0].value, str)
+            ):
+                continue
+            event_type = test.comparators[0].value
+            for call in ast.walk(node):
+                if not (
+                    isinstance(call, ast.Call)
+                    and isinstance(call.func, ast.Name)
+                    and call.func.id == "exact_object"
+                    and len(call.args) >= 2
+                    and isinstance(call.args[1], ast.Set)
+                ):
+                    continue
+                fields = {
+                    item.value
+                    for item in call.args[1].elts
+                    if isinstance(item, ast.Constant) and isinstance(item.value, str)
+                }
+                if "type" in fields:
+                    runtime_fields[event_type] = fields - {"type"}
+                    break
+
+        packet_fields: dict[str, set[str]] = {}
+        for line in packets.splitlines():
+            match = re.fullmatch(r"\| `([^`]+)` \| (.+) \|", line)
+            if match and match.group(1) in runtime_fields:
+                packet_fields[match.group(1)] = set(
+                    re.findall(r"`([^`]+)`", match.group(2))
+                )
+        self.assertEqual(packet_fields, runtime_fields)
+
+    def test_v2_registration_packet_registry_matches_the_runtime(self) -> None:
+        helper = self.read("scripts/ledger-cache")
+        packets = self.read("references/run-state-packets.md")
+        module = ast.parse(helper)
+        validate_registration = next(
+            node
+            for node in module.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "validate_registration"
+        )
+        runtime_sets: dict[str, set[str]] = {}
+        for node in ast.walk(validate_registration):
+            if not (
+                isinstance(node, ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id
+                in {"required", "source_required", "delivery_required"}
+                and isinstance(node.value, ast.Set)
+            ):
+                continue
+            runtime_sets[node.targets[0].id] = {
+                item.value
+                for item in node.value.elts
+                if isinstance(item, ast.Constant) and isinstance(item.value, str)
+            }
+
+        top = packets.split("Use exactly these top-level fields:", 1)[1].split(
+            "Each `sources[]` object", 1
+        )[0]
+        documented_top = set(re.findall(r"^\| `([^`]+)` \|", top, re.MULTILINE))
+
+        def listed_fields(after: str) -> set[str]:
+            block = packets.split(after, 1)[1].split("```text", 1)[1].split("```", 1)[0]
+            return set(re.findall(r"[a-z][a-z0-9_]*", block))
+
+        self.assertEqual(documented_top, runtime_sets["required"])
+        self.assertEqual(
+            listed_fields("Each `sources[]` object has exactly:"),
+            runtime_sets["source_required"],
+        )
+        self.assertEqual(
+            listed_fields("Each nonempty `deliveries[]` object has exactly:"),
+            runtime_sets["delivery_required"],
+        )
+        self.assertNotIn("tracker_sources", packets)
+
+    def test_gate_scopes_and_handoff_authorities_are_closed(self) -> None:
+        helper = self.read("scripts/ledger-cache")
+        packets = self.read("references/run-state-packets.md")
+        run_state = " ".join(self.read("references/run-state.md").split())
+        module = ast.parse(helper)
+        expected = {
+            "TASK_STATIC_GATES": {"dependency-integration"},
+            "DELIVERY_STATIC_GATES": {"pr-preflight"},
+            "TASK_REVISION_SET_GATES": {
+                "scope-acceptance",
+                "integration-validation",
+                "domain-closeout",
+            },
+            "DELIVERY_REVISION_GATES": {
+                "focused-validation",
+                "full-validation",
+                "autoreview",
+                "publication",
+                "codex-review",
+                "ci",
+                "pr-ready",
+                "tracker-closeout",
+                "mergeability",
+            },
+        }
+        actual: dict[str, set[str]] = {}
+        for node in module.body:
+            if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Set):
+                continue
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id in expected:
+                    actual[target.id] = {
+                        item.value
+                        for item in node.value.elts
+                        if isinstance(item, ast.Constant)
+                    }
+        self.assertEqual(actual, expected)
+
+        scope_to_constant = {
+            "task-static": "TASK_STATIC_GATES",
+            "delivery-static": "DELIVERY_STATIC_GATES",
+            "task-revision-set": "TASK_REVISION_SET_GATES",
+            "delivery-revision": "DELIVERY_REVISION_GATES",
+        }
+        for scope, constant in scope_to_constant.items():
+            row = next(
+                line for line in packets.splitlines() if line.startswith(f"| `{scope}` |")
+            )
+            gates_column = row.strip("|").split("|")[1]
+            documented = set(re.findall(r"`([^`]+)`", gates_column))
+            self.assertEqual(documented, expected[constant])
+
+        self.assertIn("Static gates dispatch before a PR revision", run_state)
+        self.assertIn("`authority=external-merge-required`", packets)
+        self.assertIn("Monitoring never creates a handoff", packets)
+        self.assertNotIn("durable-review-monitoring", packets)
+        self.assertNotIn("monitoring-handoff-recorded", packets)
+        self.assertNotIn("external-handoff-recorded", packets)
 
     def test_takeover_contract_uses_renamed_permission(self) -> None:
         runtime = self.runtime_text()
@@ -1187,7 +1385,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("fixed five-minute stale threshold", compact_runtime)
         self.assertIn("current schema-5 claims", compact_runtime)
         self.assertIn(
-            "Do not import, migrate, rename, dual-read, retire, or delete",
+            "Do not import, migrate, rename, dual-read, dual-write, retire, or delete",
             compact_runtime,
         )
         self.assertNotIn("claim retire-legacy", combined)
@@ -1217,7 +1415,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertIn("before stopping a task", options)
         self.assertIn("same-task adoption", options)
-        self.assertIn("adopt the exact original task ref", worker.lower())
+        self.assertIn("adopt each original task", worker.lower())
         self.assertIn("inability to adopt or resume it is a blocker", worker)
 
     def test_takeover_is_prepared_recoverable_and_self_contained(self) -> None:
@@ -1235,9 +1433,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("full replaced-claim snapshot", skill)
         self.assertIn("validated per-Spec adoption data", skill)
         self.assertIn("claim recover-takeover", skill)
-        self.assertIn("prepared takeover journal", run_state)
-        self.assertIn("`claim-rebound`", run_state)
-        self.assertIn("no candidate state was ever created", run_state)
+        self.assertIn("prepared journal", run_state)
+        self.assertNotIn("claim-rebound", run_state)
+        self.assertIn("keeps its exact claim and fingerprint", run_state)
+        self.assertIn("Missing state initializes only from the current claim's complete adoption mappings", run_state)
         self.assertIn("initialize only from the current prepared journal", recovery)
         self.assertIn("complete embedded adoption mappings", recovery)
         self.assertIn("no candidate JSON because creation never completed", recovery)
@@ -1517,6 +1716,34 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("If a local move is fully proven, apply `source-moved`", recovery)
         self.assertIn("Both paths, neither path", recovery)
 
+    def test_revision_and_delivery_observations_are_distinct(self) -> None:
+        helper = self.read("scripts/ledger-cache")
+        run_state = " ".join(self.read("references/run-state.md").split())
+        revision = helper.split('if event_type == "revision-observed":', 1)[1].split(
+            'if event_type == "delivery-observed":', 1
+        )[0]
+        delivery = helper.split('if event_type == "delivery-observed":', 1)[1].split(
+            'if event_type == "source-moved":', 1
+        )[0]
+
+        for field in (
+            '"repository"',
+            '"pr_number"',
+            '"pr_url"',
+            '"head_sha"',
+            '"base_ref"',
+            '"merge_base_sha"',
+        ):
+            self.assertIn(field, revision)
+        self.assertIn('"revision_key"', delivery)
+        self.assertIn('"pr"', delivery)
+        self.assertIn('"committed"', delivery)
+        self.assertIn('"published"', delivery)
+        self.assertNotIn("tracker_dirty_after_revision_key\"] = None", revision)
+        self.assertIn("tracker_dirty_after_revision_key\"] = None", delivery)
+        self.assertIn("revision[\"revision_key\"] != dirty", delivery)
+        self.assertIn("The events are distinct, not aliases", run_state)
+
     def test_terminal_pr_base_is_derived_default_branch(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
         delivery = " ".join(
@@ -1622,7 +1849,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             ).read_text().split()
         )
         fixture = (
-            REPO / "skills/plan-feature/references/full-flow-dry-run.md"
+            REPO / "skills/plan-feature/references/complete-bundle-proposal.md"
         ).read_text()
 
         self.assertIn("shared inside each Feature Spec", delivery)
@@ -1659,27 +1886,36 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("schedule around the collision", workspace)
 
     def test_local_closeout_uses_one_ready_for_review_sequence(self) -> None:
-        clauses = {
-            "SKILL.md": "For a local source, after substantive acceptance",
-            "references/gates.md": "For local Markdown, complete substantive acceptance",
-            "references/codex-review-closeout.md": "For a local Markdown source, first finish",
-            "references/spec-backed-delivery.md": "For local Markdown, after substantive acceptance",
-            "references/worker.md": "For local tracker artifacts",
-            "../plan-feature/references/issue-body-template.md": "Local tracker: after implementation",
-        }
+        gates = " ".join(self.read("references/gates.md").split())
+        segment = gates.split("For local Markdown", 1)[1]
+        order = (
+            "move each issue",
+            "tracker delivery dirty",
+            "commit and push",
+            "`revision-observed`",
+            "`delivery-observed`",
+            "$autoreview",
+            "ready-for-review",
+            "current-revision review",
+            "CI",
+            "terminal merge-ready",
+        )
+        offsets = [segment.index(token) for token in order]
+        self.assertEqual(offsets, sorted(offsets))
 
-        for path, start in clauses.items():
+        for path in (
+            "SKILL.md",
+            "references/codex-review-closeout.md",
+            "references/spec-backed-delivery.md",
+            "references/worker.md",
+        ):
             contents = " ".join(self.read(path).split())
-            self.assertIn(start, contents, path)
-            segment = contents.split(start, 1)[1][:1200]
-            self.assertLess(segment.index("$autoreview"), segment.index("ready-for-review"), path)
-            self.assertLess(
-                segment.index("ready-for-review"),
-                segment.index("current-revision review"),
-                path,
-            )
-            self.assertLess(segment.index("current-revision review"), segment.index("CI"), path)
-            self.assertLess(segment.index("CI"), segment.index("terminal merge-ready"), path)
+            self.assertIn("local", contents.lower(), path)
+            self.assertIn("delivery", contents, path)
+            self.assertIn("invalidat", contents, path)
+            self.assertIn("$autoreview", contents, path)
+            self.assertIn("ready-for-review", contents, path)
+            self.assertIn("current-revision review", contents, path)
 
     def test_metadata_is_manual_and_compact(self) -> None:
         skill = self.read("SKILL.md")
@@ -1707,12 +1943,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            85_200,
+            88_800,
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path)
             + len(self.read("references/review-monitoring.md").encode("utf-8")),
-            89_000,
+            92_200,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -1722,7 +1958,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            89_000,
+            93_000,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE

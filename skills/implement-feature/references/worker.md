@@ -3,11 +3,9 @@
 ## Assignment
 
 Create exactly one visible App task per implementation-eligible Feature Spec.
-Record its Spec ref and title, task id and title, managed repository checkout
-map, resolved task model and thinking, profile decision reason, allowed paths,
-Goal evidence, lifecycle state, changed files, validation, commits, PRs,
-current-revision review, CI, tracker-closeout preparation, blockers, and next
-action.
+Record Spec/task/title/profile/Goal/lifecycle/results. Keep one `deliveries[]`
+entry per affected repository for checkout, paths, commits, PR/revision,
+review, CI, tracker closeout, and mergeability.
 
 Task ids, managed checkouts, Goals, PR count, and internal subagent topology are
 derived runtime evidence. They are not user options.
@@ -80,10 +78,12 @@ the Execution Contract and exposed by the App-managed checkout.
 Give GitStack only exact PR, `review_operation`, and `mutation_mode=apply` for an
 authorized mutation. Before `poll-review`, report tuple/request evidence and
 require root-issued `revision_key`, `wait_started_at`, and `wait_deadline`.
-At launch set `wait_invoked_at=now`, compute
-`provider_timeout=floor(wait_deadline-now)`, and start GitStack with 10s/30s
-bounds in one local step with no root round-trip. If nonpositive, check once.
-Report invocation/timeout afterward; never reuse, default, or segment it.
+Before launch set `wait_invoked_at=now`, compute
+`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`, and report both to the root.
+Start GitStack only after the root persists `review-wait-invoked`; that event is
+single-launch authority. Use 10s/30s bounds when positive and one immediate
+no-wait check at zero. Never relaunch, default, or segment it. Bind each result
+to the exact root-issued `monitoring_cycle`.
 
 For local commit actions, use `$gitstack:git-commit` and keep
 `commit_kind=regular` unless target-repository instructions require a targeted
@@ -93,12 +93,12 @@ cross-commit corrections stop for owner direction. Never autosquash or rewrite
 the published branch. Any resulting head change invalidates current-revision
 review and CI evidence and repeats the fixed final gates.
 
-## Managed Checkout
+## Managed Deliveries And Checkouts
 
 Create the task through the App-managed worktree target before implementation.
-Record each repository id, checkout path, target branch, Git top-level, baseline
-revision, and isolation proof. A multi-repository Spec stays one task and its
-managed workspace must expose every required child checkout.
+Record one complete `managed-checkouts-observed` map of delivery key,
+repository, checkout, branch, Git top-level, baseline, and isolation. A
+multi-repository Spec remains one task. No task-level checkout/PR/revision exists.
 
 If any checkout is missing or not isolated, stop as blocked. Never create,
 remove, or repair raw Git worktrees, rotate the caller checkout, or fall back to
@@ -124,8 +124,10 @@ creation, report an
 `unsupported-runtime` blocker on that same task. Never record an objective
 fallback or create a replacement task.
 
-Call `update_goal` with `status=complete` only after the fixed terminal result
-is proven. A pending review handoff uses the first-class Goal pause operation
+Call `update_goal(status=complete)` only after root-confirmed
+`task-terminal-sealed`; read back for `task-goal-completed`, then terminal
+handoff/`merge-ready`. A pending review handoff uses
+the first-class Goal pause operation
 and readback; its due resume restores the same Goal to active before one review
 check. Other temporary blockers leave nonterminal task Goals active;
 already-terminal task Goals remain complete. If recovery finds
@@ -144,11 +146,11 @@ Project Memory implementation-closeout after integration and require
 target reconciled, named verified destinations, and complete documentation-diff
 verification. `deferred`, `no-durable-change`, or a rejected or contradicted
 accepted item blocks the task pending an owner decision or separately authorized
-planning/implementation correction. For local tracker
-artifacts, move each issue to its scoped `done/` path on the delivery branch.
-Report the exact tracked rename so the root can atomically advance the issue
-source snapshot from its active ref to the predeclared done ref; do not edit the
-body during the move. Commit/push and publish/update each PR against the
+planning/implementation correction. For local tracker artifacts, after current
+task-set substantive/integration/domain proof report the predeclared tracked
+move and unchanged body for `source-moved`. It dirties/invalidates the delivery;
+commit/push, report the new `revision-observed`, then current committed/published
+`delivery-observed` before final gates. Publish/update each PR against the
 discovered default branch. Outside the ready mutation's shell chain, record its
 exact number and URL. Rerun validation and `$autoreview`, then convert any draft
 to ready-for-review only by exact identity; a `gh` fallback is
@@ -166,8 +168,9 @@ task per issue.
 
 Canonical states are `created`, `implementing`, `validating`, `draft-pr`,
 `marking-ready-for-review`, `review-polling`, `review-monitoring`, `fixing-review`, `ci`,
-`preparing-tracker-closeout`, `checking-mergeability`, `merge-ready`, `blocked`,
-and `needs-owner`.
+`preparing-tracker-closeout`, `checking-mergeability`, `terminal-sealed`,
+`merge-ready`, `blocked`, `needs-owner`, and `failed`. Post-terminal drift is a
+separate closeout record, not a task state.
 
 The root reads current task evidence before steering. A correction names the
 observed drift, expected next state, and preserved scope. A stale or failed task
@@ -176,15 +179,14 @@ the recorded `task_title` on that same task when its live title drifts. If it
 cannot be resumed, stop as blocked; never create a replacement task for that
 Spec.
 
-After an authorized stale-root takeover, use the candidate claim's validated
-embedded adoption mapping and cross-check any available prior JSON run state. Adopt the
-exact original task ref for every previously dispatched Spec and resume it after
-verifying its Goal and managed checkouts. Across the adopted set, no task ref or
-managed `(repository, checkout)` pair may belong to two Specs. An explicit
-embedded no-task entry with the exact pre-CLAIM profile is required before first
-creation, and that first creation must use the embedded profile without
-reclassification. Do not create a task when embedded, prior-state, or live App
-evidence records one for the Spec;
+After takeover, initialize missing state only from the candidate claim's
+validated embedded adoption mapping. Adopt each original task after verifying
+Goal and complete delivery checkouts. No task ref or managed
+`(repository, checkout)` pair may belong to two Specs. An explicit embedded
+no-task entry with the exact pre-CLAIM profile is required before first creation,
+and that first creation must use the embedded profile without reclassification.
+Do not create a task when embedded, prior-state, or live App evidence records
+one for the Spec;
 inability to adopt or resume it is a blocker.
 
 ## Internal Subagents
@@ -201,8 +203,8 @@ Own this Feature Spec through pull-request-ready-for-merge-but-not-merged.
 Canonical task source id: <canonical claim/task source id>
 Authoritative Feature Spec: <authored source_spec_ref and title>
 Feature slug: <feature_slug>
-Managed repositories: <repository, checkout, target branch, baseline>
-Allowed paths: <repository-qualified paths>
+Managed deliveries: <delivery key, repository, checkout, target branch, baseline>
+Allowed paths: <delivery-keyed repository-relative paths>
 Scope and acceptance: <exact requirements and acceptance refs>
 Dependencies: <verified merged cross-Spec dependencies>
 Validation and integration gates: <commands and proof>
@@ -221,7 +223,8 @@ internal subagents.
 Do not edit the run state, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
 every affected PR is ready to merge or report a concrete blocker. Call
-`update_goal` with `status=complete` only after the terminal result is proven.
+`update_goal` with `status=complete` only after the root confirms the immutable
+terminal seal for the complete delivery revision set.
 ```
 
 ## Report
@@ -230,10 +233,10 @@ Report one compact typed packet after each material milestone, attention request
 blocker, review-wait invocation, or terminal transition. Do not repeat unchanged
 state or paste full command output; the root expands evidence only for a mismatch,
 blocker, or independent terminal verification. Report task and Goal evidence,
-state, managed checkouts, changed files,
+state, the complete delivery-keyed managed checkout map, changed files,
 the exact task display title and observation evidence, task model, thinking
-value, and profile decision reason, validation, commits, PR URLs, full current
-revision tuples, review disposition and wait assignment/invocation, CI, current PR
+value, and profile decision reason, validation, delivery commits, exact PR
+number/URL/revision, review/wait, CI, current PR
 lifecycle/conflict/mergeability state, required base-freshness, approval state,
 merge-queue eligibility, and the observation tuple/time (or exact blocker),
 prepared tracker closeout, internal subagents, blockers, drift, and next action.

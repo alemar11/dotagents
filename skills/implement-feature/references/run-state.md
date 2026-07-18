@@ -1,217 +1,221 @@
 # Implement Feature Run State
 
-## Ownership And Resolution
+## Ownership And Hard Cut
 
-Use one direct-child JSON state document per overlapping repository/source
-portfolio under `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it
-only after atomic claim acquisition. `scripts/ledger-cache` v3 is its sole
-writer; the root and visible tasks never create, patch, or replace it directly.
+Use one absolute direct-child `.json` state document per overlapping
+repository/source portfolio under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
+atomic claim acquisition. `scripts/ledger-cache` v4 is the sole active-state
+writer; roots and visible tasks never patch or replace it directly.
 
-`scripts/active-root-claim` remains the sole ownership authority. The state
-records its root id, acquire-time fingerprint, repositories, sources, and claim
-evidence, but never duplicates claim heartbeat state. Every state mutation
-requires the same live root and raw 64-hex acquire fingerprint.
+`scripts/active-root-claim` remains the sole ownership authority. Every
+mutation requires the same live root and raw 64-hex acquire fingerprint. The
+helper also requires a regular, non-symlinked state root and shared lock; a
+missing lock or unsafe path fails closed.
 
-An active state path must be an absolute direct-child `.json` path. Active
-Markdown, unsupported schemas, unknown fields, and invalid transitions block as
-`unsupported-active-ledger`. Do not import, migrate, alias, dual-read, or
-dual-write them. Archived state is cold evidence and never recovery input.
+Active state accepts only ledger schema `2.0.0` created from registration
+schema `2.0.0`. Active Markdown, active JSON `1.0.0`, aliases, unknown fields, invalid paths, and invalid
+transitions block as `unsupported-active-ledger`. Do not import, migrate,
+rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
+remain byte-identical cold evidence that can only be read, verified, or pruned.
 
 ## Command Contract
 
-Load `run-state-packets.md` immediately before creating a registration or event
-packet. It is the sole field registry for strict command inputs.
-
-Initialize once from a strict registration packet:
+Load `run-state-packets.md` immediately before writing a registration or event
+packet. It is the sole strict field registry.
 
 ```text
 scripts/ledger-cache --json ledger create --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --operation-id '<unique-operation-id>' --registration-file '<absolute-registration-json>'
-```
-
-The resulting state contains the accepted authorization evidence, complete
-source snapshots, complete implementation-eligible Feature Spec registry,
-resolved task profiles, portfolio Goal objective and fingerprint,
-`portfolio_goal_state=pending`, and the derived pending root title. It is one
-initial snapshot, not a stream of table writes. Missing or extra fields fail
-closed.
-
-Apply one or more material events atomically:
-
-```text
 scripts/ledger-cache --json ledger apply --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --expected-generation '<current-generation>' --operation-id '<unique-operation-id>' --events-file '<absolute-events-json>'
-```
-
-`expected_generation` is compare-and-swap authority. A stale generation changes
-nothing and requires a fresh read. Replaying the same `operation_id` with the
-same canonical payload is an idempotent success; reusing it with a different
-payload is a conflict. The helper validates the complete batch, applies its
-transition and invalidation rules, increments generation once, and atomically
-replaces the file under the shared claim-store lock. No partial event batch is
-visible.
-
-Read only the projection needed by the next decision:
-
-```text
 scripts/ledger-cache --json ledger read --ledger '<absolute-active-json>' --projection 'status|dispatch|recovery|terminal'
 ```
 
-`status` reports identity and current progress; `dispatch` reports the derived
-ready set and capacity; `recovery` reports the freshness inputs and due actions;
-`terminal` reports gate eligibility and final evidence. Reads never mutate or
-refresh external truth.
+`expected_generation` is compare-and-swap authority. A stale generation
+changes nothing and requires a fresh projection. Replaying the same
+`operation_id` with the same canonical payload is an idempotent success; reuse
+with another payload is a conflict. The root submits one atomic event batch;
+the helper validates it, applies transitions and invalidations, increments generation once, and
+atomically replaces the file under the shared lock. No partial batch is
+visible. Reads never mutate or refresh external truth.
 
-## Event Registry
+## Task And Delivery Model
 
-The event type registry is closed. Every event has strict type-specific fields
-and an external evidence reference; unknown event types or fields are invalid.
+Keep one task entity per implementation-eligible Feature Spec. It owns source
+and visible-task identity/title, immutable profile, Goal, lifecycle,
+dependencies, task gates, blocker, and next action; never a singular repository,
+checkout, PR, or revision. Identity comes from refs, never display titles.
 
-| event type | material transition |
+Each task owns nonempty `deliveries[]`, exactly one per affected Git repository.
+A stable `delivery_key` owns repository, branch, paths, local tracker moves,
+managed checkout/isolation, PR/revision, review, gates, and tracker dirt. Keys
+are task-unique; no managed `(repository, checkout)` pair may serve two Specs.
+
+Bind the task ref with the complete `managed-checkouts-observed` map, then use
+`task-observed` for its title, profile, Goal, and lifecycle. Before work advances
+beyond `created`, partial, unmanaged, or non-isolated checkout maps block.
+Use `revision-observed` to establish one immutable delivery/PR tuple and derive
+its `revision_key`. Use `delivery-observed` only to bind the current full PR
+lifecycle plus committed/published evidence to that exact key. The events are
+distinct, not aliases.
+
+At most three tasks are nonterminal. Ready sets, conflicts, capacity, due work,
+closeout readiness, and next actions are derived. Dependencies require verified
+upstream merge. `review-monitoring` tasks remain nonterminal and consume a slot.
+
+## Gate Scopes And Invalidation
+
+Each gate name has exactly one scope; `gate-observed` carries the resulting
+`delivery_key` and `binding_key`:
+
+| scope | key | examples |
+| --- | --- | --- |
+| `task-static` | both keys null | dependency integration |
+| `delivery-static` | delivery key; binding null | PR preflight |
+| `delivery-revision` | delivery key; current revision key as binding | focused/full validation, AutoReview, publication, Codex review, CI, PR readiness, tracker closeout, mergeability |
+| `task-revision-set` | delivery null; complete revision-set key as binding | scope acceptance, integration validation, domain closeout |
+
+Static gates dispatch before a PR revision; requiring one would deadlock task
+creation. A task revision set contains every delivery exactly once.
+
+Changed revision, diff, PR identity, rule, or tracker delivery invalidates its
+delivery gates and all task-set gates. Reuse AutoReview only for an unchanged
+complete target. Unknown or pending evidence blocks.
+
+## Closed Event Registry
+
+Each event has the exact fields in `run-state-packets.md`, a bounded external
+evidence reference, and no unknown fields.
+
+| event | material transition |
 | --- | --- |
-| `claim-rebound` | Bind a recovered takeover state to the validated candidate claim and embedded adoption evidence. |
-| `root-title-observed` | Record exact live singular/plural root-title evidence after mutation or observation. |
-| `portfolio-goal-activated` | Bind the matching root Goal and move `pending` to `active`. |
-| `portfolio-goal-paused` | Bind the armed heartbeat and observed root Goal pause after the portfolio becomes quiescent. |
-| `portfolio-goal-resumed` | Bind heartbeat consumption or manual wake evidence and restore the root Goal to `active`. |
-| `portfolio-goal-completed` | Bind completion evidence after every terminal task and gate passes. |
-| `task-observed` | Record a material task lifecycle, title, profile, Goal, managed-checkout, result, blocker, or terminal change. |
-| `source-moved` | Atomically adopt one predeclared local active-to-done tracked move with unchanged body fingerprint. |
-| `revision-observed` | Adopt one exact PR/head/base/merge-base tuple and invalidate stale revision-bound evidence. |
-| `review-wait-started` | Record the root-issued revision key and one absolute 30-minute active-wait deadline. |
-| `review-wait-invoked` | Record the worker's actual invocation time and remaining provider timeout. |
-| `review-observed` | Record current-tuple request, provider, findings, disposition, and observation evidence. |
-| `review-monitoring-scheduled` | Pause a still-waiting worker Goal and derive its next one-shot check at `observed_at+30m`. |
-| `review-monitoring-resumed` | Resume one due worker Goal for exactly one provider check. |
-| `gate-observed` | Record current evidence for one fixed validation, AutoReview, review, CI, integration, domain-closeout, tracker-closeout, publication, or mergeability gate. |
-| `external-handoff-recorded` | Record the exact terminal merge/closeout handoff for a merge-ready task. |
+| `root-title-observed` | Bind live root title. |
+| `portfolio-goal-activated` | Bind active root Goal. |
+| `portfolio-goal-paused` | Bind root pause and heartbeat. |
+| `portfolio-goal-resumed` | Bind root wake/resume. |
+| `task-observed` | Bind material task/Goal lifecycle. |
+| `managed-checkouts-observed` | Bind complete delivery checkout map. |
+| `revision-observed` | Establish exact delivery/PR revision tuple. |
+| `delivery-observed` | Bind lifecycle/commit/publication to that revision. |
+| `source-moved` | Adopt proven local move; dirty its delivery. |
+| `review-wait-started` | Start immutable 30-minute wait. |
+| `review-wait-invoked` | Bind actual invocation/timeout. |
+| `review-observed` | Bind provider result/disposition to one monitoring cycle. |
+| `review-monitoring-scheduled` | Bind one delivery's next check. |
+| `task-monitoring-paused` | Bind worker pause to its complete schedule set. |
+| `task-monitoring-resumed` | Resume due checks or one controller action. |
+| `gate-observed` | Bind one typed gate. |
+| `task-terminal-sealed` | Freeze current task terminal proof. |
+| `task-goal-completed` | Bind worker Goal completion to seal. |
+| `terminal-handoff-recorded` | Bind terminal seal, next action, and external authority. |
+| `portfolio-terminal-verified` | Bind independent portfolio proof. |
+| `portfolio-goal-completed` | Bind root Goal completion. |
+| `post-terminal-drift-recorded` | Preserve Goals; mark drift/archive block. |
 
-Do not emit an event for an unchanged poll, wait timeout, repeated task text, or
-claim heartbeat. Persist evidence digests and exact external references, not
-large command output or prose summaries.
+Do not emit events for unchanged polls, wait timeouts, repeated task text, or
+claim heartbeats. Persist digests and exact refs, not command output, review
+transcripts, or prose summaries. Do not persist Wave Reports, Recovery Packets,
+no-progress rows, or hand-authored projections.
 
 ## Root Title And Portfolio Goal
 
-`total_spec_count` counts implementation-eligible Feature Specs and excludes
-coordination-only parent/global artifacts. Zero is invalid. Derive exactly
-`👨🏻‍💻 Feature Orchestrator` for one Spec and
-`👨🏻‍💻 Multi-Feature Orchestrator` for two or more, with no counter or suffix.
-The title is stable for the accepted run and is UI evidence, never identity or
-scheduling input.
+`total_spec_count` includes only implementation-eligible Feature Specs and
+excludes coordination-only parent/global artifacts. Derive
+exactly `👨🏻‍💻 Feature Orchestrator` for one or
+`👨🏻‍💻 Multi-Feature Orchestrator` for more than one, with no counter or suffix.
+The title is stable for the accepted run, is UI evidence, and is never identity
+or scheduling input. After registration, set and observe the calling task title before Goal registration
+or dispatch, then apply `root-title-observed`. Call `get_goal`; adopt a matching
+interrupted registration or call `create_goal` without `token_budget`, then
+apply `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`;
+a missing active Goal is never recreated during recovery.
 
-After state creation, set and observe the calling task title before Goal
-registration or dispatch, then apply `root-title-observed`. Call `get_goal`;
-adopt a matching interrupted registration or call `create_goal` without
-`token_budget`, then apply `portfolio-goal-activated`. A different unfinished
-Goal is `needs-owner`; a missing active Goal is never recreated during recovery.
+Review-monitoring pause/resume is owned by `review-monitoring.md`. The root
+pauses only for a quiescent portfolio with one committed heartbeat and resumes
+before any due worker.
 
-Root and worker Goal pause/resume is owned by the conditional workflow in
-`review-monitoring.md`; load it only after a deadline remains pending or when
-recovering that typed schedule. The root pauses only for a quiescent portfolio
-and resumes before any due worker.
+## Review Timing And Monitoring
 
-Only after every Spec reaches
-`pull-request-ready-for-merge-but-not-merged`, every task Goal is complete, and
-the terminal projection passes may the root call `update_goal` with
-`status=complete` and apply `portfolio-goal-completed`. Interrupted closeout may finish these exact
-idempotent transitions after full revalidation; it never reopens implementation.
+Keep one review per delivery revision. `review-wait-started` derives immutable
+`wait_deadline=wait_started_at+30m`. Before GitStack, persist
+`review-wait-invoked` with a nonfuture timestamp and
+`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`; zero is an immediate check.
+That event is single-launch authority. Never default, restart, or extend.
 
-## Sources, Tasks, And Scheduling
+Bind results to the exact `monitoring_cycle`; scheduled/complete reviews reject
+them. Pending schedules from stored observation time. Once every current review
+is complete or future-scheduled, pause/read back the worker against the complete
+schedule fingerprint. Only if the portfolio is quiescent, arm the earliest root
+heartbeat and pause/read back root. Retain the claim. Resume uses that
+fingerprint: a due wake activates all
+due deliveries; `controller-action` permits early reconciliation. Monitoring
+creates no handoff or release.
 
-Preserve each authored source ref separately from its canonical runtime id and
-content fingerprint. Use the canonical GitHub issue URL or qualified local id
-for claim, task, and scheduling identity. A local generated issue begins at its
-active ref with its predeclared done ref. Only `source-moved` may adopt that done
-ref, and only after substantive, integration, and required domain-closeout
-evidence with an unchanged body fingerprint.
+## Local Source Move
 
-Keep one typed task entity per implementation-eligible Feature Spec. It owns the
-exact task ref and title, model/thinking profile, assignment Goal evidence,
-managed checkout map, lifecycle, affected scope, current PR identities,
-material results, blocker, and next action. A Spec has at most one task and the
-portfolio at most three nonterminal tasks. Identity comes from source and task
-refs, never display titles.
+`source-moved` requires a predeclared local active-to-done ref, unchanged body,
+and current task-set substantive/integration/domain proof. GitHub, premature,
+alternate, and untracked moves are invalid.
 
-Ready sets, path-conflict decisions, available capacity, due checks, and next
-actions are deterministic projections. A dependency is ready only when its
-upstream implementation is externally verified merged and current gate evidence
-records that fact; an upstream `merge-ready` task is still unfinished. Dispatch
-also requires current passed `pr-preflight` and `dependency-integration` gates.
-Workers paused in `review-monitoring` remain nonterminal, retain their scope,
-and count against the three-task limit. Do not persist Wave Reports, scheduling
-summaries, no-progress rows, or a hand-authored Recovery Packet.
+It dirties the delivery and invalidates revision/task-set gates. Commit/push,
+establish a newer `revision-observed`, then apply `delivery-observed`; only
+current committed/published proof clears dirt. Rerun gates. A move is not
+terminal.
 
-## Monitoring And Reconciliation
+## Staged Terminal Closeout
 
-After dispatch, take one full task snapshot. Wait with the current cursor until
-the earliest material task event, attention request, claim-heartbeat deadline,
-or hard workflow deadline. An unchanged timeout performs only the required
-claim heartbeat. Thereafter consume compact deltas and apply only material
-events. Use another full task read only for anomaly or blocker diagnosis and
-independent terminal verification.
+Closeout has one irreversible order:
 
-Each reconciliation reads the smallest projection, refreshes the external facts
-needed for the next decision, and submits one atomic event batch. On a CAS
-conflict, discard the derived batch, read the new generation, and recompute. The
-worker owns the bounded GitStack waiter; the root does not poll that provider in
-parallel.
+1. Require every applicable current static, delivery-revision, and
+   task-revision-set gate; apply `task-terminal-sealed` for the exact complete
+   delivery revision set.
+2. Call the worker Goal through `update_goal` with `status=complete`, read it
+   back, then apply `task-goal-completed`. Do not derive completion from task
+   prose.
+3. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
+   `pull-request-ready` kind, external authority, and next merge action.
+4. After every task passes those stages, independently reverify current
+   external truth and apply `portfolio-terminal-verified`.
+5. Call the root Goal through `update_goal` with `status=complete`, read it back,
+   then apply `portfolio-goal-completed`.
+6. Reverify archive eligibility, release the claim as terminal, and archive
+   through `cache-lifecycle.md`.
 
-## Revision, Review, And Gate Invalidation
+The terminal projection exposes each stage without requiring a later one.
+`terminal-handoff-recorded` is terminal-only, never monitoring/dependency wait.
 
-`revision-observed` binds the exact repository, PR number and URL, head SHA,
-base ref, and merge-base SHA. A head, base, merge-base, material diff, or
-repository-rule change invalidates older revision-bound validation, AutoReview,
-Codex review, CI, tracker-closeout, and mergeability evidence. Clean AutoReview
-evidence may be reused only when its complete target remains unchanged.
-
-Keep exactly one review entity per exact PR/head/base/merge-base revision key.
-The root applies `review-wait-started` with `wait_started_at` and absolute
-`wait_deadline=wait_started_at+30m`. The worker immediately computes
-`provider_timeout=floor(wait_deadline-now)`, launches GitStack in the same local
-step, and reports `wait_invoked_at` and the actual timeout through
-`review-wait-invoked`. If the result is nonpositive, check once. Never default,
-restart, segment, or extend the deadline.
-
-At deadline check once. If still pending, load `review-monitoring.md`; later
-checks are due one-shots and never another waiter. The original wait timestamps
-never change.
-
-Actionable findings remain represented until their fix and proof exist. A new
-revision receives a distinct review request and deadline. Terminal state
-requires the current exact PR identity, `OPEN`, non-draft, conflict-free
-mergeability, required base freshness, approvals, merge-queue eligibility,
-successful applicable CI, prepared tracker closeout, and every other fixed gate.
-Unknown or pending evidence blocks; never enqueue or merge.
+From seal onward, changed terminal truth permits only
+`post-terminal-drift-recorded`; it blocks terminal handoff, verification, and
+archive. Never reopen a Goal. Record an externally completed Goal without
+advancing closeout; correction needs owner action and a separately authorized
+fresh run.
 
 ## Takeover And Recovery
 
-Takeover authority and journals remain owned by `active-root-claim`. Cross-check
-each available prior JSON state through its recorded `ledger_ref`. A prepared
-takeover journal may initialize a missing candidate state only when no candidate
-state was ever created and the current claim, complete embedded mappings, task
-Goals, titles, profiles, and managed checkouts all revalidate. Then record
-`claim-rebound`. Never rebuild from task titles or import prior Markdown.
+`active-root-claim` owns takeover and its prepared journal. Existing candidate
+state validates normally. Missing state initializes only from the current
+claim's complete adoption mappings after source, task/no-task, Goal, profile,
+and delivery-checkout verification. Creation binds the candidate claim; do not
+infer identity or replace a mapped task. A paused same-root run keeps its exact
+claim and fingerprint; on wake verify them before mutation. If an authorized
+takeover replaced that claim, the old root stops. Revalidate surfaces, sources,
+titles, Goals, full checkouts, revisions, reviews, and gates. `recovery` is
+guidance, not external truth.
 
-On resume, revalidate runtime surfaces, claim ownership, source fingerprints,
-repositories, root and task titles, Goals, managed checkouts, current revisions,
-review waits, and fixed gates against external truth. Use the `recovery`
-projection to locate due work, but treat it as derived. Apply only material
-corrections after the complete freshness pass.
+## Bounds And Projections
 
-## Handoff, Release, And Archive
+`run-state-packets.md` bounds all input, state growth, and output. Canonical
+paths reject absolute/backslash/empty/parent traversal.
 
-`external-handoff-recorded` is terminal-only. A resumable review handoff uses
-the typed schedule, paused Goal evidence, and heartbeat in
-`review-monitoring.md`, then releases the claim while retaining active JSON.
-
-For terminal closeout, require the `terminal` projection to pass, complete all
-Goals, apply `portfolio-goal-completed`, independently verify current external
-evidence, and use the complete checksum-bound release/archive sequence in
-`cache-lifecycle.md` through `ledger archive`. The deterministic Markdown audit report is rendered only
-during archival; it is never active state.
+`status` reports bounded identity and progress, `dispatch` reports only the
+derived ready set and capacity, `recovery` reports freshness inputs and due
+actions without wall-clock verdicts, and `terminal` reports staged closeout and
+archive readiness. Callers compare `due_at` or deadlines with their observed
+clock; a projection never persists or invents an `overdue` fact.
 
 ## Hard Cut
 
-There is no compatibility path for active Markdown, templates, mutable tables,
-manual patches, free-form notes, Wave Reports, Recovery Packets, retired fields,
-or earlier active schemas. A blocked old run can start fresh only after its owner
-releases the claim. Frozen archive-v1 entries remain readable evidence under the
-separate archive contract; that does not make them active-compatible.
+There is no compatibility path for active Markdown or active JSON `1.0.0`.
+Frozen archive-v1 entries remain readable evidence only. The deterministic
+Markdown audit report is rendered only during archival. Terminal archival uses
+the `ledger archive` command in `cache-lifecycle.md`; active state exposes only
+deterministic projections from JSON.

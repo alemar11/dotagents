@@ -1,58 +1,66 @@
 # Review Monitoring Lifecycle
 
-Load this reference only when the final check at an initial review deadline is
-still pending, or when recovering a recorded review-monitoring schedule.
+Load only for a pending initial deadline or typed monitoring schedule.
 
 ## Schedule And Quiescence
 
-Record the pending observation before `review-monitoring-scheduled`. The helper
-pauses the same worker Goal, moves its task to `review-monitoring`, increments
-`monitoring_cycle`, and derives `due_at=observed_at+30m`. The original request,
-waiter, `wait_started_at`, `wait_deadline`, `wait_invoked_at`, and
-`provider_timeout` never change. Paused tasks remain nonterminal, retain their
-scope, and count against the three-task limit.
+Persist `review-wait-invoked` before the call; recovery never starts another
+waiter. Bind each result to current `monitoring_cycle`. A pending schedule
+increments that cycle and derives `due_at=observed_at+30m`; an elapsed due time
+remains `checking` for an immediate one-shot.
 
-After every material event, derive whether the portfolio is quiescent. Keep the
-root active and retain the claim while any worker is active, a Spec is
-dispatch-ready, a review check is due, or controller action remains. Otherwise
-create or update one heartbeat targeted to the exact root task for the earliest
-future `due_at`. Persist its id, pause and readback the root Goal, apply
-`portfolio-goal-paused`, release the claim with `durable-handoff`, and stop.
+After every current delivery review is either complete or future-scheduled,
+derive the complete schedule fingerprint, pause and read back the worker Goal,
+then apply `task-monitoring-paused`. A multi-delivery worker pauses once, not
+once per delivery. Paused tasks remain nonterminal and count against the
+three-task limit.
+
+After each material event, derive portfolio quiescence. Keep the root active and
+retain the claim while any worker is active, a Spec is dispatch-ready, a review
+check is due, or controller action remains. Otherwise create or update exactly
+one heartbeat targeted to the root task for the earliest future `due_at`.
+Persist its id, pause and read back the root Goal, then apply
+`portfolio-goal-paused` with that heartbeat/root-pause evidence. Keep the exact
+active claim and fingerprint while paused; do not create a handoff or release
+ownership.
 
 ## Wake And One-Shot Check
 
-On heartbeat or manual wake, resume and readback the root Goal first, reacquire
-the claim, apply `claim-rebound`, apply `portfolio-goal-resumed`, and consume or
-delete the recorded heartbeat. Resume only due workers through
-`review-monitoring-resumed`. Each resumed worker performs exactly one canonical
-review check; it never launches a second waiter.
+On heartbeat or manual wake, first verify the same root still owns the exact
+claim/fingerprint. If root is paused, resume/read it and apply
+`portfolio-goal-resumed`; otherwise keep it active. Consume any recorded heartbeat. Resume a worker with
+`task-monitoring-resumed` and the unchanged schedule fingerprint. `due-review`
+activates every due delivery and resumes the Goal only when paused;
+`controller-action` permits an early revision, cancellation, or owner
+reconciliation without changing review history. Neither launches a waiter.
 
-Clean, findings, or failed results complete monitoring. A pending result is
-recorded, then the same worker is paused and readback before another
-`review-monitoring-scheduled` derives the next check 30 minutes from that
-observation. An early manual wake consumes the root heartbeat but does not make
-future worker checks due.
+Clean, findings, or failed results end that monitoring schedule. A pending
+result is cycle-bound and rescheduled from its observation. After all current
+reviews are again complete or future-scheduled, pause the worker once with the
+new complete fingerprint. An early manual wake does not make future checks due.
 
 ## Invalidation And Recovery
 
-Head, base, or merge-base changes require the root and affected worker to be
-active before `revision-observed`; consume the old heartbeat and monitoring
-schedule before creating any request for the new tuple. Terminal closeout,
-takeover, cancellation, and owner intervention likewise delete a stale armed
-heartbeat before proceeding.
+Before applying a changed delivery revision, resume root if paused, then resume
+the worker with `resume_reason=controller-action`, consume any heartbeat, and
+apply `revision-observed` followed by current `delivery-observed`. Old revision
+schedules remain bounded history and are inert because all due selection uses
+only each delivery's current revision. Terminal closeout, cancellation, and
+owner intervention also consume a stale armed heartbeat before proceeding.
 
-Crash recovery converges on the committed state:
+Crash recovery converges on committed state:
 
 - a committed heartbeat id is viewed and updated, never duplicated;
-- no committed id permits creation of exactly one heartbeat after the schedule
-  and Goal state revalidate;
-- a heartbeat created before its id was committed is deleted only after proving
-  it targets this exact root and schedule;
-- a committed root pause without claim release completes that same release;
-- a released claim with a waking root reacquires and rebinds before worker
-  mutation.
+- no committed id permits exactly one heartbeat after schedule and Goal
+  revalidation;
+- a heartbeat created before id commit is deleted only after proving it targets
+  this exact root and schedule;
+- a committed worker pause binds one complete schedule fingerprint;
+- a committed root pause retains the same claim; wake verifies it before any
+  worker mutation;
+- a persisted wait invocation is observed or recovered, never relaunched;
+- if an authorized takeover replaced the claim, the old root stops.
 
-Never use `blocked`, raw app-server RPC, a cron job, or a replacement Goal/task
-to imitate pause or wake behavior. If first-class Goal pause/resume or targeted
-heartbeat operations are absent, the mandatory surface gate returns
+Never imitate pause/wake with `blocked`, terminal handoff, raw RPC, cron, or a
+replacement Goal/task. Missing Goal pause/resume or targeted heartbeat returns
 `unsupported-runtime` before authorization.

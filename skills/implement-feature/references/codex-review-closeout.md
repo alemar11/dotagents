@@ -2,110 +2,125 @@
 
 ## Ownership
 
-The visible Feature Spec task owns review request, polling, feedback fixes, CI,
-tracker-closeout preparation, ready-for-review transition, and terminal
-merge-ready proof. The root monitors and
-reconciles; it never takes this work back as a fallback.
+The visible Feature Spec task owns every delivery's review request, wait,
+feedback fixes, CI, tracker-closeout preparation, ready-for-review transition,
+and terminal proof. The root issues immutable timing assignments, reconciles
+typed evidence, and independently verifies closeout; it never takes worker work
+back as a fallback.
 
-## Current-Revision Review
+## Delivery-Revision Review
 
-Request exactly one Codex review for the current revision tuple: PR, head SHA,
-base ref, and merge-base SHA. Apply the tuple through `revision-observed` and
-the result through `review-observed`, including request evidence, provider
-state, findings, disposition, and completion time. Reuse a result only when the
-entire tuple matches and every finding is dispositioned. Review is mandatory
-and has no skip value.
+Request exactly one Codex review for each delivery's current exact repository,
+PR number and URL, head SHA, base ref, and merge-base SHA tuple. Establish the
+tuple through `revision-observed`, bind its lifecycle through
+`delivery-observed`, and apply the result through delivery-keyed
+`review-observed`. Reuse a result only when the entire tuple matches and every
+finding is dispositioned. Review is mandatory and has no skip value.
 
-Actionable findings return to fix, focused validation, `$autoreview`, push, and
-a new current-revision review. Head, base-ref, merge-base, or material diff
-changes invalidate earlier review and CI evidence. Resolve a review thread only
-after its fix and proof exist.
+Actionable findings return the task to fix, focused validation, `$autoreview`,
+push, and a new current-revision review. A head, base, merge base, PR identity,
+material diff, repository-rule, tracker delivery, evidence-target, or relevant
+documentation change invalidates affected delivery-revision gates and the
+complete task-revision-set gates. Resolve review threads only after fix proof.
 
-Head, base, merge-base, or repository-rule changes also invalidate mergeability
-evidence. Recheck the exact tuple and require lifecycle `OPEN`, conflict-free
-GitHub mergeability, required base freshness, approvals, and merge-queue
-eligibility before terminal `merge-ready`; unknown or pending state blocks.
-Never enqueue or merge.
+Before terminal sealing, require every delivery PR lifecycle `OPEN`, exact
+non-draft identity, conflict-free GitHub mergeability, required base freshness,
+approvals, and merge-queue eligibility. Unknown or pending state blocks. Never
+enqueue or merge.
 
-When a final issue carries a nonempty accepted knowledge delta, a later review
-fix or other material code, evidence, target, or documentation change also
-invalidates captured domain-closeout evidence whenever it can affect delta
-support or its destinations. Rerun the exact Project Memory closeout and persist
-fresh delta, destination, docs-diff, and implementation-revision evidence before
-terminal `merge-ready`.
+When a nonempty accepted knowledge delta exists, a later material code,
+evidence, target, or documentation change invalidates captured domain-closeout
+evidence whenever it can affect support or destinations. Rerun Project Memory
+closeout and persist fresh delta, destination, documentation-diff, and complete
+implementation revision-set evidence.
 
 ## Typed Review State And Idempotency
 
-The typed run state is the sole request and timing owner. Keep exactly one review
-entity keyed by `<owner>/<repo>#<number>@<head-sha>@<base-ref>@<merge-base-sha>`.
-Store request and provider/result/disposition evidence, observation fingerprint,
+The run state is the sole request and timing owner. Keep one review entity keyed
+by `task_key`, `delivery_key`, and the exact delivery `revision_key`. Store
+request, provider/result/disposition, bounded observation fingerprints,
 `wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
 `due_at`, and poll owner.
 
-Before review request, resume, or terminal merge-ready acceptance, recompute the
-full revision tuple
-and run the canonical GitStack review check. Reuse a current clean/findings
-result; wait on a current acknowledged request; create a request only for a
-proven not-requested or stale tuple. Apply `review-wait-started` before polling
-so recovery cannot duplicate the mutation. API, authentication, or configuration
+Before request, resume, or terminal acceptance, recompute the exact tuple and
+run the canonical GitStack review check. Reuse a current result, wait on a
+current acknowledged request, and create a request only for proven
+not-requested or stale revision. Apply `review-wait-started` before polling so
+recovery cannot duplicate mutation. API, authentication, or configuration
 uncertainty never authorizes another request.
 
-At the GitStack boundary, translate the fixed assignment internally: pass the
-exact PR and canonical `review_operation`; add GitStack-owned
-`mutation_mode=apply` only for an authorized request, comment, reply, or
-resolution. Do not pass App permission, Feature Spec, phase, or fixed-action
-fields to GitStack, and never expose the translation as a user option.
+At the GitStack boundary, pass only the exact PR and canonical
+`review_operation`; add GitStack-owned `mutation_mode=apply` only for an
+authorized mutation. Do not pass App permission, Feature Spec, phase, or fixed
+actions, and never expose the translation as a user option.
 
-## Fixed Wait Deadline
+## One Fixed Wait Deadline
 
-The review entity owns one 30-minute total active-wait deadline per tuple. The worker
+Each delivery revision owns one 30-minute total active-wait deadline. The worker
 reports tuple/request evidence; the root atomically records
-`review-wait-started` with `wait_started_at`/`wait_deadline` and returns
-`revision_key`/timestamps.
-At launch, the worker sets `wait_invoked_at=now`, computes
-`provider_timeout=floor(wait_deadline-now)`, and starts GitStack in the same
-local step with no root round-trip. If nonpositive, check once. Report actual
-invocation/timeout afterward through `review-wait-invoked`.
+`review-wait-started` with `wait_started_at` and the helper derives
+`wait_deadline=wait_started_at+30m`, then returns the immutable assignment.
 
-Use one GitStack waiter for it:
-`--timeout <provider_timeout>s --interval 10s --max-interval 30s`. Never use a
-provider default/example, hardcode `15m`, segment, or wrap it. Interrupted
-recovery recomputes from the unchanged deadline; it never reuses a timeout.
+Before launch, set `wait_invoked_at=now`, require it to be at or after the
+recorded start and not later than the current clock, and compute
+`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`. The root must persist
+`review-wait-invoked` before the worker calls GitStack. That event is the single
+launch authority; once recorded, recovery never starts another waiter. For a
+positive timeout use:
 
-At deadline, check the tuple once. If pending, record that observation, pause
-and readback the worker Goal, then apply `review-monitoring-scheduled`. The
-helper derives the first `due_at` 30 minutes from that observation. Do not apply
-`external-handoff-recorded`: that event remains terminal-only.
+```text
+--timeout <provider_timeout>s --interval 10s --max-interval 30s
+```
 
-Then load `review-monitoring.md` for portfolio quiescence, heartbeat, root
-pause/release, wake/reacquire, due-worker resume, one-shot checks, invalidation,
-and crash recovery. Each due worker performs one canonical review check. Never
-start another waiter or change the original active-wait timestamps. Unpollable
-access blocks; it is not a review skip.
+The canonical invocation is
+`--timeout <provider_timeout>s --interval 10s --max-interval 30s`.
+
+At zero, perform one immediate no-wait check. Never use a provider default,
+hardcode `15m`, start before `wait_started_at`, segment, restart, wrap, or extend
+the unchanged deadline.
+
+Bind the result to the exact current `monitoring_cycle`. If pending, apply
+`review-monitoring-scheduled`; the helper derives `due_at` 30 minutes from the
+stored observation. After all current delivery reviews are complete or
+future-scheduled, pause/read back the worker once and bind the complete schedule
+fingerprint. Do not apply `terminal-handoff-recorded`.
+
+Load `review-monitoring.md` for portfolio quiescence, exact-root heartbeat,
+root pause with retained claim, same-claim wake, task-level resume, one-shot checks,
+invalidation, and crash recovery. Each due worker performs one canonical check.
+Never start another waiter or change the original active-wait timestamps.
+Unpollable access
+blocks; it is not a review skip.
 
 ## Tracker Closeout
 
-Put every generated implementation issue's closing keyword in its owning
-repository PR and record it as `armed`. When an issue is hosted in another
-repository, use the fully qualified `owner/repository#number` form. After one
-implementation-eligible Feature Spec's whole-Spec gates pass, put that Spec's
-closing keyword in its designated default-branch closeout PR and record it as
-`armed`. In multi-repository work, the final integration partial's
-default-branch PR additionally arms any accepted hosted parent/global Feature
-Spec with a fully qualified ref only after every partial gate passes.
-Non-default-base PRs link to the appropriate closeout vehicle and must not close
-a Spec prematurely. Every terminal App PR must already target its repository's
-discovered default branch; verify that base during preflight and again for the
-current revision. A different base blocks terminal closeout because its closing
-keywords cannot take effect.
+Put each generated implementation issue's hosted closing keyword in its owning
+delivery PR. After an implementation-eligible Feature Spec's whole-Spec gates
+pass, put that Spec's closing keyword in its designated default-branch closeout
+PR. The final integration partial may additionally arm an accepted hosted
+parent/global Feature Spec after every partial gate passes. Use fully qualified
+refs across repositories. Non-default-base PRs cannot be closeout vehicles
+because their closing keywords cannot take effect.
 
-For a local Markdown source, first finish substantive acceptance, integration
-proof, and any knowledge closeout. Then move completed issues from their exact
-scoped active paths to their exact scoped `done/` destinations on the delivery
-branch, commit and push those moves, rerun final validation and `$autoreview`,
-convert draft PRs to ready-for-review, then obtain current-revision review and
-CI at the resulting head before terminal merge-ready state.
-Report local closeout as prepared because the completion paths reach the default
-branch only after the later merge. The orchestrator reports the external merge
-handoff and stops. A separate GitHub workflow owns merge and verifies hosted or
-local tracker closure.
+For local Markdown, first finish substantive acceptance, integration proof,
+and any knowledge closeout. Then perform only the predeclared local move in its
+owning delivery. The typed move dirties tracker delivery state and invalidates
+the old revision set. Commit and push it, observe the new head containing the
+move, rerun final validation and `$autoreview`, convert drafts to
+ready-for-review, then obtain current-revision review and CI before terminal
+merge-ready state. Report closeout as prepared because the default branch sees
+it only after later merge.
+
+## Terminal Handoff Only
+
+Review monitoring retains the active claim and creates no handoff or release.
+Its task-level pause binds the complete schedule fingerprint, while
+`portfolio-goal-paused` binds the one root heartbeat and root pause.
+
+`terminal-handoff-recorded` is terminal-only and allowed only after
+`task-terminal-sealed` and
+`task-goal-completed`. It binds the unchanged terminal seal, next action, and
+typed `external-merge-required` authority; the seal binds the exact delivery
+revisions. After all task handoffs, the root independently verifies the
+portfolio, completes its Goal, then releases and archives. A later GitHub
+workflow owns merge and post-merge closure.

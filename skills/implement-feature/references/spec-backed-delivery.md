@@ -70,9 +70,15 @@ path and exact derived `done/` destination. Both paths must resolve inside that
 affected Git repository and an App-managed checkout. A tracker artifact outside
 all affected Git repositories is non-App-executable; abort as
 `planning-required` rather than inventing an owner or widening scope.
-Snapshot both refs before CLAIM. The active ref is authoritative until the task
-performs the one planned tracked move; then `source-moved` atomically adopts the
-done ref while requiring an unchanged body fingerprint.
+Register both refs before CLAIM as the source's `source_spec_ref` and
+`planned_done_ref`, with `tracker_repository` selecting the owning delivery.
+The active ref is authoritative until current complete
+task-revision-set substantive, integration, and required domain-closeout proof
+permits the one planned tracked move. `source-moved` then adopts the done ref
+with an unchanged body fingerprint, marks that delivery tracker-dirty, and
+invalidates the old revision set until the committed/pushed new delivery
+revision is established by `revision-observed`, a current committed/published
+`delivery-observed` snapshot clears dirt, and gates are rerun.
 
 The root snapshots the complete source and each issue body and computes its own
 fingerprints. Source-provided option rows, resolution fingerprints, duplicated
@@ -141,11 +147,12 @@ derived runtime evidence, not a bundle field or user option.
 
 ## Derived Delivery And Closeout
 
-One App task owns all repositories named by its Feature Spec. The number of pull
-requests equals the number of affected Git repositories. Every repository uses
-the shared target branch as its head and must produce a real, `OPEN`, non-draft,
+One App task owns all repositories named by its Feature Spec. Registration
+creates one nonempty `deliveries[]` entry per affected Git repository, and the
+number of pull requests equals the delivery count. Every delivery uses the
+shared target branch as its head and must produce a real, `OPEN`, non-draft,
 reviewed, CI-clean PR ready to merge into its discovered default branch. The PR
-base is derived per repository and verified during preflight and current-head
+base is derived per delivery and verified during preflight and current-head
 review; it is not an input field.
 
 Derive tracker closeout from the source backend. Put each generated
@@ -160,11 +167,12 @@ repositories, and record every link as armed; hosted issues stay open until
 merge. Closing keywords are valid only in PRs whose base is the repository
 default branch; a different base is a blocker, not a closeout vehicle.
 
-For local Markdown, after substantive acceptance, integration proof, and any
-knowledge closeout, move each issue to its derived `done/` path on the delivery
-branch, commit and push that move, rerun final validation and `$autoreview`,
-convert draft PRs to ready-for-review, then obtain current-revision review and
-CI at the resulting head before terminal merge-ready state. The move is only
-prepared closeout until the later default-branch
+For local Markdown, after current task-revision-set substantive acceptance,
+integration proof, and any knowledge closeout, move each issue to its derived
+`done/` path in its owning delivery. That event dirties and invalidates the old
+delivery revision. Commit and push the move, observe the resulting head, rerun
+final validation and `$autoreview`, convert draft PRs to ready-for-review, then
+obtain current-revision review and CI before terminal merge-ready state. The
+move is only prepared closeout until the later default-branch
 merge lands it. A separate GitHub workflow owns merge and post-merge closure
 verification.

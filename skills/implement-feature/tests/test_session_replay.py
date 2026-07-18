@@ -7,6 +7,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -19,7 +20,20 @@ FIXTURE = Path(__file__).parent / "fixtures/session-replay-019f7625.json"
 TASK_KEY = "workflow-routing-contract-alignment-231"
 CREATE_OPERATION_ID = "00000000000000000000000000000001"
 UNCHANGED_OPERATION_ID = "ffffffffffffffffffffffffffffffff"
-TERMINAL_EVIDENCE = "session-replay-019f7625-terminal"
+STALE_CAS_OPERATION_ID = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+TERMINAL_EVIDENCE = "session-replay:portfolio-terminal-proof"
+EXPECTED_ROLLOUTS = {
+    "root": {
+        "sha256": "1757b81f3106416c012e7a4568c1afa23209b3e17cbb0249762e28127ec4234c",
+        "size_bytes": 2083929,
+        "line_count": 893,
+    },
+    "worker": {
+        "sha256": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
+        "size_bytes": 1957829,
+        "line_count": 880,
+    },
+}
 
 
 def revision_key(
@@ -65,6 +79,27 @@ def parse_utc(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def fresh_tokens(invocation: dict[str, Any]) -> int:
+    usage = invocation["usage"]
+    return (
+        usage["input_tokens"]
+        - usage["cached_input_tokens"]
+        + usage["output_tokens"]
+    )
+
+
+def root_invocation_category(invocation: dict[str, Any]) -> str | None:
+    """Map source-derived operation signatures to replay categories."""
+    return {
+        "direct.wait": "wait_resume",
+        "codex-app.wait-threads": "task_wait_start",
+        "apply-patch.active-ledger": "ledger_patch",
+        "active-root-claim.heartbeat": "claim_heartbeat",
+        "filesystem-read.active-ledger": "ledger_read",
+        "codex-app.read-thread": "task_full_read",
+    }.get(invocation["operation_signature"])
+
+
 class SessionReplayTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -75,25 +110,113 @@ class SessionReplayTests(unittest.TestCase):
         methodology = fixture["methodology"]
         proxy = fixture["efficiency_proxy"]
         baseline = proxy["baseline"]
-        expected = proxy["counterfactual"]
-        removed = proxy["removed_root_categories"]
+        lower_envelope = proxy["strict_lower_envelope"]
+        expected = lower_envelope["counterfactual"]
+        matched = lower_envelope["matched_root_categories"]
 
-        self.assertEqual(methodology["kind"], "deterministic-conservative-proxy")
+        self.assertEqual(fixture["fixture_schema_version"], "2.0.0")
+        self.assertEqual(
+            methodology["kind"], "session-derived-lower-envelope-counterfactual"
+        )
         self.assertFalse(methodology["is_actual_future_token_measurement"])
-        self.assertIn("not the tokens a future model run will consume", methodology["description"])
-        self.assertEqual(
-            fixture["source_sessions"]["root"]["sha256"],
-            "1757b81f3106416c012e7a4568c1afa23209b3e17cbb0249762e28127ec4234c",
+        self.assertIn(
+            "not the tokens a future model run will consume",
+            methodology["description"],
         )
-        self.assertEqual(
-            fixture["source_sessions"]["worker"]["sha256"],
-            "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
-        )
-        for source in fixture["source_sessions"].values():
-            self.assertRegex(source["sha256"], r"^[0-9a-f]{64}$")
+        self.assertIn("16,912", methodology["description"])
 
-        removed_turns = sum(item["turns"] for item in removed)
-        removed_tokens = sum(item["fresh_tokens"] for item in removed)
+        evidence: dict[str, dict[str, Any]] = {}
+        for role, source in fixture["source_sessions"].items():
+            evidence_file = source["evidence_file"]
+            self.assertEqual(Path(evidence_file).name, evidence_file)
+            evidence_path = FIXTURE.parent / evidence_file
+            evidence_bytes = evidence_path.read_bytes()
+            self.assertEqual(
+                hashlib.sha256(evidence_bytes).hexdigest(),
+                source["evidence_sha256"],
+            )
+            extracted = json.loads(evidence_bytes)
+            self.assertEqual(extracted["evidence_schema_version"], "1.0.0")
+            self.assertEqual(
+                extracted["source_rollout"]["session_id"], source["session_id"]
+            )
+            self.assertEqual(
+                {
+                    field: extracted["source_rollout"][field]
+                    for field in ("sha256", "size_bytes", "line_count")
+                },
+                EXPECTED_ROLLOUTS[role],
+            )
+            self.assertGreater(extracted["source_rollout"]["size_bytes"], len(evidence_bytes))
+            self.assertGreater(extracted["source_rollout"]["line_count"], 0)
+            completion = extracted["goal_completion"]["goal"]
+            self.assertEqual(completion["threadId"], source["session_id"])
+            self.assertEqual(completion["status"], "complete")
+            self.assertRegex(
+                extracted["goal_completion"]["source_output_record_sha256"],
+                r"^[0-9a-f]{64}$",
+            )
+            invocation_lines = []
+            for invocation in extracted["goal_invocations"]:
+                invocation_lines.append(invocation["source_call_line"])
+                self.assertRegex(
+                    invocation["source_call_record_sha256"], r"^[0-9a-f]{64}$"
+                )
+                self.assertRegex(invocation["input_sha256"], r"^[0-9a-f]{64}$")
+                self.assertNotIn("input_text", invocation)
+            self.assertEqual(invocation_lines, sorted(invocation_lines))
+            self.assertEqual(len(invocation_lines), len(set(invocation_lines)))
+            evidence[role] = extracted
+
+        derived_baseline = {
+            role: {
+                "turns": len(extracted["goal_invocations"]),
+                "fresh_tokens": extracted["goal_completion"]["goal"]["tokensUsed"],
+            }
+            for role, extracted in evidence.items()
+        }
+        derived_baseline["combined"] = {
+            field: derived_baseline["root"][field]
+            + derived_baseline["worker"][field]
+            for field in ("turns", "fresh_tokens")
+        }
+        self.assertEqual(baseline, derived_baseline)
+
+        legacy_patch_records = evidence["root"][
+            "full_session_ledger_patch_records"
+        ]
+        self.assertEqual(
+            len(legacy_patch_records), proxy["legacy_ledger_patch_attempts"]
+        )
+        for record in legacy_patch_records:
+            self.assertEqual(
+                record["operation_signature"], "apply-patch.active-ledger"
+            )
+            self.assertRegex(
+                record["source_call_record_sha256"], r"^[0-9a-f]{64}$"
+            )
+            self.assertRegex(record["input_sha256"], r"^[0-9a-f]{64}$")
+
+        category_tokens: dict[str, list[int]] = defaultdict(list)
+        for invocation in evidence["root"]["goal_invocations"]:
+            category = root_invocation_category(invocation)
+            if category is not None:
+                category_tokens[category].append(fresh_tokens(invocation))
+
+        removed_by_category: dict[str, list[int]] = {}
+        for item in matched:
+            observed_tokens = sorted(category_tokens[item["category"]])
+            self.assertEqual(len(observed_tokens), item["observed_turns"])
+            remove_count = item["observed_turns"] - item["retained_turns"]
+            if item["removal_policy"] == "retain-all":
+                self.assertEqual(remove_count, 0)
+                removed_by_category[item["category"]] = []
+            else:
+                self.assertEqual(item["removal_policy"], "remove-cheapest-observed")
+                removed_by_category[item["category"]] = observed_tokens[:remove_count]
+
+        removed_turns = sum(len(tokens) for tokens in removed_by_category.values())
+        removed_tokens = sum(sum(tokens) for tokens in removed_by_category.values())
         root_turns = baseline["root"]["turns"] - removed_turns
         root_tokens = baseline["root"]["fresh_tokens"] - removed_tokens
         combined_turns = root_turns + baseline["worker"]["turns"]
@@ -111,16 +234,56 @@ class SessionReplayTests(unittest.TestCase):
                 "combined": {"turns": 306, "fresh_tokens": 757696},
             },
         )
-        self.assertEqual((removed_turns, removed_tokens), (105, 265640))
-        self.assertEqual((root_turns, root_tokens), (29, 83381))
-        self.assertEqual((combined_turns, combined_tokens), (201, 492056))
-        self.assertEqual(expected["root"], {"turns": 29, "fresh_tokens": 83381})
+        self.assertTrue(all(item["retention_reason"] for item in matched))
         self.assertEqual(
-            expected["combined"], {"turns": 201, "fresh_tokens": 492056}
+            removed_by_category["ledger_patch"],
+            [1396, 1495, 1761, 1772, 1929, 2002, 2037, 2392],
+        )
+        self.assertEqual(removed_by_category["task_full_read"], [835, 1293])
+        self.assertEqual((removed_turns, removed_tokens), (10, 16912))
+        self.assertEqual((root_turns, root_tokens), (124, 332109))
+        self.assertEqual((combined_turns, combined_tokens), (296, 740784))
+        self.assertEqual(expected["root"], {"turns": 124, "fresh_tokens": 332109})
+        self.assertEqual(
+            expected["combined"], {"turns": 296, "fresh_tokens": 740784}
         )
         self.assertEqual(reduction, expected["fresh_token_reduction_percent"])
         self.assertEqual(
             root_worker_ratio, expected["root_to_worker_fresh_token_percent"]
+        )
+        sensitivity = proxy["wait_reduction_sensitivity"]
+        self.assertFalse(sensitivity["is_guarantee"])
+        self.assertEqual(sensitivity["removal_policy"], "remove-cheapest-observed")
+        wait_start_tokens = sorted(category_tokens["task_wait_start"])
+        wait_resume_tokens = sorted(category_tokens["wait_resume"])
+        additional_removed_wait_start = sum(
+            wait_start_tokens[
+                : len(wait_start_tokens) - sensitivity["retained_wait_start_turns"]
+            ]
+        )
+        additional_removed_wait_resume = sum(
+            wait_resume_tokens[
+                : len(wait_resume_tokens) - sensitivity["retained_wait_resume_turns"]
+            ]
+        )
+        self.assertEqual(additional_removed_wait_start, 19184)
+        self.assertEqual(additional_removed_wait_resume, 14395)
+        sensitivity_removed = (
+            removed_tokens
+            + additional_removed_wait_start
+            + additional_removed_wait_resume
+        )
+        self.assertEqual(sensitivity_removed, 50491)
+        self.assertEqual(
+            baseline["combined"]["fresh_tokens"] - sensitivity_removed,
+            sensitivity["counterfactual_combined_fresh_tokens"],
+        )
+        self.assertEqual(
+            round(
+                sensitivity_removed * 100 / baseline["combined"]["fresh_tokens"],
+                2,
+            ),
+            sensitivity["fresh_token_reduction_percent"],
         )
 
     def test_session_events_replay_through_production_cli(self) -> None:
@@ -134,11 +297,49 @@ class SessionReplayTests(unittest.TestCase):
             env["HOME"] = str(base)
             repository = base / "repository"
             subprocess.run(
-                ["git", "init", "--quiet", str(repository)],
+                [
+                    "git",
+                    "init",
+                    "--quiet",
+                    "--initial-branch",
+                    facts["target_branch"],
+                    str(repository),
+                ],
                 check=True,
                 text=True,
                 capture_output=True,
             )
+            subprocess.run(
+                ["git", "-C", str(repository), "config", "user.name", "Replay"],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository),
+                    "config",
+                    "user.email",
+                    "replay@example.invalid",
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repository), "commit", "--allow-empty", "-m", "baseline"],
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+            baseline_revision = subprocess.run(
+                ["git", "-C", str(repository), "rev-parse", "HEAD"],
+                check=True,
+                text=True,
+                capture_output=True,
+            ).stdout.strip()
             ledger = (
                 base
                 / ".cache/dotagents/skills/implement-feature/ledgers"
@@ -166,6 +367,60 @@ class SessionReplayTests(unittest.TestCase):
                 if check:
                     self.assertTrue(payload["ok"])
                 return payload
+
+            legacy_payload = b"# Frozen v1 terminal ledger\n\n- immutable replay evidence\n"
+            legacy_hash = hashlib.sha256(legacy_payload).hexdigest()
+            legacy_archive_id = (
+                "20260717T000000000000Z--legacy-session--"
+                f"{legacy_hash[:12]}"
+            )
+            legacy_entry = (
+                ledger.parent
+                / "archive/legacy-cutover-2026-07-17"
+                / legacy_archive_id
+            )
+            legacy_entry.mkdir(parents=True)
+            legacy_ledger = legacy_entry / "ledger.md"
+            legacy_metadata = legacy_entry / "metadata.json"
+            legacy_ledger.write_bytes(legacy_payload)
+            legacy_metadata.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "1.0.0",
+                        "archive_id": legacy_archive_id,
+                        "archive_reason": "legacy-cutover",
+                        "archive_group": "legacy-cutover-2026-07-17",
+                        "archived_at": "2026-07-17T00:00:00Z",
+                        "portfolio_key": "legacy-session",
+                        "original_ledger_ref": str(ledger.parent / "legacy-session.md"),
+                        "ledger_sha256": legacy_hash,
+                        "size_bytes": len(legacy_payload),
+                        "evidence_ref": "session-replay:frozen-v1",
+                        "root_id": None,
+                        "tool_version": "2.2.0",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n"
+            )
+            legacy_snapshot = {
+                "ledger": legacy_ledger.read_bytes(),
+                "metadata": legacy_metadata.read_bytes(),
+                "ledger_mtime": legacy_ledger.stat().st_mtime_ns,
+                "metadata_mtime": legacy_metadata.stat().st_mtime_ns,
+            }
+            legacy_verified = invoke(
+                LEDGER_CACHE,
+                "--json",
+                "archive",
+                "verify",
+                "--archive-id",
+                legacy_archive_id,
+            )
+            self.assertEqual(
+                legacy_verified["archives"][0]["schema_version"], "1.0.0"
+            )
 
             def write_packet(name: str, payload: Any, *, event_packet: bool) -> Path:
                 nonlocal event_packet_bytes
@@ -212,10 +467,24 @@ class SessionReplayTests(unittest.TestCase):
                 "__REPOSITORIES__": claim["repositories"],
                 "__REPOSITORY_CHECKOUTS__": claim["repository_checkouts"],
                 "__REPOSITORY_ID__": claim["repositories"][0],
+                "__BASELINE_REVISION__": baseline_revision,
                 "__INITIAL_REVISION_KEY__": initial_revision_key,
                 "__FINAL_REVISION_KEY__": final_revision_key,
+                "__ROOT_GOAL_EVIDENCE__": facts["root_goal_evidence_ref"],
+                "__ROOT_GOAL_COMPLETION_EVIDENCE__": facts[
+                    "root_goal_completion_evidence_ref"
+                ],
+                "__WORKER_GOAL_EVIDENCE__": facts["worker_goal_evidence_ref"],
+                "__WORKER_GOAL_COMPLETION_EVIDENCE__": facts[
+                    "worker_goal_completion_evidence_ref"
+                ],
             }
             registration = materialize(fixture["registration"], replacements)
+            self.assertEqual(registration["schema_version"], "2.0.0")
+            self.assertEqual(len(registration["sources"][0]["deliveries"]), 1)
+            self.assertNotIn("repository", registration["sources"][0])
+            self.assertNotIn("target_branch", registration["sources"][0])
+            self.assertNotIn("allowed_paths", registration["sources"][0])
             registration_file = write_packet(
                 "registration", registration, event_packet=False
             )
@@ -236,6 +505,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
+            self.assertEqual(created["version"], "4.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None
@@ -258,7 +528,7 @@ class SessionReplayTests(unittest.TestCase):
                             - parse_utc(review["wait_started_at"])
                         ).total_seconds()
                     )
-                if batch["name"] == "final-review-and-terminal-gate":
+                if batch["name"] == "final-proof-and-review":
                     state = json.loads(ledger.read_text())
                     review = next(
                         item
@@ -273,6 +543,59 @@ class SessionReplayTests(unittest.TestCase):
                             parse_utc(review["wait_deadline"])
                             - parse_utc(review["wait_started_at"])
                         ).total_seconds()
+                    )
+                    status = invoke(
+                        LEDGER_CACHE,
+                        "--json",
+                        "ledger",
+                        "read",
+                        "--ledger",
+                        str(ledger),
+                        "--projection",
+                        "status",
+                    )
+                    replacements["__FINAL_REVISION_SET_KEY__"] = status["tasks"][0][
+                        "revision_set_key"
+                    ]
+                if batch["name"] == "task-seal-goal-and-handoff":
+                    terminal_before_seal = invoke(
+                        LEDGER_CACHE,
+                        "--json",
+                        "ledger",
+                        "read",
+                        "--ledger",
+                        str(ledger),
+                        "--projection",
+                        "terminal",
+                    )
+                    task_terminal = terminal_before_seal["tasks"][0]
+                    self.assertTrue(task_terminal["proof_ready"])
+                    self.assertEqual(
+                        task_terminal["revision_set_key"],
+                        replacements["__FINAL_REVISION_SET_KEY__"],
+                    )
+                    replacements["__SEAL_FINGERPRINT__"] = task_terminal[
+                        "seal_candidate_fingerprint"
+                    ]
+                if batch["name"] == "portfolio-terminal-verification":
+                    terminal_before_verification = invoke(
+                        LEDGER_CACHE,
+                        "--json",
+                        "ledger",
+                        "read",
+                        "--ledger",
+                        str(ledger),
+                        "--projection",
+                        "terminal",
+                    )
+                    self.assertEqual(
+                        terminal_before_verification["phase"],
+                        "portfolio-verification-ready",
+                    )
+                    replacements["__PORTFOLIO_VERIFICATION_FINGERPRINT__"] = (
+                        terminal_before_verification[
+                            "portfolio_verification_candidate"
+                        ]
                     )
 
                 events = materialize(batch["events"], replacements)
@@ -302,6 +625,57 @@ class SessionReplayTests(unittest.TestCase):
                 final_batch_command = command
                 final_batch_file = events_file
 
+                if batch["name"] == "static-dispatch":
+                    dispatch = invoke(
+                        LEDGER_CACHE,
+                        "--json",
+                        "ledger",
+                        "read",
+                        "--ledger",
+                        str(ledger),
+                        "--projection",
+                        "dispatch",
+                    )
+                    self.assertEqual(dispatch["ready_task_keys"], [TASK_KEY])
+                    self.assertEqual(dispatch["available_capacity"], 3)
+                    state = json.loads(ledger.read_text())
+                    self.assertIsNone(state["tasks"][0]["deliveries"][0]["revision"])
+
+                    before_stale_cas = ledger.read_bytes()
+                    stale_cas = invoke(
+                        LEDGER_CACHE,
+                        "--json",
+                        "ledger",
+                        "apply",
+                        "--ledger",
+                        str(ledger),
+                        "--root-id",
+                        facts["root_id"],
+                        "--expected-claim-fingerprint",
+                        claim["fingerprint"],
+                        "--expected-generation",
+                        str(generation - 1),
+                        "--operation-id",
+                        STALE_CAS_OPERATION_ID,
+                        "--events-file",
+                        str(events_file),
+                        check=False,
+                    )
+                    self.assertFalse(stale_cas["ok"])
+                    self.assertEqual(stale_cas["error"]["code"], "state-conflict")
+                    self.assertEqual(ledger.read_bytes(), before_stale_cas)
+
+                if batch["name"] == "managed-task-binding":
+                    state = json.loads(ledger.read_text())
+                    task = state["tasks"][0]
+                    self.assertEqual(task["task_ref"], facts["worker_task_ref"])
+                    managed_checkout = task["deliveries"][0]["managed_checkout"]
+                    self.assertEqual(managed_checkout["checkout"], str(repository))
+                    self.assertEqual(managed_checkout["git_top_level"], str(repository))
+                    self.assertEqual(
+                        managed_checkout["baseline_revision"], baseline_revision
+                    )
+
                 if batch["name"] == "review-fix-revision":
                     status = invoke(
                         LEDGER_CACHE,
@@ -314,30 +688,73 @@ class SessionReplayTests(unittest.TestCase):
                         "status",
                     )
                     task_status = status["tasks"][0]
-                    self.assertEqual(task_status["revision_key"], final_revision_key)
+                    delivery_status = task_status["deliveries"][0]
                     self.assertEqual(
-                        set(task_status["gates"]),
-                        {"dependency-integration", "pr-preflight"},
+                        delivery_status["revision_key"], final_revision_key
                     )
-                    self.assertIn("missing-current-review", task_status["terminal_blockers"])
+                    self.assertEqual(
+                        task_status["gates"], {"dependency-integration": "passed"}
+                    )
+                    self.assertEqual(
+                        delivery_status["gates"], {"pr-preflight": "passed"}
+                    )
+                    self.assertIn(
+                        "workflow-app:missing-current-review",
+                        task_status["terminal_blockers"],
+                    )
                     self.assertFalse(status["terminal_eligible"])
                     state = json.loads(ledger.read_text())
-                    self.assertEqual(len(state["reviews"]), 1)
+                    self.assertEqual(len(state["reviews"]), 2)
+                    initial_review = next(
+                        item
+                        for item in state["reviews"]
+                        if item["revision_key"] == initial_revision_key
+                    )
+                    final_review = next(
+                        item
+                        for item in state["reviews"]
+                        if item["revision_key"] == final_revision_key
+                    )
                     self.assertEqual(
-                        state["reviews"][0]["observations"][0]["observation_fingerprint"],
+                        initial_review["observations"][0]["observation_fingerprint"],
                         facts["initial_review"]["observation_fingerprint"],
                     )
+                    self.assertEqual(final_review["observations"], [])
                     self.assertTrue(
                         any(
-                            gate["revision_key"] == initial_revision_key
+                            gate["binding_key"] == initial_revision_key
                             and gate["gate"] == "focused-validation"
                             for gate in state["gates"]
                         )
                     )
+                    self.assertTrue(
+                        any(
+                            gate["binding_key"] == initial_revision_key
+                            and gate["gate"] == "codex-review"
+                            and gate["state"] == "failed"
+                            for gate in state["gates"]
+                        )
+                    )
+
+                if batch["name"] == "portfolio-terminal-verification":
+                    terminal_after_verification = invoke(
+                        LEDGER_CACHE,
+                        "--json",
+                        "ledger",
+                        "read",
+                        "--ledger",
+                        str(ledger),
+                        "--projection",
+                        "terminal",
+                    )
+                    self.assertTrue(terminal_after_verification["portfolio_verified"])
+                    self.assertEqual(
+                        terminal_after_verification["phase"], "portfolio-goal-ready"
+                    )
 
             self.assertIsNotNone(final_batch_command)
             self.assertIsNotNone(final_batch_file)
-            self.assertEqual(generation, 9)
+            self.assertEqual(generation, 10)
             self.assertEqual(typed_state_writes, proxy["typed_state_write_ceiling"])
             self.assertLess(
                 typed_state_writes, proxy["legacy_ledger_patch_attempts"] / 2
@@ -352,53 +769,91 @@ class SessionReplayTests(unittest.TestCase):
             self.assertEqual(
                 task["outcome"], "pull-request-ready-for-merge-but-not-merged"
             )
-            self.assertEqual(task["revision"]["head_sha"], facts["final_head_sha"])
-            self.assertEqual(task["pr"]["number"], facts["pull_request"]["number"])
-            self.assertEqual(task["pr"]["url"], facts["pull_request"]["url"])
-            self.assertEqual(task["pr"]["head_sha"], facts["final_head_sha"])
-            self.assertEqual(task["pr"]["base_ref"], facts["base_ref"])
-            self.assertEqual(task["pr"]["merge_base_sha"], facts["merge_base_sha"])
+            self.assertEqual(task["goal_evidence_ref"], facts["worker_goal_evidence_ref"])
+            self.assertEqual(
+                task["goal_completion_evidence_ref"],
+                facts["worker_goal_completion_evidence_ref"],
+            )
+            self.assertEqual(len(task["deliveries"]), 1)
+            delivery = task["deliveries"][0]
+            self.assertEqual(delivery["delivery_key"], facts["delivery_key"])
+            self.assertEqual(delivery["revision"]["head_sha"], facts["final_head_sha"])
+            self.assertEqual(delivery["pr"]["repository"], claim["repositories"][0])
+            self.assertEqual(delivery["pr"]["number"], facts["pull_request"]["number"])
+            self.assertEqual(delivery["pr"]["url"], facts["pull_request"]["url"])
+            self.assertEqual(delivery["pr"]["head_sha"], facts["final_head_sha"])
+            self.assertEqual(delivery["pr"]["base_ref"], facts["base_ref"])
+            self.assertEqual(
+                delivery["pr"]["merge_base_sha"], facts["merge_base_sha"]
+            )
             reconstructed_tuple = (
-                f"ambrogio-dev/yn-ai-workflows#{task['pr']['number']}@"
-                f"{task['pr']['head_sha']}@{task['pr']['base_ref']}@"
-                f"{task['pr']['merge_base_sha']}"
+                f"ambrogio-dev/yn-ai-workflows#{delivery['pr']['number']}@"
+                f"{delivery['pr']['head_sha']}@{delivery['pr']['base_ref']}@"
+                f"{delivery['pr']['merge_base_sha']}"
             )
             self.assertEqual(reconstructed_tuple, facts["pull_request"]["tuple"])
 
-            reviews = {item["revision_key"]: item for item in final_state["reviews"]}
+            reviews = {
+                (item["delivery_key"], item["revision_key"]): item
+                for item in final_state["reviews"]
+            }
             self.assertEqual(
-                reviews[initial_revision_key]["observations"][0],
+                reviews[(facts["delivery_key"], initial_revision_key)][
+                    "observations"
+                ][0],
                 {
+                    "monitoring_cycle": 0,
                     "provider_state": "findings",
                     "observation_fingerprint": facts["initial_review"][
                         "observation_fingerprint"
                     ],
                     "disposition": "fix-required",
                     "evidence_ref": facts["initial_review"]["evidence_ref"],
-                    "observed_at": reviews[initial_revision_key]["observations"][0][
-                        "observed_at"
-                    ],
+                    "observed_at": reviews[
+                        (facts["delivery_key"], initial_revision_key)
+                    ]["observations"][0]["observed_at"],
                 },
             )
             self.assertEqual(
-                reviews[final_revision_key]["observations"][-1]["provider_state"],
+                reviews[(facts["delivery_key"], final_revision_key)]["observations"][
+                    -1
+                ]["provider_state"],
                 "clean",
             )
             self.assertEqual(
-                reviews[final_revision_key]["observations"][-1]["disposition"],
+                reviews[(facts["delivery_key"], final_revision_key)]["observations"][
+                    -1
+                ]["disposition"],
                 "accepted",
             )
             self.assertEqual(final_state["goal"]["state"], "complete")
+            self.assertEqual(
+                final_state["goal"]["completion_evidence_ref"],
+                facts["root_goal_completion_evidence_ref"],
+            )
+            terminal_handoff = next(
+                item
+                for item in final_state["handoffs"]
+                if item["handoff_kind"] == "pull-request-ready"
+            )
+            self.assertEqual(
+                terminal_handoff["authority"], "external-merge-required"
+            )
             operations = final_state["operations"]
             activation_generation = next(
                 item["generation"]
                 for item in operations
                 if "portfolio-goal-activated" in item["event_types"]
             )
-            task_closeout_generation = max(
+            task_closeout_generation = next(
                 item["generation"]
                 for item in operations
-                if "task-observed" in item["event_types"]
+                if "task-goal-completed" in item["event_types"]
+            )
+            verification_generation = next(
+                item["generation"]
+                for item in operations
+                if "portfolio-terminal-verified" in item["event_types"]
             )
             portfolio_closeout_generation = next(
                 item["generation"]
@@ -406,7 +861,8 @@ class SessionReplayTests(unittest.TestCase):
                 if "portfolio-goal-completed" in item["event_types"]
             )
             self.assertLess(activation_generation, task_closeout_generation)
-            self.assertLess(task_closeout_generation, portfolio_closeout_generation)
+            self.assertLess(task_closeout_generation, verification_generation)
+            self.assertLess(verification_generation, portfolio_closeout_generation)
 
             terminal = invoke(
                 LEDGER_CACHE,
@@ -520,6 +976,28 @@ class SessionReplayTests(unittest.TestCase):
             )
             self.assertEqual(
                 verified["archives"][0]["archive_id"], archived["archive_id"]
+            )
+            legacy_reverified = invoke(
+                LEDGER_CACHE,
+                "--json",
+                "archive",
+                "verify",
+                "--archive-id",
+                legacy_archive_id,
+            )
+            self.assertEqual(
+                legacy_reverified["archives"][0]["schema_version"], "1.0.0"
+            )
+            self.assertEqual(legacy_ledger.read_bytes(), legacy_snapshot["ledger"])
+            self.assertEqual(
+                legacy_metadata.read_bytes(), legacy_snapshot["metadata"]
+            )
+            self.assertEqual(
+                legacy_ledger.stat().st_mtime_ns, legacy_snapshot["ledger_mtime"]
+            )
+            self.assertEqual(
+                legacy_metadata.stat().st_mtime_ns,
+                legacy_snapshot["metadata_mtime"],
             )
 
             ceilings = proxy["output_byte_ceilings"]

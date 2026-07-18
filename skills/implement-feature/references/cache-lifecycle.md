@@ -24,40 +24,41 @@ remain blocking.
 
 ## Active And Archived State
 
-Keep resumable state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v3 is the
+Keep resumable ledger-schema `2.0.0` state as absolute direct-child `.json` files under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v4 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
 
 Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire fingerprint,
 never a `sha256:` value or receipt fingerprint.
+`terminal` is the only active release reason; every receipt binds stable ledger
+hash and size.
 
-For a recorded resumable handoff review schedule, require the worker pause evidence,
-future `due_at`, one committed root-targeted heartbeat id, and observed root Goal
-pause before release:
+For review monitoring, retain active JSON, exact claim/fingerprint, paused
+Goals, schedule fingerprint, and, when root is quiescent, its heartbeat. Do not release ownership. The
+same root verifies that claim on wake; a root replaced by authorized takeover
+stops. Dependency-only waits also retain claim and state, return the exact
+external action, and require explicit same-root resume; do not fabricate a
+schedule, handoff, or receipt. A pre-REGISTER claim may keep a null state ref
+until that retained claim binds registration.
 
-```text
-scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-fingerprint '<claim-fingerprint>' --release-reason durable-handoff --evidence '<durable-handoff-evidence-ref>'
-```
-
-Stop and retain the active JSON and paused nonterminal Goals. The heartbeat owns
-the next root wake; recovery reacquires the claim and applies `claim-rebound`
-before task mutation. A durable-handoff receipt never authorizes archive. A pre-REGISTER claim may have a null state ref;
-reacquire clears it.
-
-After the terminal projection passes, all Goals complete, the completion event
-commits, and current external evidence is independently reverified, run exactly:
+After the terminal projection passes each staged readiness check, every task is
+sealed, its worker Goal completion and terminal handoff are
+recorded, `portfolio-terminal-verified` passes, the root Goal completion is read
+back and recorded, and current evidence remains unchanged, run exactly:
 
 ```text
 scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-fingerprint '<claim-fingerprint>' --release-reason terminal --evidence '<terminal-evidence-ref>'
 scripts/ledger-cache --json ledger archive --ledger '<absolute-active-json>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
 ```
 
-The release receipt binds the exact root, acquire fingerprint, active JSON path,
-terminal evidence, and active bytes. Its compatibility field names remain
-`ledger_sha256` and `ledger_size_bytes`; they refer to the active JSON, not the
-derived Markdown. Archive verifies and consumes that receipt. Any failure keeps
-the active JSON or completed result available and reports cache incomplete.
+Under lock, release requires schema-2 JSON, exact ownership, and an
+archive-ready terminal projection before receipt or claim deletion. Rejection
+leaves claim and ledger unchanged.
+
+`ledger_sha256` and `ledger_size_bytes` bind validated JSON bytes, root,
+fingerprint, path, and the ledger's exact terminal evidence, not Markdown.
+Archive consumes the receipt; interruption remains recoverable.
 
 ## Archive V2 Contract
 
@@ -91,7 +92,8 @@ idempotent and resolves to the same entry.
 | `root_id` | Released terminal owner. |
 | `tool_version` | `ledger-cache` command-contract version. |
 
-The helper validates terminal eligibility, strict state schema, receipt checksum,
+The helper rejects any post-terminal drift and validates staged terminal
+eligibility, strict state schema, receipt checksum,
 and deterministic projection before publishing the archive. It serializes
 mutations under the claim-store lock, refuses active claim or takeover
 references, rejects unsafe paths and symlinks, stages both artifacts before

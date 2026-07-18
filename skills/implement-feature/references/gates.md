@@ -1,111 +1,132 @@
 # Implement Feature Gates
 
-## Run Authorization Gate
+## Authorization And Managed Checkout
 
 Require `visible_app_task_permission=granted-by-authorized-user` before CLAIM.
-That single disclosed grant covers the fixed inspect-through-ready flow for the
-accepted bundle. It does not authorize scope expansion, merge, release,
-deployment, post-merge closure, or target-repository instruction changes.
+The disclosed grant covers the fixed inspect-through-ready flow for the
+accepted bundle, not scope expansion, merge, release, deployment, post-merge
+closure, or target-repository instruction changes.
 
-## Managed Checkout Gate
+Before edits, apply one `managed-checkouts-observed` event containing every
+registered delivery exactly once. Require an App-managed isolated checkout,
+matching repository, target branch, Git top-level, baseline revision, and
+isolation proof for every delivery. Missing, duplicated, shared, unmanaged, or
+non-isolated checkout evidence blocks. Never create raw Git worktrees, rotate
+the caller checkout, or transfer implementation to the root.
 
-Require App-managed isolated checkout evidence for every affected repository.
-Missing or non-isolated checkout proof blocks the run. Never create raw Git
-worktrees, rotate the caller checkout, or transfer implementation to the root.
+## Static Dispatch Gates
 
-## Dependency And Integration Gate
+`dependency-integration` is a `task-static` gate. Dispatch only after every
+cross-Spec dependency is verified merged; a merge-ready upstream is still
+unfinished. `pr-preflight` is a `delivery-static` gate and must pass separately
+for every affected repository. Neither static gate requires a PR revision, so
+pending tasks can become dispatch-ready before publication.
 
-Dispatch only after every cross-Spec dependency is verified merged. A
-merge-ready upstream is still unfinished dependency evidence. Require the
-bundle's focused validation plus every named integration gate. Multi-repository
-completion requires exactly one distinct repo-owned integration Feature Spec
-downstream of all implementation partials. Its task must own at least one
-bounded path change and cross-repository proof, producing a real PR rather than
-a no-op validation result.
+Multi-repository completion requires exactly one distinct repo-owned
+integration Feature Spec downstream of all implementation partials. It owns a
+bounded path change and cross-repository proof and produces a real PR rather
+than a no-op validation result.
 
-## Pull Request, Review, And CI Gate
+## Delivery-Revision Gates
 
-The only delivery gate is a pull request ready to merge and not merged. Every
-affected repository must have a real `OPEN`, non-draft PR URL at its current head,
-with the base equal to that repository's currently discovered default branch,
-safe metadata, mandatory current-revision Codex review dispositioned, every
-actionable finding resolved, and at least one applicable CI check run or status
-context bound to that exact head SHA. Zero applicable CI results is a
-`ci-unavailable` blocker, not a passing gate. Every required applicable result
-must be successful; skipped or neutral evidence counts only when repository
-rules prove it is not required.
+For each delivery's current exact repository, PR number and URL, head SHA, base
+ref, and merge-base SHA require:
 
-Do not make draft status a circular prerequisite for mergeability. A task may
-publish a draft while implementing; after substantive implementation, focused
-validation, and `$autoreview`, convert it to ready-for-review with
-`isDraft=false`. Only then request or wait for repository approvals and evaluate
-the final mergeability/rule gate. The ready-for-review transition is not
-`merge-ready` and grants no merge or queue authority.
+- `publication`: real PR identity, lifecycle `OPEN`, and base equal to that
+  repository's currently discovered default branch;
+- `codex-review`: mandatory current-revision request with every actionable
+  finding resolved;
+- `ci`: at least one applicable run or status context on the exact head SHA and
+  every required applicable result successful;
+- `pr-ready`: non-draft exact PR identity after the ready-for-review transition;
+- `tracker-closeout`: every applicable closing vehicle prepared at the current
+  delivery revision;
+- `mergeability`: conflict-free GitHub mergeability plus required base
+  freshness, approvals, and merge-queue eligibility.
 
-For that same current head/base tuple, require the lifecycle to remain `OPEN`
-and GitHub to report the PR
-conflict-free and mergeable, with every repository-required base update,
-approval, and merge-queue eligibility condition satisfied. Unknown, pending,
-dirty/conflicting, behind-when-update-required, or otherwise blocked merge state
-is not ready. Persist the observed mergeability and rule evidence; never enqueue
-or merge the PR.
+Zero applicable CI results is a `ci-unavailable` blocker. Skipped or neutral
+evidence counts only when repository rules prove it is not required. Unknown,
+pending, dirty/conflicting, behind-when-update-required, closed, merged, or
+otherwise blocked state never passes. Never enqueue or merge.
 
-Review has no skip. Apply each exact tuple through `revision-observed`; the
-helper invalidates older revision-bound gate evidence when head, base-ref,
-merge-base, or material diff changes. A changed revision returns the task to
-validation, `$autoreview`, request/poll/fix, and CI as applicable. Apply each
-current proof through `gate-observed`, never by patching state.
+A draft is only an intermediate vehicle. After substantive implementation,
+focused validation, and `$autoreview`, convert it to ready-for-review with
+`isDraft=false`; only then obtain approval and final rule evidence. Do not make
+draft status a circular prerequisite for mergeability. The transition is not
+terminal.
+
+## Task-Revision-Set Gates
+
+The canonical revision-set key contains one current revision for every
+delivery. Bind `scope-acceptance`, `integration-validation`, and optional
+`domain-closeout` to that complete set. Bind `focused-validation`,
+`full-validation`, and `autoreview` to each delivery revision. A partial set
+cannot pass.
 
 ## Domain Knowledge Closeout Gate
 
 When the final issue carries a nonempty accepted `knowledge_delta`, invoke
 `$project-memory` with `memory_slice=domain-memory` and
 `domain_operation=implementation-closeout` only after integration proof.
-Require `capture_outcome=captured`, every supplied accepted item still supported
-and durably represented, every required named target reconciled, named verified
-destinations, and complete documentation-diff verification. An unresolved,
-rejected, or landed-behavior-contradicted item, `capture_outcome=deferred`, or
-`capture_outcome=no-durable-change` blocks domain closeout and terminal
-`merge-ready` pending an owner decision or separately authorized
-planning/implementation correction.
+Require `capture_outcome=captured`, every supplied accepted item still
+supported and durably represented, every required named target reconciled,
+named verified destinations, and complete documentation-diff verification. An
+unresolved, rejected, or landed-behavior-contradicted item,
+`capture_outcome=deferred`, or `capture_outcome=no-durable-change` blocks domain
+closeout and terminal `merge-ready` pending an owner decision or separately
+authorized correction.
 
-## Tracker Closeout Gate
+Any delivery revision, PR identity, material diff, repository-rule, tracker
+delivery, evidence-target, or documentation change invalidates the affected
+delivery-revision gates and every task-revision-set gate. Apply new evidence
+through typed events; never patch state.
 
-Derive closeout from the source backend. For GitHub, arm every generated
-implementation issue in its owning PR and arm each implementation-eligible
-Feature Spec in that Spec's designated default-branch whole-Spec closeout PR
-only after its gates pass. For multi-repository work, the final integration
-partial's default-branch PR also arms any accepted hosted parent/global Feature
-Spec with a fully qualified ref, but only after every partial gate passes. Use
-fully qualified issue refs across repositories, record every closing link as
-`armed`, and do not report any hosted item closed before merge. Closing keywords
-count only on PRs whose base is the repository default branch.
+## Tracker Closeout
 
-For local Markdown, complete substantive acceptance, integration proof, and the
-domain knowledge closeout gate when present. Then move each issue from its exact scoped
-active path to its exact scoped `done/` destination on the delivery branch,
-apply one `source-moved` transition to that predeclared destination
-with an unchanged body fingerprint, commit and push the move, rerun final
-validation and `$autoreview`, convert draft PRs to ready-for-review, then obtain
-current-revision review and CI at that resulting head before terminal merge-ready
-state.
-Record closeout as prepared; the default-branch completion signal appears only
-when the later PR merge lands the move.
+For GitHub, arm every generated implementation issue in its owning delivery PR.
+Arm each implementation-eligible Feature Spec in its designated default-branch
+whole-Spec closeout PR only after its gates pass. The final integration
+partial's default-branch PR may arm an accepted hosted parent/global Feature
+Spec only after every partial gate passes. Use fully qualified refs across
+repositories and leave hosted items open until merge.
 
-## Terminal Gate
+For local Markdown, complete substantive acceptance, integration proof, and
+the domain knowledge closeout gate when present. Only then move each issue from
+its exact active path to its predeclared `done/` path in the owning delivery.
+`source-moved` requires current task-revision-set proof and an unchanged body
+fingerprint; it marks that tracker delivery dirty and invalidates the current
+revision set, then commit and push the move, establish a newer tuple through
+`revision-observed`, and bind current committed/published lifecycle through
+`delivery-observed`. Only that newer published observation clears dirt. Then
+rerun final validation and `$autoreview`, convert drafts to ready-for-review,
+then obtain current-revision review and CI before terminal merge-ready state.
+Record closeout as prepared; completion reaches the default branch only after a
+later merge. GitHub sources cannot use `source-moved`.
 
-Before `merge-ready`, require scope and acceptance proof, preserved owner
-changes, current diff and validation, non-trivial `$autoreview`, dependency and
-integration proof, current-head review, CI, ready PRs, prepared tracker
-closeout, any required captured domain knowledge closeout, default-branch PR
-bases, current conflict-free mergeability and repository-rule satisfaction, and
-no unresolved actionable work. For local
-issues, the current reviewed head must include the committed and pushed
-active-to-`done/` moves.
+## Staged Terminal Gate
 
-Require the machine-derived terminal projection, then apply
-`external-handoff-recorded` with exact PR URLs, head/base/merge-base revisions,
-checks, closeout vehicle, and next merge action. Then stop and release the
-active-root claim. Neither root nor task merges, performs post-merge
-verification, or closes hosted tracker items. A later GitHub workflow owns
-those actions.
+Closeout must not be circular. Use this order:
+
+1. Prove every applicable static, delivery-revision, and task-revision-set gate
+   at the current complete revision set; apply `task-terminal-sealed`.
+2. Complete and read back that worker Goal; apply `task-goal-completed`.
+3. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
+   `pull-request-ready` kind, fixed `external-merge-required` authority, and
+   next action.
+4. After all tasks, independently reverify current proof and apply
+   `portfolio-terminal-verified`.
+5. Complete and read back the root Goal; apply `portfolio-goal-completed`.
+6. Release and archive through `cache-lifecycle.md`.
+
+The machine-derived terminal projection exposes readiness for each stage.
+Review monitoring retains the active claim and cannot satisfy terminal
+handoff. Neither the root nor a task merges, performs
+post-merge verification, or closes hosted tracker items.
+
+Review has no skip; every delivery-revision review gate is mandatory.
+
+After a task seal or Goal completion, changed terminal evidence is recorded only
+through `post-terminal-drift-recorded`. It records portfolio drift, blocks
+portfolio verification or archive, and does not reopen Goals
+or resume implementation. Report the owner action; a later correction requires
+a separately authorized fresh run.

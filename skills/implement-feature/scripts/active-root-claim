@@ -7,6 +7,8 @@ import argparse
 import contextlib
 import fcntl
 import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 import re
@@ -19,11 +21,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "8.0.0"
+__version__ = "9.0.0"
 SCHEMA_VERSION = "5.0.0"
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
-RELEASE_REASONS = {"terminal", "durable-handoff"}
+RELEASE_REASON = "terminal"
+LEDGER_CACHE_PATH = Path(__file__).resolve().with_name("ledger-cache")
 TASK_MODEL_POLICY_PATH = (
     Path(__file__).resolve().parents[1] / "references/task-model-policy.md"
 )
@@ -58,12 +61,80 @@ def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def sha256_file(path: Path) -> str:
+def open_regular_read_descriptor(path: Path) -> tuple[int, os.stat_result]:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_NONBLOCK", 0)
+    descriptor = os.open(path, flags)
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OSError(f"not a regular file: {path}")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor, metadata
+
+
+def open_directory_descriptor(path: Path) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags |= getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            raise OSError(f"not a directory: {path}")
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def stable_file_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    return (
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def read_stable_regular_bytes(path: Path) -> bytes:
+    descriptor, before = open_regular_read_descriptor(path)
+    chunks: list[bytes] = []
+    size = 0
+    try:
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            size += len(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if stable_file_identity(before) != stable_file_identity(after) or size != after.st_size:
+        raise OSError(f"file changed while being read: {path}")
+    return b"".join(chunks)
+
+
+def snapshot_stable_regular_file(path: Path) -> tuple[str, int]:
+    descriptor, before = open_regular_read_descriptor(path)
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+    size = 0
+    try:
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
             digest.update(chunk)
-    return digest.hexdigest()
+            size += len(chunk)
+        after = os.fstat(descriptor)
+    finally:
+        os.close(descriptor)
+    if stable_file_identity(before) != stable_file_identity(after) or size != after.st_size:
+        raise OSError(f"file changed while being read: {path}")
+    return digest.hexdigest(), size
 
 
 def check_id(value: str, field: str) -> str:
@@ -187,10 +258,16 @@ def canonical_ledger_ref(value: str, *, persisted: bool = False) -> str:
         raise path_contract_error(
             f"ledger_ref must not be a symlink: {path}", persisted=persisted
         )
-    if path.exists() and not path.is_file():
+    try:
+        descriptor, _ = open_regular_read_descriptor(path)
+    except FileNotFoundError:
+        pass
+    except OSError as exc:
         raise path_contract_error(
             f"ledger_ref is not a regular file: {path}", persisted=persisted
-        )
+        ) from exc
+    else:
+        os.close(descriptor)
     return str(path)
 
 
@@ -255,35 +332,42 @@ def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None
             root, field="claim cache", persisted=True
         )
     lock_path = root / ".lock"
-    if lock_path.is_symlink():
-        raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
-    if not created_root and not lock_path.exists():
-        raise ClaimError("state-conflict", f"claim lock is missing: {lock_path}", 4)
-    if lock_path.exists() and not lock_path.is_file():
-        raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
-    flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        root_descriptor = open_directory_descriptor(root)
+    except OSError as exc:
+        raise ClaimError(
+            "state-conflict", f"unsafe claim cache root: {root}", 4
+        ) from exc
+    flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     if created_root:
         flags |= os.O_CREAT | os.O_EXCL
     try:
-        descriptor = os.open(lock_path, flags, 0o600)
-    except OSError as exc:
-        raise ClaimError(
-            "state-conflict", f"cannot open claim lock: {lock_path}", 4
-        ) from exc
-    with os.fdopen(descriptor, "r+") as lock:
-        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
-            raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
-        fcntl.flock(lock.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
         try:
-            yield root
-        finally:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+            descriptor = os.open(".lock", flags, 0o600, dir_fd=root_descriptor)
+        except FileNotFoundError as exc:
+            raise ClaimError(
+                "state-conflict", f"claim lock is missing: {lock_path}", 4
+            ) from exc
+        except OSError as exc:
+            raise ClaimError(
+                "state-conflict", f"unsafe claim lock: {lock_path}", 4
+            ) from exc
+        with os.fdopen(descriptor, "r+") as lock:
+            if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+                raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+            try:
+                yield root
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+    finally:
+        os.close(root_descriptor)
 
 
 def read_claim_value(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
+        value = json.loads(read_stable_regular_bytes(path))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ClaimError("state-conflict", f"invalid claim file: {path}", 4) from exc
     if not isinstance(value, dict):
         raise ClaimError("state-conflict", f"claim schema mismatch: {path}", 4)
@@ -319,8 +403,6 @@ def validate_current_claim(
 
 
 def inspect_claim(path: Path) -> dict[str, Any]:
-    if path.is_symlink() or not path.is_file():
-        raise ClaimError("state-conflict", f"unsafe claim file: {path}", 4)
     value = read_claim_value(path)
     if value.get("schema_version") != SCHEMA_VERSION:
         raise ClaimError("state-conflict", f"unsupported claim schema: {path}", 4)
@@ -664,8 +746,8 @@ def read_task_adoption_inputs(values: list[str]) -> dict[str, dict[str, Any]]:
         if not separator or root_id in parsed or not path.is_absolute():
             raise ClaimError("invalid-input", f"expected_task_adoption is invalid: {item}", 2)
         try:
-            value = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
+            value = json.loads(read_stable_regular_bytes(path))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise ClaimError(
                 "invalid-input", f"expected_task_adoption cannot be read: {path}", 2
             ) from exc
@@ -822,11 +904,9 @@ def load_takeover_transactions(root: Path | None) -> dict[str, dict[str, Any]]:
         return {}
     transactions: dict[str, dict[str, Any]] = {}
     for path in sorted(root.glob("*.takeover")):
-        if path.is_symlink() or not path.is_file():
-            raise ClaimError("state-conflict", f"unsafe takeover transaction: {path}", 4)
         try:
-            value = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
+            value = json.loads(read_stable_regular_bytes(path))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise ClaimError("state-conflict", f"invalid takeover transaction: {path}", 4) from exc
         transaction = validate_takeover_transaction(value, path)
         root_id = transaction["candidate_claim"]["root_id"]
@@ -837,7 +917,7 @@ def load_takeover_transactions(root: Path | None) -> dict[str, dict[str, Any]]:
 
 
 def sync_directory(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
+    descriptor = open_directory_descriptor(path)
     try:
         os.fsync(descriptor)
     finally:
@@ -845,26 +925,43 @@ def sync_directory(path: Path) -> None:
 
 
 def write_json_atomic(path: Path, value: dict[str, Any]) -> None:
-    temporary = path.with_name(
-        f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
-    )
+    directory = open_directory_descriptor(path.parent)
+    temporary_name = f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
+    payload = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+    descriptor: int | None = None
     try:
-        with temporary.open("x") as handle:
-            handle.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(temporary_name, flags, 0o600, dir_fd=directory)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = None
+            handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, path)
-        sync_directory(path.parent)
+        os.replace(
+            temporary_name,
+            path.name,
+            src_dir_fd=directory,
+            dst_dir_fd=directory,
+        )
+        os.fsync(directory)
     finally:
+        if descriptor is not None:
+            os.close(descriptor)
         try:
-            temporary.unlink()
+            os.unlink(temporary_name, dir_fd=directory)
         except FileNotFoundError:
             pass
+        os.close(directory)
 
 
 def unlink_durable(path: Path) -> None:
-    path.unlink()
-    sync_directory(path.parent)
+    directory = open_directory_descriptor(path.parent)
+    try:
+        os.unlink(path.name, dir_fd=directory)
+        os.fsync(directory)
+    finally:
+        os.close(directory)
 
 
 def write_claim(path: Path, value: dict[str, Any]) -> None:
@@ -881,18 +978,97 @@ def release_receipt_fingerprint(value: dict[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def build_release_receipt(
-    claim: dict[str, Any], *, release_reason: str, evidence: str
-) -> dict[str, Any]:
+_LEDGER_RUNTIME: Any | None = None
+
+
+def load_ledger_runtime() -> Any:
+    global _LEDGER_RUNTIME
+    if _LEDGER_RUNTIME is not None:
+        return _LEDGER_RUNTIME
+    loader = importlib.machinery.SourceFileLoader(
+        "implement_feature_terminal_ledger_runtime", str(LEDGER_CACHE_PATH)
+    )
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    if spec is None:
+        raise ClaimError(
+            "state-conflict", "terminal ledger validator is unavailable", 4
+        )
+    runtime = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(runtime)
+    except Exception as exc:
+        raise ClaimError(
+            "state-conflict", "terminal ledger validator cannot be loaded", 4
+        ) from exc
+    _LEDGER_RUNTIME = runtime
+    return runtime
+
+
+def terminal_ledger_snapshot(
+    claim: dict[str, Any], ledger: Path, evidence: str
+) -> tuple[str, int]:
+    try:
+        payload = read_stable_regular_bytes(ledger)
+        value = json.loads(payload)
+    except FileNotFoundError:
+        raise ClaimError(
+            "state-conflict", f"claim ledger is not a safe file: {ledger}", 4
+        )
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ClaimError(
+            "state-conflict", f"claim ledger is not valid terminal state: {ledger}", 4
+        ) from exc
+
+    runtime = load_ledger_runtime()
+    try:
+        state = runtime.validate_state(value, ledger)
+        terminal = runtime.terminal_projection(state)
+    except Exception as exc:
+        raise ClaimError(
+            "state-conflict", f"claim ledger is not valid terminal state: {ledger}", 4
+        ) from exc
+
+    source_ids = sorted(item["source_id"] for item in state["sources"])
+    if (
+        state["portfolio"]["root_id"] != claim["root_id"]
+        or state["portfolio"]["repositories"] != claim["repositories"]
+        or state["portfolio"]["repository_checkouts"]
+        != claim["repository_checkouts"]
+        or source_ids != claim["sources"]
+        or state["claim"]["fingerprint"] != claim["fingerprint"]
+    ):
+        raise ClaimError(
+            "state-conflict",
+            f"claim ledger ownership does not match the active claim: {ledger}",
+            4,
+        )
+    if state["closeout"]["portfolio_terminal_evidence_ref"] != evidence:
+        raise ClaimError(
+            "state-conflict",
+            f"terminal release evidence does not match the verified ledger: {ledger}",
+            4,
+            {
+                "ledger_ref": str(ledger),
+                "expected_evidence_ref": state["closeout"][
+                    "portfolio_terminal_evidence_ref"
+                ],
+            },
+        )
+    if not terminal["archive_ready"]:
+        raise ClaimError(
+            "state-conflict",
+            f"claim ledger is not archive-ready terminal state: {ledger}",
+            4,
+            {"ledger_ref": str(ledger), "blockers": terminal["blockers"]},
+        )
+    return hashlib.sha256(payload).hexdigest(), len(payload)
+
+
+def build_release_receipt(claim: dict[str, Any], *, evidence: str) -> dict[str, Any]:
     ledger = Path(canonical_ledger_ref(claim["ledger_ref"], persisted=True))
-    if ledger.is_file():
-        ledger_sha256: str | None = sha256_file(ledger)
-        ledger_size_bytes: int | None = ledger.stat().st_size
-    elif release_reason == "durable-handoff" and not ledger.exists():
-        ledger_sha256 = None
-        ledger_size_bytes = None
-    else:
-        raise ClaimError("state-conflict", f"claim ledger is not a safe file: {ledger}", 4)
+    ledger_sha256, ledger_size_bytes = terminal_ledger_snapshot(
+        claim, ledger, evidence
+    )
     value = {
         "schema_version": RELEASE_RECEIPT_SCHEMA_VERSION,
         "root_id": claim["root_id"],
@@ -900,7 +1076,7 @@ def build_release_receipt(
         "ledger_ref": str(ledger),
         "ledger_sha256": ledger_sha256,
         "ledger_size_bytes": ledger_size_bytes,
-        "release_reason": release_reason,
+        "release_reason": RELEASE_REASON,
         "evidence_ref": evidence,
         "released_at": timestamp(),
     }
@@ -923,12 +1099,23 @@ def validate_release_receipt(value: Any, path: Path) -> dict[str, Any]:
     }
     if not isinstance(value, dict) or set(value) != required:
         raise ClaimError("state-conflict", f"release receipt schema mismatch: {path}", 4)
+    if value["release_reason"] != RELEASE_REASON:
+        root_id = value.get("root_id")
+        raise ClaimError(
+            "state-conflict",
+            f"unsupported nonterminal release receipt for root {root_id}: {path}",
+            4,
+            {
+                "root_id": root_id,
+                "receipt_ref": str(path),
+                "release_reason": value["release_reason"],
+            },
+        )
     root_id = check_id(value["root_id"], "root_id")
     claim_fingerprint = check_fingerprint(value["claim_fingerprint"])
     if (
         value["schema_version"] != RELEASE_RECEIPT_SCHEMA_VERSION
         or path.name != f"{root_id}--{claim_fingerprint}.json"
-        or value["release_reason"] not in RELEASE_REASONS
         or not isinstance(value["evidence_ref"], str)
         or not value["evidence_ref"].strip()
         or not isinstance(value["released_at"], str)
@@ -944,24 +1131,17 @@ def validate_release_receipt(value: Any, path: Path) -> dict[str, Any]:
         and isinstance(value["ledger_size_bytes"], int)
         and value["ledger_size_bytes"] >= 0
     )
-    missing_snapshot = (
-        value["ledger_sha256"] is None and value["ledger_size_bytes"] is None
-    )
-    if not has_snapshot and not (
-        missing_snapshot and value["release_reason"] == "durable-handoff"
-    ):
+    if not has_snapshot:
         raise ClaimError("state-conflict", f"release receipt ledger mismatch: {path}", 4)
     return value
 
 
 def read_release_receipt(path: Path) -> dict[str, Any] | None:
-    if not path.exists():
-        return None
-    if path.is_symlink() or not path.is_file():
-        raise ClaimError("state-conflict", f"unsafe release receipt: {path}", 4)
     try:
-        value = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
+        value = json.loads(read_stable_regular_bytes(path))
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ClaimError("state-conflict", f"invalid release receipt: {path}", 4) from exc
     return validate_release_receipt(value, path)
 
@@ -989,25 +1169,14 @@ def persist_release_receipt(root: Path, value: dict[str, Any]) -> Path:
     return path
 
 
-def cleanup_durable_handoff_receipts(root: Path, root_id: str) -> None:
+def validate_release_receipt_store(root: Path) -> None:
     receipt_root = root / "releases"
     if not receipt_root.exists():
         return
     if receipt_root.is_symlink() or not receipt_root.is_dir():
         raise ClaimError("state-conflict", f"unsafe release receipt root: {receipt_root}", 4)
     for path in sorted(receipt_root.iterdir()):
-        receipt = read_release_receipt(path)
-        if (
-            receipt is not None
-            and receipt["root_id"] == root_id
-            and receipt["release_reason"] == "durable-handoff"
-        ):
-            unlink_durable(path)
-    try:
-        receipt_root.rmdir()
-        sync_directory(root)
-    except OSError:
-        pass
+        read_release_receipt(path)
 
 
 def delete_replaced_claim(path: Path) -> None:
@@ -1117,6 +1286,7 @@ def acquire(args: argparse.Namespace) -> dict[str, Any]:
     candidate = build_claim(args)
     with locked_claim_store(create=True, exclusive=True) as root:
         assert root is not None
+        validate_release_receipt_store(root)
         recover_pending_takeovers(root)
         claims = load_claims(root)
         current = claims.get(candidate["root_id"])
@@ -1127,7 +1297,6 @@ def acquire(args: argparse.Namespace) -> dict[str, Any]:
         conflicts = overlapping(candidate, claims)
         if conflicts:
             raise ClaimError("state-conflict", "overlapping active-root claim", 4, {"root_ids": conflicts})
-        cleanup_durable_handoff_receipts(root, candidate["root_id"])
         write_claim(root / f"{candidate['root_id']}.json", candidate)
     return {"ok": True, "command": "claim.acquire", "state": "acquired", "claim": candidate}
 
@@ -1169,6 +1338,7 @@ def takeover(args: argparse.Namespace) -> dict[str, Any]:
     candidate = build_claim(args, takeover_evidence="pending", replaced=expected)
     with locked_claim_store(create=True, exclusive=True) as root:
         assert root is not None
+        validate_release_receipt_store(root)
         recover_pending_takeovers(root)
         claims = load_claims(root)
         conflicts = overlapping(candidate, claims)
@@ -1388,6 +1558,7 @@ def recover_takeover(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=False, exclusive=True) as root:
         if root is None:
             raise ClaimError("not-found", f"takeover transaction not found: {root_id}", 3)
+        validate_release_receipt_store(root)
         transactions = load_takeover_transactions(root)
         transaction = transactions.get(root_id)
         if transaction:
@@ -1446,7 +1617,6 @@ def heartbeat(args: argparse.Namespace) -> dict[str, Any]:
 def release(args: argparse.Namespace) -> dict[str, Any]:
     root_id = check_id(args.root_id, "root_id")
     expected_fingerprint = check_fingerprint(args.expected_fingerprint)
-    release_reason = args.release_reason
     evidence = args.evidence.strip()
     if not evidence:
         raise ClaimError("invalid-input", "release evidence is required", 2)
@@ -1462,7 +1632,6 @@ def release(args: argparse.Namespace) -> dict[str, Any]:
             receipt = read_release_receipt(receipt_path)
             if (
                 receipt is not None
-                and receipt["release_reason"] == release_reason
                 and receipt["evidence_ref"] == evidence
             ):
                 return {
@@ -1476,9 +1645,7 @@ def release(args: argparse.Namespace) -> dict[str, Any]:
             raise ClaimError("not-found", f"claim not found: {root_id}", 3)
         if claim["fingerprint"] != expected_fingerprint:
             raise ClaimError("state-conflict", "claim ownership fingerprint mismatch", 4)
-        receipt = build_release_receipt(
-            claim, release_reason=release_reason, evidence=evidence
-        )
+        receipt = build_release_receipt(claim, evidence=evidence)
         persist_release_receipt(root, receipt)
         unlink_durable(root / f"{root_id}.json")
     return {
@@ -1498,6 +1665,9 @@ def doctor() -> dict[str, Any]:
         validate_cache_directory_components(
             root, field="claim cache", persisted=True
         )
+        with locked_claim_store(create=False, exclusive=False) as locked_root:
+            if locked_root is not None:
+                validate_release_receipt_store(locked_root)
         claim_store_error = None
     except ClaimError as exc:
         claim_store_error = exc.message
@@ -1569,11 +1739,11 @@ def build_parser() -> argparse.ArgumentParser:
     heartbeat_parser = verbs.add_parser("heartbeat", help="Refresh one owned claim heartbeat.")
     heartbeat_parser.add_argument("--root-id", required=True)
     heartbeat_parser.add_argument("--expected-fingerprint", required=True)
-    release_parser = verbs.add_parser("release", help="Release one terminal or handed-off claim.")
+    release_parser = verbs.add_parser("release", help="Release one terminal claim.")
     release_parser.add_argument("--root-id", required=True)
     release_parser.add_argument("--expected-fingerprint", required=True)
     release_parser.add_argument(
-        "--release-reason", required=True, choices=sorted(RELEASE_REASONS)
+        "--release-reason", required=True, choices=(RELEASE_REASON,)
     )
     release_parser.add_argument("--evidence", required=True)
     takeover_parser = verbs.add_parser("takeover", help="Replace the exact verified-stale conflicting roots.")
