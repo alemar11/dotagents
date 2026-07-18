@@ -244,21 +244,22 @@ class ImplementFeatureContractTests(unittest.TestCase):
         skill = self.read("SKILL.md")
         options = self.read("references/options.md")
         disclosure = (
-            "Here, feature means each executable Feature Spec, so one planned "
-            "feature may create multiple visible tasks. This run may change and "
-            "validate code, push commits, create or update pull requests, address "
+            "Each executable Feature Spec is one feature; one plan may create "
+            "multiple visible tasks. This run may change and validate code, push "
+            "commits, create or update pull requests, address "
             "Codex review, wait for CI, prepare hosted issue closeout, and move, "
-            "commit, and push completed local issue files when used. Tasks use "
+            "commit, and push completed local issue files when used. AutoReview "
+            "sends Git status, staged/unstaged diffs, and every non-ignored "
+            "untracked file to Codex; no extra authorization. Tasks use "
             "`gpt-5.6-sol`: `medium` only for routine localized work, `xhigh` for "
             "risky or cross-system work, and `high` otherwise. After Codex has "
-            "waited up to 30 minutes for a review response, it may pause the "
-            "waiting worker and this task, create one temporary heartbeat to "
-            "resume the same task at the next 30-minute check, and delete or "
-            "replace that heartbeat after wake. It keeps at most one such "
-            "heartbeat for this run. After Codex reserves "
+            "waited up to 30 minutes for review, it may pause the worker and this "
+            "task, keep at most one temporary heartbeat to resume the same task "
+            "at the next 30-minute check, then delete or replace it after wake. "
+            "After Codex reserves "
             "the work, it automatically deletes valid run-state archives older "
-            "than 180 days; it never plans new work, expands scope, merges pull "
-            "requests, releases, or deploys."
+            "than 180 days; it never plans, expands scope, merges, releases, or "
+            "deploys."
         )
         prompt = (
             "Start implementation? Codex will create one visible task per feature "
@@ -700,12 +701,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "change and validate code",
             "push commits",
             "create or update pull requests",
+            "AutoReview sends Git status, staged/unstaged diffs, and every non-ignored untracked file to Codex",
+            "no extra authorization",
             "address Codex review",
             "wait for CI",
             "prepare hosted issue closeout",
             "move, commit, and push completed local issue files",
             "prepare merge-ready pull requests",
-            "never plans new work, expands scope, merges pull requests, releases, or deploys",
+            "never plans, expands scope, merges, releases, or deploys",
         ):
             self.assertIn(token, options)
         self.assertIn(

@@ -19,19 +19,19 @@ This file owns every user-controlled App orchestration field.
 
 For `visible_app_task_permission=not-requested`, state this exact disclosure:
 
-> Here, feature means each executable Feature Spec, so one planned feature may
-> create multiple visible tasks. This run may change and validate code, push
+> Each executable Feature Spec is one feature; one plan may create multiple
+> visible tasks. This run may change and validate code, push
 > commits, create or update pull requests, address Codex review, wait for CI,
 > prepare hosted issue closeout, and move, commit, and push completed local issue
-> files when used. Tasks use `gpt-5.6-sol`: `medium` only for routine localized
+> files when used. AutoReview sends Git status, staged/unstaged diffs, and every
+> non-ignored untracked file to Codex; no extra authorization. Tasks use
+> `gpt-5.6-sol`: `medium` only for routine localized
 > work, `xhigh` for risky or cross-system work, and `high` otherwise. After Codex
-> has waited up to 30 minutes for a review response, it may pause the waiting
-> worker and this task, create one temporary heartbeat to resume the same task
-> at the next 30-minute check, and delete or replace that heartbeat after wake.
-> It keeps at most one such heartbeat for this run. After Codex
+> has waited up to 30 minutes for review, it may pause the worker and this task,
+> keep at most one temporary heartbeat to resume the same task at the next
+> 30-minute check, then delete or replace it after wake. After Codex
 > reserves the work, it automatically deletes valid run-state archives older
-> than 180 days; it never plans new work, expands scope, merges pull requests,
-> releases, or deploys.
+> than 180 days; it never plans, expands scope, merges, releases, or deploys.
 
 Then use one `request_user_input`:
 
