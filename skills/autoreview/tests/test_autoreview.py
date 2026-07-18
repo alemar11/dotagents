@@ -14,6 +14,8 @@ from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "autoreview"
+SKILL_PATH = Path(__file__).resolve().parents[1] / "SKILL.md"
+OPENAI_YAML_PATH = Path(__file__).resolve().parents[1] / "agents" / "openai.yaml"
 loader = importlib.machinery.SourceFileLoader("autoreview_script", str(SCRIPT_PATH))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -23,6 +25,45 @@ loader.exec_module(cli)
 
 
 class AutoreviewContractTests(unittest.TestCase):
+    def test_skill_reuses_clean_review_for_unchanged_target(self) -> None:
+        skill = SKILL_PATH.read_text(encoding="utf-8")
+        normalized_skill = " ".join(skill.split())
+
+        self.assertIn("## Review Evidence Freshness", skill)
+        self.assertIn("effective patch content and scope are unchanged", normalized_skill)
+        self.assertIn("does not invalidate clean review evidence", normalized_skill)
+        self.assertIn("A local review may cover the resulting commit", normalized_skill)
+        self.assertIn(
+            "A commit, push, PR, ship, or final-response boundary alone is not a rerun reason.",
+            normalized_skill,
+        )
+
+    def test_skill_reruns_only_when_review_freshness_is_invalidated(self) -> None:
+        skill = SKILL_PATH.read_text(encoding="utf-8")
+        normalized_skill = " ".join(skill.split())
+
+        for invalidation in (
+            "changed content or paths alter the effective patch",
+            "formatting or generated refreshes alter it",
+            "an accepted finding fix changes it",
+            "the branch/base/commit scope expands",
+            "the previous result or target cannot be verified",
+            "the user explicitly asks to review again",
+        ):
+            self.assertIn(invalidation, normalized_skill)
+
+    def test_discovery_metadata_promotes_review_evidence_reuse(self) -> None:
+        skill = SKILL_PATH.read_text(encoding="utf-8")
+        metadata = OPENAI_YAML_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("reusing verified clean evidence for an unchanged target", skill)
+        self.assertIn("reuse verified clean evidence", metadata)
+        self.assertIn("unchanged", metadata)
+        self.assertNotIn(
+            'short_description: "Run structured closeout review before final, commit, PR, or ship."',
+            metadata,
+        )
+
     def test_version(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):

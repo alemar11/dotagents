@@ -1,5 +1,5 @@
 interface:
   display_name: "Auto Review"
-  short_description: "Run structured closeout review before final, commit, PR, or ship."
+  short_description: "Run closeout review and reuse clean proof"
   brand_color: "#2B6F6C"
-  default_prompt: "Use $autoreview as the closeout review step before final, commit, PR, or ship. Pick the right local, branch, or commit mode, verify findings in real code, and rerun tests plus autoreview after any accepted fix."
+  default_prompt: "Use $autoreview to review this closeout target once, reuse verified clean evidence while its effective patch stays unchanged, and rerun only after the target changes or an explicit review-again request."

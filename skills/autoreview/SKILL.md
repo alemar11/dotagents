@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: Run Codex-only structured closeout review before final, commit, PR, or ship.
+description: Run Codex-only structured closeout review when an explicit or meaningful review is needed before final, commit, PR, or ship, while reusing verified clean evidence for an unchanged target.
 ---
 
 # Auto Review
@@ -31,17 +31,46 @@ Do not use this skill for:
   comment-only edits, or metadata-only sync
 - ordinary final responses after focused tests or proof already cover the
   changed behavior
+- a later commit, push, or finalization turn when verified clean review evidence
+  still covers the unchanged effective patch
+
+Selecting this skill starts the review workflow; it does not by itself require
+launching the helper. Apply the freshness contract below first.
+
+## Review Evidence Freshness
+
+Before launching `scripts/autoreview`, find the latest completed Auto Review for
+the intended target in the current task, imported task or session evidence, or a
+trusted caller handoff. Reuse it without another helper invocation only when:
+
+- the result is clean, or every remaining finding was consciously rejected;
+- the repository and effective patch content and scope are unchanged; and
+- the prior command, result, and reviewed target are verifiable.
+
+Staging an unchanged patch, committing exactly that patch, pushing its commit,
+or moving from implementation finalization to commit finalization does not
+invalidate clean review evidence. A local review may cover the resulting commit
+when its full patch is identical. A branch or PR review is reusable only when no
+additional commit or changed path expands the reviewed scope.
+
+Run Auto Review again when changed content or paths alter the effective patch,
+formatting or generated refreshes alter it, an accepted finding fix changes it,
+the branch/base/commit scope expands, the previous result or target cannot be
+verified, or the user explicitly asks to review again. A commit, push, PR, ship,
+or final-response boundary alone is not a rerun reason.
 
 ## Canonical Closeout Sequence
 
-1. Run the focused local tests or proof first.
-2. Run `scripts/autoreview` on the correct target mode.
-3. Verify each finding in the real code before accepting it.
-4. Fix only the accepted findings.
-5. Rerun focused tests or proof if code changed.
-6. Rerun the same `scripts/autoreview` mode, verifying previously accepted
+1. Apply `Review Evidence Freshness`. If clean evidence is reusable, return it
+   to the caller and skip the helper invocation.
+2. Run the focused local tests or proof first.
+3. Run `scripts/autoreview` on the correct target mode.
+4. Verify each finding in the real code before accepting it.
+5. Fix only the accepted findings.
+6. Rerun focused tests or proof if code changed.
+7. Rerun the same `scripts/autoreview` mode, verifying previously accepted
    findings before treating newly surfaced broad concerns as actionable.
-7. Stop once the helper is clean or the remaining findings were consciously
+8. Stop once the helper is clean or the remaining findings were consciously
    rejected with a reason.
 
 ## Runtime Surface
@@ -78,31 +107,34 @@ or "patch is incorrect", but callers must branch on `review_outcome`.
 
 ## Closeout Entry Modes
 
-- Before final or before commit on a dirty worktree: `scripts/autoreview --mode local`
-- Before PR, merge, or branch handoff: `scripts/autoreview --mode branch --base origin/main`
-- After a commit exists or when reviewing one exact commit: `scripts/autoreview --mode commit --commit HEAD`
+- When fresh review is needed for dirty local work: `scripts/autoreview --mode local`
+- When fresh review is needed for a PR, merge, or branch handoff: `scripts/autoreview --mode branch --base origin/main`
+- When fresh review is needed for one exact commit: `scripts/autoreview --mode commit --commit HEAD`
 
 ## Workflow
 
-1. Format first if formatting can move line numbers.
-2. Pick the target:
+1. Apply `Review Evidence Freshness`; skip the helper when clean evidence still
+   covers the unchanged effective patch.
+2. Format first if formatting can move line numbers. Formatting that changes the
+   patch invalidates earlier evidence.
+3. Pick the target:
    - Dirty local work: `scripts/autoreview --mode local`
    - Branch or PR work: `scripts/autoreview --mode branch --base origin/main`
    - Already committed work: `scripts/autoreview --mode commit --commit HEAD`
    - If `--base` is omitted for branch review, the helper tries optional
      `gh pr view` base detection and then falls back to the default base.
-3. Treat review output as advisory. Verify every finding by reading the real
+4. Treat review output as advisory. Verify every finding by reading the real
    code path and adjacent files before changing code.
-4. Reject unrealistic edge cases, speculative risks, broad rewrites, and fixes
+5. Reject unrealistic edge cases, speculative risks, broad rewrites, and fixes
    that over-complicate the codebase.
-5. Prefer small fixes at the right ownership boundary. Do not refactor unless it
+6. Prefer small fixes at the right ownership boundary. Do not refactor unless it
    clearly addresses the accepted bug class.
-6. If a review-triggered fix changes code, rerun focused tests and rerun
+7. If a review-triggered fix changes code, rerun focused tests and rerun
    `scripts/autoreview` on the updated target. First verify that the accepted
    findings from the previous pass are resolved; treat unrelated new findings
    as advisory unless they expose a concrete regression in the changed scope.
-7. Stop once the helper exits cleanly with no accepted/actionable findings. Do
-   not run an extra review only to get nicer closeout wording.
+8. Stop once the helper exits cleanly with no accepted/actionable findings. Do
+   not rerun it only for a later lifecycle boundary or nicer closeout wording.
 
 ## Helper Commands
 
@@ -143,7 +175,8 @@ Under `--json`, environment failures preserve the human `error` and add stable
 
 Include:
 
-- the review command used;
+- the review command used, or the prior command and result reused;
+- when reusing evidence, proof that the effective patch and scope are unchanged;
 - tests or proof run after any accepted finding was fixed;
 - findings accepted or rejected, with a brief reason;
 - the clean result from the final helper run, or why a remaining finding was
