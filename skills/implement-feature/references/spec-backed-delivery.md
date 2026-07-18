@@ -71,7 +71,7 @@ affected Git repository and an App-managed checkout. A tracker artifact outside
 all affected Git repositories is non-App-executable; abort as
 `planning-required` rather than inventing an owner or widening scope.
 Snapshot both refs before CLAIM. The active ref is authoritative until the task
-performs the one planned tracked move; then the ledger atomically adopts the
+performs the one planned tracked move; then `source-moved` atomically adopts the
 done ref while requiring an unchanged body fingerprint.
 
 The root snapshots the complete source and each issue body and computes its own

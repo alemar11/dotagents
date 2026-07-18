@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import hashlib
 import importlib.machinery
 import importlib.util
 import json
@@ -30,11 +29,18 @@ def run_claim(*args: str, env: dict[str, str], check: bool = True) -> subprocess
 class AtomicClaimHelperTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
-        self.base = Path(self.temporary.name)
+        self.base = Path(self.temporary.name).resolve()
+        self.home_patch = mock.patch.dict(os.environ, {"HOME": str(self.base)})
+        self.home_patch.start()
         self.claim_root = (
             self.base
             / ".cache/dotagents/skills/implement-feature/claims"
         )
+        self.ledger_root = (
+            self.base
+            / ".cache/dotagents/skills/implement-feature/ledgers"
+        )
+        self.ledger_root.mkdir(parents=True)
         self.repo = self.base / "repo"
         self.other_repo = self.base / "other-repo"
         for repository in (self.repo, self.other_repo):
@@ -44,13 +50,14 @@ class AtomicClaimHelperTests(unittest.TestCase):
             (repository / "README.md").write_text("base\n")
             subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
             subprocess.run(["git", "-C", str(repository), "commit", "-qm", "base"], check=True)
-        self.ledger = self.base / "ledger.md"
-        self.ledger.write_text("# fixture ledger\n")
+        self.ledger = self.ledger_root / "fixture.json"
+        self.ledger.write_text('{"schema_version":"fixture"}\n')
         self.adoption_index = 0
         self.env = os.environ.copy()
         self.env["HOME"] = str(self.base)
 
     def tearDown(self) -> None:
+        self.home_patch.stop()
         self.temporary.cleanup()
 
     def acquire_args(
@@ -223,7 +230,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "7.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "8.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -266,7 +273,10 @@ class AtomicClaimHelperTests(unittest.TestCase):
         winner = next(result[1]["claim"]["root_id"] for result in results if result[0] == 0)
         loser = next(result[1]["error"] for result in results if result[0] == 4)
         self.assertEqual(loser["code"], "state-conflict")
-        self.assertIn(winner, loser["details"]["root_ids"])
+        if "root_ids" in loser["details"]:
+            self.assertIn(winner, loser["details"]["root_ids"])
+        else:
+            self.assertIn("claim lock is missing", loser["message"])
 
         status = json.loads(run_claim("--json", "claim", "status", env=self.env).stdout)
         self.assertEqual([claim["root_id"] for claim in status["claims"]], [winner])
@@ -370,8 +380,186 @@ class AtomicClaimHelperTests(unittest.TestCase):
         )
         self.assertEqual(stale_heartbeat.returncode, 4)
 
+    def test_ledger_ref_is_one_direct_child_json_path_in_fixed_cache(self) -> None:
+        nested = self.ledger_root / "nested" / "state.json"
+        outside = self.base / "outside.json"
+        markdown = self.ledger_root / "legacy.md"
+        relative = Path("relative.json")
+        for candidate in (nested, outside, markdown, relative):
+            with self.subTest(candidate=candidate):
+                result = run_claim(
+                    *self.acquire_args(
+                        "root-invalid", self.repo, "spec-invalid", candidate
+                    ),
+                    env=self.env,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 2)
+                error = json.loads(result.stdout)["error"]
+                self.assertEqual(error["code"], "invalid-input")
+                self.assertIn("ledger_ref", error["message"])
+        self.assertFalse(self.claim_root.exists())
+
+    def test_ledger_ref_rejects_file_and_cache_component_symlinks(self) -> None:
+        outside = self.base / "outside-ledger.json"
+        outside.write_text("{}\n")
+        linked = self.ledger_root / "linked.json"
+        linked.symlink_to(outside)
+        file_result = run_claim(
+            *self.acquire_args("root-file-link", self.repo, "spec-link", linked),
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(file_result.returncode, 2)
+        self.assertIn("must not be a symlink", file_result.stdout)
+
+        linked.unlink()
+        self.ledger.unlink()
+        self.ledger_root.rmdir()
+        external_root = self.base / "external-ledgers"
+        external_root.mkdir()
+        self.ledger_root.symlink_to(external_root, target_is_directory=True)
+        component_result = run_claim(
+            *self.acquire_args(
+                "root-component-link",
+                self.repo,
+                "spec-component-link",
+                self.ledger_root / "state.json",
+            ),
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(component_result.returncode, 2)
+        self.assertIn("symlinked cache component", component_result.stdout)
+        self.assertEqual(list(external_root.iterdir()), [])
+
+    def test_claim_cache_symlink_and_missing_lock_fail_closed(self) -> None:
+        external_claims = self.base / "external-claims"
+        external_claims.mkdir()
+        self.claim_root.symlink_to(external_claims, target_is_directory=True)
+        linked_result = run_claim(
+            *self.acquire_args("root-linked", self.repo, "spec-linked"),
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(linked_result.returncode, 4)
+        self.assertIn("symlinked cache component", linked_result.stdout)
+        self.assertEqual(list(external_claims.iterdir()), [])
+
+        self.claim_root.unlink()
+        self.claim_root.mkdir()
+        missing_lock_result = run_claim(
+            *self.acquire_args("root-unlocked", self.repo, "spec-unlocked"),
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(missing_lock_result.returncode, 4)
+        self.assertIn("claim lock is missing", missing_lock_result.stdout)
+        self.assertEqual(
+            sorted(path.name for path in self.claim_root.iterdir()), []
+        )
+
+    def test_exclusive_mutation_rejects_removed_or_symlinked_lock(self) -> None:
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        claim_path = self.claim_root / "root-a.json"
+        before = claim_path.read_bytes()
+        lock_path = self.claim_root / ".lock"
+        lock_path.unlink()
+
+        heartbeat = run_claim(
+            "--json",
+            "claim",
+            "heartbeat",
+            "--root-id",
+            "root-a",
+            "--expected-fingerprint",
+            claim["fingerprint"],
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(heartbeat.returncode, 4)
+        self.assertIn("claim lock is missing", heartbeat.stdout)
+        self.assertEqual(claim_path.read_bytes(), before)
+
+        outside_lock = self.base / "outside-lock"
+        outside_lock.touch()
+        lock_path.symlink_to(outside_lock)
+        release = run_claim(
+            "--json",
+            "claim",
+            "release",
+            "--root-id",
+            "root-a",
+            "--expected-fingerprint",
+            claim["fingerprint"],
+            "--release-reason",
+            "terminal",
+            "--evidence",
+            "must-not-release",
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(release.returncode, 4)
+        self.assertIn("unsafe claim lock", release.stdout)
+        self.assertEqual(claim_path.read_bytes(), before)
+
+    def test_active_claim_with_legacy_markdown_ref_is_not_migrated(self) -> None:
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        claim["ledger_ref"] = str(self.ledger_root / "legacy.md")
+        claim["fingerprint"] = CLAIM_RUNTIME.fingerprint(claim)
+        claim_path = self.claim_root / "root-a.json"
+        claim_path.write_text(json.dumps(claim, indent=2, sort_keys=True) + "\n")
+        before = claim_path.read_bytes()
+
+        status = run_claim(
+            "--json", "claim", "status", "--root-id", "root-a", env=self.env, check=False
+        )
+
+        self.assertEqual(status.returncode, 4)
+        self.assertIn("direct-child .json", status.stdout)
+        self.assertEqual(claim_path.read_bytes(), before)
+
+    def test_terminal_release_receipt_binds_json_run_state_bytes(self) -> None:
+        run_state = self.ledger_root / "run-state.json"
+        payload = b'{"schema_version":"1.0.0"}\n'
+        run_state.write_bytes(payload)
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-json", self.repo, "spec-json", ledger=run_state),
+                env=self.env,
+            ).stdout
+        )["claim"]
+        released = json.loads(
+            run_claim(
+                "--json",
+                "claim",
+                "release",
+                "--root-id",
+                "root-json",
+                "--expected-fingerprint",
+                claim["fingerprint"],
+                "--release-reason",
+                "terminal",
+                "--evidence",
+                "json-terminal-proof",
+                env=self.env,
+            ).stdout
+        )
+        receipt = released["release_receipt"]
+        self.assertEqual(receipt["ledger_ref"], str(run_state.resolve()))
+        self.assertEqual(receipt["ledger_sha256"], hashlib.sha256(payload).hexdigest())
+        self.assertEqual(receipt["ledger_size_bytes"], len(payload))
+
     def test_pre_register_claim_can_release_to_durable_handoff(self) -> None:
-        missing_ledger = self.base / "not-registered.md"
+        missing_ledger = self.ledger_root / "not-registered.json"
         acquired = json.loads(
             run_claim(
                 *self.acquire_args(
@@ -755,14 +943,14 @@ class AtomicClaimHelperTests(unittest.TestCase):
     def test_takeover_rejects_duplicate_task_ref_across_replaced_roots(self) -> None:
         claim_a = json.loads(
             run_claim(
-                *self.acquire_args("root-a", self.repo, "spec-1", self.base / "ledger-a.md"),
+                *self.acquire_args("root-a", self.repo, "spec-1", self.ledger_root / "ledger-a.json"),
                 env=self.env,
             ).stdout
         )["claim"]
         claim_b = json.loads(
             run_claim(
                 *self.acquire_args(
-                    "root-b", self.other_repo, "spec-2", self.base / "ledger-b.md"
+                    "root-b", self.other_repo, "spec-2", self.ledger_root / "ledger-b.json"
                 ),
                 env=self.env,
             ).stdout
@@ -785,7 +973,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 [claim_a, claim_b],
                 [adoption_a, adoption_b],
                 terminations,
-                ledger=self.base / "ledger-c.md",
+                ledger=self.ledger_root / "ledger-c.json",
             ),
             env=self.env,
             check=False,
@@ -832,7 +1020,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
 
     def test_takeover_rejects_duplicate_checkout_across_specs(self) -> None:
         acquire = self.acquire_args(
-            "root-a", self.repo, "spec-1", self.base / "ledger-a.md"
+            "root-a", self.repo, "spec-1", self.ledger_root / "ledger-a.json"
         )
         second = self.acquire_args("unused", self.repo, "spec-2")
         second_source = second[second.index("--source") + 1]
@@ -866,7 +1054,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 [claim],
                 [adoption],
                 [termination],
-                ledger=self.base / "ledger-b.md",
+                ledger=self.ledger_root / "ledger-b.json",
             ),
             env=self.env,
             check=False,
@@ -935,7 +1123,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertFalse((self.claim_root / "root-b.takeover").exists())
 
     def test_takeover_prepare_write_failure_preserves_prior_claims(self) -> None:
-        old_ledger = self.base / "old-ledger.md"
+        old_ledger = self.ledger_root / "old-ledger.json"
         claim = json.loads(
             run_claim(
                 *self.acquire_args("root-a", self.repo, "spec-1", old_ledger),
@@ -947,7 +1135,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         adoption = self.make_task_adoption(claim, termination)
         args = CLAIM_RUNTIME.build_parser().parse_args(
             self.takeover_args(
-                "root-b", [claim], [adoption], [termination], ledger=self.base / "new-ledger.md"
+                "root-b", [claim], [adoption], [termination], ledger=self.ledger_root / "new-ledger.json"
             )
         )
 
@@ -994,7 +1182,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         claim_a = json.loads(
             run_claim(
                 *self.acquire_args(
-                    "root-a", self.repo, "spec-1", self.base / "ledger-a.md"
+                    "root-a", self.repo, "spec-1", self.ledger_root / "ledger-a.json"
                 ),
                 env=self.env,
             ).stdout
@@ -1002,7 +1190,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         claim_b = json.loads(
             run_claim(
                 *self.acquire_args(
-                    "root-b", self.other_repo, "spec-2", self.base / "ledger-b.md"
+                    "root-b", self.other_repo, "spec-2", self.ledger_root / "ledger-b.json"
                 ),
                 env=self.env,
             ).stdout
@@ -1020,7 +1208,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 [claim_a, claim_b],
                 adoptions,
                 terminations,
-                ledger=self.base / "ledger-c.md",
+                ledger=self.ledger_root / "ledger-c.json",
             )
         )
         real_delete = CLAIM_RUNTIME.delete_replaced_claim
@@ -1090,8 +1278,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 for item in recovered["claim"]["takeover_evidence"]["replaced_claims"]
             ],
             [
-                str((self.base / "ledger-a.md").resolve()),
-                str((self.base / "ledger-b.md").resolve()),
+                str((self.ledger_root / "ledger-a.json").resolve()),
+                str((self.ledger_root / "ledger-b.json").resolve()),
             ],
         )
         repeated = json.loads(
@@ -1112,7 +1300,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         claim = json.loads(
             run_claim(
                 *self.acquire_args(
-                    "root-a", self.repo, "spec-1", self.base / "ledger-a.md"
+                    "root-a", self.repo, "spec-1", self.ledger_root / "ledger-a.json"
                 ),
                 env=self.env,
             ).stdout
@@ -1126,7 +1314,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 [claim],
                 [adoption],
                 [termination],
-                ledger=self.base / "ledger-b.md",
+                ledger=self.ledger_root / "ledger-b.json",
             )
         )
         with mock.patch.object(CLAIM_RUNTIME, "claim_root", return_value=self.claim_root):
@@ -1161,8 +1349,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertFalse((self.claim_root / "root-b.takeover").exists())
 
     def test_immediate_recovery_uses_embedded_adoption_without_new_ledger(self) -> None:
-        old_ledger = self.base / "ledger-old.md"
-        new_ledger = self.base / "ledger-new.md"
+        old_ledger = self.ledger_root / "ledger-old.json"
+        new_ledger = self.ledger_root / "ledger-new.json"
         claim = json.loads(
             run_claim(
                 *self.acquire_args("root-a", self.repo, "spec-1", old_ledger),
@@ -1213,7 +1401,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
 
     def test_takeover_preserves_resolved_profile_for_no_task_spec(self) -> None:
         acquire = self.acquire_args(
-            "root-a", self.repo, "spec-1", self.base / "ledger-old.md"
+            "root-a", self.repo, "spec-1", self.ledger_root / "ledger-old.json"
         )
         second = self.acquire_args("unused", self.repo, "spec-2")
         acquire.extend(["--source", second[second.index("--source") + 1]])

@@ -12,7 +12,7 @@ or asks to run Implement Feature in the ChatGPT desktop
 app. It is the single App-only implementation adapter: it never plans, repairs
 planning artifacts, or invokes another orchestrator.
 
-The root owns authorization, intake, the active-root claim, the ledger,
+The root owns authorization, intake, the active-root claim, the typed run state,
 scheduling, monitoring, and final status. Exactly one visible App task owns each
 implementation-eligible Feature Spec through the only successful App result:
 `pull-request-ready-for-merge-but-not-merged`.
@@ -23,7 +23,11 @@ This is the first runtime step. Before asking permission, reading sources,
 persistence, or mutation, verify visible ChatGPT desktop app task creation, App-managed worktree
 binding, `codex_app__set_thread_title`, live task-title observation, and
 `create_goal`, `get_goal`, and `update_goal` in the root plus general visible-task
-Goal-tool support. This gate does not create a task to inspect task-local tools.
+Goal-tool support. The Goal surface must support first-class targeted state
+readback and `active` to `paused` to `active` transitions for both root and
+worker tasks. The App automation surface must support create, view, update, and
+delete for one heartbeat targeted to the exact root task, and that heartbeat
+must wake the same task. This gate does not create a task to inspect task-local tools.
 Filesystem, CLI, local skill, or background-agent access does not prove this
 surface. If any capability is absent or unverifiable, return
 `unsupported-runtime` without asking permission or creating artifacts.
@@ -66,7 +70,7 @@ merge, release, or deployment.
   Spec, and at most three nonterminal Spec tasks. Every created, resumed, or
   steered task uses the recorded per-Spec model profile.
 - After CLAIM, give the calling task the stable root title defined by
-  `references/ledger.md`: `👨🏻‍💻 Feature Orchestrator` for one executable Spec
+  `references/run-state.md`: `👨🏻‍💻 Feature Orchestrator` for one executable Spec
   or `👨🏻‍💻 Multi-Feature Orchestrator` for more than one, with no counter.
 - Give every task a root-owned display title: one relevant emoji, one space, and
   the exact authored Feature Spec title. Use `🛠️` only when nothing is clearer;
@@ -100,7 +104,7 @@ delivery compatibility, and integration gates. Resolve each accepted Spec's
 task profile before CLAIM. Missing or contradictory evidence is
 `planning-required`; an explicit non-App target is
 `unsupported-app-delivery-target`. Never create, repair, publish, or mutate
-planning or tracker artifacts. Report exact failures and that no claim, ledger,
+planning or tracker artifacts. Report exact failures and that no claim, run state,
 Goal, task, tracker write, or source mutation was created.
 
 ## Controller Loop
@@ -111,15 +115,17 @@ Goal, task, tracker write, or source mutation was created.
    profile. Convert verified GitHub `owner/repository#N` refs to
    `https://github.com/owner/repository/issues/N`; use the URL as the claim/task source id while
    preserving the authored ref as evidence.
-3. **CLAIM** — load `references/ledger.md`; run
+3. **CLAIM** — load `references/run-state.md`; run
    `scripts/active-root-claim --json doctor`; canonicalize repositories and
    sources; acquire before any other artifact. Qualify local refs as
    `git:<git-common-dir>::ref:<source-ref>`. Never pass GitHub shorthand directly to the
    helper.
 4. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
    and fixed 180-day prune once in the root. Warnings are nonblocking.
-5. **REGISTER** — create the ledger, authorization/source snapshots, and complete
-   Spec registry with the portfolio objective and `portfolio_goal_state=pending`;
+5. **REGISTER** — initialize the direct-child JSON run state through
+   `scripts/ledger-cache ledger create`, including authorization/source snapshots,
+   the complete Spec registry, portfolio objective, and
+   `portfolio_goal_state=pending`;
    persist `root_task_title`, then set and observe the calling task title. Only
    then reconcile with `get_goal`; otherwise call `create_goal`. Persist active
    evidence. Never set `token_budget`.
@@ -133,18 +139,23 @@ Goal, task, tracker write, or source mutation was created.
    set; adopt exact takeover tasks or create one managed visible task per Spec
    with its recorded profile; set and observe its title; verify that exact task's Goal tools
    and assignment Goal before advancing beyond `created`.
-8. **MONITOR** — reconcile live task evidence and steer precise corrections with
-   the recorded profile. Never pull implementation or review into the root.
+8. **MONITOR** — take one full task snapshot after dispatch, then consume compact
+   deltas until a material transition, attention request, claim-heartbeat
+   deadline, heartbeat wake, or hard workflow deadline. Steer precise corrections with the
+   recorded profile. Never pull implementation or review into the root.
 9. **GATE** — load `references/gates.md` and
    `references/codex-review-closeout.md`; require every fixed terminal gate.
-10. **RECONCILE** — refresh sources, claim, merged dependencies, tasks, review
-    waits, ledger, and recovery; dispatch another wave or record the blocker or
-    durable handoff.
+10. **RECONCILE** — read the smallest `ledger-cache ledger read` projection,
+    refresh only changed external evidence, and atomically apply the resulting
+    events; dispatch another wave, schedule a due review check, or record the
+    blocker or terminal external handoff.
 
-Every wave must produce a transition, evidence update, owner decision, or
-explicit no-progress record. After the first wave, load
-`references/runtime-efficiency.md` when delta evidence can avoid redundant
-reads without weakening a freshness gate.
+An unchanged wait timeout performs only a required claim heartbeat. It creates
+no run-state event or no-progress record. Use a full task read only for startup
+verification, anomaly or blocker diagnosis, and independent terminal
+verification. The worker owns the initial bounded provider wait and every later
+one-shot provider check; the root never polls the same provider in parallel. A
+paused review-monitoring task remains nonterminal and consumes one of the three slots.
 
 ## Scheduling
 
@@ -167,8 +178,8 @@ fingerprint, heartbeat while active, and use it for heartbeat and release.
 Release only after terminal proof or a recorded durable handoff.
 
 An overlapping live claim returns `needs-owner`. For a stale claim, perform
-read-only discovery first and load the takeover contract in
-`references/ledger.md`. Before asking or stopping tasks, use the helper's
+  read-only discovery first and load the takeover contract in
+  `references/run-state.md`. Before asking or stopping tasks, use the helper's
 read-only status evidence to prove every conflicting heartbeat is at least its
 fixed five-minute stale threshold. A stale heartbeat alone is never task-stop evidence.
 Then resolve `stale_claim_takeover_permission` as specified by
@@ -193,10 +204,10 @@ Every new task calls `create_goal` for its exact assignment. Recovery calls
 visible task; never create another Goal or replacement task. Workers report
 evidence; only the root changes portfolio state.
 
-On resume, load `references/recovery-validation.md` before mutation and
+On heartbeat or manual resume, load `references/recovery-validation.md` before mutation and
 revalidate the runtime surface, claim, source fingerprints, repositories, root
-and task titles, Goals, managed checkouts, gates, and review waits. Archived
-ledgers are cold evidence, never recovery input.
+and task titles, Goals, managed checkouts, gates, and review waits. Archived run
+states are cold evidence, never recovery input.
 
 ## Delivery And Final Report
 
@@ -214,7 +225,7 @@ current-revision review, then CI and terminal merge-ready proof. Hosted and loca
 issues remain open until a later default-branch merge.
 
 For pre-CLAIM aborts, report the evidence and zero-mutation result. Otherwise
-return ledger-derived source fingerprints, title, task/Goal and checkout proof,
+return run-state-derived source fingerprints, title, task/Goal and checkout proof,
 changes, validation, commits, PR URLs, reviewed revisions, CI, captured
 domain-closeout evidence, prepared tracker closeout, current-head mergeability
 and repository-rule evidence, blockers, recovery freshness, and next action.
@@ -223,13 +234,18 @@ Before terminal release, revalidate exact root-title evidence; every task and th
 root then call `update_goal` with `status=complete`. Persist
 `portfolio_goal_state=complete` and its evidence, then run the complete terminal
 release/archive sequence in `references/cache-lifecycle.md`. A
-failed title, completion, or evidence write retains the claim and active ledger. A
-resumable handoff uses that reference's complete durable-handoff release and
-retains its ledger and active nonterminal Goals. Recovery may finish only a fully
+failed title, completion, or evidence write retains the claim and active run state. A
+resumable review handoff first pauses and readbacks each waiting worker Goal,
+arms one earliest-due root heartbeat, pauses and readbacks the root Goal, then
+uses that reference's complete durable-handoff release. It retains the run state
+and paused nonterminal Goals. Recovery may finish only a fully
 revalidated completion, release, or archive transition; it never resumes
 implementation after terminal proof.
 
 ## Reference Routing
 
-Use the load predicates above. When loading `references/ledger.md`, also load
-`references/ledger-template.md`.
+Use the load predicates above. `references/run-state.md` is the canonical owner
+of active-state commands, event types, projections, and transition rules. Load
+`references/run-state-packets.md` only immediately before writing a strict
+registration or event packet. Load `references/review-monitoring.md` only when
+the initial deadline remains pending or recovery finds its typed schedule.

@@ -50,9 +50,11 @@ dirty/conflicting, behind-when-update-required, or otherwise blocked merge state
 is not ready. Persist the observed mergeability and rule evidence; never enqueue
 or merge the PR.
 
-Review has no skip. Head, base-ref, merge-base, or material diff changes
-invalidate older review evidence. A changed revision returns the task to
-validation, `$autoreview`, request/poll/fix, and CI as applicable.
+Review has no skip. Apply each exact tuple through `revision-observed`; the
+helper invalidates older revision-bound gate evidence when head, base-ref,
+merge-base, or material diff changes. A changed revision returns the task to
+validation, `$autoreview`, request/poll/fix, and CI as applicable. Apply each
+current proof through `gate-observed`, never by patching state.
 
 ## Domain Knowledge Closeout Gate
 
@@ -82,7 +84,7 @@ count only on PRs whose base is the repository default branch.
 For local Markdown, complete substantive acceptance, integration proof, and the
 domain knowledge closeout gate when present. Then move each issue from its exact scoped
 active path to its exact scoped `done/` destination on the delivery branch,
-atomically advance its ledger source snapshot to that predeclared destination
+apply one `source-moved` transition to that predeclared destination
 with an unchanged body fingerprint, commit and push the move, rerun final
 validation and `$autoreview`, convert draft PRs to ready-for-review, then obtain
 current-revision review and CI at that resulting head before terminal merge-ready
@@ -101,7 +103,8 @@ no unresolved actionable work. For local
 issues, the current reviewed head must include the committed and pushed
 active-to-`done/` moves.
 
-Record the external handoff with exact PR URLs, head/base/merge-base revisions,
+Require the machine-derived terminal projection, then apply
+`external-handoff-recorded` with exact PR URLs, head/base/merge-base revisions,
 checks, closeout vehicle, and next merge action. Then stop and release the
 active-root claim. Neither root nor task merges, performs post-merge
 verification, or closes hosted tracker items. A later GitHub workflow owns

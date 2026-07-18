@@ -6,8 +6,8 @@ individual Spec is single-repository.
 
 ## Ownership
 
-The root owns the shared claim, dependency graph, scheduling, ledger, and final
-handoff. Each repository retains its code, project memory, validation, branch,
+The root owns the shared claim, dependency graph, scheduling, typed run state,
+and final handoff. Each repository retains its code, project memory, validation, branch,
 commit, pull request, and tracker artifacts. Repository topology is bundle or
 Project Memory data, never an App option.
 

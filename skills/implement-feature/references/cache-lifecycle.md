@@ -1,14 +1,14 @@
-# Ledger Cache Lifecycle
+# Run-State Cache Lifecycle
 
 ## Ownership And Timing
 
 The root owns cache maintenance. Never create a visible task, internal subagent,
-Goal, or worktree for it. Load this reference after a successful CLAIM and
-before REGISTER, and again before terminal claim release and ledger archival.
+Goal, or worktree for it. Load this reference after successful CLAIM and before
+REGISTER, then again before terminal claim release and archival.
 
-The authorization disclosure names automatic deletion of valid archived
-ledgers older than 180 days. Unsupported, denied, and `planning-required` runs
-perform no cache maintenance because they stop before CLAIM.
+The authorization disclosure names automatic deletion of valid archives older
+than 180 days. Unsupported, denied, and `planning-required` runs stop before
+CLAIM and perform no cache maintenance.
 
 Run once per controller entry after an acquired, already-owned, or recovered
 takeover claim:
@@ -18,98 +18,127 @@ scripts/ledger-cache --json doctor
 scripts/ledger-cache --json archive prune --older-than-days 180 --apply
 ```
 
-Do not rerun maintenance for every scheduling wave. A doctor or prune warning is
-nonblocking: continue the claimed implementation and report the warning in the
-final status. Active claim or ledger failures remain governed by their existing
-blocking contracts.
+Do not repeat maintenance for each scheduling wave. A doctor or prune warning
+is nonblocking and belongs in final status. Active claim or run-state failures
+remain blocking.
 
 ## Active And Archived State
 
-Keep resumable ledgers directly under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. Archived ledgers are cold
-cache evidence only and live below `ledgers/archive/`; never load, restore, or
-migrate them as active recovery state.
+Keep resumable state as absolute direct-child `.json` files under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v3 is the
+sole active-state writer. Archived entries live below `ledgers/archive/` as cold
+evidence; never restore, load, or migrate them into active state.
 
-Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire
-fingerprint, never a `sha256:` value or receipt fingerprint.
+Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire fingerprint,
+never a `sha256:` value or receipt fingerprint.
 
-For a recorded resumable handoff:
+For a recorded resumable handoff review schedule, require the worker pause evidence,
+future `due_at`, one committed root-targeted heartbeat id, and observed root Goal
+pause before release:
 
 ```text
 scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-fingerprint '<claim-fingerprint>' --release-reason durable-handoff --evidence '<durable-handoff-evidence-ref>'
 ```
 
-Stop; keep the ledger; the receipt never authorizes archive. Pre-REGISTER may
-have a null snapshot; reacquire clears it.
+Stop and retain the active JSON and paused nonterminal Goals. The heartbeat owns
+the next root wake; recovery reacquires the claim and applies `claim-rebound`
+before task mutation. A durable-handoff receipt never authorizes archive. A pre-REGISTER claim may have a null state ref;
+reacquire clears it.
 
-After terminal reconciliation, run in order with the same root and terminal
-evidence:
+After the terminal projection passes, all Goals complete, the completion event
+commits, and current external evidence is independently reverified, run exactly:
 
 ```text
 scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-fingerprint '<claim-fingerprint>' --release-reason terminal --evidence '<terminal-evidence-ref>'
-scripts/ledger-cache --json ledger archive --ledger '<absolute-active-ledger>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
+scripts/ledger-cache --json ledger archive --ledger '<absolute-active-json>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
 ```
 
-The receipt binds root/fingerprint/ledger/evidence; archive verifies/consumes it.
-Failure keeps the ledger/result and reports cache incomplete.
+The release receipt binds the exact root, acquire fingerprint, active JSON path,
+terminal evidence, and active bytes. Its compatibility field names remain
+`ledger_sha256` and `ledger_size_bytes`; they refer to the active JSON, not the
+derived Markdown. Archive verifies and consumes that receipt. Any failure keeps
+the active JSON or completed result available and reports cache incomplete.
 
-## Archive Contract
+## Archive V2 Contract
 
-The helper keeps `ledger.md` byte-identical and writes `metadata.json` beside it:
+New terminal archives use metadata schema `2.0.0`:
 
 ```text
 ledgers/archive/YYYY/MM/<timestamp>--<portfolio>--<sha12>/
+  ledger.json
   ledger.md
   metadata.json
 ```
 
-The nine retained legacy cutover entries use
-`ledgers/archive/legacy-cutover-2026-07-17/<portfolio-and-hash>/`. The helper may
-list, verify, and prune this exact frozen group but cannot create more legacy
-entries.
-Metadata schema `1.0.0` owns these fields:
+`ledger.json` is byte-identical canonical terminal state. `ledger.md` is a
+deterministic audit projection rendered from that state during archival; it is
+never active input. Repeating archive with the same receipt and bytes is
+idempotent and resolves to the same entry.
 
 | field | contract |
 | --- | --- |
 | `archive_id` | Canonical entry-directory identity. |
-| `archive_reason` | `terminal` or `legacy-cutover`. |
-| `archive_group` | Cutover group or `null`. |
+| `archive_reason` | `terminal`. |
+| `archive_group` | `null` for v2 terminal archives. |
 | `archived_at` | UTC retention timestamp. |
-| `portfolio_key` | Original active-ledger stem. |
-| `original_ledger_ref` | Absolute direct child of the active ledger root. |
-| `ledger_sha256` | SHA-256 of byte-identical `ledger.md`. |
-| `size_bytes` | Ledger byte count. |
-| `evidence_ref` | Terminal or cutover authorization evidence. |
-| `root_id` | Released terminal owner or `null` for cutover. |
+| `portfolio_key` | Original active-state stem. |
+| `original_ledger_ref` | Absolute direct child of the active state root. |
+| `state_sha256` | SHA-256 of byte-identical `ledger.json`. |
+| `state_size_bytes` | Canonical JSON byte count. |
+| `markdown_sha256` | SHA-256 of deterministic `ledger.md`. |
+| `markdown_size_bytes` | Markdown byte count. |
+| `evidence_ref` | Exact terminal release evidence. |
+| `root_id` | Released terminal owner. |
 | `tool_version` | `ledger-cache` command-contract version. |
 
-The helper serializes mutations through the existing claim-store lock, requires
-the exact terminal release receipt, refuses active claim or takeover references,
-rejects unsafe paths and symlinks, stages the ledger before unlinking it, and
-never changes claim JSON or takeover journals.
+The helper validates terminal eligibility, strict state schema, receipt checksum,
+and deterministic projection before publishing the archive. It serializes
+mutations under the claim-store lock, refuses active claim or takeover
+references, rejects unsafe paths and symlinks, stages both artifacts before
+unlinking active state, and never changes claim JSON or takeover journals.
+
+## Frozen Archive V1 Compatibility
+
+Existing metadata-schema `1.0.0` archives remain readable, verifiable, and
+prunable byte-for-byte. Their frozen layout is:
+
+```text
+ledgers/archive/YYYY/MM/<existing-entry>/
+  ledger.md
+  metadata.json
+```
+
+The nine retained legacy cutover entries remain under
+`ledgers/archive/legacy-cutover-2026-07-17/<portfolio-and-hash>/`. Preserve their
+existing `ledger_sha256`, `size_bytes`, identity, evidence, and tool-version
+metadata exactly. The helper may list, verify, and prune these entries but cannot
+rewrite them, make them active, or create more v1 or legacy-cutover entries.
+This cold-read contract is historical evidence preservation, not active-state
+compatibility or migration.
 
 ## Automatic Retention
 
-Use a strict 180-day TTL for every valid archive category, including legacy
-cutover entries. Eligibility begins exactly at `archived_at + 180 days`; file
+Use a strict 180-day TTL for every valid archive version and category, including
+legacy cutover entries. Eligibility begins at `archived_at + 180 days`; file
 mtime is irrelevant and there is no last-N exception.
 
 Direct operator pruning is dry-run by default. Only `--apply` deletes. Each
 entry is revalidated under the shared lock, moved into internal trash, and
-deleted through its two known files without recursive unresolved-path removal.
+deleted only through the exact file set allowed by its metadata version.
 Malformed metadata, checksum mismatches, symlinks, unexpected files,
 interrupted entries, and claim-referenced entries are protected and reported;
 they do not prevent unrelated valid entries from expiring.
 
 `doctor`, `archive list`, and `archive verify` are read-only and create no cache
-directories. Doctor reports integrity, size, count, oldest archive, next expiry,
-interrupted operations, and informational warnings at 25 MiB or 100 archives.
+directories. Doctor reports unsupported active Markdown, active-state integrity,
+archive integrity, size, count, oldest entry, next expiry, interrupted
+operations, and informational warnings at 25 MiB or 100 archives.
 
 ## Helper Maintenance
 
-`scripts/ledger-cache` is the shipped local/offline artifact and keeps one
+`scripts/ledger-cache` is the shipped local/offline artifact with one
 `__version__` semver source of truth. It has no config, auth, network, raw escape
 hatch, or maintenance project. After changes, run `--help`, `--version`,
-`--json doctor`, focused cache-helper tests, a dry-run fixture, and the complete
-Implement Feature contract suite. Use major versions for breaking command,
-JSON, or metadata contracts.
+`--json doctor`, focused helper tests, a dry-run fixture, and the complete
+Implement Feature contract suite. Breaking command, JSON, active-state, or
+metadata changes require a major version.

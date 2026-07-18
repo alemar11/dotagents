@@ -31,7 +31,7 @@ workers to a live task, or update unrelated skills.
 2. Compare the discovered surface against:
    - `skills/implement-feature/SKILL.md`;
    - `skills/implement-feature/references/worker.md`;
-   - `skills/implement-feature/references/ledger.md`;
+   - `skills/implement-feature/references/run-state.md`;
    - `skills/implement-feature/references/gates.md` only when tool changes
      affect authorization, proof, or closeout behavior.
 3. Check whether current docs still answer these questions precisely:

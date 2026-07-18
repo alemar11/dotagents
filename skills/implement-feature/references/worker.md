@@ -69,7 +69,7 @@ prepare-tracker-closeout, check-mergeability, report
 
 Allowed paths narrow edit scope; they do not alter this action set or grant
 scope expansion. The run authorization disclosed and covers these actions for
-the accepted bundle. The task may not edit the orchestration ledger, manage
+the accepted bundle. The task may not edit the orchestration run state, manage
 sibling or root tasks, change branch or PR strategy, merge, release, deploy,
 perform post-merge closure, or change target-repository instructions.
 
@@ -114,7 +114,8 @@ terminal result `pull-request-ready-for-merge-but-not-merged`. Do not pass
 
 On recovery, call `get_goal`. A nonterminal task requires an active objective
 and fingerprint matching the recorded Goal evidence before implementation
-resumes. A task already recorded at the fixed terminal result requires matching
+resumes, except a task in `review-monitoring`, which requires the same objective
+in observed `paused` state until its due one-shot check. A task already recorded at the fixed terminal result requires matching
 completed Goal evidence and must not resume implementation. Never call
 `create_goal` for either recovery path. The root verifies that evidence and the
 exact live task title before advancing beyond `created` or resuming a
@@ -124,8 +125,10 @@ creation, report an
 fallback or create a replacement task.
 
 Call `update_goal` with `status=complete` only after the fixed terminal result
-is proven. Temporary blockers and resumable handoffs leave nonterminal task
-Goals active; already-terminal task Goals remain complete. If recovery finds
+is proven. A pending review handoff uses the first-class Goal pause operation
+and readback; its due resume restores the same Goal to active before one review
+check. Other temporary blockers leave nonterminal task Goals active;
+already-terminal task Goals remain complete. If recovery finds
 the terminal proof recorded while this Goal is still active, revalidate that
 proof, call `update_goal` with `status=complete`, persist the evidence, and
 report without resuming implementation. If the Goal already completed but its
@@ -162,7 +165,7 @@ Follow the generated issues' dependency order inside the task; do not create a
 task per issue.
 
 Canonical states are `created`, `implementing`, `validating`, `draft-pr`,
-`marking-ready-for-review`, `review-polling`, `fixing-review`, `ci`,
+`marking-ready-for-review`, `review-polling`, `review-monitoring`, `fixing-review`, `ci`,
 `preparing-tracker-closeout`, `checking-mergeability`, `merge-ready`, `blocked`,
 and `needs-owner`.
 
@@ -174,13 +177,13 @@ cannot be resumed, stop as blocked; never create a replacement task for that
 Spec.
 
 After an authorized stale-root takeover, use the candidate claim's validated
-embedded adoption mapping and cross-check any available prior ledger. Adopt the
+embedded adoption mapping and cross-check any available prior JSON run state. Adopt the
 exact original task ref for every previously dispatched Spec and resume it after
 verifying its Goal and managed checkouts. Across the adopted set, no task ref or
 managed `(repository, checkout)` pair may belong to two Specs. An explicit
 embedded no-task entry with the exact pre-CLAIM profile is required before first
 creation, and that first creation must use the embedded profile without
-reclassification. Do not create a task when embedded, prior-ledger, or live App
+reclassification. Do not create a task when embedded, prior-state, or live App
 evidence records one for the Spec;
 inability to adopt or resume it is a blocker.
 
@@ -211,9 +214,11 @@ before implementation and omit `token_budget`. If this is a resumed task, call
 If this task is already terminal, verify its completed Goal and report without
 resuming implementation; if its recorded terminal proof precedes an unfinished
 Goal completion transition, finish that transition only. Work only in the
-managed checkouts. Use fixed actions and the root-issued review deadline; report its
-arguments and any internal subagents.
-Do not edit the ledger, manage sibling tasks, widen scope, change delivery
+managed checkouts. Use fixed actions and the root-issued review deadline; after
+that deadline, perform only root-issued due one-shot checks, pausing or resuming
+this same Goal as directed. Report arguments, Goal transition readbacks, and any
+internal subagents.
+Do not edit the run state, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
 every affected PR is ready to merge or report a concrete blocker. Call
 `update_goal` with `status=complete` only after the terminal result is proven.
@@ -221,7 +226,11 @@ every affected PR is ready to merge or report a concrete blocker. Call
 
 ## Report
 
-Report task and Goal evidence, state, managed checkouts, changed files,
+Report one compact typed packet after each material milestone, attention request,
+blocker, review-wait invocation, or terminal transition. Do not repeat unchanged
+state or paste full command output; the root expands evidence only for a mismatch,
+blocker, or independent terminal verification. Report task and Goal evidence,
+state, managed checkouts, changed files,
 the exact task display title and observation evidence, task model, thinking
 value, and profile decision reason, validation, commits, PR URLs, full current
 revision tuples, review disposition and wait assignment/invocation, CI, current PR
@@ -231,5 +240,5 @@ prepared tracker closeout, internal subagents, blockers, drift, and next action.
 When a knowledge delta exists,
 report its actual `capture_outcome`, delta fingerprint, every verified named
 destination, documentation-diff fingerprint, and relevant implementation
-revision tuples, or the exact closeout blocker. Only the root accepts lifecycle
-transitions.
+revision tuples, or the exact closeout blocker. Only the root validates and
+applies lifecycle events to portfolio run state.

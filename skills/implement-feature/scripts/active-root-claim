@@ -12,13 +12,14 @@ import os
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "7.0.0"
+__version__ = "8.0.0"
 SCHEMA_VERSION = "5.0.0"
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
@@ -47,6 +48,10 @@ class ClaimError(Exception):
 
 def claim_root() -> Path:
     return Path.home() / ".cache/dotagents/skills/implement-feature/claims"
+
+
+def ledger_root() -> Path:
+    return claim_root().parent / "ledgers"
 
 
 def timestamp() -> str:
@@ -117,11 +122,76 @@ def canonical_sources(values: list[str]) -> list[str]:
     return sources
 
 
-def canonical_ledger_ref(value: str) -> str:
+def lexical_absolute(path: Path) -> Path:
+    return Path(os.path.abspath(os.fspath(path)))
+
+
+def path_contract_error(message: str, *, persisted: bool) -> ClaimError:
+    return ClaimError(
+        "state-conflict" if persisted else "invalid-input",
+        message,
+        4 if persisted else 2,
+    )
+
+
+def validate_cache_directory_components(
+    path: Path, *, field: str, persisted: bool
+) -> Path:
+    home = lexical_absolute(Path.home())
+    candidate = lexical_absolute(path)
+    try:
+        relative = candidate.relative_to(home)
+    except ValueError as exc:
+        raise path_contract_error(
+            f"{field} is outside the current home directory: {candidate}",
+            persisted=persisted,
+        ) from exc
+    current = home
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            raise path_contract_error(
+                f"{field} contains a symlinked cache component: {current}",
+                persisted=persisted,
+            )
+        if current.exists() and not current.is_dir():
+            raise path_contract_error(
+                f"{field} contains a non-directory cache component: {current}",
+                persisted=persisted,
+            )
+    return candidate
+
+
+def canonical_ledger_ref(value: str, *, persisted: bool = False) -> str:
+    if not isinstance(value, str):
+        raise path_contract_error(
+            "ledger_ref must be an absolute direct-child JSON path",
+            persisted=persisted,
+        )
     path = Path(value).expanduser()
     if not path.is_absolute():
-        raise ClaimError("invalid-input", "ledger_ref must be an absolute path", 2)
-    return str(path.resolve(strict=False))
+        raise path_contract_error(
+            "ledger_ref must be an absolute direct-child JSON path",
+            persisted=persisted,
+        )
+    path = lexical_absolute(path)
+    root = validate_cache_directory_components(
+        ledger_root(), field="ledger_ref", persisted=persisted
+    )
+    if path.parent != root or path.suffix != ".json" or path.name == ".json":
+        raise path_contract_error(
+            f"ledger_ref must be a direct-child .json file under {root}",
+            persisted=persisted,
+        )
+    if path.is_symlink():
+        raise path_contract_error(
+            f"ledger_ref must not be a symlink: {path}", persisted=persisted
+        )
+    if path.exists() and not path.is_file():
+        raise path_contract_error(
+            f"ledger_ref is not a regular file: {path}", persisted=persisted
+        )
+    return str(path)
 
 
 def fingerprint(value: dict[str, Any]) -> str:
@@ -167,22 +237,42 @@ def release_receipt_path(root: Path, root_id: str, claim_fingerprint: str) -> Pa
 
 @contextlib.contextmanager
 def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None]:
-    root = claim_root()
-    if not root.exists() and not create:
+    root = validate_cache_directory_components(
+        claim_root(), field="claim cache", persisted=True
+    )
+    root_existed = root.exists()
+    if not root_existed and not create:
         yield None
         return
-    if create:
-        root.mkdir(parents=True, exist_ok=True)
+    created_root = False
+    if not root_existed:
+        try:
+            root.mkdir(parents=True)
+            created_root = True
+        except FileExistsError:
+            root_existed = True
+        root = validate_cache_directory_components(
+            root, field="claim cache", persisted=True
+        )
     lock_path = root / ".lock"
-    mode = "a+" if create else "r"
+    if lock_path.is_symlink():
+        raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
+    if not created_root and not lock_path.exists():
+        raise ClaimError("state-conflict", f"claim lock is missing: {lock_path}", 4)
+    if lock_path.exists() and not lock_path.is_file():
+        raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
+    flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+    if created_root:
+        flags |= os.O_CREAT | os.O_EXCL
     try:
-        lock = lock_path.open(mode)
-    except FileNotFoundError:
-        if create:
-            raise
-        yield None
-        return
-    with lock:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        raise ClaimError(
+            "state-conflict", f"cannot open claim lock: {lock_path}", 4
+        ) from exc
+    with os.fdopen(descriptor, "r+") as lock:
+        if not stat.S_ISREG(os.fstat(lock.fileno()).st_mode):
+            raise ClaimError("state-conflict", f"unsafe claim lock: {lock_path}", 4)
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
         try:
             yield root
@@ -221,12 +311,16 @@ def validate_current_claim(
         raise ClaimError("state-conflict", f"claim schema mismatch: {path}", 4)
     if value["schema_version"] != SCHEMA_VERSION or value["fingerprint"] != fingerprint(value):
         raise ClaimError("state-conflict", f"claim fingerprint mismatch: {path}", 4)
+    if canonical_ledger_ref(value["ledger_ref"], persisted=True) != value["ledger_ref"]:
+        raise ClaimError("state-conflict", f"claim ledger_ref mismatch: {path}", 4)
     if validate_takeover:
         validate_takeover_evidence(value, path)
     return value
 
 
 def inspect_claim(path: Path) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise ClaimError("state-conflict", f"unsafe claim file: {path}", 4)
     value = read_claim_value(path)
     if value.get("schema_version") != SCHEMA_VERSION:
         raise ClaimError("state-conflict", f"unsupported claim schema: {path}", 4)
@@ -728,6 +822,8 @@ def load_takeover_transactions(root: Path | None) -> dict[str, dict[str, Any]]:
         return {}
     transactions: dict[str, dict[str, Any]] = {}
     for path in sorted(root.glob("*.takeover")):
+        if path.is_symlink() or not path.is_file():
+            raise ClaimError("state-conflict", f"unsafe takeover transaction: {path}", 4)
         try:
             value = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
@@ -749,9 +845,11 @@ def sync_directory(path: Path) -> None:
 
 
 def write_json_atomic(path: Path, value: dict[str, Any]) -> None:
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary = path.with_name(
+        f".{path.name}.{os.getpid()}.{secrets.token_hex(8)}.tmp"
+    )
     try:
-        with temporary.open("w") as handle:
+        with temporary.open("x") as handle:
             handle.write(json.dumps(value, indent=2, sort_keys=True) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
@@ -786,9 +884,7 @@ def release_receipt_fingerprint(value: dict[str, Any]) -> str:
 def build_release_receipt(
     claim: dict[str, Any], *, release_reason: str, evidence: str
 ) -> dict[str, Any]:
-    ledger = Path(claim["ledger_ref"])
-    if ledger.is_symlink():
-        raise ClaimError("state-conflict", f"claim ledger is not a safe file: {ledger}", 4)
+    ledger = Path(canonical_ledger_ref(claim["ledger_ref"], persisted=True))
     if ledger.is_file():
         ledger_sha256: str | None = sha256_file(ledger)
         ledger_size_bytes: int | None = ledger.stat().st_size
@@ -832,8 +928,6 @@ def validate_release_receipt(value: Any, path: Path) -> dict[str, Any]:
     if (
         value["schema_version"] != RELEASE_RECEIPT_SCHEMA_VERSION
         or path.name != f"{root_id}--{claim_fingerprint}.json"
-        or not isinstance(value["ledger_ref"], str)
-        or not Path(value["ledger_ref"]).is_absolute()
         or value["release_reason"] not in RELEASE_REASONS
         or not isinstance(value["evidence_ref"], str)
         or not value["evidence_ref"].strip()
@@ -842,6 +936,8 @@ def validate_release_receipt(value: Any, path: Path) -> dict[str, Any]:
         or value["fingerprint"] != release_receipt_fingerprint(value)
     ):
         raise ClaimError("state-conflict", f"release receipt value mismatch: {path}", 4)
+    if canonical_ledger_ref(value["ledger_ref"], persisted=True) != value["ledger_ref"]:
+        raise ClaimError("state-conflict", f"release receipt ledger_ref mismatch: {path}", 4)
     has_snapshot = (
         isinstance(value["ledger_sha256"], str)
         and bool(FINGERPRINT_RE.fullmatch(value["ledger_sha256"]))
@@ -1399,18 +1495,26 @@ def doctor() -> dict[str, Any]:
     root = claim_root()
     git = shutil.which("git")
     try:
+        validate_cache_directory_components(
+            root, field="claim cache", persisted=True
+        )
+        claim_store_error = None
+    except ClaimError as exc:
+        claim_store_error = exc.message
+    try:
         task_model_policy = load_task_model_policy()
         policy_error = None
     except ClaimError as exc:
         task_model_policy = None
         policy_error = exc.message
     return {
-        "ok": bool(git) and task_model_policy is not None,
+        "ok": bool(git) and task_model_policy is not None and claim_store_error is None,
         "command": "doctor",
         "version": __version__,
         "offline": True,
         "claim_root": str(root),
         "claim_root_exists": root.exists(),
+        "claim_store_error": claim_store_error,
         "fcntl_available": True,
         "git": {"available": bool(git), "path": git},
         "task_model_policy": {

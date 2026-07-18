@@ -25,7 +25,11 @@ For `visible_app_task_permission=not-requested`, state this exact disclosure:
 > prepare hosted issue closeout, and move, commit, and push completed local issue
 > files when used. Tasks use `gpt-5.6-sol`: `medium` only for routine localized
 > work, `xhigh` for risky or cross-system work, and `high` otherwise. After Codex
-> reserves the work, it automatically deletes valid archived run ledgers older
+> has waited up to 30 minutes for a review response, it may pause the waiting
+> worker and this task, create one temporary heartbeat to resume the same task
+> at the next 30-minute check, and delete or replace that heartbeat after wake.
+> It keeps at most one such heartbeat for this run. After Codex
+> reserves the work, it automatically deletes valid run-state archives older
 > than 180 days; it never plans new work, expands scope, merges pull requests,
 > releases, or deploys.
 

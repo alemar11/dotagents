@@ -10,7 +10,8 @@ reconciles; it never takes this work back as a fallback.
 ## Current-Revision Review
 
 Request exactly one Codex review for the current revision tuple: PR, head SHA,
-base ref, and merge-base SHA. Record the tuple, request evidence, provider
+base ref, and merge-base SHA. Apply the tuple through `revision-observed` and
+the result through `review-observed`, including request evidence, provider
 state, findings, disposition, and completion time. Reuse a result only when the
 entire tuple matches and every finding is dispositioned. Review is mandatory
 and has no skip value.
@@ -33,12 +34,11 @@ support or its destinations. Rerun the exact Project Memory closeout and persist
 fresh delta, destination, docs-diff, and implementation-revision evidence before
 terminal `merge-ready`.
 
-## Request Registry And Idempotency
+## Typed Review State And Idempotency
 
-The ledger's Codex Review Wait Registry is the sole request and timing owner.
-Keep exactly one row keyed by
-`<owner>/<repo>#<number>@<head-sha>@<base-ref>@<merge-base-sha>`. Store request
-and provider/result/disposition evidence, observation fingerprint,
+The typed run state is the sole request and timing owner. Keep exactly one review
+entity keyed by `<owner>/<repo>#<number>@<head-sha>@<base-ref>@<merge-base-sha>`.
+Store request and provider/result/disposition evidence, observation fingerprint,
 `wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
 `due_at`, and poll owner.
 
@@ -46,8 +46,8 @@ Before review request, resume, or terminal merge-ready acceptance, recompute the
 full revision tuple
 and run the canonical GitStack review check. Reuse a current clean/findings
 result; wait on a current acknowledged request; create a request only for a
-proven not-requested or stale tuple. Persist the row before polling so recovery
-cannot duplicate the mutation. API, authentication, or configuration
+proven not-requested or stale tuple. Apply `review-wait-started` before polling
+so recovery cannot duplicate the mutation. API, authentication, or configuration
 uncertainty never authorizes another request.
 
 At the GitStack boundary, translate the fixed assignment internally: pass the
@@ -58,23 +58,30 @@ fields to GitStack, and never expose the translation as a user option.
 
 ## Fixed Wait Deadline
 
-The registry owns one 30-minute total active-wait deadline per tuple. The worker
+The review entity owns one 30-minute total active-wait deadline per tuple. The worker
 reports tuple/request evidence; the root atomically records
-`wait_started_at`/`wait_deadline` and returns `revision_key`/timestamps.
+`review-wait-started` with `wait_started_at`/`wait_deadline` and returns
+`revision_key`/timestamps.
 At launch, the worker sets `wait_invoked_at=now`, computes
 `provider_timeout=floor(wait_deadline-now)`, and starts GitStack in the same
 local step with no root round-trip. If nonpositive, check once. Report actual
-invocation/timeout afterward for root persistence.
+invocation/timeout afterward through `review-wait-invoked`.
 
 Use one GitStack waiter for it:
 `--timeout <provider_timeout>s --interval 10s --max-interval 30s`. Never use a
 provider default/example, hardcode `15m`, segment, or wrap it. Interrupted
 recovery recomputes from the unchanged deadline; it never reuses a timeout.
 
-At deadline, check the tuple once. If pending, persist one `monitoring-required`
-handoff and `due_at`, stop, then release. Do not extend, re-request, or rewrite
-timestamps. Resume checks the row before mutation. Unpollable access blocks; it
-is not a review skip.
+At deadline, check the tuple once. If pending, record that observation, pause
+and readback the worker Goal, then apply `review-monitoring-scheduled`. The
+helper derives the first `due_at` 30 minutes from that observation. Do not apply
+`external-handoff-recorded`: that event remains terminal-only.
+
+Then load `review-monitoring.md` for portfolio quiescence, heartbeat, root
+pause/release, wake/reacquire, due-worker resume, one-shot checks, invalidation,
+and crash recovery. Each due worker performs one canonical review check. Never
+start another waiter or change the original active-wait timestamps. Unpollable
+access blocks; it is not a review skip.
 
 ## Tracker Closeout
 

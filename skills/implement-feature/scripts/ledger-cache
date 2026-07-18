@@ -1,38 +1,134 @@
 #!/usr/bin/env python3
-"""Archive and retain Implement Feature ledgers."""
+"""Own typed Implement Feature run state and its cold archives."""
 
 from __future__ import annotations
 
 import argparse
+import copy
 import contextlib
 import fcntl
 import hashlib
 import json
 import os
+import posixpath
 import re
 import secrets
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "2.0.0"
-METADATA_SCHEMA_VERSION = "1.0.0"
+__version__ = "3.0.0"
+LEDGER_SCHEMA_VERSION = "1.0.0"
+REGISTRATION_SCHEMA_VERSION = "1.0.0"
+WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
+READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
 SIZE_WARNING_BYTES = 25 * 1024 * 1024
 COUNT_WARNING_ENTRIES = 100
+MAX_TEXT_LENGTH = 4096
+MAX_SOURCES = 64
+MAX_REPOSITORIES_PER_TASK = 8
+MAX_ALLOWED_PATHS_PER_REPOSITORY = 128
+MAX_EVENTS_PER_BATCH = 64
+MAX_OPERATIONS = 512
+MAX_REVIEWS = 256
+MAX_REVIEW_OBSERVATIONS = 64
+MAX_OUTPUT_BYTES = 128 * 1024
+MAX_PACKET_BYTES = 1024 * 1024
 READ_ARCHIVE_REASONS = {"terminal", "legacy-cutover"}
 CLAIM_SCHEMA_VERSION = "5.0.0"
 TAKEOVER_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
 RELEASE_REASONS = {"terminal", "durable-handoff"}
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+LOWER_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 RETAINED_LEGACY_GROUP = "legacy-cutover-2026-07-17"
+ROOT_TITLES = {
+    "single": "👨🏻‍💻 Feature Orchestrator",
+    "multiple": "👨🏻‍💻 Multi-Feature Orchestrator",
+}
+TRACKER_BACKENDS = {"github", "local"}
+SOURCE_STATES = {"ready-for-agent", "done"}
+TASK_STATES = {
+    "pending",
+    "created",
+    "implementing",
+    "validating",
+    "draft-pr",
+    "marking-ready-for-review",
+    "review-polling",
+    "review-monitoring",
+    "fixing-review",
+    "ci",
+    "preparing-tracker-closeout",
+    "checking-mergeability",
+    "blocked",
+    "needs-owner",
+    "merge-ready",
+    "failed",
+}
+ACTIVE_TASK_STATES = TASK_STATES - {"pending", "created", "merge-ready", "failed"}
+TASK_TRANSITIONS = {
+    "pending": {"pending", "created", "blocked", "needs-owner", "failed"},
+    "created": {"created", *ACTIVE_TASK_STATES, "failed"},
+    **{
+        state: {*ACTIVE_TASK_STATES, "merge-ready", "failed"}
+        for state in ACTIVE_TASK_STATES
+    },
+    "merge-ready": {"merge-ready"},
+    "failed": {"failed"},
+}
+TASK_GOAL_TRANSITIONS = {
+    "pending": {"pending", "active"},
+    "active": {"active", "complete"},
+    "paused": {"paused"},
+    "complete": {"complete"},
+}
+EVENT_TYPES = {
+    "claim-rebound",
+    "root-title-observed",
+    "portfolio-goal-activated",
+    "portfolio-goal-paused",
+    "portfolio-goal-resumed",
+    "portfolio-goal-completed",
+    "task-observed",
+    "source-moved",
+    "revision-observed",
+    "review-wait-started",
+    "review-wait-invoked",
+    "review-observed",
+    "review-monitoring-scheduled",
+    "review-monitoring-resumed",
+    "gate-observed",
+    "external-handoff-recorded",
+}
+STATIC_GATES = {"pr-preflight", "dependency-integration"}
+REVISION_GATES = {
+    "scope-acceptance",
+    "focused-validation",
+    "full-validation",
+    "autoreview",
+    "publication",
+    "codex-review",
+    "ci",
+    "pr-ready",
+    "tracker-closeout",
+    "domain-closeout",
+    "mergeability",
+    "terminal",
+}
+GATE_STATES = {"passed", "failed"}
+REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
+REVIEW_DISPOSITIONS = {"pending", "fix-required", "accepted", "blocked"}
+REVIEW_MONITORING_STATES = {"active-wait", "scheduled", "checking", "complete"}
+PROJECTIONS = {"status", "dispatch", "recovery", "terminal"}
 
 
 class CacheError(Exception):
@@ -83,15 +179,90 @@ def parse_timestamp(value: Any, field: str) -> datetime:
 
 
 def check_id(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not ID_RE.fullmatch(value):
+    if (
+        not isinstance(value, str)
+        or len(value) > 128
+        or not ID_RE.fullmatch(value)
+    ):
         raise CacheError("invalid-input", f"{field} is not canonical: {value}", 2)
+    return value
+
+
+def check_lower_kebab(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not LOWER_KEBAB_RE.fullmatch(value):
+        raise CacheError("invalid-input", f"{field} is not lower-kebab: {value}", 2)
     return value
 
 
 def nonempty(value: Any, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise CacheError("invalid-input", f"{field} is required", 2)
-    return value.strip()
+    result = value.strip()
+    if len(result) > MAX_TEXT_LENGTH:
+        raise CacheError("invalid-input", f"{field} exceeds the bounded length", 2)
+    return result
+
+
+def canonical_allowed_path(value: Any, field: str) -> str:
+    raw = nonempty(value, field)
+    if "\\" in raw or raw.startswith("/"):
+        raise CacheError("invalid-input", f"{field} must be repository-relative", 2)
+    segments = raw.split("/")
+    if any(segment == ".." for segment in segments):
+        raise CacheError("invalid-input", f"{field} must not traverse parents", 2)
+    normalized = posixpath.normpath(raw)
+    if normalized.startswith("../") or normalized == ".." or normalized.startswith("/"):
+        raise CacheError("invalid-input", f"{field} is outside the repository", 2)
+    return normalized
+
+
+def ensure_safe_cache_chain(target: Path, field: str) -> None:
+    home = Path.home().expanduser()
+    try:
+        relative = target.relative_to(home)
+    except ValueError as exc:
+        raise CacheError("state-conflict", f"{field} is outside the user cache", 4) from exc
+    current = home
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink() or (current.exists() and not current.is_dir()):
+            raise CacheError("state-conflict", f"unsafe {field}: {current}", 4)
+
+
+def exact_object(value: Any, required: set[str], field: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != required:
+        missing = sorted(required - set(value)) if isinstance(value, dict) else sorted(required)
+        unknown = sorted(set(value) - required) if isinstance(value, dict) else []
+        raise CacheError(
+            "invalid-input",
+            f"{field} schema is invalid",
+            2,
+            {"missing": missing, "unknown": unknown},
+        )
+    return value
+
+
+def canonical_fingerprint(value: Any, field: str) -> str:
+    if not isinstance(value, str) or not FINGERPRINT_RE.fullmatch(value):
+        raise CacheError("invalid-input", f"{field} is not a SHA-256 fingerprint", 2)
+    return value
+
+
+def canonical_absolute_path(value: Any, field: str) -> str:
+    raw = nonempty(value, field)
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        raise CacheError("invalid-input", f"{field} must be absolute", 2)
+    return str(path.resolve(strict=False))
+
+
+def stable_json_bytes(value: Any) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+
+
+def request_fingerprint(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def sha256_file(path: Path) -> str:
@@ -118,9 +289,25 @@ def write_json_durable(path: Path, value: dict[str, Any]) -> None:
     sync_directory(path.parent)
 
 
+def replace_json_durable(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.parent / f".tmp-{path.name}-{secrets.token_hex(16)}"
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(stable_json_bytes(value))
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        sync_directory(path.parent)
+    finally:
+        if temporary.exists() and temporary.is_file() and not temporary.is_symlink():
+            temporary.unlink()
+
+
 @contextlib.contextmanager
 def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None]:
     root = claim_root()
+    ensure_safe_cache_chain(root, "claim-store path")
     if not root.exists() and not create:
         yield None
         return
@@ -133,6 +320,8 @@ def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None
     try:
         lock = lock_path.open(mode)
     except FileNotFoundError:
+        if exclusive:
+            raise CacheError("state-conflict", f"claim-store lock is missing: {lock_path}", 4)
         yield root
         return
     with lock:
@@ -305,7 +494,7 @@ def validate_release_receipt(path: Path) -> dict[str, Any]:
         missing_snapshot and value["release_reason"] == "durable-handoff"
     ):
         raise CacheError("state-conflict", f"release receipt ledger mismatch: {path}", 4)
-    canonical_ledger = canonical_active_ledger(ledger_ref)
+    canonical_ledger = canonical_claim_ledger(ledger_ref)
     return {**value, "path": str(path), "ledger_ref": str(canonical_ledger)}
 
 
@@ -378,47 +567,1907 @@ def inspect_claim_artifacts(root: Path | None) -> dict[str, Any]:
     return result
 
 
-def canonical_active_ledger(value: str) -> Path:
+def canonical_claim_ledger(value: str) -> Path:
     path = Path(value).expanduser()
     if not path.is_absolute():
         raise CacheError("invalid-input", "ledger must be an absolute path", 2)
     if path.is_symlink():
         raise CacheError("invalid-input", f"ledger must not be a symlink: {path}", 2)
-    resolved = path.resolve(strict=False)
-    root = ledger_root().resolve(strict=False)
-    if resolved.parent != root or resolved.suffix != ".md":
+    ensure_safe_cache_chain(ledger_root(), "ledger root")
+    canonical = Path(os.path.abspath(os.fspath(path)))
+    root = Path(os.path.abspath(os.fspath(ledger_root())))
+    if canonical.parent != root or canonical.suffix not in {".json", ".md"}:
         raise CacheError(
             "invalid-input",
-            "ledger must be a direct Markdown child of the active ledger root",
+            "ledger must be a direct child of the active ledger root",
             2,
-            {"ledger": str(resolved), "ledger_root": str(root)},
+            {"ledger": str(canonical), "ledger_root": str(root)},
         )
-    check_id(resolved.stem, "portfolio_key")
-    return resolved
+    check_id(canonical.stem, "portfolio_key")
+    return canonical
+
+
+def canonical_active_ledger(value: str) -> Path:
+    path = canonical_claim_ledger(value)
+    if path.suffix != ".json":
+        raise CacheError(
+            "unsupported-active-ledger",
+            "active Markdown ledgers are unsupported; create a new JSON run state",
+            2,
+            {"ledger": str(path)},
+        )
+    return path
+
+
+def read_json_file(value: str, field: str) -> Any:
+    raw = nonempty(value, field)
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        raise CacheError("invalid-input", f"{field} must be an absolute path", 2)
+    if path.is_symlink() or not path.is_file():
+        raise CacheError("invalid-input", f"{field} is not a safe regular file: {path}", 2)
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CacheError("invalid-input", f"{field} is not valid JSON: {path}", 2) from exc
+
+
+def active_claim(root: Path | None, root_id: str, fingerprint: str, ledger: Path) -> dict[str, Any]:
+    if root is None:
+        raise CacheError("state-conflict", f"active claim is missing: {root_id}", 4)
+    path = root / f"{root_id}.json"
+    if path.is_symlink() or not path.is_file():
+        raise CacheError("state-conflict", f"active claim is missing: {root_id}", 4)
+    try:
+        claim = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CacheError("state-conflict", f"active claim is unreadable: {root_id}", 4) from exc
+    if not isinstance(claim, dict) or claim_artifact_error(path, claim):
+        raise CacheError("state-conflict", f"active claim is invalid: {root_id}", 4)
+    if claim["fingerprint"] != fingerprint:
+        raise CacheError("state-conflict", "active claim fingerprint changed", 4)
+    if claim["ledger_ref"] != str(ledger):
+        raise CacheError("state-conflict", "active claim ledger reference changed", 4)
+    return claim
+
+
+def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> dict[str, Any]:
+    required = {
+        "schema_version",
+        "root_task_ref",
+        "root_checkout",
+        "objective",
+        "objective_fingerprint",
+        "permission_evidence_ref",
+        "repositories",
+        "repository_checkouts",
+        "sources",
+    }
+    registration = exact_object(value, required, "registration")
+    if registration["schema_version"] != REGISTRATION_SCHEMA_VERSION:
+        raise CacheError("invalid-input", "registration schema is unsupported", 2)
+    root_task_ref = nonempty(registration["root_task_ref"], "registration.root_task_ref")
+    root_checkout = canonical_absolute_path(registration["root_checkout"], "registration.root_checkout")
+    objective = nonempty(registration["objective"], "registration.objective")
+    objective_fingerprint = canonical_fingerprint(
+        registration["objective_fingerprint"], "registration.objective_fingerprint"
+    )
+    if hashlib.sha256(objective.encode()).hexdigest() != objective_fingerprint:
+        raise CacheError("invalid-input", "objective fingerprint does not match", 2)
+    permission = nonempty(
+        registration["permission_evidence_ref"], "registration.permission_evidence_ref"
+    )
+    repositories = registration["repositories"]
+    checkouts = registration["repository_checkouts"]
+    if repositories != claim["repositories"] or checkouts != claim["repository_checkouts"]:
+        raise CacheError("state-conflict", "registration repository claim does not match", 4)
+    if not isinstance(repositories, list) or not repositories:
+        raise CacheError("invalid-input", "registration.repositories is invalid", 2)
+    if not isinstance(registration["sources"], list) or not registration["sources"]:
+        raise CacheError("invalid-input", "registration.sources is invalid", 2)
+    source_required = {
+        "task_key",
+        "source_id",
+        "source_spec_ref",
+        "feature_spec_title",
+        "feature_slug",
+        "repository",
+        "source_state",
+        "source_fingerprint",
+        "planned_done_ref",
+        "tracker_backend",
+        "target_branch",
+        "allowed_paths",
+        "dependency_ids",
+        "requires_domain_closeout",
+        "task_model",
+        "task_thinking",
+        "thinking_reason",
+        "task_goal_objective_fingerprint",
+    }
+    normalized_sources: list[dict[str, Any]] = []
+    task_keys: set[str] = set()
+    source_ids: set[str] = set()
+    for index, raw in enumerate(registration["sources"]):
+        field = f"registration.sources[{index}]"
+        item = exact_object(raw, source_required, field)
+        task_key = check_lower_kebab(item["task_key"], f"{field}.task_key")
+        source_id = nonempty(item["source_id"], f"{field}.source_id")
+        if task_key in task_keys or source_id in source_ids:
+            raise CacheError("invalid-input", f"{field} duplicates an identity", 2)
+        task_keys.add(task_key)
+        source_ids.add(source_id)
+        repository = nonempty(item["repository"], f"{field}.repository")
+        if repository not in claim["repositories"]:
+            raise CacheError("state-conflict", f"{field}.repository is outside the claim", 4)
+        if item["source_state"] != "ready-for-agent":
+            raise CacheError("invalid-input", f"{field}.source_state must be ready-for-agent", 2)
+        tracker = item["tracker_backend"]
+        if tracker not in TRACKER_BACKENDS:
+            raise CacheError("invalid-input", f"{field}.tracker_backend is invalid", 2)
+        fingerprint = canonical_fingerprint(item["source_fingerprint"], f"{field}.source_fingerprint")
+        if not isinstance(item["allowed_paths"], list) or not item["allowed_paths"]:
+            raise CacheError("invalid-input", f"{field}.allowed_paths is invalid", 2)
+        allowed_paths = [nonempty(path, f"{field}.allowed_paths") for path in item["allowed_paths"]]
+        if len(allowed_paths) != len(set(allowed_paths)):
+            raise CacheError("invalid-input", f"{field}.allowed_paths contains duplicates", 2)
+        if not isinstance(item["dependency_ids"], list):
+            raise CacheError("invalid-input", f"{field}.dependency_ids is invalid", 2)
+        dependencies = [
+            check_lower_kebab(dep, f"{field}.dependency_ids")
+            for dep in item["dependency_ids"]
+        ]
+        if len(dependencies) != len(set(dependencies)) or task_key in dependencies:
+            raise CacheError("invalid-input", f"{field}.dependency_ids is invalid", 2)
+        if not isinstance(item["requires_domain_closeout"], bool):
+            raise CacheError("invalid-input", f"{field}.requires_domain_closeout is invalid", 2)
+        task_model = nonempty(item["task_model"], f"{field}.task_model")
+        if task_model != "gpt-5.6-sol":
+            raise CacheError("invalid-input", f"{field}.task_model is invalid", 2)
+        task_thinking = item["task_thinking"]
+        if task_thinking not in {"medium", "high", "xhigh"}:
+            raise CacheError("invalid-input", f"{field}.task_thinking is invalid", 2)
+        thinking_reason = nonempty(item["thinking_reason"], f"{field}.thinking_reason")
+        task_goal_fingerprint = canonical_fingerprint(
+            item["task_goal_objective_fingerprint"],
+            f"{field}.task_goal_objective_fingerprint",
+        )
+        normalized_sources.append(
+            {
+                "task_key": task_key,
+                "source_id": source_id,
+                "source_spec_ref": nonempty(item["source_spec_ref"], f"{field}.source_spec_ref"),
+                "feature_spec_title": nonempty(
+                    item["feature_spec_title"], f"{field}.feature_spec_title"
+                ),
+                "feature_slug": check_lower_kebab(
+                    item["feature_slug"], f"{field}.feature_slug"
+                ),
+                "repository": repository,
+                "source_state": item["source_state"],
+                "source_fingerprint": fingerprint,
+                "planned_done_ref": nonempty(item["planned_done_ref"], f"{field}.planned_done_ref"),
+                "tracker_backend": tracker,
+                "target_branch": nonempty(item["target_branch"], f"{field}.target_branch"),
+                "allowed_paths": allowed_paths,
+                "dependency_ids": dependencies,
+                "requires_domain_closeout": item["requires_domain_closeout"],
+                "task_model": task_model,
+                "task_thinking": task_thinking,
+                "thinking_reason": thinking_reason,
+                "task_goal_objective_fingerprint": task_goal_fingerprint,
+            }
+        )
+    if sorted(source_ids) != sorted(claim["sources"]):
+        raise CacheError("state-conflict", "registration source claim does not match", 4)
+    for item in normalized_sources:
+        unknown = set(item["dependency_ids"]) - task_keys
+        if unknown:
+            raise CacheError("invalid-input", "registration dependency is unknown", 2, {"ids": sorted(unknown)})
+    visiting: set[str] = set()
+    visited: set[str] = set()
+    graph = {item["task_key"]: item["dependency_ids"] for item in normalized_sources}
+
+    def visit(task_key: str) -> None:
+        if task_key in visiting:
+            raise CacheError("invalid-input", "registration dependencies contain a cycle", 2)
+        if task_key in visited:
+            return
+        visiting.add(task_key)
+        for dependency in graph[task_key]:
+            visit(dependency)
+        visiting.remove(task_key)
+        visited.add(task_key)
+
+    for task_key in graph:
+        visit(task_key)
+    if ledger.stem != check_id(ledger.stem, "portfolio_key"):
+        raise CacheError("invalid-input", "ledger portfolio key is invalid", 2)
+    return {
+        "root_task_ref": root_task_ref,
+        "root_checkout": root_checkout,
+        "objective": objective,
+        "objective_fingerprint": objective_fingerprint,
+        "permission_evidence_ref": permission,
+        "repositories": repositories,
+        "repository_checkouts": checkouts,
+        "sources": normalized_sources,
+    }
+
+
+def state_payload_fingerprint(state: dict[str, Any]) -> str:
+    payload = copy.deepcopy(state)
+    payload.pop("content_fingerprint", None)
+    return request_fingerprint(payload)
+
+
+def seal_state_fingerprint(state: dict[str, Any]) -> None:
+    state["content_fingerprint"] = state_payload_fingerprint(state)
+
+
+def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
+    required = {
+        "schema_version",
+        "generation",
+        "content_fingerprint",
+        "created_at",
+        "updated_at",
+        "portfolio",
+        "claim",
+        "authorization",
+        "goal",
+        "monitoring",
+        "sources",
+        "tasks",
+        "reviews",
+        "gates",
+        "handoffs",
+        "operations",
+    }
+    try:
+        value = exact_object(state, required, "run_state")
+        if value["schema_version"] != LEDGER_SCHEMA_VERSION:
+            raise CacheError("integrity-failure", "run-state schema is unsupported", 5)
+        if not isinstance(value["generation"], int) or value["generation"] < 1:
+            raise CacheError("integrity-failure", "run-state generation is invalid", 5)
+        canonical_fingerprint(value["content_fingerprint"], "run_state.content_fingerprint")
+        parse_timestamp(value["created_at"], "created_at")
+        parse_timestamp(value["updated_at"], "updated_at")
+        exact_object(
+            value["portfolio"],
+            {
+                "key",
+                "root_id",
+                "root_task_ref",
+                "root_task_title",
+                "root_task_title_evidence_ref",
+                "root_checkout",
+                "objective",
+                "objective_fingerprint",
+                "repositories",
+                "repository_checkouts",
+            },
+            "run_state.portfolio",
+        )
+        if value["portfolio"]["key"] != ledger.stem:
+            raise CacheError("integrity-failure", "run-state path identity mismatch", 5)
+        exact_object(value["claim"], {"fingerprint"}, "run_state.claim")
+        exact_object(
+            value["authorization"],
+            {"visible_app_task_permission", "evidence_ref"},
+            "run_state.authorization",
+        )
+        exact_object(
+            value["goal"],
+            {
+                "state",
+                "evidence_ref",
+                "pause_evidence_ref",
+                "resume_evidence_ref",
+                "completion_evidence_ref",
+            },
+            "run_state.goal",
+        )
+        if value["goal"]["state"] not in {"pending", "active", "paused", "complete"}:
+            raise CacheError("integrity-failure", "run-state Goal state is invalid", 5)
+        exact_object(
+            value["monitoring"],
+            {
+                "state",
+                "heartbeat_id",
+                "target_thread_id",
+                "due_at",
+                "suspension_evidence_ref",
+                "resume_evidence_ref",
+            },
+            "run_state.monitoring",
+        )
+        if value["monitoring"]["state"] not in {"inactive", "armed"}:
+            raise CacheError("integrity-failure", "run-state monitoring state is invalid", 5)
+        for field in ("sources", "tasks", "reviews", "gates", "handoffs", "operations"):
+            if not isinstance(value[field], list):
+                raise CacheError("integrity-failure", f"run-state {field} is invalid", 5)
+        source_keys = {
+            "task_key",
+            "source_id",
+            "source_spec_ref",
+            "current_ref",
+            "planned_done_ref",
+            "state",
+            "fingerprint",
+            "tracker_backend",
+            "move_evidence_ref",
+        }
+        task_keys = {
+            "task_key",
+            "source_id",
+            "source_spec_ref",
+            "feature_spec_title",
+            "feature_slug",
+            "repository",
+            "target_branch",
+            "allowed_paths",
+            "dependency_ids",
+            "requires_domain_closeout",
+            "task_ref",
+            "checkout",
+            "model",
+            "reasoning_effort",
+            "thinking_reason",
+            "task_title",
+            "task_title_evidence_ref",
+            "goal_objective_fingerprint",
+            "goal_state",
+            "goal_evidence_ref",
+            "goal_pause_evidence_ref",
+            "goal_resume_evidence_ref",
+            "goal_completion_evidence_ref",
+            "state",
+            "outcome",
+            "attention_reason",
+            "summary_ref",
+            "pr",
+            "revision",
+        }
+        for index, item in enumerate(value["sources"]):
+            exact_object(item, source_keys, f"run_state.sources[{index}]")
+        for index, item in enumerate(value["tasks"]):
+            exact_object(item, task_keys, f"run_state.tasks[{index}]")
+            if item["state"] not in TASK_STATES:
+                raise CacheError("integrity-failure", "run-state task state is invalid", 5)
+            if item["revision"] is not None:
+                exact_object(
+                    item["revision"],
+                    {
+                        "head_sha",
+                        "base_ref",
+                        "merge_base_sha",
+                        "repository",
+                        "pr_number",
+                        "pr_url",
+                        "revision_key",
+                        "evidence_ref",
+                        "observed_at",
+                    },
+                    f"run_state.tasks[{index}].revision",
+                )
+                revision = item["revision"]
+                if revision["repository"] != item["repository"] or revision[
+                    "revision_key"
+                ] != revision_key(
+                    revision["repository"],
+                    revision["pr_number"],
+                    revision["pr_url"],
+                    revision["head_sha"],
+                    revision["base_ref"],
+                    revision["merge_base_sha"],
+                ):
+                    raise CacheError(
+                        "integrity-failure", "run-state revision identity is invalid", 5
+                    )
+            if item["pr"] is not None:
+                exact_object(
+                    item["pr"],
+                    {
+                        "repository",
+                        "number",
+                        "url",
+                        "state",
+                        "is_draft",
+                        "head_sha",
+                        "base_ref",
+                        "merge_base_sha",
+                        "mergeable",
+                        "merge_state",
+                        "closing_refs",
+                    },
+                    f"run_state.tasks[{index}].pr",
+                )
+        for index, item in enumerate(value["reviews"]):
+            exact_object(
+                item,
+                {
+                    "task_key",
+                    "revision_key",
+                    "request_ref",
+                    "wait_started_at",
+                    "wait_deadline",
+                    "wait_invoked_at",
+                    "provider_timeout",
+                    "monitoring_state",
+                    "due_at",
+                    "monitoring_cycle",
+                    "pause_evidence_ref",
+                    "resume_evidence_ref",
+                    "observations",
+                },
+                f"run_state.reviews[{index}]",
+            )
+            if not isinstance(item["observations"], list):
+                raise CacheError("integrity-failure", "run-state review observations are invalid", 5)
+            if item["monitoring_state"] not in REVIEW_MONITORING_STATES:
+                raise CacheError("integrity-failure", "run-state review monitoring state is invalid", 5)
+            if not isinstance(item["monitoring_cycle"], int) or item["monitoring_cycle"] < 0:
+                raise CacheError("integrity-failure", "run-state review monitoring cycle is invalid", 5)
+            if item["due_at"] is not None:
+                parse_timestamp(item["due_at"], "due_at")
+            for observation in item["observations"]:
+                exact_object(
+                    observation,
+                    {
+                        "provider_state",
+                        "observation_fingerprint",
+                        "disposition",
+                        "evidence_ref",
+                        "observed_at",
+                    },
+                    "run_state.review.observation",
+                )
+        for index, item in enumerate(value["gates"]):
+            exact_object(
+                item,
+                {"task_key", "gate", "state", "revision_key", "evidence_ref", "observed_at"},
+                f"run_state.gates[{index}]",
+            )
+        for index, item in enumerate(value["handoffs"]):
+            exact_object(
+                item,
+                {"task_key", "handoff_kind", "evidence_ref", "next_action", "recorded_at"},
+                f"run_state.handoffs[{index}]",
+            )
+        for index, item in enumerate(value["operations"]):
+            exact_object(
+                item,
+                {"operation_id", "request_fingerprint", "event_types", "generation", "applied_at"},
+                f"run_state.operations[{index}]",
+            )
+        if state_payload_fingerprint(value) != value["content_fingerprint"]:
+            raise CacheError("integrity-failure", "run-state fingerprint mismatch", 5)
+        return value
+    except CacheError as exc:
+        if exc.code == "integrity-failure":
+            raise
+        raise CacheError("integrity-failure", exc.message, 5, exc.details) from exc
+
+
+def load_state(ledger: Path) -> dict[str, Any]:
+    if not ledger.exists():
+        raise CacheError("not-found", f"run state not found: {ledger}", 3)
+    if ledger.is_symlink() or not ledger.is_file():
+        raise CacheError("invalid-input", f"run state is not a safe regular file: {ledger}", 2)
+    try:
+        raw = json.loads(ledger.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CacheError("integrity-failure", f"run state is unreadable: {ledger}", 5) from exc
+    return validate_state(raw, ledger)
+
+
+def task_by_key(state: dict[str, Any], task_key: str) -> dict[str, Any]:
+    matches = [task for task in state["tasks"] if task["task_key"] == task_key]
+    if len(matches) != 1:
+        raise CacheError("invalid-input", f"unknown task_key: {task_key}", 2)
+    return matches[0]
+
+
+def current_gate(state: dict[str, Any], task: dict[str, Any], gate: str) -> dict[str, Any] | None:
+    revision_key = task["revision"]["revision_key"] if task["revision"] else None
+    expected_revision = None if gate in STATIC_GATES else revision_key
+    matches = [
+        item
+        for item in state["gates"]
+        if item["task_key"] == task["task_key"]
+        and item["gate"] == gate
+        and item["revision_key"] == expected_revision
+    ]
+    return matches[-1] if matches else None
+
+
+def current_review(state: dict[str, Any], task: dict[str, Any]) -> dict[str, Any] | None:
+    if not task["revision"]:
+        return None
+    matches = [
+        item
+        for item in state["reviews"]
+        if item["task_key"] == task["task_key"]
+        and item["revision_key"] == task["revision"]["revision_key"]
+    ]
+    return matches[-1] if matches else None
+
+
+def portfolio_pause_blockers(state: dict[str, Any], now: datetime) -> list[str]:
+    """Return work that prevents the root Goal from becoming quiescent."""
+    blockers: list[str] = []
+    for task in state["tasks"]:
+        if task["state"] in {"merge-ready", "failed"}:
+            continue
+        if task["state"] == "pending":
+            continue
+        if task["state"] != "review-monitoring":
+            blockers.append(f"{task['task_key']}:controller-action-required")
+            continue
+        if task["goal_state"] != "paused" or task["goal_pause_evidence_ref"] is None:
+            blockers.append(f"{task['task_key']}:task-goal-not-paused")
+        review = current_review(state, task)
+        if not review or review["monitoring_state"] != "scheduled" or review["due_at"] is None:
+            blockers.append(f"{task['task_key']}:monitoring-not-scheduled")
+        elif parse_timestamp(review["due_at"], "due_at") <= now:
+            blockers.append(f"{task['task_key']}:review-check-due")
+    active = [
+        task
+        for task in state["tasks"]
+        if task["task_ref"] is not None and task["state"] not in {"merge-ready", "failed"}
+    ]
+    capacity = max(0, 3 - len(active))
+    selected: list[dict[str, Any]] = []
+    for candidate in sorted(
+        (
+            task
+            for task in state["tasks"]
+            if task["state"] == "pending"
+            and current_gate(state, task, "pr-preflight")
+            and current_gate(state, task, "pr-preflight")["state"] == "passed"
+            and current_gate(state, task, "dependency-integration")
+            and current_gate(state, task, "dependency-integration")["state"] == "passed"
+        ),
+        key=lambda task: task["source_id"],
+    ):
+        if len(selected) >= capacity:
+            break
+        if any(paths_overlap(candidate, other) for other in [*active, *selected]):
+            continue
+        selected.append(candidate)
+    blockers.extend(f"{task['task_key']}:dispatch-ready" for task in selected)
+    return blockers
+
+
+def task_terminal_blockers(
+    state: dict[str, Any], task: dict[str, Any], *, require_task_state: bool
+) -> list[str]:
+    blockers: list[str] = []
+    if task["task_title"] is None or task["task_title_evidence_ref"] is None:
+        blockers.append("missing-task-title-evidence")
+    if task["goal_state"] != "complete" or task["goal_completion_evidence_ref"] is None:
+        blockers.append("task-goal-not-complete")
+    if task["revision"] is None:
+        blockers.append("missing-current-revision")
+    required_gates = set(STATIC_GATES) | (REVISION_GATES - {"domain-closeout"})
+    if task["requires_domain_closeout"]:
+        required_gates.add("domain-closeout")
+    for gate in sorted(required_gates):
+        evidence = current_gate(state, task, gate)
+        if not evidence or evidence["state"] != "passed":
+            blockers.append(f"gate:{gate}")
+    review = current_review(state, task)
+    if not review or not review["observations"]:
+        blockers.append("missing-current-review")
+    else:
+        observation = review["observations"][-1]
+        if observation["provider_state"] != "clean" or observation["disposition"] != "accepted":
+            blockers.append("review-not-clean")
+    pr = task["pr"]
+    revision = task["revision"]
+    source = next(item for item in state["sources"] if item["task_key"] == task["task_key"])
+    if source["tracker_backend"] == "local" and source["state"] != "done":
+        blockers.append("local-source-not-done")
+    if pr is None:
+        blockers.append("missing-pull-request")
+    elif (
+        pr["state"] != "open"
+        or pr["is_draft"]
+        or not pr["mergeable"]
+        or pr["merge_state"] != "clean"
+        or revision is None
+        or pr["head_sha"] != revision["head_sha"]
+        or pr["base_ref"] != revision["base_ref"]
+        or pr["merge_base_sha"] != revision["merge_base_sha"]
+    ):
+        blockers.append("pull-request-not-ready")
+    if require_task_state and task["state"] != "merge-ready":
+        blockers.append("task-not-merge-ready")
+    return blockers
+
+
+def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
+    tasks = []
+    blockers: list[str] = []
+    for task in state["tasks"]:
+        task_blockers = task_terminal_blockers(state, task, require_task_state=True)
+        tasks.append(
+            {
+                "task_key": task["task_key"],
+                "state": task["state"],
+                "revision_key": task["revision"]["revision_key"] if task["revision"] else None,
+                "blockers": task_blockers,
+            }
+        )
+        blockers.extend(f"{task['task_key']}:{item}" for item in task_blockers)
+        if not any(item["task_key"] == task["task_key"] for item in state["handoffs"]):
+            blockers.append(f"{task['task_key']}:missing-external-handoff")
+    if state["goal"]["state"] != "complete":
+        blockers.append("portfolio-goal-not-complete")
+    return {"eligible": not blockers, "blockers": blockers, "tasks": tasks}
+
+
+def paths_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    if left["repository"] != right["repository"]:
+        return False
+    for left_path in left["allowed_paths"]:
+        for right_path in right["allowed_paths"]:
+            if any(character in left_path + right_path for character in "*?["):
+                return True
+            normalized_left = left_path.strip("/") or "."
+            normalized_right = right_path.strip("/") or "."
+            if (
+                normalized_left == "."
+                or normalized_right == "."
+                or normalized_left == normalized_right
+                or normalized_left.startswith(normalized_right + "/")
+                or normalized_right.startswith(normalized_left + "/")
+            ):
+                return True
+    return False
+
+
+def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
+    if projection not in PROJECTIONS:
+        raise CacheError("invalid-input", f"unknown projection: {projection}", 2)
+    terminal = terminal_projection(state)
+    base: dict[str, Any] = {
+        "projection": projection,
+        "generation": state["generation"],
+        "content_fingerprint": state["content_fingerprint"],
+        "portfolio_key": state["portfolio"]["key"],
+        "root_id": state["portfolio"]["root_id"],
+        "root_task_title": state["portfolio"]["root_task_title"],
+        "root_task_title_evidence_ref": state["portfolio"]["root_task_title_evidence_ref"],
+        "goal": copy.deepcopy(state["goal"]),
+        "monitoring": copy.deepcopy(state["monitoring"]),
+    }
+    if projection == "terminal":
+        return {**base, **terminal}
+    if projection == "dispatch":
+        active = [
+            task
+            for task in state["tasks"]
+            if task["task_ref"] is not None
+            and task["state"] not in {"merge-ready", "failed"}
+        ]
+        capacity = max(0, 3 - len(active))
+        candidates = sorted(
+            (
+                task
+                for task in state["tasks"]
+                if task["state"] == "pending"
+                and current_gate(state, task, "pr-preflight")
+                and current_gate(state, task, "pr-preflight")["state"] == "passed"
+                and current_gate(state, task, "dependency-integration")
+                and current_gate(state, task, "dependency-integration")["state"]
+                == "passed"
+            ),
+            key=lambda task: task["source_id"],
+        )
+        selected: list[dict[str, Any]] = []
+        for candidate in candidates:
+            if len(selected) >= capacity:
+                break
+            if any(paths_overlap(candidate, other) for other in [*active, *selected]):
+                continue
+            selected.append(candidate)
+        return {
+            **base,
+            "ready_task_keys": [task["task_key"] for task in selected],
+            "available_capacity": capacity,
+        }
+    tasks = []
+    due_reviews = []
+    now = utc_now()
+    for task in state["tasks"]:
+        revision_key = task["revision"]["revision_key"] if task["revision"] else None
+        gate_summary = {
+            gate: current_gate(state, task, gate)["state"]
+            for gate in sorted(STATIC_GATES | REVISION_GATES)
+            if current_gate(state, task, gate)
+        }
+        tasks.append(
+            {
+                "task_key": task["task_key"],
+                "task_ref": task["task_ref"],
+                "task_title": task["task_title"],
+                "state": task["state"],
+                "goal_state": task["goal_state"],
+                "revision_key": revision_key,
+                "gates": gate_summary,
+                "terminal_blockers": task_terminal_blockers(
+                    state, task, require_task_state=False
+                ),
+            }
+        )
+        review = current_review(state, task)
+        if review and review["monitoring_state"] != "complete":
+            due_at = review["due_at"] or review["wait_deadline"]
+            deadline = parse_timestamp(due_at, "due_at")
+            due_reviews.append(
+                {
+                    "task_key": task["task_key"],
+                    "request_ref": review["request_ref"],
+                    "wait_deadline": review["wait_deadline"],
+                    "monitoring_state": review["monitoring_state"],
+                    "due_at": due_at,
+                    "monitoring_cycle": review["monitoring_cycle"],
+                    "overdue": deadline <= now,
+                }
+            )
+    base.update({"tasks": tasks, "due_reviews": due_reviews, "terminal_eligible": terminal["eligible"]})
+    if projection == "recovery":
+        base["sources"] = [
+            {
+                "task_key": item["task_key"],
+                "current_ref": item["current_ref"],
+                "state": item["state"],
+                "fingerprint": item["fingerprint"],
+            }
+            for item in state["sources"]
+        ]
+        base["handoffs"] = copy.deepcopy(state["handoffs"])
+    return base
+
+
+def render_markdown(state: dict[str, Any]) -> str:
+    terminal = terminal_projection(state)
+    lines = [
+        "# Implement Feature Terminal Run State",
+        "",
+        f"- Portfolio: `{state['portfolio']['key']}`",
+        f"- Root: `{state['portfolio']['root_id']}`",
+        f"- Root task: {state['portfolio']['root_task_title']}",
+        f"- Objective: {state['portfolio']['objective']}",
+        f"- Generation: `{state['generation']}`",
+        f"- Goal: `{state['goal']['state']}`",
+        f"- Terminal eligible: `{'yes' if terminal['eligible'] else 'no'}`",
+        "",
+        "## Feature Spec Tasks",
+        "",
+        "| task | source | state | revision | pull request |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
+        revision = task["revision"]["revision_key"] if task["revision"] else "none"
+        pr = task["pr"]["url"] if task["pr"] else "none"
+        lines.append(
+            f"| `{task['task_key']}` | {task['source_spec_ref']} | `{task['state']}` | `{revision}` | {pr} |"
+        )
+    lines.extend(["", "## Current Gate Evidence", "", "| task | gate | state | evidence |", "| --- | --- | --- | --- |"])
+    for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
+        for gate in sorted(STATIC_GATES | REVISION_GATES):
+            item = current_gate(state, task, gate)
+            if item:
+                lines.append(
+                    f"| `{task['task_key']}` | `{gate}` | `{item['state']}` | {item['evidence_ref']} |"
+                )
+    lines.extend(["", "## External Handoffs", ""])
+    if state["handoffs"]:
+        for item in state["handoffs"]:
+            lines.append(
+                f"- `{item['task_key']}` `{item['handoff_kind']}`: {item['evidence_ref']} — {item['next_action']}"
+            )
+    else:
+        lines.append("- None")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def new_state(
+    *,
+    ledger: Path,
+    root_id: str,
+    claim: dict[str, Any],
+    registration: dict[str, Any],
+    operation_id: str,
+) -> dict[str, Any]:
+    now = format_timestamp(utc_now())
+    sources = []
+    tasks = []
+    for item in registration["sources"]:
+        sources.append(
+            {
+                "task_key": item["task_key"],
+                "source_id": item["source_id"],
+                "source_spec_ref": item["source_spec_ref"],
+                "current_ref": item["source_spec_ref"],
+                "planned_done_ref": item["planned_done_ref"],
+                "state": item["source_state"],
+                "fingerprint": item["source_fingerprint"],
+                "tracker_backend": item["tracker_backend"],
+                "move_evidence_ref": None,
+            }
+        )
+        tasks.append(
+            {
+                "task_key": item["task_key"],
+                "source_id": item["source_id"],
+                "source_spec_ref": item["source_spec_ref"],
+                "feature_spec_title": item["feature_spec_title"],
+                "feature_slug": item["feature_slug"],
+                "repository": item["repository"],
+                "target_branch": item["target_branch"],
+                "allowed_paths": item["allowed_paths"],
+                "dependency_ids": item["dependency_ids"],
+                "requires_domain_closeout": item["requires_domain_closeout"],
+                "task_ref": None,
+                "checkout": None,
+                "model": item["task_model"],
+                "reasoning_effort": item["task_thinking"],
+                "thinking_reason": item["thinking_reason"],
+                "task_title": None,
+                "task_title_evidence_ref": None,
+                "goal_objective_fingerprint": item[
+                    "task_goal_objective_fingerprint"
+                ],
+                "goal_state": "pending",
+                "goal_evidence_ref": None,
+                "goal_pause_evidence_ref": None,
+                "goal_resume_evidence_ref": None,
+                "goal_completion_evidence_ref": None,
+                "state": "pending",
+                "outcome": None,
+                "attention_reason": None,
+                "summary_ref": None,
+                "pr": None,
+                "revision": None,
+            }
+        )
+    title = ROOT_TITLES["single" if len(tasks) == 1 else "multiple"]
+    registration_fingerprint = request_fingerprint(registration)
+    state = {
+        "schema_version": LEDGER_SCHEMA_VERSION,
+        "generation": 1,
+        "content_fingerprint": "0" * 64,
+        "created_at": now,
+        "updated_at": now,
+        "portfolio": {
+            "key": ledger.stem,
+            "root_id": root_id,
+            "root_task_ref": registration["root_task_ref"],
+            "root_task_title": title,
+            "root_task_title_evidence_ref": None,
+            "root_checkout": registration["root_checkout"],
+            "objective": registration["objective"],
+            "objective_fingerprint": registration["objective_fingerprint"],
+            "repositories": registration["repositories"],
+            "repository_checkouts": registration["repository_checkouts"],
+        },
+        "claim": {"fingerprint": claim["fingerprint"]},
+        "authorization": {
+            "visible_app_task_permission": "granted-by-authorized-user",
+            "evidence_ref": registration["permission_evidence_ref"],
+        },
+        "goal": {
+            "state": "pending",
+            "evidence_ref": None,
+            "pause_evidence_ref": None,
+            "resume_evidence_ref": None,
+            "completion_evidence_ref": None,
+        },
+        "monitoring": {
+            "state": "inactive",
+            "heartbeat_id": None,
+            "target_thread_id": registration["root_task_ref"],
+            "due_at": None,
+            "suspension_evidence_ref": None,
+            "resume_evidence_ref": None,
+        },
+        "sources": sources,
+        "tasks": tasks,
+        "reviews": [],
+        "gates": [],
+        "handoffs": [],
+        "operations": [
+            {
+                "operation_id": operation_id,
+                "request_fingerprint": registration_fingerprint,
+                "event_types": ["registration"],
+                "generation": 1,
+                "applied_at": now,
+            }
+        ],
+    }
+    seal_state_fingerprint(state)
+    return state
+
+
+def check_operation_id(value: Any) -> str:
+    if not isinstance(value, str) or not TRANSACTION_ID_RE.fullmatch(value):
+        raise CacheError("invalid-input", "operation_id must be 32 lowercase hex characters", 2)
+    return value
+
+
+def revision_key(
+    repository: str,
+    pr_number: int,
+    pr_url: str,
+    head_sha: str,
+    base_ref: str,
+    merge_base_sha: str,
+) -> str:
+    return request_fingerprint(
+        {
+            "repository": repository,
+            "pr_number": pr_number,
+            "pr_url": pr_url,
+            "head_sha": head_sha,
+            "base_ref": base_ref,
+            "merge_base_sha": merge_base_sha,
+        }
+    )
+
+
+def validate_pr(value: Any, task: dict[str, Any], field: str) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    pr = exact_object(
+        value,
+        {
+            "repository",
+            "number",
+            "url",
+            "state",
+            "is_draft",
+            "head_sha",
+            "base_ref",
+            "merge_base_sha",
+            "mergeable",
+            "merge_state",
+            "closing_refs",
+        },
+        field,
+    )
+    if nonempty(pr["repository"], f"{field}.repository") != task["repository"]:
+        raise CacheError("invalid-input", f"{field}.repository does not match the task", 2)
+    if not isinstance(pr["number"], int) or pr["number"] < 1:
+        raise CacheError("invalid-input", f"{field}.number is invalid", 2)
+    url = nonempty(pr["url"], f"{field}.url")
+    if pr["state"] not in {"open", "closed"} or not isinstance(pr["is_draft"], bool):
+        raise CacheError("invalid-input", f"{field} lifecycle is invalid", 2)
+    head_sha = nonempty(pr["head_sha"], f"{field}.head_sha")
+    base_ref = nonempty(pr["base_ref"], f"{field}.base_ref")
+    merge_base_sha = nonempty(pr["merge_base_sha"], f"{field}.merge_base_sha")
+    if not isinstance(pr["mergeable"], bool) or pr["merge_state"] not in {
+        "clean",
+        "blocked",
+        "dirty",
+        "behind",
+        "unknown",
+    }:
+        raise CacheError("invalid-input", f"{field} merge state is invalid", 2)
+    if not isinstance(pr["closing_refs"], list):
+        raise CacheError("invalid-input", f"{field}.closing_refs is invalid", 2)
+    closing_refs = [nonempty(item, f"{field}.closing_refs") for item in pr["closing_refs"]]
+    if len(closing_refs) != len(set(closing_refs)):
+        raise CacheError("invalid-input", f"{field}.closing_refs contains duplicates", 2)
+    return {
+        "repository": task["repository"],
+        "number": pr["number"],
+        "url": url,
+        "state": pr["state"],
+        "is_draft": pr["is_draft"],
+        "head_sha": head_sha,
+        "base_ref": base_ref,
+        "merge_base_sha": merge_base_sha,
+        "mergeable": pr["mergeable"],
+        "merge_state": pr["merge_state"],
+        "closing_refs": closing_refs,
+    }
+
+
+def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
+    if not isinstance(raw, dict) or raw.get("type") not in EVENT_TYPES:
+        raise CacheError("invalid-input", "event type is missing or unsupported", 2)
+    event_type = raw["type"]
+    observed_at = format_timestamp(now)
+    if event_type == "claim-rebound":
+        event = exact_object(
+            raw,
+            {"type", "previous_claim_fingerprint", "claim_fingerprint", "evidence_ref"},
+            event_type,
+        )
+        previous = canonical_fingerprint(
+            event["previous_claim_fingerprint"], "previous_claim_fingerprint"
+        )
+        replacement = canonical_fingerprint(event["claim_fingerprint"], "claim_fingerprint")
+        nonempty(event["evidence_ref"], "evidence_ref")
+        if state["claim"]["fingerprint"] != previous:
+            raise CacheError("state-conflict", "claim-rebound previous fingerprint is stale", 4)
+        if previous == replacement:
+            return False
+        state["claim"]["fingerprint"] = replacement
+        return True
+
+    if event_type == "root-title-observed":
+        event = exact_object(raw, {"type", "title", "evidence_ref"}, event_type)
+        if event["title"] != state["portfolio"]["root_task_title"]:
+            raise CacheError("invalid-input", "observed root title does not match derived title", 2)
+        evidence = nonempty(event["evidence_ref"], "evidence_ref")
+        if state["portfolio"]["root_task_title_evidence_ref"] == evidence:
+            return False
+        state["portfolio"]["root_task_title_evidence_ref"] = evidence
+        return True
+
+    if event_type == "portfolio-goal-activated":
+        event = exact_object(
+            raw, {"type", "goal_evidence_ref", "objective_fingerprint"}, event_type
+        )
+        if event["objective_fingerprint"] != state["portfolio"]["objective_fingerprint"]:
+            raise CacheError("invalid-input", "Goal objective fingerprint does not match", 2)
+        if state["portfolio"]["root_task_title_evidence_ref"] is None:
+            raise CacheError("state-conflict", "Goal cannot activate before root title evidence", 4)
+        evidence = nonempty(event["goal_evidence_ref"], "goal_evidence_ref")
+        if state["goal"]["state"] == "active" and state["goal"]["evidence_ref"] == evidence:
+            return False
+        if state["goal"]["state"] != "pending":
+            raise CacheError("state-conflict", "portfolio Goal activation is out of order", 4)
+        state["goal"].update(
+            {
+                "state": "active",
+                "evidence_ref": evidence,
+                "pause_evidence_ref": None,
+                "resume_evidence_ref": None,
+                "completion_evidence_ref": None,
+            }
+        )
+        return True
+
+    if event_type == "portfolio-goal-paused":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "goal_evidence_ref",
+                "pause_evidence_ref",
+                "heartbeat_id",
+                "target_thread_id",
+                "due_at",
+            },
+            event_type,
+        )
+        if state["goal"]["state"] != "active" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
+            raise CacheError("state-conflict", "portfolio Goal pause is out of order", 4)
+        if state["monitoring"]["state"] != "inactive":
+            raise CacheError("state-conflict", "portfolio monitoring is already armed", 4)
+        blockers = portfolio_pause_blockers(state, now)
+        if blockers:
+            raise CacheError(
+                "state-conflict",
+                "portfolio Goal cannot pause while controller work is runnable",
+                4,
+                {"blockers": blockers},
+            )
+        scheduled_due = sorted(
+            review["due_at"]
+            for review in state["reviews"]
+            if review["monitoring_state"] == "scheduled" and review["due_at"] is not None
+        )
+        due_at = nonempty(event["due_at"], "due_at")
+        due = parse_timestamp(due_at, "due_at")
+        if not scheduled_due or due_at != scheduled_due[0] or due <= now:
+            raise CacheError("invalid-input", "heartbeat due_at is not the earliest future review check", 2)
+        target_thread_id = nonempty(event["target_thread_id"], "target_thread_id")
+        if target_thread_id != state["portfolio"]["root_task_ref"]:
+            raise CacheError("invalid-input", "heartbeat target does not match the root task", 2)
+        state["goal"]["state"] = "paused"
+        state["goal"]["pause_evidence_ref"] = nonempty(
+            event["pause_evidence_ref"], "pause_evidence_ref"
+        )
+        state["monitoring"].update(
+            {
+                "state": "armed",
+                "heartbeat_id": nonempty(event["heartbeat_id"], "heartbeat_id"),
+                "target_thread_id": target_thread_id,
+                "due_at": due_at,
+                "suspension_evidence_ref": state["goal"]["pause_evidence_ref"],
+                "resume_evidence_ref": None,
+            }
+        )
+        return True
+
+    if event_type == "portfolio-goal-resumed":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "goal_evidence_ref",
+                "heartbeat_id",
+                "resume_evidence_ref",
+            },
+            event_type,
+        )
+        if state["goal"]["state"] != "paused" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
+            raise CacheError("state-conflict", "portfolio Goal resume is out of order", 4)
+        if (
+            state["monitoring"]["state"] != "armed"
+            or state["monitoring"]["heartbeat_id"] != event["heartbeat_id"]
+        ):
+            raise CacheError("state-conflict", "portfolio heartbeat identity changed", 4)
+        resume_evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
+        state["goal"]["state"] = "active"
+        state["goal"]["resume_evidence_ref"] = resume_evidence
+        state["monitoring"]["state"] = "inactive"
+        state["monitoring"]["resume_evidence_ref"] = resume_evidence
+        return True
+
+    if event_type == "portfolio-goal-completed":
+        event = exact_object(
+            raw, {"type", "goal_evidence_ref", "completion_evidence_ref"}, event_type
+        )
+        if state["goal"]["state"] == "complete":
+            if (
+                state["goal"]["evidence_ref"] != event["goal_evidence_ref"]
+                or state["goal"]["completion_evidence_ref"]
+                != event["completion_evidence_ref"]
+            ):
+                raise CacheError(
+                    "state-conflict", "portfolio Goal completion evidence changed", 4
+                )
+            return False
+        if state["goal"]["state"] != "active" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
+            raise CacheError("state-conflict", "portfolio Goal completion is out of order", 4)
+        if state["monitoring"]["state"] != "inactive":
+            raise CacheError("state-conflict", "portfolio Goal cannot complete with an armed heartbeat", 4)
+        blockers = []
+        for task in state["tasks"]:
+            blockers.extend(
+                f"{task['task_key']}:{item}"
+                for item in task_terminal_blockers(state, task, require_task_state=True)
+            )
+            if not any(
+                item["task_key"] == task["task_key"] for item in state["handoffs"]
+            ):
+                blockers.append(f"{task['task_key']}:missing-external-handoff")
+        if blockers:
+            raise CacheError("state-conflict", "portfolio Goal cannot complete before terminal gates", 4, {"blockers": blockers})
+        state["goal"]["state"] = "complete"
+        state["goal"]["completion_evidence_ref"] = nonempty(
+            event["completion_evidence_ref"], "completion_evidence_ref"
+        )
+        return True
+
+    task_key = check_lower_kebab(raw.get("task_key"), "task_key")
+    task = task_by_key(state, task_key)
+
+    if event_type == "task-observed":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "task_ref",
+                "checkout",
+                "model",
+                "reasoning_effort",
+                "thinking_reason",
+                "task_title",
+                "task_title_evidence_ref",
+                "goal_objective_fingerprint",
+                "goal_state",
+                "goal_evidence_ref",
+                "goal_completion_evidence_ref",
+                "state",
+                "outcome",
+                "attention_reason",
+                "summary_ref",
+                "pr",
+            },
+            event_type,
+        )
+        task_ref = nonempty(event["task_ref"], "task_ref")
+        checkout = canonical_absolute_path(event["checkout"], "checkout")
+        model = nonempty(event["model"], "model")
+        effort = event["reasoning_effort"]
+        if effort not in {"medium", "high", "xhigh"}:
+            raise CacheError("invalid-input", "reasoning_effort is invalid", 2)
+        for field, candidate in (
+            ("task_ref", task_ref),
+            ("checkout", checkout),
+            ("model", model),
+            ("reasoning_effort", effort),
+            ("thinking_reason", nonempty(event["thinking_reason"], "thinking_reason")),
+        ):
+            if task[field] is not None and task[field] != candidate:
+                raise CacheError("state-conflict", f"task identity field changed: {field}", 4)
+        task_title = nonempty(event["task_title"], "task_title")
+        if task["task_title"] is not None and task["task_title"] != task_title:
+            raise CacheError("state-conflict", "task title changed", 4)
+        title_evidence = event["task_title_evidence_ref"]
+        if title_evidence is not None:
+            title_evidence = nonempty(title_evidence, "task_title_evidence_ref")
+        if event["goal_objective_fingerprint"] != task["goal_objective_fingerprint"]:
+            raise CacheError("state-conflict", "task Goal objective fingerprint changed", 4)
+        goal_state = event["goal_state"]
+        if (
+            goal_state not in TASK_GOAL_TRANSITIONS
+            or goal_state not in TASK_GOAL_TRANSITIONS[task["goal_state"]]
+        ):
+            raise CacheError(
+                "state-conflict",
+                f"invalid task Goal transition: {task['goal_state']} -> {goal_state}",
+                4,
+            )
+        goal_evidence = event["goal_evidence_ref"]
+        if goal_evidence is not None:
+            goal_evidence = nonempty(goal_evidence, "goal_evidence_ref")
+        goal_completion = event["goal_completion_evidence_ref"]
+        if goal_completion is not None:
+            goal_completion = nonempty(
+                goal_completion, "goal_completion_evidence_ref"
+            )
+        if goal_state in {"active", "complete"} and goal_evidence is None:
+            raise CacheError("invalid-input", "active task Goal requires evidence", 2)
+        if goal_state == "complete" and goal_completion is None:
+            raise CacheError("invalid-input", "complete task Goal requires completion evidence", 2)
+        state_value = event["state"]
+        if state_value not in TASK_STATES or state_value not in TASK_TRANSITIONS[task["state"]]:
+            raise CacheError("state-conflict", f"invalid task transition: {task['state']} -> {state_value}", 4)
+        outcome = event["outcome"]
+        if outcome is not None:
+            outcome = nonempty(outcome, "outcome")
+        attention = event["attention_reason"]
+        if attention is not None:
+            attention = nonempty(attention, "attention_reason")
+        summary_ref = event["summary_ref"]
+        if summary_ref is not None:
+            summary_ref = nonempty(summary_ref, "summary_ref")
+        pr = validate_pr(event["pr"], task, "pr")
+        if task["pr"] is not None:
+            if pr is None:
+                raise CacheError("state-conflict", "pull request identity cannot be removed", 4)
+            for identity_field in ("repository", "number", "url"):
+                if task["pr"][identity_field] != pr[identity_field]:
+                    raise CacheError(
+                        "state-conflict",
+                        f"pull request identity changed: {identity_field}",
+                        4,
+                    )
+        if pr is not None and task["revision"] is not None and (
+            pr["repository"] != task["revision"]["repository"]
+            or pr["number"] != task["revision"]["pr_number"]
+            or pr["url"] != task["revision"]["pr_url"]
+            or pr["head_sha"] != task["revision"]["head_sha"]
+            or pr["base_ref"] != task["revision"]["base_ref"]
+            or pr["merge_base_sha"] != task["revision"]["merge_base_sha"]
+        ):
+            raise CacheError("state-conflict", "task PR tuple differs from current revision", 4)
+        candidate = {
+            "task_ref": task_ref,
+            "checkout": checkout,
+            "model": model,
+            "reasoning_effort": effort,
+            "thinking_reason": task["thinking_reason"],
+            "task_title": task_title,
+            "task_title_evidence_ref": title_evidence,
+            "goal_state": goal_state,
+            "goal_evidence_ref": goal_evidence,
+            "goal_completion_evidence_ref": goal_completion,
+            "state": state_value,
+            "outcome": outcome,
+            "attention_reason": attention,
+            "summary_ref": summary_ref,
+            "pr": pr,
+        }
+        changed = any(task[field] != value for field, value in candidate.items())
+        for field, value in candidate.items():
+            task[field] = value
+        if state_value in ACTIVE_TASK_STATES | {"merge-ready"} and (
+            task["task_title_evidence_ref"] is None
+            or task["goal_state"] not in {"active", "complete"}
+        ):
+            raise CacheError(
+                "state-conflict",
+                "task cannot run before title and assignment Goal evidence",
+                4,
+            )
+        if goal_state == "complete":
+            goal_blockers = task_terminal_blockers(
+                state, task, require_task_state=False
+            )
+            if goal_blockers:
+                raise CacheError(
+                    "state-conflict",
+                    "task Goal cannot complete before terminal proof",
+                    4,
+                    {"blockers": goal_blockers},
+                )
+        if state_value == "merge-ready":
+            blockers = task_terminal_blockers(state, task, require_task_state=False)
+            if blockers:
+                raise CacheError("state-conflict", "task cannot become merge-ready", 4, {"blockers": blockers})
+        return changed
+
+    if event_type == "source-moved":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "from_ref",
+                "to_ref",
+                "source_fingerprint",
+                "evidence_ref",
+            },
+            event_type,
+        )
+        source = next(item for item in state["sources"] if item["task_key"] == task_key)
+        if (
+            source["state"] == "done"
+            and event["to_ref"] == source["planned_done_ref"]
+            and event["source_fingerprint"] == source["fingerprint"]
+        ):
+            return False
+        if event["from_ref"] != source["current_ref"]:
+            raise CacheError("state-conflict", "source-moved from_ref is stale", 4)
+        if event["to_ref"] != source["planned_done_ref"]:
+            raise CacheError("invalid-input", "source-moved target is not the planned done ref", 2)
+        if event["source_fingerprint"] != source["fingerprint"]:
+            raise CacheError("state-conflict", "source fingerprint changed during move", 4)
+        source["current_ref"] = source["planned_done_ref"]
+        source["state"] = "done"
+        source["move_evidence_ref"] = nonempty(event["evidence_ref"], "evidence_ref")
+        return True
+
+    if event_type == "revision-observed":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "head_sha",
+                "base_ref",
+                "merge_base_sha",
+                "repository",
+                "pr_number",
+                "pr_url",
+                "evidence_ref",
+            },
+            event_type,
+        )
+        if state["goal"]["state"] == "paused" or task["goal_state"] == "paused":
+            raise CacheError(
+                "state-conflict",
+                "resume root and worker Goals before changing revision",
+                4,
+            )
+        head = nonempty(event["head_sha"], "head_sha")
+        base = nonempty(event["base_ref"], "base_ref")
+        merge_base = nonempty(event["merge_base_sha"], "merge_base_sha")
+        repository = nonempty(event["repository"], "repository")
+        if repository != task["repository"]:
+            raise CacheError("invalid-input", "revision repository does not match task", 2)
+        if not isinstance(event["pr_number"], int) or event["pr_number"] < 1:
+            raise CacheError("invalid-input", "revision pr_number is invalid", 2)
+        pr_url = nonempty(event["pr_url"], "pr_url")
+        if task["pr"] is not None and (
+            task["pr"]["repository"] != repository
+            or task["pr"]["number"] != event["pr_number"]
+            or task["pr"]["url"] != pr_url
+        ):
+            raise CacheError("state-conflict", "revision PR identity changed", 4)
+        candidate = {
+            "repository": repository,
+            "pr_number": event["pr_number"],
+            "pr_url": pr_url,
+            "head_sha": head,
+            "base_ref": base,
+            "merge_base_sha": merge_base,
+            "revision_key": revision_key(
+                repository, event["pr_number"], pr_url, head, base, merge_base
+            ),
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "observed_at": observed_at,
+        }
+        if task["revision"] and all(
+            task["revision"][field] == candidate[field]
+            for field in (
+                "head_sha",
+                "base_ref",
+                "merge_base_sha",
+                "repository",
+                "pr_number",
+                "pr_url",
+                "revision_key",
+                "evidence_ref",
+            )
+        ):
+            return False
+        if task["state"] == "merge-ready":
+            raise CacheError("state-conflict", "terminal task revision cannot change", 4)
+        task["revision"] = candidate
+        return True
+
+    if task["revision"] is None and event_type in {
+        "review-wait-started",
+        "review-wait-invoked",
+        "review-observed",
+        "review-monitoring-scheduled",
+        "review-monitoring-resumed",
+        "gate-observed",
+    }:
+        raise CacheError("state-conflict", f"{event_type} requires a current revision", 4)
+
+    if event_type == "review-wait-started":
+        event = exact_object(
+            raw, {"type", "task_key", "revision_key", "request_ref"}, event_type
+        )
+        if event["revision_key"] != task["revision"]["revision_key"]:
+            raise CacheError("state-conflict", "review request revision is stale", 4)
+        request_ref = nonempty(event["request_ref"], "request_ref")
+        existing = current_review(state, task)
+        if existing:
+            if existing["request_ref"] == request_ref:
+                return False
+            raise CacheError("state-conflict", "current revision already has a review request", 4)
+        state["reviews"].append(
+            {
+                "task_key": task_key,
+                "revision_key": task["revision"]["revision_key"],
+                "request_ref": request_ref,
+                "wait_started_at": observed_at,
+                "wait_deadline": format_timestamp(now + timedelta(minutes=30)),
+                "wait_invoked_at": None,
+                "provider_timeout": None,
+                "monitoring_state": "active-wait",
+                "due_at": None,
+                "monitoring_cycle": 0,
+                "pause_evidence_ref": None,
+                "resume_evidence_ref": None,
+                "observations": [],
+            }
+        )
+        return True
+
+    review = current_review(state, task)
+    if event_type in {
+        "review-wait-invoked",
+        "review-observed",
+        "review-monitoring-scheduled",
+        "review-monitoring-resumed",
+    } and review is None:
+        raise CacheError("state-conflict", f"{event_type} requires a review request", 4)
+
+    if event_type == "review-wait-invoked":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "revision_key",
+                "request_ref",
+                "wait_invoked_at",
+                "provider_timeout",
+            },
+            event_type,
+        )
+        assert review is not None
+        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
+            raise CacheError("state-conflict", "review waiter identity changed", 4)
+        invoked = parse_timestamp(event["wait_invoked_at"], "wait_invoked_at")
+        deadline = parse_timestamp(review["wait_deadline"], "wait_deadline")
+        remaining = int((deadline - invoked).total_seconds())
+        if remaining <= 0 or event["provider_timeout"] != remaining:
+            raise CacheError("invalid-input", "provider_timeout is not the exact remaining deadline", 2)
+        if review["wait_invoked_at"] is not None:
+            if (
+                review["wait_invoked_at"] == event["wait_invoked_at"]
+                and review["provider_timeout"] == remaining
+            ):
+                return False
+            raise CacheError("state-conflict", "review waiter already launched", 4)
+        review["wait_invoked_at"] = event["wait_invoked_at"]
+        review["provider_timeout"] = remaining
+        return True
+
+    if event_type == "review-observed":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "revision_key",
+                "request_ref",
+                "provider_state",
+                "observation_fingerprint",
+                "disposition",
+                "evidence_ref",
+            },
+            event_type,
+        )
+        assert review is not None
+        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
+            raise CacheError("state-conflict", "review observation identity changed", 4)
+        if review["wait_invoked_at"] is None:
+            raise CacheError("state-conflict", "review observation precedes waiter launch", 4)
+        provider_state = event["provider_state"]
+        disposition = event["disposition"]
+        if provider_state not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
+            raise CacheError("invalid-input", "review observation state is invalid", 2)
+        if provider_state == "clean" and disposition != "accepted":
+            raise CacheError("invalid-input", "clean review must be accepted", 2)
+        fingerprint = canonical_fingerprint(
+            event["observation_fingerprint"], "observation_fingerprint"
+        )
+        if any(item["observation_fingerprint"] == fingerprint for item in review["observations"]):
+            return False
+        review["observations"].append(
+            {
+                "provider_state": provider_state,
+                "observation_fingerprint": fingerprint,
+                "disposition": disposition,
+                "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+                "observed_at": observed_at,
+            }
+        )
+        if provider_state != "waiting":
+            review["monitoring_state"] = "complete"
+            review["due_at"] = None
+        return True
+
+    if event_type == "review-monitoring-scheduled":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "revision_key",
+                "request_ref",
+                "pause_evidence_ref",
+            },
+            event_type,
+        )
+        assert review is not None
+        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
+            raise CacheError("state-conflict", "review monitoring identity changed", 4)
+        if review["monitoring_state"] not in {"active-wait", "checking"}:
+            raise CacheError("state-conflict", "review monitoring schedule is out of order", 4)
+        if not review["observations"]:
+            raise CacheError("state-conflict", "review monitoring requires a final pending observation", 4)
+        observation = review["observations"][-1]
+        if observation["provider_state"] != "waiting" or observation["disposition"] != "pending":
+            raise CacheError("state-conflict", "review monitoring requires a pending provider result", 4)
+        observation_time = parse_timestamp(observation["observed_at"], "observed_at")
+        check_due = parse_timestamp(
+            review["wait_deadline"] if review["monitoring_state"] == "active-wait" else review["due_at"],
+            "review_check_due_at",
+        )
+        if now < check_due or observation_time < check_due:
+            raise CacheError("state-conflict", "review schedule lacks a due-time pending check", 4)
+        if task["state"] != "review-polling" or task["goal_state"] != "active":
+            raise CacheError("state-conflict", "task is not ready to pause for review monitoring", 4)
+        pause_evidence = nonempty(event["pause_evidence_ref"], "pause_evidence_ref")
+        review["monitoring_state"] = "scheduled"
+        review["due_at"] = format_timestamp(now + timedelta(minutes=30))
+        review["monitoring_cycle"] += 1
+        review["pause_evidence_ref"] = pause_evidence
+        task["state"] = "review-monitoring"
+        task["goal_state"] = "paused"
+        task["goal_pause_evidence_ref"] = pause_evidence
+        return True
+
+    if event_type == "review-monitoring-resumed":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "revision_key",
+                "request_ref",
+                "resume_evidence_ref",
+            },
+            event_type,
+        )
+        assert review is not None
+        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
+            raise CacheError("state-conflict", "review monitoring identity changed", 4)
+        if state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "root Goal must resume before a worker Goal", 4)
+        if review["monitoring_state"] != "scheduled" or review["due_at"] is None:
+            raise CacheError("state-conflict", "review monitoring resume is out of order", 4)
+        if parse_timestamp(review["due_at"], "due_at") > now:
+            raise CacheError("state-conflict", "review monitoring check is not due", 4)
+        if task["state"] != "review-monitoring" or task["goal_state"] != "paused":
+            raise CacheError("state-conflict", "task is not paused for review monitoring", 4)
+        resume_evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
+        review["monitoring_state"] = "checking"
+        review["resume_evidence_ref"] = resume_evidence
+        task["state"] = "review-polling"
+        task["goal_state"] = "active"
+        task["goal_resume_evidence_ref"] = resume_evidence
+        return True
+
+    if event_type == "gate-observed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "gate", "state", "revision_key", "evidence_ref"},
+            event_type,
+        )
+        gate = event["gate"]
+        if gate not in STATIC_GATES | REVISION_GATES or event["state"] not in GATE_STATES:
+            raise CacheError("invalid-input", "gate observation is invalid", 2)
+        expected_revision = None if gate in STATIC_GATES else task["revision"]["revision_key"]
+        if event["revision_key"] != expected_revision:
+            raise CacheError("state-conflict", "gate observation revision is stale", 4)
+        if gate == "domain-closeout" and not task["requires_domain_closeout"]:
+            raise CacheError("invalid-input", "domain-closeout is not required for this task", 2)
+        if gate == "terminal" and event["state"] == "passed":
+            prerequisites = (
+                set(STATIC_GATES)
+                | (REVISION_GATES - {"terminal", "domain-closeout"})
+                | ({"domain-closeout"} if task["requires_domain_closeout"] else set())
+            )
+            missing = [
+                item
+                for item in sorted(prerequisites)
+                if not current_gate(state, task, item)
+                or current_gate(state, task, item)["state"] != "passed"
+            ]
+            if missing:
+                raise CacheError("state-conflict", "terminal gate prerequisites are missing", 4, {"gates": missing})
+        evidence = nonempty(event["evidence_ref"], "evidence_ref")
+        existing = [
+            item
+            for item in state["gates"]
+            if item["task_key"] == task_key
+            and item["gate"] == gate
+            and item["revision_key"] == expected_revision
+        ]
+        candidate = {
+            "task_key": task_key,
+            "gate": gate,
+            "state": event["state"],
+            "revision_key": expected_revision,
+            "evidence_ref": evidence,
+            "observed_at": observed_at,
+        }
+        if existing:
+            current = existing[-1]
+            if all(current[field] == candidate[field] for field in ("state", "revision_key", "evidence_ref")):
+                return False
+            current.update(candidate)
+        else:
+            state["gates"].append(candidate)
+        return True
+
+    if event_type == "external-handoff-recorded":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "handoff_kind", "evidence_ref", "next_action"},
+            event_type,
+        )
+        if task["state"] != "merge-ready":
+            raise CacheError("state-conflict", "external handoff requires merge-ready state", 4)
+        candidate = {
+            "task_key": task_key,
+            "handoff_kind": nonempty(event["handoff_kind"], "handoff_kind"),
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "next_action": nonempty(event["next_action"], "next_action"),
+            "recorded_at": observed_at,
+        }
+        if any(
+            item["task_key"] == task_key
+            and item["handoff_kind"] == candidate["handoff_kind"]
+            and item["evidence_ref"] == candidate["evidence_ref"]
+            for item in state["handoffs"]
+        ):
+            return False
+        state["handoffs"].append(candidate)
+        return True
+
+    raise CacheError("invalid-input", f"unsupported event type: {event_type}", 2)
+
+
+def create_ledger(args: argparse.Namespace) -> dict[str, Any]:
+    ledger = canonical_active_ledger(args.ledger)
+    root_id = check_id(args.root_id, "root_id")
+    expected_fingerprint = canonical_fingerprint(
+        args.expected_claim_fingerprint, "expected_claim_fingerprint"
+    )
+    operation_id = check_operation_id(args.operation_id)
+    packet = read_json_file(args.registration_file, "registration_file")
+    mutation_state = "created"
+    with locked_claim_store(create=True, exclusive=True) as claims:
+        claim = active_claim(claims, root_id, expected_fingerprint, ledger)
+        registration = validate_registration(packet, claim, ledger)
+        legacy = ledger.with_suffix(".md")
+        if legacy.exists():
+            raise CacheError(
+                "unsupported-active-ledger",
+                "active Markdown ledger blocks the hard-cut JSON identity",
+                2,
+                {"ledger": str(legacy)},
+            )
+        if ledger.exists():
+            state = load_state(ledger)
+            expected_request = request_fingerprint(registration)
+            matches = [
+                item for item in state["operations"] if item["operation_id"] == operation_id
+            ]
+            if (
+                state["portfolio"]["root_id"] != root_id
+                or state["claim"]["fingerprint"] != expected_fingerprint
+                or len(matches) != 1
+                or matches[0]["request_fingerprint"] != expected_request
+                or matches[0]["event_types"] != ["registration"]
+            ):
+                raise CacheError("state-conflict", f"run state already exists: {ledger}", 4)
+            mutation_state = "already-created"
+        else:
+            state = new_state(
+                ledger=ledger,
+                root_id=root_id,
+                claim=claim,
+                registration=registration,
+                operation_id=operation_id,
+            )
+            ledger.parent.mkdir(parents=True, exist_ok=True)
+            write_json_durable(ledger, state)
+    return {
+        "ok": True,
+        "command": "ledger.create",
+        "version": __version__,
+        "mutation_state": mutation_state,
+        **project_state(state, "status"),
+    }
+
+
+def apply_ledger(args: argparse.Namespace) -> dict[str, Any]:
+    ledger = canonical_active_ledger(args.ledger)
+    root_id = check_id(args.root_id, "root_id")
+    expected_fingerprint = canonical_fingerprint(
+        args.expected_claim_fingerprint, "expected_claim_fingerprint"
+    )
+    operation_id = check_operation_id(args.operation_id)
+    if args.expected_generation < 1:
+        raise CacheError("invalid-input", "expected_generation must be positive", 2)
+    events = read_json_file(args.events_file, "events_file")
+    if not isinstance(events, list) or not events:
+        raise CacheError("invalid-input", "events_file must contain a nonempty JSON array", 2)
+    event_types = []
+    for event in events:
+        if not isinstance(event, dict) or event.get("type") not in EVENT_TYPES:
+            raise CacheError("invalid-input", "events_file contains an unsupported event", 2)
+        event_types.append(event["type"])
+    fingerprint = request_fingerprint(events)
+    with locked_claim_store(create=False, exclusive=True) as claims:
+        claim = active_claim(claims, root_id, expected_fingerprint, ledger)
+        state = load_state(ledger)
+        if (
+            state["portfolio"]["root_id"] != root_id
+            or state["portfolio"]["repositories"] != claim["repositories"]
+            or state["portfolio"]["repository_checkouts"]
+            != claim["repository_checkouts"]
+            or sorted(item["source_id"] for item in state["sources"])
+            != sorted(claim["sources"])
+        ):
+            raise CacheError(
+                "state-conflict", "run-state ownership scope differs from the active claim", 4
+            )
+        prior = [item for item in state["operations"] if item["operation_id"] == operation_id]
+        if prior:
+            if prior[0]["request_fingerprint"] != fingerprint:
+                raise CacheError("state-conflict", "operation_id was reused with different events", 4)
+            return {
+                "ok": True,
+                "command": "ledger.apply",
+                "version": __version__,
+                "mutation_state": "already-applied",
+                **project_state(state, "status"),
+            }
+        if state["generation"] != args.expected_generation:
+            raise CacheError(
+                "state-conflict",
+                "expected_generation is stale",
+                4,
+                {"expected": args.expected_generation, "actual": state["generation"]},
+            )
+        rebound_events = [event for event in events if event["type"] == "claim-rebound"]
+        if state["claim"]["fingerprint"] != expected_fingerprint:
+            if (
+                len(rebound_events) != 1
+                or rebound_events[0].get("previous_claim_fingerprint")
+                != state["claim"]["fingerprint"]
+                or rebound_events[0].get("claim_fingerprint") != expected_fingerprint
+            ):
+                raise CacheError("state-conflict", "run-state claim binding is stale", 4)
+        elif rebound_events:
+            raise CacheError("invalid-input", "claim-rebound is not required", 2)
+        candidate = copy.deepcopy(state)
+        now = utc_now()
+        changed = False
+        for event in events:
+            changed = apply_event(candidate, event, now) or changed
+        if not changed:
+            return {
+                "ok": True,
+                "command": "ledger.apply",
+                "version": __version__,
+                "mutation_state": "unchanged",
+                **project_state(state, "status"),
+            }
+        candidate["generation"] = state["generation"] + 1
+        candidate["updated_at"] = format_timestamp(now)
+        candidate["operations"].append(
+            {
+                "operation_id": operation_id,
+                "request_fingerprint": fingerprint,
+                "event_types": event_types,
+                "generation": candidate["generation"],
+                "applied_at": candidate["updated_at"],
+            }
+        )
+        seal_state_fingerprint(candidate)
+        validate_state(candidate, ledger)
+        replace_json_durable(ledger, candidate)
+    return {
+        "ok": True,
+        "command": "ledger.apply",
+        "version": __version__,
+        "mutation_state": "applied",
+        "applied_event_types": event_types,
+        **project_state(candidate, "status"),
+    }
+
+
+def read_ledger(args: argparse.Namespace) -> dict[str, Any]:
+    ledger = canonical_active_ledger(args.ledger)
+    state = load_state(ledger)
+    return {
+        "ok": True,
+        "command": "ledger.read",
+        "version": __version__,
+        **project_state(state, args.projection),
+    }
 
 
 def metadata_for(
     *,
     ledger: Path,
-    ledger_hash: str,
-    size_bytes: int,
+    state_hash: str,
+    state_size_bytes: int,
+    markdown_hash: str,
+    markdown_size_bytes: int,
     archived_at: datetime,
-    archive_reason: str,
-    archive_group: str | None,
     evidence_ref: str,
-    root_id: str | None,
+    root_id: str,
 ) -> dict[str, Any]:
-    archive_id = f"{compact_timestamp(archived_at)}--{ledger.stem}--{ledger_hash[:12]}"
+    archive_id = f"{compact_timestamp(archived_at)}--{ledger.stem}--{state_hash[:12]}"
     return {
-        "schema_version": METADATA_SCHEMA_VERSION,
+        "schema_version": WRITE_METADATA_SCHEMA_VERSION,
         "archive_id": archive_id,
-        "archive_reason": archive_reason,
-        "archive_group": archive_group,
+        "archive_reason": "terminal",
+        "archive_group": None,
         "archived_at": format_timestamp(archived_at),
         "portfolio_key": ledger.stem,
         "original_ledger_ref": str(ledger),
-        "ledger_sha256": ledger_hash,
-        "size_bytes": size_bytes,
+        "state_sha256": state_hash,
+        "state_size_bytes": state_size_bytes,
+        "markdown_sha256": markdown_hash,
+        "markdown_size_bytes": markdown_size_bytes,
         "evidence_ref": evidence_ref,
         "root_id": root_id,
         "tool_version": __version__,
@@ -433,7 +2482,7 @@ def archive_parent(metadata: dict[str, Any]) -> Path:
 
 
 def validate_metadata(value: Any, entry: Path) -> dict[str, Any]:
-    required = {
+    legacy_required = {
         "schema_version",
         "archive_id",
         "archive_reason",
@@ -447,10 +2496,27 @@ def validate_metadata(value: Any, entry: Path) -> dict[str, Any]:
         "root_id",
         "tool_version",
     }
-    if not isinstance(value, dict) or set(value) != required:
-        raise CacheError("integrity-failure", f"archive metadata schema mismatch: {entry}", 5)
-    if value["schema_version"] != METADATA_SCHEMA_VERSION:
+    current_required = {
+        "schema_version",
+        "archive_id",
+        "archive_reason",
+        "archive_group",
+        "archived_at",
+        "portfolio_key",
+        "original_ledger_ref",
+        "state_sha256",
+        "state_size_bytes",
+        "markdown_sha256",
+        "markdown_size_bytes",
+        "evidence_ref",
+        "root_id",
+        "tool_version",
+    }
+    if not isinstance(value, dict) or value.get("schema_version") not in READ_METADATA_SCHEMA_VERSIONS:
         raise CacheError("integrity-failure", f"unsupported archive metadata: {entry}", 5)
+    required = legacy_required if value["schema_version"] == "1.0.0" else current_required
+    if set(value) != required:
+        raise CacheError("integrity-failure", f"archive metadata schema mismatch: {entry}", 5)
     check_id(value["archive_id"], "archive_id")
     check_id(value["portfolio_key"], "portfolio_key")
     if value["archive_id"] != entry.name:
@@ -458,6 +2524,8 @@ def validate_metadata(value: Any, entry: Path) -> dict[str, Any]:
     if value["archive_reason"] not in READ_ARCHIVE_REASONS:
         raise CacheError("integrity-failure", f"archive reason mismatch: {entry}", 5)
     if value["archive_reason"] == "legacy-cutover":
+        if value["schema_version"] != "1.0.0":
+            raise CacheError("integrity-failure", f"current archive cannot be legacy: {entry}", 5)
         check_id(value["archive_group"], "archive_group")
         if value["archive_group"] != RETAINED_LEGACY_GROUP:
             raise CacheError("integrity-failure", f"legacy archive group mismatch: {entry}", 5)
@@ -468,16 +2536,28 @@ def validate_metadata(value: Any, entry: Path) -> dict[str, Any]:
             raise CacheError("integrity-failure", f"terminal archive group mismatch: {entry}", 5)
         check_id(value["root_id"], "root_id")
     parse_timestamp(value["archived_at"], "archived_at")
-    if not isinstance(value["ledger_sha256"], str) or not FINGERPRINT_RE.fullmatch(
-        value["ledger_sha256"]
-    ):
-        raise CacheError("integrity-failure", f"archive checksum mismatch: {entry}", 5)
-    if not isinstance(value["size_bytes"], int) or value["size_bytes"] < 0:
-        raise CacheError("integrity-failure", f"archive size mismatch: {entry}", 5)
+    checksum_fields = (
+        (("ledger_sha256", "size_bytes"),)
+        if value["schema_version"] == "1.0.0"
+        else (
+            ("state_sha256", "state_size_bytes"),
+            ("markdown_sha256", "markdown_size_bytes"),
+        )
+    )
+    for checksum_field, size_field in checksum_fields:
+        if not isinstance(value[checksum_field], str) or not FINGERPRINT_RE.fullmatch(
+            value[checksum_field]
+        ):
+            raise CacheError("integrity-failure", f"archive checksum mismatch: {entry}", 5)
+        if not isinstance(value[size_field], int) or value[size_field] < 0:
+            raise CacheError("integrity-failure", f"archive size mismatch: {entry}", 5)
     nonempty(value["evidence_ref"], "evidence_ref")
     original = Path(value["original_ledger_ref"])
-    if not original.is_absolute() or original.resolve(strict=False).parent != ledger_root().resolve(
-        strict=False
+    expected_suffix = ".md" if value["schema_version"] == "1.0.0" else ".json"
+    if (
+        not original.is_absolute()
+        or original.resolve(strict=False).parent != ledger_root().resolve(strict=False)
+        or original.suffix != expected_suffix
     ):
         raise CacheError("integrity-failure", f"archive source mismatch: {entry}", 5)
     return value
@@ -487,8 +2567,8 @@ def validate_archive_entry(entry: Path, *, verify_hash: bool) -> dict[str, Any]:
     if entry.is_symlink() or not entry.is_dir():
         raise CacheError("integrity-failure", f"archive entry is not a directory: {entry}", 5)
     children = {path.name: path for path in entry.iterdir()}
-    if set(children) != {"ledger.md", "metadata.json"}:
-        raise CacheError("integrity-failure", f"archive entry has unexpected files: {entry}", 5)
+    if "metadata.json" not in children:
+        raise CacheError("integrity-failure", f"archive metadata is missing: {entry}", 5)
     if any(path.is_symlink() or not path.is_file() for path in children.values()):
         raise CacheError("integrity-failure", f"archive entry contains unsafe files: {entry}", 5)
     try:
@@ -496,14 +2576,39 @@ def validate_archive_entry(entry: Path, *, verify_hash: bool) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise CacheError("integrity-failure", f"archive metadata is unreadable: {entry}", 5) from exc
     metadata = validate_metadata(value, entry)
+    expected_children = (
+        {"ledger.md", "metadata.json"}
+        if metadata["schema_version"] == "1.0.0"
+        else {"ledger.json", "ledger.md", "metadata.json"}
+    )
+    if set(children) != expected_children:
+        raise CacheError("integrity-failure", f"archive entry has unexpected files: {entry}", 5)
+    if any(path.is_symlink() or not path.is_file() for path in children.values()):
+        raise CacheError("integrity-failure", f"archive entry contains unsafe files: {entry}", 5)
     if archive_parent(metadata).resolve(strict=False) != entry.parent.resolve(strict=False):
         raise CacheError("integrity-failure", f"archive parent mismatch: {entry}", 5)
-    actual_size = children["ledger.md"].stat().st_size
-    if actual_size != metadata["size_bytes"]:
+    if metadata["schema_version"] == "1.0.0":
+        if children["ledger.md"].stat().st_size != metadata["size_bytes"]:
+            raise CacheError("integrity-failure", f"archive byte count mismatch: {entry}", 5)
+        if verify_hash and sha256_file(children["ledger.md"]) != metadata["ledger_sha256"]:
+            raise CacheError("integrity-failure", f"archive checksum mismatch: {entry}", 5)
+        return {**metadata, "entry_path": str(entry), "ledger_path": str(children["ledger.md"])}
+    if (
+        children["ledger.json"].stat().st_size != metadata["state_size_bytes"]
+        or children["ledger.md"].stat().st_size != metadata["markdown_size_bytes"]
+    ):
         raise CacheError("integrity-failure", f"archive byte count mismatch: {entry}", 5)
-    if verify_hash and sha256_file(children["ledger.md"]) != metadata["ledger_sha256"]:
+    if verify_hash and (
+        sha256_file(children["ledger.json"]) != metadata["state_sha256"]
+        or sha256_file(children["ledger.md"]) != metadata["markdown_sha256"]
+    ):
         raise CacheError("integrity-failure", f"archive checksum mismatch: {entry}", 5)
-    return {**metadata, "entry_path": str(entry), "ledger_path": str(children["ledger.md"])}
+    return {
+        **metadata,
+        "entry_path": str(entry),
+        "state_path": str(children["ledger.json"]),
+        "ledger_path": str(children["ledger.md"]),
+    }
 
 
 def archive_entry_dirs() -> tuple[list[Path], list[dict[str, str]], list[str]]:
@@ -615,6 +2720,13 @@ def stage_ledger(source: Path, destination: Path) -> None:
         os.fsync(output_handle.fileno())
 
 
+def stage_bytes(value: bytes, destination: Path) -> None:
+    with destination.open("xb") as handle:
+        handle.write(value)
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
 def terminal_release_receipt(
     claim_state: dict[str, Any],
     *,
@@ -624,6 +2736,7 @@ def terminal_release_receipt(
     ledger_hash: str,
     size_bytes: int,
     required: bool,
+    expected_claim_fingerprint: str | None = None,
 ) -> Path | None:
     matches = [
         item
@@ -645,6 +2758,11 @@ def terminal_release_receipt(
         return None
     receipt = matches[0]
     if (
+        (
+            expected_claim_fingerprint is not None
+            and receipt["claim_fingerprint"] != expected_claim_fingerprint
+        )
+        or
         receipt["ledger_sha256"] != ledger_hash
         or receipt["ledger_size_bytes"] != size_bytes
     ):
@@ -667,22 +2785,12 @@ def remove_empty_parents(path: Path, stop: Path) -> None:
 
 
 def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
-    reason = "terminal"
     evidence_ref = nonempty(args.evidence_ref, "evidence_ref")
     root_id = check_id(args.root_id, "root_id")
-    group = None
-    if len(args.ledger) != 1:
-        raise CacheError("invalid-input", "terminal archive requires one ledger", 2)
-    ledgers = [canonical_active_ledger(value) for value in args.ledger]
-    if len(ledgers) != len(set(ledgers)):
-        raise CacheError("invalid-input", "duplicate ledger paths are not allowed", 2)
-
-    archived_at = utc_now()
-    completed: list[dict[str, Any]] = []
-    staged: list[dict[str, Any]] = []
-    committed: list[dict[str, Any]] = []
-    duplicate_sources: list[tuple[Path, dict[str, Any]]] = []
-    used_release_receipts: set[Path] = set()
+    ledger_value = args.ledger[0] if isinstance(args.ledger, list) else args.ledger
+    ledger = canonical_active_ledger(ledger_value)
+    completed: dict[str, Any] | None = None
+    receipt_path: Path | None = None
     with locked_claim_store(create=True, exclusive=True) as claims:
         claim_state = inspect_claim_artifacts(claims)
         if not claim_state["safe"]:
@@ -698,158 +2806,121 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 f"terminal root still has active claim ownership: {root_id}",
                 4,
             )
-        for ledger in ledgers:
-            existing = find_completed_archive(
-                ledger,
-                archive_reason=reason,
-                archive_group=group,
-                evidence_ref=evidence_ref,
-                root_id=root_id,
-            )
-            if not ledger.exists():
-                if existing:
-                    receipt = terminal_release_receipt(
-                        claim_state,
-                        ledger=ledger,
-                        root_id=root_id,
-                        evidence_ref=evidence_ref,
-                        ledger_hash=existing["ledger_sha256"],
-                        size_bytes=existing["size_bytes"],
-                        required=False,
-                    )
-                    if receipt is not None:
-                        used_release_receipts.add(receipt)
-                    completed.append(existing)
-                    continue
-                raise CacheError("not-found", f"ledger not found: {ledger}", 3)
-            if ledger.is_symlink() or not ledger.is_file():
-                raise CacheError("invalid-input", f"ledger is not a safe regular file: {ledger}", 2)
-            if str(ledger) in claim_state["ledger_refs"]:
-                raise CacheError(
-                    "state-conflict",
-                    f"ledger is referenced by active claim state: {ledger}",
-                    4,
+        existing = find_completed_archive(
+            ledger,
+            archive_reason="terminal",
+            archive_group=None,
+            evidence_ref=evidence_ref,
+            root_id=root_id,
+        )
+        if not ledger.exists():
+            if not existing or existing["schema_version"] != WRITE_METADATA_SCHEMA_VERSION:
+                raise CacheError("not-found", f"run state not found: {ledger}", 3)
+            try:
+                archived_state = validate_state(
+                    json.loads(Path(existing["state_path"]).read_text()), ledger
                 )
-            ledger_hash = sha256_file(ledger)
-            size_bytes = ledger.stat().st_size
-            receipt = terminal_release_receipt(
+            except (OSError, json.JSONDecodeError) as exc:
+                raise CacheError(
+                    "integrity-failure", "archived terminal state is unreadable", 5
+                ) from exc
+            receipt_path = terminal_release_receipt(
                 claim_state,
                 ledger=ledger,
                 root_id=root_id,
                 evidence_ref=evidence_ref,
-                ledger_hash=ledger_hash,
-                size_bytes=size_bytes,
-                required=True,
+                ledger_hash=existing["state_sha256"],
+                size_bytes=existing["state_size_bytes"],
+                required=False,
+                expected_claim_fingerprint=archived_state["claim"]["fingerprint"],
             )
-            assert receipt is not None
-            used_release_receipts.add(receipt)
+            completed = existing
+        else:
+            if ledger.is_symlink() or not ledger.is_file():
+                raise CacheError("invalid-input", f"run state is not a safe file: {ledger}", 2)
+            if str(ledger) in claim_state["ledger_refs"]:
+                raise CacheError(
+                    "state-conflict", f"run state is referenced by active claim state: {ledger}", 4
+                )
+            state = load_state(ledger)
+            terminal = terminal_projection(state)
+            if not terminal["eligible"]:
+                raise CacheError(
+                    "state-conflict",
+                    "run state is not terminal",
+                    4,
+                    {"blockers": terminal["blockers"]},
+                )
+            state_hash = sha256_file(ledger)
+            state_size = ledger.stat().st_size
+            receipt_path = terminal_release_receipt(
+                claim_state,
+                ledger=ledger,
+                root_id=root_id,
+                evidence_ref=evidence_ref,
+                ledger_hash=state_hash,
+                size_bytes=state_size,
+                required=True,
+                expected_claim_fingerprint=state["claim"]["fingerprint"],
+            )
+            markdown = render_markdown(state).encode()
+            markdown_hash = hashlib.sha256(markdown).hexdigest()
             if existing:
                 if (
-                    existing["ledger_sha256"] != ledger_hash
-                    or existing["size_bytes"] != size_bytes
+                    existing.get("state_sha256") != state_hash
+                    or existing.get("state_size_bytes") != state_size
+                    or existing.get("markdown_sha256") != markdown_hash
+                    or existing.get("markdown_size_bytes") != len(markdown)
                 ):
                     raise CacheError(
-                        "state-conflict", f"completed archive conflicts with active ledger: {ledger}", 4
+                        "state-conflict", f"completed archive conflicts with run state: {ledger}", 4
                     )
-                completed.append(existing)
-                duplicate_sources.append((ledger, existing))
-                continue
-            metadata = metadata_for(
-                ledger=ledger,
-                ledger_hash=ledger_hash,
-                size_bytes=size_bytes,
-                archived_at=archived_at,
-                archive_reason=reason,
-                archive_group=group,
-                evidence_ref=evidence_ref,
-                root_id=root_id,
-            )
-            final = archive_parent(metadata) / metadata["archive_id"]
-            if final.exists():
-                raise CacheError("state-conflict", f"archive destination already exists: {final}", 4)
-            staged.append({"source": ledger, "metadata": metadata, "final": final})
-
-        if staged:
-            archive_root().mkdir(parents=True, exist_ok=True)
-            temporary = archive_root() / f".tmp-{secrets.token_hex(16)}"
-            temporary.mkdir()
-            try:
-                for item in staged:
-                    entry = temporary / item["metadata"]["archive_id"]
-                    entry.mkdir()
-                    stage_ledger(item["source"], entry / "ledger.md")
-                    write_json_durable(entry / "metadata.json", item["metadata"])
-                    if sha256_file(entry / "ledger.md") != item["metadata"]["ledger_sha256"]:
-                        raise CacheError(
-                            "integrity-failure", f"staged archive checksum mismatch: {item['source']}", 5
-                        )
-                    sync_directory(entry)
-                    item["stage"] = entry
-                for item in staged:
-                    item["final"].parent.mkdir(parents=True, exist_ok=True)
-                    os.replace(item["stage"], item["final"])
-                    sync_directory(item["final"].parent)
-                    committed.append(item)
-                for item in committed:
-                    item["source"].unlink()
-                    sync_directory(item["source"].parent)
-                    completed.append(
-                        validate_archive_entry(item["final"], verify_hash=True)
-                    )
-                for source, _existing in duplicate_sources:
-                    source.unlink()
-                    sync_directory(source.parent)
-            except Exception:
-                for source, existing in duplicate_sources:
-                    if source.exists():
-                        continue
-                    archive_ledger = Path(existing["ledger_path"])
-                    stage_ledger(archive_ledger, source)
-                    sync_directory(source.parent)
-                for item in reversed(committed):
-                    if item["source"].exists() or not item["final"].exists():
-                        restored = item["source"].exists()
-                    else:
-                        archive_ledger = item["final"] / "ledger.md"
-                        stage_ledger(archive_ledger, item["source"])
-                        sync_directory(item["source"].parent)
-                        restored = True
-                    if restored and item["final"].is_dir():
-                        for name in ("ledger.md", "metadata.json"):
-                            path = item["final"] / name
+                completed = existing
+            else:
+                metadata = metadata_for(
+                    ledger=ledger,
+                    state_hash=state_hash,
+                    state_size_bytes=state_size,
+                    markdown_hash=markdown_hash,
+                    markdown_size_bytes=len(markdown),
+                    archived_at=utc_now(),
+                    evidence_ref=evidence_ref,
+                    root_id=root_id,
+                )
+                final = archive_parent(metadata) / metadata["archive_id"]
+                archive_root().mkdir(parents=True, exist_ok=True)
+                temporary = archive_root() / f".tmp-{secrets.token_hex(16)}"
+                stage = temporary / metadata["archive_id"]
+                try:
+                    stage.mkdir(parents=True)
+                    stage_ledger(ledger, stage / "ledger.json")
+                    stage_bytes(markdown, stage / "ledger.md")
+                    write_json_durable(stage / "metadata.json", metadata)
+                    sync_directory(stage)
+                    final.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(stage, final)
+                    sync_directory(final.parent)
+                    completed = validate_archive_entry(final, verify_hash=True)
+                finally:
+                    if stage.exists() and stage.is_dir():
+                        for name in ("ledger.json", "ledger.md", "metadata.json"):
+                            path = stage / name
                             if path.is_file() and not path.is_symlink():
                                 path.unlink()
                         try:
-                            item["final"].rmdir()
-                            remove_empty_parents(item["final"].parent, archive_root())
+                            stage.rmdir()
                         except OSError:
                             pass
-                raise
-            finally:
-                if temporary.exists():
-                    for entry in list(temporary.iterdir()):
-                        if entry.is_dir():
-                            for name in ("ledger.md", "metadata.json"):
-                                path = entry / name
-                                if path.exists() and path.is_file() and not path.is_symlink():
-                                    path.unlink()
-                            try:
-                                entry.rmdir()
-                            except OSError:
-                                pass
-                    try:
-                        temporary.rmdir()
-                    except OSError:
-                        pass
-            remove_empty_parents(temporary.parent, archive_root())
-        elif duplicate_sources:
-            for source, _existing in duplicate_sources:
-                source.unlink()
-                sync_directory(source.parent)
-        for receipt in sorted(used_release_receipts):
-            if receipt.exists():
-                receipt.unlink()
-                sync_directory(receipt.parent)
+                    if temporary.exists() and temporary.is_dir():
+                        try:
+                            temporary.rmdir()
+                        except OSError:
+                            pass
+            ledger.unlink()
+            sync_directory(ledger.parent)
+        if receipt_path is not None and receipt_path.exists():
+            receipt_path.unlink()
+            sync_directory(receipt_path.parent)
         releases = claim_root() / "releases"
         if releases.is_dir():
             try:
@@ -858,13 +2929,14 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
             except OSError:
                 pass
 
+    assert completed is not None
     return {
         "ok": True,
         "command": "ledger.archive",
         "version": __version__,
-        "archive_reason": reason,
-        "archive_group": group,
-        "archives": sorted(completed, key=lambda item: item["archive_id"]),
+        "archive_reason": "terminal",
+        "archive_group": None,
+        "archives": [completed],
     }
 
 
@@ -911,7 +2983,7 @@ def validate_trash_entry(
     if entry.is_symlink() or not entry.is_dir():
         raise CacheError("integrity-failure", f"unsafe trash entry: {entry}", 5)
     children = {path.name: path for path in entry.iterdir()}
-    if set(children) != {"ledger.md", "metadata.json"} or any(
+    if "metadata.json" not in children or any(
         path.is_symlink() or not path.is_file() for path in children.values()
     ):
         raise CacheError("integrity-failure", f"unexpected trash entry: {entry}", 5)
@@ -926,13 +2998,32 @@ def validate_trash_entry(
     if not re.fullmatch(r"[0-9a-f]{16}", token):
         raise CacheError("integrity-failure", f"trash identity mismatch: {entry}", 5)
     metadata = validate_metadata(value, entry.parent / value["archive_id"])
-    if children["ledger.md"].stat().st_size != metadata["size_bytes"]:
-        raise CacheError("integrity-failure", f"trash byte count mismatch: {entry}", 5)
-    if sha256_file(children["ledger.md"]) != metadata["ledger_sha256"]:
+    expected_children = (
+        {"ledger.md", "metadata.json"}
+        if metadata["schema_version"] == "1.0.0"
+        else {"ledger.json", "ledger.md", "metadata.json"}
+    )
+    if set(children) != expected_children:
+        raise CacheError("integrity-failure", f"unexpected trash entry: {entry}", 5)
+    if metadata["schema_version"] == "1.0.0":
+        if (
+            children["ledger.md"].stat().st_size != metadata["size_bytes"]
+            or sha256_file(children["ledger.md"]) != metadata["ledger_sha256"]
+        ):
+            raise CacheError("integrity-failure", f"trash checksum mismatch: {entry}", 5)
+    elif (
+        children["ledger.json"].stat().st_size != metadata["state_size_bytes"]
+        or children["ledger.md"].stat().st_size != metadata["markdown_size_bytes"]
+        or sha256_file(children["ledger.json"]) != metadata["state_sha256"]
+        or sha256_file(children["ledger.md"]) != metadata["markdown_sha256"]
+    ):
         raise CacheError("integrity-failure", f"trash checksum mismatch: {entry}", 5)
     if parse_timestamp(metadata["archived_at"], "archived_at") > cutoff:
         raise CacheError("integrity-failure", f"trash retention age mismatch: {entry}", 5)
-    if {metadata["original_ledger_ref"], str(children["ledger.md"])} & claim_refs:
+    payload_refs = {metadata["original_ledger_ref"], str(children["ledger.md"])}
+    if "ledger.json" in children:
+        payload_refs.add(str(children["ledger.json"]))
+    if payload_refs & claim_refs:
         raise CacheError("state-conflict", f"trash entry is referenced by claim state: {entry}", 4)
     return metadata
 
@@ -958,8 +3049,8 @@ def cleanup_trash(
             continue
         children = {path.name: path for path in entry.iterdir()}
         reclaimed += sum(path.stat().st_size for path in children.values())
-        children["ledger.md"].unlink()
-        children["metadata.json"].unlink()
+        for path in children.values():
+            path.unlink()
         entry.rmdir()
     try:
         trash_root.rmdir()
@@ -995,10 +3086,10 @@ def prune_archives(args: argparse.Namespace) -> dict[str, Any]:
             if not claim_state["safe"]:
                 protected.append({"archive_id": entry["archive_id"], "error": "claim state unreadable"})
                 continue
-            if {
-                entry["original_ledger_ref"],
-                entry["ledger_path"],
-            } & claim_state["ledger_refs"]:
+            entry_refs = {entry["original_ledger_ref"], entry["ledger_path"]}
+            if entry.get("state_path"):
+                entry_refs.add(entry["state_path"])
+            if entry_refs & claim_state["ledger_refs"]:
                 protected.append({"archive_id": entry["archive_id"], "error": "referenced by claim state"})
                 continue
             eligible.append(entry)
@@ -1062,16 +3153,40 @@ def doctor() -> dict[str, Any]:
     with locked_claim_store(create=False, exclusive=False) as claims:
         claim_state = inspect_claim_artifacts(claims)
         scan = scan_archives(verify_hash=True)
-    active_ledgers = []
+    active_ledgers: list[dict[str, Any]] = []
+    unsupported_active_ledgers: list[str] = []
+    invalid_active_ledgers: list[dict[str, str]] = []
     root = ledger_root()
     if root.is_dir():
+        for path in sorted(root.glob("*.json")):
+            try:
+                state = load_state(path)
+                active_ledgers.append(
+                    {
+                        "path": str(path),
+                        "size_bytes": path.stat().st_size,
+                        "generation": state["generation"],
+                        "content_fingerprint": state["content_fingerprint"],
+                    }
+                )
+            except CacheError as exc:
+                invalid_active_ledgers.append({"path": str(path), "error": exc.message})
         for path in sorted(root.glob("*.md")):
             if path.is_file() and not path.is_symlink():
-                active_ledgers.append({"path": str(path), "size_bytes": path.stat().st_size})
-    archive_bytes = sum(item["size_bytes"] for item in scan["valid"])
+                unsupported_active_ledgers.append(str(path))
+    archive_bytes = sum(
+        item["size_bytes"]
+        if item["schema_version"] == "1.0.0"
+        else item["state_size_bytes"] + item["markdown_size_bytes"]
+        for item in scan["valid"]
+    )
     archive_times = [parse_timestamp(item["archived_at"], "archived_at") for item in scan["valid"]]
     total_bytes = archive_bytes + sum(item["size_bytes"] for item in active_ledgers)
     warnings = [*claim_state["warnings"], *scan["warnings"]]
+    if unsupported_active_ledgers:
+        warnings.append("one or more unsupported active Markdown ledgers exist")
+    if invalid_active_ledgers:
+        warnings.append("one or more active JSON run states are invalid")
     if scan["invalid"]:
         warnings.append("one or more archive entries are invalid")
     if scan["temporary"]:
@@ -1083,7 +3198,12 @@ def doctor() -> dict[str, Any]:
         warnings.append("cache retention threshold exceeded")
     oldest = min(archive_times) if archive_times else None
     return {
-        "ok": not scan["invalid"] and not scan["temporary"] and not scan["trash"] and claim_state["safe"],
+        "ok": not scan["invalid"]
+        and not scan["temporary"]
+        and not scan["trash"]
+        and not unsupported_active_ledgers
+        and not invalid_active_ledgers
+        and claim_state["safe"],
         "command": "doctor",
         "version": __version__,
         "offline": True,
@@ -1092,6 +3212,8 @@ def doctor() -> dict[str, Any]:
         "ledger_root": str(ledger_root()),
         "archive_root": str(archive_root()),
         "active_ledgers": active_ledgers,
+        "unsupported_active_ledgers": unsupported_active_ledgers,
+        "invalid_active_ledgers": invalid_active_ledgers,
         "archive_count": len(scan["valid"]),
         "archive_bytes": archive_bytes,
         "total_bytes": total_bytes,
@@ -1116,17 +3238,33 @@ def doctor() -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Archive and retain Implement Feature ledgers."
+        description="Own typed Implement Feature run state and cold archives."
     )
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--json", action="store_true")
     nouns = parser.add_subparsers(dest="noun", required=True)
     nouns.add_parser("doctor", help="Inspect cache readiness and integrity without writing state.")
 
-    ledger = nouns.add_parser("ledger", help="Manage active orchestration ledgers.")
+    ledger = nouns.add_parser("ledger", help="Manage active typed run state.")
     ledger_verbs = ledger.add_subparsers(dest="verb", required=True)
-    archive = ledger_verbs.add_parser("archive", help="Move completed ledgers into cold storage.")
-    archive.add_argument("--ledger", action="append", required=True)
+    create = ledger_verbs.add_parser("create", help="Create strict generation-one run state.")
+    create.add_argument("--ledger", required=True)
+    create.add_argument("--root-id", required=True)
+    create.add_argument("--expected-claim-fingerprint", required=True)
+    create.add_argument("--operation-id", required=True)
+    create.add_argument("--registration-file", required=True)
+    apply = ledger_verbs.add_parser("apply", help="Atomically apply a typed event batch.")
+    apply.add_argument("--ledger", required=True)
+    apply.add_argument("--root-id", required=True)
+    apply.add_argument("--expected-claim-fingerprint", required=True)
+    apply.add_argument("--expected-generation", type=int, required=True)
+    apply.add_argument("--operation-id", required=True)
+    apply.add_argument("--events-file", required=True)
+    read = ledger_verbs.add_parser("read", help="Read one bounded derived projection.")
+    read.add_argument("--ledger", required=True)
+    read.add_argument("--projection", choices=sorted(PROJECTIONS), required=True)
+    archive = ledger_verbs.add_parser("archive", help="Archive terminal typed run state.")
+    archive.add_argument("--ledger", required=True)
     archive.add_argument("--evidence-ref", required=True)
     archive.add_argument("--root-id", required=True)
 
@@ -1145,6 +3283,12 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
     if args.noun == "doctor":
         return doctor()
     if args.noun == "ledger":
+        if args.verb == "create":
+            return create_ledger(args)
+        if args.verb == "apply":
+            return apply_ledger(args)
+        if args.verb == "read":
+            return read_ledger(args)
         return archive_ledgers(args)
     if args.verb == "list":
         return list_archives()

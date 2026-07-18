@@ -25,7 +25,7 @@ is unavailable. After the mandatory App surface gate, verify that
 `codex_app__create_thread` and `codex_app__send_message_to_thread` both expose
 the canonical model and every allowed thinking value. If that support is absent
 or unverifiable, abort as `unsupported-runtime` before asking permission,
-claiming scope, creating a ledger, or creating a task.
+claiming scope, creating run state, or creating a task.
 
 The mandatory authorization step discloses this exact model and adaptive
 thinking policy. A grant of
@@ -71,7 +71,7 @@ either argument on those calls, because omission can inherit the calling root's
 settings instead of preserving the task profile.
 
 Record the exact model, thinking value, decision reason, and creation evidence
-in the Feature Spec Task Registry. Recovery and takeover reuse that recorded
+in the typed task entity. Recovery and takeover reuse that recorded
 profile for the original task. Source drift before task creation reruns intake
 and profile resolution; after creation, never reclassify the task, replace it,
 or silently change its profile.
