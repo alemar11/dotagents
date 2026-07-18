@@ -24,8 +24,9 @@ Canonical values:
 
 ## Detection
 
-Use repo evidence first, then explicit owner instruction. Prefer `Unknown` and
-ask when evidence is contradictory.
+Use repo evidence first, then explicit owner instruction. Prefer `Unknown` when
+evidence is contradictory, then load
+[setup-questions.md](setup-questions.md) and use its project structure prompt.
 
 - Select `single-repository` when the current project has one Git repository and no
   strong evidence of multiple independently planned internal contexts.

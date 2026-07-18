@@ -16,9 +16,10 @@ Strong signals include:
 - existing copy, tone, translation, or brand-language guidelines,
 - app-store, release, marketing, or support docs that define language support.
 
-If signals are ambiguous, ask before drafting. If no localization support is
-visible, do not create `TRANSLATION.md` and do not add an `AGENTS.md`
-localization pointer.
+If signals are ambiguous, load [setup-questions.md](setup-questions.md) and use
+its localization conventions prompt before drafting. If no localization
+support is visible, do not create `TRANSLATION.md` and do not add an
+`AGENTS.md` localization pointer.
 
 ## Location
 

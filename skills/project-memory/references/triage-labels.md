@@ -30,7 +30,9 @@ GitHub examples into local markdown modes.
 
 The table above uses the default GitHub type names. Rewrite the right-hand
 `Tracker value` cells only when the actual GitHub tracker uses different
-values.
+values. When customized or conflicting values remain ambiguous after tracker
+inspection, load [setup-questions.md](setup-questions.md) and use its issue-type
+mapping prompt.
 
 In GitHub issue-tracker mode, use `$gitstack:github-issues` to apply native GitHub
 Issue Type values when available.
@@ -67,6 +69,9 @@ acyclic so completed work cannot be locked behind circular prerequisites.
 Edit the right-hand columns to match the vocabulary actually used in this
 repo's tracker. If GitHub issue types are disabled for the organization, record
 the fallback labels or body-field convention here.
+When customized or conflicting workflow values remain ambiguous after tracker
+inspection, load [setup-questions.md](setup-questions.md) and use its
+workflow-state mapping prompt.
 
 ## Local Markdown Validation
 

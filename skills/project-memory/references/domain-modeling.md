@@ -42,10 +42,11 @@ an enum or treat its presence as write authority.
 ### 1. Inspect existing context
 
 - Resolve the current memory-owning root and read its `CONTEXT.md` first when
-  it exists. If it is intentionally absent, use repository evidence and create
-  it only with authorized durable content or verified topology-routing
-  evidence. In a multi-repository coordination workspace, follow its
-  `Repository Registry`
+  it exists. During authorized setup/bootstrap, create or update it at every
+  memory-owning root selected by the setup scope, even when evidence supports
+  only a minimal entry point with explicit unknowns. Outside setup/bootstrap,
+  use repository evidence and create it only with authorized durable content.
+  In a multi-repository coordination workspace, follow its `Repository Registry`
   to every affected child repository and read each available child root
   `CONTEXT.md`. An empty registry context cell means no child context exists;
   inspect that child's repository evidence without inventing or creating a
@@ -64,10 +65,11 @@ an enum or treat its presence as write authority.
   indeterminate. Do not guess, and do not mistake legitimate cross-scope work
   for routing ambiguity.
 - Prefer updating an existing relevant file over creating a new one.
-- If no root context exists and an authorized durable term or rule needs a
-  home, create `CONTEXT.md` at the memory-owning root. For a verified monorepo
-  or multi-repository workspace, create the minimal root routing surface before
-  creating any scoped context.
+- During authorized setup/bootstrap, ensure root `CONTEXT.md` exists before
+  completion even when no durable term or rule is yet established. Outside
+  setup/bootstrap, create it when an authorized durable term or rule needs a
+  home. For a verified monorepo or multi-repository workspace, create the
+  minimal root routing surface before creating any scoped context.
 - If no suitable authorized destination exists, defer capture and name the
   missing file or surface explicitly.
 

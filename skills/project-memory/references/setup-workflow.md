@@ -18,7 +18,6 @@ review:
 - `issue_type` mapping
 - `workflow_state` mapping
 - root/scoped context routing
-- context seed decision
 - translation memory decision
 - `AGENTS.md` setup block state
 
@@ -30,10 +29,11 @@ fields belong to Implement Feature.
 
 ## Settings Editor
 
-When the requested section is unclear, ask which section to change. Otherwise
-edit only the named or required section and preserve unrelated custom prose,
-comments, mappings, path conventions, dry-run overrides, project labels, and
-tracker-specific values unless the user explicitly changes them.
+When the requested section is unclear, use the setup-target question in
+[setup-questions.md](setup-questions.md). Otherwise edit only the named or
+required section and preserve unrelated custom prose, comments, mappings, path
+conventions, dry-run overrides, project labels, and tracker-specific values
+unless the user explicitly changes them.
 
 Editable sections:
 
@@ -43,7 +43,6 @@ Editable sections:
 - `workflow-state-mapping`
 - `domain-memory`
 - `translation-memory`
-- `context-seed`
 - `agents-pointers`
 - `done`
 
@@ -59,11 +58,10 @@ For each selected configuration section, show the current value first, then
   mapping, or custom per canonical state.
 - `domain-memory`: show the current root `CONTEXT.md`, scoped routes, workspace
   repository registry when applicable, and centralized ADR root. Refresh those
-  surfaces from evidence; do not present or persist a domain-layout enum.
+  surfaces from evidence; during authorized setup/bootstrap, always create or
+  update root `CONTEXT.md` at every memory-owning root selected by the setup
+  scope. Do not present or persist a domain-layout enum.
 - `translation-memory`: `enabled`, `not-applicable`, `needs-confirmation`.
-- `context-seed`: `seed-context`; `routing-only` only when verified monorepo or
-  workspace topology supports real routes; otherwise explain why no context
-  should be written.
 - `agents-pointers`: create missing pointer block, refresh stale pointer block,
   or minimize copied setup detail into project-memory pointers.
 
@@ -75,7 +73,9 @@ affirmative confirmation before writing.
 
 Ask only about a materially ambiguous target or behavior-affecting value that
 repo evidence and the defaults below cannot resolve. Do not force the user
-through unrelated editable sections.
+through unrelated editable sections. If ambiguity remains, load
+[setup-questions.md](setup-questions.md) and use its applicable first-time-user
+prompt.
 
 ## Decision Defaults
 
@@ -91,16 +91,18 @@ through unrelated editable sections.
   not durable issue-tracker configuration.
 - Do not define durable worker assignments, worker-count limits, scheduled
   checks, publication policy, or issue mutation policy in project memory.
-- Read root `CONTEXT.md` first when it exists. For a verified monorepo or
-  multi-repository workspace, topology supports a minimal root routing context
-  even when richer domain seeding remains `routing-only`. For an
-  evidence-free single repository, continue from repository evidence without
-  creating an empty root context.
-- Recommend `seed-context` only when non-empty repository evidence supports
-  useful vocabulary, rules, boundaries, or scoped deltas. Use `routing-only`
-  only when verified monorepo or multi-repository workspace topology supports
-  stable scope or repository routes. For an evidence-free single repository,
-  write no `CONTEXT.md` and report the missing evidence.
+- Read root `CONTEXT.md` first when it exists. During authorized domain
+  setup/bootstrap, always create or update it at every memory-owning root
+  selected by the setup scope. Populate only evidence-backed purpose,
+  vocabulary, rules, boundaries, and routing. When richer evidence is absent,
+  keep a minimal entry point and state the missing knowledge explicitly rather
+  than inventing it.
+- For a verified monorepo or multi-repository workspace, use stable topology
+  evidence for root scope or repository routing. Create scoped contexts only
+  when durable evidence and authority support their content. A child-repository
+  root selected by the authorized setup scope follows the mandatory
+  root-context rule; child repositories outside that scope remain optional and
+  untouched.
 - Recommend enabled translation memory only when localization support and
   durable translation rules are confirmed by evidence or the user.
 
@@ -115,8 +117,8 @@ Before writing, show only applicable items from this list:
 - intended `project-memory/config/project-layout.md`;
 - intended `project-memory/config/issue-tracker.md`;
 - intended `project-memory/config/triage-labels.md`;
-- intended root `CONTEXT.md` routing and evidence-backed seed, or why no root
-  context should be written for an evidence-free single repository;
+- intended root `CONTEXT.md` creation or update, including evidence-backed
+  content, stable routing, and any explicit unknowns;
 - intended workspace repository-registry context pointers, omitting child
   context paths that do not exist and are not authorized for creation;
 - intended scoped `CONTEXT.md` files, or why root-only routing is sufficient;
@@ -160,9 +162,9 @@ After direct write authority or separate affirmative confirmation:
 - Create or update `AGENTS.md` pointer block and apply only authorized
   minimization.
 - Create or update root and scoped `CONTEXT.md` through
-  `references/domain-modeling.md`. For a verified monorepo or
-  multi-repository workspace, ensure the root routing context exists before
-  writing a scoped context.
+  `references/domain-modeling.md`. During authorized setup/bootstrap, ensure
+  root `CONTEXT.md` exists at every memory-owning root selected by the setup
+  scope before writing any scoped context or completing setup.
 - Create or update `TRANSLATION.md` only when localization memory is confirmed.
 - Create ADRs only for accepted, load-bearing decisions.
 - Preserve unrelated or uncertain content in `AGENTS.md`, `CONTEXT.md`,
@@ -222,31 +224,25 @@ Summarize only the applicable fields:
 - `AGENTS.md` minimization outcome;
 - workspace mode, if applicable;
 - session-history window and whether it was used;
-- context seed evidence and seeded terms/rules/open questions;
+- root-context creation or update, evidence-backed terms/rules/routing, and
+  explicit unknowns;
 - `TRANSLATION.md` audience, locale, terminology, or open questions seeded;
 - ADRs created or updated;
 - workflows that can now consume setup.
 
 ## Standard Ambiguity Questions
 
-Ask only after repository and workspace evidence cannot resolve the target.
-Keep candidate paths concrete and ask one question at a time:
+Normally ask no questions. After repository evidence and the defaults above
+leave a material ambiguity, load
+[setup-questions.md](setup-questions.md) and use exactly one applicable
+evidence-first template. Its canonical question set covers setup target,
+conflicting project structure, conflicting issue locations, separate project
+contexts, overlapping project ownership, workspace-versus-repository rules,
+localization conventions, issue-type mappings, and workflow-state mappings.
 
-- **Scoped-context candidates:** when several independently meaningful internal
-  projects are visible but scope boundaries are unclear, ask which candidate
-  paths should become distinct routes and which have enough evidence for a
-  scoped `CONTEXT.md`. Recommend an optional-pointer route when topology is
-  clear but distinct vocabulary or rules are not.
-- **Overlapping ownership:** when two scoped rows could own the affected path,
-  ask which scope is authoritative or how the paths should be split. Do not
-  persist overlapping routes.
-- **Workspace ownership:** when a coordination rule could belong either to the
-  workspace or a child repository, ask which memory-owning root owns it.
-  Recommend the child repository unless the rule is genuinely cross-repo.
-- **Seed depth:** when topology proves a root routing surface but richer domain
-  evidence is weak, ask whether to keep routing-only or seed the named
-  evidence-backed terms and rules. Recommend routing-only.
-
-These questions resolve target data and evidence, not new behavior-affecting
-configuration fields. Do not ask the user to classify the project as a domain
-layout after `repository_layout` is known.
+Keep Project Memory internals out of user-facing prompts. Ask about concrete
+projects, repositories, paths, trackers, rules, and localization behavior, then
+translate the answer to canonical configuration internally. Never ask the user
+whether evidence is sufficient, combine two unresolved decisions in one
+question, or ask a question already resolved by an explicit request, durable
+repository evidence, or a documented default.

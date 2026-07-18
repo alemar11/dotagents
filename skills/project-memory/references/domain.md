@@ -7,9 +7,11 @@ independently meaningful internal domains.
 
 ## Discovery order
 
-1. Read `CONTEXT.md` at the current memory-owning root when it exists. If it is
-   intentionally absent, use repository evidence and create it only with
-   authorized durable content or verified topology-routing evidence.
+1. Read `CONTEXT.md` at the current memory-owning root when it exists. During
+   authorized setup/bootstrap, create or update it at every memory-owning root
+   selected by the setup scope, even when available evidence supports only a
+   minimal entry point with explicit unknowns. Outside setup/bootstrap, use
+   repository evidence and create it only with authorized durable content.
 2. In a multi-repository coordination workspace, use its
    `## Repository Registry` to select every affected child repository and read
    each available child root `CONTEXT.md`. A missing optional child context is
@@ -34,7 +36,7 @@ repository's root context when it exists.
 When root `CONTEXT.md` exists or its creation is authorized, `AGENTS.md` should
 point at it and carry agent operating rules. It should not duplicate domain
 vocabulary, tracker procedures, planning history, localization rules, or
-context seed material after those items have a Project Memory home.
+initial context material after those items have a Project Memory home.
 
 ## Memory-owning roots
 
@@ -189,9 +191,12 @@ there instead of copying it into `AGENTS.md` or `CONTEXT.md`.
 
 ## Bootstrap and closeout
 
-For a detected monorepo or multi-repository workspace, verified topology is
-enough evidence for a minimal root routing `CONTEXT.md`. Rich vocabulary,
-rules, boundaries, and scoped context files still require the evidence in
+Authorized setup/bootstrap always creates or updates root `CONTEXT.md` at every
+memory-owning root selected by the setup scope. For a detected monorepo or
+multi-repository workspace, verified topology supports stable root routing.
+For an evidence-poor single repository, keep the root as a minimal entry point
+and state unsupported project knowledge as unresolved. Rich vocabulary, rules,
+boundaries, and scoped context files still require the evidence in
 `references/context-seed.md`.
 
 For an already-used project, load `references/domain-modeling.md` before

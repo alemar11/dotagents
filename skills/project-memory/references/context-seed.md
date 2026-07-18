@@ -1,7 +1,31 @@
 # Initial CONTEXT.md Seed
 
-Use this reference when `project-memory` bootstraps a non-empty repository or
-coordination workspace and evidence can support useful root or scoped context.
+Use this reference when `project-memory` bootstraps a repository or coordination
+workspace. It controls how much evidence-backed content to add; it does not
+decide whether root `CONTEXT.md` exists.
+
+## Mandatory root entry point
+
+Authorized setup/bootstrap always creates or updates root `CONTEXT.md` at every
+memory-owning root selected by the setup scope. When durable repository evidence
+is sparse, create a minimal entry point and make the missing knowledge explicit
+without inventing project facts. For example:
+
+```markdown
+# Context
+
+Project Memory entry point for this repository or workspace.
+
+## Open Questions
+
+- Project purpose, shared vocabulary, and durable boundaries are not yet
+  established.
+```
+
+Scoped contexts remain optional and require evidence and authority for durable
+scoped content. A child-repository root selected by the authorized setup scope
+follows the same mandatory root-context rule; child repositories outside that
+scope remain optional and untouched.
 
 ## Evidence threshold
 
@@ -28,10 +52,9 @@ triage details to `project-memory/config/*` instead of copying them into
 `CONTEXT.md`.
 
 For a detected monorepo or multi-repository workspace, verified topology is
-enough evidence for a minimal root `CONTEXT.md` containing only stable purpose,
-scope routing, or repository routing that can be proved from manifests,
-repository boundaries, or durable workspace configuration. It is not evidence
-for richer vocabulary, behavioral rules, or scoped context files.
+enough evidence for stable scope or repository routing in the mandatory root
+`CONTEXT.md`. It is not evidence for richer vocabulary, behavioral rules, or
+scoped context files.
 Routing tables may use `—` for context pointers when topology proves the route
 but durable evidence does not support creating the child or scoped context
 file.

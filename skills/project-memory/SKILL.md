@@ -59,12 +59,15 @@ when the selected scope has write authority.
   dedicated memory surfaces.
 - Load `references/domain-modeling.md` before creating, updating, reviewing, or
   reconciling `CONTEXT.md`, domain docs, or ADRs. Read the current
-  memory-owning root's `CONTEXT.md` when it exists; otherwise use repository
-  evidence until authorized durable content or verified topology routing
-  warrants creation. Treat the current Git repository as a selected root; in a
-  coordination workspace also follow its repository registry to affected
-  child roots and read each available child root context. Then select every
-  matched available scoped `CONTEXT.md` from each selected repository root.
+  memory-owning root's `CONTEXT.md` when it exists. During authorized
+  setup/bootstrap, create or update root `CONTEXT.md` at every memory-owning
+  root selected by that setup scope, even when evidence supports only a minimal
+  entry point with explicit unknowns. Outside setup/bootstrap, use repository
+  evidence until authorized durable content warrants creation. Treat the
+  current Git repository as a selected root; in a coordination workspace also
+  follow its repository registry to affected child roots and read each
+  available child root context. Then select every matched available scoped
+  `CONTEXT.md` from each selected repository root.
 - Use one `project-memory/` directory per memory-owning root: one at a Git
   repository root, or one at a non-Git coordination-workspace root. Internal
   monorepo projects use scoped `CONTEXT.md` files and centralized root ADRs,
@@ -72,7 +75,9 @@ when the selected scope has write authority.
 - Seed durable memory only from strong repo evidence, committed behavior,
   accepted tracker decisions, final session evidence, or explicit user
   acceptance. Exclude tentative/rejected ideas, secrets, raw logs, and weak
-  inferences.
+  inferences. Mandatory root-context creation never authorizes invented domain
+  facts; keep unsupported purpose, vocabulary, rules, or boundaries explicitly
+  unresolved.
 - Create `TRANSLATION.md` only when localization support or durable translation
   rules are evidenced or confirmed. Do not create empty ADR directories.
 - Explicit setup/configure/initialize/update/refresh instructions authorize
@@ -129,13 +134,17 @@ Load only the selected branch:
 | --- | --- |
 | Tracker routing | `issue-tracker-github.md` or `issue-tracker-local.md`, `tracker-publishing.md`, `triage-labels.md`, and `setup-workflow.md` for edits. |
 | Project layout | `project-layout.md` and `setup-workflow.md` for edits. |
-| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
+| Domain setup/bootstrap | `domain.md`, `domain-modeling.md`, `context-seed.md`, and `setup-workflow.md`; add `session-history.md` only when the derived context is `existing-project-bootstrap`. |
 | Domain inline update / implementation closeout / periodic review | `domain-modeling.md`; add `domain.md` only when target layout or ownership is ambiguous, and `documentation-shapes.md` only when no stronger local shape exists. |
-| Translation | `translation.md`. |
+| Translation | `translation.md` and `setup-workflow.md`. |
 | Pointer/settings work | `setup-workflow.md`. |
 
 Do not load domain, localization, or session-history evidence for tracker-only
 work. This operation-specific loading rule is part of the token contract.
+For any setup branch, load
+[setup-questions.md](references/setup-questions.md) only when inspected
+evidence and the defaults in `setup-workflow.md` leave a material ambiguity.
+Normally ask no setup questions.
 
 ## Workflow
 
@@ -190,6 +199,12 @@ Update only authorized files. Keep `AGENTS.md` pointer-first. Use
 decisions against behavior that actually landed; omit provisional planning
 language and verify the docs diff alongside feature proof.
 
+For authorized domain setup/bootstrap, ensure root `CONTEXT.md` exists at every
+memory-owning root selected by the setup scope before completion. Scoped
+contexts remain optional and evidence-backed. A child-repository root selected
+by the authorized setup scope follows the same mandatory root-context rule;
+child repositories outside that scope remain optional and untouched.
+
 In orchestrator-workspace setup, do not create project or feature folders. Do
 not create orchestration runtime config files. Before completing a touched
 `issue-tracker.md`, reject unknown configuration keys rather than rewriting or
@@ -217,6 +232,8 @@ it never counts as captured.
 
 - `options.md`: canonical option fields and values.
 - `setup-workflow.md`: settings editor, normalization, pointers, and report.
+- [setup-questions.md](references/setup-questions.md): conditional
+  first-time-user ambiguity prompts and internal answer mapping.
 - `project-layout.md`: durable `repository_layout` configuration and topology
   detection boundaries.
 - `triage-labels.md`: sole reusable canonical issue-type/workflow-state registry

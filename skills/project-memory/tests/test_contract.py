@@ -226,6 +226,7 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertNotIn(retired_domain_config, setup)
 
     def test_context_routing_uses_one_root_entrypoint(self) -> None:
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         domain = (SKILL_ROOT / "references" / "domain.md").read_text(
             encoding="utf-8"
         )
@@ -271,9 +272,30 @@ class ProjectMemoryContractTests(unittest.TestCase):
         self.assertIn("must not create\n  a nested `project-memory/` directory", domain)
         self.assertIn("read its `CONTEXT.md` first", modeling)
         self.assertIn("Standard Ambiguity Questions", setup)
-        self.assertIn("routing-only", setup)
-        self.assertIn("evidence-free single repository", setup)
-        self.assertIn("write no `CONTEXT.md`", setup)
+        for contents in (skill, domain, modeling, setup):
+            normalized = " ".join(contents.split())
+            self.assertIn("authorized", normalized)
+            self.assertIn("setup/bootstrap", normalized)
+            self.assertIn("root `CONTEXT.md`", normalized)
+        self.assertIn(
+            "During authorized domain setup/bootstrap, always create or update it",
+            " ".join(setup.split()),
+        )
+        for contents in (skill, setup):
+            normalized = " ".join(contents.split())
+            self.assertIn(
+                "child-repository root selected by the authorized setup scope",
+                normalized,
+            )
+            self.assertIn("outside that scope remain optional and untouched", normalized)
+        retired_setup_terms = (
+            "`context-" + "seed`",
+            "`seed-" + "context`",
+            "`routing-" + "only`",
+        )
+        for retired in retired_setup_terms:
+            self.assertNotIn(retired, setup)
+        self.assertIn("minimal entry point", " ".join(setup.split()))
         self.assertIn("scoped monorepo context", translation)
 
         plan_options = (
@@ -300,6 +322,101 @@ class ProjectMemoryContractTests(unittest.TestCase):
         for contents in (plan_skill, spec_phase):
             normalized = " ".join(contents.split()).lower()
             self.assertIn("read every available matched context before drafting", normalized)
+
+    def test_setup_questions_are_first_time_user_facing(self) -> None:
+        questions = (
+            SKILL_ROOT / "references" / "setup-questions.md"
+        ).read_text(encoding="utf-8")
+        setup = (SKILL_ROOT / "references" / "setup-workflow.md").read_text(
+            encoding="utf-8"
+        )
+        skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
+
+        headings = re.findall(r"^## (.+)$", questions, flags=re.MULTILINE)
+        self.assertEqual(
+            headings,
+            [
+                "Setup Target",
+                "Project Structure",
+                "Issue Location",
+                "Separate Project Contexts",
+                "Overlapping Project Ownership",
+                "Workspace Or Repository Rule",
+                "Localization Conventions",
+                "Issue-Type Mapping",
+                "Workflow-State Mapping",
+                "Questions Setup Must Not Ask",
+            ],
+        )
+        self.assertIn("Normally ask no questions", questions)
+        self.assertIn("ask one question at a time", questions)
+        self.assertIn("Never ask the user to judge evidence sufficiency", questions)
+        self.assertIn(
+            "Root\n`CONTEXT.md` creation remains mandatory",
+            questions,
+        )
+        self.assertIn(
+            "[setup-questions.md](setup-questions.md) and use exactly one",
+            " ".join(setup.split()),
+        )
+        self.assertIn(
+            "[setup-questions.md](references/setup-questions.md)",
+            skill,
+        )
+        loading_matrix = skill.split("## Reference Loading Matrix", 1)[1].split(
+            "## Workflow", 1
+        )[0]
+        for row_name in ("Domain setup/bootstrap", "Translation"):
+            row = next(
+                line
+                for line in loading_matrix.splitlines()
+                if line.startswith(f"| {row_name} |")
+            )
+            self.assertIn("`setup-workflow.md`", row)
+        for reference_name in (
+            "project-layout.md",
+            "translation.md",
+            "triage-labels.md",
+        ):
+            contents = (SKILL_ROOT / "references" / reference_name).read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("[setup-questions.md](setup-questions.md)", contents)
+
+        prompt_text = "\n".join(
+            line[2:] for line in questions.splitlines() if line.startswith("> ")
+        ).lower()
+        for internal_term in (
+            "memory-owning root",
+            "scoped route",
+            "repository_layout",
+            "tracker_backend",
+            "translation memory",
+            "authoritative scope",
+            "evidence sufficiency",
+        ):
+            self.assertNotIn(internal_term, prompt_text)
+
+        retired_setup_terms = (
+            "context-" + "seed",
+            "seed-" + "context",
+            "routing-" + "only",
+        )
+        for retired in retired_setup_terms:
+            self.assertNotIn(retired, questions)
+
+        for prompt_fragment in (
+            "Which projects should I set up?",
+            "complete Project Memory setup",
+            "How should planning treat this",
+            "Where should future Feature Specs",
+            "Do they use different product vocabulary",
+            "Which project should define the rules",
+            "Where does it apply?",
+            "Does this project maintain translation",
+            "Is this mapping correct?",
+        ):
+            self.assertIn(prompt_fragment, questions)
 
     def test_runtime_consumers_have_no_retired_context_routing(self) -> None:
         roots = [
