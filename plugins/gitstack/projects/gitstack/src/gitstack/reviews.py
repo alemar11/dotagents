@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import which
@@ -14,6 +15,16 @@ from typing import Any
 
 
 from . import __version__ as VERSION
+from .common import GitStackError
+from .provider_text import (
+    API_VERSION,
+    ProviderText,
+    api_request,
+    read_text_file,
+    require_worktree,
+    verify_response_text,
+    verify_worktree_unchanged,
+)
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
 CODEX_TERMINAL_PREFIX = re.compile(r"(?im)^\s*Codex Review\s*:")
@@ -48,11 +59,28 @@ class RunResult:
 
 
 class ReviewError(Exception):
-    def __init__(self, message: str, *, code: str = "command_failed", exit_code: int = 1) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "command_failed",
+        exit_code: int = 1,
+        details: dict[str, Any] | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code
         self.exit_code = exit_code
+        self.details = details
+
+
+class StrictParser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
+    def error(self, message: str) -> None:
+        raise ReviewError("Invalid command arguments.", code="invalid_arguments", exit_code=64)
 
 
 def run(command: list[str], *, cwd: Path | None = None) -> RunResult:
@@ -594,95 +622,256 @@ def collect_entries(repo: str, pr: int, include_resolved: bool) -> list[dict[str
     return entries
 
 
-def selected_entries(entries: list[dict[str, Any]], selection: str | None, comment_ids: str | None) -> list[dict[str, Any]]:
-    if selection and comment_ids:
-        raise ReviewError(
-            "Use either --selection or --comment-ids with a reply body, not both.",
-            code="invalid_arguments",
-            exit_code=64,
-        )
-    if not selection and not comment_ids:
-        raise ReviewError(
-            "--reply-body or --reply-body-file requires --selection or --comment-ids.",
-            code="invalid_arguments",
-            exit_code=64,
-        )
-    key = "index" if selection else "comment_id"
-    lookup = {str(entry[key]): entry for entry in entries}
-    selected: list[dict[str, Any]] = []
-    for part in str(selection or comment_ids or "").replace(",", " ").split():
-        if part not in lookup:
-            raise ReviewError(f"{key} '{part}' was not found.", code="invalid_arguments", exit_code=64)
-        selected.append(lookup[part])
-    return selected
+def _review_error(exc: GitStackError) -> ReviewError:
+    return ReviewError(str(exc), code=exc.code, exit_code=exc.exit_code, details=exc.details)
 
 
-def read_body(body: str | None, body_file: str | None, *, option_prefix: str = "body") -> str:
-    if body and body_file:
-        raise ReviewError(
-            f"Use either --{option_prefix} or --{option_prefix}-file, not both.",
-            code="invalid_arguments",
-            exit_code=64,
-        )
-    if body_file:
-        try:
-            value = Path(body_file).read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as exc:
-            raise ReviewError(
-                f"Could not read --{option_prefix}-file '{body_file}': {exc}",
-                code="invalid_arguments",
-                exit_code=64,
-            ) from exc
-    else:
-        value = body or ""
-    if not value.strip():
-        raise ReviewError(
-            f"A non-empty --{option_prefix} or --{option_prefix}-file is required.",
-            code="invalid_arguments",
-            exit_code=64,
-        )
-    return value
+def _api_object(endpoint: str) -> dict[str, Any]:
+    payload = gh_json([
+        "api", endpoint, "--method", "GET",
+        "--header", "Accept: application/vnd.github+json",
+        "--header", f"X-GitHub-Api-Version: {API_VERSION}",
+    ])
+    if not isinstance(payload, dict):
+        raise ReviewError("GitHub read-back returned an unexpected response.", code="provider_response_invalid", exit_code=65)
+    return payload
 
 
-def post_conversation_comment(repo: str, pr: int, body: str, dry_run: bool) -> dict[str, Any]:
-    action: dict[str, Any] = {
-        "type": "conversation_comment",
-        "status": "dry-run" if dry_run else "pending",
-        "body_preview": snippet(body),
-    }
-    if dry_run:
-        return action
-    result = run_gh(["pr", "comment", str(pr), "--repo", repo, "--body", body])
-    action["transport"] = "gh pr comment"
-    if result.returncode != 0:
-        raise ReviewError((result.stderr or result.stdout or "comment failed").strip(), exit_code=result.returncode)
-    action["status"] = "posted"
-    output = result.stdout.strip()
-    if output:
-        action["url"] = output
+def _viewer_login() -> str:
+    payload = _api_object("user")
+    login = payload.get("login")
+    if not isinstance(login, str) or not login:
+        raise ReviewError("Could not resolve the authenticated GitHub identity.", code="provider_identity_missing", exit_code=65)
+    return login
+
+
+def _verify_pr_target(repo: str, pr: int) -> dict[str, Any]:
+    payload = _api_object(f"repos/{repo}/pulls/{pr}")
+    if payload.get("number") != pr or not str(payload.get("url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
+        raise ReviewError("GitHub pull-request read-back did not match the requested target.", code="provider_target_mismatch", exit_code=65)
+    return payload
+
+
+def _created_after(item: dict[str, Any], started_at: str) -> bool:
+    return str(item.get("created_at") or "") >= started_at
+
+
+def _proof(item: dict[str, Any], body: ProviderText, *, target: dict[str, Any], status: str) -> dict[str, Any]:
+    try:
+        verify_response_text(item, body)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    object_id = item.get("id")
+    url = item.get("html_url")
+    if not isinstance(object_id, int) or not isinstance(url, str) or not url:
+        raise ReviewError("GitHub response omitted provider object identity.", code="provider_identity_missing", exit_code=65)
+    return {"status": status, "id": object_id, "url": url, "target": target, "text": body.proof()}
+
+
+def _guarded_result(
+    action: dict[str, Any],
+    before: dict[str, Any] | None,
+) -> dict[str, Any]:
+    try:
+        after = verify_worktree_unchanged(before)
+    except GitStackError as exc:
+        raise ReviewError(
+            str(exc), code=exc.code, exit_code=exc.exit_code,
+            details={"action": action},
+        ) from exc
+    if after is not None:
+        action["worktree"] = after
     return action
 
 
-def post_replies(repo: str, pr: int, entries: list[dict[str, Any]], body: str, dry_run: bool) -> list[dict[str, Any]]:
-    actions: list[dict[str, Any]] = []
-    for entry in entries:
-        action: dict[str, Any] = {"comment_id": entry["comment_id"], "type": entry["type"], "status": "dry-run" if dry_run else "pending"}
-        if dry_run:
-            actions.append(action)
-            continue
-        if entry["type"] == "conversation_comment":
-            result = run_gh(["pr", "comment", str(pr), "--repo", repo, "--body", f"{body} (ref: {entry['comment_id']})"])
-            action["transport"] = "gh pr comment"
-            action["status"] = "posted" if result.returncode == 0 else "error"
-        else:
-            endpoint = f"repos/{repo}/pulls/{pr}/comments/{entry['comment_id']}/replies"
-            result = run_gh(["api", "-X", "POST", endpoint, "-H", "Accept: application/vnd.github+json", "-f", f"body={body}"])
-            action["transport"] = "gh api"
-            action["status"] = "replied" if result.returncode == 0 else "error"
-        if result.returncode != 0:
-            action["message"] = (result.stderr or result.stdout or "reply failed").strip()
-        actions.append(action)
-    return actions
+def post_conversation_comment(
+    repo: str,
+    pr: int,
+    body: ProviderText,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
+    _verify_pr_target(repo, pr)
+    try:
+        before = require_worktree(expected_worktree_fingerprint)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    target = {"repo": repo, "pr": pr, "kind": "conversation-comment"}
+    if dry_run:
+        return {
+            "status": "dry-run", "target": target, "text": body.proof(),
+            "transport": {"method": "POST", "endpoint": f"repos/{repo}/issues/{pr}/comments", "api_version": API_VERSION},
+        }
+    actor = _viewer_login()
+    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    result = api_request("POST", f"repos/{repo}/issues/{pr}/comments", {"body": body.text})
+    if result.returncode:
+        matches = [
+            item for item in gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
+            if str((item.get("user") or {}).get("login") or "") == actor
+            and str(item.get("body") or "").encode("utf-8") == body.data
+            and _created_after(item, started_at)
+        ]
+        if len(matches) != 1:
+            raise ReviewError(
+                "Comment creation is unconfirmed after one exact-target read-back; do not retry blindly.",
+                code="provider_write_ambiguous", exit_code=result.returncode,
+                details={"target": target, "matches": len(matches), "text": body.proof()},
+            )
+        item, status = matches[0], "recovered"
+    else:
+        try:
+            item = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise ReviewError("Comment response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
+        status = "posted"
+    if not isinstance(item, dict) or not str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}"):
+        raise ReviewError("Comment response did not match the intended PR.", code="provider_target_mismatch", exit_code=65)
+    return _guarded_result(_proof(item, body, target=target, status=status), before)
+
+
+def reply_to_review_comment(
+    repo: str,
+    pr: int,
+    comment_id: int,
+    body: ProviderText,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
+    parent = _api_object(f"repos/{repo}/pulls/comments/{comment_id}")
+    if not str(parent.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
+        raise ReviewError("Review comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
+    try:
+        before = require_worktree(expected_worktree_fingerprint)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    target = {"repo": repo, "pr": pr, "kind": "review-reply", "parent_id": comment_id}
+    endpoint = f"repos/{repo}/pulls/{pr}/comments/{comment_id}/replies"
+    if dry_run:
+        return {"status": "dry-run", "target": target, "text": body.proof(), "transport": {"method": "POST", "endpoint": endpoint, "api_version": API_VERSION}}
+    actor = _viewer_login()
+    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    result = api_request("POST", endpoint, {"body": body.text})
+    if result.returncode:
+        matches = [
+            item for item in gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
+            if item.get("in_reply_to_id") == comment_id
+            and str((item.get("user") or {}).get("login") or "") == actor
+            and str(item.get("body") or "").encode("utf-8") == body.data
+            and _created_after(item, started_at)
+        ]
+        if len(matches) != 1:
+            raise ReviewError(
+                "Review reply is unconfirmed after one exact-thread read-back; do not retry blindly.",
+                code="provider_write_ambiguous", exit_code=result.returncode,
+                details={"target": target, "matches": len(matches), "text": body.proof()},
+            )
+        item, status = matches[0], "recovered"
+    else:
+        try:
+            item = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise ReviewError("Review reply response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
+        status = "replied"
+    if not isinstance(item, dict) or item.get("in_reply_to_id") != comment_id or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
+        raise ReviewError("Review reply response did not match the intended thread.", code="provider_target_mismatch", exit_code=65)
+    return _guarded_result(_proof(item, body, target=target, status=status), before)
+
+
+def edit_comment(
+    repo: str,
+    pr: int,
+    comment_id: int,
+    kind: str,
+    body: ProviderText,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
+    namespace = "issues/comments" if kind == "conversation" else "pulls/comments"
+    endpoint = f"repos/{repo}/{namespace}/{comment_id}"
+    current = _api_object(endpoint)
+    target_url = current.get("issue_url") if kind == "conversation" else current.get("pull_request_url")
+    target_noun = "issues" if kind == "conversation" else "pulls"
+    if not str(target_url or "").endswith(f"/repos/{repo}/{target_noun}/{pr}"):
+        raise ReviewError("Comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
+    target = {"repo": repo, "pr": pr, "kind": f"{kind}-comment", "comment_id": comment_id}
+    try:
+        before = require_worktree(expected_worktree_fingerprint)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    if str(current.get("body") or "").encode("utf-8") == body.data:
+        return _guarded_result(_proof(current, body, target=target, status="reused"), before)
+    if dry_run:
+        return {"status": "dry-run", "target": target, "text": body.proof(), "transport": {"method": "PATCH", "endpoint": endpoint, "api_version": API_VERSION}}
+    result = api_request("PATCH", endpoint, {"body": body.text})
+    if result.returncode:
+        item = _api_object(endpoint)
+        if str(item.get("body") or "").encode("utf-8") != body.data:
+            raise ReviewError(
+                "Comment edit is unconfirmed after one exact-object read-back; do not retry blindly.",
+                code="provider_write_ambiguous", exit_code=result.returncode,
+                details={"target": target, "text": body.proof()},
+            )
+        status = "recovered"
+    else:
+        try:
+            item = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise ReviewError("Comment edit response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
+        status = "edited"
+    if not isinstance(item, dict):
+        raise ReviewError("Comment edit returned an unexpected response.", code="provider_response_invalid", exit_code=65)
+    if item.get("id") != comment_id:
+        raise ReviewError("Comment edit response identity did not match the requested comment.", code="provider_target_mismatch", exit_code=65)
+    return _guarded_result(_proof(item, body, target=target, status=status), before)
+
+
+def submit_review(
+    repo: str,
+    pr: int,
+    event: str,
+    body: ProviderText,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
+    pr_payload = _verify_pr_target(repo, pr)
+    try:
+        before = require_worktree(expected_worktree_fingerprint)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    provider_event = {"approve": "APPROVE", "request-changes": "REQUEST_CHANGES", "comment": "COMMENT"}[event]
+    expected_state = {"approve": "APPROVED", "request-changes": "CHANGES_REQUESTED", "comment": "COMMENTED"}[event]
+    target = {"repo": repo, "pr": pr, "kind": "review", "head": str((pr_payload.get("head") or {}).get("sha") or ""), "event": event}
+    endpoint = f"repos/{repo}/pulls/{pr}/reviews"
+    if dry_run:
+        return {"status": "dry-run", "target": target, "text": body.proof(), "transport": {"method": "POST", "endpoint": endpoint, "api_version": API_VERSION}}
+    actor = _viewer_login()
+    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    result = api_request("POST", endpoint, {"body": body.text, "event": provider_event})
+    if result.returncode:
+        matches = [
+            item for item in gh_api_paginated_list(endpoint)
+            if str((item.get("user") or {}).get("login") or "") == actor
+            and item.get("state") == expected_state
+            and str(item.get("body") or "").encode("utf-8") == body.data
+            and str(item.get("submitted_at") or "") >= started_at
+        ]
+        if len(matches) != 1:
+            raise ReviewError(
+                "Review submission is unconfirmed after one exact-target read-back; do not retry blindly.",
+                code="provider_write_ambiguous", exit_code=result.returncode,
+                details={"target": target, "matches": len(matches), "text": body.proof()},
+            )
+        item, status = matches[0], "recovered"
+    else:
+        try:
+            item = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise ReviewError("Review response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
+        status = "submitted"
+    if not isinstance(item, dict) or item.get("state") != expected_state or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
+        raise ReviewError("Review response did not match the intended target and event.", code="provider_target_mismatch", exit_code=65)
+    return _guarded_result(_proof(item, body, target=target, status=status), before)
 
 
 def render_text(payload: dict[str, Any]) -> str:
@@ -729,7 +918,7 @@ def doctor_payload() -> dict[str, object]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = StrictParser(
         prog="gitstack reviews",
         description="Inspect, check, wait for, or respond to pull-request reviews.",
     )
@@ -737,23 +926,43 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="store_true", help="Print version and exit.")
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("doctor", help="Check local git and gh readiness.")
-    address = subparsers.add_parser("address", help="List review context or reply to selected comments.")
+    address = subparsers.add_parser("address", help="List review context read-only.")
     address.add_argument("--pr", required=True, help="Pull request number.")
     address.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
     address.add_argument("--include-resolved", action="store_true", help="Include resolved or outdated review threads.")
-    address.add_argument("--selection", help="Space or comma separated row indexes to reply to.")
-    address.add_argument("--comment-ids", help="Space or comma separated GitHub comment ids to reply to.")
-    address.add_argument("--reply-body", help="Reply body. Requires --selection or --comment-ids.")
-    address.add_argument("--reply-body-file", help="Read the reply body from a UTF-8 file. Requires --selection or --comment-ids.")
-    address.add_argument("--dry-run", action="store_true", help="Preview reply actions without posting.")
     address.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
     comment = subparsers.add_parser("comment", help="Post a top-level PR discussion comment.")
     comment.add_argument("--pr", required=True, help="Pull request number.")
     comment.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
-    comment.add_argument("--body", help="Comment body.")
-    comment.add_argument("--body-file", help="Read the comment body from a UTF-8 file.")
+    comment.add_argument("--body-file", required=True, help="Absolute UTF-8 regular-file path containing the comment body.")
     comment.add_argument("--dry-run", action="store_true", help="Preview the comment action without posting.")
+    comment.add_argument("--expected-worktree-fingerprint")
     comment.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
+    reply = subparsers.add_parser("reply", help="Reply to one pull-request review comment.")
+    reply.add_argument("--pr", required=True)
+    reply.add_argument("--repo")
+    reply.add_argument("--comment-id", required=True)
+    reply.add_argument("--body-file", required=True)
+    reply.add_argument("--dry-run", action="store_true")
+    reply.add_argument("--expected-worktree-fingerprint")
+    reply.add_argument("--allow-non-project", action="store_true")
+    edit = subparsers.add_parser("edit-comment", help="Edit one conversation or review comment.")
+    edit.add_argument("--pr", required=True)
+    edit.add_argument("--repo")
+    edit.add_argument("--comment-id", required=True)
+    edit.add_argument("--kind", required=True, choices=("conversation", "review"))
+    edit.add_argument("--body-file", required=True)
+    edit.add_argument("--dry-run", action="store_true")
+    edit.add_argument("--expected-worktree-fingerprint")
+    edit.add_argument("--allow-non-project", action="store_true")
+    submit = subparsers.add_parser("submit-review", help="Submit one PR review with a file-backed body.")
+    submit.add_argument("--pr", required=True)
+    submit.add_argument("--repo")
+    submit.add_argument("--event", required=True, choices=("approve", "request-changes", "comment"))
+    submit.add_argument("--body-file", required=True)
+    submit.add_argument("--dry-run", action="store_true")
+    submit.add_argument("--expected-worktree-fingerprint")
+    submit.add_argument("--allow-non-project", action="store_true")
     for command, help_text in (
         ("check", "Inspect automated review state once and exit."),
         ("wait", "Wait for an automated review to complete or time out."),
@@ -776,12 +985,23 @@ def emit_success(data: object, command: list[str]) -> None:
 
 
 def emit_error(exc: ReviewError, command: list[str]) -> None:
-    print(json.dumps({"ok": False, "version": VERSION, "command": command, "error": {"code": exc.code, "message": exc.message}}, indent=2))
+    error: dict[str, Any] = {"code": exc.code, "message": exc.message}
+    if exc.details is not None:
+        error["details"] = exc.details
+    print(json.dumps({"ok": False, "version": VERSION, "command": command, "error": error}, indent=2))
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except ReviewError as exc:
+        raw = list(argv or [])
+        if "--json" in raw:
+            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "reply", "edit-comment", "submit-review", "check", "wait"}), "")])
+        else:
+            print(exc.message, file=sys.stderr)
+        return exc.exit_code
     if args.version:
         print(VERSION)
         return 0
@@ -794,7 +1014,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
             print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
         return 0 if payload["ok"] else 1
-    if args.command not in {"address", "comment", "check", "wait"}:
+    if args.command not in {"address", "comment", "reply", "edit-comment", "submit-review", "check", "wait"}:
         parser.print_help()
         return 0
     try:
@@ -823,25 +1043,37 @@ def main(argv: list[str] | None = None) -> int:
                 print(render_text(payload), end="")
             return exit_code
         if args.command == "comment":
-            body = read_body(args.body, args.body_file)
-            payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run)}
+            try:
+                body = read_text_file(args.body_file, field="body")
+            except GitStackError as exc:
+                raise _review_error(exc) from exc
+            payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run, args.expected_worktree_fingerprint)}
             if args.json:
                 emit_success(payload, ["comment"])
             else:
                 print(render_text(payload), end="")
             return 0
+        if args.command in {"reply", "edit-comment", "submit-review"}:
+            try:
+                body = read_text_file(args.body_file, field="body")
+            except GitStackError as exc:
+                raise _review_error(exc) from exc
+            if args.command == "reply":
+                comment_id = positive_int(args.comment_id, "comment-id")
+                action = reply_to_review_comment(repo, pr, comment_id, body, args.dry_run, args.expected_worktree_fingerprint)
+            elif args.command == "edit-comment":
+                comment_id = positive_int(args.comment_id, "comment-id")
+                action = edit_comment(repo, pr, comment_id, args.kind, body, args.dry_run, args.expected_worktree_fingerprint)
+            else:
+                action = submit_review(repo, pr, args.event, body, args.dry_run, args.expected_worktree_fingerprint)
+            payload = {"repo": repo, "pr": pr, "action": action}
+            if args.json:
+                emit_success(payload, [args.command])
+            else:
+                print(json.dumps(payload, indent=2))
+            return 0
         entries = collect_entries(repo, pr, args.include_resolved)
         payload: dict[str, Any] = {"repo": repo, "pr": pr, "entries": entries}
-        if args.reply_body or args.reply_body_file:
-            targets = selected_entries(entries, args.selection, args.comment_ids)
-            reply_body = read_body(args.reply_body, args.reply_body_file, option_prefix="reply-body")
-            payload["actions"] = post_replies(repo, pr, targets, reply_body, args.dry_run)
-        elif args.selection or args.comment_ids:
-            raise ReviewError(
-                "--selection and --comment-ids require --reply-body or --reply-body-file.",
-                code="invalid_arguments",
-                exit_code=64,
-            )
         if args.json:
             emit_success(payload, ["address"])
         else:

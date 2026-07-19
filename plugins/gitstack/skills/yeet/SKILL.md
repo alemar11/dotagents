@@ -12,8 +12,9 @@ skills, direct `git`, the shared CLI, and connector-backed PR operations:
 
 - Use `$gitstack:git-commit` for staging and commit authoring.
 - Use `<plugin-root>/scripts/gitstack publish preflight` for structured local
-  readiness, the connector for supported PR lifecycle operations, and `gh` for
-  identical-target fallback.
+  readiness and `publish open --title-file --body-file` for new PRs. Use the
+  connector for supported existing-PR lifecycle operations. Do not put PR
+  title or body text in argv or a shell string.
 - Use `$gitstack:github-issues`, `$gitstack:github-triage`, `$gitstack:github-deep-review`, `$gitstack:github-ci`,
   or `$gitstack:github-review-threads` only for focused follow-up GitHub work.
 

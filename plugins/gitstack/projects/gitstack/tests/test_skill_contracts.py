@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import tempfile
 import unittest
@@ -23,6 +24,28 @@ def section(text: str, heading: str) -> str:
 
 
 class GitStackSkillContractTests(unittest.TestCase):
+    def test_executable_fences_do_not_inline_provider_text(self) -> None:
+        unsafe = re.compile(
+            r"--(?:title|body|description|comment|reply-body)(?:=|\s+)[\"']|"
+            r"\s-[fF]\s+body=|\s-m\s+[\"']"
+        )
+        for relative in (
+            "skills/github-issues/references/workflows.md",
+            "skills/github-releases/references/workflows.md",
+            "skills/github-review-threads/references/workflows.md",
+            "skills/github-review-threads/references/script-summary.md",
+            "skills/yeet/references/workflows.md",
+        ):
+            text = read(relative)
+            fences = re.findall(r"```(?:bash|sh)\n(.*?)```", text, flags=re.DOTALL)
+            with self.subTest(relative=relative):
+                self.assertFalse(any(unsafe.search(fence) for fence in fences))
+
+        review_docs = read("skills/github-review-threads/references/script-summary.md")
+        self.assertNotIn("--reply-body", review_docs)
+        self.assertNotIn("--selection", review_docs)
+        self.assertIn("`address` is read-only", review_docs)
+
     def test_github_connector_is_declared_and_runtime_required(self) -> None:
         manifest = json.loads(read(".app.json"))
 

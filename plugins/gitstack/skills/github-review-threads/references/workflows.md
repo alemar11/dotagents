@@ -52,31 +52,44 @@ Resolve `<plugin-root>` as two directories above the directory containing the ow
 By default, resolved or outdated review threads are omitted. Add
 `--include-resolved` only when the user asks for full history.
 
-## Reply To Selected Comments
+## Reply To One Review Comment
 
-First list comments, then reply by displayed selection or comment id:
+First list comments, then reply to exactly one provider review-comment id:
 
 ```bash
-<plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number> --selection "1 3" --reply-body-file <message-file> --dry-run
-<plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number> --comment-ids "123456" --reply-body-file <message-file>
+<plugin-root>/scripts/gitstack --json repo snapshot
+<plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
 ```
 
-Write reply text to a UTF-8 file outside the repository. Do not interpolate
-arbitrary comment text into `--reply-body` in a shell command. Remove temporary
-message files after the action is verified.
+Write reply text to an absolute UTF-8 regular non-symlink file outside the
+repository. The command rejects inline text. Remove temporary message files
+after provider identity, target, body fingerprint, and worktree proof are
+verified.
 
-Use `--dry-run` for batch replies unless the user already approved posting or a
-calling workflow supplies `mutation_mode=apply`, the exact PR, selected
-comments, reply body, and `review_operation=reply`.
+Use `--dry-run` unless the user already approved posting or a calling workflow
+supplies `mutation_mode=apply`, the exact PR and comment id, reply body, and
+`review_operation=reply`.
+
+## Edit Comments Or Submit Reviews
+
+```bash
+<plugin-root>/scripts/gitstack reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
+```
+
+Each command verifies the existing target before writing and the returned
+provider object afterward. On an ambiguous write it performs one exact-target
+read-back and fails closed; do not retry it blindly.
 
 ## Post Top-Level PR Discussion Comments
 
-Use the helper for normal PR discussion comments, including simple review
-requests:
+Use the helper for normal PR discussion comments. The separate review-request
+protocol owns request composition, head binding, acknowledgment, and waiting.
 
 ```bash
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
 ```
 
 Use `--dry-run` unless the user explicitly asked to post the discussion comment
@@ -87,8 +100,9 @@ authorization and phase fields must be normalized before this boundary.
 
 ## Fallback Direct Commands
 
-Use direct `gh` only when `<plugin-root>/scripts/gitstack reviews` is unavailable, broken, or lacks the
-needed operation. State the fallback reason in the response.
+Use direct `gh` only for a genuinely file-backed operation. If no file-backed
+fallback exists, require the structured GitHub connector and fail closed.
+State the fallback reason in the response.
 
 ```bash
 gh pr comment <number> --repo <owner/repo> --body-file <message-file>

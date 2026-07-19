@@ -7,16 +7,19 @@
 <plugin-root>/scripts/gitstack --version
 <plugin-root>/scripts/gitstack doctor
 <plugin-root>/scripts/gitstack --json doctor
+<plugin-root>/scripts/gitstack --json repo snapshot
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
-<plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number> --comment-ids <ids> --reply-body-file <message-file>
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file>
+<plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file>
+<plugin-root>/scripts/gitstack reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file>
+<plugin-root>/scripts/gitstack reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout <caller-owned-duration>
 ```
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning
-`SKILL.md`. Prefer `--reply-body-file` for replies so arbitrary text never needs
-shell interpolation.
+`SKILL.md`. All provider text is mandatory file-backed input; inline provider
+text flags do not exist.
 
 ## JSON Mode
 
@@ -79,17 +82,17 @@ callers can suppress unchanged ledger and progress updates.
 
 ## Discussion Comments
 
-Use `comment` for top-level PR discussion comments. It supports `--body`,
-`--body-file`, `--dry-run`, `--json`, `--repo`, `--pr`, and
-`--allow-non-project`.
+`address` is read-only. Use `comment`, one-target `reply`, `edit-comment`, and
+`submit-review` for mutations. They require absolute regular non-symlink UTF-8
+body files and accept optional `--expected-worktree-fingerprint` protection.
+Dry-run and result envelopes contain only byte counts, SHA-256 fingerprints,
+target identity, and transport metadata; they never contain provider text.
 
-Use `address --reply-body-file` with `--selection` or `--comment-ids` for safe
-file-backed replies. `--reply-body` remains available for callers that already
-pass an argument vector without a shell, but shell examples must use the file
-surface.
-
-In JSON mode, `comment` returns the same success/error envelope as other
-commands, with `data.action.status` set to `dry-run` or `posted`.
+Successful writes return provider object id and URL, exact target identity, and
+the submitted body fingerprint. An ambiguous write performs one read-back and
+returns `provider_write_ambiguous` without retrying. A confirmed write followed
+by worktree drift returns `provider_write_partial_success` with the confirmed
+provider identity in error details.
 
 ## Maintenance Source
 

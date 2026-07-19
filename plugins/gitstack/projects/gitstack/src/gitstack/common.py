@@ -20,10 +20,18 @@ class Result:
 
 
 class GitStackError(RuntimeError):
-    def __init__(self, message: str, *, code: str = "command_failed", exit_code: int = 1):
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "command_failed",
+        exit_code: int = 1,
+        details: dict[str, Any] | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.exit_code = exit_code
+        self.details = details
 
 
 def run(command: Sequence[str], cwd: Path | None = None) -> Result:
@@ -84,4 +92,7 @@ def envelope(command: list[str], data: Any) -> dict[str, Any]:
 
 
 def error_envelope(command: list[str], exc: GitStackError) -> dict[str, Any]:
-    return {"ok": False, "version": __version__, "command": command, "error": {"code": exc.code, "message": str(exc)}}
+    error: dict[str, Any] = {"code": exc.code, "message": str(exc)}
+    if exc.details is not None:
+        error["details"] = exc.details
+    return {"ok": False, "version": __version__, "command": command, "error": error}

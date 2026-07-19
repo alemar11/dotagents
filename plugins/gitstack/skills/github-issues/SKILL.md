@@ -25,13 +25,14 @@ This skill only handles GitHub Issues.
 
 ## Core Rules
 
-- Prefer connector issue tools for supported operations. Use direct `gh`
-  commands for Issue Types, parent/sub-issue relationships, dependencies,
-  label administration, and other connector gaps. This skill has no dedicated
-  CLI command family in v1.
+- Prefer connector issue tools for supported operations. Use direct `gh` only
+  for a connector gap whose free-form provider text is genuinely file-backed;
+  otherwise fail closed. This skill has no dedicated CLI command family.
 - Confirm repository context before mutation, using the current checkout or an
   explicit `--repo <owner>/<repo>`.
-- Prefer `--body-file` for non-trivial issue bodies or comments.
+- Send issue titles and other free-form fields through the structured GitHub
+  connector. Use `gh --body-file` only for operations whose every free-form
+  field is genuinely file-backed.
 - Create temporary `--body-file` inputs outside checkout-owned artifact paths
   and remove them after mutation unless the user or calling workflow explicitly
   provides a persistent body-file or local mirror path.

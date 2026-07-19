@@ -13,10 +13,10 @@ them, and draft or publish dispositions with explicit authority.
 
 ## Transport and CLI
 
-Prefer the GitHub connector for thread-aware listing, replies, comment edits,
-reviews, and resolution state. Use `gh` for gaps. An authorized write may fall
-back automatically only for the same operation, repository, PR, and comment or
-thread after `gh` authentication and access verification; report the fallback.
+Prefer the GitHub connector for thread-aware listing and resolution state. For
+provider text, use only a structured connector mutation whose exact target can
+be read back, or the typed file-backed GitStack commands below. Never place a
+title, body, description, reply, or review text in argv or a shell string.
 
 Resolve `<plugin-root>` as two directories above the directory containing this
 `SKILL.md`:
@@ -25,13 +25,17 @@ Resolve `<plugin-root>` as two directories above the directory containing this
 <plugin-root>/scripts/gitstack --help
 <plugin-root>/scripts/gitstack --version
 <plugin-root>/scripts/gitstack --json doctor
+<plugin-root>/scripts/gitstack --json repo snapshot
 <plugin-root>/scripts/gitstack --json reviews address --repo <owner/repo> --pr <number>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout <caller-owned-duration>
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <message-file> --dry-run
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
 ```
 
-The CLI uses `gh`, emits stable JSON envelopes, and writes no implicit config.
+The CLI validates absolute regular non-symlink UTF-8 files, sends JSON to `gh
+api --input -`, emits byte counts and SHA-256 fingerprints instead of text, and
+verifies provider identity, target, response text, and an optional Git
+worktree fingerprint. It writes no implicit config.
 It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
@@ -53,10 +57,15 @@ reactions into one current-head state and one stable observation fingerprint.
 4. Inspect adjacent code and tests, implement the selected changes locally, and
    validate the affected behavior.
 5. Draft a disposition per selected thread that names the change and proof.
-   Keep replies in UTF-8 files outside the repository.
+   Keep provider text in UTF-8 regular files outside the repository. Capture a
+   `repo snapshot` immediately before each mutation and pass its fingerprint
+   when the caller requires worktree protection.
 6. Post replies, edit comments, submit reviews, or resolve threads only when the
    user explicitly authorizes publication or a calling workflow supplies exact
    PR/action authority. Never infer it from an inspect or review request.
+   A failed or unreadable mutation gets one exact-target read-back and no blind
+   retry. Preserve returned partial-success evidence if the provider write is
+   confirmed but the worktree guard fails.
 7. Resolve a thread only after its requested change is implemented and
    validated, or when an authorized disposition clearly explains why no change
    is appropriate. Never substitute a top-level PR comment for a thread reply

@@ -17,8 +17,11 @@ confirms the release source.
 
 Use `release_operation=create-tag` only with explicit mutation authority:
 
+Write the annotated-tag message to an absolute UTF-8 file without shell
+interpolation, then use Git's file-backed message input:
+
 ```bash
-git tag -a <tag> -m "<release title>"
+git tag -a <tag> -F <absolute-release-title-file>
 git push origin <tag>
 git ls-remote --tags origin <tag>
 ```
@@ -32,6 +35,12 @@ notes:
 gh release create <tag> --draft --generate-notes
 gh release edit <tag> --draft=false
 ```
+
+For hand-written release names or notes, use the structured GitHub connector.
+An existing genuinely file-backed `gh --notes-file` operation is allowed only
+when no other free-form field is placed in argv. If the required field has no
+safe connector or file-backed surface, fail closed; do not add a release
+mutation command to GitStack in this refinement.
 
 For asset uploads:
 

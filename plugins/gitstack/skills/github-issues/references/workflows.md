@@ -51,10 +51,10 @@ If the installed `gh` version rejects a JSON field such as `issueType`,
 
 ## Create Issues
 
-Use `--body-file` for non-trivial issue bodies or comments. Create temporary
-body files outside checkout-owned artifact paths and remove the temp directory
-after the command succeeds or fails, unless the user or calling workflow
-explicitly provided a persistent body-file or local mirror path.
+Create issues through the structured GitHub connector. The current `gh issue
+create` surface requires the free-form title in argv, so it is not an allowed
+fallback. If the connector is unavailable, fail closed; do not invent an issue
+CLI or interpolate the title into a shell command.
 
 Generated Markdown bodies are untrusted shell input. Do not place them inside
 double-quoted shell strings, `echo`, command substitutions, or unquoted heredocs
@@ -77,31 +77,9 @@ tracker before retrying. Reuse the created issue numbers and retry only missing
 or incorrect operations; do not rerun the full create sequence from local
 assumptions.
 
-```bash
-tmpdir="$(mktemp -d)"
-body_file="$tmpdir/issue.md"
-# Write the generated body to "$body_file" without shell interpolation, then
-# run one of:
-gh issue create --title "<title>" --body-file "$body_file"
-gh issue create --title "<title>" --body-file "$body_file" --type "<type>"
-gh issue create --title "<title>" --body-file "$body_file" --label "<label>"
-gh issue create --title "<title>" --body-file "$body_file" --parent <parent-number-or-url>
-rm -rf "$tmpdir"
-```
-
-For an explicit target repo:
-
-```bash
-tmpdir="$(mktemp -d)"
-body_file="$tmpdir/issue.md"
-# Write the generated body to "$body_file" without shell interpolation, then
-# run one of:
-gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file"
-gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --type "<type>"
-gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --label "<label>"
-gh issue create --repo <owner>/<repo> --title "<title>" --body-file "$body_file" --parent <parent-number-or-url>
-rm -rf "$tmpdir"
-```
+Supply the exact repository, structured title/body, optional issue type, labels,
+and parent relationship to the connector. Verify the returned issue number and
+URL, then read the exact target back before claiming its text is verified.
 
 After creating or editing an issue type, verify with `issueType`; `type` is not
 a valid JSON field for `gh issue view`:
@@ -148,24 +126,17 @@ gh issue edit <number-or-url> --remove-label "<label>"
 ```
 
 Create labels only when the user or calling workflow explicitly requested a
-new label:
-
-```bash
-gh label list --repo <owner>/<repo> --search "<label>"
-gh label create "<label>" --repo <owner>/<repo> --description "<description>"
-```
+new label. Use the structured GitHub connector because `gh label create`
+requires free-form name and description text in argv. If connector label
+creation is unavailable, fail closed.
 
 Do not create other labels unless the user or tracker configuration explicitly
 asks for new taxonomy.
 
 ## Parent And Sub-Issues
 
-Prefer creating child issues with the parent relationship already set, using
-the same temporary body-file pattern as issue creation:
-
-```bash
-gh issue create --title "<title>" --body-file "$body_file" --parent <parent-number-or-url>
-```
+Prefer creating child issues with the parent relationship already set through
+the same structured connector issue-creation operation.
 
 Attach or remove existing relationships only when explicitly requested:
 
@@ -197,11 +168,18 @@ Only close when the user or calling workflow explicitly authorizes the
 disposition and the issue acceptance criteria are satisfied or intentionally not
 planned.
 
+When a rationale is required, first post it with a verified file-backed
+comment, then change state without an inline comment:
+
 ```bash
-gh issue close <number-or-url> --comment "<closing rationale>"
-gh issue close <number-or-url> --reason completed --comment "<closing rationale>"
-gh issue close <number-or-url> --reason "not planned" --comment "<closing rationale>"
+gh issue comment <number-or-url> --body-file <absolute-message-file>
+gh issue close <number-or-url>
+gh issue close <number-or-url> --reason completed
+gh issue close <number-or-url> --reason "not planned"
 ```
+
+Read the comment and issue state back. If the comment succeeds and closure
+fails, report that partial success and do not repost the rationale blindly.
 
 Before closing partially satisfied work, create or link an owner-visible
 follow-up when mutation is authorized. Otherwise keep the source issue open and
@@ -213,9 +191,13 @@ Reopen only when the user or calling workflow explicitly requests that state
 transition. Verify the resulting issue state.
 
 ```bash
-gh issue reopen <number-or-url> --comment "<reopening rationale>"
+gh issue comment <number-or-url> --body-file <absolute-message-file>
+gh issue reopen <number-or-url>
 gh issue view <number-or-url> --json number,state,url
 ```
+
+Read the comment back before reopening. Preserve the comment identity if the
+state transition fails; do not repost it blindly.
 
 ## Dry Runs
 

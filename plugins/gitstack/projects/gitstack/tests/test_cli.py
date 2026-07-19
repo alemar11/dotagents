@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from gitstack import cli
 from gitstack.common import GitStackError, Result, normalize_remote, resolve_repo
-from gitstack.publish import _find_open_pr, open_pr, preflight, template
+from gitstack.publish import _find_open_pr, open_pr, preflight
 
 
 class CliContractTests(unittest.TestCase):
@@ -27,13 +27,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "4.1.1")
+        self.assertEqual(output.strip(), "5.0.0")
 
     def test_json_doctor_shape(self) -> None:
         code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "4.1.1")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
 
     def test_json_argument_error(self) -> None:
@@ -42,6 +42,20 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(code, 64)
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
+
+    def test_publish_rejects_inline_title_without_echoing_it(self) -> None:
+        hostile = "`unsafe` $(command) $HOME"
+        code, output = self.invoke([
+            "--json", "publish", "open", "--title", hostile, "--body-file", "/tmp/body.md",
+        ])
+        self.assertEqual(code, 64)
+        self.assertNotIn(hostile, output)
+        self.assertEqual(json.loads(output)["error"]["code"], "invalid_arguments")
+
+    def test_publish_template_command_was_removed(self) -> None:
+        code, output = self.invoke(["--json", "publish", "template"])
+        self.assertEqual(code, 64)
+        self.assertEqual(json.loads(output)["error"]["code"], "invalid_arguments")
 
     def test_repo_resolve_json(self) -> None:
         code, output = self.invoke(["repo", "resolve", "--repo", "owner/repo", "--json"])
@@ -53,25 +67,30 @@ class CliContractTests(unittest.TestCase):
         self.assertEqual(normalize_remote("git@github.com:owner/repo.git"), "owner/repo")
         self.assertEqual(normalize_remote("https://github.com/owner/repo.git"), "owner/repo")
 
-    def test_template_reads_utf8_body_file(self) -> None:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
-            handle.write("Body ✓")
-            handle.flush()
-            self.assertEqual(template("Title", handle.name)["body"], "Body ✓")
-
     def test_publish_refuses_default_branch(self) -> None:
         state = {"repo": "owner/repo", "root": "/tmp/repo", "branch": "main", "default_branch": "main", "on_default_branch": True, "upstream": None, "dirty": False, "status": [], "existing_pull_request": None}
-        with mock.patch("gitstack.publish.preflight", return_value=state):
-            with self.assertRaises(GitStackError) as raised:
-                open_pr(repo=None, title="Title", body_file="body.md", draft=True, base=None, dry_run=True)
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text("Title", encoding="utf-8")
+            body_file.write_text("Body", encoding="utf-8")
+            with mock.patch("gitstack.publish.preflight", return_value=state):
+                with self.assertRaises(GitStackError) as raised:
+                    open_pr(repo=None, title_file=str(title_file), body_file=str(body_file), draft=True, base=None, dry_run=True, expected_worktree_fingerprint=None)
         self.assertEqual(raised.exception.code, "unsafe_branch")
 
     def test_publish_dry_run(self) -> None:
         state = {"repo": "owner/repo", "root": "/tmp/repo", "branch": "feature", "default_branch": "main", "on_default_branch": False, "upstream": "origin/feature", "dirty": False, "status": [], "existing_pull_request": None}
-        with mock.patch("gitstack.publish.preflight", return_value=state):
-            result = open_pr(repo=None, title="Title", body_file="body.md", draft=True, base="main", dry_run=True)
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text("Title", encoding="utf-8")
+            body_file.write_text("Body", encoding="utf-8")
+            with mock.patch("gitstack.publish.preflight", return_value=state):
+                result = open_pr(repo=None, title_file=str(title_file), body_file=str(body_file), draft=True, base="main", dry_run=True, expected_worktree_fingerprint=None)
         self.assertEqual(result["status"], "dry-run")
-        self.assertIn("--draft", result["command"])
+        self.assertEqual(result["transport"]["endpoint"], "repos/owner/repo/pulls")
+        self.assertNotIn("Title", json.dumps(result))
 
     def test_preflight_keeps_matching_explicit_repo_checkout(self) -> None:
         def fake_checked(command, cwd=None):
@@ -212,9 +231,14 @@ class CliContractTests(unittest.TestCase):
             "upstream": None, "upstream_valid": True, "needs_push": True,
             "dirty": False, "status": [], "existing_pull_request": None,
         }
-        with mock.patch("gitstack.publish.preflight", return_value=state):
-            with self.assertRaises(GitStackError) as raised:
-                open_pr(repo=None, title="Title", body_file="body.md", draft=True, base=None, dry_run=True)
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text("Title", encoding="utf-8")
+            body_file.write_text("Body", encoding="utf-8")
+            with mock.patch("gitstack.publish.preflight", return_value=state):
+                with self.assertRaises(GitStackError) as raised:
+                    open_pr(repo=None, title_file=str(title_file), body_file=str(body_file), draft=True, base=None, dry_run=True, expected_worktree_fingerprint=None)
         self.assertEqual(raised.exception.code, "branch_not_pushed")
 
     def test_open_pr_lookup_requires_verified_head_identity(self) -> None:

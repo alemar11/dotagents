@@ -34,14 +34,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "4.1.1")
+        self.assertEqual(stdout.getvalue().strip(), "5.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "4.1.1")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -85,51 +85,32 @@ class ReviewsContractTests(unittest.TestCase):
             cli.duration_seconds("0s", "timeout")
 
     def test_comment_dry_run_json_shape(self) -> None:
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            code = cli.main(
-                [
-                    "--json",
-                    "comment",
-                    "--repo",
-                    "owner/repo",
-                    "--pr",
-                    "12",
-                    "--body",
-                    "@codex please review this PR.",
-                    "--dry-run",
-                ]
-            )
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
+            handle.write("`ticks` $(command) $HOME 'quotes' \"double\"\nUnicode ✓")
+            handle.flush()
+            stdout = io.StringIO()
+            with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12}), \
+                 mock.patch.object(cli, "require_worktree", return_value=None), \
+                 contextlib.redirect_stdout(stdout):
+                code = cli.main(
+                    [
+                        "--json", "comment", "--repo", "owner/repo", "--pr", "12",
+                        "--body-file", handle.name, "--dry-run",
+                    ]
+                )
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "4.1.1")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
         self.assertEqual(payload["data"]["action"]["status"], "dry-run")
-        self.assertEqual(payload["data"]["action"]["type"], "conversation_comment")
+        rendered = json.dumps(payload, ensure_ascii=False)
+        self.assertNotIn("ticks", rendered)
+        self.assertNotIn("command", rendered.replace('"command": ["comment"]', ""))
 
-    def test_read_body_from_file(self) -> None:
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
-            handle.write("hello from file")
-            handle.flush()
-            self.assertEqual(cli.read_body(None, handle.name), "hello from file")
-
-    def test_read_body_rejects_ambiguous_input(self) -> None:
-        with self.assertRaises(cli.ReviewError):
-            cli.read_body("body", "message.md")
-
-    def test_read_body_rejects_invalid_utf8(self) -> None:
-        with tempfile.NamedTemporaryFile("wb") as handle:
-            handle.write(b"\xff")
-            handle.flush()
-            with self.assertRaises(cli.ReviewError) as raised:
-                cli.read_body(None, handle.name, option_prefix="reply-body")
-
-        self.assertEqual(raised.exception.code, "invalid_arguments")
-
-    def test_address_reads_reply_body_from_file(self) -> None:
+    def test_address_is_read_only(self) -> None:
         entry = {
             "index": 1,
             "type": "review_comment",
@@ -144,97 +125,46 @@ class ReviewsContractTests(unittest.TestCase):
             "is_resolved": False,
             "is_outdated": False,
         }
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
-            handle.write("Addressed in the latest revision.")
-            handle.flush()
-            stdout = io.StringIO()
-            with mock.patch.object(cli, "collect_entries", return_value=[entry]):
-                with contextlib.redirect_stdout(stdout):
-                    code = cli.main(
-                        [
-                            "--json",
-                            "address",
-                            "--repo",
-                            "owner/repo",
-                            "--pr",
-                            "12",
-                            "--comment-ids",
-                            "123456",
-                            "--reply-body-file",
-                            handle.name,
-                            "--dry-run",
-                        ]
-                    )
-
+        stdout = io.StringIO()
+        with mock.patch.object(cli, "collect_entries", return_value=[entry]), contextlib.redirect_stdout(stdout):
+            code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "4.1.1")
-        self.assertEqual(payload["data"]["actions"][0]["status"], "dry-run")
+        self.assertEqual(payload["version"], "5.0.0")
+        self.assertNotIn("actions", payload["data"])
 
-    def test_review_reply_uses_pr_scoped_endpoint(self) -> None:
-        entry = {"type": "review_comment", "comment_id": 123456}
-        result = mock.Mock(returncode=0, stdout="", stderr="")
-
-        with mock.patch.object(cli, "run_gh", return_value=result) as run_gh:
-            actions = cli.post_replies("owner/repo", 12, [entry], "Fixed.", False)
-
-        run_gh.assert_called_once_with(
-            [
-                "api",
-                "-X",
-                "POST",
-                "repos/owner/repo/pulls/12/comments/123456/replies",
-                "-H",
-                "Accept: application/vnd.github+json",
-                "-f",
-                "body=Fixed.",
-            ]
-        )
-        self.assertEqual(actions[0]["status"], "replied")
-
-    def test_review_reply_preserves_api_failure(self) -> None:
-        entry = {"type": "review_comment", "comment_id": 123456}
-        result = mock.Mock(returncode=1, stdout="", stderr="HTTP 404")
-
-        with mock.patch.object(cli, "run_gh", return_value=result):
-            actions = cli.post_replies("owner/repo", 12, [entry], "Fixed.", False)
-
-        self.assertEqual(actions[0]["status"], "error")
-        self.assertEqual(actions[0]["message"], "HTTP 404")
-
-    def test_address_rejects_inline_and_file_reply_bodies_together(self) -> None:
-        entry = {
-            "index": 1,
-            "type": "review_comment",
-            "comment_id": 123456,
-        }
+    def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
         with tempfile.NamedTemporaryFile("w", encoding="utf-8") as handle:
-            handle.write("file body")
+            handle.write("Fixed `x` and $(not-run).")
             handle.flush()
             stdout = io.StringIO()
-            with mock.patch.object(cli, "collect_entries", return_value=[entry]):
-                with contextlib.redirect_stdout(stdout):
-                    code = cli.main(
-                        [
-                            "--json",
-                            "address",
-                            "--repo",
-                            "owner/repo",
-                            "--pr",
-                            "12",
-                            "--comment-ids",
-                            "123456",
-                            "--reply-body",
-                            "inline body",
-                            "--reply-body-file",
-                            handle.name,
-                            "--dry-run",
-                        ]
-                    )
+            parent = {"id": 123456, "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12"}
+            with mock.patch.object(cli, "_api_object", return_value=parent), \
+                 mock.patch.object(cli, "require_worktree", return_value=None), \
+                 contextlib.redirect_stdout(stdout):
+                code = cli.main([
+                    "--json", "reply", "--repo", "owner/repo", "--pr", "12",
+                    "--comment-id", "123456", "--body-file", handle.name, "--dry-run",
+                ])
+        self.assertEqual(code, 0)
+        payload = json.loads(stdout.getvalue())
+        action = payload["data"]["action"]
+        self.assertEqual(action["target"]["parent_id"], 123456)
+        self.assertEqual(action["transport"]["endpoint"], "repos/owner/repo/pulls/12/comments/123456/replies")
+        self.assertNotIn("not-run", json.dumps(payload))
 
+    def test_inline_provider_text_flags_are_rejected(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        hostile = "`unsafe` $(command) $HOME"
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = cli.main([
+                "--json", "comment", "--repo", "owner/repo", "--pr", "12", "--body", hostile,
+            ])
         self.assertEqual(code, 64)
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
+        self.assertNotIn(hostile, stdout.getvalue() + stderr.getvalue())
 
     def test_check_codex_reports_findings_for_expected_head(self) -> None:
         head = "a" * 40

@@ -4,7 +4,9 @@ import contextlib
 import io
 import json
 import os
+import subprocess
 import sys
+import tomllib
 import unittest
 import zipfile
 from pathlib import Path
@@ -29,19 +31,28 @@ class StarsContractTests(unittest.TestCase):
         with SCRIPT.open("rb") as handle:
             self.assertEqual(handle.readline().decode().strip(), "#!/usr/bin/env python3")
 
+    def test_manifest_package_and_shipped_artifact_versions_match(self) -> None:
+        plugin_root = Path(__file__).resolve().parents[3]
+        manifest = json.loads((plugin_root / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
+        package = tomllib.loads((Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8"))
+        artifact_version = subprocess.check_output([str(SCRIPT), "--version"], text=True).strip()
+        self.assertEqual(manifest["version"], "5.0.0")
+        self.assertEqual(package["project"]["version"], manifest["version"])
+        self.assertEqual(artifact_version, manifest["version"])
+
     def test_version(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             code = self.stars.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "4.1.1")
+        self.assertEqual(stdout.getvalue().strip(), "5.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             self.stars.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "4.1.1")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertIn("gh", payload["checks"])
 
     def test_invalid_command_json(self) -> None:

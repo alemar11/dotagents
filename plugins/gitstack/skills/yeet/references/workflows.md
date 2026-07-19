@@ -56,12 +56,15 @@ git push                         # verified existing origin/<branch> upstream
 git push -u origin HEAD          # only when the preflight found no upstream
 gh pr list --repo <owner/repo> --head <branch> --state open --limit 2 \
   --json number,title,url,isDraft,headRefName,headRepositoryOwner
-gh pr create --repo <owner/repo> --head <branch> --draft --fill
+<plugin-root>/scripts/gitstack --json repo snapshot
+<plugin-root>/scripts/gitstack --json publish open --repo <owner/repo> --title-file <absolute-title-file> --body-file <absolute-body-file> --draft --expected-worktree-fingerprint <sha256>
 ```
 
 Use explicit pathspecs for staging. Run only one of the two push commands. Run
-`gh pr create` only when the post-push lookup still returns no PR; otherwise
-update the recorded PR instead of creating a duplicate.
+Run `publish open` only when the post-push lookup still returns no PR. It sends
+title and body through JSON stdin, verifies exact UTF-8 byte fingerprints and
+the returned PR target, and performs one exact-head read-back after an
+ambiguous response. Do not retry it blindly.
 
 ## No Publishable Local Work
 
@@ -90,10 +93,13 @@ Close out by saying explicitly:
 
 ## Existing PR
 
+Read the existing PR, then use the structured GitHub connector for title/body
+edits. GitStack does not expose `publish edit`, and `gh pr edit` requires the
+free-form title in argv.
+
 ```bash
 gh pr view <number> --repo <owner/repo> \
-  --json number,title,url,isDraft,headRefName,headRepositoryOwner,baseRefName
-gh pr edit <number> --repo <owner/repo> --title "<title>" --body-file <body-file>
+  --json number,title,body,url,isDraft,headRefName,headRepositoryOwner,baseRefName
 ```
 
 Verify `headRefName` and the head repository still match the preflight before
@@ -106,9 +112,9 @@ editing. Never silently retarget a PR.
   explicitly authorizes history rewriting for the named branch.
 - If a push reports a network or transport error, compare the local commit with
   the remote branch before retrying; the remote may already have accepted it.
-- If `gh pr create` errors or times out, re-run the exact open-PR lookup before
-  another create attempt. Treat a matching PR as success and continue with
-  `gh pr edit` when metadata still needs an update.
+- If `publish open` reports an ambiguous write, preserve its read-back evidence
+  and stop. It already performed the only automatic exact-head read-back; do
+  not issue another create attempt.
 - On any changed branch, remote, upstream, authentication, or PR state, stop and
   rerun the full preflight rather than continuing from stale assumptions.
 

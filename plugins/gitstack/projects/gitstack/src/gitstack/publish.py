@@ -5,6 +5,15 @@ from pathlib import Path
 from typing import Any
 
 from .common import GitStackError, REPO_PATTERN, checked, normalize_remote, run
+from .provider_text import (
+    API_VERSION,
+    api_request,
+    parse_api_object,
+    read_text_file,
+    require_worktree,
+    verify_response_text,
+    verify_worktree_unchanged,
+)
 
 
 def _find_open_pr(repo: str, branch: str, root: Path) -> dict[str, Any] | None:
@@ -13,7 +22,7 @@ def _find_open_pr(repo: str, branch: str, root: Path) -> dict[str, Any] | None:
         [
             "gh", "pr", "list", "--repo", repo, "--state", "open",
             "--head", f"{owner}:{branch}", "--limit", "2", "--json",
-            "number,url,title,state,isDraft,headRefName,headRepositoryOwner,headRepository",
+            "number,url,state,isDraft,headRefName,headRepositoryOwner,headRepository",
         ],
         root,
     )
@@ -120,18 +129,77 @@ def preflight(repo: str | None = None) -> dict[str, Any]:
     }
 
 
-def template(title: str | None, body_file: str | None) -> dict[str, Any]:
-    body = ""
-    if body_file:
-        try:
-            body = Path(body_file).read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as exc:
-            raise GitStackError(f"Could not read body file '{body_file}': {exc}", code="invalid_arguments", exit_code=64) from exc
-    return {"title": title or "", "body": body, "draft": True}
+def _verified_pull_request(
+    payload: dict[str, Any],
+    *,
+    repo: str,
+    branch: str,
+    base: str,
+    draft: bool,
+    title: Any,
+    body: Any,
+) -> dict[str, Any]:
+    verify_response_text(payload, title, field="title")
+    verify_response_text(payload, body)
+    head = payload.get("head") if isinstance(payload.get("head"), dict) else {}
+    base_payload = payload.get("base") if isinstance(payload.get("base"), dict) else {}
+    number = payload.get("number")
+    html_url = payload.get("html_url")
+    if (
+        not isinstance(number, int)
+        or not isinstance(html_url, str)
+        or not html_url.endswith(f"/{repo}/pull/{number}")
+        or head.get("ref") != branch
+        or base_payload.get("ref") != base
+        or payload.get("draft") is not draft
+    ):
+        raise GitStackError(
+            "GitHub pull-request response did not match the intended target.",
+            code="provider_target_mismatch",
+            exit_code=65,
+        )
+    return {
+        "number": number,
+        "url": html_url,
+        "target": {"repo": repo, "head": branch, "base": base, "draft": draft},
+        "text": {"title": title.proof(), "body": body.proof()},
+    }
 
 
-def open_pr(*, repo: str | None, title: str, body_file: str, draft: bool, base: str | None, dry_run: bool) -> dict[str, Any]:
+def _read_pull_request(repo: str, number: int, root: Path) -> dict[str, Any]:
+    result = checked(
+        [
+            "gh", "api", f"repos/{repo}/pulls/{number}",
+            "--method", "GET",
+            "--header", "Accept: application/vnd.github+json",
+            "--header", f"X-GitHub-Api-Version: {API_VERSION}",
+        ],
+        root,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise GitStackError("Could not parse pull-request read-back.", code="provider_response_invalid", exit_code=65) from exc
+    if not isinstance(payload, dict):
+        raise GitStackError("Pull-request read-back returned an unexpected response.", code="provider_response_invalid", exit_code=65)
+    return payload
+
+
+def open_pr(
+    *,
+    repo: str | None,
+    title_file: str,
+    body_file: str,
+    draft: bool,
+    base: str | None,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
     state = preflight(repo)
+    root = Path(state["root"])
+    title = read_text_file(title_file, field="title", single_line=True)
+    body = read_text_file(body_file, field="body", allow_empty=True)
+    worktree_before = require_worktree(expected_worktree_fingerprint, root)
     if state["on_default_branch"]:
         raise GitStackError("Refusing to publish from the default branch.", code="unsafe_branch", exit_code=65)
     if state["dirty"]:
@@ -142,15 +210,52 @@ def open_pr(*, repo: str | None, title: str, body_file: str, draft: bool, base: 
             code="branch_not_pushed",
             exit_code=65,
         )
+    selected_base = base or state["default_branch"]
     if state["existing_pull_request"]:
-        return {"status": "reused", "pull_request": state["existing_pull_request"], "preflight": state}
-    command = ["gh", "pr", "create", "--repo", state["repo"], "--title", title, "--body-file", body_file]
-    if draft:
-        command.append("--draft")
-    if base:
-        command += ["--base", base]
+        existing = state["existing_pull_request"]
+        verified = _verified_pull_request(
+            _read_pull_request(state["repo"], int(existing["number"]), root),
+            repo=state["repo"], branch=state["branch"], base=selected_base,
+            draft=draft, title=title, body=body,
+        )
+        return {"status": "reused", "pull_request": verified, "preflight": state}
+    request = {
+        "title": title.text,
+        "body": body.text,
+        "head": state["branch"],
+        "base": selected_base,
+        "draft": draft,
+    }
     if dry_run:
-        return {"status": "dry-run", "command": command, "preflight": state}
-    result = checked(command, Path(state["root"]))
-    url = result.stdout.strip()
-    return {"status": "created", "url": url, "preflight": state}
+        return {
+            "status": "dry-run",
+            "transport": {"method": "POST", "endpoint": f"repos/{state['repo']}/pulls", "api_version": API_VERSION},
+            "target": {"repo": state["repo"], "head": state["branch"], "base": selected_base, "draft": draft},
+            "text": {"title": title.proof(), "body": body.proof()},
+            "preflight": state,
+        }
+    result = api_request("POST", f"repos/{state['repo']}/pulls", request, cwd=root)
+    status = "created"
+    if result.returncode:
+        recovered = _find_open_pr(state["repo"], state["branch"], root)
+        if recovered is None:
+            raise GitStackError(
+                "Pull-request creation is unconfirmed after one exact-head read-back; do not retry blindly.",
+                code="provider_write_ambiguous",
+                exit_code=result.returncode,
+                details={"target": {"repo": state["repo"], "head": state["branch"]}, "read_back": "not-found"},
+            )
+        payload = _read_pull_request(state["repo"], int(recovered["number"]), root)
+        status = "recovered"
+    else:
+        payload = parse_api_object(result)
+    verified = _verified_pull_request(
+        payload, repo=state["repo"], branch=state["branch"], base=selected_base,
+        draft=draft, title=title, body=body,
+    )
+    try:
+        worktree_after = verify_worktree_unchanged(worktree_before, root)
+    except GitStackError as exc:
+        exc.details = {"status": status, "pull_request": verified}
+        raise
+    return {"status": status, "pull_request": verified, "worktree": worktree_after, "preflight": state}

@@ -9,12 +9,17 @@ from . import __version__
 from . import ci, portfolio, reviews, stars
 from .common import GitStackError, envelope, error_envelope, resolve_pr, resolve_repo
 from .health import doctor
-from .publish import open_pr, preflight, template
+from .provider_text import worktree_snapshot
+from .publish import open_pr, preflight
 
 
 class Parser(argparse.ArgumentParser):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        kwargs.setdefault("allow_abbrev", False)
+        super().__init__(*args, **kwargs)
+
     def error(self, message: str) -> None:
-        raise GitStackError(message, code="invalid_arguments", exit_code=64)
+        raise GitStackError("Invalid command arguments.", code="invalid_arguments", exit_code=64)
 
 
 def parser() -> Parser:
@@ -27,6 +32,7 @@ def parser() -> Parser:
     repo_sub = repo.add_subparsers(dest="verb", required=True)
     repo_resolve = repo_sub.add_parser("resolve", help="Resolve owner/repo from an argument or origin.")
     repo_resolve.add_argument("--repo")
+    repo_snapshot = repo_sub.add_parser("snapshot", help="Fingerprint the current Git HEAD and porcelain worktree state.")
     pr = commands.add_parser("pr", help="Resolve pull request context.")
     pr_sub = pr.add_subparsers(dest="verb", required=True)
     pr_resolve = pr_sub.add_parser("resolve", help="Resolve a PR number/URL or current-branch PR.")
@@ -44,16 +50,14 @@ def parser() -> Parser:
     publish_sub = publish.add_subparsers(dest="verb", required=True)
     publish_preflight = publish_sub.add_parser("preflight")
     publish_preflight.add_argument("--repo")
-    publish_template = publish_sub.add_parser("template")
-    publish_template.add_argument("--title")
-    publish_template.add_argument("--body-file")
     publish_open = publish_sub.add_parser("open")
     publish_open.add_argument("--repo")
-    publish_open.add_argument("--title", required=True)
+    publish_open.add_argument("--title-file", required=True)
     publish_open.add_argument("--body-file", required=True)
     publish_open.add_argument("--base")
     publish_open.add_argument("--draft", action="store_true", default=True)
     publish_open.add_argument("--dry-run", action="store_true")
+    publish_open.add_argument("--expected-worktree-fingerprint")
     return root
 
 
@@ -92,7 +96,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(payload, indent=2) if args.json else _doctor_text(payload))
             return 0 if payload["ok"] else 1
         if args.domain == "repo":
-            _emit(resolve_repo(args.repo), ["repo", "resolve"], args.json)
+            data = resolve_repo(args.repo) if args.verb == "resolve" else worktree_snapshot()
+            _emit(data, ["repo", args.verb], args.json)
             return 0
         if args.domain == "pr":
             _emit(resolve_pr(args.repo, args.pr), ["pr", "resolve"], args.json)
@@ -107,10 +112,16 @@ def main(argv: list[str] | None = None) -> int:
             return _forward(stars, args.args, args.json, "")
         if args.domain == "publish" and args.verb == "preflight":
             data = preflight(args.repo)
-        elif args.domain == "publish" and args.verb == "template":
-            data = template(args.title, args.body_file)
         elif args.domain == "publish" and args.verb == "open":
-            data = open_pr(repo=args.repo, title=args.title, body_file=args.body_file, draft=args.draft, base=args.base, dry_run=args.dry_run)
+            data = open_pr(
+                repo=args.repo,
+                title_file=args.title_file,
+                body_file=args.body_file,
+                draft=args.draft,
+                base=args.base,
+                dry_run=args.dry_run,
+                expected_worktree_fingerprint=args.expected_worktree_fingerprint,
+            )
         else:
             raise GitStackError("Unsupported command.", code="invalid_arguments", exit_code=64)
         _emit(data, ["publish", args.verb], args.json)
