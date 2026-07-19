@@ -40,6 +40,15 @@ def hash_path(path: Path, *, exclude_git_metadata: bool = False) -> str:
         root_path = Path(root)
         rel_root = root_path.relative_to(path)
         digest.update(f"D\0{rel_root.as_posix()}\0".encode("utf-8"))
+        for dirname in dirnames:
+            directory_path = root_path / dirname
+            if directory_path.is_symlink():
+                target = os.readlink(directory_path)
+                digest.update(
+                    f"L\0{directory_path.relative_to(path).as_posix()}\0{target}\0".encode(
+                        "utf-8"
+                    )
+                )
         for filename in sorted(filenames):
             file_path = root_path / filename
             if file_path.is_symlink():

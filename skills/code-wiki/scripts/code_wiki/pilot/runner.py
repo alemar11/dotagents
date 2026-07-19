@@ -63,10 +63,29 @@ STUDY_REQUIRED_TOPICS = (
     "validation",
     "rollback",
 )
+BASELINE_WORKFLOW_FILES = (
+    "SKILL.md",
+    "references/repo-study-playbook.md",
+    "references/wiki-html-contract.md",
+)
 
 
 def skill_root() -> Path:
     return Path(__file__).resolve().parents[3]
+
+
+def _load_baseline_workflow() -> tuple[str, dict[str, str]]:
+    """Load the exact baseline prompt bundle and its per-file identity hashes once."""
+    root = skill_root()
+    sections: list[str] = []
+    hashes: dict[str, str] = {}
+    for relative in BASELINE_WORKFLOW_FILES:
+        path = root / relative
+        raw = path.read_bytes()
+        hashes[relative] = hashlib.sha256(raw).hexdigest()
+        sections.append(f"## {path.name}\n\n{raw.decode('utf-8')}")
+    context = "\n\n# Current full Code Wiki workflow\n\n" + "\n\n".join(sections)
+    return context, hashes
 
 
 def _artifact_path(output_root: Path, snapshot: SourceSnapshot, artifact: str) -> Path:
@@ -333,6 +352,7 @@ def _new_manifest(
     reasoning_effort: str,
     codex_version: str,
     execution_evidence: str,
+    baseline_workflow_hashes: dict[str, str],
 ) -> dict[str, Any]:
     return {
         "schema_version": RUN_SCHEMA_VERSION,
@@ -351,6 +371,7 @@ def _new_manifest(
             "execution_evidence": execution_evidence,
             "graph_sha256": graph.graph_sha256,
             "node_hashes": graph.node_hashes,
+            "baseline_workflow_hashes": dict(baseline_workflow_hashes),
         },
         "source": {
             "original_checkout": str(snapshot.original_checkout),
@@ -426,18 +447,13 @@ def _node_prompt(
     input_hashes: dict[str, str],
     attempt: int,
     validation_feedback: str | None,
+    baseline_workflow_context: str | None = None,
 ) -> str:
     workflow_context = ""
     if node.node_kind == "agent-baseline":
-        root = skill_root()
-        workflow_files = (
-            root / "SKILL.md",
-            root / "references" / "repo-study-playbook.md",
-            root / "references" / "wiki-html-contract.md",
-        )
-        workflow_context = "\n\n# Current full Code Wiki workflow\n\n" + "\n\n".join(
-            f"## {path.name}\n\n{path.read_text(encoding='utf-8')}" for path in workflow_files
-        )
+        if baseline_workflow_context is None:
+            baseline_workflow_context, _ = _load_baseline_workflow()
+        workflow_context = baseline_workflow_context
     feedback = f"\n\n# Validation feedback for bounded repair\n\n{validation_feedback}" if validation_feedback else ""
     source_declared = "source" in node.input_artifacts
     input_paths = _declared_input_paths(input_root, snapshot, node.input_artifacts)
@@ -547,6 +563,7 @@ def _invoke_agent(
     output_root: Path,
     attempt: int,
     validation_feedback: str | None = None,
+    baseline_workflow_context: str | None = None,
 ) -> tuple[dict[str, Any], InvocationResult | None, str | None]:
     started_at = utc_now()
     before = assert_snapshot_clean(snapshot)
@@ -631,6 +648,7 @@ def _invoke_agent(
             input_hashes=input_hashes,
             attempt=attempt,
             validation_feedback=validation_feedback,
+            baseline_workflow_context=baseline_workflow_context,
         )
         result = executor.invoke(
             node_id=node.node_id,
@@ -940,6 +958,7 @@ def _run_pre_validation_graph(
     title: str,
     executor: CodexExecutor | FixtureExecutor,
     manifest: dict[str, Any],
+    baseline_workflow_context: str,
 ) -> bool:
     excluded = {node.node_id for node in graph.nodes.values() if node.node_kind in {"validate", "agent-repair", "agent-reader"}}
     remaining = set(graph.nodes) - excluded
@@ -982,6 +1001,7 @@ def _run_pre_validation_graph(
                     snapshot=snapshot,
                     output_root=output_root,
                     attempt=1,
+                    baseline_workflow_context=baseline_workflow_context,
                 ): node_id
                 for node_id in ready
             }
@@ -1086,6 +1106,7 @@ def _write_execution_provenance(
         "reasoning_effort": identity["reasoning_effort"],
         "codex_cli_version": identity["codex_cli_version"],
         "code_wiki_cli_version": identity["code_wiki_cli_version"],
+        "baseline_workflow_hashes": identity["baseline_workflow_hashes"],
         "manifest_evidence_sha256": manifest_evidence_sha256(manifest),
         "invocations": invocations,
         "signature_algorithm": "hmac-sha256-v1" if signing_key else "none",
@@ -1157,6 +1178,7 @@ def run_pilot(
     output_root.mkdir(parents=True, exist_ok=True)
 
     graph = load_graph(skill_root(), mode)
+    baseline_workflow_context, baseline_workflow_hashes = _load_baseline_workflow()
     snapshot = create_snapshot(repo, commit, str(resolved_cache_root))
     executor: CodexExecutor | FixtureExecutor
     if executor_fixture:
@@ -1174,6 +1196,7 @@ def run_pilot(
         reasoning_effort=reasoning_effort,
         codex_version="fixture-not-invoked" if executor_fixture else _codex_version(),
         execution_evidence="fixture" if executor_fixture else "live",
+        baseline_workflow_hashes=baseline_workflow_hashes,
     )
     _persist(output_root, manifest)
     generation_started = time.monotonic()
@@ -1184,6 +1207,7 @@ def run_pilot(
         title=title or snapshot.original_checkout.name,
         executor=executor,
         manifest=manifest,
+        baseline_workflow_context=baseline_workflow_context,
     )
 
     validation_node = next(node for node in graph.nodes.values() if node.node_kind == "validate")
@@ -1220,6 +1244,7 @@ def run_pilot(
                     output_root=output_root,
                     attempt=repair_attempt_number,
                     validation_feedback=validation_output,
+                    baseline_workflow_context=baseline_workflow_context,
                 )
                 _mark_agent_result(
                     manifest, repair_contract, repair_attempt, repair_result, repair_error
@@ -1249,6 +1274,7 @@ def run_pilot(
             snapshot=snapshot,
             output_root=output_root,
             attempt=1,
+            baseline_workflow_context=baseline_workflow_context,
         )
         _mark_agent_result(manifest, reader_node, reader_attempt, reader_result, reader_error)
         if reader_result:

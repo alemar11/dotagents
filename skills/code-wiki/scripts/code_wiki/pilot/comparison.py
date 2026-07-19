@@ -17,7 +17,7 @@ from code_wiki.pilot.provenance import (
     manifest_evidence_sha256,
     verify_receipt,
 )
-from code_wiki.pilot.runner import RUN_SCHEMA_VERSION, skill_root
+from code_wiki.pilot.runner import RUN_SCHEMA_VERSION, _load_baseline_workflow, skill_root
 from code_wiki.version import VERSION
 
 
@@ -57,6 +57,11 @@ def _read_manifest(path: Path, expected_mode: str) -> tuple[dict[str, Any], list
         errors.append(f"{expected_mode} node hashes do not match the shipped contracts")
     if identity.get("code_wiki_cli_version") != VERSION:
         errors.append(f"{expected_mode} Code Wiki CLI version is not current")
+    _, expected_workflow_hashes = _load_baseline_workflow()
+    if identity.get("baseline_workflow_hashes") != expected_workflow_hashes:
+        errors.append(
+            f"{expected_mode} baseline workflow hashes do not match the shipped workflow"
+        )
     for field in (
         "source_commit",
         "model",
@@ -132,6 +137,7 @@ def _read_manifest(path: Path, expected_mode: str) -> tuple[dict[str, Any], list
         "reasoning_effort": identity.get("reasoning_effort"),
         "codex_cli_version": identity.get("codex_cli_version"),
         "code_wiki_cli_version": identity.get("code_wiki_cli_version"),
+        "baseline_workflow_hashes": identity.get("baseline_workflow_hashes"),
     }
     if provenance.get("schema_version") != 1:
         errors.append(f"{expected_mode} execution provenance schema_version is invalid")
@@ -739,6 +745,7 @@ def build_decision(
         "codex_cli_version",
         "code_wiki_cli_version",
         "execution_evidence",
+        "baseline_workflow_hashes",
     )
     baseline_identity = baseline.get("identity") if isinstance(baseline.get("identity"), dict) else {}
     candidate_identity = candidate.get("identity") if isinstance(candidate.get("identity"), dict) else {}

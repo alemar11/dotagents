@@ -30,6 +30,7 @@ from code_wiki.pilot.runner import (  # noqa: E402
     _assert_paths_hidden,
     _materialize_declared_inputs,
     _invoke_agent,
+    _load_baseline_workflow,
     _mark_agent_result,
     _node_prompt,
     _prepare,
@@ -661,6 +662,40 @@ class CodeWikiPilotTests(unittest.TestCase):
                 source_hash,
             )
 
+    def test_artifact_hash_includes_directory_symlink_path_and_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            artifact = root / "wiki"
+            artifact.mkdir()
+            (artifact / "index.html").write_text("wiki\n", encoding="utf-8")
+            target_a = root / "target-a"
+            target_b = root / "target-b"
+            target_a.mkdir()
+            target_b.mkdir()
+            initial_hash = hash_path(artifact)
+
+            link = artifact / "external"
+            os.symlink(target_a, link, target_is_directory=True)
+            target_a_hash = hash_path(artifact)
+            self.assertNotEqual(target_a_hash, initial_hash)
+
+            link.unlink()
+            os.symlink(target_b, link, target_is_directory=True)
+            self.assertNotEqual(hash_path(artifact), target_a_hash)
+
+    def test_baseline_workflow_identity_hashes_the_exact_prompt_files(self) -> None:
+        context, workflow_hashes = _load_baseline_workflow()
+        expected_paths = (
+            "SKILL.md",
+            "references/repo-study-playbook.md",
+            "references/wiki-html-contract.md",
+        )
+        self.assertEqual(set(workflow_hashes), set(expected_paths))
+        for relative in expected_paths:
+            raw = (SKILL_ROOT / relative).read_bytes()
+            self.assertEqual(workflow_hashes[relative], hashlib.sha256(raw).hexdigest())
+            self.assertIn(raw.decode("utf-8"), context)
+
     def test_snapshot_rejects_unmaterialized_gitlinks_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1109,6 +1144,11 @@ class CodeWikiPilotTests(unittest.TestCase):
             for manifest, out in ((baseline, baseline_out), (candidate, candidate_out)):
                 self.assertEqual(manifest["terminal_status"], "completed")
                 self.assertEqual(manifest["identity"]["execution_evidence"], "fixture")
+                _, expected_workflow_hashes = _load_baseline_workflow()
+                self.assertEqual(
+                    manifest["identity"]["baseline_workflow_hashes"],
+                    expected_workflow_hashes,
+                )
                 self.assertEqual(manifest["validation_status"], "pass")
                 self.assertEqual(manifest["reader_evaluation"]["reader_status"], "pass")
                 self.assertFalse(manifest["source"]["source_mutation"])
@@ -1523,6 +1563,7 @@ class CodeWikiPilotTests(unittest.TestCase):
                 ("inconclusive", {}, {"identity_mismatch": True}),
                 ("inconclusive", {}, {"model_mismatch": True}),
                 ("inconclusive", {}, {"effort_mismatch": True}),
+                ("inconclusive", {}, {"workflow_mismatch": True}),
                 ("inconclusive", {"baseline_input": 0, "baseline_cached": 0}, {}),
                 ("inconclusive", {}, {"reader_failure": True}),
                 ("reject", {}, {"validation_failure": True}),
@@ -1561,6 +1602,10 @@ class CodeWikiPilotTests(unittest.TestCase):
                         candidate["identity"]["model"] = "different-model"
                     if candidate_changes.get("effort_mismatch"):
                         candidate["identity"]["reasoning_effort"] = "low"
+                    if candidate_changes.get("workflow_mismatch"):
+                        candidate["identity"]["baseline_workflow_hashes"]["SKILL.md"] = (
+                            "0" * 64
+                        )
                     if candidate_changes.get("reader_failure"):
                         candidate["terminal_status"] = "failed"
                         candidate["reader_evaluation"] = None
