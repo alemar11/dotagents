@@ -523,7 +523,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "8.0.0")
+            self.assertEqual(created["version"], "9.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None
@@ -820,6 +820,7 @@ class SessionReplayTests(unittest.TestCase):
                     "observations"
                 ][0],
                 {
+                    "request_binding": "recognized",
                     "provider_state": "findings",
                     "observation_fingerprint": facts["initial_review"][
                         "observation_fingerprint"

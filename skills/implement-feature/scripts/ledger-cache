@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "8.0.0"
-LEDGER_SCHEMA_VERSION = "5.0.0"
+__version__ = "9.0.0"
+LEDGER_SCHEMA_VERSION = "6.0.0"
 REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -54,6 +54,8 @@ GITHUB_REPOSITORY_RE = re.compile(
     r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]+$"
 )
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
+FULL_HEAD_RE = re.compile(r"^[0-9a-f]{40}$")
+REQUEST_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 REVISION_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -139,6 +141,9 @@ GATE_STATES = {"passed", "failed"}
 CI_AVAILABILITIES = {"configured", "not-configured"}
 REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
 REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"}
+REVIEW_REQUEST_BINDINGS = {"recognized", "unbound", "invalid", "unknown", "ambiguous"}
+REQUEST_RECEIPT_SCHEMA = "gitstack-codex-review-request:v1"
+REQUEST_RECEIPT_STATUSES = {"posted", "recovered", "reused"}
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
 AUTOREVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
@@ -287,23 +292,159 @@ def ensure_safe_cache_chain(target: Path, field: str) -> None:
             raise CacheError("state-conflict", f"unsafe {field}: {current}", 4)
 
 
-def exact_object(value: Any, required: set[str], field: str) -> dict[str, Any]:
+def exact_object(
+    value: Any,
+    required: set[str],
+    field: str,
+    *,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != required:
         missing = sorted(required - set(value)) if isinstance(value, dict) else sorted(required)
         unknown = sorted(set(value) - required) if isinstance(value, dict) else []
         raise CacheError(
-            "invalid-input",
+            error_code,
             f"{field} schema is invalid",
-            2,
+            exit_code,
             {"missing": missing, "unknown": unknown},
         )
     return value
 
 
-def canonical_fingerprint(value: Any, field: str) -> str:
+def canonical_fingerprint(
+    value: Any,
+    field: str,
+    *,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> str:
     if not isinstance(value, str) or not FINGERPRINT_RE.fullmatch(value):
-        raise CacheError("invalid-input", f"{field} is not a SHA-256 fingerprint", 2)
+        raise CacheError(error_code, f"{field} is not a SHA-256 fingerprint", exit_code)
     return value
+
+
+def validate_review_request_receipt(
+    value: Any,
+    field: str,
+    *,
+    expected_repository: str | None = None,
+    expected_pr_number: int | None = None,
+    expected_head_sha: str | None = None,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> dict[str, Any]:
+    receipt = exact_object(
+        value,
+        {
+            "schema",
+            "provider",
+            "repository",
+            "pr_number",
+            "head_sha",
+            "request_key",
+            "request_fingerprint",
+            "body_fingerprint",
+            "identity_fingerprint",
+            "provider_request_id",
+            "request_ref",
+            "comment_id",
+            "created_at",
+            "status",
+        },
+        field,
+        error_code=error_code,
+        exit_code=exit_code,
+    )
+    if receipt["schema"] != REQUEST_RECEIPT_SCHEMA or receipt["provider"] != "codex":
+        raise CacheError(error_code, f"{field} provider schema is invalid", exit_code)
+    repository = canonical_github_repository(
+        receipt["repository"],
+        f"{field}.repository",
+        error_code=error_code,
+        exit_code=exit_code,
+    )
+    pr_number = receipt["pr_number"]
+    if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number < 1:
+        raise CacheError(error_code, f"{field}.pr_number is invalid", exit_code)
+    head_sha = receipt["head_sha"]
+    if not isinstance(head_sha, str) or not FULL_HEAD_RE.fullmatch(head_sha):
+        raise CacheError(error_code, f"{field}.head_sha must be a full lowercase SHA", exit_code)
+    request_key = receipt["request_key"]
+    if not isinstance(request_key, str) or not REQUEST_KEY_RE.fullmatch(request_key):
+        raise CacheError(error_code, f"{field}.request_key is invalid", exit_code)
+    for name in ("request_fingerprint", "body_fingerprint", "identity_fingerprint"):
+        canonical_fingerprint(receipt[name], f"{field}.{name}", error_code=error_code, exit_code=exit_code)
+    provider_request_id = exact_object(
+        receipt["provider_request_id"],
+        {"kind", "value"},
+        f"{field}.provider_request_id",
+        error_code=error_code,
+        exit_code=exit_code,
+    )
+    if provider_request_id["kind"] != "github-issue-comment" or not isinstance(provider_request_id["value"], str):
+        raise CacheError(error_code, f"{field}.provider_request_id is invalid", exit_code)
+    comment_id = receipt["comment_id"]
+    if not isinstance(comment_id, int) or isinstance(comment_id, bool) or comment_id < 1:
+        raise CacheError(error_code, f"{field}.comment_id is invalid", exit_code)
+    if provider_request_id["value"] != str(comment_id):
+        raise CacheError(error_code, f"{field}.provider_request_id does not bind comment_id", exit_code)
+    request_ref = receipt["request_ref"]
+    if not isinstance(request_ref, str) or not request_ref.strip():
+        raise CacheError(error_code, f"{field}.request_ref is required", exit_code)
+    request_ref = request_ref.strip()
+    expected_ref = f"https://github.com/{repository}/pull/{pr_number}#issuecomment-{comment_id}"
+    if request_ref != expected_ref:
+        raise CacheError(error_code, f"{field}.request_ref is not the exact provider comment URL", exit_code)
+    created_at = receipt["created_at"]
+    parse_timestamp(created_at, f"{field}.created_at")
+    if receipt["status"] not in REQUEST_RECEIPT_STATUSES:
+        raise CacheError(error_code, f"{field}.status is invalid", exit_code)
+    if expected_repository is not None and repository != expected_repository:
+        raise CacheError(error_code, f"{field}.repository does not match the delivery", exit_code)
+    if expected_pr_number is not None and pr_number != expected_pr_number:
+        raise CacheError(error_code, f"{field}.pr_number does not match the delivery", exit_code)
+    if expected_head_sha is not None and head_sha != expected_head_sha:
+        raise CacheError(error_code, f"{field}.head_sha does not match the revision", exit_code)
+    expected_request_fingerprint = request_fingerprint(
+        {
+            "schema": REQUEST_RECEIPT_SCHEMA,
+            "provider": "codex",
+            "repository": repository,
+            "pr_number": pr_number,
+            "head_sha": head_sha,
+            "request_key": request_key,
+        }
+    )
+    if receipt["request_fingerprint"] != expected_request_fingerprint:
+        raise CacheError(error_code, f"{field}.request_fingerprint does not match the request identity", exit_code)
+    body = (
+        f"@codex review {head_sha}\n\n<!-- {REQUEST_RECEIPT_SCHEMA}\n"
+        f"request_key={request_key}\n"
+        f"request_fingerprint={expected_request_fingerprint}\n"
+        "-->"
+    )
+    expected_body_fingerprint = hashlib.sha256(body.encode()).hexdigest()
+    if receipt["body_fingerprint"] != expected_body_fingerprint:
+        raise CacheError(error_code, f"{field}.body_fingerprint does not match the canonical body", exit_code)
+    expected_identity_fingerprint = request_fingerprint(
+        {
+            "schema": REQUEST_RECEIPT_SCHEMA,
+            "provider": "codex",
+            "repository": repository,
+            "pr_number": pr_number,
+            "head_sha": head_sha,
+            "request_key": request_key,
+            "request_fingerprint": expected_request_fingerprint,
+            "body_fingerprint": expected_body_fingerprint,
+            "provider_request_id": provider_request_id,
+            "request_ref": request_ref,
+            "created_at": created_at,
+        }
+    )
+    if receipt["identity_fingerprint"] != expected_identity_fingerprint:
+        raise CacheError(error_code, f"{field}.identity_fingerprint does not match provider identity", exit_code)
+    return receipt
 
 
 def canonical_absolute_path(value: Any, field: str) -> str:
@@ -1770,7 +1911,9 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     "github_repository",
                     "pr_number",
                     "pr_url",
-                    "request_ref",
+                    "reviewed_head_sha",
+                    "request_receipt",
+                    "request_binding",
                     "wait_started_at",
                     "wait_deadline",
                     "wait_invoked_at",
@@ -1805,6 +1948,19 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                 error_code="integrity-failure",
                 exit_code=5,
             )
+            if not isinstance(item["reviewed_head_sha"], str) or not FULL_HEAD_RE.fullmatch(item["reviewed_head_sha"]):
+                raise CacheError("integrity-failure", "run-state review head SHA is invalid", 5)
+            validate_review_request_receipt(
+                item["request_receipt"],
+                f"run_state.reviews[{index}].request_receipt",
+                expected_repository=review_github_repository,
+                expected_pr_number=item["pr_number"],
+                expected_head_sha=item["reviewed_head_sha"],
+                error_code="integrity-failure",
+                exit_code=5,
+            )
+            if item["request_binding"] not in REVIEW_REQUEST_BINDINGS:
+                raise CacheError("integrity-failure", "run-state review request binding is invalid", 5)
             wait_started_at = parse_timestamp(item["wait_started_at"], "wait_started_at")
             wait_deadline = parse_timestamp(item["wait_deadline"], "wait_deadline")
             if wait_deadline != wait_started_at + timedelta(seconds=REVIEW_WAIT_SECONDS):
@@ -1843,6 +1999,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                 exact_object(
                     observation,
                     {
+                        "request_binding",
                         "provider_state",
                         "observation_fingerprint",
                         "disposition",
@@ -1864,6 +2021,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         5,
                     )
                 validate_review_outcome(
+                    observation["request_binding"],
                     observation["provider_state"],
                     observation["disposition"],
                     observation["warning_ref"],
@@ -2062,7 +2220,7 @@ def review_timeout_warning_body(review: dict[str, Any]) -> str:
         "Implement Feature continued because Codex review remained pending for "
         "the full 45-minute wait.\n\n"
         f"Pull request: {review['pr_url']}\n"
-        f"Review request: {review['request_ref']}\n"
+        f"Review request: {review['request_receipt']['request_ref']}\n"
         f"Revision: {review['revision_key']}\n\n"
         "This is not a clean review verdict. A later merge workflow must re-check "
         "this pull request for late Codex findings before merge."
@@ -2074,6 +2232,7 @@ def review_timeout_warning_fingerprint(review: dict[str, Any]) -> str:
 
 
 def validate_review_outcome(
+    request_binding: Any,
     provider: Any,
     disposition: Any,
     warning_ref: Any,
@@ -2091,8 +2250,16 @@ def validate_review_outcome(
         ("failed", "blocked"),
         ("waiting", "timeout-accepted"),
     }
+    if request_binding not in REVIEW_REQUEST_BINDINGS:
+        raise CacheError(error_code, "review request binding is invalid", exit_code)
     if provider not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
         raise CacheError(error_code, "review observation state is invalid", exit_code)
+    if request_binding != "recognized":
+        if (provider, disposition) != ("failed", "blocked"):
+            raise CacheError(error_code, "unrecognized review request must be blocked", exit_code)
+        if any(value is not None for value in (warning_ref, warning_posted_at, warning_fingerprint)):
+            raise CacheError(error_code, "unrecognized review request cannot carry timeout warning evidence", exit_code)
+        return
     if (provider, disposition) not in valid_pairs:
         raise CacheError(error_code, "review provider state and disposition do not match", exit_code)
     if provider == "waiting":
@@ -2116,7 +2283,7 @@ def validate_review_outcome(
                 "warning_ref must identify a comment on the exact pull request",
                 exit_code,
             )
-        if warning_ref == review["request_ref"]:
+        if warning_ref == review["request_receipt"]["request_ref"]:
             raise CacheError(
                 error_code,
                 "warning_ref cannot reuse the review request reference",
@@ -3442,15 +3609,21 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         return True
 
     if event_type == "review-wait-started":
-        event = exact_object(raw, {"type", "task_key", "delivery_key", "revision_key", "request_ref"}, event_type)
+        event = exact_object(raw, {"type", "task_key", "delivery_key", "revision_key", "request_receipt"}, event_type)
         assert delivery is not None
         revision = delivery["revision"]
         if revision is None or event["revision_key"] != revision["revision_key"]:
             raise CacheError("state-conflict", "review request revision is stale", 4)
-        request_ref = nonempty(event["request_ref"], "request_ref")
+        request_receipt = validate_review_request_receipt(
+            event["request_receipt"],
+            "request_receipt",
+            expected_repository=revision["github_repository"],
+            expected_pr_number=revision["pr_number"],
+            expected_head_sha=revision["head_sha"],
+        )
         existing = current_review(state, task, delivery)
         if existing:
-            if existing["request_ref"] == request_ref:
+            if existing["request_receipt"] == request_receipt:
                 return False
             raise CacheError("state-conflict", "current delivery revision already has a review request", 4)
         if len(state["reviews"]) >= MAX_REVIEWS:
@@ -3463,7 +3636,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "github_repository": revision["github_repository"],
                 "pr_number": revision["pr_number"],
                 "pr_url": revision["pr_url"],
-                "request_ref": request_ref,
+                "reviewed_head_sha": request_receipt["head_sha"],
+                "request_receipt": request_receipt,
+                "request_binding": "recognized",
                 "wait_started_at": observed_at,
                 "wait_deadline": format_timestamp(
                     now + timedelta(seconds=REVIEW_WAIT_SECONDS)
@@ -3485,11 +3660,18 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "review-wait-invoked":
         event = exact_object(
             raw,
-            {"type", "task_key", "delivery_key", "revision_key", "request_ref", "wait_invoked_at", "provider_timeout"},
+            {"type", "task_key", "delivery_key", "revision_key", "request_receipt", "wait_invoked_at", "provider_timeout"},
             event_type,
         )
         assert review is not None
-        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
+        request_receipt = validate_review_request_receipt(
+            event["request_receipt"],
+            "request_receipt",
+            expected_repository=review["github_repository"],
+            expected_pr_number=review["pr_number"],
+            expected_head_sha=review["request_receipt"]["head_sha"],
+        )
+        if event["revision_key"] != review["revision_key"] or request_receipt != review["request_receipt"]:
             raise CacheError("state-conflict", "review waiter identity changed", 4)
         invoked = parse_timestamp(event["wait_invoked_at"], "wait_invoked_at")
         started = parse_timestamp(review["wait_started_at"], "wait_started_at")
@@ -3517,7 +3699,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         event = exact_object(
             raw,
             {
-                "type", "task_key", "delivery_key", "revision_key", "request_ref",
+                "type", "task_key", "delivery_key", "revision_key", "request_receipt", "request_binding",
                 "provider_state", "observation_fingerprint", "disposition",
                 "evidence_ref", "warning_ref", "warning_posted_at",
                 "warning_fingerprint",
@@ -3525,7 +3707,14 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             event_type,
         )
         assert review is not None
-        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
+        request_receipt = validate_review_request_receipt(
+            event["request_receipt"],
+            "request_receipt",
+            expected_repository=review["github_repository"],
+            expected_pr_number=review["pr_number"],
+            expected_head_sha=review["request_receipt"]["head_sha"],
+        )
+        if event["revision_key"] != review["revision_key"] or request_receipt != review["request_receipt"]:
             raise CacheError("state-conflict", "review observation identity changed", 4)
         if review["wait_invoked_at"] is None:
             raise CacheError("state-conflict", "review observation precedes waiter launch", 4)
@@ -3536,6 +3725,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 2,
             )
         provider = event["provider_state"]
+        request_binding = event["request_binding"]
         disposition = event["disposition"]
         warning_ref = (
             nonempty(event["warning_ref"], "warning_ref")
@@ -3545,6 +3735,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         warning_posted_at = event["warning_posted_at"]
         warning_fingerprint = event["warning_fingerprint"]
         validate_review_outcome(
+            request_binding,
             provider,
             disposition,
             warning_ref,
@@ -3559,6 +3750,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         fingerprint = canonical_fingerprint(event["observation_fingerprint"], "observation_fingerprint")
         evidence_ref = nonempty(event["evidence_ref"], "evidence_ref")
         observation = {
+            "request_binding": request_binding,
             "provider_state": provider,
             "observation_fingerprint": fingerprint,
             "disposition": disposition,
@@ -3577,6 +3769,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if len(review["observations"]) >= MAX_REVIEW_OBSERVATIONS:
             raise CacheError("state-conflict", "review observation bound reached", 4)
         review["observations"].append({**observation, "observed_at": observed_at})
+        review["request_binding"] = request_binding
         review["wait_state"] = "complete"
         return True
 

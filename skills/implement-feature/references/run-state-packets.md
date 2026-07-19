@@ -82,9 +82,9 @@ values are refs or digests, never pasted output.
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
 | `source-moved` | `task_key`, `from_ref`, `to_ref`, `source_fingerprint`, `tracker_repository`, `revision_set_key`, `evidence_ref` |
-| `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_ref` |
-| `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `wait_invoked_at`, `provider_timeout` |
-| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `provider_state`, `observation_fingerprint`, `disposition`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
+| `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_receipt` |
+| `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `wait_invoked_at`, `provider_timeout` |
+| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `request_binding`, `provider_state`, `observation_fingerprint`, `disposition`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
 | `autoreview-observed` | `task_key`, `delivery_key`, `evidence` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
@@ -114,6 +114,8 @@ newer revision clears `source-moved` tracker dirt.
 
 Terminal handoff uses `handoff_kind=pull-request-ready` and
 `authority=external-merge-required`. A review wait never creates a handoff.
+
+`request_receipt` is complete; binding failure exits 4, never stale or timeout.
 
 ## States And Gates
 

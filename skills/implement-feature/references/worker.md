@@ -83,9 +83,9 @@ Before launch set `wait_invoked_at=now`, compute
 Start GitStack only after the root persists `review-wait-invoked`; that event is
 single-launch authority. Use 10s/30s bounds when positive and one immediate
 no-wait check at zero. Never relaunch, default, or segment it. Bind each result
-to the exact root-issued request and revision. If it remains pending at the
-45-minute deadline, post the required persistent PR warning and report its
-reference so the root can record `timeout-accepted`.
+to the persisted receipt and exact revision. Binding failure exits 4, not stale
+or timeout-eligible; pending at 45 minutes requires the PR warning and
+`timeout-accepted`.
 
 ## Provider Text Transport
 
@@ -96,7 +96,7 @@ dry-run output, or errors. This boundary is global and required; the earlier
 shell execution incident is evidence of the general risk, not a one-off review
 special case.
 
-For every GitStack provider-text mutation:
+For every GitStack provider-text mutation other than the typed review request:
 
 1. Write each text field without interpolation to its own absolute regular
    non-symlink file outside the managed checkout. Use a literal file-write tool
@@ -113,7 +113,8 @@ For every GitStack provider-text mutation:
    worktree fingerprint. Do not print or persist the text itself as transport
    proof.
 
-Use `reviews comment`, one-target `reviews reply`, `reviews edit-comment`, and
+Use `reviews request --request-key` for Codex; it owns the body and receipt. Use
+`reviews comment`, one-target `reviews reply`, `reviews edit-comment`, and
 `reviews submit-review` for their matching operations. `reviews address` is
 read-only. Open a new PR with `publish open --title-file --body-file`; existing
 PR text edits require the structured GitHub connector because GitStack has no
@@ -127,8 +128,8 @@ connector response alone is not byte verification: claim exact bytes only
 after an exact-target read-back proves them.
 
 This transport does not define Codex review-request content, exact-head
-correlation, acknowledgment, request state, or waiting. The separate typed
-review-request handshake remains the sole owner of those semantics. It also
+correlation, acknowledgment, request state, or waiting. The typed GitStack
+request operation remains the sole owner of those semantics. It also
 does not run through or extend `execution-manifest`; validation and AutoReview
 retain their existing command-manifest boundary.
 
@@ -269,12 +270,13 @@ If this is a new task, call `create_goal` with the exact assignment objective
 before implementation and omit `token_budget`. If this is a resumed task, call
 `get_goal` and verify the active objective before continuing nonterminal work.
 If this task is already terminal, verify its completed Goal and report without
-resuming implementation; if its recorded terminal proof precedes an unfinished
-Goal completion transition, finish that transition only. Work only in the
-managed checkouts. Use fixed actions and the root-issued 45-minute review
-deadline; if the exact review is still pending then, post and report the
-persistent PR warning and continue the remaining gates. Report arguments, Goal
-transition readbacks, verified command receipts, and any internal subagents.
+resuming implementation; if its terminal proof precedes unfinished Goal
+completion, finish that transition only. Work only in the
+managed checkouts. Use fixed actions, persist the GitStack request receipt, and
+pass it unchanged to the receipt-bound waiter under the root-issued 45-minute
+deadline; if pending at deadline, post/report the persistent PR warning and
+continue the remaining gates. Report arguments, readbacks, receipts, and
+internal subagents.
 Do not edit the run state, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
 every affected PR is ready to merge or report a concrete blocker. Call

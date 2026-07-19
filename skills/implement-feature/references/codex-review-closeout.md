@@ -47,30 +47,30 @@ implementation revision-set evidence.
 
 The run state is the sole request and timing owner. Keep one review entity keyed
 by `task_key`, `delivery_key`, and the exact delivery `revision_key`. Store
-the exact PR URL, request, provider/result/disposition, bounded observation fingerprints,
+the exact PR URL, complete GitStack request receipt, request binding,
+provider/result/disposition, bounded observation fingerprints,
 `wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
 and the optional durable timeout-warning reference.
 
-Before request, resume, or terminal acceptance, recompute the exact tuple and
-run the canonical GitStack review check. Reuse a current result, wait on a
-current acknowledged request, and create a request only for proven
-not-requested or stale revision. Apply `review-wait-started` before polling so
-recovery cannot duplicate mutation. API, authentication, or configuration
-uncertainty never authorizes another request.
+Before request, call GitStack's typed request operation with the exact current
+full head and caller-supplied `request_key`. It owns the strict canonical
+provider body, current-head preflight, one POST, one read-only recovery, and
+complete receipt. Persist that receipt before `review-wait-started`; the
+identity-bound waiter must consume it and fetch its exact provider comment.
+Unbound, invalid, ambiguous, or unknown binding is exit 4 and never authorizes
+a repost or timeout. API, authentication, or configuration uncertainty never
+authorizes another request.
 
 At the GitStack boundary, pass only the exact PR and canonical
 `review_operation`; add GitStack-owned `mutation_mode=apply` only for an
 authorized mutation. Do not pass App permission, Feature Spec, phase, or fixed
 actions, and never expose the translation as a user option.
 
-Every request or warning body crosses that boundary only through the mandatory
-provider-text transport in `worker.md`: an absolute regular non-symlink UTF-8
-body file, immediate `gitstack --json repo snapshot`, the typed operation with
-`--expected-worktree-fingerprint`, and verified provider target/object/body
-fingerprint plus unchanged worktree proof. Never put request or warning text in
-argv or a shell string. This rule supplies transport only; the separate typed
-review-request handshake owns exact-head request composition, recognition,
-acknowledgment, request state, and wait semantics.
+Every warning body crosses that boundary only through the mandatory provider-text
+transport in `worker.md`. The typed request operation builds its own body and
+uses GitStack's already-safe JSON-stdin transport; callers provide no request
+text. It owns exact-head composition, recognition, acknowledgment, request
+identity, and wait semantics.
 
 ## One Fixed Wait Deadline
 
@@ -115,7 +115,7 @@ Persist exactly one `review-observed` event for the exact request and revision:
 Implement Feature continued because Codex review remained pending for the full 45-minute wait.
 
 Pull request: <exact pr_url>
-Review request: <exact request_ref>
+Review request: <exact request_receipt.request_ref>
 Revision: <exact revision_key>
 
 This is not a clean review verdict. A later merge workflow must re-check this pull request for late Codex findings before merge.

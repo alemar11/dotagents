@@ -1179,7 +1179,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertIn(forbidden_boundary, normalized)
 
-        self.assertIn("separate typed review-request handshake", normalized)
+        self.assertIn("typed GitStack request operation", normalized)
         self.assertIn("does not run through or extend `execution-manifest`", normalized)
         self.assertIn("does not define Codex review-request content", normalized)
         self.assertIn("`reviews comment --body-file ... --expected-worktree-fingerprint ...`", closeout)
@@ -1259,7 +1259,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "8.0.0"', helper)
+        self.assertIn('__version__ = "9.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1276,8 +1276,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "8.0.0"',
-            'LEDGER_SCHEMA_VERSION = "5.0.0"',
+            '__version__ = "9.0.0"',
+            'LEDGER_SCHEMA_VERSION = "6.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "4.0.0"',
         ):
             self.assertIn(constant, helper)
@@ -1287,7 +1287,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `5.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `6.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -2046,10 +2046,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
             98_449,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
-        # Provider transport moves the clean-HEAD invoked paths as follows:
-        # successful 94,665 -> 98,385; with manifest 101,973 -> 105,693;
-        # multi-repository 98,714 -> 102,434. Each ceiling keeps 64 bytes of
-        # explicit headroom; structural prompt reduction is a later redesign.
+        # The typed request receipt adds 49 bytes to each clean-HEAD path:
+        # successful 98,385 -> 98,434; with manifest 105,693 -> 105,742;
+        # multi-repository 102,434 -> 102,483. Each ceiling keeps 15 bytes of
+        # explicit headroom; do not loosen these ceilings for the handshake.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
             105_757,
@@ -2104,6 +2104,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIsNotNone(prompt_match)
         assert prompt_match is not None
         prompt = prompt_match.group(1)
+        # The receipt-bound wording stays within the existing prompt path:
+        # 1,698 -> 1,699 characters.
         baseline_characters = 1704
         self.assertLessEqual(len(prompt), baseline_characters)
         self.assertNotIn("scripts/autoreview --", prompt)

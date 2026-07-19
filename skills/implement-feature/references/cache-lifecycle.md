@@ -24,19 +24,18 @@ remain blocking.
 
 ## Active And Archived State
 
-Keep resumable ledger-schema `5.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v8 is the
+Keep resumable ledger-schema `6.0.0` state as absolute direct-child `.json` files under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v9 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
-Before linking v8, let every prior-doctor active schema-4 run finish; never
-migrate or delete it. Archives remain readable.
 
 Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire fingerprint,
 never a `sha256:` value or receipt fingerprint.
 `terminal` is the only active release reason; every receipt binds stable ledger
 hash and size.
 
-For an in-flight review wait, retain active JSON and the exact claim/fingerprint.
+For an in-flight review wait, retain active JSON, the complete typed request
+receipt, and the exact claim/fingerprint.
 Keep root and worker Goals active and do not release ownership. If the exact
 request remains pending at its 45-minute deadline, record the persistent PR
 warning and continue under `timeout-accepted`; do not schedule another check or

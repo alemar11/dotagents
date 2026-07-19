@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV8Tests(unittest.TestCase):
+class LedgerCacheV9Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -517,6 +517,66 @@ class LedgerCacheV8Tests(unittest.TestCase):
             "closing_refs": [self.source_ref],
         }
 
+    def request_receipt(
+        self,
+        revision: dict,
+        *,
+        comment_id: int = 9001,
+        request_key: str = "run-clean",
+        created_at: str = "2026-07-18T12:00:00Z",
+        status: str = "posted",
+    ) -> dict:
+        schema = "gitstack-codex-review-request:v1"
+        repository = "example/dotagents"
+        pr_number = 233
+        head_sha = revision["head_sha"]
+
+        def fingerprint(value: dict) -> str:
+            return hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+            ).hexdigest()
+
+        request_fingerprint = fingerprint({
+            "schema": schema,
+            "provider": "codex",
+            "repository": repository,
+            "pr_number": pr_number,
+            "head_sha": head_sha,
+            "request_key": request_key,
+        })
+        body = f"@codex review {head_sha}\n\n<!-- {schema}\nrequest_key={request_key}\nrequest_fingerprint={request_fingerprint}\n-->"
+        body_fingerprint = hashlib.sha256(body.encode()).hexdigest()
+        request_ref = f"https://github.com/{repository}/pull/{pr_number}#issuecomment-{comment_id}"
+        identity_fingerprint = fingerprint({
+            "schema": schema,
+            "provider": "codex",
+            "repository": repository,
+            "pr_number": pr_number,
+            "head_sha": head_sha,
+            "request_key": request_key,
+            "request_fingerprint": request_fingerprint,
+            "body_fingerprint": body_fingerprint,
+            "provider_request_id": {"kind": "github-issue-comment", "value": str(comment_id)},
+            "request_ref": request_ref,
+            "created_at": created_at,
+        })
+        return {
+            "schema": schema,
+            "provider": "codex",
+            "repository": repository,
+            "pr_number": pr_number,
+            "head_sha": head_sha,
+            "request_key": request_key,
+            "request_fingerprint": request_fingerprint,
+            "body_fingerprint": body_fingerprint,
+            "identity_fingerprint": identity_fingerprint,
+            "provider_request_id": {"kind": "github-issue-comment", "value": str(comment_id)},
+            "request_ref": request_ref,
+            "comment_id": comment_id,
+            "created_at": created_at,
+            "status": status,
+        }
+
     def observe_delivery(self, revision: dict, *, ready: bool = True) -> None:
         pr = self.pr_for(revision)
         if not ready:
@@ -539,7 +599,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
         )
 
     def start_clean_review(self, revision: dict) -> None:
-        request_ref = "github-review://233/request-1"
+        request_receipt = self.request_receipt(revision, request_key="run-clean")
         self.apply(
             [
                 {
@@ -547,7 +607,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
+                    "request_receipt": request_receipt,
                 }
             ]
         )
@@ -559,7 +619,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
+                    "request_receipt": request_receipt,
                     "wait_invoked_at": review["wait_started_at"],
                     "provider_timeout": 2700,
                 },
@@ -568,7 +628,8 @@ class LedgerCacheV8Tests(unittest.TestCase):
                     "task_key": self.task_key,
                     "delivery_key": "dotagents",
                     "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
+                    "request_receipt": request_receipt,
+                    "request_binding": "recognized",
                     "provider_state": "clean",
                     "observation_fingerprint": hashlib.sha256(
                         b"clean-review"
@@ -769,7 +830,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "8.0.0")
+        self.assertEqual(version, "9.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1324,7 +1385,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
         self.apply([self.task_event(state="review-polling")])
         state = self.state()
         started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        request_ref = "github-review://233/request-timeout"
+        request_receipt = self.request_receipt(revision, request_key="run-timeout", comment_id=9001, created_at="2026-07-18T12:00:00Z")
         self.direct_event(
             state,
             {
@@ -1332,7 +1393,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
             },
             started,
         )
@@ -1352,7 +1413,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
                 "wait_invoked_at": "2026-07-18T12:00:00Z",
                 "provider_timeout": 2700,
             },
@@ -1363,12 +1424,13 @@ class LedgerCacheV8Tests(unittest.TestCase):
             "task_key": self.task_key,
             "delivery_key": "dotagents",
             "revision_key": revision["revision_key"],
-            "request_ref": request_ref,
+            "request_receipt": request_receipt,
+            "request_binding": "recognized",
             "provider_state": "waiting",
             "observation_fingerprint": hashlib.sha256(b"pending-timeout").hexdigest(),
             "disposition": "timeout-accepted",
             "evidence_ref": "github-review://233/pending",
-            "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9001",
+            "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9010",
             "warning_posted_at": review["wait_deadline"],
             "warning_fingerprint": CACHE_RUNTIME.review_timeout_warning_fingerprint(review),
         }
@@ -1389,7 +1451,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
             )
         wrong_pr_warning = {
             **observation,
-            "warning_ref": "https://github.com/example/other/pull/999#issuecomment-9001",
+            "warning_ref": "https://github.com/example/other/pull/999#issuecomment-9010",
         }
         with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "exact pull request"):
             CACHE_RUNTIME.apply_event(
@@ -1604,21 +1666,21 @@ class LedgerCacheV8Tests(unittest.TestCase):
         self.observe_delivery(revision)
         state = self.state()
         started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        request_ref = "github-review://233/request-clean"
+        request_receipt = self.request_receipt(revision, request_key="run-clean", comment_id=9002, created_at="2026-07-18T12:00:00Z")
         for event in (
             {
                 "type": "review-wait-started",
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
             },
             {
                 "type": "review-wait-invoked",
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
                 "wait_invoked_at": "2026-07-18T12:00:00Z",
                 "provider_timeout": 2700,
             },
@@ -1629,7 +1691,8 @@ class LedgerCacheV8Tests(unittest.TestCase):
             "task_key": self.task_key,
             "delivery_key": "dotagents",
             "revision_key": revision["revision_key"],
-            "request_ref": request_ref,
+            "request_receipt": request_receipt,
+            "request_binding": "recognized",
             "provider_state": "failed",
             "observation_fingerprint": hashlib.sha256(b"failed").hexdigest(),
             "disposition": "accepted",
@@ -1689,6 +1752,31 @@ class LedgerCacheV8Tests(unittest.TestCase):
         self.assertTrue(CACHE_RUNTIME.review_is_accepted(state["reviews"][-1]))
         self.assertEqual(CACHE_RUNTIME.review_warnings(state), [])
 
+    def test_unbound_request_cannot_be_timeout_accepted(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        self.start_clean_review(revision)
+        review = self.state()["reviews"][-1]
+        deadline = CACHE_RUNTIME.parse_timestamp(review["wait_deadline"], "wait_deadline")
+        for binding in ("unbound", "invalid", "unknown", "ambiguous"):
+            with self.subTest(binding=binding), self.assertRaisesRegex(
+                CACHE_RUNTIME.CacheError, "unrecognized review request"
+            ):
+                CACHE_RUNTIME.validate_review_outcome(
+                    binding,
+                    "waiting",
+                    "timeout-accepted",
+                    None,
+                    None,
+                    None,
+                    review,
+                    deadline,
+                    deadline,
+                    "invalid-input",
+                    2,
+                )
+
     def test_review_wait_expired_before_launch_uses_zero_and_accepts_timeout(self) -> None:
         self.bootstrap_active_task()
         revision = self.observe_revision()
@@ -1696,7 +1784,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
         state = self.state()
         started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
         invoked = started + timedelta(minutes=50)
-        request_ref = "github-review://233/request-late"
+        request_receipt = self.request_receipt(revision, request_key="run-late", comment_id=9003, created_at="2026-07-18T12:00:00Z")
         self.direct_event(
             state,
             {
@@ -1704,7 +1792,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
             },
             started,
         )
@@ -1716,7 +1804,7 @@ class LedgerCacheV8Tests(unittest.TestCase):
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
                 "wait_invoked_at": "2026-07-18T12:50:00Z",
                 "provider_timeout": 0,
             },
@@ -1729,7 +1817,8 @@ class LedgerCacheV8Tests(unittest.TestCase):
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
                 "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
+                "request_receipt": request_receipt,
+                "request_binding": "recognized",
                 "provider_state": "waiting",
                 "observation_fingerprint": hashlib.sha256(b"late-pending").hexdigest(),
                 "disposition": "timeout-accepted",
