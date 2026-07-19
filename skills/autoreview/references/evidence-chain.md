@@ -23,7 +23,13 @@ later Codex PR review findings, close through fix verification and produce
 
 ## Finding Intake
 
-Pass `--finding-file <path>` for every fix verification. The file is strict:
+Do not calculate `finding_id`. Start with `scripts/autoreview --json findings
+template`, fill only the authoritative finding, disposition, and reason fields,
+set `template=false`, then run `findings prepare`. AutoReview's existing finding
+validator and fingerprint implementation are the sole owners of the generated
+id. Preparation makes no Codex call and consumes no review budget.
+
+Pass the prepared `--finding-file <path>` for every fix verification. The file is strict:
 
 ```json
 {
@@ -74,6 +80,13 @@ If the same finding recurs without a substantive head change, stop with
 ## Commands
 
 ```bash
+scripts/autoreview --json findings template --finding-source codex-review \
+  --output /tmp/autoreview-finding-draft.json
+
+scripts/autoreview --json findings prepare \
+  --input /tmp/autoreview-finding-draft.json \
+  --output /tmp/autoreview-findings.json
+
 scripts/autoreview --mode branch --base origin/main \
   --review-phase full --evidence-output /tmp/autoreview-full.json
 

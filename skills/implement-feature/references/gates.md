@@ -50,6 +50,12 @@ ref, and merge-base SHA require:
 - `mergeability`: conflict-free GitHub mergeability plus required base
   freshness, approvals, and merge-queue eligibility.
 
+For `focused-validation`, `full-validation`, and `autoreview`, require a
+verified current command receipt from `execution-manifest.md`. Its gate
+fingerprint must bind the current bundle, checkout cwd, exact argv, pinned
+tools/dependencies, write policy, and outputs. A pre-call manifest or finding
+validation failure is not a gate result and consumes no AutoReview budget.
+
 When `ci_availability=not-configured`, do not emit, wait for, poll, or accept a
 `ci` gate; report availability, never `passed`. For configured CI, skipped or
 neutral counts only when rules prove it optional. Unknown, pending,

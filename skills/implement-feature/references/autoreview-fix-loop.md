@@ -3,6 +3,11 @@
 Load only after AutoReview or Codex PR review returns an accepted finding.
 
 Follow AutoReview's `references/evidence-chain.md` on the committed branch.
+Create finding drafts without ids and run AutoReview's `findings prepare`
+operation; it alone validates authoritative finding fields and generates the
+canonical ids. Prepare each supported AutoReview invocation as an
+`execution-manifest` command, then run and verify its receipt before recording
+evidence.
 Batch accepted fixes, commit/push a substantive revision, run focused proof,
 then use `fix-verification`; delta rounds have no numeric cap but each must
 advance the head. After first-full fixes reach `verification-clean`, run the

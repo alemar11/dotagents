@@ -142,7 +142,12 @@ evidence write was interrupted, verify and persist that result without calling
 ## Execution
 
 Implement only the accepted bundle and prove substantive acceptance and
-integration. For a nonempty final-issue `knowledge_delta`, complete the exact
+integration. Read the root-prepared canonical bundle manifest, verify its
+digest, and execute only the assigned worker-owned `validation` and `autoreview`
+command ids through `scripts/execution-manifest`; verify each receipt and report
+its fingerprint. Never reconstruct cwd, argv, tool paths, finding ids, or hash
+recipes from prose. Other fixed actions retain their existing owners and
+contracts. For a nonempty final-issue `knowledge_delta`, complete the exact
 Project Memory implementation-closeout after integration and require
 `capture_outcome=captured`, every supplied accepted item and required named
 target reconciled, named verified destinations, and complete documentation-diff
@@ -206,15 +211,13 @@ visible task. They never receive separate portfolio or tracker authority.
 ```text
 Own this Feature Spec through pull-request-ready-for-merge-but-not-merged.
 
-Canonical task source id: <canonical claim/task source id>
-Authoritative Feature Spec: <authored source_spec_ref and title>
-Feature slug: <feature_slug>
-Managed deliveries: <delivery key, repository, checkout, target branch, baseline>
-Allowed paths: <delivery-keyed repository-relative paths>
+Assignment: <canonical source id; authored Feature Spec ref/title; feature slug>
+Managed scope: <delivery, repository, checkout, branch, baseline, allowed paths>
 Scope and acceptance: <exact requirements and acceptance refs>
 Dependencies: <verified merged cross-Spec dependencies>
-Validation and integration gates: <commands and proof>
+Validation/integration: <requirements, proof refs, command ids/manifests/digests>
 Knowledge closeout: <exact final-issue delta or none>
+Canonical bundle manifest: <absolute path and manifest/bundle digests>
 
 If this is a new task, call `create_goal` with the exact assignment objective
 before implementation and omit `token_budget`. If this is a resumed task, call
@@ -225,7 +228,7 @@ Goal completion transition, finish that transition only. Work only in the
 managed checkouts. Use fixed actions and the root-issued 45-minute review
 deadline; if the exact review is still pending then, post and report the
 persistent PR warning and continue the remaining gates. Report arguments, Goal
-transition readbacks, and any internal subagents.
+transition readbacks, verified command receipts, and any internal subagents.
 Do not edit the run state, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
 every affected PR is ready to merge or report a concrete blocker. Call

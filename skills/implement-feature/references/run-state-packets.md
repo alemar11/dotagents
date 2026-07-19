@@ -128,6 +128,9 @@ Review provider/disposition values are `waiting|findings|clean|failed` and
 `autoreview-observed.evidence` flattens the helper envelope's lineage, phase,
 target, counters, open findings, metrics, and ref; omit closed history and
 `observed_at`. Full count is 1–2; every unbounded delta advances `head_sha`.
+For manifest-backed validation and AutoReview, use the verified receipt
+fingerprint in the existing `evidence_ref`; do not add packet or persisted
+state fields.
 
 | gate scope | gates | required identity |
 | --- | --- | --- |

@@ -1,0 +1,875 @@
+#!/usr/bin/env python3
+"""Prepare and execute deterministic Implement Feature command manifests."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+
+__version__ = "1.0.0"
+SCHEMA_VERSION = "1.0.0"
+MAX_PACKET_BYTES = 1024 * 1024
+MAX_OUTPUT_BYTES = 128 * 1024
+COMMAND_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+SHELL_OPERATORS = {"|", "||", "&", "&&", ";", "<", ">", ">>", "2>", "2>>"}
+SHELL_WRAPPERS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "cmd", "powershell", "pwsh"}
+OPERATIONS = {"delivery-preflight", "validation", "autoreview"}
+REVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
+
+
+class ManifestError(Exception):
+    def __init__(self, code: str, message: str, recovery: str, exit_code: int = 2):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.recovery = recovery
+        self.exit_code = exit_code
+
+
+def canonical_bytes(value: Any) -> bytes:
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("ascii")
+    except (TypeError, ValueError) as exc:
+        raise ManifestError("invalid-input", "value is not canonical JSON", "regenerate-from-template") from exc
+
+
+def digest(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def fingerprint(value: Any) -> str:
+    return digest(canonical_bytes(value))
+
+
+def exact_object(value: Any, fields: set[str], label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ManifestError(
+            "invalid-input",
+            f"{label} must contain exactly: {', '.join(sorted(fields))}",
+            "regenerate-from-template",
+        )
+    return value
+
+
+def nonempty(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ManifestError("invalid-input", f"{label} must be nonempty", "regenerate-from-template")
+    return value.strip()
+
+
+def absolute_path(value: Any, label: str, *, existing: bool = False) -> Path:
+    path = Path(nonempty(value, label))
+    if not path.is_absolute():
+        raise ManifestError("invalid-input", f"{label} must be absolute", "regenerate-from-template")
+    if path.is_symlink():
+        raise ManifestError("invalid-input", f"{label} must not be a symlink", "use-regular-path")
+    if existing and not path.is_file():
+        raise ManifestError("invalid-input", f"{label} must be an existing regular file", "restore-input")
+    return path
+
+
+def read_json(path_value: str, label: str) -> dict[str, Any]:
+    path = absolute_path(path_value, label, existing=True)
+    if path.stat().st_size > MAX_PACKET_BYTES:
+        raise ManifestError("invalid-input", f"{label} exceeds 1 MiB", "reduce-input")
+    try:
+        value = json.loads(path.read_text())
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ManifestError("invalid-input", f"{label} is unreadable JSON", "regenerate-from-template") from exc
+    if not isinstance(value, dict):
+        raise ManifestError("invalid-input", f"{label} must contain one JSON object", "regenerate-from-template")
+    return value
+
+
+def write_json(path_value: str, value: dict[str, Any]) -> Path:
+    path = absolute_path(path_value, "output")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(canonical_bytes(value) + b"\n")
+    return path
+
+
+def manifest_fingerprint(value: dict[str, Any]) -> str:
+    return fingerprint({key: item for key, item in value.items() if key != "manifest_sha256"})
+
+
+def validate_file_record(record: Any, label: str, *, tool: bool) -> dict[str, Any]:
+    fields = {"source_kind", "source_ref", "resolved_path", "real_path", "size_bytes", "sha256"}
+    if tool:
+        fields |= {"tool_id", "version"}
+    value = exact_object(record, fields, label)
+    if value["source_kind"] not in {"configured-install", "repository-file", "path-command", "skill-shipped", "generated-packet", "command-output"}:
+        raise ManifestError("manifest-schema-invalid", f"{label} source kind is invalid", "prepare-command-again")
+    nonempty(value["source_ref"], f"{label} source_ref")
+    resolved = absolute_path(value["resolved_path"], f"{label} resolved_path")
+    real = absolute_path(value["real_path"], f"{label} real_path")
+    if resolved.resolve() != real:
+        raise ManifestError("manifest-schema-invalid", f"{label} real path is invalid", "prepare-command-again")
+    if not isinstance(value["size_bytes"], int) or isinstance(value["size_bytes"], bool) or value["size_bytes"] < 0:
+        raise ManifestError("manifest-schema-invalid", f"{label} size is invalid", "prepare-command-again")
+    if not isinstance(value["sha256"], str) or not HEX64_RE.fullmatch(value["sha256"]):
+        raise ManifestError("manifest-schema-invalid", f"{label} digest is invalid", "prepare-command-again")
+    if tool:
+        nonempty(value["tool_id"], f"{label} tool_id")
+        if value["version"] is not None and not isinstance(value["version"], str):
+            raise ManifestError("manifest-schema-invalid", f"{label} version is invalid", "prepare-command-again")
+    return value
+
+
+def validate_manifest(value: dict[str, Any]) -> dict[str, Any]:
+    fields = {
+        "schema_version", "command_id", "operation", "owner", "cwd", "argv",
+        "expected_exit_codes", "dependencies", "tools", "write_set", "outputs",
+        "bundle_sha256", "argv_fingerprint", "gate_fingerprint", "manifest_sha256",
+    }
+    exact_object(value, fields, "command manifest")
+    if value["schema_version"] != SCHEMA_VERSION or value["operation"] not in OPERATIONS:
+        raise ManifestError("manifest-schema-invalid", "command manifest schema is unsupported", "prepare-command-again")
+    if manifest_fingerprint(value) != value["manifest_sha256"]:
+        raise ManifestError("manifest-hash-mismatch", "command manifest hash does not match", "prepare-command-again")
+    if not isinstance(value["command_id"], str) or not COMMAND_ID_RE.fullmatch(value["command_id"]):
+        raise ManifestError("manifest-schema-invalid", "command manifest id is invalid", "prepare-command-again")
+    if value["owner"] not in {"root", "worker"}:
+        raise ManifestError("manifest-schema-invalid", "command manifest owner is invalid", "prepare-command-again")
+    absolute_path(value["cwd"], "command manifest cwd")
+    validate_literal_argv(value["argv"])
+    if value["argv_fingerprint"] != fingerprint({"cwd": value["cwd"], "argv": value["argv"]}):
+        raise ManifestError("manifest-hash-mismatch", "command argv fingerprint does not match", "prepare-command-again")
+    if not isinstance(value["bundle_sha256"], str) or not HEX64_RE.fullmatch(value["bundle_sha256"]):
+        raise ManifestError("manifest-schema-invalid", "command bundle fingerprint is invalid", "prepare-command-again")
+    if value["gate_fingerprint"] != gate_fingerprint(value):
+        raise ManifestError("manifest-schema-invalid", "command gate fingerprint is invalid", "prepare-command-again")
+    exits = value["expected_exit_codes"]
+    if (
+        not isinstance(exits, list)
+        or not exits
+        or any(not isinstance(code, int) or isinstance(code, bool) or code < 0 or code > 255 for code in exits)
+        or exits != sorted(set(exits))
+    ):
+        raise ManifestError("manifest-schema-invalid", "expected exit codes are invalid", "prepare-command-again")
+    tool_ids: set[str] = set()
+    for collection, is_tool in ((value["dependencies"], False), (value["tools"], True)):
+        if not isinstance(collection, list):
+            raise ManifestError("manifest-schema-invalid", "pinned files are invalid", "prepare-command-again")
+        for index, record in enumerate(collection):
+            validated = validate_file_record(record, f"pinned file {index}", tool=is_tool)
+            if is_tool and validated["tool_id"] in tool_ids:
+                raise ManifestError("manifest-schema-invalid", "tool ids must be unique", "prepare-command-again")
+            if is_tool:
+                tool_ids.add(validated["tool_id"])
+    write_set = exact_object(value["write_set"], {"mode", "allowed_paths", "expected_paths"}, "command write_set")
+    if write_set["mode"] not in {"none", "declared"}:
+        raise ManifestError("manifest-schema-invalid", "command write policy is invalid", "prepare-command-again")
+    allowed = validate_relative_paths(write_set["allowed_paths"], "command write_set.allowed_paths")
+    expected = validate_relative_paths(write_set["expected_paths"], "command write_set.expected_paths")
+    if allowed != write_set["allowed_paths"] or expected != write_set["expected_paths"]:
+        raise ManifestError("manifest-schema-invalid", "command write paths are not canonical", "prepare-command-again")
+    if write_set["mode"] == "none" and (allowed or expected):
+        raise ManifestError("manifest-schema-invalid", "no-write commands cannot declare paths", "prepare-command-again")
+    if not set(expected).issubset(allowed):
+        raise ManifestError("manifest-schema-invalid", "expected write paths must be allowed", "prepare-command-again")
+    if not isinstance(value["outputs"], list):
+        raise ManifestError("manifest-schema-invalid", "command outputs are invalid", "prepare-command-again")
+    if any(not isinstance(output, str) for output in value["outputs"]):
+        raise ManifestError("manifest-schema-invalid", "command outputs must be path strings", "prepare-command-again")
+    if len(value["outputs"]) != len(set(value["outputs"])):
+        raise ManifestError("manifest-schema-invalid", "command outputs must be unique", "prepare-command-again")
+    for index, output in enumerate(value["outputs"]):
+        absolute_path(output, f"command outputs[{index}]")
+    return value
+
+
+def gate_fingerprint(value: dict[str, Any]) -> str:
+    return fingerprint(
+        {
+            "command_id": value["command_id"],
+            "operation": value["operation"],
+            "owner": value["owner"],
+            "cwd": value["cwd"],
+            "argv": value["argv"],
+            "expected_exit_codes": value["expected_exit_codes"],
+            "dependencies": value["dependencies"],
+            "tools": value["tools"],
+            "write_set": value["write_set"],
+            "outputs": value["outputs"],
+            "bundle_sha256": value["bundle_sha256"],
+        }
+    )
+
+
+def validate_bundle(value: dict[str, Any]) -> dict[str, Any]:
+    exact_object(
+        value,
+        {"schema_version", "root_task_ref", "bundle_recipe", "entries", "bundle_sha256", "manifest_sha256"},
+        "bundle manifest",
+    )
+    if value["schema_version"] != SCHEMA_VERSION or value["bundle_recipe"] != "sha256-frame-v1":
+        raise ManifestError("manifest-schema-invalid", "bundle manifest schema is unsupported", "prepare-bundle-again")
+    if manifest_fingerprint(value) != value["manifest_sha256"]:
+        raise ManifestError("bundle-hash-mismatch", "bundle manifest hash does not match", "prepare-bundle-again")
+    nonempty(value["root_task_ref"], "bundle root_task_ref")
+    if not isinstance(value["entries"], list) or not value["entries"]:
+        raise ManifestError("manifest-schema-invalid", "bundle entries are invalid", "prepare-bundle-again")
+    rows: list[dict[str, Any]] = []
+    for index, raw in enumerate(value["entries"]):
+        row = exact_object(
+            raw,
+            {"entry_id", "kind", "source_ref", "byte_length", "content_sha256", "snapshot_path"},
+            f"bundle entries[{index}]",
+        )
+        path = absolute_path(row["snapshot_path"], f"bundle entries[{index}].snapshot_path", existing=True)
+        data = path.read_bytes()
+        if len(data) != row["byte_length"] or digest(data) != row["content_sha256"]:
+            raise ManifestError("manifest-stale", f"bundle source changed: {path}", "prepare-bundle-again", 3)
+        rows.append({key: row[key] for key in ("entry_id", "kind", "source_ref", "byte_length", "content_sha256")})
+    if rows != sorted(rows, key=lambda row: row["entry_id"]):
+        raise ManifestError("manifest-schema-invalid", "bundle entries are not canonically sorted", "prepare-bundle-again")
+    payload = b"implement-feature-bundle\0sha256-frame-v1\0" + len(rows).to_bytes(8, "big")
+    for row in rows:
+        frame = canonical_bytes(row)
+        payload += len(frame).to_bytes(8, "big") + frame
+    if digest(payload) != value["bundle_sha256"]:
+        raise ManifestError("bundle-hash-mismatch", "bundle aggregate hash does not match", "prepare-bundle-again")
+    return value
+
+
+def file_record(path: Path, *, source_kind: str, source_ref: str) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file():
+        raise ManifestError("tool-missing", f"required file is unavailable: {path}", "restore-pinned-tool", 3)
+    data = path.read_bytes()
+    return {
+        "source_kind": source_kind,
+        "source_ref": source_ref,
+        "resolved_path": str(path),
+        "real_path": str(path.resolve()),
+        "size_bytes": len(data),
+        "sha256": digest(data),
+    }
+
+
+def command_version(path: Path) -> str | None:
+    try:
+        result = subprocess.run(
+            [str(path), "--version"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    rendered = (result.stdout or result.stderr).strip()
+    return rendered[:4096] or None
+
+
+def resolve_executable(token: str, cwd: Path) -> tuple[Path, str, str]:
+    raw = Path(token)
+    if raw.is_absolute():
+        path = raw
+        source_kind = "configured-install"
+        source_ref = str(raw)
+    elif "/" in token:
+        path = (cwd / raw).resolve()
+        source_kind = "repository-file"
+        source_ref = str(raw)
+    else:
+        resolved = shutil.which(token)
+        if not resolved:
+            raise ManifestError("tool-missing", f"required command is unavailable: {token}", "install-or-restore-pinned-tool", 3)
+        path = Path(resolved)
+        source_kind = "path-command"
+        source_ref = token
+    if path.is_symlink():
+        path = path.resolve()
+    if not path.is_file() or not os.access(path, os.X_OK):
+        raise ManifestError("tool-missing", f"required command is not executable: {path}", "restore-pinned-tool", 3)
+    return path, source_kind, source_ref
+
+
+def tool_record(tool_id: str, path: Path, source_kind: str, source_ref: str) -> dict[str, Any]:
+    record = file_record(path, source_kind=source_kind, source_ref=source_ref)
+    return {"tool_id": tool_id, **record, "version": command_version(path)}
+
+
+def dependency_record(path: Path, cwd: Path | None) -> dict[str, Any]:
+    if cwd is not None:
+        try:
+            relative = path.relative_to(cwd)
+        except ValueError:
+            pass
+        else:
+            return file_record(path, source_kind="repository-file", source_ref=relative.as_posix())
+    return file_record(path, source_kind="configured-install", source_ref=str(path))
+
+
+def validate_literal_argv(value: Any) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise ManifestError("command-argv-invalid", "argv must be a nonempty literal string array", "use-literal-argv")
+    argv: list[str] = []
+    for index, token in enumerate(value):
+        if not isinstance(token, str) or not token:
+            raise ManifestError("command-argv-invalid", f"argv[{index}] must be a nonempty string", "use-literal-argv")
+        argv.append(token)
+    for token in argv:
+        if (
+            token in SHELL_OPERATORS
+            or "$" in token
+            or "`" in token
+            or any(char in token for char in ("|", ";", "<", ">"))
+        ):
+            raise ManifestError("command-argv-invalid", "argv contains shell syntax", "use-literal-argv")
+    if any(re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", token) for token in argv):
+        raise ManifestError("command-argv-invalid", "argv cannot contain an environment assignment", "use-literal-argv")
+    if Path(argv[0]).name.lower() in SHELL_WRAPPERS:
+        raise ManifestError("command-argv-invalid", "shell wrappers are forbidden", "invoke-the-tool-directly")
+    return argv
+
+
+def validate_relative_paths(value: Any, label: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ManifestError("invalid-input", f"{label} must be an array", "regenerate-from-template")
+    result: list[str] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, str) or not item or Path(item).is_absolute() or ".." in Path(item).parts or "\\" in item:
+            raise ManifestError("invalid-input", f"{label}[{index}] is not repository-relative", "regenerate-from-template")
+        normalized = Path(item).as_posix()
+        if normalized in result:
+            raise ManifestError("invalid-input", f"{label} contains duplicate paths", "regenerate-from-template")
+        result.append(normalized)
+    return sorted(result)
+
+
+def bundle_template() -> dict[str, Any]:
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "template": True,
+        "root_task_ref": "REPLACE_ME",
+        "entries": [
+            {
+                "entry_id": "replace-me",
+                "kind": "feature-spec",
+                "source_ref": "REPLACE_ME",
+                "snapshot_path": "/absolute/path/to/snapshot",
+            }
+        ],
+    }
+
+
+def prepare_bundle(request: dict[str, Any]) -> dict[str, Any]:
+    exact_object(request, {"schema_version", "template", "root_task_ref", "entries"}, "bundle request")
+    if request["schema_version"] != SCHEMA_VERSION or request["template"] is not False:
+        raise ManifestError("invalid-input", "bundle request is an unprepared template or unsupported schema", "fill-template")
+    root_task_ref = nonempty(request["root_task_ref"], "root_task_ref")
+    entries = request["entries"]
+    if not isinstance(entries, list) or not entries:
+        raise ManifestError("invalid-input", "entries must be nonempty", "fill-template")
+    prepared: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    identity_rows: list[dict[str, Any]] = []
+    for index, raw in enumerate(entries):
+        item = exact_object(raw, {"entry_id", "kind", "source_ref", "snapshot_path"}, f"entries[{index}]")
+        entry_id = nonempty(item["entry_id"], f"entries[{index}].entry_id")
+        if not COMMAND_ID_RE.fullmatch(entry_id) or entry_id in seen:
+            raise ManifestError("invalid-input", f"entries[{index}].entry_id is invalid or duplicate", "fill-template")
+        seen.add(entry_id)
+        path = absolute_path(item["snapshot_path"], f"entries[{index}].snapshot_path", existing=True)
+        data = path.read_bytes()
+        identity = {
+            "entry_id": entry_id,
+            "kind": nonempty(item["kind"], f"entries[{index}].kind"),
+            "source_ref": nonempty(item["source_ref"], f"entries[{index}].source_ref"),
+            "byte_length": len(data),
+            "content_sha256": digest(data),
+        }
+        identity_rows.append(identity)
+        prepared.append({**identity, "snapshot_path": str(path)})
+    prepared.sort(key=lambda row: row["entry_id"])
+    identity_rows.sort(key=lambda row: row["entry_id"])
+    payload = b"implement-feature-bundle\0sha256-frame-v1\0" + len(identity_rows).to_bytes(8, "big")
+    for row in identity_rows:
+        frame = canonical_bytes(row)
+        payload += len(frame).to_bytes(8, "big") + frame
+    manifest: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "root_task_ref": root_task_ref,
+        "bundle_recipe": "sha256-frame-v1",
+        "entries": prepared,
+        "bundle_sha256": digest(payload),
+    }
+    manifest["manifest_sha256"] = manifest_fingerprint(manifest)
+    return manifest
+
+
+def command_template(operation: str) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "template": True,
+        "command_id": "replace-me",
+        "operation": operation,
+        "owner": "worker" if operation in {"validation", "autoreview"} else "root",
+        "cwd": "/absolute/repository/checkout" if operation != "delivery-preflight" else None,
+        "parameters": {},
+        "dependency_files": [],
+        "write_set": {"mode": "none", "allowed_paths": [], "expected_paths": []},
+        "expected_exit_codes": [0],
+    }
+    if operation == "delivery-preflight":
+        base["parameters"] = {"input": "/absolute/path/to/delivery-preflight.json"}
+    elif operation == "validation":
+        base["parameters"] = {"argv": ["python3", "-m", "unittest"]}
+    else:
+        base["parameters"] = {
+            "mode": "branch", "base": "origin/main", "review_phase": "full",
+            "prior_evidence": None, "finding_file": None,
+            "evidence_output": "/absolute/path/to/evidence.json",
+            "json_output": None, "dry_run": False,
+        }
+    return base
+
+
+def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str, Any]:
+    fields = {
+        "schema_version", "template", "command_id", "operation", "owner", "cwd",
+        "parameters", "dependency_files", "write_set", "expected_exit_codes",
+    }
+    exact_object(request, fields, "command request")
+    if request["schema_version"] != SCHEMA_VERSION or request["template"] is not False:
+        raise ManifestError("invalid-input", "command request is an unprepared template or unsupported schema", "fill-template")
+    bundle = validate_bundle(bundle)
+    operation = request["operation"]
+    if operation not in OPERATIONS:
+        raise ManifestError("invalid-input", "operation is unsupported", "choose-supported-operation")
+    command_id = nonempty(request["command_id"], "command_id")
+    if not COMMAND_ID_RE.fullmatch(command_id):
+        raise ManifestError("invalid-input", "command_id must be lower-kebab", "fill-template")
+    owner = request["owner"]
+    if owner not in {"root", "worker"}:
+        raise ManifestError("invalid-input", "owner must be root or worker", "fill-template")
+    expected = request["expected_exit_codes"]
+    if not isinstance(expected, list) or not expected or any(not isinstance(item, int) or isinstance(item, bool) or item < 0 or item > 255 for item in expected):
+        raise ManifestError("invalid-input", "expected_exit_codes is invalid", "fill-template")
+    expected = sorted(set(expected))
+    dependency_files = request["dependency_files"]
+    if not isinstance(dependency_files, list):
+        raise ManifestError("invalid-input", "dependency_files must be an array", "fill-template")
+    dependency_paths = [
+        absolute_path(value, f"dependency_files[{index}]", existing=True)
+        for index, value in enumerate(dependency_files)
+    ]
+    dependencies: list[dict[str, Any]] = []
+    write_request = exact_object(request["write_set"], {"mode", "allowed_paths", "expected_paths"}, "write_set")
+    if write_request["mode"] not in {"none", "declared"}:
+        raise ManifestError("invalid-input", "write_set.mode must be none or declared", "fill-template")
+    allowed = validate_relative_paths(write_request["allowed_paths"], "write_set.allowed_paths")
+    expected_paths = validate_relative_paths(write_request["expected_paths"], "write_set.expected_paths")
+    if write_request["mode"] == "none" and (allowed or expected_paths):
+        raise ManifestError("invalid-input", "none write set cannot declare paths", "fill-template")
+    if any(not any(path == allowed_path or path.startswith(allowed_path.rstrip("/") + "/") for allowed_path in allowed) for path in expected_paths):
+        raise ManifestError("invalid-input", "expected paths must be allowed", "fill-template")
+    params = request["parameters"]
+    outputs: list[str] = []
+    tools: list[dict[str, Any]] = []
+    if operation == "delivery-preflight":
+        exact_object(params, {"input"}, "parameters")
+        helper = Path(__file__).resolve().with_name("delivery-preflight")
+        cwd = Path(__file__).resolve().parents[1]
+        input_path = absolute_path(params["input"], "parameters.input", existing=True)
+        argv = [str(helper), "--json", "inspect", "--input", str(input_path)]
+        tools.append(tool_record("delivery-preflight", helper, "skill-shipped", "implement-feature:scripts/delivery-preflight"))
+        gh, kind, ref = resolve_executable("gh", cwd)
+        tools.append(tool_record("gh", gh, kind, ref))
+        git, git_kind, git_ref = resolve_executable("git", cwd)
+        tools.append(tool_record("git", git, git_kind, git_ref))
+        dependencies.append(file_record(input_path, source_kind="generated-packet", source_ref="delivery-preflight-input"))
+        if request["cwd"] is not None or owner != "root" or write_request["mode"] != "none":
+            raise ManifestError("invalid-input", "delivery-preflight derives root ownership, cwd, and no-write policy", "regenerate-from-template")
+    else:
+        cwd = absolute_path(request["cwd"], "cwd")
+        if not cwd.is_dir():
+            raise ManifestError("command-cwd-invalid", "cwd must be an existing directory", "restore-managed-checkout")
+        if owner != "worker":
+            raise ManifestError("invalid-input", f"{operation} must be worker-owned", "regenerate-from-template")
+        if operation == "validation":
+            exact_object(params, {"argv"}, "parameters")
+            argv = validate_literal_argv(params["argv"])
+            executable, kind, ref = resolve_executable(argv[0], cwd)
+            argv[0] = str(executable)
+            tools.append(tool_record("validation-command", executable, kind, ref))
+            git, git_kind, git_ref = resolve_executable("git", cwd)
+            tools.append(tool_record("git", git, git_kind, git_ref))
+        else:
+            exact_object(
+                params,
+                {"mode", "base", "review_phase", "prior_evidence", "finding_file", "evidence_output", "json_output", "dry_run"},
+                "parameters",
+            )
+            if params["mode"] not in {"local", "branch", "commit"} or params["review_phase"] not in REVIEW_PHASES or not isinstance(params["dry_run"], bool):
+                raise ManifestError("invalid-input", "AutoReview parameters use invalid canonical values", "regenerate-from-template")
+            if params["mode"] == "branch" and not isinstance(params["base"], str):
+                raise ManifestError("invalid-input", "branch AutoReview requires base", "regenerate-from-template")
+            helper = Path(__file__).resolve().parents[2] / "autoreview/scripts/autoreview"
+            codex, codex_kind, codex_ref = resolve_executable("codex", cwd)
+            git, git_kind, git_ref = resolve_executable("git", cwd)
+            tools.extend(
+                [
+                    tool_record("autoreview", helper, "skill-shipped", "autoreview:scripts/autoreview"),
+                    tool_record("codex", codex, codex_kind, codex_ref),
+                    tool_record("git", git, git_kind, git_ref),
+                ]
+            )
+            argv = [str(helper), "--json", "--mode", params["mode"], "--review-phase", params["review_phase"], "--codex-bin", str(codex)]
+            if params["base"] is not None:
+                argv.extend(["--base", nonempty(params["base"], "parameters.base")])
+            for field, flag in (("prior_evidence", "--prior-evidence"), ("finding_file", "--finding-file")):
+                if params[field] is not None:
+                    path = absolute_path(params[field], f"parameters.{field}", existing=True)
+                    argv.extend([flag, str(path)])
+                    dependencies.append(file_record(path, source_kind="generated-packet", source_ref=field))
+            for field, flag in (("evidence_output", "--evidence-output"), ("json_output", "--json-output")):
+                if params[field] is not None:
+                    path = absolute_path(params[field], f"parameters.{field}")
+                    argv.extend([flag, str(path)])
+                    outputs.append(str(path))
+            if params["dry_run"]:
+                argv.append("--dry-run")
+            if write_request["mode"] != "none":
+                raise ManifestError("invalid-input", "AutoReview repository write policy must be none", "regenerate-from-template")
+    dependencies.extend(dependency_record(path, cwd) for path in dependency_paths)
+    write_set = {"mode": write_request["mode"], "allowed_paths": allowed, "expected_paths": expected_paths}
+    manifest: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "command_id": command_id,
+        "operation": operation,
+        "owner": owner,
+        "cwd": str(cwd),
+        "argv": argv,
+        "expected_exit_codes": expected,
+        "dependencies": sorted(dependencies, key=lambda row: row["resolved_path"]),
+        "tools": sorted(tools, key=lambda row: row["tool_id"]),
+        "write_set": write_set,
+        "outputs": sorted(outputs),
+        "bundle_sha256": bundle["bundle_sha256"],
+    }
+    manifest["argv_fingerprint"] = fingerprint({"cwd": manifest["cwd"], "argv": argv})
+    manifest["gate_fingerprint"] = gate_fingerprint(manifest)
+    manifest["manifest_sha256"] = manifest_fingerprint(manifest)
+    return manifest
+
+
+def verify_file_record(record: dict[str, Any], *, tool: bool) -> None:
+    path = Path(record["resolved_path"])
+    if path.is_symlink() or not path.is_file():
+        code = "tool-missing" if tool else "manifest-stale"
+        raise ManifestError(code, f"pinned file is unavailable: {path}", "refresh-tools" if tool else "prepare-command-again", 3)
+    if digest(path.read_bytes()) != record["sha256"]:
+        code = "tool-digest-mismatch" if tool else "manifest-stale"
+        raise ManifestError(code, f"pinned file changed: {path}", "restore-pinned-tool" if tool else "prepare-command-again", 3)
+    if tool and record.get("version") != command_version(path):
+        raise ManifestError("tool-digest-mismatch", f"pinned tool version changed: {path}", "restore-pinned-tool", 3)
+
+
+def tracked_snapshot(cwd: Path, git_path: str) -> dict[str, str]:
+    result = subprocess.run(
+        [git_path, "-C", str(cwd), "ls-files", "-co", "--exclude-standard", "-z"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ManifestError("command-cwd-invalid", "write observation requires a Git checkout", "use-managed-git-checkout", 3)
+    snapshot: dict[str, str] = {}
+    for raw in result.stdout.split(b"\0"):
+        if not raw:
+            continue
+        rel = os.fsdecode(raw)
+        path = cwd / rel
+        if path.is_file() and not path.is_symlink():
+            snapshot[Path(rel).as_posix()] = digest(path.read_bytes())
+    return snapshot
+
+
+def path_allowed(path: str, allowed: list[str]) -> bool:
+    return any(path == item or path.startswith(item.rstrip("/") + "/") for item in allowed)
+
+
+def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str, Any], int]:
+    manifest = validate_manifest(manifest)
+    for dependency in manifest["dependencies"]:
+        verify_file_record(dependency, tool=False)
+    for tool in manifest["tools"]:
+        verify_file_record(tool, tool=True)
+    cwd = Path(manifest["cwd"])
+    if not cwd.is_dir():
+        raise ManifestError("command-cwd-invalid", "manifest cwd is unavailable", "restore-managed-checkout", 3)
+    git_tools = [tool for tool in manifest["tools"] if tool["tool_id"] == "git"]
+    if len(git_tools) != 1:
+        raise ManifestError("manifest-schema-invalid", "command manifest requires one pinned git tool", "prepare-command-again")
+    before = tracked_snapshot(cwd, git_tools[0]["resolved_path"])
+    receipt = absolute_path(receipt_path, "receipt")
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    stdout_path = receipt.with_suffix(receipt.suffix + ".stdout")
+    stderr_path = receipt.with_suffix(receipt.suffix + ".stderr")
+    environment = os.environ.copy()
+    pinned_directories = list(dict.fromkeys(str(Path(tool["resolved_path"]).parent) for tool in manifest["tools"]))
+    environment["PATH"] = os.pathsep.join(pinned_directories + [environment.get("PATH", "")])
+    result = subprocess.run(
+        manifest["argv"], cwd=cwd, env=environment,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    )
+    stdout_path.write_bytes(result.stdout)
+    stderr_path.write_bytes(result.stderr)
+    after = tracked_snapshot(cwd, git_tools[0]["resolved_path"])
+    changed = sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
+    unexpected = [path for path in changed if not path_allowed(path, manifest["write_set"]["allowed_paths"])]
+    missing = [path for path in manifest["write_set"]["expected_paths"] if not (cwd / path).exists()]
+    output_records: list[dict[str, Any]] = []
+    missing_outputs: list[str] = []
+    for raw in manifest["outputs"]:
+        path = Path(raw)
+        if path.is_file() and not path.is_symlink():
+            output_records.append(file_record(path, source_kind="command-output", source_ref=path.name))
+        else:
+            missing_outputs.append(raw)
+    status = "passed"
+    if result.returncode not in manifest["expected_exit_codes"] or unexpected or missing or missing_outputs:
+        status = "failed"
+    value: dict[str, Any] = {
+        "schema_version": SCHEMA_VERSION,
+        "manifest_sha256": manifest["manifest_sha256"],
+        "command_id": manifest["command_id"],
+        "gate_fingerprint": manifest["gate_fingerprint"],
+        "status": status,
+        "exit_code": result.returncode,
+        "cwd_observed": str(cwd.resolve()),
+        "argv_fingerprint": fingerprint({"cwd": str(cwd), "argv": manifest["argv"]}),
+        "tools": [{"tool_id": row["tool_id"], "resolved_path": row["resolved_path"], "sha256": row["sha256"], "version": row["version"]} for row in manifest["tools"]],
+        "stdout": file_record(stdout_path, source_kind="command-output", source_ref="stdout"),
+        "stderr": file_record(stderr_path, source_kind="command-output", source_ref="stderr"),
+        "writes": {"changed_paths": changed, "unexpected_paths": unexpected, "missing_expected_paths": missing, "missing_outputs": missing_outputs},
+        "outputs": output_records,
+        "prior_receipt_sha256": None,
+    }
+    value["receipt_sha256"] = fingerprint(value)
+    write_json(receipt_path, value)
+    return value, 0 if status == "passed" else 4
+
+
+def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
+    manifest = validate_manifest(manifest)
+    fields = {
+        "schema_version", "manifest_sha256", "command_id", "gate_fingerprint", "status", "exit_code",
+        "cwd_observed", "argv_fingerprint", "tools", "stdout", "stderr", "writes", "outputs",
+        "prior_receipt_sha256", "receipt_sha256",
+    }
+    exact_object(receipt, fields, "receipt")
+    if receipt["schema_version"] != SCHEMA_VERSION or receipt["receipt_sha256"] != fingerprint({key: item for key, item in receipt.items() if key != "receipt_sha256"}):
+        raise ManifestError("receipt-invalid", "receipt fingerprint is invalid", "run-command-again")
+    if receipt["manifest_sha256"] != manifest["manifest_sha256"] or receipt["command_id"] != manifest["command_id"] or receipt["gate_fingerprint"] != manifest["gate_fingerprint"]:
+        raise ManifestError("receipt-invalid", "receipt is bound to another command manifest", "run-command-again")
+    if receipt["status"] not in {"passed", "failed", "reused"}:
+        raise ManifestError("receipt-invalid", "receipt status is invalid", "run-command-again")
+    if not isinstance(receipt["exit_code"], int) or isinstance(receipt["exit_code"], bool):
+        raise ManifestError("receipt-invalid", "receipt exit code is invalid", "run-command-again")
+    absolute_path(receipt["cwd_observed"], "receipt cwd")
+    if receipt["argv_fingerprint"] != manifest["argv_fingerprint"]:
+        raise ManifestError("receipt-invalid", "receipt argv does not match", "run-command-again")
+    if receipt["prior_receipt_sha256"] is not None and (
+        not isinstance(receipt["prior_receipt_sha256"], str)
+        or not HEX64_RE.fullmatch(receipt["prior_receipt_sha256"])
+    ):
+        raise ManifestError("receipt-invalid", "prior receipt hash is invalid", "run-command-again")
+    if not isinstance(receipt["tools"], list) or len(receipt["tools"]) != len(manifest["tools"]):
+        raise ManifestError("receipt-invalid", "receipt tool observations are invalid", "run-command-again")
+    observed_tools = []
+    for index, tool in enumerate(receipt["tools"]):
+        observed = exact_object(tool, {"tool_id", "resolved_path", "sha256", "version"}, f"receipt tools[{index}]")
+        expected = manifest["tools"][index]
+        if observed != {key: expected[key] for key in ("tool_id", "resolved_path", "sha256", "version")}:
+            raise ManifestError("receipt-invalid", "receipt tool observation does not match", "run-command-again")
+        observed_tools.append(observed)
+    for dependency in manifest["dependencies"]:
+        verify_file_record(dependency, tool=False)
+    for tool in manifest["tools"]:
+        verify_file_record(tool, tool=True)
+    for field in ("stdout", "stderr"):
+        validate_file_record(receipt[field], f"receipt {field}", tool=False)
+        verify_file_record(receipt[field], tool=False)
+    writes = exact_object(
+        receipt["writes"],
+        {"changed_paths", "unexpected_paths", "missing_expected_paths", "missing_outputs"},
+        "receipt writes",
+    )
+    for field in ("changed_paths", "unexpected_paths", "missing_expected_paths"):
+        if validate_relative_paths(writes[field], f"receipt writes.{field}") != writes[field]:
+            raise ManifestError("receipt-invalid", f"receipt {field} is not canonical", "run-command-again")
+    if not isinstance(writes["missing_outputs"], list) or any(not isinstance(path, str) for path in writes["missing_outputs"]):
+        raise ManifestError("receipt-invalid", "receipt missing outputs are invalid", "run-command-again")
+    if not isinstance(receipt["outputs"], list):
+        raise ManifestError("receipt-invalid", "receipt outputs are invalid", "run-command-again")
+    for output in receipt["outputs"]:
+        validate_file_record(output, "receipt output", tool=False)
+        verify_file_record(output, tool=False)
+    return receipt
+
+
+def refresh_tools(manifest: dict[str, Any]) -> dict[str, Any]:
+    refreshed = json.loads(json.dumps(validate_manifest(manifest)))
+    replacements: dict[str, str] = {}
+    for index, tool in enumerate(refreshed["tools"]):
+        if tool["source_kind"] == "path-command":
+            path, kind, ref = resolve_executable(tool["source_ref"], Path(refreshed["cwd"]))
+        elif tool["source_kind"] == "skill-shipped":
+            if tool["source_ref"] == "implement-feature:scripts/delivery-preflight":
+                path = Path(__file__).resolve().with_name("delivery-preflight")
+            elif tool["source_ref"] == "autoreview:scripts/autoreview":
+                path = Path(__file__).resolve().parents[2] / "autoreview/scripts/autoreview"
+            else:
+                raise ManifestError("tool-source-untrusted", "skill tool source is unknown", "prepare-command-again", 3)
+            kind, ref = tool["source_kind"], tool["source_ref"]
+        else:
+            path, kind, ref = Path(tool["resolved_path"]), tool["source_kind"], tool["source_ref"]
+        candidate = tool_record(tool["tool_id"], path, kind, ref)
+        if candidate["sha256"] != tool["sha256"] or candidate["version"] != tool["version"] or candidate["source_ref"] != tool["source_ref"]:
+            raise ManifestError("unpinned-substitution-rejected", f"tool identity changed: {tool['tool_id']}", "prepare-new-reviewed-run", 3)
+        replacements[tool["resolved_path"]] = candidate["resolved_path"]
+        refreshed["tools"][index] = candidate
+    refreshed["argv"] = [replacements.get(token, token) for token in refreshed["argv"]]
+    refreshed["argv_fingerprint"] = fingerprint({"cwd": refreshed["cwd"], "argv": refreshed["argv"]})
+    refreshed["gate_fingerprint"] = gate_fingerprint(refreshed)
+    refreshed["manifest_sha256"] = manifest_fingerprint(refreshed)
+    return refreshed
+
+
+def reuse_receipt(manifest: dict[str, Any], prior: dict[str, Any]) -> dict[str, Any]:
+    validate_receipt(prior, manifest)
+    if prior["status"] not in {"passed", "reused"}:
+        raise ManifestError("gate-evidence-stale", "prior receipt does not cover this command", "run-command-again")
+    value = json.loads(json.dumps(prior))
+    value.update(
+        {
+            "manifest_sha256": manifest["manifest_sha256"],
+            "command_id": manifest["command_id"],
+            "gate_fingerprint": manifest["gate_fingerprint"],
+            "status": "reused",
+            "prior_receipt_sha256": prior["receipt_sha256"],
+        }
+    )
+    value["receipt_sha256"] = fingerprint({key: item for key, item in value.items() if key != "receipt_sha256"})
+    return value
+
+
+def doctor() -> dict[str, Any]:
+    return {
+        "ok": True,
+        "command": "doctor",
+        "version": __version__,
+        "offline": True,
+        "operations": sorted(OPERATIONS),
+        "python": sys.executable,
+    }
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Prepare and execute deterministic Implement Feature command manifests.")
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--json", action="store_true")
+    nouns = parser.add_subparsers(dest="noun", required=True)
+    nouns.add_parser("doctor", help="Check local manifest readiness without writing state.")
+    bundle = nouns.add_parser("bundle", help="Template or prepare an immutable source bundle.")
+    bundle_verbs = bundle.add_subparsers(dest="verb", required=True)
+    bundle_template_parser = bundle_verbs.add_parser("template")
+    bundle_template_parser.add_argument("--output", required=True)
+    bundle_prepare = bundle_verbs.add_parser("prepare")
+    bundle_prepare.add_argument("--input", required=True)
+    bundle_prepare.add_argument("--output", required=True)
+    command = nouns.add_parser("command", help="Template, prepare, refresh, or run a command manifest.")
+    command_verbs = command.add_subparsers(dest="verb", required=True)
+    command_template_parser = command_verbs.add_parser("template")
+    command_template_parser.add_argument("--operation", choices=sorted(OPERATIONS), required=True)
+    command_template_parser.add_argument("--output", required=True)
+    command_prepare = command_verbs.add_parser("prepare")
+    command_prepare.add_argument("--bundle", required=True)
+    command_prepare.add_argument("--input", required=True)
+    command_prepare.add_argument("--output", required=True)
+    command_refresh = command_verbs.add_parser("refresh-tools")
+    command_refresh.add_argument("--manifest", required=True)
+    command_refresh.add_argument("--output", required=True)
+    command_run = command_verbs.add_parser("run")
+    command_run.add_argument("--manifest", required=True)
+    command_run.add_argument("--receipt", required=True)
+    receipt = nouns.add_parser("receipt", help="Verify or reuse a command receipt.")
+    receipt_verbs = receipt.add_subparsers(dest="verb", required=True)
+    receipt_verify = receipt_verbs.add_parser("verify")
+    receipt_verify.add_argument("--manifest", required=True)
+    receipt_verify.add_argument("--receipt", required=True)
+    receipt_reuse = receipt_verbs.add_parser("reuse")
+    receipt_reuse.add_argument("--manifest", required=True)
+    receipt_reuse.add_argument("--prior-receipt", required=True)
+    receipt_reuse.add_argument("--output", required=True)
+    return parser
+
+
+def emit(value: dict[str, Any], as_json: bool) -> None:
+    rendered = canonical_bytes(value).decode("ascii") if as_json else json.dumps(value, indent=2, sort_keys=True)
+    if len(rendered.encode()) > MAX_OUTPUT_BYTES:
+        raise ManifestError("output-limit", "command output exceeds 128 KiB", "read-output-file", 4)
+    print(rendered)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    try:
+        if args.noun == "doctor":
+            result = doctor()
+        elif args.noun == "bundle":
+            result = bundle_template() if args.verb == "template" else prepare_bundle(read_json(args.input, "bundle input"))
+            write_json(args.output, result)
+            result = {"ok": True, "command": f"bundle-{args.verb}", "output": args.output, "manifest_sha256": result.get("manifest_sha256")}
+        elif args.noun == "command":
+            if args.verb == "template":
+                value = command_template(args.operation)
+            elif args.verb == "prepare":
+                value = prepare_command(read_json(args.input, "command input"), read_json(args.bundle, "bundle manifest"))
+            elif args.verb == "refresh-tools":
+                value = refresh_tools(validate_manifest(read_json(args.manifest, "command manifest")))
+            else:
+                value, exit_code = run_manifest(validate_manifest(read_json(args.manifest, "command manifest")), args.receipt)
+                emit(value, args.json)
+                return exit_code
+            write_json(args.output, value)
+            result = {"ok": True, "command": f"command-{args.verb}", "output": args.output, "manifest_sha256": value.get("manifest_sha256")}
+        else:
+            manifest = validate_manifest(read_json(args.manifest, "command manifest"))
+            if args.verb == "verify":
+                value = validate_receipt(read_json(args.receipt, "receipt"), manifest)
+                result = {"ok": True, "command": "receipt-verify", "receipt_sha256": value["receipt_sha256"], "status": value["status"]}
+            else:
+                value = reuse_receipt(manifest, read_json(args.prior_receipt, "prior receipt"))
+                write_json(args.output, value)
+                result = {"ok": True, "command": "receipt-reuse", "output": args.output, "receipt_sha256": value["receipt_sha256"]}
+        emit(result, args.json)
+        return 0
+    except ManifestError as exc:
+        error = {"ok": False, "error": {"code": exc.code, "message": exc.message, "recovery": exc.recovery}}
+        emit(error, True)
+        return exc.exit_code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

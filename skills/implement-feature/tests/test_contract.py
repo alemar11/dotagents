@@ -1988,7 +1988,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            93_750,
+            96_000,
+        )
+        manifest_path = successful_path + ("references/execution-manifest.md",)
+        self.assertLessEqual(
+            sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
+            102_500,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -1998,7 +2003,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            97_750,
+            100_000,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE
@@ -2029,6 +2034,40 @@ class ImplementFeatureContractTests(unittest.TestCase):
             ):
                 app_feature_executors.append(path.name)
         self.assertEqual(sorted(app_feature_executors), ["implement-feature"])
+
+    def test_execution_manifest_scope_and_worker_prompt_budget_are_bounded(self) -> None:
+        skill = self.read("SKILL.md")
+        worker = self.read("references/worker.md")
+        execution = self.read("references/execution-manifest.md")
+        run_state = self.read("references/run-state.md")
+        script = self.read("scripts/execution-manifest")
+        prompt_match = re.search(r"## Prompt\n\n```text\n(.*?)\n```", worker, re.DOTALL)
+        self.assertIsNotNone(prompt_match)
+        assert prompt_match is not None
+        prompt = prompt_match.group(1)
+        baseline_characters = 1704
+        self.assertLessEqual(len(prompt), baseline_characters)
+        self.assertNotIn("scripts/autoreview --", prompt)
+        self.assertNotIn("scripts/delivery-preflight", prompt)
+        self.assertNotIn("ledger-cache --json", prompt)
+        self.assertIn("Canonical bundle manifest", prompt)
+        self.assertIn("command ids/manifests/digests", prompt)
+        self.assertIn("references/execution-manifest.md", skill)
+        for operation in ("delivery-preflight", "validation", "autoreview"):
+            self.assertIn(f'"{operation}"', script)
+            self.assertIn(operation, execution)
+        for deferred in ("Claims", "ledger commands", "GitStack", "CI"):
+            self.assertIn(deferred, execution)
+        self.assertIn("scripts/ledger-cache --json ledger create", run_state)
+
+    def test_execution_manifest_validation_forbids_shell_transport(self) -> None:
+        execution = self.read("references/execution-manifest.md")
+        script = self.read("scripts/execution-manifest")
+        self.assertIn("literal string array", execution)
+        self.assertIn("A string command line is invalid", " ".join(execution.split()))
+        self.assertIn("SHELL_WRAPPERS", script)
+        self.assertIn("environment assignment", script)
+        self.assertNotIn("shlex", script)
 
     def test_retired_package_facing_names_are_absent(self) -> None:
         retired = (

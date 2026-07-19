@@ -18,8 +18,9 @@ Call `get_goal` once in the root. If `blocked`, return `new-root-required` befor
 authorization/run-state reads, require a fresh App task, preserve prior
 artifacts, and never adopt/update that Goal.
 
-Run `scripts/delivery-preflight --json doctor` and require authenticated `gh`
-plus API reachability before external freshness checks. Missing capability is
+Run and verify a freshly prepared `delivery-preflight` command manifest under
+`execution-manifest.md` and require its pinned authenticated `gh` plus API
+reachability before external freshness checks. Missing capability is
 `unsupported-runtime`; do not reinterpret it as CI absence.
 
 Read `ledger-cache ledger read --projection recovery` only after that gate.

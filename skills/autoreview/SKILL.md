@@ -175,6 +175,8 @@ scripts/autoreview --mode local
 scripts/autoreview --mode branch --base origin/main
 scripts/autoreview --mode commit --commit HEAD
 scripts/autoreview --json doctor
+scripts/autoreview --json findings template --finding-source codex-review --output /tmp/autoreview-finding-draft.json
+scripts/autoreview --json findings prepare --input /tmp/autoreview-finding-draft.json --output /tmp/autoreview-findings.json
 ```
 
 Useful options:
@@ -190,6 +192,9 @@ Useful options:
 - `--review-phase`, `--prior-evidence`, `--finding-file`, and
   `--evidence-output`: create or continue the committed-branch evidence chain
   documented in `references/evidence-chain.md`.
+- `findings template|prepare`: emit a strict draft without caller-generated ids,
+  then validate authoritative fields and generate canonical ids locally. These
+  operations never call Codex or consume review budget.
 - `--heartbeat-seconds`: change the long-running Codex review heartbeat
   interval. The default is 60 seconds.
 - `--no-web-search`: omit Codex web search for the review run.

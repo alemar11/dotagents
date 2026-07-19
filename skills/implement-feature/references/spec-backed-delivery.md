@@ -81,7 +81,10 @@ revision is established by `revision-observed`, a current committed/published
 `delivery-observed` snapshot clears dirt, and gates are rerun.
 
 The root snapshots the complete source and each issue body and computes its own
-fingerprints. Source-provided option rows, resolution fingerprints, duplicated
+fingerprints by preparing the canonical aggregate and per-entry records through
+`execution-manifest.md`. Every worker can independently reconstruct the
+documented `sha256-frame-v1` aggregate from the manifest without receiving a
+private byte recipe. Source-provided option rows, resolution fingerprints, duplicated
 delivery sections, and `## Orchestrator Handoff` sections are incompatible.
 
 ## Intake Validation

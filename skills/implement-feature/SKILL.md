@@ -119,12 +119,12 @@ Goal, task, tracker write, or source mutation was created.
    Goal as `new-root-required`.
 1. **AUTHORIZE** — verify the model policy and obtain the fixed-flow grant.
 2. **SNAPSHOT** — acquire the complete bundle once, retain it only as temporary
-   read-only intake data, and derive the candidate delivery repository/branch set.
-3. **DELIVERY-PREFLIGHT** — run `scripts/delivery-preflight --json doctor`, then
-   one bounded `inspect` packet. Require GitHub access, push/PR capability,
-   read access to PR lifecycle, mergeability/conflicts, and policy visibility;
-   discover the default base and classify CI as `configured` or
-   `not-configured`. Unknown or blocked capability returns
+   data; prepare its canonical bundle and derive the delivery set.
+3. **DELIVERY-PREFLIGHT** — with `references/execution-manifest.md`,
+   prepare/run/verify `delivery-preflight` manifest. Require GitHub push/PR
+   access, read access to PR lifecycle,
+   mergeability/conflicts, and policy visibility; classify CI as `configured`
+   or `not-configured`. Unknown or blocked capability returns
    `delivery-preflight-failed` with zero artifacts. `not-configured` is valid.
 4. **INTAKE** — validate and fingerprint the complete saved snapshot; resolve each task
    profile and require its final delivery set to equal the preflight set exactly.
@@ -270,4 +270,5 @@ Post-terminal drift blocks archive and never reopens Goals or implementation.
 ## Reference Routing
 
 Use the predicates. `run-state.md` owns commands, projections, and transitions;
-`run-state-packets.md` owns event types/fields and loads only before writes.
+`run-state-packets.md` owns event fields before writes; `execution-manifest.md`
+owns bundles plus supported command manifests and receipts.

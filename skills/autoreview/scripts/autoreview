@@ -12,7 +12,7 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 
 PRIORITIES = {0, 1, 2, 3}
 FINDING_CATEGORIES = {"bug", "security", "regression", "test-gap", "maintainability"}
@@ -1455,8 +1455,104 @@ def run_disposition(args: argparse.Namespace) -> int:
     return 0
 
 
+def findings_template(finding_source: str) -> dict[str, Any]:
+    return {
+        "schema_version": "1.0.0",
+        "template": True,
+        "finding_source": finding_source,
+        "findings": [
+            {
+                "finding": {
+                    "title": "REPLACE_ME",
+                    "body": "REPLACE_ME",
+                    "priority": 2,
+                    "finding_category": "bug",
+                    "confidence": 1.0,
+                    "code_location": {
+                        "file_path": "relative/path.py",
+                        "line": 1,
+                    },
+                },
+                "disposition": "accepted",
+                "reason": "REPLACE_ME",
+            }
+        ],
+    }
+
+
+def prepare_findings(value: dict[str, Any]) -> dict[str, Any]:
+    if set(value) != {"schema_version", "template", "finding_source", "findings"}:
+        raise AutoreviewError("finding draft has an invalid shape", code="finding-fields-invalid", recovery="regenerate-finding-template")
+    if value.get("schema_version") != "1.0.0" or value.get("template") is not False:
+        raise AutoreviewError("finding draft is an unprepared template or unsupported schema", code="finding-fields-invalid", recovery="fill-finding-template")
+    source = value.get("finding_source")
+    rows = value.get("findings")
+    if source not in {"autoreview", "codex-review"} or not isinstance(rows, list) or not rows:
+        raise AutoreviewError("finding draft must use a canonical source and nonempty findings", code="finding-fields-invalid", recovery="fill-finding-template")
+    prepared: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or set(row) != {"finding", "disposition", "reason"}:
+            raise AutoreviewError(f"finding draft row {index} is invalid", code="finding-fields-invalid", recovery="regenerate-finding-template")
+        finding = row.get("finding")
+        path = finding.get("code_location", {}).get("file_path", "") if isinstance(finding, dict) else ""
+        validate_finding(index, finding, {path})
+        disposition = row.get("disposition")
+        reason = row.get("reason")
+        if disposition not in {"accepted", "rejected"} or not isinstance(reason, str) or not reason:
+            raise AutoreviewError(f"finding draft row {index} has invalid disposition", code="finding-fields-invalid", recovery="fill-finding-template")
+        identifier = finding_id(finding)
+        if identifier in seen:
+            raise AutoreviewError(f"finding draft row {index} is duplicate", code="finding-fields-invalid", recovery="deduplicate-findings")
+        seen.add(identifier)
+        prepared.append({"finding_id": identifier, "finding": finding, "disposition": disposition, "reason": reason})
+    return {"finding_source": source, "findings": prepared}
+
+
+def run_findings_command(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Template or prepare canonical AutoReview finding intake.")
+    parser.add_argument("--json", action="store_true")
+    nouns = parser.add_subparsers(dest="noun", required=True)
+    findings = nouns.add_parser("findings")
+    verbs = findings.add_subparsers(dest="verb", required=True)
+    template = verbs.add_parser("template")
+    template.add_argument("--finding-source", choices=["autoreview", "codex-review"], required=True)
+    template.add_argument("--output", required=True)
+    prepare = verbs.add_parser("prepare")
+    prepare.add_argument("--input", required=True)
+    prepare.add_argument("--output", required=True)
+    args = parser.parse_args(argv)
+    try:
+        output = Path(args.output)
+        if not output.is_absolute():
+            raise AutoreviewError("finding output must be absolute", code="finding-fields-invalid", recovery="use-absolute-output")
+        if output.is_symlink() or (output.exists() and not output.is_file()):
+            raise AutoreviewError("finding output must be a regular file path", code="finding-fields-invalid", recovery="use-regular-output")
+        if args.verb == "template":
+            value = findings_template(args.finding_source)
+        else:
+            input_path = Path(args.input)
+            if not input_path.is_absolute() or input_path.is_symlink() or not input_path.is_file():
+                raise AutoreviewError("finding input must be an absolute regular file", code="finding-fields-invalid", recovery="regenerate-finding-template")
+            value = prepare_findings(load_json_file(str(input_path), "finding draft"))
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+        result = {"ok": True, "command": f"findings-{args.verb}", "output": str(output), "finding_count": len(value["findings"])}
+        print(json.dumps(result, indent=2, sort_keys=True) if args.json else f"{result['command']}: {output}")
+        return 0
+    except AutoreviewError as exc:
+        if args.json:
+            print(json.dumps({"ok": False, "error": str(exc), "error_code": exc.code, "recovery": exc.recovery}, indent=2, sort_keys=True), file=sys.stderr)
+        else:
+            print(f"autoreview: {exc}", file=sys.stderr)
+        return 2
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a Codex-only structured closeout review.")
+    parser = argparse.ArgumentParser(
+        description="Run a Codex-only structured closeout review.",
+        epilog="Finding intake helpers: --json findings template|prepare ...",
+    )
     parser.add_argument("command", nargs="?", choices=["doctor"], help="Optional command. Omit to run a review.")
     parser.add_argument("--version", action="store_true", help="Print the autoreview helper version.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON when supported.")
@@ -1501,7 +1597,11 @@ def positive_int(value: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv or sys.argv[1:])
+    raw_argv = argv or sys.argv[1:]
+    positional_probe = [item for item in raw_argv if item != "--json"]
+    if positional_probe and positional_probe[0] == "findings":
+        return run_findings_command(raw_argv)
+    args = parse_args(raw_argv)
     if args.version:
         print(f"autoreview {VERSION}")
         return 0

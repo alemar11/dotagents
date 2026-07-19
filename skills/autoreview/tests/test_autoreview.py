@@ -104,7 +104,72 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 1.1.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 1.2.0")
+
+    def test_findings_prepare_owns_canonical_ids(self) -> None:
+        finding = {
+            "title": "Canonical finding",
+            "body": "The helper must derive this identifier.",
+            "priority": 2,
+            "confidence": 0.95,
+            "finding_category": "bug",
+            "code_location": {"file_path": "src/app.py", "line": 12},
+        }
+        draft = {
+            "schema_version": "1.0.0",
+            "template": False,
+            "finding_source": "codex-review",
+            "findings": [{"finding": finding, "disposition": "accepted", "reason": "Verified."}],
+        }
+        prepared = cli.prepare_findings(draft)
+        self.assertEqual(prepared["findings"][0]["finding_id"], cli.finding_id(finding))
+        with self.assertRaisesRegex(cli.AutoreviewError, "invalid shape"):
+            cli.prepare_findings({**draft, "finding_id": "a" * 64})
+
+    def test_findings_prepare_is_pre_codex_and_manual_mismatch_still_fails(self) -> None:
+        finding = {
+            "title": "Canonical finding",
+            "body": "The supplied identifier is wrong.",
+            "priority": 1,
+            "confidence": 1.0,
+            "finding_category": "regression",
+            "code_location": {"file_path": "app.py", "line": 1},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            draft_path = root / "draft.json"
+            output_path = root / "prepared.json"
+            draft_path.write_text(json.dumps({
+                "schema_version": "1.0.0",
+                "template": False,
+                "finding_source": "codex-review",
+                "findings": [{"finding": finding, "disposition": "accepted", "reason": "Verified."}],
+            }))
+            with mock.patch.object(cli, "run_codex", side_effect=AssertionError("Codex must not run")):
+                code = cli.main(["--json", "findings", "prepare", "--input", str(draft_path), "--output", str(output_path)])
+            self.assertEqual(code, 0)
+            prepared = json.loads(output_path.read_text())
+            target_path = root / "target.json"
+            target_path.write_text("unchanged")
+            symlink_path = root / "symlink.json"
+            symlink_path.symlink_to(target_path)
+            with contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(
+                    cli.main(["--json", "findings", "template", "--finding-source", "codex-review", "--output", str(symlink_path)]),
+                    2,
+                )
+            self.assertEqual(target_path.read_text(), "unchanged")
+            prepared["findings"][0]["finding_id"] = "0" * 64
+            manual_path = root / "manual.json"
+            manual_path.write_text(json.dumps(prepared))
+            prior = {"finding_state": {"open": []}}
+            with self.assertRaisesRegex(cli.AutoreviewError, "fingerprint mismatch"):
+                cli.load_finding_file(str(manual_path), prior)
+
+    def test_findings_word_in_review_option_does_not_select_prepare_command(self) -> None:
+        with mock.patch.object(cli, "run_review", return_value=0) as run_review:
+            self.assertEqual(cli.main(["--prompt", "findings"]), 0)
+        run_review.assert_called_once()
 
     def test_incremental_command_surface_is_canonical(self) -> None:
         args = cli.parse_args([
@@ -187,9 +252,15 @@ class AutoreviewContractTests(unittest.TestCase):
             )
             fake.chmod(0o755)
             report_path = root / "report.json"
+            codex_home = root / "codex-home"
+            codex_home.mkdir()
 
             def invoke(*args: str, expected: int) -> subprocess.CompletedProcess[str]:
-                env = {**os.environ, "FAKE_REPORT": str(report_path)}
+                env = {
+                    **os.environ,
+                    "CODEX_HOME": str(codex_home),
+                    "FAKE_REPORT": str(report_path),
+                }
                 result = subprocess.run(
                     [str(SCRIPT_PATH), "--mode", "branch", "--base", "main", "--codex-bin", str(fake), "--no-web-search", *args],
                     cwd=repo, env=env, text=True, capture_output=True,

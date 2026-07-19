@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "bundle_request": {
+    "schema_version": "1.0.0",
+    "template": false,
+    "root_task_ref": "task:replay",
+    "entries": [
+      {
+        "entry_id": "source",
+        "kind": "feature-spec",
+        "source_ref": "example/repository#1",
+        "snapshot_path": "{ROOT}/source.md"
+      }
+    ]
+  },
+  "validation_request": {
+    "schema_version": "1.0.0",
+    "template": false,
+    "command_id": "replay-validation",
+    "operation": "validation",
+    "owner": "worker",
+    "cwd": "{ROOT}/repo",
+    "parameters": {
+      "argv": ["{PYTHON}", "--version"]
+    },
+    "dependency_files": ["{ROOT}/source.md"],
+    "write_set": {
+      "mode": "none",
+      "allowed_paths": [],
+      "expected_paths": []
+    },
+    "expected_exit_codes": [0]
+  },
+  "expected": {
+    "bundle_recipe": "sha256-frame-v1",
+    "operation": "validation",
+    "receipt_status": "passed"
+  }
+}
