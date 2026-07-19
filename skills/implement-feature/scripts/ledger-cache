@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "6.0.0"
+__version__ = "7.0.0"
 LEDGER_SCHEMA_VERSION = "4.0.0"
 REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
@@ -141,6 +141,7 @@ REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
 PROJECTIONS = {"status", "dispatch", "recovery", "terminal"}
+PORTFOLIO_OBJECTIVE_CI_CLAUSE = "CI when configured"
 
 
 class CacheError(Exception):
@@ -974,6 +975,12 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     root_task_ref = nonempty(registration["root_task_ref"], "registration.root_task_ref")
     root_checkout = canonical_absolute_path(registration["root_checkout"], "registration.root_checkout")
     objective = nonempty(registration["objective"], "registration.objective")
+    if PORTFOLIO_OBJECTIVE_CI_CLAUSE not in objective:
+        raise CacheError(
+            "invalid-input",
+            "registration.objective lacks the current conditional-CI clause",
+            2,
+        )
     objective_fingerprint = canonical_fingerprint(
         registration["objective_fingerprint"], "registration.objective_fingerprint"
     )
@@ -1352,7 +1359,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
         canonical_fingerprint(value["content_fingerprint"], "run_state.content_fingerprint")
         parse_timestamp(value["created_at"], "created_at")
         parse_timestamp(value["updated_at"], "updated_at")
-        exact_object(
+        portfolio = exact_object(
             value["portfolio"],
             {
                 "key",
@@ -1368,6 +1375,23 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             },
             "run_state.portfolio",
         )
+        objective = nonempty(portfolio["objective"], "run_state.portfolio.objective")
+        if PORTFOLIO_OBJECTIVE_CI_CLAUSE not in objective:
+            raise CacheError(
+                "integrity-failure",
+                "run-state portfolio objective uses the retired CI contract",
+                5,
+            )
+        objective_fingerprint = canonical_fingerprint(
+            portfolio["objective_fingerprint"],
+            "run_state.portfolio.objective_fingerprint",
+        )
+        if hashlib.sha256(objective.encode()).hexdigest() != objective_fingerprint:
+            raise CacheError(
+                "integrity-failure",
+                "run-state portfolio objective fingerprint does not match",
+                5,
+            )
         if value["portfolio"]["key"] != ledger.stem:
             raise CacheError("integrity-failure", "run-state path identity mismatch", 5)
         exact_object(value["claim"], {"fingerprint"}, "run_state.claim")

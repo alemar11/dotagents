@@ -23,11 +23,11 @@ Use exactly these top-level fields:
 | `schema_version` | `4.0.0` |
 | `root_task_ref` | calling App task ref |
 | `root_checkout` | absolute root checkout |
-| `objective` | exact portfolio Goal text |
+| `objective` | freshly derived portfolio Goal text containing exact `CI when configured` |
 | `objective_fingerprint` | its SHA-256 |
 | `permission_evidence_ref` | authorization evidence |
 | `repositories` | sorted canonical Git common directories |
-| `repository_checkouts` | exact `{repository, checkout}` claim map |
+| `repository_checkouts` | exact `{git_common_dir, checkout}` claim map |
 | `sources` | nonempty task-source records below |
 
 Each `sources[]` object has exactly:

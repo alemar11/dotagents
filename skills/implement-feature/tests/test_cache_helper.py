@@ -50,11 +50,11 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV6Tests(unittest.TestCase):
+class LedgerCacheV7Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
-    task_goal_objective = "Implement Feature Spec 232 exactly"
+    task_goal_objective = "Implement Feature Spec 232 exactly with CI when configured"
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -147,7 +147,9 @@ class LedgerCacheV6Tests(unittest.TestCase):
     def registration_for(self, claim: dict | None = None) -> dict:
         claim = claim or self.claim
         assert claim is not None
-        objective = "Implement the registered Feature Spec portfolio"
+        objective = (
+            "Implement the registered Feature Spec portfolio with CI when configured"
+        )
         return {
             "schema_version": "4.0.0",
             "root_task_ref": "app-task://root-a",
@@ -738,12 +740,12 @@ class LedgerCacheV6Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v6_offline_and_read_only(self) -> None:
+    def test_doctor_is_v7_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "6.0.0")
+        self.assertEqual(version, "7.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -775,6 +777,37 @@ class LedgerCacheV6Tests(unittest.TestCase):
         self.assertEqual(state["portfolio"]["repositories"], claim["repositories"])
         self.assertEqual(state["claim"]["fingerprint"], claim["fingerprint"])
         self.assertEqual(len(state["operations"]), 1)
+
+    def test_objective_requires_conditional_ci_on_create_and_read(self) -> None:
+        self.acquire()
+        retired = self.registration_for()
+        retired["objective"] = "Implement the portfolio with mandatory CI"
+        retired["objective_fingerprint"] = hashlib.sha256(
+            retired["objective"].encode()
+        ).hexdigest()
+        rejected = self.create(registration=retired, check=False)
+        self.error(rejected, "invalid-input")
+        self.assertFalse(self.ledger.exists())
+
+        self.create(registration=self.registration_for())
+        state = self.state()
+        state["portfolio"]["objective"] = retired["objective"]
+        state["portfolio"]["objective_fingerprint"] = retired[
+            "objective_fingerprint"
+        ]
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        self.ledger.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n")
+        stale = self.run_cache(
+            "--json",
+            "ledger",
+            "read",
+            "--ledger",
+            str(self.ledger),
+            "--projection",
+            "recovery",
+            check=False,
+        )
+        self.error(stale, "integrity-failure")
 
     def test_active_paths_require_direct_json_and_reject_markdown(self) -> None:
         outside = self.home / "outside.json"

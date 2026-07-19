@@ -110,9 +110,11 @@ root or background implementation.
 
 The initial prompt requires a newly created task to call `create_goal` before
 work. Its assignment-scoped objective contains the exact Feature Spec,
-repositories and allowed paths, acceptance criteria, validation, and fixed
-terminal result `pull-request-ready-for-merge-but-not-merged`. Do not pass
-`token_budget`.
+repositories and allowed paths, acceptance criteria, validation, and
+gates including AutoReview, current-revision Codex review, CI when configured,
+integration, and fixed terminal result
+`pull-request-ready-for-merge-but-not-merged`. Derive it anew; never reuse a
+prior objective or fingerprint. Do not pass `token_budget`.
 
 On recovery, call `get_goal`. A nonterminal task requires an active objective
 and fingerprint matching the recorded Goal evidence before implementation
