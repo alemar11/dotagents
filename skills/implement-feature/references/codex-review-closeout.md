@@ -63,6 +63,15 @@ At the GitStack boundary, pass only the exact PR and canonical
 authorized mutation. Do not pass App permission, Feature Spec, phase, or fixed
 actions, and never expose the translation as a user option.
 
+Every request or warning body crosses that boundary only through the mandatory
+provider-text transport in `worker.md`: an absolute regular non-symlink UTF-8
+body file, immediate `gitstack --json repo snapshot`, the typed operation with
+`--expected-worktree-fingerprint`, and verified provider target/object/body
+fingerprint plus unchanged worktree proof. Never put request or warning text in
+argv or a shell string. This rule supplies transport only; the separate typed
+review-request handshake owns exact-head request composition, recognition,
+acknowledgment, request state, and wait semantics.
+
 ## One Fixed Wait Deadline
 
 Each delivery revision owns one 45-minute total active-wait deadline. The worker
@@ -111,6 +120,13 @@ Revision: <exact revision_key>
 
 This is not a clean review verdict. A later merge workflow must re-check this pull request for late Codex findings before merge.
 ```
+
+Write that exact body to an absolute file without interpolation, capture the
+managed checkout's GitStack worktree fingerprint, then post it with one typed
+`reviews comment --body-file ... --expected-worktree-fingerprint ...` call.
+Require the canonical issue-comment URL and id, exact PR target, expected body
+byte count/SHA-256, and unchanged worktree proof. On an ambiguous response use
+only GitStack's one read-back result; never post the warning again blindly.
 
 The helper derives the expected body from stored review identity. The comment
 timestamp must be at or after the immutable deadline and no later than the

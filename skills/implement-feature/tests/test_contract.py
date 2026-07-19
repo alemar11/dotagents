@@ -1145,6 +1145,61 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("15-minute", closeout)
         self.assertNotIn("--timeout 15m", runtime)
 
+    def test_provider_text_transport_is_file_backed_guarded_and_scope_bounded(self) -> None:
+        skill = self.read("SKILL.md")
+        worker = self.read("references/worker.md")
+        closeout = self.read("references/codex-review-closeout.md")
+        recovery = self.read("references/recovery-validation.md")
+        normalized = " ".join((skill + worker + closeout + recovery).split())
+
+        for token in (
+            "Provider Text Transport",
+            "opaque UTF-8 bytes",
+            "absolute regular non-symlink file",
+            "`apply_patch`",
+            "`--json repo snapshot`",
+            "`--expected-worktree-fingerprint <fingerprint>`",
+            "provider object id and URL",
+            "UTF-8 byte count and SHA-256",
+            "unchanged worktree fingerprint",
+            "one exact-target read-back",
+            "never retry blindly",
+            "partial-success evidence",
+            "connector response alone is not byte verification",
+            "`reviews address` is read-only",
+            "`publish open --title-file --body-file`",
+            "GitStack has no `publish edit` command",
+        ):
+            self.assertIn(token, normalized)
+
+        for forbidden_boundary in (
+            "argv, an environment variable, a shell command string",
+            "logs, dry-run output, or errors",
+            "Inline text flags, parser aliases, generic API writes",
+        ):
+            self.assertIn(forbidden_boundary, normalized)
+
+        self.assertIn("separate typed review-request handshake", normalized)
+        self.assertIn("does not run through or extend `execution-manifest`", normalized)
+        self.assertIn("does not define Codex review-request content", normalized)
+        self.assertIn("`reviews comment --body-file ... --expected-worktree-fingerprint ...`", closeout)
+        self.assertIn("old snapshots and old temporary files are not recovery authority", normalized)
+
+        unsafe = re.compile(r"--(?:title|body|description|comment)(?:=|\s+)[\"']|\s-[fF]\s+body=")
+        for relative in (
+            "SKILL.md",
+            "references/worker.md",
+            "references/codex-review-closeout.md",
+            "references/recovery-validation.md",
+        ):
+            fences = re.findall(
+                r"```(?:bash|sh)\n(.*?)```",
+                self.read(relative),
+                flags=re.DOTALL,
+            )
+            with self.subTest(relative=relative):
+                self.assertFalse(any(unsafe.search(fence) for fence in fences))
+
     def test_ci_requires_current_head_evidence_only_when_configured(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
         gates = " ".join(self.read("references/gates.md").split())
@@ -1988,12 +2043,16 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            96_000,
+            98_449,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
+        # Provider transport moves the clean-HEAD invoked paths as follows:
+        # successful 94,665 -> 98,385; with manifest 101,973 -> 105,693;
+        # multi-repository 98,714 -> 102,434. Each ceiling keeps 64 bytes of
+        # explicit headroom; structural prompt reduction is a later redesign.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
-            102_500,
+            105_757,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -2003,7 +2062,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            100_000,
+            102_498,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE

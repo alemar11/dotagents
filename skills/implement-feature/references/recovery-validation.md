@@ -111,6 +111,14 @@ newer committed and published observation clears tracker dirt. Rerun gates.
 
 ## Review Wait Recovery
 
+Before any resumed provider-text mutation, reload the transport contract in
+`worker.md`, recreate the opaque text file from current authorized data, and
+take a fresh GitStack `repo snapshot` in the exact managed checkout. Require
+the typed file flag and `--expected-worktree-fingerprint`; old snapshots and
+old temporary files are not recovery authority. Preserve a confirmed provider
+object/read-back as partial success, and never retry an ambiguous write. A
+connector mutation is byte-verified only after an exact-target read-back.
+
 Recompute the exact delivery revision before review work. Reuse a result only
 for that tuple with all findings dispositioned. Preserve an existing request's
 original `wait_started_at` and deadline. Persist its single invocation before

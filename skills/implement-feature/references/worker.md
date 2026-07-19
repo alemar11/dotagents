@@ -87,6 +87,51 @@ to the exact root-issued request and revision. If it remains pending at the
 45-minute deadline, post the required persistent PR warning and report its
 reference so the root can record `timeout-accepted`.
 
+## Provider Text Transport
+
+Treat every provider-owned title, body, description, comment, reply, review,
+release note, and warning as opaque UTF-8 bytes. Never place that text in argv,
+an environment variable, a shell command string, command substitution, logs,
+dry-run output, or errors. This boundary is global and required; the earlier
+shell execution incident is evidence of the general risk, not a one-off review
+special case.
+
+For every GitStack provider-text mutation:
+
+1. Write each text field without interpolation to its own absolute regular
+   non-symlink file outside the managed checkout. Use a literal file-write tool
+   such as `apply_patch`; do not use `echo`, an interpolating heredoc, or a shell
+   variable containing the text.
+2. From the exact managed checkout, run GitStack `--json repo snapshot` and
+   retain its SHA-256 `fingerprint` as the immediate pre-call worktree proof.
+3. Invoke only the typed operation with `--title-file`, `--body-file`, or the
+   operation's other file field plus
+   `--expected-worktree-fingerprint <fingerprint>`. Inline text flags, parser
+   aliases, generic API writes, and shell-built command lines are forbidden.
+4. Require the result to prove the exact repository/PR/comment target,
+   provider object id and URL, UTF-8 byte count and SHA-256, and unchanged
+   worktree fingerprint. Do not print or persist the text itself as transport
+   proof.
+
+Use `reviews comment`, one-target `reviews reply`, `reviews edit-comment`, and
+`reviews submit-review` for their matching operations. `reviews address` is
+read-only. Open a new PR with `publish open --title-file --body-file`; existing
+PR text edits require the structured GitHub connector because GitStack has no
+`publish edit` command. Issue and release text follows the GitStack skill's
+connector-or-genuinely-file-backed rules; if no safe surface exists, stop.
+
+On a failed or unreadable mutation, accept only GitStack's one exact-target
+read-back result and never retry blindly. Preserve confirmed provider identity
+as partial-success evidence when the subsequent worktree check fails. A
+connector response alone is not byte verification: claim exact bytes only
+after an exact-target read-back proves them.
+
+This transport does not define Codex review-request content, exact-head
+correlation, acknowledgment, request state, or waiting. The separate typed
+review-request handshake remains the sole owner of those semantics. It also
+does not run through or extend `execution-manifest`; validation and AutoReview
+retain their existing command-manifest boundary.
+
 For local commit actions, use `$gitstack:git-commit` and keep
 `commit_kind=regular` unless target-repository instructions require a targeted
 fixup. Review or `$autoreview` feedback alone never selects a fixup. A required
@@ -158,8 +203,9 @@ task-set substantive/integration/domain proof report the predeclared tracked
 move and unchanged body for `source-moved`. It dirties/invalidates the delivery;
 commit/push, report the new `revision-observed`, then current committed/published
 `delivery-observed` before final gates. Publish/update each PR against the
-discovered default branch. Outside the ready mutation's shell chain, record its
-exact number and URL. Run validation and `$autoreview`; when it or PR review
+discovered default branch through the provider-text contract above. Outside
+the ready mutation's shell chain, record its exact number and URL plus the
+returned target/text/worktree proofs. Run validation and `$autoreview`; when it or PR review
 returns accepted findings, load `autoreview-fix-loop.md` and follow its typed
 delta chain. Then convert any draft
 to ready-for-review only by exact identity; a `gh` fallback is
