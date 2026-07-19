@@ -55,8 +55,9 @@ and the optional durable timeout-warning reference.
 Before request, call GitStack's typed request operation with the exact current
 full head and caller-supplied `request_key`. It owns the strict canonical
 provider body, current-head preflight, one POST, one read-only recovery, and
-complete receipt. Persist that receipt before `review-wait-started`; the
-identity-bound waiter must consume it and fetch its exact provider comment.
+complete receipt. Apply `review-wait-started` with it before invoking the
+identity-bound waiter; the event persists it, and the waiter fetches the
+that comment.
 Unbound, invalid, ambiguous, or unknown binding is exit 4 and never authorizes
 a repost or timeout. API, authentication, or configuration uncertainty never
 authorizes another request.
