@@ -41,7 +41,7 @@ GitStack is the repo-local Git and GitHub workflow plugin. It uses the official 
 
 | Skill | Purpose |
 | --- | --- |
-| `autoreview` | Send selected change bundles to a separate read-only Codex execution for structured closeout review and reuse verified clean evidence for unchanged targets. |
+| `autoreview` | Send selected change bundles to a separate read-only Codex execution, reuse clean evidence, and verify committed review fixes through bounded delta prompts. |
 | `code-wiki` | Generate an evidence-backed linked HTML wiki for a local repository or git URL. |
 | `crusty` | Direct-only advisory critique for decisions, implementations, architecture, naming, and tradeoffs. |
 | `okf` | Write, scaffold, inspect, and validate Open Knowledge Format markdown bundles with the shipped OKF CLI. |

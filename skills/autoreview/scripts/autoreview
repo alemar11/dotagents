@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -11,11 +12,13 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 PRIORITIES = {0, 1, 2, 3}
 FINDING_CATEGORIES = {"bug", "security", "regression", "test-gap", "maintainability"}
 REVIEW_OUTCOMES = {"pass", "fail"}
+REVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
+TERMINAL_STATES = {"fix-required", "verification-clean", "terminal-clean", "terminal-composite-clean"}
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -61,6 +64,38 @@ SCHEMA: dict[str, Any] = {
         "review_outcome": {"type": "string", "enum": sorted(REVIEW_OUTCOMES)},
         "review_explanation": {"type": "string", "minLength": 1, "maxLength": 3000},
         "review_confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    },
+}
+
+VERIFICATION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": [
+        "verified_findings",
+        "findings",
+        "review_outcome",
+        "review_explanation",
+        "review_confidence",
+    ],
+    "properties": {
+        "verified_findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["finding_id", "resolution", "explanation", "confidence"],
+                "properties": {
+                    "finding_id": {"type": "string", "minLength": 64, "maxLength": 64},
+                    "resolution": {"type": "string", "enum": ["resolved", "unresolved"]},
+                    "explanation": {"type": "string", "minLength": 1, "maxLength": 2000},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                },
+            },
+        },
+        "findings": SCHEMA["properties"]["findings"],
+        "review_outcome": SCHEMA["properties"]["review_outcome"],
+        "review_explanation": SCHEMA["properties"]["review_explanation"],
+        "review_confidence": SCHEMA["properties"]["review_confidence"],
     },
 }
 
@@ -451,6 +486,221 @@ def changed_paths(repo: Path, target: str, target_ref: str | None, commit_ref: s
     return {line.strip() for source in sources for line in source.splitlines() if line.strip()}
 
 
+def sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def evidence_fingerprint(value: dict[str, Any]) -> str:
+    return sha256_text(canonical_json({key: item for key, item in value.items() if key != "evidence_fingerprint"}))
+
+
+def current_head(repo: Path) -> str:
+    head = git(repo, "rev-parse", "HEAD").strip()
+    if not head:
+        raise AutoreviewError("review target has no HEAD revision")
+    return head
+
+
+def merge_base(repo: Path, base_ref: str, head: str = "HEAD") -> str:
+    value = git(repo, "merge-base", base_ref, head).strip()
+    if not value:
+        raise AutoreviewError("branch review target has no merge base")
+    return value
+
+
+def repository_id(repo: Path) -> str:
+    origin = git(repo, "config", "--get", "remote.origin.url", check=False).strip()
+    return sha256_text(origin or str(repo.resolve()))
+
+
+def finding_id(finding: dict[str, Any]) -> str:
+    return sha256_text(canonical_json(finding))
+
+
+def load_json_file(path: str, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(Path(path).read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise AutoreviewError(f"{label} is unreadable: {path}") from exc
+    if not isinstance(value, dict):
+        raise AutoreviewError(f"{label} must contain one JSON object")
+    return value
+
+
+def validate_evidence(value: dict[str, Any]) -> dict[str, Any]:
+    required = {
+        "schema_version", "review_phase", "lineage_id", "parent_evidence_fingerprint",
+        "repository_id", "target", "counts", "finding_state", "report",
+        "terminal_state", "metrics", "evidence_fingerprint",
+    }
+    if set(value) != required or value.get("schema_version") != "1.0.0":
+        raise AutoreviewError("prior evidence has an unsupported schema")
+    if value.get("review_phase") not in REVIEW_PHASES or value.get("terminal_state") not in TERMINAL_STATES:
+        raise AutoreviewError("prior evidence has invalid canonical values")
+    if evidence_fingerprint(value) != value.get("evidence_fingerprint"):
+        raise AutoreviewError("prior evidence fingerprint mismatch")
+    hex64 = lambda item: isinstance(item, str) and len(item) == 64 and all(char in "0123456789abcdef" for char in item)
+    for field in ("lineage_id", "repository_id", "evidence_fingerprint"):
+        if not hex64(value.get(field)):
+            raise AutoreviewError(f"prior evidence {field} is invalid")
+    parent = value.get("parent_evidence_fingerprint")
+    if parent is not None and not hex64(parent):
+        raise AutoreviewError("prior evidence parent fingerprint is invalid")
+    target = value.get("target")
+    counts = value.get("counts")
+    finding_state = value.get("finding_state")
+    if not isinstance(target, dict) or set(target) != {
+        "mode", "base_ref", "merge_base_sha", "head_sha", "target_fingerprint", "changed_files"
+    }:
+        raise AutoreviewError("prior evidence target is invalid")
+    if target.get("mode") != "branch" or not isinstance(target.get("changed_files"), list):
+        raise AutoreviewError("incremental evidence requires a branch target")
+    if (
+        not isinstance(target.get("base_ref"), str) or not target["base_ref"]
+        or not isinstance(target.get("merge_base_sha"), str) or len(target["merge_base_sha"]) not in {40, 64}
+        or not isinstance(target.get("head_sha"), str) or len(target["head_sha"]) not in {40, 64}
+        or not hex64(target.get("target_fingerprint"))
+        or not target["changed_files"] or len(target["changed_files"]) != len(set(target["changed_files"]))
+    ):
+        raise AutoreviewError("prior evidence target values are invalid")
+    for path in target["changed_files"]:
+        if not isinstance(path, str) or not path or Path(path).is_absolute() or ".." in Path(path).parts:
+            raise AutoreviewError("prior evidence changed file is invalid")
+    if not isinstance(counts, dict) or set(counts) != {"full_reviews", "fix_verifications"}:
+        raise AutoreviewError("prior evidence counters are invalid")
+    if (
+        not isinstance(counts["full_reviews"], int) or isinstance(counts["full_reviews"], bool)
+        or counts["full_reviews"] not in {1, 2}
+        or not isinstance(counts["fix_verifications"], int) or isinstance(counts["fix_verifications"], bool)
+        or counts["fix_verifications"] < 0
+    ):
+        raise AutoreviewError("prior evidence counter values are invalid")
+    if not isinstance(finding_state, dict) or set(finding_state) != {"open", "resolved", "rejected"}:
+        raise AutoreviewError("prior evidence finding state is invalid")
+    if not all(isinstance(finding_state[name], list) for name in finding_state):
+        raise AutoreviewError("prior evidence finding lists are invalid")
+    open_ids: set[str] = set()
+    for index, row in enumerate(finding_state["open"]):
+        if not isinstance(row, dict) or set(row) != {"finding_id", "finding"} or not hex64(row.get("finding_id")):
+            raise AutoreviewError(f"prior evidence open finding {index} is invalid")
+        validate_finding(index, row["finding"], set(target["changed_files"]))
+        if finding_id(row["finding"]) != row["finding_id"] or row["finding_id"] in open_ids:
+            raise AutoreviewError(f"prior evidence open finding {index} fingerprint is invalid")
+        open_ids.add(row["finding_id"])
+    if any(not hex64(item) for item in finding_state["resolved"]) or len(finding_state["resolved"]) != len(set(finding_state["resolved"])):
+        raise AutoreviewError("prior evidence resolved findings are invalid")
+    for index, row in enumerate(finding_state["rejected"]):
+        if not isinstance(row, dict) or set(row) != {"finding_id", "finding", "disposition", "reason"} or row.get("disposition") != "rejected":
+            raise AutoreviewError(f"prior evidence rejected finding {index} is invalid")
+        validate_finding(index, row["finding"], set(target["changed_files"]))
+        if finding_id(row["finding"]) != row.get("finding_id") or not row.get("reason"):
+            raise AutoreviewError(f"prior evidence rejected finding {index} fingerprint is invalid")
+    report = value.get("report")
+    if not isinstance(report, dict):
+        raise AutoreviewError("prior evidence report is invalid")
+    if value["review_phase"] == "fix-verification":
+        base_report = {key: report.get(key) for key in ("findings", "review_outcome", "review_explanation", "review_confidence")}
+        validate_report(base_report, set(target["changed_files"]))
+        verified = report.get("verified_findings")
+        if not isinstance(verified, list):
+            raise AutoreviewError("prior verification report is invalid")
+        for index, item in enumerate(verified):
+            if not isinstance(item, dict) or set(item) != {"finding_id", "resolution", "explanation", "confidence"}:
+                raise AutoreviewError(f"prior verified finding {index} is invalid")
+            if not hex64(item["finding_id"]) or item["resolution"] not in {"resolved", "unresolved"} or not item["explanation"] or not number_in_range(item["confidence"]):
+                raise AutoreviewError(f"prior verified finding {index} has invalid values")
+    else:
+        validate_report(report, set(target["changed_files"]))
+    metrics = value.get("metrics")
+    if not isinstance(metrics, dict) or set(metrics) != {"prompt_characters", "elapsed_seconds"}:
+        raise AutoreviewError("prior evidence metrics are invalid")
+    if any(not isinstance(metrics[name], int) or isinstance(metrics[name], bool) or metrics[name] < 0 for name in metrics):
+        raise AutoreviewError("prior evidence metric values are invalid")
+    if open_ids and value["terminal_state"] != "fix-required":
+        raise AutoreviewError("prior evidence with open findings must require a fix")
+    if not open_ids and value["terminal_state"] == "fix-required":
+        raise AutoreviewError("prior evidence fix-required state has no open findings")
+    return value
+
+
+def load_finding_file(
+    path: str,
+    prior: dict[str, Any],
+    *,
+    require_accepted: bool = True,
+) -> tuple[str, list[dict[str, Any]], list[dict[str, Any]]]:
+    value = load_json_file(path, "finding file")
+    if set(value) != {"finding_source", "findings"} or value.get("finding_source") not in {"autoreview", "codex-review"}:
+        raise AutoreviewError("finding file must use canonical finding_source")
+    rows = value.get("findings")
+    if not isinstance(rows, list) or not rows:
+        raise AutoreviewError("finding file must contain at least one finding")
+    accepted: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    prior_open = {row["finding_id"] for row in prior["finding_state"]["open"]}
+    if value["finding_source"] == "codex-review" and prior_open:
+        raise AutoreviewError("codex-review findings require prior AutoReview findings to be closed")
+    seen: set[str] = set()
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or set(row) != {"finding_id", "finding", "disposition", "reason"}:
+            raise AutoreviewError(f"finding file row {index} is invalid")
+        identifier = row.get("finding_id")
+        if not isinstance(identifier, str) or len(identifier) != 64 or identifier in seen:
+            raise AutoreviewError(f"finding file row {index} has invalid finding_id")
+        seen.add(identifier)
+        if row.get("disposition") not in {"accepted", "rejected"} or not isinstance(row.get("reason"), str) or not row["reason"]:
+            raise AutoreviewError(f"finding file row {index} has invalid disposition")
+        finding = row.get("finding")
+        finding_path = finding.get("code_location", {}).get("file_path", "") if isinstance(finding, dict) else ""
+        validate_finding(index, finding, {finding_path})
+        if finding_id(finding) != identifier:
+            raise AutoreviewError(f"finding file row {index} fingerprint mismatch")
+        if value["finding_source"] == "autoreview" and identifier not in prior_open:
+            raise AutoreviewError(f"finding file row {index} is not open in prior evidence")
+        (accepted if row["disposition"] == "accepted" else rejected).append(row)
+    if value["finding_source"] == "autoreview" and seen != prior_open:
+        raise AutoreviewError("finding file must disposition every open AutoReview finding")
+    if require_accepted and not accepted:
+        raise AutoreviewError("fix verification requires at least one accepted finding")
+    return value["finding_source"], accepted, rejected
+
+
+def delta_bundle(repo: Path, previous_head: str) -> tuple[str, set[str], dict[str, list[tuple[int, int]]]]:
+    ancestor = run([resolve_command("git", repo), "merge-base", "--is-ancestor", previous_head, "HEAD"], repo, check=False)
+    if ancestor.returncode != 0:
+        raise AutoreviewError("prior head is not an ancestor of HEAD", code="lineage-invalidated", recovery="start-new-full-lineage")
+    patch = git(repo, "diff", "--patch", "--find-renames", "--unified=0", f"{previous_head}..HEAD")
+    paths = {line.strip() for line in git(repo, "diff", "--name-only", f"{previous_head}..HEAD").splitlines() if line.strip()}
+    if not paths:
+        raise AutoreviewError("fix verification requires a changed HEAD", code="review-no-progress", recovery="needs-owner")
+    ranges: dict[str, list[tuple[int, int]]] = {}
+    current_path: str | None = None
+    old_path: str | None = None
+    import re
+    for line in patch.splitlines():
+        if line.startswith("--- a/"):
+            old_path = line[6:]
+        elif line == "+++ /dev/null":
+            current_path = old_path
+        elif line.startswith("+++ b/"):
+            current_path = line[6:]
+        elif current_path and line.startswith("@@"):
+            match = re.search(r"\+(\d+)(?:,(\d+))?", line)
+            if match:
+                start = max(1, int(match.group(1))); length = int(match.group(2) or "1")
+                if length == 0:
+                    current_file = repo / current_path
+                    if current_file.is_file():
+                        line_count = len(current_file.read_text(errors="replace").splitlines())
+                        start = min(start, max(1, line_count))
+                ranges.setdefault(current_path, []).append((start, max(start, start + length - 1)))
+    return bounded(patch), paths, ranges
+
+
 def load_extra_prompt(args: argparse.Namespace) -> str:
     chunks: list[str] = []
     for value in args.prompt or []:
@@ -513,6 +763,45 @@ def build_prompt(
     ).strip()
 
 
+def build_verification_prompt(
+    repo: Path,
+    delta: str,
+    accepted: list[dict[str, Any]],
+    extra_prompt: str,
+    datasets: str,
+) -> str:
+    return textwrap.dedent(
+        f"""
+        You are a senior code reviewer performing a narrow fix verification.
+
+        Hard rules:
+        - Return exactly one JSON object matching this schema:
+        {json.dumps(VERIFICATION_SCHEMA, indent=2)}
+        - Do not modify files or invoke nested reviewers.
+        - Verify every supplied accepted finding by finding_id.
+        - Review only the supplied delta and regressions caused by its changed lines.
+        - Do not perform a new broad review of the feature.
+        - New findings must point to an added or modified line in the delta.
+        - For deletion-only regressions, point to the nearest surviving line,
+          or line 1 of a fully deleted file; the validator uses the same policy.
+        - Set review_outcome to pass only when every accepted finding is resolved and no delta regression remains.
+        - Read-only inspection is allowed; tests, formatters, generators, installs, and mutations are forbidden.
+
+        Repository: {repo}
+
+        # Accepted Findings
+        {json.dumps(accepted, indent=2)}
+
+        {extra_prompt}
+
+        {datasets}
+
+        # Fix Delta
+        {delta}
+        """
+    ).strip()
+
+
 def configured_codex_model() -> str | None:
     try:
         import tomllib
@@ -556,7 +845,7 @@ def write_json_temp(data: dict[str, Any]) -> Path:
     return path
 
 
-def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
+def run_codex(args: argparse.Namespace, repo: Path, prompt: str, schema: dict[str, Any] | None = None) -> str:
     ensure_review_environment()
     codex_bin = resolve_command(args.codex_bin, repo)
     model = args.model or configured_codex_model()
@@ -585,7 +874,7 @@ def run_codex(args: argparse.Namespace, repo: Path, prompt: str) -> str:
     pending_base_exception: BaseException | None = None
     cleanup_errors: list[str] = []
     try:
-        schema_path = write_json_temp(SCHEMA)
+        schema_path = write_json_temp(schema or SCHEMA)
         output_handle = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
         with output_handle:
             output_path = Path(output_handle.name)
@@ -715,6 +1004,8 @@ def validate_report(report: dict[str, Any], changed: set[str]) -> None:
         raise AutoreviewError(f"review JSON has invalid review_outcome: {report.get('review_outcome')}")
     if report["findings"] and report["review_outcome"] != "fail":
         raise AutoreviewError("review JSON with findings must set review_outcome to fail")
+    if not report["findings"] and report["review_outcome"] == "fail":
+        raise AutoreviewError("review JSON fail outcome must include a discrete finding")
     if not isinstance(report.get("review_explanation"), str) or not report["review_explanation"]:
         raise AutoreviewError("review JSON review_explanation must be a non-empty string")
     if len(report["review_explanation"]) > 3000:
@@ -763,6 +1054,129 @@ def validate_finding(index: int, finding: Any, changed: set[str]) -> None:
         raise AutoreviewError(f"finding {index} uses invalid file path: {rel}")
     if rel not in changed:
         raise AutoreviewError(f"finding {index} points to a file outside the reviewed change: {rel}")
+
+
+def validate_verification_report(
+    report: dict[str, Any],
+    accepted_ids: set[str],
+    changed: set[str],
+    ranges: dict[str, list[tuple[int, int]]],
+) -> None:
+    allowed = {"verified_findings", "findings", "review_outcome", "review_explanation", "review_confidence"}
+    if set(report) != allowed:
+        raise AutoreviewError("verification JSON has unexpected keys")
+    verified = report.get("verified_findings")
+    if not isinstance(verified, list):
+        raise AutoreviewError("verification JSON verified_findings must be an array")
+    seen: set[str] = set()
+    unresolved = False
+    for index, item in enumerate(verified):
+        if not isinstance(item, dict) or set(item) != {"finding_id", "resolution", "explanation", "confidence"}:
+            raise AutoreviewError(f"verified finding {index} is invalid")
+        if item["finding_id"] not in accepted_ids or item["finding_id"] in seen:
+            raise AutoreviewError(f"verified finding {index} has an unexpected finding_id")
+        if item["resolution"] not in {"resolved", "unresolved"} or not item["explanation"] or not number_in_range(item["confidence"]):
+            raise AutoreviewError(f"verified finding {index} has invalid values")
+        seen.add(item["finding_id"])
+        unresolved = unresolved or item["resolution"] == "unresolved"
+    if seen != accepted_ids:
+        raise AutoreviewError("verification JSON must cover every accepted finding")
+    base_report = {key: report[key] for key in ("findings", "review_outcome", "review_explanation", "review_confidence")}
+    validate_report(base_report, changed)
+    for index, finding in enumerate(report["findings"]):
+        location = finding["code_location"]
+        if not any(start <= location["line"] <= end for start, end in ranges.get(location["file_path"], [])):
+            raise AutoreviewError(f"finding {index} points outside the changed delta lines")
+    expected_fail = unresolved or bool(report["findings"])
+    if expected_fail != (report["review_outcome"] == "fail"):
+        raise AutoreviewError("verification outcome does not match unresolved findings")
+
+
+def finding_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
+    return [{"finding_id": finding_id(item), "finding": item} for item in report.get("findings", [])]
+
+
+def make_evidence(
+    *,
+    phase: str,
+    repo: Path,
+    base_ref: str,
+    bundle_fingerprint: str,
+    changed: set[str],
+    report: dict[str, Any],
+    prompt_characters: int,
+    elapsed_seconds: int,
+    prior: dict[str, Any] | None = None,
+    accepted: list[dict[str, Any]] | None = None,
+    rejected: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    head = current_head(repo)
+    if prior is None:
+        lineage_id = sha256_text(canonical_json({
+            "repository_id": repository_id(repo), "base_ref": base_ref,
+            "merge_base_sha": merge_base(repo, base_ref), "head_sha": head,
+            "changed_files": sorted(changed),
+        }))
+        counts = {"full_reviews": 1, "fix_verifications": 0}
+        resolved: list[str] = []
+        rejected_rows: list[dict[str, Any]] = []
+    else:
+        lineage_id = prior["lineage_id"]
+        counts = dict(prior["counts"])
+        if phase == "terminal-full":
+            counts["full_reviews"] += 1
+        elif phase == "fix-verification":
+            counts["fix_verifications"] += 1
+        resolved = list(prior["finding_state"]["resolved"])
+        rejected_rows = list(prior["finding_state"]["rejected"])
+    if phase == "fix-verification":
+        for item in report["verified_findings"]:
+            if item["resolution"] == "resolved" and item["finding_id"] not in resolved:
+                resolved.append(item["finding_id"])
+        rejected_rows.extend(rejected or [])
+    elif phase == "disposition":
+        rejected_rows.extend(rejected or [])
+    open_rows = finding_rows(report)
+    if phase == "fix-verification":
+        unresolved_ids = {
+            item["finding_id"] for item in report["verified_findings"]
+            if item["resolution"] == "unresolved"
+        }
+        open_rows.extend(
+            {"finding_id": row["finding_id"], "finding": row["finding"]}
+            for row in accepted or [] if row["finding_id"] in unresolved_ids
+        )
+        open_rows = list({row["finding_id"]: row for row in open_rows}.values())
+    if report["review_outcome"] == "pass":
+        if phase in {"full", "terminal-full"}:
+            terminal_state = "terminal-clean"
+        elif phase == "disposition":
+            terminal_state = "terminal-composite-clean"
+        elif counts["full_reviews"] >= 2 or prior and prior["terminal_state"] in {"terminal-clean", "terminal-composite-clean"}:
+            terminal_state = "terminal-composite-clean"
+        else:
+            terminal_state = "verification-clean"
+    else:
+        terminal_state = "fix-required"
+    evidence: dict[str, Any] = {
+        "schema_version": "1.0.0",
+        "review_phase": phase,
+        "lineage_id": lineage_id,
+        "parent_evidence_fingerprint": prior["evidence_fingerprint"] if prior else None,
+        "repository_id": repository_id(repo),
+        "target": {
+            "mode": "branch", "base_ref": base_ref, "merge_base_sha": merge_base(repo, base_ref),
+            "head_sha": head, "target_fingerprint": bundle_fingerprint,
+            "changed_files": list(prior["target"]["changed_files"]) if prior else sorted(changed),
+        },
+        "counts": counts,
+        "finding_state": {"open": open_rows, "resolved": resolved, "rejected": rejected_rows},
+        "report": report,
+        "terminal_state": terminal_state,
+        "metrics": {"prompt_characters": prompt_characters, "elapsed_seconds": elapsed_seconds},
+    }
+    evidence["evidence_fingerprint"] = evidence_fingerprint(evidence)
+    return evidence
 
 
 def human_report(report: dict[str, Any]) -> str:
@@ -866,7 +1280,7 @@ def command_info(name: str, repo: Path | None) -> dict[str, Any]:
     }
 
 
-def build_review(args: argparse.Namespace) -> tuple[Path, str, str | None, set[str], str]:
+def build_review(args: argparse.Namespace) -> tuple[Path, str, str | None, set[str], str, str]:
     repo = repo_root()
     target, target_ref = choose_target(repo, args.mode, args.base)
     if target == "local":
@@ -881,11 +1295,29 @@ def build_review(args: argparse.Namespace) -> tuple[Path, str, str | None, set[s
     if not changed:
         raise AutoreviewError("review target has no changed files")
     prompt = build_prompt(repo, target, target_ref, bundle, load_extra_prompt(args), load_datasets(args))
-    return repo, target, target_ref, changed, prompt
+    return repo, target, target_ref, changed, prompt, sha256_text(bundle)
 
 
 def run_review(args: argparse.Namespace) -> int:
-    repo, target, target_ref, changed, prompt = build_review(args)
+    if args.review_phase == "fix-verification":
+        return run_fix_verification(args)
+    if args.review_phase == "disposition":
+        return run_disposition(args)
+    if args.review_phase == "full" and (args.prior_evidence or args.finding_file):
+        raise AutoreviewError("full review does not accept prior evidence or a finding file")
+    if args.review_phase == "terminal-full" and (not args.prior_evidence or not args.evidence_output or args.finding_file):
+        raise AutoreviewError("terminal-full requires --prior-evidence and --evidence-output only")
+    repo, target, target_ref, changed, prompt, target_fingerprint = build_review(args)
+    if args.evidence_output and (target != "branch" or target_ref is None):
+        raise AutoreviewError("evidence chains require branch mode")
+    prior: dict[str, Any] | None = None
+    if args.review_phase == "terminal-full":
+        prior = validate_evidence(load_json_file(args.prior_evidence, "prior evidence"))
+        validate_lineage(repo, target_ref, changed, prior)
+        if prior["terminal_state"] != "verification-clean":
+            raise AutoreviewError("terminal-full requires a clean verification chain")
+        if prior["counts"]["full_reviews"] != 1:
+            raise AutoreviewError("a third full review is forbidden in the same lineage", code="full-review-budget-exhausted", recovery="use-fix-verification")
     if args.dry_run:
         payload = {
             "ok": True,
@@ -908,10 +1340,20 @@ def run_review(args: argparse.Namespace) -> int:
                 print(f"prompt written: {args.output}")
         return 0
 
-    report = extract_json(run_codex(args, repo, prompt))
+    import time
+    started = time.monotonic()
+    report = extract_json(run_codex(args, repo, prompt, SCHEMA))
+    elapsed = int(time.monotonic() - started)
     validate_report(report, changed)
     if args.json_output:
         Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    if args.evidence_output:
+        evidence = make_evidence(
+            phase=args.review_phase, repo=repo, base_ref=target_ref,
+            bundle_fingerprint=target_fingerprint, changed=changed, report=report,
+            prompt_characters=len(prompt), elapsed_seconds=elapsed, prior=prior,
+        )
+        Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
     rendered = human_report(report)
     if args.output:
         Path(args.output).write_text(rendered + "\n")
@@ -922,11 +1364,108 @@ def run_review(args: argparse.Namespace) -> int:
     return 1 if report["review_outcome"] == "fail" else 0
 
 
+def validate_lineage(repo: Path, base_ref: str, changed: set[str], prior: dict[str, Any]) -> None:
+    target = prior["target"]
+    if prior["repository_id"] != repository_id(repo) or target["base_ref"] != base_ref:
+        raise AutoreviewError("repository or base changed", code="lineage-invalidated", recovery="start-new-full-lineage")
+    if target["merge_base_sha"] != merge_base(repo, base_ref):
+        raise AutoreviewError("merge base changed", code="lineage-invalidated", recovery="start-new-full-lineage")
+    if not changed.issubset(set(target["changed_files"])):
+        raise AutoreviewError("review scope expanded to new paths", code="lineage-invalidated", recovery="start-new-full-lineage")
+
+
+def run_fix_verification(args: argparse.Namespace) -> int:
+    if not args.prior_evidence or not args.finding_file or not args.evidence_output:
+        raise AutoreviewError("fix-verification requires --prior-evidence, --finding-file, and --evidence-output")
+    repo = repo_root()
+    target, base_ref = choose_target(repo, args.mode, args.base)
+    if target != "branch" or base_ref is None or is_dirty(repo):
+        raise AutoreviewError("fix-verification requires a clean committed branch target")
+    prior = validate_evidence(load_json_file(args.prior_evidence, "prior evidence"))
+    full_changed = changed_paths(repo, "branch", base_ref, args.commit)
+    validate_lineage(repo, base_ref, full_changed, prior)
+    source, accepted, rejected = load_finding_file(args.finding_file, prior)
+    delta, delta_paths, ranges = delta_bundle(repo, prior["target"]["head_sha"])
+    if not delta_paths.issubset(set(prior["target"]["changed_files"])):
+        raise AutoreviewError("fix delta expands the reviewed path set", code="lineage-invalidated", recovery="start-new-full-lineage")
+    prompt = build_verification_prompt(repo, delta, accepted, load_extra_prompt(args), load_datasets(args))
+    if args.dry_run:
+        payload = {"ok": True, "dry_run": True, "review_phase": "fix-verification", "finding_source": source,
+                   "changed_files": sorted(delta_paths), "prompt_characters": len(prompt)}
+        if args.output:
+            Path(args.output).write_text(prompt)
+        print(json.dumps(payload, indent=2, sort_keys=True) if args.json else f"autoreview dry run: fix-verification\nchanged files: {len(delta_paths)}\nprompt characters: {len(prompt)}")
+        return 0
+    import time
+    started = time.monotonic()
+    report = extract_json(run_codex(args, repo, prompt, VERIFICATION_SCHEMA))
+    elapsed = int(time.monotonic() - started)
+    accepted_ids = {row["finding_id"] for row in accepted}
+    validate_verification_report(report, accepted_ids, delta_paths, ranges)
+    if args.json_output:
+        Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    evidence = make_evidence(
+        phase="fix-verification", repo=repo, base_ref=base_ref,
+        bundle_fingerprint=sha256_text(delta), changed=full_changed, report=report,
+        prompt_characters=len(prompt), elapsed_seconds=elapsed, prior=prior,
+        accepted=accepted, rejected=rejected,
+    )
+    Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+    rendered = human_report({key: report[key] for key in ("findings", "review_outcome", "review_explanation", "review_confidence")})
+    if args.output:
+        Path(args.output).write_text(rendered + "\n")
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json else rendered)
+    return 1 if report["review_outcome"] == "fail" else 0
+
+
+def run_disposition(args: argparse.Namespace) -> int:
+    if not args.prior_evidence or not args.finding_file or not args.evidence_output:
+        raise AutoreviewError("disposition requires --prior-evidence, --finding-file, and --evidence-output")
+    repo = repo_root()
+    target, base_ref = choose_target(repo, args.mode, args.base)
+    if target != "branch" or base_ref is None or is_dirty(repo):
+        raise AutoreviewError("disposition requires a clean committed branch target")
+    prior = validate_evidence(load_json_file(args.prior_evidence, "prior evidence"))
+    if current_head(repo) != prior["target"]["head_sha"]:
+        raise AutoreviewError("disposition requires the unchanged reviewed head", code="lineage-invalidated", recovery="use-fix-verification")
+    changed = changed_paths(repo, "branch", base_ref, args.commit)
+    validate_lineage(repo, base_ref, changed, prior)
+    source, accepted, rejected = load_finding_file(args.finding_file, prior, require_accepted=False)
+    if source != "autoreview" or accepted or not rejected:
+        raise AutoreviewError("disposition accepts only a rejection-only AutoReview finding file")
+    report = {
+        "findings": [],
+        "review_outcome": "pass",
+        "review_explanation": "Every prior finding was consciously rejected with a reason.",
+        "review_confidence": 1.0,
+    }
+    evidence = make_evidence(
+        phase="disposition", repo=repo, base_ref=base_ref,
+        bundle_fingerprint=prior["target"]["target_fingerprint"], changed=changed,
+        report=report, prompt_characters=0, elapsed_seconds=0, prior=prior,
+        rejected=rejected,
+    )
+    Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
+    if args.json_output:
+        Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    rendered = human_report(report)
+    if args.output:
+        Path(args.output).write_text(rendered + "\n")
+    print(json.dumps(report, indent=2, sort_keys=True) if args.json else rendered)
+    return 0
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a Codex-only structured closeout review.")
     parser.add_argument("command", nargs="?", choices=["doctor"], help="Optional command. Omit to run a review.")
     parser.add_argument("--version", action="store_true", help="Print the autoreview helper version.")
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON when supported.")
+    parser.add_argument(
+        "--review-phase",
+        choices=sorted(REVIEW_PHASES),
+        default="full",
+        help="Review phase. Incremental phases require evidence files.",
+    )
     parser.add_argument("--mode", choices=["auto", "local", "branch", "commit"], default="auto")
     parser.add_argument(
         "--base",
@@ -941,6 +1480,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Build the review prompt without calling Codex.")
     parser.add_argument("--output", help="Write human report output, or dry-run prompt, to a file.")
     parser.add_argument("--json-output", help="Write the validated structured review JSON to a file.")
+    parser.add_argument("--evidence-output", help="Write a validated review-chain evidence envelope.")
+    parser.add_argument("--prior-evidence", help="Prior review-chain evidence envelope.")
+    parser.add_argument("--finding-file", help="Canonical accepted/rejected finding intake for fix verification.")
     parser.add_argument(
         "--heartbeat-seconds",
         type=positive_int,

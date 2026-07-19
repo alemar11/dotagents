@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -103,7 +104,206 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 1.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 1.1.0")
+
+    def test_incremental_command_surface_is_canonical(self) -> None:
+        args = cli.parse_args([
+            "--review-phase", "fix-verification",
+            "--prior-evidence", "prior.json",
+            "--finding-file", "findings.json",
+            "--evidence-output", "next.json",
+        ])
+        self.assertEqual(args.review_phase, "fix-verification")
+        self.assertEqual(cli.REVIEW_PHASES, {"full", "fix-verification", "disposition", "terminal-full"})
+
+    def test_evidence_fingerprint_detects_tampering(self) -> None:
+        evidence = {
+            "schema_version": "1.0.0",
+            "review_phase": "full",
+            "lineage_id": "a" * 64,
+            "parent_evidence_fingerprint": None,
+            "repository_id": "b" * 64,
+            "target": {
+                "mode": "branch", "base_ref": "origin/main", "merge_base_sha": "c" * 40,
+                "head_sha": "d" * 40, "target_fingerprint": "e" * 64,
+                "changed_files": ["src/app.py"],
+            },
+            "counts": {"full_reviews": 1, "fix_verifications": 0},
+            "finding_state": {"open": [], "resolved": [], "rejected": []},
+            "report": {"findings": [], "review_outcome": "pass", "review_explanation": "Clean.", "review_confidence": 1.0},
+            "terminal_state": "terminal-clean",
+            "metrics": {"prompt_characters": 10, "elapsed_seconds": 1},
+        }
+        evidence["evidence_fingerprint"] = cli.evidence_fingerprint(evidence)
+        self.assertEqual(cli.validate_evidence(evidence), evidence)
+        evidence["terminal_state"] = "fix-required"
+        with self.assertRaisesRegex(cli.AutoreviewError, "fingerprint mismatch"):
+            cli.validate_evidence(evidence)
+
+        evidence["evidence_fingerprint"] = cli.evidence_fingerprint(evidence)
+        evidence["counts"]["full_reviews"] = "one"
+        evidence["evidence_fingerprint"] = cli.evidence_fingerprint(evidence)
+        with self.assertRaisesRegex(cli.AutoreviewError, "counter values"):
+            cli.validate_evidence(evidence)
+
+    def test_verification_findings_must_point_to_delta_lines(self) -> None:
+        report = {
+            "verified_findings": [{
+                "finding_id": "a" * 64, "resolution": "resolved",
+                "explanation": "The guard now handles the case.", "confidence": 1.0,
+            }],
+            "findings": [{
+                "title": "Outside delta", "body": "This line was not changed.",
+                "priority": 2, "confidence": 0.9, "finding_category": "regression",
+                "code_location": {"file_path": "src/app.py", "line": 20},
+            }],
+            "review_outcome": "fail", "review_explanation": "A regression remains.", "review_confidence": 0.9,
+        }
+        with self.assertRaisesRegex(cli.AutoreviewError, "outside the changed delta lines"):
+            cli.validate_verification_report(report, {"a" * 64}, {"src/app.py"}, {"src/app.py": [(4, 8)]})
+
+    def test_branch_evidence_chain_runs_full_delta_and_terminal_full(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            repo.mkdir()
+            subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+            (repo / "app.py").write_text("value = 1\n")
+            subprocess.run(["git", "add", "app.py"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(["git", "switch", "-c", "feature"], cwd=repo, check=True, capture_output=True)
+            feature_tail = "".join(f"item_{index} = {index}\n" for index in range(700))
+            (repo / "app.py").write_text("value = 2\n" + feature_tail)
+            subprocess.run(["git", "commit", "-am", "feature"], cwd=repo, check=True, capture_output=True)
+
+            fake = root / "fake-codex"
+            fake.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, shutil, sys\n"
+                "out = sys.argv[sys.argv.index('--output-last-message') + 1]\n"
+                "shutil.copyfile(os.environ['FAKE_REPORT'], out)\n"
+            )
+            fake.chmod(0o755)
+            report_path = root / "report.json"
+
+            def invoke(*args: str, expected: int) -> subprocess.CompletedProcess[str]:
+                env = {**os.environ, "FAKE_REPORT": str(report_path)}
+                result = subprocess.run(
+                    [str(SCRIPT_PATH), "--mode", "branch", "--base", "main", "--codex-bin", str(fake), "--no-web-search", *args],
+                    cwd=repo, env=env, text=True, capture_output=True,
+                )
+                self.assertEqual(result.returncode, expected, result.stderr)
+                return result
+
+            full_evidence = root / "full.json"
+            full_report = {
+                "findings": [{
+                    "title": "Reject the changed value", "body": "The changed value is unsupported.",
+                    "priority": 2, "confidence": 0.9, "finding_category": "bug",
+                    "code_location": {"file_path": "app.py", "line": 1},
+                }],
+                "review_outcome": "fail", "review_explanation": "One defect.", "review_confidence": 0.9,
+            }
+            report_path.write_text(json.dumps(full_report))
+            invoke("--review-phase", "full", "--evidence-output", str(full_evidence), expected=1)
+            first = json.loads(full_evidence.read_text())
+
+            rejected_intake = root / "rejected.json"
+            rejected_intake.write_text(json.dumps({
+                "finding_source": "autoreview",
+                "findings": [{**first["finding_state"]["open"][0], "disposition": "rejected", "reason": "False positive."}],
+            }))
+            disposition_evidence = root / "disposition.json"
+            invoke(
+                "--review-phase", "disposition", "--prior-evidence", str(full_evidence),
+                "--finding-file", str(rejected_intake), "--evidence-output", str(disposition_evidence), expected=0,
+            )
+            disposition = json.loads(disposition_evidence.read_text())
+            self.assertEqual(disposition["terminal_state"], "terminal-composite-clean")
+            self.assertEqual(disposition["counts"], {"full_reviews": 1, "fix_verifications": 0})
+
+            (repo / "app.py").write_text("value = 3\n" + feature_tail)
+            subprocess.run(["git", "commit", "-am", "fix"], cwd=repo, check=True, capture_output=True)
+            invoke(
+                "--review-phase", "disposition", "--prior-evidence", str(full_evidence),
+                "--finding-file", str(rejected_intake), "--evidence-output", str(disposition_evidence), expected=2,
+            )
+            intake = root / "findings.json"
+            intake.write_text(json.dumps({
+                "finding_source": "autoreview",
+                "findings": [{**first["finding_state"]["open"][0], "disposition": "accepted", "reason": "Verified."}],
+            }))
+            delta_evidence = root / "delta.json"
+            identifier = first["finding_state"]["open"][0]["finding_id"]
+            report_path.write_text(json.dumps({
+                "verified_findings": [{"finding_id": identifier, "resolution": "resolved", "explanation": "Fixed.", "confidence": 1.0}],
+                "findings": [], "review_outcome": "pass", "review_explanation": "Resolved.", "review_confidence": 1.0,
+            }))
+            invoke(
+                "--review-phase", "fix-verification", "--prior-evidence", str(full_evidence),
+                "--finding-file", str(intake), "--evidence-output", str(delta_evidence), expected=0,
+            )
+            delta = json.loads(delta_evidence.read_text())
+            self.assertEqual(delta["terminal_state"], "verification-clean")
+            self.assertEqual(delta["target"]["changed_files"], first["target"]["changed_files"])
+            self.assertLessEqual(
+                delta["metrics"]["prompt_characters"],
+                int(first["metrics"]["prompt_characters"] * 0.35),
+            )
+
+            terminal_evidence = root / "terminal.json"
+            report_path.write_text(json.dumps({
+                "findings": [], "review_outcome": "pass", "review_explanation": "Clean.", "review_confidence": 1.0,
+            }))
+            invoke(
+                "--review-phase", "terminal-full", "--prior-evidence", str(delta_evidence),
+                "--evidence-output", str(terminal_evidence), expected=0,
+            )
+            terminal = json.loads(terminal_evidence.read_text())
+            self.assertEqual(terminal["terminal_state"], "terminal-clean")
+            self.assertEqual(terminal["counts"], {"full_reviews": 2, "fix_verifications": 1})
+
+    def test_codex_review_intake_cannot_replace_open_autoreview_findings(self) -> None:
+        finding = {
+            "title": "Open defect", "body": "The defect remains.", "priority": 1,
+            "confidence": 1.0, "finding_category": "bug",
+            "code_location": {"file_path": "app.py", "line": 1},
+        }
+        identifier = cli.finding_id(finding)
+        prior = {"finding_state": {"open": [{"finding_id": identifier, "finding": finding}]}}
+        with tempfile.NamedTemporaryFile("w", suffix=".json") as handle:
+            json.dump({
+                "finding_source": "codex-review",
+                "findings": [{"finding_id": identifier, "finding": finding, "disposition": "accepted", "reason": "Verified."}],
+            }, handle)
+            handle.flush()
+            with self.assertRaisesRegex(cli.AutoreviewError, "prior AutoReview findings"):
+                cli.load_finding_file(handle.name, prior)
+
+    def test_deletion_delta_uses_line_one_of_deleted_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+            (repo / "guard.py").write_text("def guard():\n    return True\n")
+            subprocess.run(["git", "add", "guard.py"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "guard"], cwd=repo, check=True, capture_output=True)
+            previous = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, text=True, capture_output=True).stdout.strip()
+            (repo / "guard.py").write_text("def guard():\n")
+            subprocess.run(["git", "commit", "-am", "delete last line"], cwd=repo, check=True, capture_output=True)
+            _, paths, ranges = cli.delta_bundle(repo, previous)
+            self.assertEqual(paths, {"guard.py"})
+            self.assertEqual(ranges["guard.py"], [(1, 1)])
+            previous = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, check=True, text=True, capture_output=True).stdout.strip()
+            (repo / "guard.py").unlink()
+            subprocess.run(["git", "add", "-u"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "delete guard"], cwd=repo, check=True, capture_output=True)
+            _, paths, ranges = cli.delta_bundle(repo, previous)
+            self.assertEqual(paths, {"guard.py"})
+            self.assertEqual(ranges["guard.py"], [(1, 1)])
 
     def test_schema_uses_canonical_option_values(self) -> None:
         self.assertEqual(

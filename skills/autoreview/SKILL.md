@@ -1,6 +1,6 @@
 ---
 name: autoreview
-description: Run Codex-only structured closeout review by sending the selected change bundle to a separate read-only Codex execution when an explicit or meaningful review is needed before final, commit, PR, or ship, while reusing verified clean evidence for an unchanged target.
+description: Run Codex-only structured closeout review by sending the selected change bundle to a separate read-only Codex execution, reusing verified clean evidence for an unchanged target, and verifying committed review fixes incrementally before final, commit, PR, or ship.
 ---
 
 # Auto Review
@@ -87,10 +87,16 @@ web search, not the Codex engine transfer.
 4. Verify each finding in the real code before accepting it.
 5. Fix only the accepted findings.
 6. Rerun focused tests or proof if code changed.
-7. Rerun the same `scripts/autoreview` mode, verifying previously accepted
-   findings before treating newly surfaced broad concerns as actionable.
-8. Stop once the helper is clean or the remaining findings were consciously
-   rejected with a reason.
+7. For committed branch work, read
+   [references/evidence-chain.md](references/evidence-chain.md), disposition
+   every finding, and use `review_phase=fix-verification` after accepted fixes.
+   Local or exact-commit targets without chain evidence rerun a full review.
+8. After fixes to the first full review are delta-clean, run the one allowed
+   `terminal-full`. Resolve findings from that pass through further progressing
+   fix verifications; do not run a third full review in the same lineage.
+9. Stop on `terminal-clean`, `terminal-composite-clean`, or consciously rejected
+   remaining findings. Repeated feedback without a substantive changed head is
+   `review-no-progress`, not permission for an unbounded retry loop.
 
 ## Runtime Surface
 
@@ -124,6 +130,12 @@ The validated JSON result uses canonical option values:
 remain separate data. Human output may explain the result as "patch is correct"
 or "patch is incorrect", but callers must branch on `review_outcome`.
 
+For committed branch fix loops, the evidence-chain contract additionally uses
+`review_phase=full|fix-verification|disposition|terminal-full` and terminal state
+`fix-required|verification-clean|terminal-clean|terminal-composite-clean`.
+Read [references/evidence-chain.md](references/evidence-chain.md) before using
+those values or their strict finding-intake file.
+
 ## Closeout Entry Modes
 
 - When fresh review is needed for dirty local work: `scripts/autoreview --mode local`
@@ -148,11 +160,12 @@ or "patch is incorrect", but callers must branch on `review_outcome`.
    that over-complicate the codebase.
 6. Prefer small fixes at the right ownership boundary. Do not refactor unless it
    clearly addresses the accepted bug class.
-7. If a review-triggered fix changes code, rerun focused tests and rerun
-   `scripts/autoreview` on the updated target. First verify that the accepted
-   findings from the previous pass are resolved; treat unrelated new findings
-   as advisory unless they expose a concrete regression in the changed scope.
-8. Stop once the helper exits cleanly with no accepted/actionable findings. Do
+7. If a review-triggered fix changes a committed branch, rerun focused tests
+   and follow [references/evidence-chain.md](references/evidence-chain.md).
+   Fix verification examines only accepted findings and regressions on changed
+   delta lines. A base, merge-base, repository, or path-set expansion starts a
+   new full-review lineage.
+8. Stop once terminal evidence has no accepted/actionable findings. Do
    not rerun it only for a later lifecycle boundary or nicer closeout wording.
 
 ## Helper Commands
@@ -174,6 +187,9 @@ Useful options:
 - `--model`: pass an explicit Codex model.
 - `--dry-run`: build the target bundle and prompt without calling Codex.
 - `--json-output`: write the validated structured report to a file.
+- `--review-phase`, `--prior-evidence`, `--finding-file`, and
+  `--evidence-output`: create or continue the committed-branch evidence chain
+  documented in `references/evidence-chain.md`.
 - `--heartbeat-seconds`: change the long-running Codex review heartbeat
   interval. The default is 60 seconds.
 - `--no-web-search`: omit Codex web search for the review run.
