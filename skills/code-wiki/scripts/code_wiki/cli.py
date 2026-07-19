@@ -10,9 +10,26 @@ from pathlib import Path
 from code_wiki.claim_matrix import synthesize_claim_matrix
 from code_wiki.evidence import render_evidence_chip, source_url_for_evidence
 from code_wiki.inventory import build_inventory, write_json
+from code_wiki.pilot.comparison import compare_runs
+from code_wiki.pilot.doctor import doctor
+from code_wiki.pilot.runner import REASONING_EFFORTS, run_pilot, skill_root
 from code_wiki.scaffold import scaffold
 from code_wiki.validation import validate
 from code_wiki.version import VERSION
+
+
+class JsonArgumentError(RuntimeError):
+    """Raised after a JSON argument error has been emitted."""
+
+
+class JsonAwareArgumentParser(argparse.ArgumentParser):
+    json_errors = False
+
+    def error(self, message: str) -> None:
+        if self.json_errors:
+            print(json.dumps({"ok": False, "error": f"argument error: {message}"}, sort_keys=True))
+            raise JsonArgumentError(message)
+        super().error(message)
 
 
 def cmd_inventory(args: argparse.Namespace) -> int:
@@ -35,6 +52,57 @@ def cmd_synthesize(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     return validate(args.wiki, strict=args.strict)
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    result = doctor(skill_root())
+    if args.json:
+        print(json.dumps(result, indent=2, sort_keys=True))
+    else:
+        print(
+            f"code-wiki {result['cli_version']} live pilot readiness: "
+            f"{'ready' if result['live_pilot_ready'] else 'setup-required'}"
+        )
+        for name, check in result["checks"].items():
+            print(f"- {name}: {'ready' if check['ok'] else 'not-ready'}")
+    return 0 if result["ok"] else 1
+
+
+def cmd_pilot_run(args: argparse.Namespace) -> int:
+    exit_code, manifest = run_pilot(
+        mode=args.mode,
+        repo=args.repo,
+        commit=args.commit,
+        out=args.out,
+        model=args.model,
+        reasoning_effort=args.reasoning_effort,
+        title=args.title,
+        executor_fixture=args.executor_fixture,
+        cache_root=args.cache_root,
+    )
+    result = {
+        "run_manifest": manifest["output"]["manifest_path"],
+        "terminal_status": manifest["terminal_status"],
+        "validation_status": manifest["validation_status"],
+        "reader_status": (
+            manifest["reader_evaluation"].get("reader_status")
+            if isinstance(manifest.get("reader_evaluation"), dict)
+            else None
+        ),
+    }
+    print(json.dumps(result, indent=2, sort_keys=True) if args.json else f"wrote pilot run manifest to {result['run_manifest']}")
+    return exit_code
+
+
+def cmd_pilot_compare(args: argparse.Namespace) -> int:
+    exit_code, decision = compare_runs(args.baseline_run, args.candidate_run, args.out)
+    result = {
+        "promotion_status": decision["promotion_status"],
+        "comparison_json": str(Path(args.out).expanduser().resolve() / "comparison.json"),
+        "comparison_markdown": str(Path(args.out).expanduser().resolve() / "comparison.md"),
+    }
+    print(json.dumps(result, indent=2, sort_keys=True) if args.json else f"promotion_status={result['promotion_status']}\nwrote comparison to {result['comparison_json']}")
+    return exit_code
 
 
 def refs_from_batch_input(input_arg: str) -> list[str]:
@@ -106,9 +174,13 @@ def cmd_evidence_link(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="code-wiki")
+    parser = JsonAwareArgumentParser(prog="code-wiki")
     parser.add_argument("--version", action="version", version=f"code-wiki {VERSION}")
+    parser.add_argument("--json", action="store_true", help="emit stable JSON for commands that support it")
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    doctor_parser = subparsers.add_parser("doctor", help="check local and pilot runtime readiness without invoking a model")
+    doctor_parser.set_defaults(func=cmd_doctor)
 
     inventory_parser = subparsers.add_parser("inventory", help="scan a repo and write inventory JSON")
     inventory_parser.add_argument("--repo", required=True, help="local repository path")
@@ -170,13 +242,58 @@ def build_parser() -> argparse.ArgumentParser:
     )
     evidence_parser.set_defaults(func=cmd_evidence_link)
 
+    pilot_parser = subparsers.add_parser("pilot", help="run or compare the opt-in Markdown node-graph pilot")
+    pilot_subparsers = pilot_parser.add_subparsers(dest="pilot_command", required=True)
+
+    pilot_run_parser = pilot_subparsers.add_parser("run", help="run one baseline or node-graph wiki generation")
+    pilot_run_parser.add_argument("--mode", required=True, choices=("baseline", "node-graph"))
+    pilot_run_parser.add_argument("--repo", required=True, help="clean local Git repository")
+    pilot_run_parser.add_argument("--commit", required=True, help="commit or ref to pin in the isolated snapshot")
+    pilot_run_parser.add_argument("--out", required=True, help="empty output directory outside the source repository")
+    pilot_run_parser.add_argument("--model", required=True, help="explicit Codex model for every agent node")
+    pilot_run_parser.add_argument(
+        "--reasoning-effort",
+        required=True,
+        choices=tuple(sorted(REASONING_EFFORTS)),
+        help="explicit Codex reasoning effort",
+    )
+    pilot_run_parser.add_argument("--title", help="wiki title; defaults to the source repository name")
+    pilot_run_parser.add_argument(
+        "--executor-fixture",
+        help="explicit test-only Codex subprocess fixture JSON",
+    )
+    pilot_run_parser.add_argument(
+        "--cache-root",
+        help="override the disposable snapshot cache root for isolated tests",
+    )
+    pilot_run_parser.set_defaults(func=cmd_pilot_run)
+
+    pilot_compare_parser = pilot_subparsers.add_parser("compare", help="compare complete baseline and node-graph run manifests")
+    pilot_compare_parser.add_argument("--baseline-run", required=True, help="baseline run.json path")
+    pilot_compare_parser.add_argument("--candidate-run", required=True, help="node-graph run.json path")
+    pilot_compare_parser.add_argument("--out", required=True, help="comparison output directory")
+    pilot_compare_parser.set_defaults(func=cmd_pilot_compare)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(argv) if argv is not None else sys.argv[1:]
+    JsonAwareArgumentParser.json_errors = "--json" in arguments
     parser = build_parser()
-    args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        args = parser.parse_args(arguments)
+        return args.func(args)
+    except JsonArgumentError:
+        return 2
+    except (OSError, RuntimeError, ValueError) as exc:
+        if "--json" in arguments:
+            print(json.dumps({"ok": False, "error": str(exc)}, sort_keys=True))
+        else:
+            print(f"error: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        JsonAwareArgumentParser.json_errors = False
 
 
 if __name__ == "__main__":

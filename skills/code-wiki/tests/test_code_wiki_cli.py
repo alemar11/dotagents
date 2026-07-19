@@ -107,12 +107,32 @@ class CodeWikiCliTests(unittest.TestCase):
     def test_help_and_version_use_public_launcher(self) -> None:
         version = self.run_code_wiki("--version")
         self.assertEqual(version.returncode, 0, version.stderr)
-        self.assertIn("code-wiki 0.6.0", version.stdout)
+        self.assertIn("code-wiki 0.7.0", version.stdout)
 
         help_result = self.run_code_wiki("--help")
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
         self.assertIn("synthesize", help_result.stdout)
         self.assertIn("evidence-link", help_result.stdout)
+        self.assertIn("doctor", help_result.stdout)
+        self.assertIn("pilot", help_result.stdout)
+
+        pilot_help = self.run_code_wiki("pilot", "--help")
+        self.assertEqual(pilot_help.returncode, 0, pilot_help.stderr)
+        self.assertIn("run", pilot_help.stdout)
+        self.assertIn("compare", pilot_help.stdout)
+        self.assertNotIn("provenance", pilot_help.stdout)
+
+        for invalid_args in (
+            ("--json", "pilot", "run", "--mode", "invalid"),
+            ("--json", "pilot", "run", "--mode", "baseline"),
+        ):
+            with self.subTest(invalid_args=invalid_args):
+                invalid = self.run_code_wiki(*invalid_args)
+                self.assertEqual(invalid.returncode, 2)
+                self.assertEqual(invalid.stderr, "")
+                payload = json.loads(invalid.stdout)
+                self.assertFalse(payload["ok"])
+                self.assertIn("argument error", payload["error"])
 
         validate_help = self.run_code_wiki("validate", "--help")
         self.assertEqual(validate_help.returncode, 0, validate_help.stderr)

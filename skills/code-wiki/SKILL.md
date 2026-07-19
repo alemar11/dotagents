@@ -40,11 +40,26 @@ This skill is Codex-dependent. It can use:
   adds value beyond deterministic local diagrams.
 - `~/.cache/dotagents/skills/code-wiki/` for default disposable git clones and
   temporary analysis artifacts.
+- An explicit opt-in Markdown node-graph pilot that requires local `python3`,
+  `git`, and the Codex CLI with `codex exec --ephemeral --json`, explicit model
+  and reasoning-effort selection, and a non-bypass workspace sandbox.
 
 Never put the final wiki in the cache. The durable wiki belongs in the
 user-chosen output folder. If the user explicitly asks to store cloned source
 locally beside the wiki, use the local wiki cache pattern instead of the global
 cache.
+
+## Optional Markdown Node-Graph Pilot
+
+The normal workflow below remains the default. Select the pilot only when the
+user explicitly asks to run or inspect the baseline/node-graph experiment; do
+not infer it from an ordinary Code Wiki request.
+
+Open `references/pilot.md` before a pilot run. It owns the shipped commands,
+clean snapshot boundary, Markdown node contracts, typed manifests, actual
+Codex token fields, identical reader evaluation, deterministic comparison
+gates, and the `promote|revise|reject|inconclusive` result contract. A pilot
+result is evidence only and never promotes or mutates the default workflow.
 
 ## Workflow
 
@@ -215,3 +230,19 @@ only file layout, and validation passes.
   diagrams, evidence links, and validation expectations.
 - `references/image-guidance.md`: optional raster image and hybrid diagram
   rules.
+- `references/pilot.md`: explicit opt-in baseline/node-graph execution,
+  manifests, reader evaluation, and deterministic comparison.
+
+## CLI Maintenance
+
+- Normal runtime execution stays on `scripts/code-wiki`; the Python package
+  under `scripts/code_wiki/` is internal to the shipped artifact.
+- `scripts/code_wiki/version.py` is the single semver source of truth.
+- CLI changes must preserve the standard-library-only package, update the
+  shipped help and owner docs, and rerun `--help`, `--version`, `--json doctor`,
+  the full unit suite, and a safe fixture-backed end-to-end check.
+- Reads and `doctor` must not create config or signing keys. Live pilot runs may
+  create and reuse the mode-0600 provenance key under
+  `~/.cache/dotagents/skills/code-wiki/pilot/`. Pilot snapshots there are
+  disposable; final wikis, manifests, raw evidence, and comparisons stay under
+  user-selected outputs.
