@@ -9,12 +9,13 @@
 <plugin-root>/scripts/gitstack --json doctor
 <plugin-root>/scripts/gitstack --json repo snapshot
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
+<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key>
 <plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
-<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <sha> --timeout <caller-owned-duration>
+<plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
 ```
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning
@@ -49,19 +50,25 @@ The script does not write configuration files.
 
 ## Automated Review State
 
-Both `check` and `wait` return `data.provider`, `data.review_state`, `data.head`,
-`data.current_head`, `data.head_is_current`, `data.observation_fingerprint`,
-plus normalized review, request, terminal-comment, and selected terminal
-evidence. States are `not-requested`, `acknowledged`, `pending`, `clean`,
-`findings`, `stale`, and `error`. `error` is terminal provider-authored failure
+`request` returns a canonical body fingerprint and a complete receipt with
+`request_key`, request/body/identity fingerprints, exact provider comment id,
+URL, and creation time. `wait` requires that receipt and fetches that exact id.
+Both `check` and `wait` return `data.provider`, `data.request_binding`,
+`data.review_state`, `data.head`, `data.current_head`, `data.head_is_current`,
+`data.observation_fingerprint`, plus normalized review, request,
+terminal-comment, and selected terminal evidence. Request bindings are
+`absent`, `recognized`, `unbound`, `invalid`, `unknown`, or `ambiguous`.
+Review states are orthogonal: `not-requested`, `acknowledged`, `pending`,
+`clean`, `findings`, `stale`, and `error`. `error` is terminal provider-authored failure
 evidence for the requested head, distinct from a GitStack API/configuration
 error envelope. `review_state` is factual CLI result state, not an invocation
 option. Terminal evidence may be a formal review, an
 authenticated provider-authored top-level comment posted after the matching
 request and naming the reviewed head, or a clean provider reaction. Conflicting
-terminal outcomes, or a terminal comment that cannot be correlated across
-overlapping requests for the same head, return `ambiguous_review_evidence` with
-exit code `4`.
+terminal outcomes return `ambiguous_review_evidence` with exit code `4`.
+Missing binding or acknowledgment is also exit `4`, never `stale` and never
+timeout-eligible. `stale` is reserved for actual PR-head drift or mismatched
+provider terminal evidence.
 
 Exit codes are stable: `0` for clean, `1` for findings, `2` for
 not-requested/acknowledged/pending, `3` for stale review evidence, `4` for a
@@ -73,9 +80,12 @@ seconds, minutes, or hours, such as `30s`, `15m`, or `1h`.
 `--timeout` bounds one invocation. A composing caller that owns a deadline
 derives and passes `<caller-owned-duration>`; GitStack never replaces, extends,
 or segments it.
-`--head` accepts a full hexadecimal commit SHA or an unambiguous prefix of at
-least seven characters. Review-request comments must include that SHA or prefix
-for acknowledgement and reaction evidence to count toward the target head.
+`request` requires a full 40-character lowercase head SHA and a caller-supplied
+request key. Only its exact canonical marker is recognized; markerless plain,
+short, or prose requests are diagnosed as `unbound`, while malformed or
+conflicting typed markers are `invalid`.
+`check` may inspect without a receipt, but `wait` requires one and never scans
+for a replacement SHA-bearing comment.
 `wait` also returns `attempts`, `state_transitions`, and `unchanged_attempts`.
 The observation fingerprint excludes those counters and elapsed time, so
 callers can suppress unchanged ledger and progress updates.

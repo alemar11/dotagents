@@ -60,7 +60,9 @@ check as evidence and keep analysis read-only:
 Route review work to `$gitstack:github-review-threads` with the exact repository
 and PR plus one operation per invocation: `review_operation=check|wait` for
 read-only freshness, or `review_operation=reply|request|resolve` with
-`mutation_mode=apply` only after the matching write is authorized.
+`mutation_mode=apply` only after the matching write is authorized. A Codex
+`request` uses GitStack's typed full-head/request-key operation and persists its
+complete receipt before any wait; it has no legacy text fallback.
 
 Read local instructions, issue workflows, test guidance, and maintainer runbooks
 before deciding. If the repository is not checked out locally, clone or fetch it

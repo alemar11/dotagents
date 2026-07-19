@@ -92,6 +92,14 @@ class GitStackSkillContractTests(unittest.TestCase):
         self.assertIn("review_operation=wait", yeet)
         self.assertIn("one operation per", yeet)
 
+        review_threads = read("skills/github-review-threads/SKILL.md")
+        self.assertIn("reviews request", review_threads)
+        self.assertIn("full head SHA", review_threads)
+        self.assertIn("persist its complete", review_threads)
+        self.assertIn("request receipt", review_threads)
+        self.assertIn("never substitutes a newer comment", review_threads)
+        self.assertIn("There is no direct legacy fallback", read("skills/github-review-threads/references/workflows.md"))
+
     def test_review_wait_duration_is_caller_owned(self) -> None:
         paths = (
             "skills/github-review-threads/SKILL.md",

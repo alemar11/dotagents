@@ -62,9 +62,11 @@ Prefer the shortest publish path that matches the state in front of you:
 7. When the calling workflow requires an automated-review publication gate,
    hand it to `$gitstack:github-review-threads` with the exact repository and
    PR, configured provider, and published head SHA. Use one operation per
-   invocation: `review_operation=request` with `mutation_mode=apply` for an
-   authorized request, then `review_operation=wait` for the bounded read-only
-   wait. Do not duplicate provider detection or polling inside Yeet.
+   invocation: `review_operation=request` with `mutation_mode=apply`, a full
+   head SHA, and a caller-supplied request key for an authorized typed request,
+   then `review_operation=wait` with the persisted complete receipt for the
+   bounded read-only wait. Do not duplicate provider detection or polling inside
+   Yeet.
 
 ## References
 

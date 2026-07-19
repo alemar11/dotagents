@@ -27,6 +27,15 @@ from .provider_text import (
     verify_response_text,
     verify_worktree_unchanged,
 )
+from .review_request import (
+    RequestPlan,
+    build_request,
+    parse_request,
+    receipt,
+    receipt_matches,
+    validate_receipt,
+    validate_full_head,
+)
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
 CODEX_TERMINAL_PREFIX = re.compile(r"(?im)^\s*Codex Review\s*:")
@@ -50,6 +59,14 @@ REVIEW_EXIT_CODES = {
     "pending": 2,
     "stale": 3,
     "error": 4,
+}
+REQUEST_BINDING_EXIT_CODES = {
+    "absent": 2,
+    "recognized": 0,
+    "unbound": 4,
+    "invalid": 4,
+    "unknown": 4,
+    "ambiguous": 4,
 }
 
 
@@ -215,20 +232,9 @@ def validate_head(raw: str) -> str:
     return value
 
 
-def review_request_matches(comment: dict[str, Any], provider: str, head: str) -> bool:
-    body = str(comment.get("body") or "")
-    command = re.search(r"(?is)@codex\s+review\b(?P<tail>.*)", body) if provider == "codex" else None
-    if provider == "codex" and not command:
-        return False
-    evidence = command.group("tail") if command else body
-    tokens = re.findall(r"(?i)(?<![0-9a-f])([0-9a-f]{7,40})(?![0-9a-f])", evidence)
-    return any(sha_matches(token, head) for token in tokens)
-
-
-def provider_terminal_comment(
+def provider_terminal_comment_any(
     comment: dict[str, Any],
     provider: str,
-    head: str,
 ) -> dict[str, Any] | None:
     if not authored_by(comment, provider):
         return None
@@ -240,7 +246,7 @@ def provider_terminal_comment(
         return None
     match = REVIEWED_COMMIT.search(body)
     reviewed_head = match.group(1).lower() if match else ""
-    if not reviewed_head or not sha_matches(reviewed_head, head):
+    if not reviewed_head:
         return None
     if CODEX_ERROR_RESULT.search(body):
         outcome = "error"
@@ -272,7 +278,97 @@ def provider_reactions(repo: str, comment_id: int, provider: str) -> set[str]:
     }
 
 
-def check_automated_review(repo: str, pr: int, provider: str, expected_head: str | None) -> dict[str, Any]:
+def _receipt_is_complete(value: object) -> bool:
+    if not isinstance(value, dict):
+        return False
+    try:
+        validate_receipt(
+            value,
+            provider="codex",
+            repository=str(value.get("repository") or ""),
+            pr_number=int(value.get("pr_number")),
+            expected_head=str(value.get("head_sha") or ""),
+        )
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _request_plan_from_receipt(
+    value: object,
+    provider: str,
+    repository: str,
+    pr_number: int,
+) -> RequestPlan | None:
+    if not _receipt_is_complete(value):
+        return None
+    assert isinstance(value, dict)
+    if value.get("provider") != provider or value.get("repository") != repository or value.get("pr_number") != pr_number:
+        return None
+    try:
+        validate_receipt(
+            value,
+            provider=provider,
+            repository=repository,
+            pr_number=pr_number,
+        )
+        plan = build_request(
+            provider,
+            repository,
+            pr_number,
+            str(value["head_sha"]),
+            str(value["request_key"]),
+        )
+    except ValueError:
+        return None
+    if value.get("request_fingerprint") != plan.request_fingerprint or value.get("body_fingerprint") != plan.body_fingerprint:
+        return None
+    return plan
+
+
+def _comment_for_plan(
+    comment: dict[str, Any],
+    plan: RequestPlan,
+) -> bool:
+    parsed = parse_request(comment.get("body") or "", plan.provider, plan.repository, plan.pr_number)
+    return (
+        parsed.classification == "canonical"
+        and parsed.head_sha == plan.head_sha
+        and parsed.request_key == plan.request_key
+        and parsed.request_fingerprint == plan.request_fingerprint
+        and parsed.body_fingerprint == plan.body_fingerprint
+        and str(comment.get("body") or "") == plan.body
+    )
+
+
+def _request_conflicts(
+    conversation: list[dict[str, Any]],
+    plan: RequestPlan,
+) -> tuple[str | None, list[dict[str, Any]]]:
+    exact: list[dict[str, Any]] = []
+    for item in conversation:
+        parsed = parse_request(item.get("body") or "", plan.provider, plan.repository, plan.pr_number)
+        if parsed.classification == "canonical" and parsed.head_sha == plan.head_sha:
+            if _comment_for_plan(item, plan):
+                exact.append(item)
+            else:
+                return "invalid", exact
+        elif parsed.classification == "invalid":
+            return "invalid", exact
+        elif parsed.classification == "unbound":
+            return "unbound", exact
+    if len(exact) > 1:
+        return "ambiguous", exact
+    return None, exact
+
+
+def check_automated_review(
+    repo: str,
+    pr: int,
+    provider: str,
+    expected_head: str | None,
+    request_identity: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     # Validate before any network reads so unsupported providers fail predictably.
     is_provider_author(provider, "")
     pull = gh_json(["api", f"repos/{repo}/pulls/{pr}", "-H", "Accept: application/vnd.github+json"])
@@ -284,6 +380,7 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
     current_head = validate_head(current_head)
     requested_head = validate_head(expected_head) if expected_head else current_head
     head = current_head if sha_matches(current_head, requested_head) else requested_head
+    head_is_current = sha_matches(current_head, head)
 
     reviews = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/reviews")
     inline_comments = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
@@ -295,89 +392,128 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
         for item in inline_comments
         if authored_by(item, provider) and sha_matches(item.get("commit_id"), head)
     ]
-    requests = [
-        item
-        for item in conversation
-        if review_request_matches(item, provider, head)
-    ]
-    latest_request = max(requests, key=lambda item: str(item.get("created_at") or ""), default=None)
-    request_created_at = str(latest_request.get("created_at") or "") if latest_request else ""
+
+    saved_plan = _request_plan_from_receipt(request_identity, provider, repo, pr) if request_identity else None
+    binding = "absent"
+    selected_request: dict[str, Any] | None = None
+    selected_receipt: dict[str, Any] | None = None
+    request_error: str | None = None
+    if request_identity is not None and saved_plan is None:
+        binding = "invalid"
+    elif saved_plan is not None:
+        binding = "unknown"
+        try:
+            comment_id = int(request_identity["comment_id"])  # type: ignore[index]
+            selected_request = _api_object(f"repos/{repo}/issues/comments/{comment_id}")
+            if not _comment_for_plan(selected_request, saved_plan) or not receipt_matches(saved_plan, selected_request, request_identity):
+                binding = "invalid"
+                request_error = "The persisted request receipt does not match the exact provider comment."
+            else:
+                binding = "recognized"
+                selected_receipt = receipt(saved_plan, selected_request, status="persisted")
+        except (ReviewError, KeyError, TypeError, ValueError) as exc:
+            request_error = str(exc)
+    else:
+        candidate_plan: RequestPlan | None = None
+        for item in conversation:
+            parsed = parse_request(item.get("body") or "", provider, repo, pr)
+            if parsed.classification == "canonical" and parsed.head_sha and sha_matches(parsed.head_sha, head):
+                if candidate_plan is None:
+                    try:
+                        candidate_plan = build_request(provider, repo, pr, parsed.head_sha, str(parsed.request_key))
+                        selected_request = item
+                    except (TypeError, ValueError):
+                        binding = "invalid"
+                        break
+                else:
+                    binding = "ambiguous"
+                    break
+        if binding == "absent" and candidate_plan is not None and selected_request is not None:
+            binding = "recognized"
+            selected_receipt = receipt(candidate_plan, selected_request, status="observed")
+        if binding == "absent":
+            conflict, _ = _request_conflicts(
+                conversation,
+                build_request(provider, repo, pr, current_head if head_is_current else head, "diagnostic"),
+            ) if head_is_current else (None, [])
+            if conflict:
+                binding = conflict
+
+    plan = saved_plan
+    if plan is None and selected_request is not None and selected_receipt is not None:
+        try:
+            plan = build_request(provider, repo, pr, selected_receipt["head_sha"], selected_receipt["request_key"])
+        except (KeyError, TypeError, ValueError):
+            plan = None
+            binding = "invalid"
+
+    if plan is not None and selected_request is not None:
+        conflict, exact = _request_conflicts(conversation, plan)
+        if conflict == "ambiguous" or len(exact) > 1:
+            binding = "ambiguous"
+        elif conflict in {"unbound", "invalid"}:
+            binding = conflict
+        elif binding == "recognized" and selected_receipt is None:
+            selected_receipt = receipt(plan, selected_request, status="observed")
+
+    request_created_at = str(selected_receipt.get("created_at") or "") if selected_receipt else ""
+    reactions: set[str] = set()
+    if binding == "recognized" and selected_request and selected_request.get("id"):
+        try:
+            reactions = provider_reactions(repo, int(selected_request["id"]), provider)
+        except ReviewError as exc:
+            binding = "unknown"
+            request_error = str(exc)
+
     current_request_reviews = [
-        item
-        for item in head_reviews
-        if not request_created_at or str(item.get("submitted_at") or "") > request_created_at
-    ]
+        item for item in head_reviews
+        if request_created_at and str(item.get("submitted_at") or "") > request_created_at
+    ] if binding == "recognized" else []
     current_request_findings = [
-        item
-        for item in head_findings
-        if not request_created_at or str(item.get("created_at") or "") > request_created_at
-    ]
+        item for item in head_findings
+        if request_created_at and str(item.get("created_at") or "") > request_created_at
+    ] if binding == "recognized" else []
     latest_formal_review = max(
         current_request_reviews,
         key=lambda item: str(item.get("submitted_at") or ""),
         default=None,
     )
-    reactions: set[str] = set()
-    if latest_request and latest_request.get("id"):
-        reactions = provider_reactions(repo, int(latest_request["id"]), provider)
-
     all_terminal_comments = [
-        result
-        for item in conversation
-        if (
-            result := provider_terminal_comment(
-                item,
-                provider,
-                head,
-            )
-        )
-        is not None
+        result for item in conversation
+        if (result := provider_terminal_comment_any(item, provider)) is not None
     ]
     terminal_comments = [
-        result
-        for result in all_terminal_comments
-        if request_created_at and str(result.get("created_at") or "") > request_created_at
+        result for result in all_terminal_comments
+        if binding == "recognized" and request_created_at and str(result.get("created_at") or "") > request_created_at
+        and sha_matches(result.get("reviewed_head"), head)
+    ]
+    mismatched_terminal_comments = [
+        result for result in all_terminal_comments
+        if binding == "recognized" and request_created_at
+        and str(result.get("created_at") or "") > request_created_at
+        and not sha_matches(result.get("reviewed_head"), head)
     ]
     latest_terminal_comment = max(
         terminal_comments,
         key=lambda item: str(item.get("created_at") or ""),
         default=None,
     )
-    if latest_terminal_comment and len(requests) > 1:
-        ordered_requests = sorted(requests, key=lambda item: str(item.get("created_at") or ""))
-        for previous_request, next_request in zip(ordered_requests, ordered_requests[1:]):
-            previous_at = str(previous_request.get("created_at") or "")
-            next_at = str(next_request.get("created_at") or "")
-            completed_before_next = any(
-                previous_at < str(result.get("created_at") or "") < next_at
-                for result in all_terminal_comments
-            ) or any(
-                previous_at < str(review.get("submitted_at") or "") < next_at
-                for review in head_reviews
-            )
-            if not previous_at or not next_at or not completed_before_next:
-                raise ReviewError(
-                    "A terminal Codex result cannot be correlated across overlapping requests for the same PR head.",
-                    code="ambiguous_review_evidence",
-                    exit_code=4,
-                )
+    if latest_terminal_comment and selected_request and len([item for item in conversation if _comment_for_plan(item, plan)]) > 1:  # type: ignore[arg-type]
+        raise ReviewError(
+            "A terminal Codex result cannot be correlated across duplicate exact requests.",
+            code="ambiguous_review_evidence",
+            exit_code=4,
+        )
 
-    head_is_current = sha_matches(current_head, head)
-    formal_outcome = (
-        "findings"
-        if current_request_findings
-        else ("clean" if current_request_reviews else None)
-    )
+    formal_outcome = "findings" if current_request_findings else ("clean" if current_request_reviews else None)
     terminal_outcomes = {
-        outcome
-        for outcome in (
+        outcome for outcome in (
             formal_outcome,
             *(str(result.get("outcome") or "") for result in terminal_comments),
             "clean" if "+1" in reactions else None,
-        )
-        if outcome
+        ) if outcome
     }
-    if head_is_current and len(terminal_outcomes) > 1:
+    if binding == "recognized" and head_is_current and len(terminal_outcomes) > 1:
         raise ReviewError(
             "Conflicting terminal Codex review evidence exists for the current PR head.",
             code="ambiguous_review_evidence",
@@ -391,8 +527,22 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
         "outcome": None,
         "head": head,
     }
-    if not head_is_current:
+    if binding != "recognized":
+        status: str | None = "stale" if binding == "absent" and not head_is_current else None
+        if binding == "absent" and head_is_current:
+            status = "not-requested"
+    elif not head_is_current:
         status = "stale"
+    elif mismatched_terminal_comments:
+        status = "stale"
+        mismatched = mismatched_terminal_comments[-1]
+        evidence = {
+            "kind": "mismatched-provider-comment",
+            "object_id": mismatched.get("comment_id"),
+            "created_at": mismatched.get("created_at"),
+            "outcome": mismatched.get("outcome"),
+            "head": mismatched.get("reviewed_head"),
+        }
     elif latest_terminal_comment:
         status = str(latest_terminal_comment["outcome"])
         evidence = {
@@ -415,29 +565,28 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
         status = "clean"
         evidence = {
             "kind": "clean-reaction",
-            "object_id": latest_request.get("id") if latest_request else None,
-            "created_at": latest_request.get("created_at") if latest_request else None,
+            "object_id": selected_request.get("id") if selected_request else None,
+            "created_at": selected_request.get("created_at") if selected_request else None,
             "outcome": status,
             "head": head,
         }
-    elif latest_request:
-        status = "acknowledged" if "eyes" in reactions else "pending"
-    elif provider_reviews or any(
-        provider == "codex"
-        and (
-            re.search(r"(?i)@codex\s+review\b", str(item.get("body") or ""))
-            or CODEX_TERMINAL_PREFIX.search(str(item.get("body") or ""))
-        )
-        for item in conversation
-    ):
-        status = "stale"
     else:
-        status = "not-requested"
+        status = "acknowledged" if "eyes" in reactions else "pending"
 
+    request_payload: dict[str, Any] = dict(selected_receipt or {})
+    request_payload.update({
+        "comment_id": selected_request.get("id") if selected_request else request_payload.get("comment_id"),
+        "created_at": selected_request.get("created_at") if selected_request else request_payload.get("created_at"),
+        "acknowledged": "eyes" in reactions,
+        "clean_reaction": "+1" in reactions,
+    })
+    if request_error:
+        request_payload["error"] = request_error
     payload = {
         "repo": repo,
         "pr": pr,
         "provider": provider,
+        "request_binding": binding,
         "review_state": status,
         "head": head,
         "current_head": current_head,
@@ -448,12 +597,7 @@ def check_automated_review(repo: str, pr: int, provider: str, expected_head: str
             "submitted_at": latest_formal_review.get("submitted_at") if latest_formal_review else None,
             "findings": len(current_request_findings),
         },
-        "request": {
-            "comment_id": latest_request.get("id") if latest_request else None,
-            "created_at": latest_request.get("created_at") if latest_request else None,
-            "acknowledged": "eyes" in reactions,
-            "clean_reaction": "+1" in reactions,
-        },
+        "request": request_payload,
         "terminal_comment": {
             "count": len(terminal_comments),
             "latest_id": latest_terminal_comment.get("comment_id") if latest_terminal_comment else None,
@@ -475,7 +619,18 @@ def wait_for_automated_review(
     timeout: float,
     initial_interval: float,
     max_interval: float,
+    request_identity: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
+    if not _receipt_is_complete(request_identity):
+        return {
+            "repo": repo,
+            "pr": pr,
+            "provider": provider,
+            "request_binding": "invalid",
+            "review_state": None,
+            "error": "The identity-bound automated review waiter requires a complete request receipt.",
+            "attempts": 0,
+        }, REQUEST_BINDING_EXIT_CODES["invalid"]
     started = time.monotonic()
     interval = initial_interval
     attempts = 0
@@ -484,7 +639,7 @@ def wait_for_automated_review(
     previous_fingerprint: str | None = None
     while True:
         attempts += 1
-        payload = check_automated_review(repo, pr, provider, expected_head)
+        payload = check_automated_review(repo, pr, provider, expected_head, request_identity)
         fingerprint = str(payload.get("observation_fingerprint") or "")
         if previous_fingerprint is None or fingerprint != previous_fingerprint:
             transitions += 1
@@ -495,7 +650,13 @@ def wait_for_automated_review(
         payload["state_transitions"] = transitions
         payload["unchanged_attempts"] = unchanged_attempts
         payload["elapsed_seconds"] = round(time.monotonic() - started, 3)
-        status = str(payload["review_state"])
+        binding = str(payload.get("request_binding") or "unknown")
+        status_value = payload.get("review_state")
+        status = str(status_value) if status_value is not None else ""
+        if binding != "recognized":
+            if binding == "absent" and status == "not-requested":
+                return payload, REVIEW_EXIT_CODES[status]
+            return payload, REQUEST_BINDING_EXIT_CODES.get(binding, 4)
         if status in {"clean", "findings", "not-requested", "stale", "error"}:
             return payload, REVIEW_EXIT_CODES[status]
         remaining = timeout - (time.monotonic() - started)
@@ -760,6 +921,163 @@ def post_conversation_comment(
         raise _review_error(exc) from exc
 
 
+def _verify_pr_head(repo: str, pr: int, expected_head: str) -> dict[str, Any]:
+    pull = _verify_pr_target(repo, pr)
+    actual = str(((pull.get("head") or {}).get("sha")) or "")
+    try:
+        actual = validate_full_head(actual)
+    except ValueError as exc:
+        raise ReviewError("GitHub pull-request read-back omitted a full head SHA.", code="provider_target_mismatch", exit_code=65) from exc
+    if actual != expected_head:
+        raise ReviewError(
+            "The pull-request head changed before the typed review request could be posted.",
+            code="head_drift",
+            exit_code=3,
+            details={"expected_head": expected_head, "current_head": actual},
+        )
+    return pull
+
+
+def _request_target_comment(item: dict[str, Any], repo: str, pr: int) -> bool:
+    return str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}")
+
+
+def request_automated_review(
+    repo: str,
+    pr: int,
+    provider: str,
+    head: str,
+    request_key: str,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
+    is_provider_author(provider, "")
+    try:
+        plan = build_request(provider, repo, pr, head, request_key)
+    except ValueError as exc:
+        raise ReviewError(str(exc), code="invalid_request", exit_code=64) from exc
+    _verify_pr_head(repo, pr, plan.head_sha)
+    conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
+    conflict, exact = _request_conflicts(conversation, plan)
+    if conflict == "unbound":
+        raise ReviewError(
+            "An existing unbound Codex review trigger prevents a typed request from being posted.",
+            code="request_unbound",
+            exit_code=4,
+            details={"request_binding": "unbound", "head": plan.head_sha},
+        )
+    if conflict == "invalid":
+        raise ReviewError(
+            "An existing conflicting or malformed typed Codex request prevents a new request.",
+            code="invalid_request",
+            exit_code=4,
+            details={"request_binding": "invalid", "head": plan.head_sha},
+        )
+    if conflict == "ambiguous" or len(exact) > 1:
+        raise ReviewError(
+            "Multiple exact-key Codex requests exist for this PR head; refusing to choose one.",
+            code="ambiguous_request",
+            exit_code=4,
+            details={"request_binding": "ambiguous", "head": plan.head_sha},
+        )
+    if exact:
+        existing = exact[0]
+        try:
+            saved_receipt = receipt(plan, existing, status="reused")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ReviewError(
+                "The existing typed Codex request cannot prove complete provider identity.",
+                code="request_unknown",
+                exit_code=4,
+                details={"request_binding": "unknown"},
+            ) from exc
+        return {
+            "status": "reused",
+            "request": saved_receipt,
+            "target": {"repo": repo, "pr": pr, "kind": "codex-review-request"},
+            "text": {"field": "body", "encoding": "utf-8", "bytes": len(plan.body.encode("utf-8")), "sha256": plan.body_fingerprint},
+            "transport": {"method": "POST", "endpoint": f"repos/{repo}/issues/{pr}/comments", "api_version": API_VERSION, "posted": False},
+        }
+    try:
+        before = require_worktree(expected_worktree_fingerprint)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    target = {"repo": repo, "pr": pr, "kind": "codex-review-request"}
+    body = ProviderText("body", plan.body.encode("utf-8"), plan.body)
+    if dry_run:
+        return {
+            "status": "dry-run",
+            "request": {
+                "schema": plan.schema,
+                "provider": plan.provider,
+                "repository": plan.repository,
+                "pr_number": plan.pr_number,
+                "head_sha": plan.head_sha,
+                "request_key": plan.request_key,
+                "request_fingerprint": plan.request_fingerprint,
+                "body_fingerprint": plan.body_fingerprint,
+            },
+            "target": target,
+            "text": body.proof(),
+            "transport": {"method": "POST", "endpoint": f"repos/{repo}/issues/{pr}/comments", "api_version": API_VERSION, "posted": False},
+        }
+    actor = _viewer_login()
+    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    result = api_request("POST", f"repos/{repo}/issues/{pr}/comments", {"body": plan.body})
+    finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    def prove(item: dict[str, Any]) -> dict[str, Any]:
+        if (
+            not _request_target_comment(item, repo, pr)
+            or _item_login(item) != actor
+            or not _in_creation_window(item, "created_at", started_at, finished_at)
+            or not _comment_for_plan(item, plan)
+        ):
+            raise _proof_failure("Typed request response did not match the intended creation.", "provider_target_mismatch")
+        _proof(item, body, target=target, status="posted")
+        return item
+
+    def read_back() -> dict[str, Any]:
+        matches = [
+            item for item in _read_back_list(f"repos/{repo}/issues/{pr}/comments")
+            if _item_login(item) == actor
+            and _request_target_comment(item, repo, pr)
+            and _in_creation_window(item, "created_at", started_at, finished_at)
+            and _comment_for_plan(item, plan)
+        ]
+        if len(matches) != 1:
+            raise _proof_failure("Typed request read-back did not uniquely prove the creation.", "provider_read_back_not_unique")
+        return prove(matches[0])
+
+    try:
+        proof = prove_mutation(
+            result,
+            prove_response=prove,
+            read_back=read_back,
+            target=target,
+            text=body.proof(),
+            ambiguous_message="Typed review request creation is unconfirmed after one exact-target read-back; do not retry blindly.",
+        )
+        status = "recovered" if proof.recovered else "posted"
+        action = {
+            "status": status,
+            "request": receipt(plan, proof.value, status=status),
+            "target": target,
+            "text": body.proof(),
+            "transport": {"method": "POST", "endpoint": f"repos/{repo}/issues/{pr}/comments", "api_version": API_VERSION, "posted": True, "recovered": proof.recovered},
+        }
+        return _guarded_result(action, before)
+    except GitStackError as exc:
+        if exc.code == "provider_write_ambiguous":
+            raise ReviewError(
+                "The typed review request identity is unknown after one read-only recovery; do not retry or start the waiter.",
+                code="request_unknown",
+                exit_code=4,
+                details=exc.details,
+            ) from exc
+        raise _review_error(exc) from exc
+
+
 def reply_to_review_comment(
     repo: str,
     pr: int,
@@ -965,9 +1283,12 @@ def render_text(payload: dict[str, Any]) -> str:
             lines.append(f"- comment {action['comment_id']}: {action['status']}")
     if payload.get("action"):
         action = payload["action"]
-        lines.append(f"{action['status']}: conversation comment for {payload['repo']}#{payload['pr']}")
+        lines.append(f"{action['status']}: review action for {payload['repo']}#{payload['pr']}")
         if action.get("url"):
             lines.append(str(action["url"]))
+        request = action.get("request") or {}
+        if request.get("request_ref"):
+            lines.append(str(request["request_ref"]))
     return "\n".join(lines) + "\n"
 
 
@@ -1006,6 +1327,15 @@ def build_parser() -> argparse.ArgumentParser:
     comment.add_argument("--dry-run", action="store_true", help="Preview the comment action without posting.")
     comment.add_argument("--expected-worktree-fingerprint")
     comment.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
+    request = subparsers.add_parser("request", help="Post or recover one typed, exact-head automated review request.")
+    request.add_argument("--provider", required=True, help="Automated review provider. Currently: codex.")
+    request.add_argument("--pr", required=True, help="Pull request number.")
+    request.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
+    request.add_argument("--head", required=True, help="Full 40-character expected reviewed head SHA.")
+    request.add_argument("--request-key", required=True, help="Stable caller-owned request lineage key.")
+    request.add_argument("--dry-run", action="store_true", help="Preview the canonical request without posting.")
+    request.add_argument("--expected-worktree-fingerprint")
+    request.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
     reply = subparsers.add_parser("reply", help="Reply to one pull-request review comment.")
     reply.add_argument("--pr", required=True)
     reply.add_argument("--repo")
@@ -1040,6 +1370,7 @@ def build_parser() -> argparse.ArgumentParser:
         review.add_argument("--pr", required=True, help="Pull request number.")
         review.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
         review.add_argument("--head", help="Expected reviewed head SHA. Defaults to the current PR head.")
+        review.add_argument("--request-receipt-file", help="Absolute UTF-8 JSON file containing the complete typed request receipt.")
         review.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
         if command == "wait":
             review.add_argument("--timeout", default="15m", help="Maximum wait, for example 30s, 15m, or 1h.")
@@ -1066,7 +1397,7 @@ def main(argv: list[str] | None = None) -> int:
     except ReviewError as exc:
         raw = list(argv or [])
         if "--json" in raw:
-            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "reply", "edit-comment", "submit-review", "check", "wait"}), "")])
+            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "edit-comment", "submit-review", "check", "wait"}), "")])
         else:
             print(exc.message, file=sys.stderr)
         return exc.exit_code
@@ -1082,16 +1413,38 @@ def main(argv: list[str] | None = None) -> int:
             print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
             print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
         return 0 if payload["ok"] else 1
-    if args.command not in {"address", "comment", "reply", "edit-comment", "submit-review", "check", "wait"}:
+    if args.command not in {"address", "comment", "request", "reply", "edit-comment", "submit-review", "check", "wait"}:
         parser.print_help()
         return 0
     try:
         pr = positive_int(args.pr, "pr")
         repo = resolve_repo(args.repo, allow_non_project=args.allow_non_project)
         if args.command in {"check", "wait"}:
+            request_identity = None
+            if args.request_receipt_file:
+                try:
+                    receipt_text = read_text_file(args.request_receipt_file, field="request-receipt").text
+                    request_identity = json.loads(receipt_text)
+                except (GitStackError, json.JSONDecodeError, TypeError) as exc:
+                    if isinstance(exc, GitStackError):
+                        raise _review_error(exc) from exc
+                    raise ReviewError("The request receipt file must contain one JSON object.", code="invalid_request", exit_code=64) from exc
+                if not isinstance(request_identity, dict):
+                    raise ReviewError("The request receipt file must contain one JSON object.", code="invalid_request", exit_code=64)
+            if args.command == "wait" and request_identity is None:
+                raise ReviewError(
+                    "The identity-bound automated review waiter requires --request-receipt-file.",
+                    code="request_binding_required",
+                    exit_code=64,
+                )
             if args.command == "check":
-                payload = check_automated_review(repo, pr, args.provider, args.head)
-                exit_code = REVIEW_EXIT_CODES[str(payload["review_state"])]
+                payload = check_automated_review(repo, pr, args.provider, args.head, request_identity)
+                binding = str(payload.get("request_binding") or "unknown")
+                if binding != "recognized":
+                    status = payload.get("review_state")
+                    exit_code = REVIEW_EXIT_CODES[str(status)] if binding == "absent" and status == "not-requested" else REQUEST_BINDING_EXIT_CODES.get(binding, 4)
+                else:
+                    exit_code = REVIEW_EXIT_CODES[str(payload["review_state"])]
             else:
                 timeout = duration_seconds(args.timeout, "timeout")
                 interval = duration_seconds(args.interval, "interval")
@@ -1103,13 +1456,29 @@ def main(argv: list[str] | None = None) -> int:
                         exit_code=64,
                     )
                 payload, exit_code = wait_for_automated_review(
-                    repo, pr, args.provider, args.head, timeout, interval, max_interval
+                    repo, pr, args.provider, args.head, timeout, interval, max_interval, request_identity
                 )
             if args.json:
                 emit_success(payload, [args.command])
             else:
                 print(render_text(payload), end="")
             return exit_code
+        if args.command == "request":
+            action = request_automated_review(
+                repo,
+                pr,
+                args.provider,
+                args.head,
+                args.request_key,
+                args.dry_run,
+                args.expected_worktree_fingerprint,
+            )
+            payload = {"repo": repo, "pr": pr, "action": action}
+            if args.json:
+                emit_success(payload, ["request"])
+            else:
+                print(render_text(payload), end="")
+            return 0
         if args.command == "comment":
             try:
                 body = read_text_file(args.body_file, field="body")
