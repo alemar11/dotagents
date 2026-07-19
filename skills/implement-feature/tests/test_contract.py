@@ -16,17 +16,10 @@ def run_app_preclaim_fixture(
     permission: str,
     bundle_ready: bool,
     goal_surface_available: bool = True,
-    goal_pause_surface_available: bool = True,
-    heartbeat_surface_available: bool = True,
 ) -> tuple[str, list[str], list[str]]:
     observations = ["surface"]
     mutations: list[str] = []
-    if (
-        not surface_available
-        or not goal_surface_available
-        or not goal_pause_surface_available
-        or not heartbeat_surface_available
-    ):
+    if not surface_available or not goal_surface_available:
         return "unsupported-runtime", observations, mutations
     observations.append("authorization")
     if permission != "granted-by-authorized-user":
@@ -184,7 +177,6 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/gates.md",
             "references/spec-backed-delivery.md",
             "references/codex-review-closeout.md",
-            "references/review-monitoring.md",
             "references/recovery-validation.md",
             "references/multi-repo-workspace.md",
         }
@@ -252,11 +244,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "sends Git status, staged/unstaged diffs, and every non-ignored "
             "untracked file to Codex; no extra authorization. Tasks use "
             "`gpt-5.6-sol`: `medium` only for routine localized work, `xhigh` for "
-            "risky or cross-system work, and `high` otherwise. After Codex has "
-            "waited up to 30 minutes for review, it may pause the worker and this "
-            "task, keep at most one temporary heartbeat to resume the same task "
-            "at the next 30-minute check, then delete or replace it after wake. "
-            "After Codex reserves "
+            "risky or cross-system work, and `high` otherwise. Codex waits up to "
+            "45 minutes for each requested review. If a review is still pending "
+            "at that deadline, it records a persistent warning on the pull request, "
+            "reports the warning to you, and continues the remaining gates without "
+            "treating the review as clean. A later merge workflow must check for "
+            "late findings. After Codex reserves "
             "the work, it automatically deletes valid run-state archives older "
             "than 180 days; it never plans, expands scope, merges, releases, or "
             "deploys."
@@ -750,13 +743,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("there is no last-N exception", lifecycle)
         self.assertIn("warning is nonblocking", normalized_lifecycle)
         self.assertIn("After the terminal projection passes", lifecycle)
-        self.assertIn("For review monitoring, retain", normalized_lifecycle)
+        self.assertIn("For an in-flight review wait, retain", normalized_lifecycle)
         self.assertIn("Dependency-only waits also retain", normalized_lifecycle)
         self.assertIn("raw 64-hex", lifecycle)
         self.assertIn("never a `sha256:` value", normalized_lifecycle)
-        monitoring = lifecycle.split("For review monitoring", 1)[1].split("After the terminal", 1)[0]
+        monitoring = lifecycle.split("For an in-flight review wait", 1)[1].split("After the terminal", 1)[0]
         terminal = lifecycle.split("After the terminal projection passes", 1)[1].split("The release receipt binds", 1)[0]
-        self.assertIn("Do not release ownership", monitoring)
+        self.assertIn("do not release ownership", monitoring)
         self.assertNotIn("claim release", monitoring)
         self.assertIn("do not fabricate", monitoring)
         for token in (
@@ -988,12 +981,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("pull-request-ready-for-merge-but-not-merged", worker)
         self.assertIn("objective_fingerprint", packets)
         self.assertIn("portfolio-goal-activated", packets)
-        self.assertIn("portfolio-goal-paused", packets)
-        self.assertIn("portfolio-goal-resumed", packets)
         self.assertIn("portfolio-goal-completed", packets)
-        self.assertIn("review-monitoring-scheduled", packets)
-        self.assertIn("task-monitoring-paused", packets)
-        self.assertIn("task-monitoring-resumed", packets)
+        self.assertNotIn("portfolio-goal-paused", packets)
+        self.assertNotIn("review-monitoring-scheduled", packets)
+        self.assertNotIn("task-monitoring-paused", packets)
         self.assertIn("goal_evidence_ref", packets)
         self.assertIn("Before any mutation, read each exact recorded task", normalized_recovery)
         self.assertIn("portfolio_goal_state=pending", recovery)
@@ -1023,8 +1014,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             .split()
         )
         self.assertIn("general visible-task Goal-tool support", surface)
-        self.assertIn("`active` to `paused` to `active`", surface)
-        self.assertIn("heartbeat targeted to the exact root task", surface)
+        self.assertIn("`pending` to `active` to `complete`", surface)
+        self.assertIn("Goal pause/resume and App heartbeat automation are not part", surface)
         self.assertIn("does not create a task to inspect task-local tools", surface)
         dispatch = " ".join(
             skill.split("7. **DISPATCH**", 1)[1].split("8. **MONITOR**", 1)[0].split()
@@ -1060,17 +1051,17 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertNotIn(retired, runtime)
 
-    def test_review_is_mandatory_with_one_fixed_thirty_minute_deadline(self) -> None:
+    def test_review_is_mandatory_with_one_fixed_45_minute_deadline(self) -> None:
         closeout = self.read("references/codex-review-closeout.md")
-        monitoring = self.read("references/review-monitoring.md")
         normalized_closeout = " ".join(closeout.split())
         gates = self.read("references/gates.md")
         worker = self.read("references/worker.md")
         packets = self.read("references/run-state-packets.md")
+        runtime = self.runtime_text()
         for token in ("head SHA", "base ref", "merge-base SHA"):
             self.assertIn(token, normalized_closeout)
         self.assertIn("entire tuple matches", closeout)
-        self.assertIn("one 30-minute total active-wait deadline", closeout)
+        self.assertIn("one 45-minute total active-wait deadline", closeout)
         for token in (
             "`revision_key`",
             "`wait_started_at`",
@@ -1079,6 +1070,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`",
             "`--timeout <provider_timeout>s --interval 10s --max-interval 30s`",
             "unchanged deadline",
+            "`timeout-accepted`",
+            "`warning_ref`",
+            "persistent PR warning",
+            "later merge workflow must re-check",
         ):
             self.assertIn(token, normalized_closeout)
         self.assertLess(
@@ -1100,41 +1095,38 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("Start GitStack only after the root persists", worker)
         self.assertIn("provider_timeout", packets)
         self.assertIn("wait_invoked_at", packets)
-        self.assertIn("monitoring_cycle", packets)
-        self.assertIn("schedule_fingerprint", packets)
+        self.assertIn("warning_ref", packets)
         self.assertEqual(
-            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=120),
-            1_680,
+            derive_provider_timeout_seconds(wait_deadline=2_700, wait_invoked_at=120),
+            2_580,
         )
         self.assertEqual(
-            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=1_800),
+            derive_provider_timeout_seconds(wait_deadline=2_700, wait_invoked_at=2_700),
             0,
         )
         self.assertEqual(
-            derive_provider_timeout_seconds(wait_deadline=1_800, wait_invoked_at=1_900),
+            derive_provider_timeout_seconds(wait_deadline=2_700, wait_invoked_at=2_800),
             0,
         )
-        for token in (
-            "`review-monitoring-scheduled`",
-            "`task-monitoring-paused`",
-            "`task-monitoring-resumed`",
-            "`portfolio-goal-paused`",
-            "`portfolio-goal-resumed`",
-            "retains the active claim",
-            "never starts another waiter",
+        for retired in (
+            "review-monitoring-scheduled",
+            "task-monitoring-paused",
+            "task-monitoring-resumed",
+            "portfolio-goal-paused",
+            "portfolio-goal-resumed",
+            "monitoring_cycle",
+            "schedule_fingerprint",
         ):
-            self.assertIn(token, " ".join((closeout + monitoring + packets).split()))
-        self.assertNotIn("monitoring-handoff-recorded", closeout + monitoring + packets)
-        self.assertIn("terminal-only", closeout)
-        self.assertIn("Never start another waiter or change the original active-wait timestamps", " ".join(closeout.split()))
+            self.assertNotIn(retired, runtime)
+        self.assertFalse((ROOT / "references/review-monitoring.md").exists())
+        self.assertIn("Terminal Handoff Only", closeout)
+        self.assertIn("Never schedule another check", closeout)
         self.assertIn("`review_operation`", closeout)
         self.assertIn("`mutation_mode=apply`", closeout)
         self.assertIn("never expose the translation as a user option", closeout)
-        self.assertIn("Review has no skip", gates)
+        self.assertIn("Review request has no skip", gates)
         self.assertNotIn("15-minute", closeout)
-        self.assertNotIn("--timeout 15m", self.runtime_text())
-        self.assertNotIn("extended profile", closeout)
-        self.assertNotIn("explicitly-skipped-by-authorized-user", self.runtime_text())
+        self.assertNotIn("--timeout 15m", runtime)
 
     def test_ci_requires_current_head_evidence_and_cannot_pass_empty(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
@@ -1181,7 +1173,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "one atomic event batch",
             "deterministic projections",
             "Hard Cut",
-            "no compatibility path for active Markdown",
+            "no compatibility path or migration for active Markdown",
             "Frozen archive-v1 entries remain readable evidence",
         ):
             self.assertIn(token, run_state)
@@ -1190,7 +1182,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "4.0.0"', helper)
+        self.assertIn('__version__ = "5.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1201,21 +1193,20 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_v2_event_packet_registry_matches_the_v4_runtime(self) -> None:
+    def test_v3_event_packet_registry_matches_the_v5_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "4.0.0"',
-            'LEDGER_SCHEMA_VERSION = "2.0.0"',
-            'REGISTRATION_SCHEMA_VERSION = "2.0.0"',
+            '__version__ = "5.0.0"',
+            'LEDGER_SCHEMA_VERSION = "3.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "3.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("| `schema_version` | `2.0.0` |", packets)
-        self.assertIn("Active state accepts only ledger schema `2.0.0`", run_state)
-        self.assertIn("active JSON `1.0.0`", run_state)
-        self.assertIn("Do not import, migrate", run_state)
+        self.assertIn("| `schema_version` | `3.0.0` |", packets)
+        self.assertIn("Active state accepts only ledger schema `3.0.0`", run_state)
+        self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
         apply_event = next(
@@ -1267,7 +1258,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 )
         self.assertEqual(packet_fields, runtime_fields)
 
-    def test_v2_registration_packet_registry_matches_the_runtime(self) -> None:
+    def test_v3_registration_packet_registry_matches_the_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         module = ast.parse(helper)
@@ -1368,7 +1359,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         self.assertIn("Static gates dispatch before a PR revision", run_state)
         self.assertIn("`authority=external-merge-required`", packets)
-        self.assertIn("Monitoring never creates a handoff", packets)
+        self.assertIn("A review wait never creates a handoff", packets)
         self.assertNotIn("durable-review-monitoring", packets)
         self.assertNotIn("monitoring-handoff-recorded", packets)
         self.assertNotIn("external-handoff-recorded", packets)
@@ -1539,17 +1530,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
             ],
         )
 
-        for missing in ("goal-pause", "heartbeat"):
-            outcome, observations, mutations = run_app_preclaim_fixture(
-                surface_available=True,
-                permission="granted-by-authorized-user",
-                bundle_ready=True,
-                goal_pause_surface_available=missing != "goal-pause",
-                heartbeat_surface_available=missing != "heartbeat",
-            )
-            self.assertEqual(outcome, "unsupported-runtime")
-            self.assertEqual(observations, ["surface"])
-            self.assertEqual(mutations, [])
+        surface_contract = self.read("SKILL.md").split(
+            "## Mandatory Runtime Surface Gate", 1
+        )[1].split("## Mandatory Run Authorization", 1)[0]
+        self.assertIn("Goal pause/resume", surface_contract)
+        self.assertIn("not part of this runtime contract", " ".join(surface_contract.split()))
 
     def test_multi_repo_requires_one_task_and_all_managed_checkouts(self) -> None:
         text = " ".join(self.read("references/multi-repo-workspace.md").split())
@@ -1946,12 +1931,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            88_800,
-        )
-        self.assertLessEqual(
-            sum(len(self.read(path).encode("utf-8")) for path in successful_path)
-            + len(self.read("references/review-monitoring.md").encode("utf-8")),
-            92_200,
+            92_500,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -1961,7 +1941,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            93_000,
+            96_500,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE

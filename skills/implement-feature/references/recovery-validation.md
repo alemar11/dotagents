@@ -1,6 +1,6 @@
 # Recovery Validation
 
-Load this reference on every heartbeat or manual resume, including prepared
+Load this reference on every manual resume, including prepared
 takeover and embedded-adoption recovery before a candidate JSON state exists.
 
 ## Runtime Surface Revalidation
@@ -9,8 +9,8 @@ Before reading run state or a recorded task, verify visible ChatGPT desktop app
 task creation, App-managed worktree binding, task-title mutation and
 observation, and `create_goal`, `get_goal`, and `update_goal` in the root plus
 general task Goal support. Require first-class targeted Goal
-`active`/`paused` read-write support and App heartbeat create/view/update/delete
-plus same-root wake support. Prior evidence, background agents, and filesystem
+`pending`/`active`/`complete` readback and updates. Goal pause/resume and App
+heartbeat automation are not required. Prior evidence, background agents, and filesystem
 access are insufficient. Missing support is `unsupported-runtime` without
 asking permission or performing mutation.
 
@@ -45,8 +45,7 @@ Perform one complete read-only pass:
    live title drift without repairing it during this pass.
 6. Call `get_goal` in the root and every recorded task. Pending registration may
    observe a matching active Goal or no Goal; do not adopt or create it
-   during this pass. Active and paused Goals must match their objective and
-   fingerprint; paused state is valid only for typed review monitoring.
+   during this pass. Active Goals must match their objective and fingerprint.
    Completed Goal readback requires a matching terminal seal stage. A sealed or
    terminal task with an active Goal is an interrupted closeout transition, not
    implementation work.
@@ -54,13 +53,13 @@ Perform one complete read-only pass:
    head/base/merge-base tuple, review request and deadline, CI, PR lifecycle,
    tracker state, mergeability and repository rules. Recompute the canonical
    complete task revision set, validation, AutoReview, integration, domain
-   closeout, merged dependencies, path conflicts, ready order, due checks,
+   closeout, merged dependencies, path conflicts, ready order, review deadlines,
    blockers, and next stage.
 8. For sealed tasks and completed Goals, independently reverify terminal truth.
    Record drift candidates; do not resume work or reopen a Goal.
 
 The recovery projection is derived guidance, not external truth. It reports
-timestamps, not wall-clock `overdue` judgments. Callers compare due timestamps
+timestamps, not wall-clock `overdue` judgments. Callers compare review deadlines
 with their observed clock. Do not patch JSON or manufacture an event from stale
 prose.
 
@@ -76,7 +75,7 @@ only when none exists, call `create_goal` once without `token_budget`; apply
 `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`.
 
 For a nonterminal task, require exact source assignment, task ref, derived display title,
-profile, matching active Goal or exact typed paused Goal, and complete managed
+profile, matching active Goal, and complete managed
 checkout map. Repair title drift on that same task only after freshness passes,
 then report it through `task-observed`. Resume only the original visible task
 with its recorded profile.
@@ -88,26 +87,24 @@ committed/pushed tuple through delivery-keyed `revision-observed`, then apply
 `delivery-observed` with the exact revision key and current lifecycle. Only a
 newer committed and published observation clears tracker dirt. Rerun gates.
 
-## Review Monitoring Recovery
+## Review Wait Recovery
 
 Recompute the exact delivery revision before review work. Reuse a result only
 for that tuple with all findings dispositioned. Preserve an existing request's
 original `wait_started_at` and deadline. Persist its single invocation before
 the provider call with `max(0,floor(deadline-wait_invoked_at))`; zero is one immediate
 check. A recorded invocation is never relaunched. Accept observations only for
-the exact current monitoring cycle while active-waiting or checking.
+the exact current request and revision while active-waiting.
 
-When still pending, verify the complete schedule fingerprint, worker pause,
-conditional root heartbeat/pause, and unchanged active claim. On wake, verify
-the same claim, resume root only if paused, consume any heartbeat, and resume the worker
-with that fingerprint. `due-review` activates all due current deliveries for
-one check; `controller-action` permits early revision reconciliation. A pending
-result rearms from its stored observation without another waiter. Old revision
-schedules remain inert history.
-
-Crash recovery converges on one schedule and heartbeat id. Create only when no
-id was committed, update only the committed id, and delete stale ids only after
-proving ownership. Never leave two heartbeats for one portfolio.
+If the waiter result remains pending, compare its observation time with the
+immutable 45-minute deadline. Before the deadline, continue observing the
+already-launched call; do not start another. At or after the deadline, require
+the persistent PR warning, then record the one final
+`waiting/timeout-accepted` observation with its `warning_ref`. Root and worker
+Goals remain active, the claim remains unchanged, and closeout continues. A
+missing request, access or provider failure, findings, or missing warning is a
+blocker. Never create a review schedule, pause a Goal, arm a heartbeat, or
+relaunch the provider waiter. Old-revision waits remain inert history.
 
 ## Staged Closeout Recovery
 
@@ -143,7 +140,7 @@ current claim's complete embedded adoption mappings. Verify each source, exact
 task ref or explicit
 no-task entry, Goal, immutable profile, title, and every delivery checkout. The
 registration packet carries those mappings and ledger creation binds the
-candidate claim. A paused same-root run instead keeps its original claim; it
+candidate claim. A resumed same-root run instead keeps its original claim; it
 never rebinds state to a replacement fingerprint.
 
 Do not infer identity from task titles, replaced-root prose, or archived state,

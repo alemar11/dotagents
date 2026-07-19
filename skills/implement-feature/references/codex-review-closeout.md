@@ -15,7 +15,15 @@ PR number and URL, head SHA, base ref, and merge-base SHA tuple. Establish the
 tuple through `revision-observed`, bind its lifecycle through
 `delivery-observed`, and apply the result through delivery-keyed
 `review-observed`. Reuse a result only when the entire tuple matches and every
-finding is dispositioned. Review is mandatory and has no skip value.
+finding is dispositioned. The review request is mandatory and has no skip
+value. Only an exact request that remains pending through its fixed deadline may
+use the explicit timeout-accepted outcome below.
+
+The revision observation must bind canonical GitHub `owner/repository`, the PR
+number, and the exact URL
+`https://github.com/<owner/repository>/pull/<number>`. The lifecycle observation
+must repeat that identity. A malformed, non-GitHub, or mismatched URL blocks
+before review timing begins.
 
 Actionable findings return the task to fix, focused validation, `$autoreview`,
 push, and a new current-revision review. A head, base, merge base, PR identity,
@@ -38,9 +46,9 @@ implementation revision-set evidence.
 
 The run state is the sole request and timing owner. Keep one review entity keyed
 by `task_key`, `delivery_key`, and the exact delivery `revision_key`. Store
-request, provider/result/disposition, bounded observation fingerprints,
+the exact PR URL, request, provider/result/disposition, bounded observation fingerprints,
 `wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
-`due_at`, and poll owner.
+and the optional durable timeout-warning reference.
 
 Before request, resume, or terminal acceptance, recompute the exact tuple and
 run the canonical GitStack review check. Reuse a current result, wait on a
@@ -56,10 +64,10 @@ actions, and never expose the translation as a user option.
 
 ## One Fixed Wait Deadline
 
-Each delivery revision owns one 30-minute total active-wait deadline. The worker
+Each delivery revision owns one 45-minute total active-wait deadline. The worker
 reports tuple/request evidence; the root atomically records
 `review-wait-started` with `wait_started_at` and the helper derives
-`wait_deadline=wait_started_at+30m`, then returns the immutable assignment.
+`wait_deadline=wait_started_at+45m`, then returns the immutable assignment.
 
 Before launch, set `wait_invoked_at=now`, require it to be at or after the
 recorded start and not later than the current clock, and compute
@@ -79,18 +87,47 @@ At zero, perform one immediate no-wait check. Never use a provider default,
 hardcode `15m`, start before `wait_started_at`, segment, restart, wrap, or extend
 the unchanged deadline.
 
-Bind the result to the exact current `monitoring_cycle`. If pending, apply
-`review-monitoring-scheduled`; the helper derives `due_at` 30 minutes from the
-stored observation. After all current delivery reviews are complete or
-future-scheduled, pause/read back the worker once and bind the complete schedule
-fingerprint. Do not apply `terminal-handoff-recorded`.
+The one provider call ends as `clean`, `findings`, `failed`, or `waiting`.
+Persist exactly one `review-observed` event for the exact request and revision:
 
-Load `review-monitoring.md` for portfolio quiescence, exact-root heartbeat,
-root pause with retained claim, same-claim wake, task-level resume, one-shot checks,
-invalidation, and crash recovery. Each due worker performs one canonical check.
-Never start another waiter or change the original active-wait timestamps.
-Unpollable access
-blocks; it is not a review skip.
+- `clean` pairs with `accepted` and no warning.
+- `findings` pairs with `fix-required` and returns to the fix loop.
+- `failed` pairs with `blocked`; request, access, authentication, configuration,
+  or provider failure is never a timeout acceptance.
+- `waiting` may pair with `timeout-accepted` only when observed at or after the
+  immutable deadline and only after a persistent PR warning has been posted. The
+  event must carry that exact PR's canonical GitHub issue-comment URL as
+  `warning_ref`; unrelated URLs and free text are invalid. It must also carry
+  the observed comment creation time as `warning_posted_at` and the SHA-256 of
+  this exact UTF-8 body as `warning_fingerprint`:
+
+```text
+Implement Feature continued because Codex review remained pending for the full 45-minute wait.
+
+Pull request: <exact pr_url>
+Review request: <exact request_ref>
+Revision: <exact revision_key>
+
+This is not a clean review verdict. A later merge workflow must re-check this pull request for late Codex findings before merge.
+```
+
+The helper derives the expected body from stored review identity. The comment
+timestamp must be at or after the immutable deadline and no later than the
+observation. The warning reference may not reuse the review request reference.
+
+The timeout result means only that the current revision proceeds without a returned
+Codex verdict. It is not `clean`, does not waive `$autoreview`, CI, mergeability,
+branch rules, approvals, base freshness, tracker closeout, or any other gate,
+and cannot override a rule that still blocks the pull request. Surface the same
+warning in the user-facing final report. Superseded revision warnings remain
+history but are excluded from current status and terminal projections. A later merge workflow must re-check
+the exact PR for late Codex findings before merge.
+
+Never schedule another check, pause a Goal, arm an App heartbeat, start another
+waiter, or change the original timing fields. Root and worker Goals remain
+active through the remaining gates and complete only through their normal
+terminal transitions. Recovery observes the already-launched waiter or records
+its single final outcome; it never relaunches it.
 
 ## Tracker Closeout
 
@@ -113,9 +150,9 @@ it only after later merge.
 
 ## Terminal Handoff Only
 
-Review monitoring retains the active claim and creates no handoff or release.
-Its task-level pause binds the complete schedule fingerprint, while
-`portfolio-goal-paused` binds the one root heartbeat and root pause.
+An in-flight fixed review wait retains the active claim and creates no handoff
+or release. A timeout-accepted result continues normal closeout with its warning
+evidence; it does not create a nonterminal handoff.
 
 `terminal-handoff-recorded` is terminal-only and allowed only after
 `task-terminal-sealed` and

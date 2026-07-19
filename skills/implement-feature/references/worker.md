@@ -83,7 +83,9 @@ Before launch set `wait_invoked_at=now`, compute
 Start GitStack only after the root persists `review-wait-invoked`; that event is
 single-launch authority. Use 10s/30s bounds when positive and one immediate
 no-wait check at zero. Never relaunch, default, or segment it. Bind each result
-to the exact root-issued `monitoring_cycle`.
+to the exact root-issued request and revision. If it remains pending at the
+45-minute deadline, post the required persistent PR warning and report its
+reference so the root can record `timeout-accepted`.
 
 For local commit actions, use `$gitstack:git-commit` and keep
 `commit_kind=regular` unless target-repository instructions require a targeted
@@ -114,8 +116,7 @@ terminal result `pull-request-ready-for-merge-but-not-merged`. Do not pass
 
 On recovery, call `get_goal`. A nonterminal task requires an active objective
 and fingerprint matching the recorded Goal evidence before implementation
-resumes, except a task in `review-monitoring`, which requires the same objective
-in observed `paused` state until its due one-shot check. A task already recorded at the fixed terminal result requires matching
+resumes. A task already recorded at the fixed terminal result requires matching
 completed Goal evidence and must not resume implementation. Never call
 `create_goal` for either recovery path. The root verifies that evidence and the
 exact live task title before advancing beyond `created` or resuming a
@@ -126,10 +127,9 @@ fallback or create a replacement task.
 
 Call `update_goal(status=complete)` only after root-confirmed
 `task-terminal-sealed`; read back for `task-goal-completed`, then terminal
-handoff/`merge-ready`. A pending review handoff uses
-the first-class Goal pause operation
-and readback; its due resume restores the same Goal to active before one review
-check. Other temporary blockers leave nonterminal task Goals active;
+handoff/`merge-ready`. A pending review keeps the nonterminal task Goal active;
+if it reaches the fixed deadline, the timeout warning is recorded and the task
+continues the remaining gates. Other temporary blockers also leave Goals active;
 already-terminal task Goals remain complete. If recovery finds
 the terminal proof recorded while this Goal is still active, revalidate that
 proof, call `update_goal` with `status=complete`, persist the evidence, and
@@ -167,7 +167,7 @@ Follow the generated issues' dependency order inside the task; do not create a
 task per issue.
 
 Canonical states are `created`, `implementing`, `validating`, `draft-pr`,
-`marking-ready-for-review`, `review-polling`, `review-monitoring`, `fixing-review`, `ci`,
+`marking-ready-for-review`, `review-polling`, `fixing-review`, `ci`,
 `preparing-tracker-closeout`, `checking-mergeability`, `terminal-sealed`,
 `merge-ready`, `blocked`, `needs-owner`, and `failed`. Post-terminal drift is a
 separate closeout record, not a task state.
@@ -216,10 +216,10 @@ before implementation and omit `token_budget`. If this is a resumed task, call
 If this task is already terminal, verify its completed Goal and report without
 resuming implementation; if its recorded terminal proof precedes an unfinished
 Goal completion transition, finish that transition only. Work only in the
-managed checkouts. Use fixed actions and the root-issued review deadline; after
-that deadline, perform only root-issued due one-shot checks, pausing or resuming
-this same Goal as directed. Report arguments, Goal transition readbacks, and any
-internal subagents.
+managed checkouts. Use fixed actions and the root-issued 45-minute review
+deadline; if the exact review is still pending then, post and report the
+persistent PR warning and continue the remaining gates. Report arguments, Goal
+transition readbacks, and any internal subagents.
 Do not edit the run state, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
 every affected PR is ready to merge or report a concrete blocker. Call

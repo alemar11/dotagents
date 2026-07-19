@@ -480,7 +480,7 @@ class SessionReplayTests(unittest.TestCase):
                 ],
             }
             registration = materialize(fixture["registration"], replacements)
-            self.assertEqual(registration["schema_version"], "2.0.0")
+            self.assertEqual(registration["schema_version"], "3.0.0")
             self.assertEqual(len(registration["sources"][0]["deliveries"]), 1)
             self.assertNotIn("repository", registration["sources"][0])
             self.assertNotIn("target_branch", registration["sources"][0])
@@ -505,7 +505,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "4.0.0")
+            self.assertEqual(created["version"], "5.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None
@@ -802,13 +802,15 @@ class SessionReplayTests(unittest.TestCase):
                     "observations"
                 ][0],
                 {
-                    "monitoring_cycle": 0,
                     "provider_state": "findings",
                     "observation_fingerprint": facts["initial_review"][
                         "observation_fingerprint"
                     ],
                     "disposition": "fix-required",
                     "evidence_ref": facts["initial_review"]["evidence_ref"],
+                    "warning_ref": None,
+                    "warning_posted_at": None,
+                    "warning_fingerprint": None,
                     "observed_at": reviews[
                         (facts["delivery_key"], initial_revision_key)
                     ]["observations"][0]["observed_at"],

@@ -34,8 +34,9 @@ ref, and merge-base SHA require:
 
 - `publication`: real PR identity, lifecycle `OPEN`, and base equal to that
   repository's currently discovered default branch;
-- `codex-review`: mandatory current-revision request with every actionable
-  finding resolved;
+- `codex-review`: mandatory current-revision request with either a clean result,
+  or an exact 45-minute pending timeout recorded as `timeout-accepted` with a
+  persistent PR warning; every returned actionable finding must be resolved;
 - `ci`: at least one applicable run or status context on the exact head SHA and
   every required applicable result successful;
 - `pr-ready`: non-draft exact PR identity after the ready-for-review transition;
@@ -123,7 +124,11 @@ Review monitoring retains the active claim and cannot satisfy terminal
 handoff. Neither the root nor a task merges, performs
 post-merge verification, or closes hosted tracker items.
 
-Review has no skip; every delivery-revision review gate is mandatory.
+Review request has no skip; every delivery-revision review gate is mandatory.
+`timeout-accepted` passes only that gate and is never equivalent to a clean
+verdict. It cannot override CI, mergeability, branch rules, approvals, or any
+repository-required review state. Surface its warning in terminal evidence, and
+require the later merge workflow to re-check late Codex findings.
 
 After a task seal or Goal completion, changed terminal evidence is recorded only
 through `post-terminal-drift-recorded`. It records portfolio drift, blocks

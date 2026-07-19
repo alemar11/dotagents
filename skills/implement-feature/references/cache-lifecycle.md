@@ -24,8 +24,8 @@ remain blocking.
 
 ## Active And Archived State
 
-Keep resumable ledger-schema `2.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v4 is the
+Keep resumable ledger-schema `3.0.0` state as absolute direct-child `.json` files under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v5 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
 
@@ -34,10 +34,12 @@ never a `sha256:` value or receipt fingerprint.
 `terminal` is the only active release reason; every receipt binds stable ledger
 hash and size.
 
-For review monitoring, retain active JSON, exact claim/fingerprint, paused
-Goals, schedule fingerprint, and, when root is quiescent, its heartbeat. Do not release ownership. The
-same root verifies that claim on wake; a root replaced by authorized takeover
-stops. Dependency-only waits also retain claim and state, return the exact
+For an in-flight review wait, retain active JSON and the exact claim/fingerprint.
+Keep root and worker Goals active and do not release ownership. If the exact
+request remains pending at its 45-minute deadline, record the persistent PR
+warning and continue under `timeout-accepted`; do not schedule another check or
+create a nonterminal handoff. A root replaced by authorized takeover stops.
+Dependency-only waits also retain claim and state, return the exact
 external action, and require explicit same-root resume; do not fabricate a
 schedule, handoff, or receipt. A pre-REGISTER claim may keep a null state ref
 until that retained claim binds registration.
@@ -52,7 +54,7 @@ scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-
 scripts/ledger-cache --json ledger archive --ledger '<absolute-active-json>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
 ```
 
-Under lock, release requires schema-2 JSON, exact ownership, and an
+Under lock, release requires schema-3 JSON, exact ownership, and an
 archive-ready terminal projection before receipt or claim deletion. Rejection
 leaves claim and ledger unchanged.
 

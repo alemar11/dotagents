@@ -26,10 +26,11 @@ For `visible_app_task_permission=not-requested`, state this exact disclosure:
 > files when used. AutoReview sends Git status, staged/unstaged diffs, and every
 > non-ignored untracked file to Codex; no extra authorization. Tasks use
 > `gpt-5.6-sol`: `medium` only for routine localized
-> work, `xhigh` for risky or cross-system work, and `high` otherwise. After Codex
-> has waited up to 30 minutes for review, it may pause the worker and this task,
-> keep at most one temporary heartbeat to resume the same task at the next
-> 30-minute check, then delete or replace it after wake. After Codex
+> work, `xhigh` for risky or cross-system work, and `high` otherwise. Codex
+> waits up to 45 minutes for each requested review. If a review is still pending
+> at that deadline, it records a persistent warning on the pull request, reports
+> the warning to you, and continues the remaining gates without treating the
+> review as clean. A later merge workflow must check for late findings. After Codex
 > reserves the work, it automatically deletes valid run-state archives older
 > than 180 days; it never plans, expands scope, merges, releases, or deploys.
 
@@ -64,7 +65,8 @@ insufficient.
 
 The successful outcome is always
 `pull-request-ready-for-merge-but-not-merged`; current-revision Codex review is
-always required; execution always uses one visible task per Feature Spec,
+always requested, with only an evidenced 45-minute pending timeout eligible for
+`timeout-accepted`; execution always uses one visible task per Feature Spec,
 App-managed worktrees, and at most three nonterminal tasks. These are invariants,
 not options.
 

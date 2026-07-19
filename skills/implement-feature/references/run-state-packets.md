@@ -8,8 +8,8 @@ files are short-lived strict JSON inputs, not recovery state. Reuse one stable
 
 Limit packets to 1 MiB, text/evidence fields to 4,096 UTF-8 characters, sources
 to 64, deliveries per task to 8, allowed paths per delivery to 128, and each
-batch to 64 events. State retains at most 512 operations, 256 reviews, and 64
-observations per review; command JSON output is at most 128 KiB.
+batch to 64 events. State retains at most 512 operations, 256 reviews, and one
+final observation per review; command JSON output is at most 128 KiB.
 
 Canonical repository-relative paths reject absolute paths, backslashes, `.`,
 empty segments, parent traversal, and duplicate spellings.
@@ -20,7 +20,7 @@ Use exactly these top-level fields:
 
 | field | value |
 | --- | --- |
-| `schema_version` | `2.0.0` |
+| `schema_version` | `3.0.0` |
 | `root_task_ref` | calling App task ref |
 | `root_checkout` | absolute root checkout |
 | `objective` | exact portfolio Goal text |
@@ -70,19 +70,14 @@ values are refs or digests, never pasted output.
 | --- | --- |
 | `root-title-observed` | `title`, `evidence_ref` |
 | `portfolio-goal-activated` | `goal_evidence_ref`, `objective_fingerprint` |
-| `portfolio-goal-paused` | `goal_evidence_ref`, `pause_evidence_ref`, `heartbeat_id`, `target_thread_id`, `due_at` |
-| `portfolio-goal-resumed` | `goal_evidence_ref`, `heartbeat_id`, `resume_evidence_ref` |
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `goal_objective_fingerprint`, `goal_state`, `goal_evidence_ref`, `state`, `outcome`, `attention_reason`, `summary_ref` |
-| `revision-observed` | `task_key`, `delivery_key`, `repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
+| `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
 | `source-moved` | `task_key`, `from_ref`, `to_ref`, `source_fingerprint`, `tracker_repository`, `revision_set_key`, `evidence_ref` |
 | `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_ref` |
 | `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `wait_invoked_at`, `provider_timeout` |
-| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `monitoring_cycle`, `provider_state`, `observation_fingerprint`, `disposition`, `evidence_ref` |
-| `review-monitoring-scheduled` | `task_key`, `delivery_key`, `revision_key`, `request_ref` |
-| `task-monitoring-paused` | `task_key`, `schedule_fingerprint`, `pause_evidence_ref` |
-| `task-monitoring-resumed` | `task_key`, `schedule_fingerprint`, `resume_reason`, `resume_evidence_ref` |
+| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `provider_state`, `observation_fingerprint`, `disposition`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
 | `task-goal-completed` | `task_key`, `seal_fingerprint`, `goal_evidence_ref`, `completion_evidence_ref` |
@@ -97,9 +92,11 @@ absolute `git_top_level`, registered `target_branch`, 40-hex
 `baseline_revision`, and `isolation_evidence_ref`.
 
 `revision-observed` establishes the immutable repository, PR number/URL,
-head/base/merge-base tuple for one derived `revision_key`.
+head/base/merge-base tuple for one derived `revision_key`. Its
+`github_repository` is canonical `owner/repository`, and `pr_url` must equal
+`https://github.com/<github_repository>/pull/<pr_number>` exactly.
 `delivery-observed` requires that key. Its `pr` object has exactly
-`repository`, `number`, `url`, `state`, `is_draft`, `head_sha`, `base_ref`,
+`repository`, `github_repository`, `number`, `url`, `state`, `is_draft`, `head_sha`, `base_ref`,
 `merge_base_sha`, `mergeable`, `merge_state`, and `closing_refs`; its tuple
 must equal the revision. Terminal truth requires `"state": "open"`,
 `"is_draft": false`, `"mergeable": true`, `"merge_state": "clean"`,
@@ -107,17 +104,17 @@ must equal the revision. Terminal truth requires `"state": "open"`,
 newer revision clears `source-moved` tracker dirt.
 
 Terminal handoff uses `handoff_kind=pull-request-ready` and
-`authority=external-merge-required`. Monitoring never creates a handoff.
+`authority=external-merge-required`. A review wait never creates a handoff.
 
 ## States And Gates
 
 Task states are `pending`, `created`, `implementing`, `validating`, `draft-pr`,
-`marking-ready-for-review`, `review-polling`, `review-monitoring`,
-`fixing-review`, `ci`, `preparing-tracker-closeout`, `checking-mergeability`,
+`marking-ready-for-review`, `review-polling`, `fixing-review`, `ci`,
+`preparing-tracker-closeout`, `checking-mergeability`,
 `terminal-sealed`, `merge-ready`, `blocked`, `needs-owner`, and `failed`. Goal
-states are `pending`, `active`, `paused`, and `complete`.
+states are `pending`, `active`, and `complete`.
 Review provider/disposition values are `waiting|findings|clean|failed` and
-`pending|fix-required|accepted|blocked`.
+`timeout-accepted|fix-required|accepted|blocked`.
 
 | gate scope | gates | required identity |
 | --- | --- | --- |
@@ -129,16 +126,22 @@ Review provider/disposition values are `waiting|findings|clean|failed` and
 Gate state is `passed` or `failed`. A task revision-set key digests sorted
 `(delivery_key, revision_key)` pairs for every delivery.
 
-The deadline is `wait_started_at+30m`. Before the provider call, persist a
+The deadline is `wait_started_at+45m`. Before the provider call, persist a
 nonfuture invocation and
 `provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`; zero is one
-no-wait check. An observation binds the current monitoring cycle and only
-`active-wait|checking`. Scheduling derives `due_at=observed_at+30m`; already-due
-stays `checking`. Task pause/resume binds the complete schedule fingerprint.
-`due-review` activates all due deliveries; `controller-action` resumes early
-without changing history. Root pause retains the claim.
+no-wait check. Exactly one observation completes the review. Valid pairs are
+`clean/accepted`, `findings/fix-required`, `failed/blocked`, and
+`waiting/timeout-accepted`. Only the last pair requires a nonempty
+`warning_ref`, and it is invalid before the deadline or unless it is a canonical
+issue-comment URL on that review's exact stored PR URL. It also requires
+`warning_posted_at` between the deadline and observation plus
+`warning_fingerprint` matching the exact warning body in
+`codex-review-closeout.md`. Every other pair
+requires all three warning fields to be null. No review schedule, Goal pause,
+or App heartbeat follows.
 
-Terminal seal requires all current gates and a clean complete revision set.
+Terminal seal requires all current gates and an accepted complete review set;
+timeout-accepted reviews remain explicit warnings and are not called clean.
 Worker Goal completion requires the unchanged seal; terminal handoff follows.
 Portfolio verification requires every task handoff; root Goal completion
 requires that verification. Post-terminal drift is the only post-seal evidence

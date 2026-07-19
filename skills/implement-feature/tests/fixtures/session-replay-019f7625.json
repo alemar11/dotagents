@@ -128,7 +128,7 @@
     }
   },
   "registration": {
-    "schema_version": "2.0.0",
+    "schema_version": "3.0.0",
     "root_task_ref": "codex-task:019f761a-59b5-74b3-97a3-f24f01dadc93",
     "root_checkout": "__ROOT_CHECKOUT__",
     "objective": "Deliver Feature Spec ambrogio-dev/yn-ai-workflows#231 \"Workflow Routing Contract Alignment\" through an open, non-draft, merge-ready-but-unmerged pull request against the discovered default branch, satisfying validation, autoreview, current-revision Codex review, CI, integration, tracker closeout, repository rules, and Goal closeout.",
@@ -235,13 +235,13 @@
           "attention_reason": null,
           "summary_ref": null
         },
-        {"type": "revision-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "repository": "__REPOSITORY_ID__", "pr_number": 233, "pr_url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "head_sha": "a12cb1d3a32ccab54a5753b6d2bf453a6c9dfec2", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "evidence_ref": "session-replay:initial-head"},
+        {"type": "revision-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "repository": "__REPOSITORY_ID__", "github_repository": "ambrogio-dev/yn-ai-workflows", "pr_number": 233, "pr_url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "head_sha": "a12cb1d3a32ccab54a5753b6d2bf453a6c9dfec2", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "evidence_ref": "session-replay:initial-head"},
         {
           "type": "delivery-observed",
           "task_key": "workflow-routing-contract-alignment-231",
           "delivery_key": "workflow-app",
           "revision_key": "__INITIAL_REVISION_KEY__",
-          "pr": {"repository": "__REPOSITORY_ID__", "number": 233, "url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "state": "open", "is_draft": false, "head_sha": "a12cb1d3a32ccab54a5753b6d2bf453a6c9dfec2", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "mergeable": true, "merge_state": "clean", "closing_refs": ["https://github.com/ambrogio-dev/yn-ai-workflows/issues/231", "ambrogio-dev/yn-ai-workflows#232"]},
+          "pr": {"repository": "__REPOSITORY_ID__", "github_repository": "ambrogio-dev/yn-ai-workflows", "number": 233, "url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "state": "open", "is_draft": false, "head_sha": "a12cb1d3a32ccab54a5753b6d2bf453a6c9dfec2", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "mergeable": true, "merge_state": "clean", "closing_refs": ["https://github.com/ambrogio-dev/yn-ai-workflows/issues/231", "ambrogio-dev/yn-ai-workflows#232"]},
           "committed": true,
           "published": true,
           "evidence_ref": "session-replay:initial-delivery"
@@ -255,7 +255,7 @@
       "operation_id": "00000000000000000000000000000005",
       "events": [
         {"type": "review-wait-invoked", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "revision_key": "__INITIAL_REVISION_KEY__", "request_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012163277", "wait_invoked_at": "__INITIAL_WAIT_INVOKED_AT__", "provider_timeout": "__INITIAL_PROVIDER_TIMEOUT__"},
-        {"type": "review-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "revision_key": "__INITIAL_REVISION_KEY__", "request_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012163277", "monitoring_cycle": 0, "provider_state": "findings", "observation_fingerprint": "f557643ab405450d62fb23da605888035089d84fc3fb59cb7903ac4384fff384", "disposition": "fix-required", "evidence_ref": "review=4728946085;comment=3608815484;finding=P2-update-localized-result-source-diagnostics"},
+        {"type": "review-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "revision_key": "__INITIAL_REVISION_KEY__", "request_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012163277", "provider_state": "findings", "observation_fingerprint": "f557643ab405450d62fb23da605888035089d84fc3fb59cb7903ac4384fff384", "disposition": "fix-required", "evidence_ref": "review=4728946085;comment=3608815484;finding=P2-update-localized-result-source-diagnostics", "warning_ref": null, "warning_posted_at": null, "warning_fingerprint": null},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "codex-review", "state": "failed", "binding_key": "__INITIAL_REVISION_KEY__", "evidence_ref": "P2-update-localized-result-source-diagnostics"}
       ]
     },
@@ -263,13 +263,13 @@
       "name": "review-fix-revision",
       "operation_id": "00000000000000000000000000000006",
       "events": [
-        {"type": "revision-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "repository": "__REPOSITORY_ID__", "pr_number": 233, "pr_url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "head_sha": "1536a00568460e9229abc99e16396cef405bc04b", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "evidence_ref": "session-replay:review-fix-head"},
+        {"type": "revision-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "repository": "__REPOSITORY_ID__", "github_repository": "ambrogio-dev/yn-ai-workflows", "pr_number": 233, "pr_url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "head_sha": "1536a00568460e9229abc99e16396cef405bc04b", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "evidence_ref": "session-replay:review-fix-head"},
         {
           "type": "delivery-observed",
           "task_key": "workflow-routing-contract-alignment-231",
           "delivery_key": "workflow-app",
           "revision_key": "__FINAL_REVISION_KEY__",
-          "pr": {"repository": "__REPOSITORY_ID__", "number": 233, "url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "state": "open", "is_draft": false, "head_sha": "1536a00568460e9229abc99e16396cef405bc04b", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "mergeable": true, "merge_state": "clean", "closing_refs": ["https://github.com/ambrogio-dev/yn-ai-workflows/issues/231", "ambrogio-dev/yn-ai-workflows#232"]},
+          "pr": {"repository": "__REPOSITORY_ID__", "github_repository": "ambrogio-dev/yn-ai-workflows", "number": 233, "url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "state": "open", "is_draft": false, "head_sha": "1536a00568460e9229abc99e16396cef405bc04b", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "mergeable": true, "merge_state": "clean", "closing_refs": ["https://github.com/ambrogio-dev/yn-ai-workflows/issues/231", "ambrogio-dev/yn-ai-workflows#232"]},
           "committed": true,
           "published": true,
           "evidence_ref": "session-replay:final-delivery"
@@ -292,7 +292,7 @@
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "tracker-closeout", "state": "passed", "binding_key": "__FINAL_REVISION_KEY__", "evidence_ref": "armed:ambrogio-dev/yn-ai-workflows#231,ambrogio-dev/yn-ai-workflows#232"},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "mergeability", "state": "passed", "binding_key": "__FINAL_REVISION_KEY__", "evidence_ref": "lifecycle=OPEN;isDraft=false;mergeable=MERGEABLE;mergeStateStatus=CLEAN"},
         {"type": "review-wait-invoked", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "revision_key": "__FINAL_REVISION_KEY__", "request_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012199115", "wait_invoked_at": "__FINAL_WAIT_INVOKED_AT__", "provider_timeout": "__FINAL_PROVIDER_TIMEOUT__"},
-        {"type": "review-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "revision_key": "__FINAL_REVISION_KEY__", "request_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012199115", "monitoring_cycle": 0, "provider_state": "clean", "observation_fingerprint": "a4e700a3f92181748bef7d51770f59b72888350f41dfffed18b8eac73ddf72ca", "disposition": "accepted", "evidence_ref": "clean-response=https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012214550"},
+        {"type": "review-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "revision_key": "__FINAL_REVISION_KEY__", "request_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012199115", "provider_state": "clean", "observation_fingerprint": "a4e700a3f92181748bef7d51770f59b72888350f41dfffed18b8eac73ddf72ca", "disposition": "accepted", "evidence_ref": "clean-response=https://github.com/ambrogio-dev/yn-ai-workflows/pull/233#issuecomment-5012214550", "warning_ref": null, "warning_posted_at": null, "warning_fingerprint": null},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "codex-review", "state": "passed", "binding_key": "__FINAL_REVISION_KEY__", "evidence_ref": "current-head=1536a00568460e9229abc99e16396cef405bc04b;clean-response=5012214550;prior-P2-thread=resolved"}
       ]
     },

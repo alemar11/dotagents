@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v4 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v5 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -13,9 +13,9 @@ mutation requires the same live root and raw 64-hex acquire fingerprint. The
 helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed.
 
-Active state accepts only ledger schema `2.0.0` created from registration
-schema `2.0.0`. Active Markdown, active JSON `1.0.0`, aliases, unknown fields, invalid paths, and invalid
-transitions block as `unsupported-active-ledger`. Do not import, migrate,
+Active state accepts only ledger schema `3.0.0` created from registration
+schema `3.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
 
@@ -54,13 +54,16 @@ Bind the task ref with the complete `managed-checkouts-observed` map, then use
 `task-observed` for its title, profile, Goal, and lifecycle. Before work advances
 beyond `created`, partial, unmanaged, or non-isolated checkout maps block.
 Use `revision-observed` to establish one immutable delivery/PR tuple and derive
-its `revision_key`. Use `delivery-observed` only to bind the current full PR
+its `revision_key`. The tuple includes canonical GitHub `owner/repository` and
+requires its exact `https://github.com/<owner/repository>/pull/<number>` URL.
+Use `delivery-observed` only to bind the current full PR
 lifecycle plus committed/published evidence to that exact key. The events are
 distinct, not aliases.
 
-At most three tasks are nonterminal. Ready sets, conflicts, capacity, due work,
-closeout readiness, and next actions are derived. Dependencies require verified
-upstream merge. `review-monitoring` tasks remain nonterminal and consume a slot.
+At most three tasks are nonterminal. Ready sets, conflicts, capacity, review
+deadlines, closeout readiness, and next actions are derived. Dependencies
+require verified upstream merge. A task waiting for review remains nonterminal
+and consumes a slot.
 
 ## Gate Scopes And Invalidation
 
@@ -90,19 +93,14 @@ evidence reference, and no unknown fields.
 | --- | --- |
 | `root-title-observed` | Bind live root title. |
 | `portfolio-goal-activated` | Bind active root Goal. |
-| `portfolio-goal-paused` | Bind root pause and heartbeat. |
-| `portfolio-goal-resumed` | Bind root wake/resume. |
 | `task-observed` | Bind material task/Goal lifecycle. |
 | `managed-checkouts-observed` | Bind complete delivery checkout map. |
 | `revision-observed` | Establish exact delivery/PR revision tuple. |
 | `delivery-observed` | Bind lifecycle/commit/publication to that revision. |
 | `source-moved` | Adopt proven local move; dirty its delivery. |
-| `review-wait-started` | Start immutable 30-minute wait. |
+| `review-wait-started` | Start immutable 45-minute wait. |
 | `review-wait-invoked` | Bind actual invocation/timeout. |
-| `review-observed` | Bind provider result/disposition to one monitoring cycle. |
-| `review-monitoring-scheduled` | Bind one delivery's next check. |
-| `task-monitoring-paused` | Bind worker pause to its complete schedule set. |
-| `task-monitoring-resumed` | Resume due checks or one controller action. |
+| `review-observed` | Bind the single provider result/disposition and optional timeout warning. |
 | `gate-observed` | Bind one typed gate. |
 | `task-terminal-sealed` | Freeze current task terminal proof. |
 | `task-goal-completed` | Bind worker Goal completion to seal. |
@@ -129,26 +127,34 @@ interrupted registration or call `create_goal` without `token_budget`, then
 apply `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`;
 a missing active Goal is never recreated during recovery.
 
-Review-monitoring pause/resume is owned by `review-monitoring.md`. The root
-pauses only for a quiescent portfolio with one committed heartbeat and resumes
-before any due worker.
+Root and worker Goals remain active during review waits and all nonterminal
+closeout work. They transition to complete only through staged terminal
+closeout.
 
-## Review Timing And Monitoring
+## Review Timing
 
 Keep one review per delivery revision. `review-wait-started` derives immutable
-`wait_deadline=wait_started_at+30m`. Before GitStack, persist
+`wait_deadline=wait_started_at+45m`. Before GitStack, persist
 `review-wait-invoked` with a nonfuture timestamp and
 `provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`; zero is an immediate check.
 That event is single-launch authority. Never default, restart, or extend.
 
-Bind results to the exact `monitoring_cycle`; scheduled/complete reviews reject
-them. Pending schedules from stored observation time. Once every current review
-is complete or future-scheduled, pause/read back the worker against the complete
-schedule fingerprint. Only if the portfolio is quiescent, arm the earliest root
-heartbeat and pause/read back root. Retain the claim. Resume uses that
-fingerprint: a due wake activates all
-due deliveries; `controller-action` permits early reconciliation. Monitoring
-creates no handoff or release.
+Bind exactly one result to the current request and revision. Valid pairs are
+`clean/accepted`, `findings/fix-required`, `failed/blocked`, and
+`waiting/timeout-accepted`. The pending pair is valid only at or after the
+deadline and requires a persistent PR `warning_ref`; every other pair requires
+that field to be null. The warning must be a canonical GitHub issue-comment URL
+on the review entity's exact PR URL, have a post-deadline timestamp, and match
+the request/revision-specific warning fingerprint in
+`codex-review-closeout.md`. A timeout-accepted review passes the review gate without
+claiming a clean verdict, is surfaced in projections and the final report, and
+does not waive any other gate. Retain the claim and keep Goals active. Never
+schedule another check, pause a Goal, arm an App heartbeat, relaunch the waiter,
+or create a nonterminal handoff. Projections include a byte-bounded detailed
+prefix of warnings only for current delivery revisions plus an omitted-count
+summary when needed; the ledger retains the complete evidence. Superseded
+warnings remain inert history. The later merge
+workflow re-checks late Codex findings.
 
 ## Local Source Move
 
@@ -195,8 +201,8 @@ fresh run.
 state validates normally. Missing state initializes only from the current
 claim's complete adoption mappings after source, task/no-task, Goal, profile,
 and delivery-checkout verification. Creation binds the candidate claim; do not
-infer identity or replace a mapped task. A paused same-root run keeps its exact
-claim and fingerprint; on wake verify them before mutation. If an authorized
+infer identity or replace a mapped task. A same-root resumed run keeps its exact
+claim and fingerprint; verify them before mutation. If an authorized
 takeover replaced that claim, the old root stops. Revalidate surfaces, sources,
 titles, Goals, full checkouts, revisions, reviews, and gates. `recovery` is
 guidance, not external truth.
@@ -207,14 +213,15 @@ guidance, not external truth.
 paths reject absolute/backslash/empty/parent traversal.
 
 `status` reports bounded identity and progress, `dispatch` reports only the
-derived ready set and capacity, `recovery` reports freshness inputs and due
-actions without wall-clock verdicts, and `terminal` reports staged closeout and
-archive readiness. Callers compare `due_at` or deadlines with their observed
+derived ready set and capacity, `recovery` reports freshness inputs, and
+`terminal` reports staged closeout, review-timeout warnings, and archive
+readiness. Callers compare the immutable review deadline with their observed
 clock; a projection never persists or invents an `overdue` fact.
 
 ## Hard Cut
 
-There is no compatibility path for active Markdown or active JSON `1.0.0`.
+There is no compatibility path or migration for active Markdown or any active
+JSON schema before `3.0.0`.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses
 the `ledger archive` command in `cache-lifecycle.md`; active state exposes only

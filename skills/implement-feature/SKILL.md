@@ -13,7 +13,8 @@ app. It is the single App-only implementation adapter: it never plans, repairs
 planning artifacts, or invokes another orchestrator.
 
 The root owns authorization, intake, the active-root claim, the typed run state,
-scheduling, monitoring, and final status. Exactly one visible App task owns each
+review deadlines, reconciliation, and final status. Exactly one visible App
+task owns each
 implementation-eligible Feature Spec through the only successful App result:
 `pull-request-ready-for-merge-but-not-merged`.
 
@@ -23,11 +24,10 @@ This is the first runtime step. Before asking permission, reading sources,
 persistence, or mutation, verify visible ChatGPT desktop app task creation, App-managed worktree
 binding, `codex_app__set_thread_title`, live task-title observation, and
 `create_goal`, `get_goal`, and `update_goal` in the root plus general visible-task
-Goal-tool support. The Goal surface must support first-class targeted state
-readback and `active` to `paused` to `active` transitions for both root and
-worker tasks. The App automation surface must support create, view, update, and
-delete for one heartbeat targeted to the exact root task, and that heartbeat
-must wake the same task. This gate does not create a task to inspect task-local tools.
+Goal-tool support. Goal state must support targeted readback and normal
+`pending` to `active` to `complete` progress for both root and worker tasks.
+Goal pause/resume and App heartbeat automation are not part of this runtime
+contract. This gate does not create a task to inspect task-local tools.
 Filesystem, CLI, local skill, or background-agent access does not prove this
 surface. If any capability is absent or unverifiable, return
 `unsupported-runtime` without asking permission or creating artifacts.
@@ -57,9 +57,11 @@ merge, release, or deployment.
 
 - Success means real `OPEN`, non-draft, conflict-free pull requests against each
   repository's discovered default branch, at their current heads, with mandatory
-  `$autoreview`, Codex review, CI, integration, tracker-closeout, mergeability,
+  `$autoreview`, Codex review request, CI, integration, tracker-closeout,
+  mergeability,
   approval, update, and merge-queue eligibility gates satisfied. Unknown or
-  pending evidence blocks. Never enqueue or merge.
+  pending evidence blocks except the exact evidenced 45-minute
+  `timeout-accepted` review result. Never enqueue or merge.
 - Every terminal PR targets its discovered default branch; the base is derived
   and verified, never selected by the user or source. A draft is only a vehicle;
   convert it to ready-for-review after substantive proof and `$autoreview`, before
@@ -140,7 +142,7 @@ Goal, task, tracker write, or source mutation was created.
    advancing beyond `created`.
 8. **MONITOR** — take one full task snapshot after dispatch, then consume compact
    deltas until a material transition, attention request, claim-heartbeat
-   deadline, heartbeat wake, or hard workflow deadline. Steer precise corrections with the
+   deadline or hard workflow deadline. Steer precise corrections with the
    recorded profile. Never pull implementation or review into the root.
 9. **GATE** — load `references/gates.md` and
    `references/codex-review-closeout.md`; apply task-static, delivery-static,
@@ -148,15 +150,17 @@ Goal, task, tracker write, or source mutation was created.
    scope.
 10. **RECONCILE** — read the smallest `ledger-cache ledger read` projection,
     refresh only changed external evidence, and atomically apply the resulting
-    events; dispatch another wave, schedule and pause typed review monitoring,
-    or advance one staged terminal closeout transition.
+    events; dispatch another wave, reconcile the one fixed review wait, or
+    advance one staged terminal closeout transition.
 
-An unchanged wait timeout performs only a required claim heartbeat. It creates
-no run-state event or no-progress record. Use a full task read only for startup
-verification, anomaly or blocker diagnosis, and independent terminal
-verification. The worker owns the initial bounded provider wait and every later
-one-shot provider check; the root never polls the same provider in parallel. A
-paused review-monitoring task remains nonterminal and consumes one of the three slots.
+An unchanged controller observation timeout performs only a required claim
+heartbeat. It creates no run-state event or no-progress record. Use a full task
+read only for startup verification, anomaly or blocker diagnosis, and independent terminal
+verification. The worker owns the single bounded provider wait; the root never
+polls the same provider in parallel. If the exact review is still pending at
+the 45-minute deadline, persist the required warning evidence and continue
+under the explicit `timeout-accepted` result. Root and worker Goals remain
+active until their normal terminal completion.
 
 ## Scheduling
 
@@ -178,7 +182,7 @@ parallelism are not options.
 
 `scripts/active-root-claim` is the sole ownership authority. Persist the claim
 fingerprint, heartbeat while active, and use it for heartbeat and terminal
-release. Review monitoring and dependency waits retain ownership.
+release. Review waits and dependency waits retain ownership.
 
 An overlapping live claim returns `needs-owner`. For a stale claim, perform
   read-only discovery first and load the takeover contract in
@@ -211,7 +215,7 @@ Every new task calls `create_goal` for its exact assignment. Recovery calls
 visible task; never create another Goal or replacement task. Workers report
 evidence; only the root changes portfolio state.
 
-On heartbeat or manual resume, load `references/recovery-validation.md` before mutation and
+On manual resume, load `references/recovery-validation.md` before mutation and
 revalidate the runtime surface, claim, source fingerprints, repositories, root
 and task titles, Goals, managed checkouts, gates, and review waits. Archived run
 states are cold evidence, never recovery input.
@@ -236,17 +240,20 @@ For pre-CLAIM aborts, report the evidence and zero-mutation result. Otherwise
 return run-state-derived source fingerprints, title, task/Goal and checkout proof,
 changes, validation, commits, PR URLs, reviewed revisions, CI, captured
 domain-closeout evidence, prepared tracker closeout, current-head mergeability
-and repository-rule evidence, blockers, recovery freshness, and next action.
+and repository-rule evidence, review-timeout warnings, blockers, recovery
+freshness, and next action.
 
 After root-title revalidation, close out only in this order:
 `task-terminal-sealed`, worker Goal/readback, `task-goal-completed`,
 `terminal-handoff-recorded`, `portfolio-terminal-verified`, root Goal/readback,
 `portfolio-goal-completed`, release and archive. Failure retains active state.
 
-Review monitoring schedules every pending delivery, pauses each worker once
-against its complete schedule fingerprint, and only when the portfolio is
-quiescent arms the earliest root heartbeat and pauses root. It keeps claim,
-state, and paused Goals; no handoff or release.
+An exact Codex review that remains pending after the fixed 45-minute wait is not
+reported as clean. Post a persistent warning on the PR, persist its reference as
+`timeout-accepted`, warn the user in the final report, and continue the
+remaining gates. Review request failure, access uncertainty, findings, and
+missing request evidence remain blockers. A later merge workflow must re-check
+late Codex findings before merge.
 Post-terminal drift blocks archive and never reopens Goals or implementation.
 
 ## Reference Routing
@@ -254,5 +261,4 @@ Post-terminal drift blocks archive and never reopens Goals or implementation.
 Use the load predicates above. `references/run-state.md` is the canonical owner
 of active-state commands, event types, projections, and transition rules. Load
 `references/run-state-packets.md` only immediately before writing a strict
-registration or event packet. Load `references/review-monitoring.md` only when
-the initial deadline remains pending or recovery finds its typed schedule.
+registration or event packet.

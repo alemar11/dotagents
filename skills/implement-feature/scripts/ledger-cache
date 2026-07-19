@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "4.0.0"
-LEDGER_SCHEMA_VERSION = "2.0.0"
-REGISTRATION_SCHEMA_VERSION = "2.0.0"
+__version__ = "5.0.0"
+LEDGER_SCHEMA_VERSION = "3.0.0"
+REGISTRATION_SCHEMA_VERSION = "3.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -37,7 +37,8 @@ MAX_ALLOWED_PATHS_PER_REPOSITORY = 128
 MAX_EVENTS_PER_BATCH = 64
 MAX_OPERATIONS = 512
 MAX_REVIEWS = 256
-MAX_REVIEW_OBSERVATIONS = 64
+MAX_REVIEW_OBSERVATIONS = 1
+MAX_PROJECTED_REVIEW_WARNING_BYTES = 24 * 1024
 MAX_GATES = 2048
 MAX_HANDOFFS = 512
 MAX_OUTPUT_BYTES = 128 * 1024
@@ -49,6 +50,9 @@ RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
 RELEASE_REASONS = {"terminal"}
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 LOWER_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+GITHUB_REPOSITORY_RE = re.compile(
+    r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]+$"
+)
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 TIMESTAMP_RE = re.compile(r"^\d{8}T\d{6}(?:\d{6})?Z$")
 TRANSACTION_ID_RE = re.compile(r"^[0-9a-f]{32}$")
@@ -70,7 +74,6 @@ TASK_STATES = {
     "draft-pr",
     "marking-ready-for-review",
     "review-polling",
-    "review-monitoring",
     "fixing-review",
     "ci",
     "preparing-tracker-closeout",
@@ -95,8 +98,6 @@ TASK_TRANSITIONS = {
 EVENT_TYPES = {
     "root-title-observed",
     "portfolio-goal-activated",
-    "portfolio-goal-paused",
-    "portfolio-goal-resumed",
     "portfolio-goal-completed",
     "managed-checkouts-observed",
     "task-observed",
@@ -106,9 +107,6 @@ EVENT_TYPES = {
     "review-wait-started",
     "review-wait-invoked",
     "review-observed",
-    "review-monitoring-scheduled",
-    "task-monitoring-paused",
-    "task-monitoring-resumed",
     "gate-observed",
     "task-terminal-sealed",
     "task-goal-completed",
@@ -138,8 +136,9 @@ STATIC_GATES = TASK_STATIC_GATES | DELIVERY_STATIC_GATES
 REVISION_GATES = TASK_REVISION_SET_GATES | DELIVERY_REVISION_GATES
 GATE_STATES = {"passed", "failed"}
 REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
-REVIEW_DISPOSITIONS = {"pending", "fix-required", "accepted", "blocked"}
-REVIEW_MONITORING_STATES = {"active-wait", "scheduled", "checking", "complete"}
+REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"}
+REVIEW_WAIT_STATES = {"active-wait", "complete"}
+REVIEW_WAIT_SECONDS = 45 * 60
 PROJECTIONS = {"status", "dispatch", "recovery", "terminal"}
 
 
@@ -213,6 +212,46 @@ def nonempty(value: Any, field: str) -> str:
     if len(result) > MAX_TEXT_LENGTH:
         raise CacheError("invalid-input", f"{field} exceeds the bounded length", 2)
     return result
+
+
+def canonical_github_repository(
+    value: Any,
+    field: str,
+    *,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise CacheError(error_code, f"{field} is required", exit_code)
+    repository = value.strip()
+    repository_name = repository.partition("/")[2]
+    if (
+        len(repository) > MAX_TEXT_LENGTH
+        or not GITHUB_REPOSITORY_RE.fullmatch(repository)
+        or repository_name in {".", ".."}
+    ):
+        raise CacheError(error_code, f"{field} is not canonical owner/repository", exit_code)
+    return repository
+
+
+def canonical_github_pr_url(
+    value: Any,
+    github_repository: str,
+    pr_number: int,
+    field: str,
+    *,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise CacheError(error_code, f"{field} is required", exit_code)
+    url = value.strip()
+    if len(url) > MAX_TEXT_LENGTH:
+        raise CacheError(error_code, f"{field} exceeds the bounded length", exit_code)
+    expected = f"https://github.com/{github_repository}/pull/{pr_number}"
+    if url != expected:
+        raise CacheError(error_code, f"{field} is not the canonical GitHub PR URL", exit_code)
+    return url
 
 
 def canonical_allowed_path(value: Any, field: str) -> str:
@@ -1269,7 +1308,6 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
         "claim",
         "authorization",
         "goal",
-        "monitoring",
         "sources",
         "tasks",
         "reviews",
@@ -1318,28 +1356,12 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             {
                 "state",
                 "evidence_ref",
-                "pause_evidence_ref",
-                "resume_evidence_ref",
                 "completion_evidence_ref",
             },
             "run_state.goal",
         )
-        if value["goal"]["state"] not in {"pending", "active", "paused", "complete"}:
+        if value["goal"]["state"] not in {"pending", "active", "complete"}:
             raise CacheError("integrity-failure", "run-state Goal state is invalid", 5)
-        exact_object(
-            value["monitoring"],
-            {
-                "state",
-                "heartbeat_id",
-                "target_thread_id",
-                "due_at",
-                "suspension_evidence_ref",
-                "resume_evidence_ref",
-            },
-            "run_state.monitoring",
-        )
-        if value["monitoring"]["state"] not in {"inactive", "armed"}:
-            raise CacheError("integrity-failure", "run-state monitoring state is invalid", 5)
         for field in ("sources", "tasks", "reviews", "gates", "handoffs", "operations"):
             if not isinstance(value[field], list):
                 raise CacheError("integrity-failure", f"run-state {field} is invalid", 5)
@@ -1397,10 +1419,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             "goal_objective_fingerprint",
             "goal_state",
             "goal_evidence_ref",
-            "goal_pause_evidence_ref",
-            "goal_resume_evidence_ref",
             "goal_completion_evidence_ref",
-            "monitoring_schedule_fingerprint",
             "state",
             "outcome",
             "attention_reason",
@@ -1424,15 +1443,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             check_lower_kebab(item["task_key"], f"run_state.tasks[{index}].task_key")
             if item["state"] not in TASK_STATES:
                 raise CacheError("integrity-failure", "run-state task state is invalid", 5)
-            schedule_fingerprint = item["monitoring_schedule_fingerprint"]
-            if schedule_fingerprint is not None:
-                canonical_fingerprint(
-                    schedule_fingerprint,
-                    f"run_state.tasks[{index}].monitoring_schedule_fingerprint",
-                )
-            if (item["state"] == "review-monitoring") != (schedule_fingerprint is not None):
-                raise CacheError("integrity-failure", "run-state worker monitoring epoch is invalid", 5)
-            if item["goal_state"] not in {"pending", "active", "paused", "complete"}:
+            if item["goal_state"] not in {"pending", "active", "complete"}:
                 raise CacheError("integrity-failure", "run-state task Goal state is invalid", 5)
             if item["task_ref"] is not None:
                 nonempty(item["task_ref"], f"run_state.tasks[{index}].task_ref")
@@ -1522,6 +1533,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                             "base_ref",
                             "merge_base_sha",
                             "repository",
+                            "github_repository",
                             "pr_number",
                             "pr_url",
                             "revision_key",
@@ -1531,9 +1543,27 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         f"{delivery_field}.revision",
                     )
                     revision = delivery["revision"]
-                    if revision["repository"] != delivery["repository"] or revision[
-                        "revision_key"
-                    ] != revision_key(
+                    if (
+                        not isinstance(revision["pr_number"], int)
+                        or isinstance(revision["pr_number"], bool)
+                        or revision["pr_number"] < 1
+                    ):
+                        raise CacheError("integrity-failure", "run-state revision PR number is invalid", 5)
+                    github_repository = canonical_github_repository(
+                        revision["github_repository"],
+                        f"{delivery_field}.revision.github_repository",
+                        error_code="integrity-failure",
+                        exit_code=5,
+                    )
+                    canonical_github_pr_url(
+                        revision["pr_url"],
+                        github_repository,
+                        revision["pr_number"],
+                        f"{delivery_field}.revision.pr_url",
+                        error_code="integrity-failure",
+                        exit_code=5,
+                    )
+                    if revision["repository"] != delivery["repository"] or revision["revision_key"] != revision_key(
                         revision["repository"],
                         revision["pr_number"],
                         revision["pr_url"],
@@ -1588,16 +1618,15 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     "task_key",
                     "delivery_key",
                     "revision_key",
+                    "github_repository",
+                    "pr_number",
+                    "pr_url",
                     "request_ref",
                     "wait_started_at",
                     "wait_deadline",
                     "wait_invoked_at",
                     "provider_timeout",
-                    "monitoring_state",
-                    "due_at",
-                    "monitoring_cycle",
-                    "pause_evidence_ref",
-                    "resume_evidence_ref",
+                    "wait_state",
                     "observations",
                 },
                 f"run_state.reviews[{index}]",
@@ -1607,10 +1636,37 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             check_lower_kebab(item["task_key"], f"run_state.reviews[{index}].task_key")
             check_lower_kebab(item["delivery_key"], f"run_state.reviews[{index}].delivery_key")
             canonical_fingerprint(item["revision_key"], f"run_state.reviews[{index}].revision_key")
+            if (
+                not isinstance(item["pr_number"], int)
+                or isinstance(item["pr_number"], bool)
+                or item["pr_number"] < 1
+            ):
+                raise CacheError("integrity-failure", "run-state review PR number is invalid", 5)
+            review_github_repository = canonical_github_repository(
+                item["github_repository"],
+                f"run_state.reviews[{index}].github_repository",
+                error_code="integrity-failure",
+                exit_code=5,
+            )
+            canonical_github_pr_url(
+                item["pr_url"],
+                review_github_repository,
+                item["pr_number"],
+                f"run_state.reviews[{index}].pr_url",
+                error_code="integrity-failure",
+                exit_code=5,
+            )
             wait_started_at = parse_timestamp(item["wait_started_at"], "wait_started_at")
             wait_deadline = parse_timestamp(item["wait_deadline"], "wait_deadline")
+            if wait_deadline != wait_started_at + timedelta(seconds=REVIEW_WAIT_SECONDS):
+                raise CacheError(
+                    "integrity-failure",
+                    "run-state review deadline is not exactly 45 minutes",
+                    5,
+                )
             wait_invoked_at = item["wait_invoked_at"]
             provider_timeout = item["provider_timeout"]
+            invoked_at = None
             if (wait_invoked_at is None) != (provider_timeout is None):
                 raise CacheError("integrity-failure", "run-state review invocation is incomplete", 5)
             if wait_invoked_at is not None:
@@ -1626,36 +1682,52 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     raise CacheError("integrity-failure", "run-state review timeout is invalid", 5)
             if len(item["observations"]) > MAX_REVIEW_OBSERVATIONS:
                 raise CacheError("integrity-failure", "run-state review observations exceed their bound", 5)
-            if item["monitoring_state"] not in REVIEW_MONITORING_STATES:
-                raise CacheError("integrity-failure", "run-state review monitoring state is invalid", 5)
-            if not isinstance(item["monitoring_cycle"], int) or item["monitoring_cycle"] < 0:
-                raise CacheError("integrity-failure", "run-state review monitoring cycle is invalid", 5)
-            if item["due_at"] is not None:
-                parse_timestamp(item["due_at"], "due_at")
-            observed_cycles: set[int] = set()
+            if item["observations"] and invoked_at is None:
+                raise CacheError(
+                    "integrity-failure",
+                    "run-state review observation precedes provider invocation",
+                    5,
+                )
+            if item["wait_state"] not in REVIEW_WAIT_STATES:
+                raise CacheError("integrity-failure", "run-state review wait state is invalid", 5)
             for observation in item["observations"]:
                 exact_object(
                     observation,
                     {
-                        "monitoring_cycle",
                         "provider_state",
                         "observation_fingerprint",
                         "disposition",
                         "evidence_ref",
+                        "warning_ref",
+                        "warning_posted_at",
+                        "warning_fingerprint",
                         "observed_at",
                     },
                     "run_state.review.observation",
                 )
-                cycle = observation["monitoring_cycle"]
-                if (
-                    not isinstance(cycle, int)
-                    or isinstance(cycle, bool)
-                    or cycle < 0
-                    or cycle > item["monitoring_cycle"]
-                    or cycle in observed_cycles
-                ):
-                    raise CacheError("integrity-failure", "run-state review observation cycle is invalid", 5)
-                observed_cycles.add(cycle)
+                observation_at = parse_timestamp(
+                    observation["observed_at"], "observed_at"
+                )
+                if observation_at < invoked_at:
+                    raise CacheError(
+                        "integrity-failure",
+                        "run-state review observation predates provider invocation",
+                        5,
+                    )
+                validate_review_outcome(
+                    observation["provider_state"],
+                    observation["disposition"],
+                    observation["warning_ref"],
+                    observation["warning_posted_at"],
+                    observation["warning_fingerprint"],
+                    item,
+                    observation_at,
+                    wait_deadline,
+                    "integrity-failure",
+                    5,
+                )
+            if (item["wait_state"] == "complete") != bool(item["observations"]):
+                raise CacheError("integrity-failure", "run-state review completion state is invalid", 5)
         for index, item in enumerate(value["gates"]):
             exact_object(
                 item,
@@ -1818,40 +1890,154 @@ def current_review(
     return matches[-1] if matches else None
 
 
-def current_scheduled_reviews(
-    state: dict[str, Any],
-) -> list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]]:
-    scheduled: list[tuple[dict[str, Any], dict[str, Any], dict[str, Any]]] = []
-    for task in state["tasks"]:
-        for delivery in task["deliveries"]:
-            review = current_review(state, task, delivery)
-            if (
-                review is not None
-                and review["monitoring_state"] == "scheduled"
-                and review["due_at"] is not None
-            ):
-                scheduled.append((task, delivery, review))
-    return sorted(
-        scheduled,
-        key=lambda item: parse_timestamp(item[2]["due_at"], "due_at"),
+def review_timeout_warning_body(review: dict[str, Any]) -> str:
+    return (
+        "Implement Feature continued because Codex review remained pending for "
+        "the full 45-minute wait.\n\n"
+        f"Pull request: {review['pr_url']}\n"
+        f"Review request: {review['request_ref']}\n"
+        f"Revision: {review['revision_key']}\n\n"
+        "This is not a clean review verdict. A later merge workflow must re-check "
+        "this pull request for late Codex findings before merge."
     )
 
 
-def task_monitoring_schedule_fingerprint(
-    state: dict[str, Any], task: dict[str, Any]
-) -> str | None:
-    scheduled = [
-        {
-            "delivery_key": delivery["delivery_key"],
-            "revision_key": review["revision_key"],
-            "request_ref": review["request_ref"],
-            "monitoring_cycle": review["monitoring_cycle"],
-            "due_at": review["due_at"],
-        }
-        for candidate_task, delivery, review in current_scheduled_reviews(state)
-        if candidate_task is task
-    ]
-    return request_fingerprint(scheduled) if scheduled else None
+def review_timeout_warning_fingerprint(review: dict[str, Any]) -> str:
+    return hashlib.sha256(review_timeout_warning_body(review).encode()).hexdigest()
+
+
+def validate_review_outcome(
+    provider: Any,
+    disposition: Any,
+    warning_ref: Any,
+    warning_posted_at: Any,
+    warning_fingerprint: Any,
+    review: dict[str, Any],
+    observed_at: datetime,
+    deadline: datetime,
+    error_code: str,
+    exit_code: int,
+) -> None:
+    valid_pairs = {
+        ("clean", "accepted"),
+        ("findings", "fix-required"),
+        ("failed", "blocked"),
+        ("waiting", "timeout-accepted"),
+    }
+    if provider not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
+        raise CacheError(error_code, "review observation state is invalid", exit_code)
+    if (provider, disposition) not in valid_pairs:
+        raise CacheError(error_code, "review provider state and disposition do not match", exit_code)
+    if provider == "waiting":
+        if observed_at < deadline:
+            raise CacheError(error_code, "pending review cannot be accepted before its deadline", exit_code)
+        if (
+            not isinstance(warning_ref, str)
+            or not warning_ref.strip()
+            or len(warning_ref.strip()) > MAX_TEXT_LENGTH
+        ):
+            raise CacheError(error_code, "warning_ref is required", exit_code)
+        comment_prefix = f"{review['pr_url']}#issuecomment-"
+        comment_id = warning_ref.removeprefix(comment_prefix)
+        if (
+            not warning_ref.startswith(comment_prefix)
+            or not comment_id.isdigit()
+            or int(comment_id) < 1
+        ):
+            raise CacheError(
+                error_code,
+                "warning_ref must identify a comment on the exact pull request",
+                exit_code,
+            )
+        if warning_ref == review["request_ref"]:
+            raise CacheError(
+                error_code,
+                "warning_ref cannot reuse the review request reference",
+                exit_code,
+            )
+        posted_at = parse_timestamp(warning_posted_at, "warning_posted_at")
+        if posted_at < deadline or posted_at > observed_at:
+            raise CacheError(
+                error_code,
+                "warning_posted_at must be between the review deadline and observation",
+                exit_code,
+            )
+        fingerprint = canonical_fingerprint(
+            warning_fingerprint, "warning_fingerprint"
+        )
+        if fingerprint != review_timeout_warning_fingerprint(review):
+            raise CacheError(
+                error_code,
+                "warning_fingerprint does not match the required timeout warning",
+                exit_code,
+            )
+    elif any(
+        value is not None
+        for value in (warning_ref, warning_posted_at, warning_fingerprint)
+    ):
+        raise CacheError(
+            error_code,
+            "warning evidence is only valid for an accepted review timeout",
+            exit_code,
+        )
+
+
+def review_is_accepted(review: dict[str, Any] | None) -> bool:
+    if review is None or review["wait_state"] != "complete" or not review["observations"]:
+        return False
+    observation = review["observations"][-1]
+    return (
+        observation["provider_state"] == "clean"
+        and observation["disposition"] == "accepted"
+    ) or (
+        observation["provider_state"] == "waiting"
+        and observation["disposition"] == "timeout-accepted"
+        and observation["warning_ref"] is not None
+    )
+
+
+def review_warnings(state: dict[str, Any]) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    total = 0
+    omitted = 0
+    for task in state["tasks"]:
+        for delivery in task["deliveries"]:
+            review = current_review(state, task, delivery)
+            if review is None or not review["observations"]:
+                continue
+            observation = review["observations"][-1]
+            if observation["disposition"] != "timeout-accepted":
+                continue
+            total += 1
+            warning = {
+                "code": "codex-review-timeout-accepted",
+                "task_key": review["task_key"],
+                "delivery_key": review["delivery_key"],
+                "revision_key": review["revision_key"],
+                "pr_url": review["pr_url"],
+                "warning_ref": observation["warning_ref"],
+            }
+            candidate_size = len(
+                json.dumps(
+                    [*warnings, warning],
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            )
+            if candidate_size <= MAX_PROJECTED_REVIEW_WARNING_BYTES - 256:
+                warnings.append(warning)
+            else:
+                omitted += 1
+    if omitted:
+        warnings.append(
+            {
+                "code": "codex-review-timeout-accepted",
+                "summary": "additional-warnings-omitted",
+                "omitted_count": omitted,
+                "total_count": total,
+            }
+        )
+    return warnings
 
 
 def task_dispatch_ready(state: dict[str, Any], task: dict[str, Any]) -> bool:
@@ -1890,46 +2076,6 @@ def paths_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
     return False
 
 
-def portfolio_pause_blockers(state: dict[str, Any], now: datetime) -> list[str]:
-    blockers: list[str] = []
-    for task in state["tasks"]:
-        if task["state"] in {"merge-ready", "failed"} or task["state"] == "pending":
-            continue
-        if task["state"] != "review-monitoring":
-            blockers.append(f"{task['task_key']}:controller-action-required")
-            continue
-        if task["goal_state"] != "paused" or task["goal_pause_evidence_ref"] is None:
-            blockers.append(f"{task['task_key']}:task-goal-not-paused")
-        for delivery in task["deliveries"]:
-            review = current_review(state, task, delivery)
-            if review and review["monitoring_state"] == "complete":
-                continue
-            if not review or review["monitoring_state"] != "scheduled" or review["due_at"] is None:
-                blockers.append(
-                    f"{task['task_key']}:{delivery['delivery_key']}:controller-action-required"
-                )
-                continue
-            if parse_timestamp(review["due_at"], "due_at") <= now:
-                blockers.append(f"{task['task_key']}:{delivery['delivery_key']}:review-check-due")
-    active = [
-        task for task in state["tasks"]
-        if task["task_ref"] is not None and task["state"] not in {"merge-ready", "failed"}
-    ]
-    capacity = max(0, 3 - len(active))
-    selected: list[dict[str, Any]] = []
-    for candidate in sorted(
-        (task for task in state["tasks"] if task["state"] == "pending" and task_dispatch_ready(state, task)),
-        key=lambda task: task["source_id"],
-    ):
-        if len(selected) >= capacity:
-            break
-        if any(paths_overlap(candidate, other) for other in [*active, *selected]):
-            continue
-        selected.append(candidate)
-    blockers.extend(f"{task['task_key']}:dispatch-ready" for task in selected)
-    return blockers
-
-
 def delivery_proof_blockers(
     state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
 ) -> list[str]:
@@ -1948,10 +2094,8 @@ def delivery_proof_blockers(
     review = current_review(state, task, delivery)
     if not review or not review["observations"]:
         blockers.append("missing-current-review")
-    else:
-        observation = review["observations"][-1]
-        if observation["provider_state"] != "clean" or observation["disposition"] != "accepted":
-            blockers.append("review-not-clean")
+    elif not review_is_accepted(review):
+        blockers.append("review-not-accepted")
     revision = delivery["revision"]
     pr = delivery["pr"]
     if pr is None:
@@ -1963,6 +2107,7 @@ def delivery_proof_blockers(
         or pr["merge_state"] != "clean"
         or revision is None
         or pr["repository"] != revision["repository"]
+        or pr["github_repository"] != revision["github_repository"]
         or pr["number"] != revision["pr_number"]
         or pr["url"] != revision["pr_url"]
         or pr["head_sha"] != revision["head_sha"]
@@ -2096,6 +2241,7 @@ def task_terminal_blockers(
 def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
     tasks: list[dict[str, Any]] = []
     blockers: list[str] = []
+    warnings = review_warnings(state)
     for task in state["tasks"]:
         proof_blockers = task_proof_blockers(state, task)
         task_blockers = task_terminal_blockers(state, task, require_task_state=True)
@@ -2139,6 +2285,7 @@ def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
         "blockers": sorted(set(blockers)),
         "portfolio_verification_candidate": verification_candidate,
         "portfolio_verified": verified,
+        "warnings": warnings,
         "tasks": tasks,
     }
 
@@ -2156,7 +2303,7 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
         "root_task_title": state["portfolio"]["root_task_title"],
         "root_task_title_evidence_ref": state["portfolio"]["root_task_title_evidence_ref"],
         "goal": copy.deepcopy(state["goal"]),
-        "monitoring": copy.deepcopy(state["monitoring"]),
+        "warnings": copy.deepcopy(terminal["warnings"]),
         "phase": terminal["phase"],
     }
     if projection == "terminal":
@@ -2183,7 +2330,6 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
             "available_capacity": capacity,
         }
     tasks: list[dict[str, Any]] = []
-    due_reviews: list[dict[str, Any]] = []
     for task in state["tasks"]:
         gate_summary: dict[str, str] = {}
         for gate in sorted(TASK_STATIC_GATES | TASK_REVISION_SET_GATES):
@@ -2208,19 +2354,6 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                     "tracker_dirty": delivery["tracker_dirty_after_revision_key"] is not None,
                 }
             )
-            review = current_review(state, task, delivery)
-            if review and review["monitoring_state"] != "complete":
-                due_reviews.append(
-                    {
-                        "task_key": task["task_key"],
-                        "delivery_key": delivery["delivery_key"],
-                        "request_ref": review["request_ref"],
-                        "wait_deadline": review["wait_deadline"],
-                        "monitoring_state": review["monitoring_state"],
-                        "due_at": review["due_at"] or review["wait_deadline"],
-                        "monitoring_cycle": review["monitoring_cycle"],
-                    }
-                )
         tasks.append(
             {
                 "task_key": task["task_key"],
@@ -2237,7 +2370,6 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
     base.update(
         {
             "tasks": tasks,
-            "due_reviews": due_reviews,
             "terminal_eligible": terminal["eligible"],
         }
     )
@@ -2304,6 +2436,23 @@ def render_markdown(state: dict[str, Any]) -> str:
                     lines.append(
                         f"| `{task['task_key']}:{delivery['delivery_key']}` | `{gate}` | `{item['state']}` | {item['evidence_ref']} |"
                     )
+    lines.extend(["", "## Review Warnings", ""])
+    warnings = review_warnings(state)
+    if warnings:
+        for item in warnings:
+            if item.get("summary") == "additional-warnings-omitted":
+                lines.append(
+                    f"- {item['omitted_count']} additional timeout warnings omitted "
+                    f"from this bounded view ({item['total_count']} total); full "
+                    "evidence remains in the JSON archive."
+                )
+            else:
+                lines.append(
+                    f"- `{item['task_key']}:{item['delivery_key']}` timed out: "
+                    f"{item['warning_ref']}"
+                )
+    else:
+        lines.append("- None")
     lines.extend(["", "## External Handoffs", ""])
     if state["handoffs"]:
         for item in state["handoffs"]:
@@ -2421,10 +2570,7 @@ def new_state(
                     if adoption["task_state"] == "recorded"
                     else None
                 ),
-                "goal_pause_evidence_ref": None,
-                "goal_resume_evidence_ref": None,
                 "goal_completion_evidence_ref": None,
-                "monitoring_schedule_fingerprint": None,
                 "state": "created" if adoption["task_state"] == "recorded" else "pending",
                 "outcome": None,
                 "attention_reason": None,
@@ -2464,17 +2610,7 @@ def new_state(
         "goal": {
             "state": "pending",
             "evidence_ref": None,
-            "pause_evidence_ref": None,
-            "resume_evidence_ref": None,
             "completion_evidence_ref": None,
-        },
-        "monitoring": {
-            "state": "inactive",
-            "heartbeat_id": None,
-            "target_thread_id": registration["root_task_ref"],
-            "due_at": None,
-            "suspension_evidence_ref": None,
-            "resume_evidence_ref": None,
         },
         "sources": sources,
         "tasks": tasks,
@@ -2534,6 +2670,7 @@ def validate_pr(value: Any, task: dict[str, Any], field: str) -> dict[str, Any] 
         value,
         {
             "repository",
+            "github_repository",
             "number",
             "url",
             "state",
@@ -2549,9 +2686,18 @@ def validate_pr(value: Any, task: dict[str, Any], field: str) -> dict[str, Any] 
     )
     if nonempty(pr["repository"], f"{field}.repository") != task["repository"]:
         raise CacheError("invalid-input", f"{field}.repository does not match the task", 2)
-    if not isinstance(pr["number"], int) or pr["number"] < 1:
+    if (
+        not isinstance(pr["number"], int)
+        or isinstance(pr["number"], bool)
+        or pr["number"] < 1
+    ):
         raise CacheError("invalid-input", f"{field}.number is invalid", 2)
-    url = nonempty(pr["url"], f"{field}.url")
+    github_repository = canonical_github_repository(
+        pr["github_repository"], f"{field}.github_repository"
+    )
+    url = canonical_github_pr_url(
+        pr["url"], github_repository, pr["number"], f"{field}.url"
+    )
     if pr["state"] not in {"open", "closed"} or not isinstance(pr["is_draft"], bool):
         raise CacheError("invalid-input", f"{field} lifecycle is invalid", 2)
     head_sha = nonempty(pr["head_sha"], f"{field}.head_sha")
@@ -2572,6 +2718,7 @@ def validate_pr(value: Any, task: dict[str, Any], field: str) -> dict[str, Any] 
         raise CacheError("invalid-input", f"{field}.closing_refs contains duplicates", 2)
     return {
         "repository": task["repository"],
+        "github_repository": github_repository,
         "number": pr["number"],
         "url": url,
         "state": pr["state"],
@@ -2674,13 +2821,8 @@ def source_move_blockers(
             if not evidence or evidence["state"] != "passed":
                 blockers.append(f"{delivery['delivery_key']}:gate:{gate}")
         review = current_review(state, task, delivery)
-        if (
-            not review
-            or not review["observations"]
-            or review["observations"][-1]["provider_state"] != "clean"
-            or review["observations"][-1]["disposition"] != "accepted"
-        ):
-            blockers.append(f"{delivery['delivery_key']}:review-not-clean")
+        if not review_is_accepted(review):
+            blockers.append(f"{delivery['delivery_key']}:review-not-accepted")
     return blockers
 
 
@@ -2715,69 +2857,14 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             {
                 "state": "active",
                 "evidence_ref": evidence,
-                "pause_evidence_ref": None,
-                "resume_evidence_ref": None,
                 "completion_evidence_ref": None,
             }
         )
         return True
 
-    if event_type == "portfolio-goal-paused":
-        event = exact_object(
-            raw,
-            {"type", "goal_evidence_ref", "pause_evidence_ref", "heartbeat_id", "target_thread_id", "due_at"},
-            event_type,
-        )
-        if state["goal"]["state"] != "active" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
-            raise CacheError("state-conflict", "portfolio Goal pause is out of order", 4)
-        if state["monitoring"]["state"] != "inactive":
-            raise CacheError("state-conflict", "portfolio monitoring is already armed", 4)
-        blockers = portfolio_pause_blockers(state, now)
-        if blockers:
-            raise CacheError(
-                "state-conflict",
-                "portfolio Goal cannot pause while controller work is runnable",
-                4,
-                {"blockers": blockers},
-            )
-        scheduled = current_scheduled_reviews(state)
-        due_at = nonempty(event["due_at"], "due_at")
-        due = parse_timestamp(due_at, "due_at")
-        if not scheduled or due_at != scheduled[0][2]["due_at"] or due <= now:
-            raise CacheError("invalid-input", "heartbeat due_at is not the earliest future review check", 2)
-        target = nonempty(event["target_thread_id"], "target_thread_id")
-        if target != state["portfolio"]["root_task_ref"]:
-            raise CacheError("invalid-input", "heartbeat target does not match the root task", 2)
-        pause_evidence = nonempty(event["pause_evidence_ref"], "pause_evidence_ref")
-        state["goal"]["state"] = "paused"
-        state["goal"]["pause_evidence_ref"] = pause_evidence
-        state["monitoring"].update(
-            {
-                "state": "armed",
-                "heartbeat_id": nonempty(event["heartbeat_id"], "heartbeat_id"),
-                "target_thread_id": target,
-                "due_at": due_at,
-                "suspension_evidence_ref": pause_evidence,
-                "resume_evidence_ref": None,
-            }
-        )
-        return True
-
-    if event_type == "portfolio-goal-resumed":
-        event = exact_object(raw, {"type", "goal_evidence_ref", "heartbeat_id", "resume_evidence_ref"}, event_type)
-        if state["goal"]["state"] != "paused" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
-            raise CacheError("state-conflict", "portfolio Goal resume is out of order", 4)
-        if state["monitoring"]["state"] != "armed" or state["monitoring"]["heartbeat_id"] != event["heartbeat_id"]:
-            raise CacheError("state-conflict", "portfolio heartbeat identity changed", 4)
-        evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
-        state["goal"]["state"] = "active"
-        state["goal"]["resume_evidence_ref"] = evidence
-        state["monitoring"].update({"state": "inactive", "resume_evidence_ref": evidence})
-        return True
-
     if event_type == "portfolio-terminal-verified":
         event = exact_object(raw, {"type", "verification_fingerprint", "evidence_ref"}, event_type)
-        if state["goal"]["state"] != "active" or state["monitoring"]["state"] != "inactive":
+        if state["goal"]["state"] != "active":
             raise CacheError("state-conflict", "portfolio verification requires an active root Goal", 4)
         candidate = portfolio_verification_candidate(state)
         fingerprint = canonical_fingerprint(event["verification_fingerprint"], "verification_fingerprint")
@@ -2816,8 +2903,6 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("state-conflict", "portfolio Goal completion evidence changed", 4)
         if state["goal"]["state"] != "active" or state["goal"]["evidence_ref"] != event["goal_evidence_ref"]:
             raise CacheError("state-conflict", "portfolio Goal completion is out of order", 4)
-        if state["monitoring"]["state"] != "inactive":
-            raise CacheError("state-conflict", "portfolio Goal cannot complete with an armed heartbeat", 4)
         state["goal"]["state"] = "complete"
         state["goal"]["completion_evidence_ref"] = nonempty(
             event["completion_evidence_ref"], "completion_evidence_ref"
@@ -2927,7 +3012,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         ):
             raise CacheError("state-conflict", "task Goal evidence changed", 4)
         state_value = event["state"]
-        if state_value in {"merge-ready", "terminal-sealed", "review-monitoring"}:
+        if state_value in {"merge-ready", "terminal-sealed"}:
             raise CacheError("invalid-input", "task-observed cannot perform managed transitions", 2)
         if state_value not in TASK_STATES or state_value not in TASK_TRANSITIONS[task["state"]]:
             raise CacheError("state-conflict", f"invalid task transition: {task['state']} -> {state_value}", 4)
@@ -2949,119 +3034,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         task.update(candidate)
         return changed
 
-    if event_type == "task-monitoring-paused":
-        event = exact_object(
-            raw,
-            {"type", "task_key", "schedule_fingerprint", "pause_evidence_ref"},
-            event_type,
-        )
-        if state["goal"]["state"] != "active":
-            raise CacheError("state-conflict", "root Goal must remain active while pausing a worker", 4)
-        if task["state"] != "review-polling" or task["goal_state"] != "active":
-            raise CacheError("state-conflict", "task is not active for review monitoring pause", 4)
-        scheduled: list[dict[str, Any]] = []
-        for candidate_delivery in task["deliveries"]:
-            candidate_review = current_review(state, task, candidate_delivery)
-            if candidate_review is None or candidate_review["monitoring_state"] not in {"complete", "scheduled"}:
-                raise CacheError(
-                    "state-conflict",
-                    "every current delivery review must be complete or scheduled before worker pause",
-                    4,
-                )
-            if candidate_review["monitoring_state"] == "complete":
-                observation = candidate_review["observations"][-1] if candidate_review["observations"] else None
-                if (
-                    observation is None
-                    or observation["provider_state"] != "clean"
-                    or observation["disposition"] != "accepted"
-                ):
-                    raise CacheError(
-                        "state-conflict",
-                        "non-clean review result requires controller action before worker pause",
-                        4,
-                    )
-            if candidate_review["monitoring_state"] == "scheduled":
-                if (
-                    candidate_review["due_at"] is None
-                    or parse_timestamp(candidate_review["due_at"], "due_at") <= now
-                ):
-                    raise CacheError("state-conflict", "a scheduled review check is already due", 4)
-                scheduled.append(candidate_review)
-        if not scheduled:
-            raise CacheError("state-conflict", "worker pause requires a future review schedule", 4)
-        schedule_fingerprint = canonical_fingerprint(
-            event["schedule_fingerprint"], "schedule_fingerprint"
-        )
-        if schedule_fingerprint != task_monitoring_schedule_fingerprint(state, task):
-            raise CacheError("state-conflict", "worker monitoring schedule changed before pause", 4)
-        evidence = nonempty(event["pause_evidence_ref"], "pause_evidence_ref")
-        for candidate_review in scheduled:
-            candidate_review["pause_evidence_ref"] = evidence
-        task["state"] = "review-monitoring"
-        task["goal_state"] = "paused"
-        task["goal_pause_evidence_ref"] = evidence
-        task["monitoring_schedule_fingerprint"] = schedule_fingerprint
-        return True
-
-    if event_type == "task-monitoring-resumed":
-        event = exact_object(
-            raw,
-            {
-                "type", "task_key", "schedule_fingerprint", "resume_reason",
-                "resume_evidence_ref",
-            },
-            event_type,
-        )
-        if state["goal"]["state"] != "active":
-            raise CacheError("state-conflict", "root Goal must resume before a worker Goal", 4)
-        paused_worker = task["state"] == "review-monitoring" and task["goal_state"] == "paused"
-        active_worker = task["state"] == "review-polling" and task["goal_state"] == "active"
-        if not paused_worker and not active_worker:
-            raise CacheError("state-conflict", "task is not available for review monitoring", 4)
-        schedule_fingerprint = canonical_fingerprint(
-            event["schedule_fingerprint"], "schedule_fingerprint"
-        )
-        if (
-            (paused_worker and schedule_fingerprint != task["monitoring_schedule_fingerprint"])
-            or schedule_fingerprint != task_monitoring_schedule_fingerprint(state, task)
-        ):
-            raise CacheError("state-conflict", "worker monitoring schedule changed before resume", 4)
-        reason = event["resume_reason"]
-        if reason not in {"due-review", "controller-action"}:
-            raise CacheError("invalid-input", "review monitoring resume reason is invalid", 2)
-        if active_worker and reason != "due-review":
-            raise CacheError("state-conflict", "an active worker can only activate a due review", 4)
-        scheduled = [
-            review
-            for candidate_delivery in task["deliveries"]
-            if (review := current_review(state, task, candidate_delivery)) is not None
-            and review["monitoring_state"] == "scheduled"
-            and review["due_at"] is not None
-        ]
-        if not scheduled:
-            raise CacheError("state-conflict", "task has no current review schedule", 4)
-        due = [
-            review
-            for review in scheduled
-            if parse_timestamp(review["due_at"], "due_at") <= now
-        ]
-        if reason == "due-review" and not due:
-            raise CacheError("state-conflict", "review monitoring check is not due", 4)
-        evidence = nonempty(event["resume_evidence_ref"], "resume_evidence_ref")
-        if reason == "due-review":
-            for review in due:
-                review["monitoring_state"] = "checking"
-                review["resume_evidence_ref"] = evidence
-        if paused_worker:
-            task["state"] = "review-polling"
-            task["goal_state"] = "active"
-            task["goal_resume_evidence_ref"] = evidence
-            task["monitoring_schedule_fingerprint"] = None
-        return True
-
     if event_type in {
         "revision-observed", "delivery-observed", "review-wait-started",
-        "review-wait-invoked", "review-observed", "review-monitoring-scheduled",
+        "review-wait-invoked", "review-observed",
     }:
         delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
         delivery = delivery_by_key(task, delivery_key)
@@ -3073,25 +3048,36 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raw,
             {
                 "type", "task_key", "delivery_key", "head_sha", "base_ref",
-                "merge_base_sha", "repository", "pr_number", "pr_url", "evidence_ref",
+                "merge_base_sha", "repository", "github_repository",
+                "pr_number", "pr_url", "evidence_ref",
             },
             event_type,
         )
         assert delivery is not None
         if state["goal"]["state"] != "active" or task["goal_state"] != "active":
             raise CacheError("state-conflict", "revision observation requires active Goals", 4)
-        if state["goal"]["state"] == "paused" or task["goal_state"] == "paused":
-            raise CacheError("state-conflict", "resume root and worker Goals before changing revision", 4)
         repository = nonempty(event["repository"], "repository")
         if repository != delivery["repository"]:
             raise CacheError("invalid-input", "revision repository does not match delivery", 2)
-        if not isinstance(event["pr_number"], int) or event["pr_number"] < 1:
+        if (
+            not isinstance(event["pr_number"], int)
+            or isinstance(event["pr_number"], bool)
+            or event["pr_number"] < 1
+        ):
             raise CacheError("invalid-input", "revision pr_number is invalid", 2)
-        pr_url = nonempty(event["pr_url"], "pr_url")
+        github_repository = canonical_github_repository(
+            event["github_repository"], "github_repository"
+        )
+        pr_url = canonical_github_pr_url(
+            event["pr_url"], github_repository, event["pr_number"], "pr_url"
+        )
         if delivery["pr"] is not None and any(
             delivery["pr"][field] != expected
             for field, expected in (
-                ("repository", repository), ("number", event["pr_number"]), ("url", pr_url)
+                ("repository", repository),
+                ("github_repository", github_repository),
+                ("number", event["pr_number"]),
+                ("url", pr_url),
             )
         ):
             raise CacheError("state-conflict", "revision PR identity changed", 4)
@@ -3100,6 +3086,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         merge_base = nonempty(event["merge_base_sha"], "merge_base_sha")
         candidate = {
             "repository": repository,
+            "github_repository": github_repository,
             "pr_number": event["pr_number"],
             "pr_url": pr_url,
             "head_sha": head,
@@ -3139,6 +3126,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("invalid-input", "delivery observation requires a pull request", 2)
         if (
             pr["repository"] != revision["repository"]
+            or pr["github_repository"] != revision["github_repository"]
             or pr["number"] != revision["pr_number"]
             or pr["url"] != revision["pr_url"]
             or pr["head_sha"] != revision["head_sha"]
@@ -3238,24 +3226,23 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "task_key": task_key,
                 "delivery_key": delivery["delivery_key"],
                 "revision_key": revision["revision_key"],
+                "github_repository": revision["github_repository"],
+                "pr_number": revision["pr_number"],
+                "pr_url": revision["pr_url"],
                 "request_ref": request_ref,
                 "wait_started_at": observed_at,
-                "wait_deadline": format_timestamp(now + timedelta(minutes=30)),
+                "wait_deadline": format_timestamp(
+                    now + timedelta(seconds=REVIEW_WAIT_SECONDS)
+                ),
                 "wait_invoked_at": None,
                 "provider_timeout": None,
-                "monitoring_state": "active-wait",
-                "due_at": None,
-                "monitoring_cycle": 0,
-                "pause_evidence_ref": None,
-                "resume_evidence_ref": None,
+                "wait_state": "active-wait",
                 "observations": [],
             }
         )
         return True
 
-    if event_type in {
-        "review-wait-invoked", "review-observed", "review-monitoring-scheduled",
-    }:
+    if event_type in {"review-wait-invoked", "review-observed"}:
         assert delivery is not None
         review = current_review(state, task, delivery)
         if review is None:
@@ -3297,8 +3284,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raw,
             {
                 "type", "task_key", "delivery_key", "revision_key", "request_ref",
-                "monitoring_cycle", "provider_state", "observation_fingerprint",
-                "disposition", "evidence_ref",
+                "provider_state", "observation_fingerprint", "disposition",
+                "evidence_ref", "warning_ref", "warning_posted_at",
+                "warning_fingerprint",
             },
             event_type,
         )
@@ -3307,83 +3295,55 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("state-conflict", "review observation identity changed", 4)
         if review["wait_invoked_at"] is None:
             raise CacheError("state-conflict", "review observation precedes waiter launch", 4)
-        cycle = event["monitoring_cycle"]
-        if (
-            not isinstance(cycle, int)
-            or isinstance(cycle, bool)
-            or cycle != review["monitoring_cycle"]
-            or review["monitoring_state"] not in {"active-wait", "checking"}
-        ):
-            raise CacheError("state-conflict", "review observation check cycle is stale", 4)
+        if now < parse_timestamp(review["wait_invoked_at"], "wait_invoked_at"):
+            raise CacheError(
+                "invalid-input",
+                "review observation predates provider invocation",
+                2,
+            )
         provider = event["provider_state"]
         disposition = event["disposition"]
-        if provider not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
-            raise CacheError("invalid-input", "review observation state is invalid", 2)
-        if provider == "clean" and disposition != "accepted":
-            raise CacheError("invalid-input", "clean review must be accepted", 2)
+        warning_ref = (
+            nonempty(event["warning_ref"], "warning_ref")
+            if event["warning_ref"] is not None
+            else None
+        )
+        warning_posted_at = event["warning_posted_at"]
+        warning_fingerprint = event["warning_fingerprint"]
+        validate_review_outcome(
+            provider,
+            disposition,
+            warning_ref,
+            warning_posted_at,
+            warning_fingerprint,
+            review,
+            now,
+            parse_timestamp(review["wait_deadline"], "wait_deadline"),
+            "invalid-input",
+            2,
+        )
         fingerprint = canonical_fingerprint(event["observation_fingerprint"], "observation_fingerprint")
         evidence_ref = nonempty(event["evidence_ref"], "evidence_ref")
-        prior_cycle = next(
-            (item for item in review["observations"] if item["monitoring_cycle"] == cycle),
-            None,
-        )
-        if prior_cycle is not None:
-            if (
-                prior_cycle["provider_state"] == provider
-                and prior_cycle["observation_fingerprint"] == fingerprint
-                and prior_cycle["disposition"] == disposition
-                and prior_cycle["evidence_ref"] == evidence_ref
-            ):
+        observation = {
+            "provider_state": provider,
+            "observation_fingerprint": fingerprint,
+            "disposition": disposition,
+            "evidence_ref": evidence_ref,
+            "warning_ref": warning_ref,
+            "warning_posted_at": warning_posted_at,
+            "warning_fingerprint": warning_fingerprint,
+        }
+        if review["observations"]:
+            prior = review["observations"][-1]
+            if {key: prior[key] for key in observation} == observation:
                 return False
-            raise CacheError("state-conflict", "review check cycle already has an observation", 4)
+            raise CacheError("state-conflict", "review already has an observation", 4)
+        if review["wait_state"] != "active-wait":
+            raise CacheError("state-conflict", "review observation is already complete", 4)
         if len(review["observations"]) >= MAX_REVIEW_OBSERVATIONS:
             raise CacheError("state-conflict", "review observation bound reached", 4)
-        review["observations"].append(
-            {
-                "monitoring_cycle": cycle,
-                "provider_state": provider,
-                "observation_fingerprint": fingerprint,
-                "disposition": disposition,
-                "evidence_ref": evidence_ref,
-                "observed_at": observed_at,
-            }
-        )
-        if provider != "waiting":
-            review["monitoring_state"] = "complete"
-            review["due_at"] = None
-        return True
-
-    if event_type == "review-monitoring-scheduled":
-        event = exact_object(
-            raw,
-            {"type", "task_key", "delivery_key", "revision_key", "request_ref"},
-            event_type,
-        )
-        assert review is not None
-        if event["revision_key"] != review["revision_key"] or event["request_ref"] != review["request_ref"]:
-            raise CacheError("state-conflict", "review monitoring identity changed", 4)
-        if task["state"] != "review-polling" or task["goal_state"] != "active":
-            raise CacheError("state-conflict", "task is not active for review monitoring schedule", 4)
-        if review["monitoring_state"] not in {"active-wait", "checking"} or not review["observations"]:
-            raise CacheError("state-conflict", "review monitoring schedule is out of order", 4)
-        observation = review["observations"][-1]
-        if (
-            observation["monitoring_cycle"] != review["monitoring_cycle"]
-            or observation["provider_state"] != "waiting"
-            or observation["disposition"] != "pending"
-        ):
-            raise CacheError("state-conflict", "review monitoring requires a pending result", 4)
-        due_source = review["wait_deadline"] if review["monitoring_state"] == "active-wait" else review["due_at"]
-        due = parse_timestamp(due_source, "review_check_due_at") if due_source is not None else None
-        observation_time = parse_timestamp(observation["observed_at"], "observed_at")
-        if due is None or now < due or observation_time < due:
-            raise CacheError("state-conflict", "review monitoring check is not due", 4)
-        next_due = observation_time + timedelta(minutes=30)
-        review["monitoring_state"] = "scheduled" if next_due > now else "checking"
-        review["due_at"] = format_timestamp(next_due)
-        review["monitoring_cycle"] += 1
-        review["pause_evidence_ref"] = None
-        review["resume_evidence_ref"] = None
+        review["observations"].append({**observation, "observed_at": observed_at})
+        review["wait_state"] = "complete"
         return True
 
     if event_type == "gate-observed":
@@ -3407,6 +3367,16 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("state-conflict", "gate observation binding is stale", 4)
         if gate == "domain-closeout" and not task["requires_domain_closeout"]:
             raise CacheError("invalid-input", "domain-closeout is not required for this task", 2)
+        if (
+            gate == "codex-review"
+            and event["state"] == "passed"
+            and not review_is_accepted(current_review(state, task, scoped_delivery))
+        ):
+            raise CacheError(
+                "state-conflict",
+                "codex-review gate requires a clean review or an evidenced accepted timeout",
+                4,
+            )
         evidence = nonempty(event["evidence_ref"], "evidence_ref")
         candidate = {
             "task_key": task_key,

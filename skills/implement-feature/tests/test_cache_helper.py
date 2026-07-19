@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV3Tests(unittest.TestCase):
+class LedgerCacheV5Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -149,7 +149,7 @@ class LedgerCacheV3Tests(unittest.TestCase):
         assert claim is not None
         objective = "Implement the registered Feature Spec portfolio"
         return {
-            "schema_version": "2.0.0",
+            "schema_version": "3.0.0",
             "root_task_ref": "app-task://root-a",
             "root_checkout": str(REPOSITORY),
             "objective": objective,
@@ -425,6 +425,7 @@ class LedgerCacheV3Tests(unittest.TestCase):
                     "base_ref": "main",
                     "merge_base_sha": merge_base,
                     "repository": repository,
+                    "github_repository": "example/docs",
                     "pr_number": 234,
                     "pr_url": pr_url,
                     "revision_key": CACHE_RUNTIME.revision_key(
@@ -476,6 +477,7 @@ class LedgerCacheV3Tests(unittest.TestCase):
                     "base_ref": "main",
                     "merge_base_sha": merge_base,
                     "repository": repository,
+                    "github_repository": "example/dotagents",
                     "pr_number": 233,
                     "pr_url": "https://github.com/example/dotagents/pull/233",
                     "evidence_ref": f"git://revision/{head}",
@@ -488,6 +490,7 @@ class LedgerCacheV3Tests(unittest.TestCase):
         assert self.registration is not None
         return {
             "repository": self.registration["sources"][0]["deliveries"][0]["repository"],
+            "github_repository": "example/dotagents",
             "number": 233,
             "url": "https://github.com/example/dotagents/pull/233",
             "state": "open",
@@ -544,7 +547,7 @@ class LedgerCacheV3Tests(unittest.TestCase):
                     "revision_key": revision["revision_key"],
                     "request_ref": request_ref,
                     "wait_invoked_at": review["wait_started_at"],
-                    "provider_timeout": 1800,
+                    "provider_timeout": 2700,
                 },
                 {
                     "type": "review-observed",
@@ -552,13 +555,15 @@ class LedgerCacheV3Tests(unittest.TestCase):
                     "delivery_key": "dotagents",
                     "revision_key": revision["revision_key"],
                     "request_ref": request_ref,
-                    "monitoring_cycle": 0,
                     "provider_state": "clean",
                     "observation_fingerprint": hashlib.sha256(
                         b"clean-review"
                     ).hexdigest(),
                     "disposition": "accepted",
                     "evidence_ref": "github-review://233/clean",
+                    "warning_ref": None,
+                    "warning_posted_at": None,
+                    "warning_fingerprint": None,
                 },
             ]
         )
@@ -731,12 +736,12 @@ class LedgerCacheV3Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v4_offline_and_read_only(self) -> None:
+    def test_doctor_is_v5_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "4.0.0")
+        self.assertEqual(version, "5.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1045,16 +1050,16 @@ class LedgerCacheV3Tests(unittest.TestCase):
         self.assertNotEqual(second["revision_key"], first["revision_key"])
         self.assertNotIn("scope-acceptance", task["gates"])
         self.assertIn("dotagents:missing-current-review", task["terminal_blockers"])
-        self.assertEqual(projection["due_reviews"], [])
+        self.assertEqual(projection["warnings"], [])
 
-    def test_review_monitoring_pause_resume_is_reachable_and_cycle_bound(self) -> None:
+    def test_review_wait_is_fixed_45_minutes_and_timeout_requires_warning(self) -> None:
         self.bootstrap_active_task()
         revision = self.observe_revision()
         self.observe_delivery(revision)
         self.apply([self.task_event(state="review-polling")])
         state = self.state()
         started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        request_ref = "github-review://233/request-monitoring"
+        request_ref = "github-review://233/request-timeout"
         self.direct_event(
             state,
             {
@@ -1066,21 +1071,15 @@ class LedgerCacheV3Tests(unittest.TestCase):
             },
             started,
         )
-        with self.assertRaises(CACHE_RUNTIME.CacheError) as before_start:
-            CACHE_RUNTIME.apply_event(
-                state,
-                {
-                    "type": "review-wait-invoked",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "wait_invoked_at": "2026-07-18T11:59:59Z",
-                    "provider_timeout": 1801,
-                },
-                started,
-            )
-        self.assertEqual(before_start.exception.code, "invalid-input")
+        review = state["reviews"][-1]
+        self.assertEqual(review["wait_deadline"], "2026-07-18T12:45:00Z")
+        corrupt_deadline = copy.deepcopy(state)
+        corrupt_deadline["reviews"][-1]["wait_deadline"] = "2026-07-18T12:44:00Z"
+        CACHE_RUNTIME.seal_state_fingerprint(corrupt_deadline)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid_deadline:
+            CACHE_RUNTIME.validate_state(corrupt_deadline, self.ledger)
+        self.assertEqual(invalid_deadline.exception.code, "integrity-failure")
+        self.assertEqual(invalid_deadline.exception.exit_code, 5)
         self.direct_event(
             state,
             {
@@ -1090,647 +1089,400 @@ class LedgerCacheV3Tests(unittest.TestCase):
                 "revision_key": revision["revision_key"],
                 "request_ref": request_ref,
                 "wait_invoked_at": "2026-07-18T12:00:00Z",
-                "provider_timeout": 1800,
+                "provider_timeout": 2700,
             },
             started,
         )
-        deadline = started + timedelta(minutes=30)
-        self.direct_event(
-            state,
-            {
-                "type": "review-observed",
-                "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "monitoring_cycle": 0,
-                    "provider_state": "waiting",
-                    "observation_fingerprint": hashlib.sha256(b"pending").hexdigest(),
-                "disposition": "pending",
-                "evidence_ref": "github-review://233/pending",
-            },
-            deadline,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "review-monitoring-scheduled",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-            },
-            deadline,
-        )
-        due_at = state["reviews"][0]["due_at"]
-        schedule_fingerprint = CACHE_RUNTIME.task_monitoring_schedule_fingerprint(
-            state, state["tasks"][0]
-        )
-        assert schedule_fingerprint is not None
-        self.direct_event(
-            state,
-            {
-                "type": "task-monitoring-paused",
-                "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "pause_evidence_ref": "app-task://worker-232/goal-paused",
-            },
-            deadline,
-        )
-        active_root_state = copy.deepcopy(state)
-        other = copy.deepcopy(active_root_state["tasks"][0])
-        other.update(
-            {
-                "task_key": "spec-other",
-                "source_id": "https://github.com/example/dotagents/issues/999",
-                "source_spec_ref": "https://github.com/example/dotagents/issues/999",
-                "task_ref": "app-task://worker-999",
-                "state": "implementing",
-                "goal_state": "active",
-                "monitoring_schedule_fingerprint": None,
-            }
-        )
-        active_root_state["tasks"].append(other)
-        self.assertIn(
-            "spec-other:controller-action-required",
-            CACHE_RUNTIME.portfolio_pause_blockers(active_root_state, deadline),
-        )
-        due_while_root_active = CACHE_RUNTIME.parse_timestamp(due_at, "due_at")
-        self.direct_event(
-            active_root_state,
-            {
-                "type": "task-monitoring-resumed",
-                "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "resume_reason": "due-review",
-                "resume_evidence_ref": "app-task://worker-232/root-still-active",
-            },
-            due_while_root_active,
-        )
-        self.assertEqual(active_root_state["goal"]["state"], "active")
-        self.assertEqual(active_root_state["monitoring"]["state"], "inactive")
-        self.assertEqual(CACHE_RUNTIME.portfolio_pause_blockers(state, deadline), [])
-        self.direct_event(
-            state,
-            {
-                "type": "portfolio-goal-paused",
-                "goal_evidence_ref": "app-task://root-a/goal",
-                "pause_evidence_ref": "app-task://root-a/goal-paused",
-                "heartbeat_id": "heartbeat-review",
-                "target_thread_id": "app-task://root-a",
-                "due_at": due_at,
-            },
-            deadline,
-        )
-        self.assertEqual(state["goal"]["state"], "paused")
-        self.assertEqual(state["handoffs"], [])
-
-        due = CACHE_RUNTIME.parse_timestamp(due_at, "due_at")
-        self.direct_event(
-            state,
-            {
-                "type": "portfolio-goal-resumed",
-                "goal_evidence_ref": "app-task://root-a/goal",
-                "heartbeat_id": "heartbeat-review",
-                "resume_evidence_ref": "app-task://root-a/goal-resumed",
-            },
-            due,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "task-monitoring-resumed",
-                "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "resume_reason": "due-review",
-                "resume_evidence_ref": "app-task://worker-232/goal-resumed",
-            },
-            due,
-        )
-        repeated_fingerprint = hashlib.sha256(b"pending").hexdigest()
-        self.direct_event(
-            state,
-            {
-                "type": "review-observed",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-                "monitoring_cycle": 1,
-                "provider_state": "waiting",
-                "observation_fingerprint": repeated_fingerprint,
-                "disposition": "pending",
-                "evidence_ref": "github-review://233/pending",
-            },
-            due,
-        )
-        delayed_apply = due + timedelta(minutes=5)
-        self.direct_event(
-            state,
-            {
-                "type": "review-monitoring-scheduled",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-            },
-            delayed_apply,
-        )
-        review = state["reviews"][0]
-        self.assertEqual(len(review["observations"]), 2)
-        self.assertEqual(
-            review["due_at"],
-            CACHE_RUNTIME.format_timestamp(due + timedelta(minutes=30)),
-        )
-
-    def test_review_wait_uses_zero_for_exact_deadline_and_rejects_invalid_timeout(self) -> None:
-        self.bootstrap_active_task()
-        revision = self.observe_revision()
-        self.observe_delivery(revision)
-        self.apply([self.task_event(state="review-polling")])
-        state = self.state()
-        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        request_ref = "github-review://233/exact-deadline"
-        self.direct_event(
-            state,
-            {
-                "type": "review-wait-started",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-            },
-            started,
-        )
-        deadline = started + timedelta(minutes=30)
-        for invalid_timeout in (-1, False):
-            with self.subTest(provider_timeout=invalid_timeout):
-                with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid:
-                    CACHE_RUNTIME.apply_event(
-                        state,
-                        {
-                            "type": "review-wait-invoked",
-                            "task_key": self.task_key,
-                            "delivery_key": "dotagents",
-                            "revision_key": revision["revision_key"],
-                            "request_ref": request_ref,
-                            "wait_invoked_at": CACHE_RUNTIME.format_timestamp(deadline),
-                            "provider_timeout": invalid_timeout,
-                        },
-                        deadline,
-                    )
-                self.assertEqual(invalid.exception.code, "invalid-input")
-        with self.assertRaises(CACHE_RUNTIME.CacheError) as future:
-            CACHE_RUNTIME.apply_event(
-                state,
-                {
-                    "type": "review-wait-invoked",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "wait_invoked_at": CACHE_RUNTIME.format_timestamp(deadline),
-                    "provider_timeout": 0,
-                },
-                deadline - timedelta(seconds=1),
-            )
-        self.assertEqual(future.exception.code, "invalid-input")
-        self.direct_event(
-            state,
-            {
-                "type": "review-wait-invoked",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-                "wait_invoked_at": CACHE_RUNTIME.format_timestamp(deadline),
-                "provider_timeout": 0,
-            },
-            deadline,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "review-observed",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-                "monitoring_cycle": 0,
-                "provider_state": "clean",
-                "observation_fingerprint": hashlib.sha256(b"clean-at-deadline").hexdigest(),
-                "disposition": "accepted",
-                "evidence_ref": "github-review://233/clean-at-deadline",
-            },
-            deadline,
-        )
-
-    def test_review_wait_expired_before_launch_uses_zero_and_schedules_from_observation(self) -> None:
-        self.bootstrap_active_task()
-        revision = self.observe_revision()
-        self.observe_delivery(revision)
-        self.apply([self.task_event(state="review-polling")])
-        state = self.state()
-        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        request_ref = "github-review://233/expired-before-launch"
-        self.direct_event(
-            state,
-            {
-                "type": "review-wait-started",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-            },
-            started,
-        )
-        observed_at = started + timedelta(minutes=35)
-        self.direct_event(
-            state,
-            {
-                "type": "review-wait-invoked",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-                "wait_invoked_at": CACHE_RUNTIME.format_timestamp(observed_at),
-                "provider_timeout": 0,
-            },
-            observed_at,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "review-observed",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-                "monitoring_cycle": 0,
-                "provider_state": "waiting",
-                "observation_fingerprint": hashlib.sha256(b"late-pending").hexdigest(),
-                "disposition": "pending",
-                "evidence_ref": "github-review://233/late-pending",
-            },
-            observed_at,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "review-monitoring-scheduled",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "revision_key": revision["revision_key"],
-                "request_ref": request_ref,
-            },
-            observed_at,
-        )
-        self.assertEqual(
-            state["reviews"][0]["due_at"],
-            CACHE_RUNTIME.format_timestamp(observed_at + timedelta(minutes=30)),
-        )
-
-    def test_task_monitoring_epoch_resumes_all_due_deliveries_once(self) -> None:
-        self.bootstrap_active_task()
-        first_revision = self.observe_revision()
-        self.observe_delivery(first_revision)
-        self.apply([self.task_event(state="review-polling")])
-        state = self.state()
-        second = self.add_synthetic_delivery(state)
-        revisions = {
-            "dotagents": first_revision,
-            "docs": second["revision"],
+        observation = {
+            "type": "review-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "revision_key": revision["revision_key"],
+            "request_ref": request_ref,
+            "provider_state": "waiting",
+            "observation_fingerprint": hashlib.sha256(b"pending-timeout").hexdigest(),
+            "disposition": "timeout-accepted",
+            "evidence_ref": "github-review://233/pending",
+            "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9001",
+            "warning_posted_at": review["wait_deadline"],
+            "warning_fingerprint": CACHE_RUNTIME.review_timeout_warning_fingerprint(review),
         }
-        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
-        for delivery_key, revision in revisions.items():
-            request_ref = f"github-review://{delivery_key}/pending"
-            self.direct_event(
-                state,
-                {
-                    "type": "review-wait-started",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                },
-                started,
-            )
-            self.direct_event(
-                state,
-                {
-                    "type": "review-wait-invoked",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "wait_invoked_at": CACHE_RUNTIME.format_timestamp(started),
-                    "provider_timeout": 1800,
-                },
-                started,
-            )
-        deadline = started + timedelta(minutes=30)
-        for delivery_key, revision in revisions.items():
-            request_ref = f"github-review://{delivery_key}/pending"
-            self.direct_event(
-                state,
-                {
-                    "type": "review-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "monitoring_cycle": 0,
-                    "provider_state": "waiting",
-                    "observation_fingerprint": hashlib.sha256(
-                        f"pending-{delivery_key}".encode()
-                    ).hexdigest(),
-                    "disposition": "pending",
-                    "evidence_ref": f"github-review://{delivery_key}/observation",
-                },
-                deadline,
-            )
-            self.direct_event(
-                state,
-                {
-                    "type": "review-monitoring-scheduled",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                },
-                deadline,
-            )
-        self.assertEqual(state["tasks"][0]["state"], "review-polling")
-        schedule_fingerprint = CACHE_RUNTIME.task_monitoring_schedule_fingerprint(
-            state, state["tasks"][0]
-        )
-        assert schedule_fingerprint is not None
-        self.direct_event(
-            state,
-            {
-                "type": "task-monitoring-paused",
-                "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "pause_evidence_ref": "app-task://worker-232/multi-paused",
-            },
-            deadline,
-        )
-        due_at = state["reviews"][0]["due_at"]
-        self.direct_event(
-            state,
-            {
-                "type": "portfolio-goal-paused",
-                "goal_evidence_ref": "app-task://root-a/goal",
-                "pause_evidence_ref": "app-task://root-a/multi-paused",
-                "heartbeat_id": "heartbeat-multi",
-                "target_thread_id": "app-task://root-a",
-                "due_at": due_at,
-            },
-            deadline,
-        )
-        due = CACHE_RUNTIME.parse_timestamp(due_at, "due_at")
-        self.direct_event(
-            state,
-            {
-                "type": "portfolio-goal-resumed",
-                "goal_evidence_ref": "app-task://root-a/goal",
-                "heartbeat_id": "heartbeat-multi",
-                "resume_evidence_ref": "app-task://root-a/multi-resumed",
-            },
-            due,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "task-monitoring-resumed",
-                "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "resume_reason": "due-review",
-                "resume_evidence_ref": "app-task://worker-232/multi-resumed",
-            },
-            due,
-        )
-        self.assertEqual(
-            {review["delivery_key"] for review in state["reviews"] if review["monitoring_state"] == "checking"},
-            {"dotagents", "docs"},
-        )
-        for delivery_key, provider_state, disposition in (
-            ("dotagents", "clean", "accepted"),
-            ("docs", "waiting", "pending"),
+        with self.assertRaisesRegex(
+            CACHE_RUNTIME.CacheError, "cannot be accepted before its deadline"
         ):
-            revision = revisions[delivery_key]
-            self.direct_event(
-                state,
-                {
-                    "type": "review-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": f"github-review://{delivery_key}/pending",
-                    "monitoring_cycle": 1,
-                    "provider_state": provider_state,
-                    "observation_fingerprint": hashlib.sha256(
-                        f"cycle-1-{delivery_key}".encode()
-                    ).hexdigest(),
-                    "disposition": disposition,
-                    "evidence_ref": f"github-review://{delivery_key}/cycle-1",
-                },
-                due,
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state),
+                observation,
+                started + timedelta(minutes=44, seconds=59),
             )
-        self.direct_event(
-            state,
-            {
-                "type": "review-monitoring-scheduled",
-                "task_key": self.task_key,
-                "delivery_key": "docs",
-                "revision_key": revisions["docs"]["revision_key"],
-                "request_ref": "github-review://docs/pending",
-            },
-            due,
-        )
-        next_fingerprint = CACHE_RUNTIME.task_monitoring_schedule_fingerprint(
-            state, state["tasks"][0]
-        )
-        assert next_fingerprint is not None
-        self.direct_event(
-            state,
-            {
-                "type": "task-monitoring-paused",
-                "task_key": self.task_key,
-                "schedule_fingerprint": next_fingerprint,
-                "pause_evidence_ref": "app-task://worker-232/clean-plus-pending-paused",
-            },
-            due,
-        )
-        self.assertEqual(state["tasks"][0]["state"], "review-monitoring")
-
-    def test_controller_resume_makes_replaced_revision_schedule_inert(self) -> None:
-        self.bootstrap_active_task()
-        first_revision = self.observe_revision()
-        self.observe_delivery(first_revision)
-        self.apply([self.task_event(state="review-polling")])
-        state = self.state()
-        second = self.add_synthetic_delivery(state)
-        starts = {
-            "dotagents": datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc),
-            "docs": datetime(2026, 7, 18, 12, 0, 0, 100000, tzinfo=timezone.utc),
+        missing_warning = {**observation, "warning_ref": None}
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "warning_ref is required"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state),
+                missing_warning,
+                started + timedelta(minutes=45),
+            )
+        wrong_pr_warning = {
+            **observation,
+            "warning_ref": "https://github.com/example/other/pull/999#issuecomment-9001",
         }
-        revisions = {"dotagents": first_revision, "docs": second["revision"]}
-        for delivery_key, revision in revisions.items():
-            started = starts[delivery_key]
-            request_ref = f"github-review://{delivery_key}/stale"
-            self.direct_event(
-                state,
-                {
-                    "type": "review-wait-started",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                },
-                started,
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "exact pull request"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state),
+                wrong_pr_warning,
+                started + timedelta(minutes=45),
             )
-            self.direct_event(
-                state,
-                {
-                    "type": "review-wait-invoked",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "wait_invoked_at": CACHE_RUNTIME.format_timestamp(started),
-                    "provider_timeout": 1800,
-                },
-                started,
+        wrong_content = {**observation, "warning_fingerprint": "0" * 64}
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "required timeout warning"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state),
+                wrong_content,
+                started + timedelta(minutes=45),
             )
-            observed_at = started + timedelta(minutes=30)
-            self.direct_event(
-                state,
-                {
-                    "type": "review-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": delivery_key,
-                    "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                    "monitoring_cycle": 0,
-                    "provider_state": "waiting",
-                    "observation_fingerprint": hashlib.sha256(
-                        f"stale-{delivery_key}".encode()
-                    ).hexdigest(),
-                    "disposition": "pending",
-                    "evidence_ref": f"github-review://{delivery_key}/stale-observation",
-                },
-                observed_at,
+        old_comment = {**observation, "warning_posted_at": "2026-07-18T12:44:59Z"}
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "between the review deadline"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state),
+                old_comment,
+                started + timedelta(minutes=45),
             )
-            self.direct_event(
-                state,
+        self.direct_event(state, observation, started + timedelta(minutes=45))
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        CACHE_RUNTIME.validate_state(state, self.ledger)
+        self.assertEqual(review["wait_state"], "complete")
+        self.assertEqual(state["goal"]["state"], "active")
+        self.assertEqual(state["tasks"][0]["goal_state"], "active")
+        self.assertEqual(
+            CACHE_RUNTIME.review_warnings(state),
+            [
                 {
-                    "type": "review-monitoring-scheduled",
+                    "code": "codex-review-timeout-accepted",
                     "task_key": self.task_key,
-                    "delivery_key": delivery_key,
+                    "delivery_key": "dotagents",
                     "revision_key": revision["revision_key"],
-                    "request_ref": request_ref,
-                },
-                observed_at,
-            )
-        now = starts["docs"] + timedelta(minutes=30)
-        schedule_fingerprint = CACHE_RUNTIME.task_monitoring_schedule_fingerprint(
-            state, state["tasks"][0]
+                    "pr_url": revision["pr_url"],
+                    "warning_ref": observation["warning_ref"],
+                }
+            ],
         )
-        assert schedule_fingerprint is not None
         self.direct_event(
             state,
             {
-                "type": "task-monitoring-paused",
+                "type": "gate-observed",
                 "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "pause_evidence_ref": "app-task://worker-232/controller-paused",
+                "delivery_key": "dotagents",
+                "gate": "codex-review",
+                "state": "passed",
+                "binding_key": revision["revision_key"],
+                "evidence_ref": observation["warning_ref"],
             },
-            now,
+            started + timedelta(minutes=46),
         )
-        scheduled = CACHE_RUNTIME.current_scheduled_reviews(state)
-        self.assertEqual(scheduled[0][1]["delivery_key"], "dotagents")
-        earliest_due = scheduled[0][2]["due_at"]
-        self.direct_event(
-            state,
-            {
-                "type": "portfolio-goal-paused",
-                "goal_evidence_ref": "app-task://root-a/goal",
-                "pause_evidence_ref": "app-task://root-a/controller-paused",
-                "heartbeat_id": "heartbeat-controller",
-                "target_thread_id": "app-task://root-a",
-                "due_at": earliest_due,
-            },
-            now,
-        )
-        early = now + timedelta(minutes=5)
-        self.direct_event(
-            state,
-            {
-                "type": "portfolio-goal-resumed",
-                "goal_evidence_ref": "app-task://root-a/goal",
-                "heartbeat_id": "heartbeat-controller",
-                "resume_evidence_ref": "app-task://root-a/controller-resumed",
-            },
-            early,
-        )
-        self.direct_event(
-            state,
-            {
-                "type": "task-monitoring-resumed",
-                "task_key": self.task_key,
-                "schedule_fingerprint": schedule_fingerprint,
-                "resume_reason": "controller-action",
-                "resume_evidence_ref": "app-task://worker-232/controller-resumed",
-            },
-            early,
-        )
-        repository = state["tasks"][0]["deliveries"][0]["repository"]
         self.direct_event(
             state,
             {
                 "type": "revision-observed",
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
+                "repository": revision["repository"],
+                "github_repository": revision["github_repository"],
+                "pr_number": revision["pr_number"],
+                "pr_url": revision["pr_url"],
                 "head_sha": "e" * 40,
-                "base_ref": "main",
+                "base_ref": revision["base_ref"],
                 "merge_base_sha": "f" * 40,
-                "repository": repository,
-                "pr_number": 233,
-                "pr_url": "https://github.com/example/dotagents/pull/233",
-                "evidence_ref": "git://revision/replaced",
+                "evidence_ref": "git://revision/after-timeout",
             },
-            early,
+            started + timedelta(minutes=47),
         )
-        self.assertEqual(
-            [delivery["delivery_key"] for _, delivery, _ in CACHE_RUNTIME.current_scheduled_reviews(state)],
-            ["docs"],
+        self.assertEqual(CACHE_RUNTIME.review_warnings(state), [])
+
+    def test_review_warning_projection_is_bounded_and_reports_omissions(self) -> None:
+        self.bootstrap_active_task()
+        state = self.state()
+        base_task = state["tasks"][0]
+        base_delivery = base_task["deliveries"][0]
+        tasks = []
+        sources = []
+        reviews = []
+        for task_index in range(32):
+            task_key = f"task-{task_index}"
+            deliveries = []
+            for delivery_index in range(8):
+                warning_index = task_index * 8 + delivery_index + 1
+                delivery_key = f"delivery-{delivery_index}"
+                revision_key = hashlib.sha256(
+                    f"revision-{warning_index}".encode()
+                ).hexdigest()
+                repository = f"example/{'r' * 3000}"
+                pr_url = (
+                    f"https://github.com/{repository}/pull/{warning_index}"
+                )
+                delivery = copy.deepcopy(base_delivery)
+                delivery["delivery_key"] = delivery_key
+                delivery["revision"] = {"revision_key": revision_key}
+                deliveries.append(delivery)
+                reviews.append(
+                    {
+                        "task_key": task_key,
+                        "delivery_key": delivery_key,
+                        "revision_key": revision_key,
+                        "pr_url": pr_url,
+                        "wait_state": "complete",
+                        "observations": [
+                            {
+                                "provider_state": "waiting",
+                                "disposition": "timeout-accepted",
+                                "warning_ref": (
+                                    f"{pr_url}#issuecomment-{warning_index}"
+                                ),
+                            }
+                        ],
+                    }
+                )
+            task = copy.deepcopy(base_task)
+            task["task_key"] = task_key
+            task["deliveries"] = deliveries
+            tasks.append(task)
+            source = copy.deepcopy(state["sources"][0])
+            source["task_key"] = task_key
+            sources.append(source)
+
+        state["tasks"] = tasks
+        state["sources"] = sources
+        state["reviews"] = reviews
+        warnings = CACHE_RUNTIME.review_warnings(state)
+        encoded = json.dumps(
+            warnings, sort_keys=True, separators=(",", ":")
+        ).encode()
+        self.assertLessEqual(
+            len(encoded), CACHE_RUNTIME.MAX_PROJECTED_REVIEW_WARNING_BYTES
         )
-        current_fingerprint = CACHE_RUNTIME.task_monitoring_schedule_fingerprint(
-            state, state["tasks"][0]
+        self.assertEqual(warnings[-1]["summary"], "additional-warnings-omitted")
+        self.assertEqual(warnings[-1]["total_count"], 256)
+        self.assertGreater(warnings[-1]["omitted_count"], 0)
+        markdown = CACHE_RUNTIME.render_markdown(state)
+        self.assertIn("additional timeout warnings omitted", markdown)
+        self.assertIn("full evidence remains in the JSON archive", markdown)
+
+    def test_github_pr_identity_rejects_untrusted_input_and_corrupt_state(self) -> None:
+        self.bootstrap_active_task()
+        assert self.registration is not None
+        repository = self.registration["sources"][0]["deliveries"][0]["repository"]
+        event = {
+            "type": "revision-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "head_sha": "a" * 40,
+            "base_ref": "main",
+            "merge_base_sha": "b" * 40,
+            "repository": repository,
+            "github_repository": "example/dotagents",
+            "pr_number": 233,
+            "pr_url": "https://attacker.example/pull/233",
+            "evidence_ref": "git://revision/untrusted-url",
+        }
+        base_state = self.state()
+        observed_at = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+        for github_repository in ("example/.github", "example/source.git"):
+            with self.subTest(github_repository=github_repository):
+                accepted = {
+                    **event,
+                    "github_repository": github_repository,
+                    "pr_url": f"https://github.com/{github_repository}/pull/233",
+                }
+                self.assertTrue(
+                    CACHE_RUNTIME.apply_event(
+                        copy.deepcopy(base_state), accepted, observed_at
+                    )
+                )
+        rejected = self.apply([event], check=False)
+        error = self.error(rejected, "invalid-input")
+        self.assertIn("canonical GitHub PR URL", error["message"])
+
+        revision = self.observe_revision()
+        corrupt_revision = self.state()
+        corrupt_revision["tasks"][0]["deliveries"][0]["revision"]["pr_url"] = (
+            "https://attacker.example/pull/233"
         )
-        assert current_fingerprint is not None
-        docs_due = CACHE_RUNTIME.parse_timestamp(
-            CACHE_RUNTIME.current_scheduled_reviews(state)[0][2]["due_at"],
-            "due_at",
+        CACHE_RUNTIME.seal_state_fingerprint(corrupt_revision)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid_revision:
+            CACHE_RUNTIME.validate_state(corrupt_revision, self.ledger)
+        self.assertEqual(invalid_revision.exception.code, "integrity-failure")
+        self.assertEqual(invalid_revision.exception.exit_code, 5)
+
+        self.start_clean_review(revision)
+        corrupt_review = self.state()
+        corrupt_review["reviews"][-1]["github_repository"] = "example/other"
+        CACHE_RUNTIME.seal_state_fingerprint(corrupt_review)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid_review:
+            CACHE_RUNTIME.validate_state(corrupt_review, self.ledger)
+        self.assertEqual(invalid_review.exception.code, "integrity-failure")
+        self.assertEqual(invalid_review.exception.exit_code, 5)
+
+    def test_review_outcomes_are_strict_and_clean_may_finish_early(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        state = self.state()
+        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+        request_ref = "github-review://233/request-clean"
+        for event in (
+            {
+                "type": "review-wait-started",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": revision["revision_key"],
+                "request_ref": request_ref,
+            },
+            {
+                "type": "review-wait-invoked",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": revision["revision_key"],
+                "request_ref": request_ref,
+                "wait_invoked_at": "2026-07-18T12:00:00Z",
+                "provider_timeout": 2700,
+            },
+        ):
+            self.direct_event(state, event, started)
+        invalid = {
+            "type": "review-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "revision_key": revision["revision_key"],
+            "request_ref": request_ref,
+            "provider_state": "failed",
+            "observation_fingerprint": hashlib.sha256(b"failed").hexdigest(),
+            "disposition": "accepted",
+            "evidence_ref": "github-review://233/failed",
+            "warning_ref": None,
+            "warning_posted_at": None,
+            "warning_fingerprint": None,
+        }
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "do not match"):
+            CACHE_RUNTIME.apply_event(copy.deepcopy(state), invalid, started)
+        for provider_state, disposition in (
+            ("clean", "accepted"),
+            ("failed", "blocked"),
+        ):
+            with self.subTest(
+                provider_state=provider_state,
+                disposition=disposition,
+            ):
+                predates_invocation = {
+                    **invalid,
+                    "provider_state": provider_state,
+                    "disposition": disposition,
+                }
+                with self.assertRaisesRegex(
+                    CACHE_RUNTIME.CacheError, "predates provider invocation"
+                ):
+                    CACHE_RUNTIME.apply_event(
+                        copy.deepcopy(state),
+                        predates_invocation,
+                        started - timedelta(microseconds=1),
+                    )
+        clean = {
+            **invalid,
+            "provider_state": "clean",
+            "observation_fingerprint": hashlib.sha256(b"clean").hexdigest(),
+            "evidence_ref": "github-review://233/clean",
+        }
+        self.direct_event(state, clean, started + timedelta(minutes=5))
+        self.assertFalse(
+            CACHE_RUNTIME.apply_event(
+                state,
+                clean,
+                started + timedelta(minutes=6),
+            )
+        )
+        corrupt_observation_time = copy.deepcopy(state)
+        corrupt_observation_time["reviews"][-1]["observations"][-1][
+            "observed_at"
+        ] = "2026-07-18T11:59:59Z"
+        CACHE_RUNTIME.seal_state_fingerprint(corrupt_observation_time)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid_time:
+            CACHE_RUNTIME.validate_state(corrupt_observation_time, self.ledger)
+        self.assertEqual(invalid_time.exception.code, "integrity-failure")
+        self.assertEqual(invalid_time.exception.exit_code, 5)
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        CACHE_RUNTIME.validate_state(state, self.ledger)
+        self.assertTrue(CACHE_RUNTIME.review_is_accepted(state["reviews"][-1]))
+        self.assertEqual(CACHE_RUNTIME.review_warnings(state), [])
+
+    def test_review_wait_expired_before_launch_uses_zero_and_accepts_timeout(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        state = self.state()
+        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+        invoked = started + timedelta(minutes=50)
+        request_ref = "github-review://233/request-late"
+        self.direct_event(
+            state,
+            {
+                "type": "review-wait-started",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": revision["revision_key"],
+                "request_ref": request_ref,
+            },
+            started,
+        )
+        review = state["reviews"][-1]
+        self.direct_event(
+            state,
+            {
+                "type": "review-wait-invoked",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": revision["revision_key"],
+                "request_ref": request_ref,
+                "wait_invoked_at": "2026-07-18T12:50:00Z",
+                "provider_timeout": 0,
+            },
+            invoked,
         )
         self.direct_event(
             state,
             {
-                "type": "task-monitoring-resumed",
+                "type": "review-observed",
                 "task_key": self.task_key,
-                "schedule_fingerprint": current_fingerprint,
-                "resume_reason": "due-review",
-                "resume_evidence_ref": "app-task://worker-232/already-active",
+                "delivery_key": "dotagents",
+                "revision_key": revision["revision_key"],
+                "request_ref": request_ref,
+                "provider_state": "waiting",
+                "observation_fingerprint": hashlib.sha256(b"late-pending").hexdigest(),
+                "disposition": "timeout-accepted",
+                "evidence_ref": "github-review://233/late-pending",
+                "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9002",
+                "warning_posted_at": "2026-07-18T12:50:00Z",
+                "warning_fingerprint": CACHE_RUNTIME.review_timeout_warning_fingerprint(review),
             },
-            docs_due,
+            invoked,
         )
-        self.assertEqual(
-            next(review for review in state["reviews"] if review["delivery_key"] == "docs")[
-                "monitoring_state"
-            ],
-            "checking",
-        )
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        CACHE_RUNTIME.validate_state(state, self.ledger)
+        self.assertEqual(state["reviews"][-1]["provider_timeout"], 0)
+        self.assertEqual(len(CACHE_RUNTIME.review_warnings(state)), 1)
+
+    def test_removed_review_monitoring_events_are_rejected(self) -> None:
+        self.bootstrap_active_task()
+        for event_type in (
+            "portfolio-goal-paused",
+            "portfolio-goal-resumed",
+            "review-monitoring-scheduled",
+            "task-monitoring-paused",
+            "task-monitoring-resumed",
+        ):
+            with self.subTest(event_type=event_type):
+                with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "unsupported"):
+                    CACHE_RUNTIME.apply_event(
+                        copy.deepcopy(self.state()),
+                        {"type": event_type},
+                        datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc),
+                    )
 
     def test_staged_closeout_and_post_terminal_drift_preserve_completed_goals(self) -> None:
         state = self.make_terminal_state()
@@ -1770,9 +1522,6 @@ class LedgerCacheV3Tests(unittest.TestCase):
             "review-wait-started",
             "review-wait-invoked",
             "review-observed",
-            "review-monitoring-scheduled",
-            "task-monitoring-paused",
-            "task-monitoring-resumed",
             "gate-observed",
             "task-terminal-sealed",
         }
