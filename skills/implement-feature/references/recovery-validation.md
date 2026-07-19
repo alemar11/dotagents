@@ -14,6 +14,10 @@ heartbeat automation are not required. Prior evidence, background agents, and fi
 access are insufficient. Missing support is `unsupported-runtime` without
 asking permission or performing mutation.
 
+Run `scripts/delivery-preflight --json doctor` and require authenticated `gh`
+plus API reachability before external freshness checks. Missing capability is
+`unsupported-runtime`; do not reinterpret it as CI absence.
+
 Read `ledger-cache ledger read --projection recovery` only after that gate.
 Before any mutation, read each exact recorded task and require matching Goal
 tools and never create a replacement or objective fallback.
@@ -31,7 +35,11 @@ Perform one complete read-only pass:
    the body fingerprint is unchanged, and Git proves the tracked move. Both
    paths, neither path, another destination, a GitHub source move, or changed
    body blocks.
-3. Verify each registered repository and branch, then verify the complete
+3. Verify each registered repository and branch, then rerun the bounded
+   delivery preflight for the complete registered set. Require the same GitHub
+   repository/default-base identity and a definitive `configured` or
+   `not-configured` result. An unknown result blocks without replacing prior
+   state. Then verify the complete
    `deliveries[]` set for each task. Every delivery requires its exact
    App-managed checkout, Git top-level, baseline, current HEAD, isolation proof,
    and unique `(repository, checkout)` ownership. A partial, shared, symlinked,
@@ -50,7 +58,8 @@ Perform one complete read-only pass:
    terminal task with an active Goal is an interrupted closeout transition, not
    implementation work.
 7. Recompute each delivery's exact PR repository, number, URL,
-   head/base/merge-base tuple, review request and deadline, CI, PR lifecycle,
+   head/base/merge-base tuple, review request and deadline, configured CI or
+   explicit `not-configured`, PR lifecycle,
    tracker state, mergeability and repository rules. Recompute the canonical
    complete task revision set, validation, AutoReview, integration, domain
    closeout, merged dependencies, path conflicts, ready order, review deadlines,
@@ -68,6 +77,11 @@ prose.
 Only after the full pass succeeds may the root apply material events through
 `ledger-cache ledger apply` at the observed generation. On CAS conflict,
 discard the batch, reread, and recompute.
+
+Before seal, apply a changed definitive capability observation through
+`delivery-preflight-observed`; its new preflight key invalidates delivery and
+task-set bindings. After seal, never apply that event: record the changed key
+only through `post-terminal-drift-recorded` and block archive.
 
 For `portfolio_goal_state=pending`, first repair and observe the root title,
 then apply `root-title-observed`. Adopt a matching Goal observed in the pass or,

@@ -1,3 +1,4 @@
+import errno
 import hashlib
 import importlib.machinery
 import importlib.util
@@ -159,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV5Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV6Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -177,7 +178,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_goal_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV5Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV6Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
@@ -336,7 +337,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "9.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "10.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -359,7 +360,39 @@ class AtomicClaimHelperTests(unittest.TestCase):
             doctor["task_model_policy"]["profile"]["model"], "gpt-5.6-sol"
         )
         self.assertFalse(doctor["claim_root_exists"])
+        self.assertIsNone(doctor["claim_store_error_code"])
         self.assertFalse(self.claim_root.exists())
+
+    def test_claim_store_permission_errors_are_not_state_conflicts(self) -> None:
+        for error_number in (errno.EACCES, errno.EPERM, errno.EROFS):
+            with self.subTest(error_number=error_number):
+                mapped = CLAIM_RUNTIME.classify_claim_store_error(
+                    OSError(error_number, "permission unavailable"),
+                    "claim store unavailable",
+                )
+                self.assertEqual(mapped.code, "claim-store-unavailable")
+                self.assertEqual(mapped.details, {"errno": error_number})
+
+        pending = CLAIM_RUNTIME.ClaimError(
+            "takeover-pending", "retry takeover", 4
+        )
+        pending.__cause__ = PermissionError(errno.EPERM, "sandbox denied")
+        self.assertEqual(
+            CLAIM_RUNTIME.normalize_claim_error(pending).code,
+            "claim-store-unavailable",
+        )
+
+        self.claim_root.mkdir(parents=True)
+        (self.claim_root / ".lock").touch()
+        with mock.patch.object(
+            CLAIM_RUNTIME,
+            "open_directory_descriptor",
+            side_effect=PermissionError(errno.EACCES, "sandbox denied"),
+        ):
+            with self.assertRaises(CLAIM_RUNTIME.ClaimError) as failure:
+                with CLAIM_RUNTIME.locked_claim_store(create=False, exclusive=False):
+                    pass
+        self.assertEqual(failure.exception.code, "claim-store-unavailable")
 
     def test_release_cli_rejects_retired_durable_handoff_choice(self) -> None:
         release_help = run_claim(

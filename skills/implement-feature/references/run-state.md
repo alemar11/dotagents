@@ -5,16 +5,17 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v5 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v6 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
 mutation requires the same live root and raw 64-hex acquire fingerprint. The
 helper also requires a regular, non-symlinked state root and shared lock; a
-missing lock or unsafe path fails closed.
+missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
+`EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `3.0.0` created from registration
-schema `3.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+Active state accepts only ledger schema `4.0.0` created from registration
+schema `4.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
@@ -40,79 +41,48 @@ visible. Reads never mutate or refresh external truth.
 
 ## Task And Delivery Model
 
-Keep one task entity per implementation-eligible Feature Spec. It owns source
-and visible-task identity/title, immutable profile, Goal, lifecycle,
-dependencies, task gates, blocker, and next action; never a singular repository,
-checkout, PR, or revision. Identity comes from refs, never display titles.
+Keep one task per implementation-eligible Feature Spec. It owns source/task
+identity, title, profile, Goal, lifecycle, dependencies, gates, blocker, and
+next action; identity comes from refs, never display titles. Its nonempty
+`deliveries[]` has one stable task-unique `delivery_key` per affected Git
+repository, owning repository/GitHub identity, branch/default base, CI and
+preflight state, paths, tracker moves, checkout, PR/revision, review, and gates.
+No managed `(repository, checkout)` pair may serve two Specs.
 
-Each task owns nonempty `deliveries[]`, exactly one per affected Git repository.
-A stable `delivery_key` owns repository, branch, paths, local tracker moves,
-managed checkout/isolation, PR/revision, review, gates, and tracker dirt. Keys
-are task-unique; no managed `(repository, checkout)` pair may serve two Specs.
+Bind the complete isolated checkout map with `managed-checkouts-observed`
+before work passes `created`; bind task/Goal lifecycle with `task-observed`.
+`revision-observed` establishes the immutable delivery/PR tuple and
+`revision_key`; `delivery-observed` binds lifecycle plus committed/published
+truth to it. The events are distinct, not aliases.
 
-Bind the task ref with the complete `managed-checkouts-observed` map, then use
-`task-observed` for its title, profile, Goal, and lifecycle. Before work advances
-beyond `created`, partial, unmanaged, or non-isolated checkout maps block.
-Use `revision-observed` to establish one immutable delivery/PR tuple and derive
-its `revision_key`. The tuple includes canonical GitHub `owner/repository` and
-requires its exact `https://github.com/<owner/repository>/pull/<number>` URL.
-Use `delivery-observed` only to bind the current full PR
-lifecycle plus committed/published evidence to that exact key. The events are
-distinct, not aliases.
-
-At most three tasks are nonterminal. Ready sets, conflicts, capacity, review
-deadlines, closeout readiness, and next actions are derived. Dependencies
-require verified upstream merge. A task waiting for review remains nonterminal
-and consumes a slot.
+Registration seeds the passed preflight. Before seal,
+`delivery-preflight-observed` may replace it with another definitive
+`configured|not-configured` result; unknown inspection blocks and preserves the
+last valid state. At most three tasks are nonterminal. Scheduling, review
+deadlines, closeout, and next actions are derived; dependencies require merge,
+and a review wait consumes a slot.
 
 ## Gate Scopes And Invalidation
 
-Each gate name has exactly one scope; `gate-observed` carries the resulting
-`delivery_key` and `binding_key`:
+Each `gate-observed` has one scope from `run-state-packets.md`:
+`task-static` dependency integration uses null keys; `delivery-revision` uses
+the delivery key plus its delivery evidence binding; `task-revision-set` uses
+the complete set key with no delivery. The delivery evidence key binds its
+revision key and preflight key. The task set contains every delivery evidence
+key once. CI is inapplicable only for `not-configured`.
 
-| scope | key | examples |
-| --- | --- | --- |
-| `task-static` | both keys null | dependency integration |
-| `delivery-static` | delivery key; binding null | PR preflight |
-| `delivery-revision` | delivery key; current revision key as binding | focused/full validation, AutoReview, publication, Codex review, CI, PR readiness, tracker closeout, mergeability |
-| `task-revision-set` | delivery null; complete revision-set key as binding | scope acceptance, integration validation, domain closeout |
-
-Static gates dispatch before a PR revision; requiring one would deadlock task
-creation. A task revision set contains every delivery exactly once.
-
-Changed revision, diff, PR identity, rule, or tracker delivery invalidates its
-delivery gates and all task-set gates. Reuse AutoReview only for an unchanged
-complete target. Unknown or pending evidence blocks.
+A changed revision, preflight/CI state, diff, PR identity, rule, or tracker
+delivery invalidates affected delivery and task-set gates. AutoReview is
+reusable only for an unchanged complete target; unknown or pending truth blocks.
 
 ## Closed Event Registry
 
-Each event has the exact fields in `run-state-packets.md`, a bounded external
-evidence reference, and no unknown fields.
-
-| event | material transition |
-| --- | --- |
-| `root-title-observed` | Bind live root title. |
-| `portfolio-goal-activated` | Bind active root Goal. |
-| `task-observed` | Bind material task/Goal lifecycle. |
-| `managed-checkouts-observed` | Bind complete delivery checkout map. |
-| `revision-observed` | Establish exact delivery/PR revision tuple. |
-| `delivery-observed` | Bind lifecycle/commit/publication to that revision. |
-| `source-moved` | Adopt proven local move; dirty its delivery. |
-| `review-wait-started` | Start immutable 45-minute wait. |
-| `review-wait-invoked` | Bind actual invocation/timeout. |
-| `review-observed` | Bind the single provider result/disposition and optional timeout warning. |
-| `gate-observed` | Bind one typed gate. |
-| `task-terminal-sealed` | Freeze current task terminal proof. |
-| `task-goal-completed` | Bind worker Goal completion to seal. |
-| `terminal-handoff-recorded` | Bind terminal seal, next action, and external authority. |
-| `portfolio-terminal-verified` | Bind independent portfolio proof. |
-| `portfolio-goal-completed` | Bind root Goal completion. |
-| `post-terminal-drift-recorded` | Preserve Goals; mark drift/archive block. |
-
-Do not emit events for unchanged polls, wait timeouts, repeated task text, or
-claim heartbeats. Persist digests and exact refs, not command output, review
-transcripts, or prose summaries. Do not persist Wave Reports, Recovery Packets,
-no-progress rows, or hand-authored projections.
+`run-state-packets.md` is the sole closed event-name and field registry. Events
+represent only its material transitions and carry bounded evidence refs; unknown
+fields fail. Emit nothing for unchanged polls, wait timeouts, repeated task
+text, or claim heartbeats. Persist digests/refs rather than outputs or
+transcripts; never persist Wave Reports, Recovery Packets, no-progress rows, or
+hand-authored projections.
 
 ## Root Title And Portfolio Goal
 
@@ -133,28 +103,21 @@ closeout.
 
 ## Review Timing
 
-Keep one review per delivery revision. `review-wait-started` derives immutable
-`wait_deadline=wait_started_at+45m`. Before GitStack, persist
-`review-wait-invoked` with a nonfuture timestamp and
-`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`; zero is an immediate check.
-That event is single-launch authority. Never default, restart, or extend.
+Keep one review per delivery revision. `review-wait-started` fixes
+`wait_deadline=wait_started_at+45m`; before GitStack,
+`review-wait-invoked` records a nonfuture timestamp and
+`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`. It is
+single-launch authority: never default, restart, or extend.
 
-Bind exactly one result to the current request and revision. Valid pairs are
-`clean/accepted`, `findings/fix-required`, `failed/blocked`, and
-`waiting/timeout-accepted`. The pending pair is valid only at or after the
-deadline and requires a persistent PR `warning_ref`; every other pair requires
-that field to be null. The warning must be a canonical GitHub issue-comment URL
-on the review entity's exact PR URL, have a post-deadline timestamp, and match
-the request/revision-specific warning fingerprint in
-`codex-review-closeout.md`. A timeout-accepted review passes the review gate without
-claiming a clean verdict, is surfaced in projections and the final report, and
-does not waive any other gate. Retain the claim and keep Goals active. Never
-schedule another check, pause a Goal, arm an App heartbeat, relaunch the waiter,
-or create a nonterminal handoff. Projections include a byte-bounded detailed
-prefix of warnings only for current delivery revisions plus an omitted-count
-summary when needed; the ledger retains the complete evidence. Superseded
-warnings remain inert history. The later merge
-workflow re-checks late Codex findings.
+`review-observed` binds exactly one current request/revision result:
+`clean/accepted`, `findings/fix-required`, `failed/blocked`, or
+`waiting/timeout-accepted`. Only the last is valid after the deadline and needs
+the exact PR warning URL, time, and fingerprint from
+`codex-review-closeout.md`; all other warning fields are null. It passes only
+the review gate and is never clean. Keep claim and Goals active; never schedule,
+pause, relaunch, or create a nonterminal handoff. Projections bound current
+warnings and count omissions; superseded warnings are inert. The merge workflow
+re-checks late findings.
 
 ## Local Source Move
 
@@ -221,7 +184,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `3.0.0`.
+JSON schema before `4.0.0`.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses
 the `ledger archive` command in `cache-lifecycle.md`; active state exposes only

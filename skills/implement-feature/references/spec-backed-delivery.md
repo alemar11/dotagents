@@ -151,7 +151,8 @@ One App task owns all repositories named by its Feature Spec. Registration
 creates one nonempty `deliveries[]` entry per affected Git repository, and the
 number of pull requests equals the delivery count. Every delivery uses the
 shared target branch as its head and must produce a real, `OPEN`, non-draft,
-reviewed, CI-clean PR ready to merge into its discovered default branch. The PR
+reviewed PR, CI-clean when configured and explicitly `not-configured`
+otherwise, ready to merge into its discovered default branch. The PR
 base is derived per delivery and verified during preflight and current-head
 review; it is not an input field.
 

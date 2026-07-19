@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import errno
 import fcntl
 import hashlib
 import importlib.machinery
@@ -21,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "9.0.0"
+__version__ = "10.0.0"
 SCHEMA_VERSION = "5.0.0"
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
@@ -47,6 +48,41 @@ class ClaimError(Exception):
         self.message = message
         self.exit_code = exit_code
         self.details = details or {}
+
+
+CLAIM_STORE_UNAVAILABLE_ERRNOS = {errno.EACCES, errno.EPERM, errno.EROFS}
+
+
+def unavailable_os_error(exc: BaseException) -> OSError | None:
+    current: BaseException | None = exc
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, OSError) and current.errno in CLAIM_STORE_UNAVAILABLE_ERRNOS:
+            return current
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def classify_claim_store_error(exc: BaseException, message: str) -> ClaimError:
+    unavailable = unavailable_os_error(exc)
+    if unavailable is not None:
+        return ClaimError(
+            "claim-store-unavailable",
+            message,
+            4,
+            {"errno": unavailable.errno},
+        )
+    return ClaimError("state-conflict", message, 4)
+
+
+def normalize_claim_error(exc: ClaimError) -> ClaimError:
+    if (
+        exc.code in {"state-conflict", "takeover-pending"}
+        and unavailable_os_error(exc) is not None
+    ):
+        return classify_claim_store_error(exc, "claim store is unavailable to this runtime")
+    return exc
 
 
 def claim_root() -> Path:
@@ -328,6 +364,10 @@ def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None
             created_root = True
         except FileExistsError:
             root_existed = True
+        except OSError as exc:
+            raise classify_claim_store_error(
+                exc, f"claim cache cannot be created: {root}"
+            ) from exc
         root = validate_cache_directory_components(
             root, field="claim cache", persisted=True
         )
@@ -335,9 +375,11 @@ def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None
     try:
         root_descriptor = open_directory_descriptor(root)
     except OSError as exc:
-        raise ClaimError(
-            "state-conflict", f"unsafe claim cache root: {root}", 4
-        ) from exc
+        if unavailable_os_error(exc) is not None:
+            raise classify_claim_store_error(
+                exc, f"claim cache cannot be opened: {root}"
+            ) from exc
+        raise ClaimError("state-conflict", f"unsafe claim cache root: {root}", 4) from exc
     flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
     if created_root:
         flags |= os.O_CREAT | os.O_EXCL
@@ -349,6 +391,10 @@ def locked_claim_store(*, create: bool, exclusive: bool) -> Iterator[Path | None
                 "state-conflict", f"claim lock is missing: {lock_path}", 4
             ) from exc
         except OSError as exc:
+            if unavailable_os_error(exc) is not None:
+                raise classify_claim_store_error(
+                    exc, f"claim lock cannot be opened: {lock_path}"
+                ) from exc
             raise ClaimError(
                 "state-conflict", f"unsafe claim lock: {lock_path}", 4
             ) from exc
@@ -1670,7 +1716,15 @@ def doctor() -> dict[str, Any]:
                 validate_release_receipt_store(locked_root)
         claim_store_error = None
     except ClaimError as exc:
-        claim_store_error = exc.message
+        normalized = normalize_claim_error(exc)
+        claim_store_error = normalized.message
+        claim_store_error_code = normalized.code
+    except OSError as exc:
+        normalized = classify_claim_store_error(exc, "claim store is unavailable to this runtime")
+        claim_store_error = normalized.message
+        claim_store_error_code = normalized.code
+    else:
+        claim_store_error_code = None
     try:
         task_model_policy = load_task_model_policy()
         policy_error = None
@@ -1685,6 +1739,7 @@ def doctor() -> dict[str, Any]:
         "claim_root": str(root),
         "claim_root_exists": root.exists(),
         "claim_store_error": claim_store_error,
+        "claim_store_error_code": claim_store_error_code,
         "fcntl_available": True,
         "git": {"available": bool(git), "path": git},
         "task_model_policy": {
@@ -1795,11 +1850,26 @@ def main() -> int:
         emit(dispatch(args), args.json)
         return 0
     except ClaimError as exc:
+        exc = normalize_claim_error(exc)
         emit(
             {"ok": False, "error": {"code": exc.code, "message": exc.message, "details": exc.details}},
             getattr(args, "json", False),
         )
         return exc.exit_code
+    except OSError as exc:
+        mapped = classify_claim_store_error(exc, "claim store is unavailable to this runtime")
+        emit(
+            {
+                "ok": False,
+                "error": {
+                    "code": mapped.code,
+                    "message": mapped.message,
+                    "details": mapped.details,
+                },
+            },
+            getattr(args, "json", False),
+        )
+        return mapped.exit_code
 
 
 if __name__ == "__main__":

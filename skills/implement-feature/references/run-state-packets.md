@@ -20,7 +20,7 @@ Use exactly these top-level fields:
 
 | field | value |
 | --- | --- |
-| `schema_version` | `3.0.0` |
+| `schema_version` | `4.0.0` |
 | `root_task_ref` | calling App task ref |
 | `root_checkout` | absolute root checkout |
 | `objective` | exact portfolio Goal text |
@@ -42,7 +42,8 @@ task_model, task_thinking, thinking_reason, task_goal_objective_fingerprint
 Each nonempty `deliveries[]` object has exactly:
 
 ```text
-delivery_key, repository, target_branch, allowed_paths
+delivery_key, repository, github_repository, target_branch, default_base,
+allowed_paths, ci_availability, preflight_key, preflight_evidence_ref
 ```
 
 Keys and `feature_slug` are lower-kebab. `source_id` is the canonical claim/task
@@ -51,6 +52,11 @@ or `local`, initial `source_state` is `ready-for-agent`, and hosted
 `planned_done_ref` equals `source_spec_ref`. Local destinations are predeclared.
 The task profile follows `task-model-policy.md` (`gpt-5.6-sol` and
 `medium|high|xhigh`).
+
+`github_repository` is canonical `owner/repository`; `default_base` is the
+read-only discovered PR base. `ci_availability` is exactly `configured` or
+`not-configured`. The preflight key is the SHA-256 of the canonical passed
+capability observation. Unknown or blocked inspection is never registered.
 
 Each affected repository occurs once in that task's `deliveries[]` and in the
 top-level set. Earlier task dependencies are acyclic; repositories/checkouts
@@ -71,6 +77,7 @@ values are refs or digests, never pasted output.
 | `root-title-observed` | `title`, `evidence_ref` |
 | `portfolio-goal-activated` | `goal_evidence_ref`, `objective_fingerprint` |
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
+| `delivery-preflight-observed` | `task_key`, `delivery_key`, `github_repository`, `target_branch`, `default_base`, `ci_availability`, `preflight_key`, `evidence_ref` |
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `goal_objective_fingerprint`, `goal_state`, `goal_evidence_ref`, `state`, `outcome`, `attention_reason`, `summary_ref` |
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
@@ -93,7 +100,8 @@ absolute `git_top_level`, registered `target_branch`, 40-hex
 
 `revision-observed` establishes the immutable repository, PR number/URL,
 head/base/merge-base tuple for one derived `revision_key`. Its
-`github_repository` is canonical `owner/repository`, and `pr_url` must equal
+`github_repository` must equal the registered preflight repository, `base_ref`
+must equal its default base, and `pr_url` must equal
 `https://github.com/<github_repository>/pull/<pr_number>` exactly.
 `delivery-observed` requires that key. Its `pr` object has exactly
 `repository`, `github_repository`, `number`, `url`, `state`, `is_draft`, `head_sha`, `base_ref`,
@@ -119,12 +127,13 @@ Review provider/disposition values are `waiting|findings|clean|failed` and
 | gate scope | gates | required identity |
 | --- | --- | --- |
 | `task-static` | `dependency-integration` | both keys null |
-| `delivery-static` | `pr-preflight` | delivery key; binding null |
-| `delivery-revision` | `focused-validation`, `full-validation`, `autoreview`, `publication`, `codex-review`, `ci`, `pr-ready`, `tracker-closeout`, `mergeability` | delivery key + current revision key as binding |
+| `delivery-revision` | `focused-validation`, `full-validation`, `autoreview`, `publication`, `codex-review`, conditional `ci`, `pr-ready`, `tracker-closeout`, `mergeability` | delivery key + current delivery evidence key as binding |
 | `task-revision-set` | `scope-acceptance`, `integration-validation`, optional `domain-closeout` | delivery null; complete revision-set key as binding |
 
-Gate state is `passed` or `failed`. A task revision-set key digests sorted
-`(delivery_key, revision_key)` pairs for every delivery.
+Gate state is `passed` or `failed`. The delivery evidence key hashes its current
+revision and preflight keys. A task revision-set key digests sorted
+`(delivery_key, delivery_evidence_key)` pairs. When CI is `not-configured`, the
+`ci` gate is inapplicable and any such event is rejected.
 
 The deadline is `wait_started_at+45m`. Before the provider call, persist a
 nonfuture invocation and

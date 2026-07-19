@@ -5,7 +5,7 @@
 Create exactly one visible App task per implementation-eligible Feature Spec.
 Record Spec/task/title/profile/Goal/lifecycle/results. Keep one `deliveries[]`
 entry per affected repository for checkout, paths, commits, PR/revision,
-review, CI, tracker closeout, and mergeability.
+review, CI availability and configured-CI results, tracker closeout, and mergeability.
 
 Task ids, managed checkouts, Goals, PR count, and internal subagent topology are
 derived runtime evidence. They are not user options.
@@ -157,7 +157,8 @@ to ready-for-review only by exact identity; a `gh` fallback is
 `gh pr ready <number> --repo <owner/repo>`. Selectorless or branch inference is
 forbidden. Re-read the same number; require unchanged URL and `isDraft=false`.
 After that nonterminal transition, request mandatory current-revision review
-through Codex, fix actionable findings, pass CI, prepare derived tracker
+through Codex, fix actionable findings, pass configured CI or report the
+registered `not-configured` state without polling, prepare derived tracker
 closeout, and check current GitHub mergeability. Declare terminal merge-ready
 only while each PR lifecycle is `OPEN`, mergeability is conflict-free, and every
 required base update, approval, and merge-queue eligibility condition passes.
@@ -236,7 +237,7 @@ blocker, or independent terminal verification. Report task and Goal evidence,
 state, the complete delivery-keyed managed checkout map, changed files,
 the exact task display title and observation evidence, task model, thinking
 value, and profile decision reason, validation, delivery commits, exact PR
-number/URL/revision, review/wait, CI, current PR
+number/URL/revision, review/wait, CI availability and configured-CI results, current PR
 lifecycle/conflict/mergeability state, required base-freshness, approval state,
 merge-queue eligibility, and the observation tuple/time (or exact blocker),
 prepared tracker closeout, internal subagents, blockers, drift, and next action.

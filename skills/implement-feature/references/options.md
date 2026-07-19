@@ -21,7 +21,8 @@ For `visible_app_task_permission=not-requested`, state this exact disclosure:
 
 > Each executable Feature Spec is one feature; one plan may create multiple
 > visible tasks. This run may change and validate code, push
-> commits, create or update pull requests, address Codex review, wait for CI,
+> commits, create or update pull requests, address Codex review, wait for CI
+> when a repository has CI configured,
 > prepare hosted issue closeout, and move, commit, and push completed local issue
 > files when used. AutoReview sends Git status, staged/unstaged diffs, and every
 > non-ignored untracked file to Codex; no extra authorization. Tasks use

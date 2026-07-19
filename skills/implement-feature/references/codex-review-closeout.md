@@ -3,7 +3,7 @@
 ## Ownership
 
 The visible Feature Spec task owns every delivery's review request, wait,
-feedback fixes, CI, tracker-closeout preparation, ready-for-review transition,
+feedback fixes, configured CI, tracker-closeout preparation, ready-for-review transition,
 and terminal proof. The root issues immutable timing assignments, reconciles
 typed evidence, and independently verifies closeout; it never takes worker work
 back as a fallback.
@@ -116,7 +116,7 @@ timestamp must be at or after the immutable deadline and no later than the
 observation. The warning reference may not reuse the review request reference.
 
 The timeout result means only that the current revision proceeds without a returned
-Codex verdict. It is not `clean`, does not waive `$autoreview`, CI, mergeability,
+Codex verdict. It is not `clean`, does not waive `$autoreview`, configured CI, mergeability,
 branch rules, approvals, base freshness, tracker closeout, or any other gate,
 and cannot override a rule that still blocks the pull request. Surface the same
 warning in the user-facing final report. Superseded revision warnings remain

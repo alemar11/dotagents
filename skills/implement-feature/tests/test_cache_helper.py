@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV5Tests(unittest.TestCase):
+class LedgerCacheV6Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -149,7 +149,7 @@ class LedgerCacheV5Tests(unittest.TestCase):
         assert claim is not None
         objective = "Implement the registered Feature Spec portfolio"
         return {
-            "schema_version": "3.0.0",
+            "schema_version": "4.0.0",
             "root_task_ref": "app-task://root-a",
             "root_checkout": str(REPOSITORY),
             "objective": objective,
@@ -175,8 +175,15 @@ class LedgerCacheV5Tests(unittest.TestCase):
                         {
                             "delivery_key": "dotagents",
                             "repository": claim["repositories"][0],
+                            "github_repository": "example/dotagents",
                             "target_branch": "main",
+                            "default_base": "main",
                             "allowed_paths": ["skills/implement-feature/"],
+                            "ci_availability": "configured",
+                            "preflight_key": hashlib.sha256(
+                                b"delivery-preflight-fixture"
+                            ).hexdigest(),
+                            "preflight_evidence_ref": "delivery-preflight://fixture",
                         }
                     ],
                     "dependency_ids": [],
@@ -420,6 +427,11 @@ class LedgerCacheV5Tests(unittest.TestCase):
             {
                 "delivery_key": "docs",
                 "repository": repository,
+                "github_repository": "example/docs",
+                "preflight_key": hashlib.sha256(
+                    b"delivery-preflight:example/docs:feature/docs"
+                ).hexdigest(),
+                "preflight_evidence_ref": "github://example/docs/preflight",
                 "revision": {
                     "head_sha": head,
                     "base_ref": "main",
@@ -583,18 +595,6 @@ class LedgerCacheV5Tests(unittest.TestCase):
                     "evidence_ref": f"proof://{gate}",
                 }
             )
-        for gate in sorted(CACHE_RUNTIME.DELIVERY_STATIC_GATES):
-            events.append(
-                {
-                    "type": "gate-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "gate": gate,
-                    "state": "passed",
-                    "binding_key": None,
-                    "evidence_ref": f"proof://{gate}",
-                }
-            )
         for gate in sorted(CACHE_RUNTIME.TASK_REVISION_SET_GATES - {"domain-closeout"}):
             events.append(
                 {
@@ -607,7 +607,9 @@ class LedgerCacheV5Tests(unittest.TestCase):
                     "evidence_ref": f"proof://{gate}/{revision_set}",
                 }
             )
-        for gate in sorted(CACHE_RUNTIME.DELIVERY_REVISION_GATES):
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        delivery_binding = CACHE_RUNTIME.delivery_evidence_key(delivery)
+        for gate in sorted(CACHE_RUNTIME.applicable_delivery_revision_gates(delivery)):
             events.append(
                 {
                     "type": "gate-observed",
@@ -615,8 +617,8 @@ class LedgerCacheV5Tests(unittest.TestCase):
                     "delivery_key": "dotagents",
                     "gate": gate,
                     "state": "passed",
-                    "binding_key": revision["revision_key"],
-                    "evidence_ref": f"proof://{gate}/{revision['revision_key']}",
+                    "binding_key": delivery_binding,
+                    "evidence_ref": f"proof://{gate}/{delivery_binding}",
                 }
             )
         self.apply(events)
@@ -736,12 +738,12 @@ class LedgerCacheV5Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v5_offline_and_read_only(self) -> None:
+    def test_doctor_is_v6_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "5.0.0")
+        self.assertEqual(version, "6.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -889,7 +891,7 @@ class LedgerCacheV5Tests(unittest.TestCase):
         self.error(unsupported, "invalid-input")
         self.assertEqual(self.state()["generation"], 2)
 
-    def test_static_delivery_gates_make_dispatch_reachable_before_revision(self) -> None:
+    def test_registered_preflight_makes_dispatch_reachable_before_revision(self) -> None:
         self.acquire()
         self.create()
         self.apply(
@@ -902,15 +904,6 @@ class LedgerCacheV5Tests(unittest.TestCase):
                     "state": "passed",
                     "binding_key": None,
                     "evidence_ref": "proof://dependency-integration",
-                },
-                {
-                    "type": "gate-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "gate": "pr-preflight",
-                    "state": "passed",
-                    "binding_key": None,
-                    "evidence_ref": "proof://pr-preflight/dotagents",
                 },
             ]
         )
@@ -935,6 +928,116 @@ class LedgerCacheV5Tests(unittest.TestCase):
         )
         dispatch = parse_result(self.read_projection("dispatch"))
         self.assertEqual(dispatch["ready_task_keys"], [self.task_key])
+
+    def test_not_configured_ci_is_reported_and_never_accepts_a_ci_gate(self) -> None:
+        self.acquire()
+        registration = self.registration_for()
+        registration["sources"][0]["deliveries"][0][
+            "ci_availability"
+        ] = "not-configured"
+        self.create(registration=registration)
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        self.assertEqual(delivery["ci_availability"], "not-configured")
+        status = parse_result(self.read_projection("status"))
+        self.assertEqual(
+            status["tasks"][0]["deliveries"][0]["ci_availability"],
+            "not-configured",
+        )
+
+        objective_fingerprint = self.state()["portfolio"]["objective_fingerprint"]
+        self.apply(
+            [
+                {
+                    "type": "root-title-observed",
+                    "title": "👨🏻‍💻 Feature Orchestrator",
+                    "evidence_ref": "app-task://root-a/title",
+                },
+                {
+                    "type": "portfolio-goal-activated",
+                    "goal_evidence_ref": "app-task://root-a/goal",
+                    "objective_fingerprint": objective_fingerprint,
+                },
+                self.checkout_event(),
+                self.task_event(state="created"),
+                self.task_event(state="implementing"),
+            ]
+        )
+        revision = self.observe_revision()
+        rejected = self.apply(
+            [
+                {
+                    "type": "gate-observed",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "gate": "ci",
+                    "state": "passed",
+                    "binding_key": CACHE_RUNTIME.delivery_evidence_key(
+                        self.state()["tasks"][0]["deliveries"][0]
+                    ),
+                    "evidence_ref": "proof://ci/should-not-exist",
+                }
+            ],
+            check=False,
+        )
+        self.error(rejected, "invalid-input")
+        self.observe_delivery(revision)
+        self.apply([self.task_event(state="draft-pr")])
+        self.start_clean_review(revision)
+        self.pass_terminal_gates(revision)
+        gates = {
+            item["gate"]
+            for item in self.state()["gates"]
+            if item["delivery_key"] == "dotagents"
+        }
+        self.assertNotIn("ci", gates)
+        terminal = parse_result(self.read_projection("terminal"))["tasks"][0]
+        self.assertNotIn("dotagents:gate:ci", terminal["blockers"])
+        self.assertIsNotNone(terminal["seal_candidate_fingerprint"])
+
+    def test_preflight_drift_changes_bindings_and_invalidates_delivery_gates(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        self.apply([self.task_event(state="draft-pr")])
+        self.start_clean_review(revision)
+        self.pass_terminal_gates(revision)
+        before = self.state()
+        task_before = before["tasks"][0]
+        old_revision_set = CACHE_RUNTIME.current_revision_set_key(task_before)
+        old_binding = CACHE_RUNTIME.delivery_evidence_key(task_before["deliveries"][0])
+        self.assertIsNotNone(
+            CACHE_RUNTIME.current_gate(
+                before, task_before, "full-validation", task_before["deliveries"][0]
+            )
+        )
+
+        new_preflight_key = hashlib.sha256(b"delivery-preflight-drift").hexdigest()
+        self.apply(
+            [
+                {
+                    "type": "delivery-preflight-observed",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "github_repository": "example/dotagents",
+                    "target_branch": "main",
+                    "default_base": "main",
+                    "ci_availability": "not-configured",
+                    "preflight_key": new_preflight_key,
+                    "evidence_ref": "delivery-preflight://drift",
+                }
+            ]
+        )
+        after = self.state()
+        task_after = after["tasks"][0]
+        delivery_after = task_after["deliveries"][0]
+        self.assertNotEqual(old_binding, CACHE_RUNTIME.delivery_evidence_key(delivery_after))
+        self.assertNotEqual(old_revision_set, CACHE_RUNTIME.current_revision_set_key(task_after))
+        self.assertIsNone(
+            CACHE_RUNTIME.current_gate(
+                after, task_after, "full-validation", delivery_after
+            )
+        )
+        self.assertEqual(delivery_after["ci_availability"], "not-configured")
 
     def test_registration_represents_multiple_repository_deliveries_and_rejects_singular_v2(self) -> None:
         second = self.home / "second-repository"
@@ -961,8 +1064,15 @@ class LedgerCacheV5Tests(unittest.TestCase):
             {
                 "delivery_key": f"delivery-{index}",
                 "repository": repository,
+                "github_repository": f"example/delivery-{index}",
                 "target_branch": "main",
+                "default_base": "main",
                 "allowed_paths": ["src/"],
+                "ci_availability": "configured",
+                "preflight_key": hashlib.sha256(
+                    f"delivery-preflight-{index}".encode()
+                ).hexdigest(),
+                "preflight_evidence_ref": f"delivery-preflight://{index}",
             }
             for index, repository in enumerate(claim["repositories"], start=1)
         ]
@@ -1173,7 +1283,9 @@ class LedgerCacheV5Tests(unittest.TestCase):
                 "delivery_key": "dotagents",
                 "gate": "codex-review",
                 "state": "passed",
-                "binding_key": revision["revision_key"],
+                "binding_key": CACHE_RUNTIME.delivery_evidence_key(
+                    state["tasks"][0]["deliveries"][0]
+                ),
                 "evidence_ref": observation["warning_ref"],
             },
             started + timedelta(minutes=46),
@@ -1291,9 +1403,13 @@ class LedgerCacheV5Tests(unittest.TestCase):
                     "github_repository": github_repository,
                     "pr_url": f"https://github.com/{github_repository}/pull/233",
                 }
+                accepted_state = copy.deepcopy(base_state)
+                accepted_state["tasks"][0]["deliveries"][0][
+                    "github_repository"
+                ] = github_repository
                 self.assertTrue(
                     CACHE_RUNTIME.apply_event(
-                        copy.deepcopy(base_state), accepted, observed_at
+                        accepted_state, accepted, observed_at
                     )
                 )
         rejected = self.apply([event], check=False)
@@ -1310,6 +1426,13 @@ class LedgerCacheV5Tests(unittest.TestCase):
             CACHE_RUNTIME.validate_state(corrupt_revision, self.ledger)
         self.assertEqual(invalid_revision.exception.code, "integrity-failure")
         self.assertEqual(invalid_revision.exception.exit_code, 5)
+
+        corrupt_base = self.state()
+        corrupt_base["tasks"][0]["deliveries"][0]["revision"]["base_ref"] = "next"
+        CACHE_RUNTIME.seal_state_fingerprint(corrupt_base)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid_base:
+            CACHE_RUNTIME.validate_state(corrupt_base, self.ledger)
+        self.assertEqual(invalid_base.exception.code, "integrity-failure")
 
         self.start_clean_review(revision)
         corrupt_review = self.state()

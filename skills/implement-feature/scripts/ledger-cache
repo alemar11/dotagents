@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "5.0.0"
-LEDGER_SCHEMA_VERSION = "3.0.0"
-REGISTRATION_SCHEMA_VERSION = "3.0.0"
+__version__ = "6.0.0"
+LEDGER_SCHEMA_VERSION = "4.0.0"
+REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -100,6 +100,7 @@ EVENT_TYPES = {
     "portfolio-goal-activated",
     "portfolio-goal-completed",
     "managed-checkouts-observed",
+    "delivery-preflight-observed",
     "task-observed",
     "source-moved",
     "revision-observed",
@@ -115,7 +116,6 @@ EVENT_TYPES = {
     "post-terminal-drift-recorded",
 }
 TASK_STATIC_GATES = {"dependency-integration"}
-DELIVERY_STATIC_GATES = {"pr-preflight"}
 TASK_REVISION_SET_GATES = {
     "scope-acceptance",
     "integration-validation",
@@ -132,9 +132,10 @@ DELIVERY_REVISION_GATES = {
     "tracker-closeout",
     "mergeability",
 }
-STATIC_GATES = TASK_STATIC_GATES | DELIVERY_STATIC_GATES
+STATIC_GATES = TASK_STATIC_GATES
 REVISION_GATES = TASK_REVISION_SET_GATES | DELIVERY_REVISION_GATES
 GATE_STATES = {"passed", "failed"}
+CI_AVAILABILITIES = {"configured", "not-configured"}
 REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
 REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"}
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
@@ -1047,8 +1048,13 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         delivery_required = {
             "delivery_key",
             "repository",
+            "github_repository",
             "target_branch",
+            "default_base",
             "allowed_paths",
+            "ci_availability",
+            "preflight_key",
+            "preflight_evidence_ref",
         }
         deliveries: list[dict[str, Any]] = []
         delivery_keys: set[str] = set()
@@ -1097,12 +1103,31 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
                 {
                     "delivery_key": delivery_key,
                     "repository": repository,
+                    "github_repository": canonical_github_repository(
+                        delivery["github_repository"],
+                        f"{delivery_field}.github_repository",
+                    ),
                     "target_branch": nonempty(
                         delivery["target_branch"], f"{delivery_field}.target_branch"
                     ),
+                    "default_base": nonempty(
+                        delivery["default_base"], f"{delivery_field}.default_base"
+                    ),
                     "allowed_paths": allowed_paths,
+                    "ci_availability": delivery["ci_availability"],
+                    "preflight_key": canonical_fingerprint(
+                        delivery["preflight_key"], f"{delivery_field}.preflight_key"
+                    ),
+                    "preflight_evidence_ref": nonempty(
+                        delivery["preflight_evidence_ref"],
+                        f"{delivery_field}.preflight_evidence_ref",
+                    ),
                 }
             )
+            if deliveries[-1]["ci_availability"] not in CI_AVAILABILITIES:
+                raise CacheError(
+                    "invalid-input", f"{delivery_field}.ci_availability is invalid", 2
+                )
         tracker_repository = nonempty(
             item["tracker_repository"], f"{field}.tracker_repository"
         )
@@ -1479,8 +1504,13 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     {
                         "delivery_key",
                         "repository",
+                        "github_repository",
                         "target_branch",
+                        "default_base",
                         "allowed_paths",
+                        "ci_availability",
+                        "preflight_key",
+                        "preflight_evidence_ref",
                         "managed_checkout",
                         "revision",
                         "pr",
@@ -1496,6 +1526,26 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                 check_lower_kebab(delivery["delivery_key"], f"{delivery_field}.delivery_key")
                 nonempty(delivery["repository"], f"{delivery_field}.repository")
                 nonempty(delivery["target_branch"], f"{delivery_field}.target_branch")
+                github_repository = canonical_github_repository(
+                    delivery["github_repository"],
+                    f"{delivery_field}.github_repository",
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                default_base = nonempty(
+                    delivery["default_base"], f"{delivery_field}.default_base"
+                )
+                if delivery["ci_availability"] not in CI_AVAILABILITIES:
+                    raise CacheError(
+                        "integrity-failure", "run-state CI availability is invalid", 5
+                    )
+                canonical_fingerprint(
+                    delivery["preflight_key"], f"{delivery_field}.preflight_key"
+                )
+                nonempty(
+                    delivery["preflight_evidence_ref"],
+                    f"{delivery_field}.preflight_evidence_ref",
+                )
                 delivery_keys.add(delivery["delivery_key"])
                 repositories.add(delivery["repository"])
                 if (
@@ -1549,7 +1599,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         or revision["pr_number"] < 1
                     ):
                         raise CacheError("integrity-failure", "run-state revision PR number is invalid", 5)
-                    github_repository = canonical_github_repository(
+                    revision_github_repository = canonical_github_repository(
                         revision["github_repository"],
                         f"{delivery_field}.revision.github_repository",
                         error_code="integrity-failure",
@@ -1557,19 +1607,24 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     )
                     canonical_github_pr_url(
                         revision["pr_url"],
-                        github_repository,
+                        revision_github_repository,
                         revision["pr_number"],
                         f"{delivery_field}.revision.pr_url",
                         error_code="integrity-failure",
                         exit_code=5,
                     )
-                    if revision["repository"] != delivery["repository"] or revision["revision_key"] != revision_key(
-                        revision["repository"],
-                        revision["pr_number"],
-                        revision["pr_url"],
-                        revision["head_sha"],
-                        revision["base_ref"],
-                        revision["merge_base_sha"],
+                    if (
+                        revision_github_repository != github_repository
+                        or revision["repository"] != delivery["repository"]
+                        or revision["base_ref"] != default_base
+                        or revision["revision_key"] != revision_key(
+                            revision["repository"],
+                            revision["pr_number"],
+                            revision["pr_url"],
+                            revision["head_sha"],
+                            revision["base_ref"],
+                            revision["merge_base_sha"],
+                        )
                     ):
                         raise CacheError("integrity-failure", "run-state revision identity is invalid", 5)
                 if delivery["pr"] is not None:
@@ -1738,8 +1793,6 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                 raise CacheError("integrity-failure", "run-state gate state is invalid", 5)
             if item["gate"] in TASK_STATIC_GATES:
                 valid_binding = item["delivery_key"] is None and item["binding_key"] is None
-            elif item["gate"] in DELIVERY_STATIC_GATES:
-                valid_binding = item["delivery_key"] is not None and item["binding_key"] is None
             elif item["gate"] in TASK_REVISION_SET_GATES:
                 valid_binding = item["delivery_key"] is None and isinstance(item["binding_key"], str) and bool(FINGERPRINT_RE.fullmatch(item["binding_key"]))
             else:
@@ -1819,11 +1872,29 @@ def current_revision_set_key(task: dict[str, Any]) -> str | None:
         [
             {
                 "delivery_key": delivery["delivery_key"],
-                "revision_key": delivery["revision"]["revision_key"],
+                "delivery_evidence_key": delivery_evidence_key(delivery),
             }
             for delivery in sorted(task["deliveries"], key=lambda item: item["delivery_key"])
         ]
     )
+
+
+def delivery_evidence_key(delivery: dict[str, Any]) -> str | None:
+    if delivery["revision"] is None:
+        return None
+    return request_fingerprint(
+        {
+            "revision_key": delivery["revision"]["revision_key"],
+            "preflight_key": delivery["preflight_key"],
+        }
+    )
+
+
+def applicable_delivery_revision_gates(delivery: dict[str, Any]) -> set[str]:
+    gates = set(DELIVERY_REVISION_GATES)
+    if delivery["ci_availability"] == "not-configured":
+        gates.remove("ci")
+    return gates
 
 
 def gate_binding(
@@ -1833,10 +1904,6 @@ def gate_binding(
         if delivery is not None:
             raise CacheError("invalid-input", f"{gate} is task-scoped", 2)
         return None, None
-    if gate in DELIVERY_STATIC_GATES:
-        if delivery is None:
-            raise CacheError("invalid-input", f"{gate} is delivery-scoped", 2)
-        return delivery["delivery_key"], None
     if gate in TASK_REVISION_SET_GATES:
         if delivery is not None:
             raise CacheError("invalid-input", f"{gate} is revision-set-scoped", 2)
@@ -1847,7 +1914,13 @@ def gate_binding(
     if gate in DELIVERY_REVISION_GATES:
         if delivery is None or delivery["revision"] is None:
             raise CacheError("state-conflict", f"{gate} requires a delivery revision", 4)
-        return delivery["delivery_key"], delivery["revision"]["revision_key"]
+        if gate not in applicable_delivery_revision_gates(delivery):
+            raise CacheError(
+                "invalid-input",
+                f"{gate} is not applicable when CI is not configured",
+                2,
+            )
+        return delivery["delivery_key"], delivery_evidence_key(delivery)
     raise CacheError("invalid-input", f"unknown gate: {gate}", 2)
 
 
@@ -2049,11 +2122,7 @@ def task_dispatch_ready(state: dict[str, Any], task: dict[str, Any]) -> bool:
     dependency = current_gate(state, task, "dependency-integration")
     if not dependency or dependency["state"] != "passed":
         return False
-    return all(
-        (gate := current_gate(state, task, "pr-preflight", delivery))
-        and gate["state"] == "passed"
-        for delivery in task["deliveries"]
-    )
+    return all(delivery["preflight_key"] for delivery in task["deliveries"])
 
 
 def paths_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
@@ -2084,10 +2153,7 @@ def delivery_proof_blockers(
         blockers.append("missing-managed-checkout")
     if delivery["revision"] is None:
         blockers.append("missing-current-revision")
-    static = current_gate(state, task, "pr-preflight", delivery)
-    if not static or static["state"] != "passed":
-        blockers.append("gate:pr-preflight")
-    for gate in sorted(DELIVERY_REVISION_GATES):
+    for gate in sorted(applicable_delivery_revision_gates(delivery)):
         evidence = current_gate(state, task, gate, delivery)
         if not evidence or evidence["state"] != "passed":
             blockers.append(f"gate:{gate}")
@@ -2339,7 +2405,7 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
         deliveries = []
         for delivery in task["deliveries"]:
             delivery_gates: dict[str, str] = {}
-            for gate in sorted(DELIVERY_STATIC_GATES | DELIVERY_REVISION_GATES):
+            for gate in sorted(applicable_delivery_revision_gates(delivery)):
                 evidence = current_gate(state, task, gate, delivery)
                 if evidence:
                     delivery_gates[gate] = evidence["state"]
@@ -2348,6 +2414,10 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                 {
                     "delivery_key": delivery["delivery_key"],
                     "repository": delivery["repository"],
+                    "github_repository": delivery["github_repository"],
+                    "default_base": delivery["default_base"],
+                    "ci_availability": delivery["ci_availability"],
+                    "preflight_key": delivery["preflight_key"],
                     "revision_key": revision["revision_key"] if revision else None,
                     "pr": copy.deepcopy(delivery["pr"]),
                     "gates": delivery_gates,
@@ -2406,8 +2476,8 @@ def render_markdown(state: dict[str, Any]) -> str:
         "",
         "## Feature Spec Tasks",
         "",
-        "| task | source | state | revisions | pull requests |",
-        "| --- | --- | --- | --- | --- |",
+        "| task | source | state | CI | revisions | pull requests |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
         revisions = ", ".join(
@@ -2418,8 +2488,12 @@ def render_markdown(state: dict[str, Any]) -> str:
             delivery["pr"]["url"] if delivery["pr"] else "none"
             for delivery in task["deliveries"]
         )
+        ci = ", ".join(
+            f"{delivery['delivery_key']}={delivery['ci_availability']}"
+            for delivery in task["deliveries"]
+        )
         lines.append(
-            f"| `{task['task_key']}` | {task['source_spec_ref']} | `{task['state']}` | `{revisions}` | {prs} |"
+            f"| `{task['task_key']}` | {task['source_spec_ref']} | `{task['state']}` | `{ci}` | `{revisions}` | {prs} |"
         )
     lines.extend(["", "## Current Gate Evidence", "", "| task | gate | state | evidence |", "| --- | --- | --- | --- |"])
     for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
@@ -2430,7 +2504,7 @@ def render_markdown(state: dict[str, Any]) -> str:
                     f"| `{task['task_key']}` | `{gate}` | `{item['state']}` | {item['evidence_ref']} |"
                 )
         for delivery in task["deliveries"]:
-            for gate in sorted(DELIVERY_STATIC_GATES | DELIVERY_REVISION_GATES):
+            for gate in sorted(applicable_delivery_revision_gates(delivery)):
                 item = current_gate(state, task, gate, delivery)
                 if item:
                     lines.append(
@@ -2813,10 +2887,10 @@ def source_move_blockers(
         if not evidence or evidence["state"] != "passed":
             blockers.append(f"gate:{gate}")
     for delivery in task["deliveries"]:
-        preflight = current_gate(state, task, "pr-preflight", delivery)
-        if not preflight or preflight["state"] != "passed":
-            blockers.append(f"{delivery['delivery_key']}:gate:pr-preflight")
-        for gate in sorted(DELIVERY_REVISION_GATES - {"tracker-closeout", "mergeability"}):
+        for gate in sorted(
+            applicable_delivery_revision_gates(delivery)
+            - {"tracker-closeout", "mergeability"}
+        ):
             evidence = current_gate(state, task, gate, delivery)
             if not evidence or evidence["state"] != "passed":
                 blockers.append(f"{delivery['delivery_key']}:gate:{gate}")
@@ -3035,13 +3109,60 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         return changed
 
     if event_type in {
-        "revision-observed", "delivery-observed", "review-wait-started",
+        "delivery-preflight-observed", "revision-observed", "delivery-observed", "review-wait-started",
         "review-wait-invoked", "review-observed",
     }:
         delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
         delivery = delivery_by_key(task, delivery_key)
     else:
         delivery = None
+
+    if event_type == "delivery-preflight-observed":
+        event = exact_object(
+            raw,
+            {
+                "type",
+                "task_key",
+                "delivery_key",
+                "github_repository",
+                "target_branch",
+                "default_base",
+                "ci_availability",
+                "preflight_key",
+                "evidence_ref",
+            },
+            event_type,
+        )
+        assert delivery is not None
+        github_repository = canonical_github_repository(
+            event["github_repository"], "github_repository"
+        )
+        target_branch = nonempty(event["target_branch"], "target_branch")
+        default_base = nonempty(event["default_base"], "default_base")
+        if (
+            github_repository != delivery["github_repository"]
+            or target_branch != delivery["target_branch"]
+            or default_base != delivery["default_base"]
+        ):
+            raise CacheError(
+                "state-conflict", "delivery preflight identity changed", 4
+            )
+        ci_availability = event["ci_availability"]
+        if ci_availability not in CI_AVAILABILITIES:
+            raise CacheError("invalid-input", "ci_availability is invalid", 2)
+        candidate = {
+            "ci_availability": ci_availability,
+            "preflight_key": canonical_fingerprint(
+                event["preflight_key"], "preflight_key"
+            ),
+            "preflight_evidence_ref": nonempty(
+                event["evidence_ref"], "evidence_ref"
+            ),
+        }
+        if all(delivery[field] == value for field, value in candidate.items()):
+            return False
+        delivery.update(candidate)
+        return True
 
     if event_type == "revision-observed":
         event = exact_object(
@@ -3068,6 +3189,10 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         github_repository = canonical_github_repository(
             event["github_repository"], "github_repository"
         )
+        if github_repository != delivery["github_repository"]:
+            raise CacheError(
+                "state-conflict", "revision GitHub repository changed", 4
+            )
         pr_url = canonical_github_pr_url(
             event["pr_url"], github_repository, event["pr_number"], "pr_url"
         )
@@ -3083,6 +3208,10 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("state-conflict", "revision PR identity changed", 4)
         head = nonempty(event["head_sha"], "head_sha")
         base = nonempty(event["base_ref"], "base_ref")
+        if base != delivery["default_base"]:
+            raise CacheError(
+                "state-conflict", "revision base differs from preflight default base", 4
+            )
         merge_base = nonempty(event["merge_base_sha"], "merge_base_sha")
         candidate = {
             "repository": repository,
@@ -3362,6 +3491,14 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         scoped_delivery = None
         if event["delivery_key"] is not None:
             scoped_delivery = delivery_by_key(task, check_lower_kebab(event["delivery_key"], "delivery_key"))
+        if (
+            gate == "ci"
+            and scoped_delivery is not None
+            and scoped_delivery["ci_availability"] == "not-configured"
+        ):
+            raise CacheError(
+                "invalid-input", "ci gate is not applicable when CI is not configured", 2
+            )
         expected_delivery, expected_binding = gate_binding(task, gate, scoped_delivery)
         if event["delivery_key"] != expected_delivery or event["binding_key"] != expected_binding:
             raise CacheError("state-conflict", "gate observation binding is stale", 4)

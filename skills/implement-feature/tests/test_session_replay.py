@@ -59,6 +59,15 @@ def revision_key(
     return hashlib.sha256(encoded).hexdigest()
 
 
+def delivery_evidence_key(revision: str, preflight: str) -> str:
+    encoded = json.dumps(
+        {"revision_key": revision, "preflight_key": preflight},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def materialize(value: Any, replacements: dict[str, Any]) -> Any:
     if isinstance(value, str):
         if value in replacements:
@@ -461,6 +470,9 @@ class SessionReplayTests(unittest.TestCase):
                 facts["pull_request"]["url"],
                 facts["final_head_sha"], facts["base_ref"], facts["merge_base_sha"]
             )
+            preflight_key = fixture["registration"]["sources"][0]["deliveries"][0][
+                "preflight_key"
+            ]
             replacements: dict[str, Any] = {
                 "__ROOT_CHECKOUT__": str(repository),
                 "__WORKER_CHECKOUT__": str(repository),
@@ -470,6 +482,12 @@ class SessionReplayTests(unittest.TestCase):
                 "__BASELINE_REVISION__": baseline_revision,
                 "__INITIAL_REVISION_KEY__": initial_revision_key,
                 "__FINAL_REVISION_KEY__": final_revision_key,
+                "__INITIAL_DELIVERY_EVIDENCE_KEY__": delivery_evidence_key(
+                    initial_revision_key, preflight_key
+                ),
+                "__FINAL_DELIVERY_EVIDENCE_KEY__": delivery_evidence_key(
+                    final_revision_key, preflight_key
+                ),
                 "__ROOT_GOAL_EVIDENCE__": facts["root_goal_evidence_ref"],
                 "__ROOT_GOAL_COMPLETION_EVIDENCE__": facts[
                     "root_goal_completion_evidence_ref"
@@ -480,7 +498,7 @@ class SessionReplayTests(unittest.TestCase):
                 ],
             }
             registration = materialize(fixture["registration"], replacements)
-            self.assertEqual(registration["schema_version"], "3.0.0")
+            self.assertEqual(registration["schema_version"], "4.0.0")
             self.assertEqual(len(registration["sources"][0]["deliveries"]), 1)
             self.assertNotIn("repository", registration["sources"][0])
             self.assertNotIn("target_branch", registration["sources"][0])
@@ -505,7 +523,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "5.0.0")
+            self.assertEqual(created["version"], "6.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None
@@ -695,9 +713,7 @@ class SessionReplayTests(unittest.TestCase):
                     self.assertEqual(
                         task_status["gates"], {"dependency-integration": "passed"}
                     )
-                    self.assertEqual(
-                        delivery_status["gates"], {"pr-preflight": "passed"}
-                    )
+                    self.assertEqual(delivery_status["gates"], {})
                     self.assertIn(
                         "workflow-app:missing-current-review",
                         task_status["terminal_blockers"],
@@ -722,14 +738,16 @@ class SessionReplayTests(unittest.TestCase):
                     self.assertEqual(final_review["observations"], [])
                     self.assertTrue(
                         any(
-                            gate["binding_key"] == initial_revision_key
+                            gate["binding_key"]
+                            == replacements["__INITIAL_DELIVERY_EVIDENCE_KEY__"]
                             and gate["gate"] == "focused-validation"
                             for gate in state["gates"]
                         )
                     )
                     self.assertTrue(
                         any(
-                            gate["binding_key"] == initial_revision_key
+                            gate["binding_key"]
+                            == replacements["__INITIAL_DELIVERY_EVIDENCE_KEY__"]
                             and gate["gate"] == "codex-review"
                             and gate["state"] == "failed"
                             for gate in state["gates"]

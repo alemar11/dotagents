@@ -57,7 +57,7 @@ merge, release, or deployment.
 
 - Success means real `OPEN`, non-draft, conflict-free pull requests against each
   repository's discovered default branch, at their current heads, with mandatory
-  `$autoreview`, Codex review request, CI, integration, tracker-closeout,
+  `$autoreview`, Codex review request, CI when configured, integration, tracker-closeout,
   mergeability,
   approval, update, and merge-queue eligibility gates satisfied. Unknown or
   pending evidence blocks except the exact evidenced 45-minute
@@ -84,8 +84,11 @@ merge, release, or deployment.
 
 ## Execution-Ready Intake
 
-After authorization, load `references/spec-backed-delivery.md` and perform one
-read-only intake of the complete durable Feature Spec and generated-issue graph.
+After authorization, load `references/spec-backed-delivery.md` and take one
+read-only snapshot of the durable Spec/issue graph. Derive and
+preflight its deliveries, then reuse the exact bytes for intake and
+fingerprinting. On proven drift, discard/refetch and rerun preflight before
+CLAIM.
 That reference canonically owns accepted fields, graph rules, fingerprints,
 scope, local-tracker paths, cross-Spec dependencies, integration partials,
 domain-knowledge closeout, and rejected legacy fields. Load
@@ -113,42 +116,46 @@ Goal, task, tracker write, or source mutation was created.
 
 0. **SURFACE** — prove the required App and Goal surfaces.
 1. **AUTHORIZE** — verify the model policy and obtain the fixed-flow grant.
-2. **INTAKE** — validate and fingerprint the complete bundle; resolve each task
-   profile. Convert verified GitHub `owner/repository#N` refs to
+2. **SNAPSHOT** — acquire the complete bundle once, retain it only as temporary
+   read-only intake data, and derive the candidate delivery repository/branch set.
+3. **DELIVERY-PREFLIGHT** — run `scripts/delivery-preflight --json doctor`, then
+   one bounded `inspect` packet. Require GitHub access, push/PR capability,
+   read access to PR lifecycle, mergeability/conflicts, and policy visibility;
+   discover the default base and classify CI as `configured` or
+   `not-configured`. Unknown or blocked capability returns
+   `delivery-preflight-failed` with zero artifacts. `not-configured` is valid.
+4. **INTAKE** — validate and fingerprint the complete saved snapshot; resolve each task
+   profile and require its final delivery set to equal the preflight set exactly.
+   Convert verified GitHub `owner/repository#N` refs to
    `https://github.com/owner/repository/issues/N`; use the URL as the claim/task source id while
    preserving the authored ref as evidence.
-3. **CLAIM** — load `references/run-state.md`; run
+5. **CLAIM** — load `references/run-state.md`; run
    `scripts/active-root-claim --json doctor`; canonicalize repositories and
    sources; acquire before any other artifact. Qualify local refs as
    `git:<git-common-dir>::ref:<source-ref>`. Never pass GitHub shorthand directly to the
    helper.
-4. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
+6. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
    and fixed 180-day prune once in the root. Warnings are nonblocking.
-5. **REGISTER** — call `ledger create` with authorization/sources, complete Spec
-   registry, one delivery per affected repository, portfolio objective, and
+7. **REGISTER** — call `ledger create` with authorization/sources, complete Spec
+   registry, one delivery per affected repository, its validated preflight
+   fingerprint and CI availability, portfolio objective, and
    `portfolio_goal_state=pending`;
    persist `root_task_title`, then set and observe the calling task title. Only
    then reconcile with `get_goal`; otherwise call `create_goal`. Persist active
    evidence. Never set `token_budget`.
-6. **PR-PREFLIGHT** — per delivery prove GitHub access, branch/PR
-   publication, current-head review, CI expected to produce at least one
-   applicable result, and read
-   access to PR lifecycle, mergeability/conflicts, branch rules, approvals,
-   base-freshness, and merge-queue eligibility. Discover the default base.
-   Otherwise return `pr-preflight-failed`; never downgrade.
-7. **DISPATCH** — load `references/worker.md`; choose the deterministic static
+8. **DISPATCH** — load `references/worker.md`; choose the deterministic static
    ready set; adopt/create one managed task per Spec with its profile; observe
    title, Goal tools/objective, and complete delivery checkout map before
    advancing beyond `created`.
-8. **MONITOR** — take one full task snapshot after dispatch, then consume compact
+9. **MONITOR** — take one full task snapshot after dispatch, then consume compact
    deltas until a material transition, attention request, claim-heartbeat
    deadline or hard workflow deadline. Steer precise corrections with the
    recorded profile. Never pull implementation or review into the root.
-9. **GATE** — load `references/gates.md` and
-   `references/codex-review-closeout.md`; apply task-static, delivery-static,
+10. **GATE** — load `references/gates.md` and
+   `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
    scope.
-10. **RECONCILE** — read the smallest `ledger-cache ledger read` projection,
+11. **RECONCILE** — read the smallest `ledger-cache ledger read` projection,
     refresh only changed external evidence, and atomically apply the resulting
     events; dispatch another wave, reconcile the one fixed review wait, or
     advance one staged terminal closeout transition.
@@ -225,7 +232,7 @@ states are cold evidence, never recovery input.
 Before review or terminal acceptance, load `references/gates.md` and
 `references/codex-review-closeout.md`. The visible task owns implementation,
 validation, commits, publication, `$autoreview`, current-revision review/fixes,
-CI, tracker-closeout preparation, ready-for-review transition, and merge-ready
+CI when configured, tracker-closeout preparation, ready-for-review transition, and merge-ready
 proof for every affected repository. The root verifies the evidence and never
 enqueues or merges.
 
@@ -233,12 +240,14 @@ For a local source, after current task-set acceptance/integration/domain proof,
 move only predeclared refs in their deliveries. The move dirties delivery state
 and invalidates old evidence. Commit/push, observe the new revision, rerun
 validation and `$autoreview`, convert drafts to
-ready-for-review, obtain current-revision review, then CI and terminal proof.
+ready-for-review, obtain current-revision review, then configured CI or explicit
+`not-configured` terminal revalidation, and terminal proof.
 Hosted and local issues remain open until a later default-branch merge.
 
 For pre-CLAIM aborts, report the evidence and zero-mutation result. Otherwise
 return run-state-derived source fingerprints, title, task/Goal and checkout proof,
-changes, validation, commits, PR URLs, reviewed revisions, CI, captured
+changes, validation, commits, PR URLs, reviewed revisions, CI availability and
+configured-CI results, captured
 domain-closeout evidence, prepared tracker closeout, current-head mergeability
 and repository-rule evidence, review-timeout warnings, blockers, recovery
 freshness, and next action.
@@ -258,7 +267,5 @@ Post-terminal drift blocks archive and never reopens Goals or implementation.
 
 ## Reference Routing
 
-Use the load predicates above. `references/run-state.md` is the canonical owner
-of active-state commands, event types, projections, and transition rules. Load
-`references/run-state-packets.md` only immediately before writing a strict
-registration or event packet.
+Use the predicates. `run-state.md` owns commands, projections, and transitions;
+`run-state-packets.md` owns event types/fields and loads only before writes.

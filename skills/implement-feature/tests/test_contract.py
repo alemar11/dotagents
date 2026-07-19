@@ -24,7 +24,7 @@ def run_app_preclaim_fixture(
     observations.append("authorization")
     if permission != "granted-by-authorized-user":
         return "permission-denied", observations, mutations
-    observations.append("intake")
+    observations.extend(["snapshot", "delivery-preflight", "intake"])
     if not bundle_ready:
         return "planning-required", observations, mutations
     mutations.extend(
@@ -167,6 +167,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "SKILL.md",
             "agents/openai.yaml",
             "scripts/active-root-claim",
+            "scripts/delivery-preflight",
             "scripts/ledger-cache",
             "references/options.md",
             "references/task-model-policy.md",
@@ -239,7 +240,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Each executable Feature Spec is one feature; one plan may create "
             "multiple visible tasks. This run may change and validate code, push "
             "commits, create or update pull requests, address "
-            "Codex review, wait for CI, prepare hosted issue closeout, and move, "
+            "Codex review, wait for CI when a repository has CI configured, "
+            "prepare hosted issue closeout, and move, "
             "commit, and push completed local issue files when used. AutoReview "
             "sends Git status, staged/unstaged diffs, and every non-ignored "
             "untracked file to Codex; no extra authorization. Tasks use "
@@ -495,8 +497,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
 
         register = " ".join(
-            skill.split("5. **REGISTER**", 1)[1]
-            .split("6. **PR-PREFLIGHT**", 1)[0]
+            skill.split("7. **REGISTER**", 1)[1]
+            .split("8. **DISPATCH**", 1)[0]
             .split()
         )
         for token in (
@@ -727,9 +729,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "automatically deletes valid run-state archives older than 180 days",
             options,
         )
-        self.assertLess(controller.index("3. **CLAIM**"), controller.index("4. **CACHE-MAINTENANCE**"))
-        self.assertLess(controller.index("4. **CACHE-MAINTENANCE**"), controller.index("5. **REGISTER**"))
-        self.assertLess(controller.index("5. **REGISTER**"), controller.index("7. **DISPATCH**"))
+        self.assertLess(controller.index("5. **CLAIM**"), controller.index("6. **CACHE-MAINTENANCE**"))
+        self.assertLess(controller.index("6. **CACHE-MAINTENANCE**"), controller.index("7. **REGISTER**"))
+        self.assertLess(controller.index("7. **REGISTER**"), controller.index("8. **DISPATCH**"))
 
         for command in (
             "scripts/ledger-cache --json doctor",
@@ -853,7 +855,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("`upstream_feature_spec_ref`", delivery)
         self.assertIn("`dependency_reason`", delivery)
         self.assertIn("`proposed-spec:<...>` refs", delivery)
-        self.assertIn("one read-only intake", skill)
+        self.assertIn("one read-only snapshot", skill)
         self.assertIn("planning-required", skill)
         self.assertIn("unsupported-app-delivery-target", skill)
         self.assertIn("no claim, run state, Goal, task, tracker write, or source mutation", skill)
@@ -1018,13 +1020,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("Goal pause/resume and App heartbeat automation are not part", surface)
         self.assertIn("does not create a task to inspect task-local tools", surface)
         dispatch = " ".join(
-            skill.split("7. **DISPATCH**", 1)[1].split("8. **MONITOR**", 1)[0].split()
+            skill.split("8. **DISPATCH**", 1)[1].split("9. **MONITOR**", 1)[0].split()
         )
         self.assertIn("observe title, Goal tools/objective", dispatch)
         self.assertIn("before advancing beyond `created`", dispatch)
 
         register = " ".join(
-            skill.split("5. **REGISTER**", 1)[1].split("6. **PR-PREFLIGHT**", 1)[0].split()
+            skill.split("7. **REGISTER**", 1)[1].split("8. **DISPATCH**", 1)[0].split()
         )
         self.assertLess(
             register.index("portfolio_goal_state=pending"),
@@ -1128,14 +1130,19 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("15-minute", closeout)
         self.assertNotIn("--timeout 15m", runtime)
 
-    def test_ci_requires_current_head_evidence_and_cannot_pass_empty(self) -> None:
+    def test_ci_requires_current_head_evidence_only_when_configured(self) -> None:
         skill = " ".join(self.read("SKILL.md").split())
         gates = " ".join(self.read("references/gates.md").split())
 
-        self.assertIn("expected to produce at least one applicable result", skill)
+        self.assertIn("classify CI as `configured` or `not-configured`", skill)
+        self.assertIn("`not-configured` is valid", skill)
+        self.assertIn("zero artifacts", skill)
         self.assertIn("exact head SHA", gates)
-        self.assertIn("Zero applicable CI results", gates)
-        self.assertIn("`ci-unavailable` blocker", gates)
+        self.assertIn("only when `ci_availability=configured`", gates)
+        self.assertIn("at least one applicable run or status context", gates)
+        self.assertIn("When `ci_availability=not-configured`", gates)
+        self.assertIn("do not emit, wait for, poll, or accept a `ci` gate", gates)
+        self.assertNotIn("`ci-unavailable` blocker", gates)
 
     def test_closeout_arms_issues_partials_and_global_parent_without_merging(self) -> None:
         closeout = " ".join(
@@ -1182,7 +1189,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "5.0.0"', helper)
+        self.assertIn('__version__ = "6.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1193,19 +1200,19 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_v3_event_packet_registry_matches_the_v5_runtime(self) -> None:
+    def test_v4_event_packet_registry_matches_the_v6_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "5.0.0"',
-            'LEDGER_SCHEMA_VERSION = "3.0.0"',
-            'REGISTRATION_SCHEMA_VERSION = "3.0.0"',
+            '__version__ = "6.0.0"',
+            'LEDGER_SCHEMA_VERSION = "4.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "4.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("| `schema_version` | `3.0.0` |", packets)
-        self.assertIn("Active state accepts only ledger schema `3.0.0`", run_state)
+        self.assertIn("| `schema_version` | `4.0.0` |", packets)
+        self.assertIn("Active state accepts only ledger schema `4.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -1258,7 +1265,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 )
         self.assertEqual(packet_fields, runtime_fields)
 
-    def test_v3_registration_packet_registry_matches_the_runtime(self) -> None:
+    def test_v4_registration_packet_registry_matches_the_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         module = ast.parse(helper)
@@ -1312,7 +1319,6 @@ class ImplementFeatureContractTests(unittest.TestCase):
         module = ast.parse(helper)
         expected = {
             "TASK_STATIC_GATES": {"dependency-integration"},
-            "DELIVERY_STATIC_GATES": {"pr-preflight"},
             "TASK_REVISION_SET_GATES": {
                 "scope-acceptance",
                 "integration-validation",
@@ -1345,7 +1351,6 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         scope_to_constant = {
             "task-static": "TASK_STATIC_GATES",
-            "delivery-static": "DELIVERY_STATIC_GATES",
             "task-revision-set": "TASK_REVISION_SET_GATES",
             "delivery-revision": "DELIVERY_REVISION_GATES",
         }
@@ -1357,7 +1362,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             documented = set(re.findall(r"`([^`]+)`", gates_column))
             self.assertEqual(documented, expected[constant])
 
-        self.assertIn("Static gates dispatch before a PR revision", run_state)
+        self.assertIn("task-static", run_state)
+        self.assertIn("dependency integration", run_state)
+        self.assertIn("delivery evidence key binds its revision key and preflight key", run_state)
         self.assertIn("`authority=external-merge-required`", packets)
         self.assertIn("A review wait never creates a handoff", packets)
         self.assertNotIn("durable-review-monitoring", packets)
@@ -1497,7 +1504,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 "granted-by-authorized-user",
                 False,
                 "planning-required",
-                ["surface", "authorization", "intake"],
+                ["surface", "authorization", "snapshot", "delivery-preflight", "intake"],
             ),
         )
         for surface, goal_surface, permission, ready, expected, observations in cases:
@@ -1518,7 +1525,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
             bundle_ready=True,
         )
         self.assertEqual(outcome, "accepted")
-        self.assertEqual(observations, ["surface", "authorization", "intake"])
+        self.assertEqual(
+            observations,
+            ["surface", "authorization", "snapshot", "delivery-preflight", "intake"],
+        )
         self.assertEqual(
             mutations,
             [

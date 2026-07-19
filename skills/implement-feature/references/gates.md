@@ -16,11 +16,9 @@ the caller checkout, or transfer implementation to the root.
 
 ## Static Dispatch Gates
 
-`dependency-integration` is a `task-static` gate. Dispatch only after every
-cross-Spec dependency is verified merged; a merge-ready upstream is still
-unfinished. `pr-preflight` is a `delivery-static` gate and must pass separately
-for every affected repository. Neither static gate requires a PR revision, so
-pending tasks can become dispatch-ready before publication.
+`dependency-integration` is `task-static`: dispatch only after every cross-Spec
+dependency is merged; merge-ready is unfinished. Registered preflight is typed
+delivery state, not another gate. Neither requires a PR revision.
 
 Multi-repository completion requires exactly one distinct repo-owned
 integration Feature Spec downstream of all implementation partials. It owns a
@@ -28,6 +26,12 @@ bounded path change and cross-repository proof and produces a real PR rather
 than a no-op validation result.
 
 ## Delivery-Revision Gates
+
+Registration binds each delivery's passed GitHub/default-base capability,
+`ci_availability`, `preflight_key`, and evidence ref. Only `configured` or
+`not-configured` is valid; incomplete inspection blocks before CLAIM. Before
+seal, `delivery-preflight-observed` may replace it; after seal, only
+post-terminal drift may record change.
 
 For each delivery's current exact repository, PR number and URL, head SHA, base
 ref, and merge-base SHA require:
@@ -37,18 +41,20 @@ ref, and merge-base SHA require:
 - `codex-review`: mandatory current-revision request with either a clean result,
   or an exact 45-minute pending timeout recorded as `timeout-accepted` with a
   persistent PR warning; every returned actionable finding must be resolved;
-- `ci`: at least one applicable run or status context on the exact head SHA and
-  every required applicable result successful;
+- `ci`, only when `ci_availability=configured`: at least one applicable run or
+  status context on the exact head SHA and every required applicable result
+  successful;
 - `pr-ready`: non-draft exact PR identity after the ready-for-review transition;
 - `tracker-closeout`: every applicable closing vehicle prepared at the current
   delivery revision;
 - `mergeability`: conflict-free GitHub mergeability plus required base
   freshness, approvals, and merge-queue eligibility.
 
-Zero applicable CI results is a `ci-unavailable` blocker. Skipped or neutral
-evidence counts only when repository rules prove it is not required. Unknown,
-pending, dirty/conflicting, behind-when-update-required, closed, merged, or
-otherwise blocked state never passes. Never enqueue or merge.
+When `ci_availability=not-configured`, do not emit, wait for, poll, or accept a
+`ci` gate; report availability, never `passed`. For configured CI, skipped or
+neutral counts only when rules prove it optional. Unknown, pending,
+dirty/conflicting, stale-required, closed, merged, or blocked truth fails.
+Never enqueue or merge.
 
 A draft is only an intermediate vehicle. After substantive implementation,
 focused validation, and `$autoreview`, convert it to ready-for-review with
@@ -58,11 +64,11 @@ terminal.
 
 ## Task-Revision-Set Gates
 
-The canonical revision-set key contains one current revision for every
-delivery. Bind `scope-acceptance`, `integration-validation`, and optional
-`domain-closeout` to that complete set. Bind `focused-validation`,
-`full-validation`, and `autoreview` to each delivery revision. A partial set
-cannot pass.
+The delivery evidence key hashes current revision and preflight keys. The task
+revision-set key contains every delivery evidence key. Bind
+`scope-acceptance`, `integration-validation`, and optional `domain-closeout` to
+that set; bind `focused-validation`, `full-validation`, and `autoreview` per
+delivery key. Partial sets fail.
 
 ## Domain Knowledge Closeout Gate
 
@@ -77,7 +83,8 @@ unresolved, rejected, or landed-behavior-contradicted item,
 closeout and terminal `merge-ready` pending an owner decision or separately
 authorized correction.
 
-Any delivery revision, PR identity, material diff, repository-rule, tracker
+Any delivery revision, preflight fingerprint, CI availability, PR identity,
+material diff, repository-rule, tracker
 delivery, evidence-target, or documentation change invalidates the affected
 delivery-revision gates and every task-revision-set gate. Apply new evidence
 through typed events; never patch state.
@@ -100,7 +107,8 @@ revision set, then commit and push the move, establish a newer tuple through
 `revision-observed`, and bind current committed/published lifecycle through
 `delivery-observed`. Only that newer published observation clears dirt. Then
 rerun final validation and `$autoreview`, convert drafts to ready-for-review,
-then obtain current-revision review and CI before terminal merge-ready state.
+then obtain current-revision review and configured CI, or independently
+revalidate explicit `not-configured`, before terminal merge-ready state.
 Record closeout as prepared; completion reaches the default branch only after a
 later merge. GitHub sources cannot use `source-moved`.
 
