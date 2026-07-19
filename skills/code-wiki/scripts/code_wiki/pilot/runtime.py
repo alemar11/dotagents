@@ -115,6 +115,7 @@ def _safe_environment() -> dict[str, str]:
         "HTTPS_PROXY",
         "HTTP_PROXY",
         "NO_PROXY",
+        "OPENAI_API_KEY",
     }
     return {key: value for key, value in os.environ.items() if key in allowed}
 

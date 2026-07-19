@@ -26,7 +26,12 @@ from code_wiki.pilot.provenance import (  # noqa: E402
     verify_receipt,
 )
 from code_wiki.pilot.runner import _promote_staged_outputs  # noqa: E402
-from code_wiki.pilot.runtime import CodexExecutor, ExecutionError, parse_terminal_usage  # noqa: E402
+from code_wiki.pilot.runtime import (  # noqa: E402
+    CodexExecutor,
+    ExecutionError,
+    _safe_environment,
+    parse_terminal_usage,
+)
 from code_wiki.wiki_contract import REQUIRED_PAGES  # noqa: E402
 
 
@@ -422,6 +427,16 @@ class CodeWikiPilotTests(unittest.TestCase):
             self.assertNotIn(snapshot, writable_additions)
             self.assertIn("--skip-git-repo-check", command)
 
+    def test_live_executor_environment_preserves_api_key_authentication(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {"OPENAI_API_KEY": "fixture-key", "CODE_WIKI_UNRELATED": "discard-me"},
+            clear=True,
+        ):
+            environment = _safe_environment()
+        self.assertEqual(environment["OPENAI_API_KEY"], "fixture-key")
+        self.assertNotIn("CODE_WIKI_UNRELATED", environment)
+
     def test_snapshot_rejects_tracked_symlinks_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -558,25 +573,31 @@ class CodeWikiPilotTests(unittest.TestCase):
                 ["git", "status", "--porcelain=v1"], cwd=repo, check=True, capture_output=True, text=True
             ).stdout
             baseline_fixture = self.write_fixture(root, "baseline")
-            candidate_fixture = self.write_fixture(root, "node-graph", delay_ms=400)
+            candidate_fixture = self.write_fixture(root, "node-graph", delay_ms=1500)
             baseline_result, baseline_out, baseline = self.run_fixture(
                 root, repo, commit, "baseline", baseline_fixture, "baseline-run"
             )
-            started = time.monotonic()
             candidate_result, candidate_out, candidate = self.run_fixture(
                 root, repo, commit, "node-graph", candidate_fixture, "candidate-run"
             )
-            elapsed = time.monotonic() - started
 
             validation_debug = json.loads((baseline_out / "artifacts" / "validation.json").read_text(encoding="utf-8"))["validator_output"]
             self.assertEqual(baseline_result.returncode, 0, baseline_result.stdout + baseline_result.stderr + validation_debug)
             self.assertEqual(candidate_result.returncode, 0, candidate_result.stdout + candidate_result.stderr)
             self.assertEqual(json.loads(baseline_result.stdout)["terminal_status"], "completed")
             self.assertEqual(json.loads(candidate_result.stdout)["terminal_status"], "completed")
-            self.assertLess(elapsed, 1.10, "the three delayed study nodes should join in parallel")
+            study_attempts = [
+                candidate["nodes"][f"study-{study}"]["attempts"][0]
+                for study in ("architecture", "interfaces", "operations")
+            ]
+            self.assertLess(
+                max(attempt["started_at"] for attempt in study_attempts),
+                min(attempt["completed_at"] for attempt in study_attempts),
+                "the three delayed study-node execution intervals must overlap",
+            )
             self.assertLess(
                 candidate["metrics"]["generation"]["wall_time_ms"],
-                1200,
+                sum(attempt["duration_ms"] for attempt in study_attempts),
                 "parallel study durations must not be summed as wall time",
             )
             for manifest, out in ((baseline, baseline_out), (candidate, candidate_out)):
