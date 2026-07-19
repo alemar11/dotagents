@@ -35,7 +35,7 @@ def assert_snapshot_clean(snapshot: SourceSnapshot) -> str:
     status = source_status(snapshot.snapshot_path)
     if status:
         raise RuntimeError(f"source snapshot was mutated: {status.splitlines()[0]}")
-    tree_hash = hash_path(snapshot.snapshot_path)
+    tree_hash = hash_path(snapshot.snapshot_path, exclude_git_metadata=True)
     if tree_hash != snapshot.snapshot_tree_hash:
         raise RuntimeError("source snapshot bytes changed without a clean Git-status signal")
     return tree_hash
@@ -99,5 +99,5 @@ def create_snapshot(repo_arg: str, commit_arg: str, cache_root_arg: str | None =
         commit=commit,
         original_status_before=status,
         snapshot_path=snapshot_path,
-        snapshot_tree_hash=hash_path(snapshot_path),
+        snapshot_tree_hash=hash_path(snapshot_path, exclude_git_metadata=True),
     )

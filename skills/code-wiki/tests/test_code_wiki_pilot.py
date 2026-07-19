@@ -18,6 +18,7 @@ CMD = SKILL_ROOT / "scripts" / "code-wiki"
 sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 from code_wiki.pilot.comparison import _read_manifest, build_decision  # noqa: E402
+from code_wiki.pilot.common import hash_path  # noqa: E402
 from code_wiki.pilot.contracts import ContractError, load_graph, parse_node  # noqa: E402
 from code_wiki.pilot.provenance import (  # noqa: E402
     load_or_create_provenance_key,
@@ -642,6 +643,23 @@ class CodeWikiPilotTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("cannot contain tracked symlinks", result.stdout)
+
+    def test_artifact_hash_includes_nested_git_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = Path(tmp) / "wiki"
+            artifact.mkdir()
+            (artifact / "index.html").write_text("wiki\n", encoding="utf-8")
+            artifact_hash = hash_path(artifact)
+            source_hash = hash_path(artifact, exclude_git_metadata=True)
+
+            (artifact / ".git").mkdir()
+            (artifact / ".git" / "config").write_text("unverified\n", encoding="utf-8")
+
+            self.assertNotEqual(hash_path(artifact), artifact_hash)
+            self.assertEqual(
+                hash_path(artifact, exclude_git_metadata=True),
+                source_hash,
+            )
 
     def test_snapshot_rejects_unmaterialized_gitlinks_before_execution(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

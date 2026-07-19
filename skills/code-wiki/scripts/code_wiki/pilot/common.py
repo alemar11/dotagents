@@ -24,7 +24,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def hash_path(path: Path) -> str:
+def hash_path(path: Path, *, exclude_git_metadata: bool = False) -> str:
     """Hash one file or directory, including relative names and empty directories."""
     if path.is_file():
         return sha256_file(path)
@@ -32,7 +32,11 @@ def hash_path(path: Path) -> str:
         raise FileNotFoundError(path)
     digest = hashlib.sha256()
     for root, dirnames, filenames in os.walk(path):
-        dirnames[:] = sorted(name for name in dirnames if name != ".git")
+        dirnames[:] = sorted(
+            name
+            for name in dirnames
+            if not (exclude_git_metadata and name == ".git")
+        )
         root_path = Path(root)
         rel_root = root_path.relative_to(path)
         digest.update(f"D\0{rel_root.as_posix()}\0".encode("utf-8"))

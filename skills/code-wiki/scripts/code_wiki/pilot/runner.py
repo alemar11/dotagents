@@ -83,7 +83,10 @@ def _artifact_hashes(
         path = _artifact_path(output_root, snapshot, artifact)
         if not path.exists():
             raise RuntimeError(f"declared artifact is missing: {artifact}")
-        result[artifact] = hash_path(path)
+        result[artifact] = hash_path(
+            path,
+            exclude_git_metadata=artifact == "source",
+        )
     return result
 
 
@@ -1020,7 +1023,7 @@ def _finish_source_state(manifest: dict[str, Any], snapshot: SourceSnapshot) -> 
         after_hash = assert_snapshot_clean(snapshot)
     except RuntimeError:
         manifest["source"]["source_mutation"] = True
-        after_hash = hash_path(snapshot.snapshot_path)
+        after_hash = hash_path(snapshot.snapshot_path, exclude_git_metadata=True)
     manifest["source"]["snapshot_tree_sha256_after"] = after_hash
     if original_after != snapshot.original_status_before:
         manifest["error"] = "original source checkout changed during pilot run"
