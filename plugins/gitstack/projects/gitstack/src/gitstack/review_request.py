@@ -32,6 +32,7 @@ FINGERPRINT_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 REQUEST_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 TRIGGER_PATTERN = re.compile(r"(?i)@codex\s+review\b")
 MARKER_PREFIX = f"<!-- {REQUEST_SCHEMA}"
+TYPED_HEAD_PATTERN = re.compile(r"^@codex review (?P<head>[0-9a-f]{40})(?:\n|$)")
 CANONICAL_PATTERN = re.compile(
     rf"^@codex review (?P<head>[0-9a-f]{{40}})\n\n"
     rf"<!-- {re.escape(REQUEST_SCHEMA)}\n"
@@ -159,7 +160,12 @@ def parse_request(
         return ParsedRequest("unbound")
     match = CANONICAL_PATTERN.fullmatch(text)
     if not match:
-        return ParsedRequest("invalid")
+        typed_head = TYPED_HEAD_PATTERN.match(text)
+        return ParsedRequest(
+            "invalid",
+            head_sha=typed_head.group("head") if typed_head else None,
+            body_fingerprint=_sha256(text),
+        )
     head_sha = match.group("head")
     key = match.group("request_key")
     fingerprint = match.group("request_fingerprint")

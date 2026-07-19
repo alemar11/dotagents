@@ -353,13 +353,37 @@ def _request_conflicts(
                 exact.append(item)
             else:
                 return "invalid", exact
-        elif parsed.classification == "invalid":
+        elif parsed.classification == "invalid" and parsed.head_sha == plan.head_sha:
             return "invalid", exact
-        elif parsed.classification == "unbound":
-            return "unbound", exact
     if len(exact) > 1:
         return "ambiguous", exact
     return None, exact
+
+
+def _observed_request_metadata(
+    plan: RequestPlan,
+    comment: dict[str, Any],
+) -> dict[str, Any]:
+    """Return diagnostic metadata that cannot be mistaken for a receipt."""
+
+    return {
+        "kind": "observed-request",
+        "schema": plan.schema,
+        "provider": plan.provider,
+        "repository": plan.repository,
+        "pr_number": plan.pr_number,
+        "head_sha": plan.head_sha,
+        "request_key": plan.request_key,
+        "request_fingerprint": plan.request_fingerprint,
+        "body_fingerprint": plan.body_fingerprint,
+        "provider_request_id": {
+            "kind": "github-issue-comment",
+            "value": str(comment.get("id") or ""),
+        },
+        "request_ref": str(comment.get("html_url") or ""),
+        "comment_id": comment.get("id"),
+        "created_at": str(comment.get("created_at") or ""),
+    }
 
 
 def check_automated_review(
@@ -397,6 +421,7 @@ def check_automated_review(
     binding = "absent"
     selected_request: dict[str, Any] | None = None
     selected_receipt: dict[str, Any] | None = None
+    selected_plan: RequestPlan | None = saved_plan
     request_error: str | None = None
     if request_identity is not None and saved_plan is None:
         binding = "invalid"
@@ -410,7 +435,7 @@ def check_automated_review(
                 request_error = "The persisted request receipt does not match the exact provider comment."
             else:
                 binding = "recognized"
-                selected_receipt = receipt(saved_plan, selected_request, status="persisted")
+                selected_receipt = request_identity
         except (ReviewError, KeyError, TypeError, ValueError) as exc:
             request_error = str(exc)
     else:
@@ -430,7 +455,7 @@ def check_automated_review(
                     break
         if binding == "absent" and candidate_plan is not None and selected_request is not None:
             binding = "recognized"
-            selected_receipt = receipt(candidate_plan, selected_request, status="observed")
+            selected_plan = candidate_plan
         if binding == "absent":
             conflict, _ = _request_conflicts(
                 conversation,
@@ -438,25 +463,26 @@ def check_automated_review(
             ) if head_is_current else (None, [])
             if conflict:
                 binding = conflict
+            elif any(
+                parse_request(item.get("body") or "", provider, repo, pr).classification == "unbound"
+                for item in conversation
+            ):
+                binding = "unbound"
 
-    plan = saved_plan
-    if plan is None and selected_request is not None and selected_receipt is not None:
-        try:
-            plan = build_request(provider, repo, pr, selected_receipt["head_sha"], selected_receipt["request_key"])
-        except (KeyError, TypeError, ValueError):
-            plan = None
-            binding = "invalid"
+    plan = selected_plan
 
     if plan is not None and selected_request is not None:
         conflict, exact = _request_conflicts(conversation, plan)
         if conflict == "ambiguous" or len(exact) > 1:
             binding = "ambiguous"
-        elif conflict in {"unbound", "invalid"}:
+        elif conflict == "invalid":
             binding = conflict
-        elif binding == "recognized" and selected_receipt is None:
-            selected_receipt = receipt(plan, selected_request, status="observed")
 
-    request_created_at = str(selected_receipt.get("created_at") or "") if selected_receipt else ""
+    request_created_at = (
+        str(selected_receipt.get("created_at") or "")
+        if selected_receipt
+        else str(selected_request.get("created_at") or "") if selected_request else ""
+    )
     reactions: set[str] = set()
     if binding == "recognized" and selected_request and selected_request.get("id"):
         try:
@@ -527,12 +553,12 @@ def check_automated_review(
         "outcome": None,
         "head": head,
     }
-    if binding != "recognized":
-        status: str | None = "stale" if binding == "absent" and not head_is_current else None
+    if not head_is_current:
+        status = "stale"
+    elif binding != "recognized":
+        status = None
         if binding == "absent" and head_is_current:
             status = "not-requested"
-    elif not head_is_current:
-        status = "stale"
     elif mismatched_terminal_comments:
         status = "stale"
         mismatched = mismatched_terminal_comments[-1]
@@ -573,15 +599,12 @@ def check_automated_review(
     else:
         status = "acknowledged" if "eyes" in reactions else "pending"
 
-    request_payload: dict[str, Any] = dict(selected_receipt or {})
-    request_payload.update({
-        "comment_id": selected_request.get("id") if selected_request else request_payload.get("comment_id"),
-        "created_at": selected_request.get("created_at") if selected_request else request_payload.get("created_at"),
-        "acknowledged": "eyes" in reactions,
-        "clean_reaction": "+1" in reactions,
-    })
-    if request_error:
-        request_payload["error"] = request_error
+    if selected_receipt is not None:
+        request_payload: dict[str, Any] = dict(selected_receipt)
+    elif plan is not None and selected_request is not None:
+        request_payload = _observed_request_metadata(plan, selected_request)
+    else:
+        request_payload = {}
     payload = {
         "repo": repo,
         "pr": pr,
@@ -598,6 +621,11 @@ def check_automated_review(
             "findings": len(current_request_findings),
         },
         "request": request_payload,
+        "request_error": request_error,
+        "request_observation": {
+            "acknowledged": "eyes" in reactions,
+            "clean_reaction": "+1" in reactions,
+        },
         "terminal_comment": {
             "count": len(terminal_comments),
             "latest_id": latest_terminal_comment.get("comment_id") if latest_terminal_comment else None,
@@ -653,6 +681,8 @@ def wait_for_automated_review(
         binding = str(payload.get("request_binding") or "unknown")
         status_value = payload.get("review_state")
         status = str(status_value) if status_value is not None else ""
+        if status == "stale":
+            return payload, REVIEW_EXIT_CODES[status]
         if binding != "recognized":
             if binding == "absent" and status == "not-requested":
                 return payload, REVIEW_EXIT_CODES[status]
@@ -1440,7 +1470,9 @@ def main(argv: list[str] | None = None) -> int:
             if args.command == "check":
                 payload = check_automated_review(repo, pr, args.provider, args.head, request_identity)
                 binding = str(payload.get("request_binding") or "unknown")
-                if binding != "recognized":
+                if payload.get("review_state") == "stale":
+                    exit_code = REVIEW_EXIT_CODES["stale"]
+                elif binding != "recognized":
                     status = payload.get("review_state")
                     exit_code = REVIEW_EXIT_CODES[str(status)] if binding == "absent" and status == "not-requested" else REQUEST_BINDING_EXIT_CODES.get(binding, 4)
                 else:

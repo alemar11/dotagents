@@ -72,14 +72,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "6.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "6.0.1")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "6.0.0")
+        self.assertEqual(payload["version"], "6.0.1")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -139,6 +139,14 @@ class ReviewsContractTests(unittest.TestCase):
             parse_request(plan.body.replace("request_key=run-01", "request_key=run-02"), "codex", "owner/repo", 12).classification,
             "invalid",
         )
+        malformed = parse_request(
+            plan.body.replace("request_fingerprint=", "request_fingerprint=0"),
+            "codex",
+            "owner/repo",
+            12,
+        )
+        self.assertEqual(malformed.classification, "invalid")
+        self.assertEqual(malformed.head_sha, head)
         self.assertEqual(
             parse_request(plan.body + "\n", "codex", "owner/repo", 12).classification,
             "invalid",
@@ -237,11 +245,10 @@ class ReviewsContractTests(unittest.TestCase):
 
     def test_typed_request_blocks_unbound_conflicting_and_duplicate_requests(self) -> None:
         head = "e" * 40
-        plain = {"id": 1, "body": "@codex review"}
         different = self.canonical_request(head, comment_id=2, request_key="other-run")
         exact = self.canonical_request(head, comment_id=3, request_key="run-05")
         duplicate = self.canonical_request(head, comment_id=4, request_key="run-05")
-        for comments, expected in (([plain], "request_unbound"), ([different], "invalid_request"), ([exact, duplicate], "ambiguous_request")):
+        for comments, expected in (([different], "invalid_request"), ([exact, duplicate], "ambiguous_request")):
             with self.subTest(expected=expected), \
                  mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12, "head": {"sha": head}}), \
                  mock.patch.object(cli, "gh_api_paginated_list", return_value=comments), \
@@ -251,6 +258,54 @@ class ReviewsContractTests(unittest.TestCase):
                 cli.request_automated_review("owner/repo", 12, "codex", head, "run-05", False, None)
             self.assertEqual(raised.exception.code, expected)
             mutation.assert_not_called()
+
+    def test_typed_request_ignores_historical_unbound_and_different_head_requests(self) -> None:
+        head = "e" * 40
+        old_head = "f" * 40
+        historical_plain = {"id": 1, "body": "@codex review"}
+        historical_typed = self.canonical_request(old_head, comment_id=2, request_key="old-run")
+        plan = build_request("codex", "owner/repo", 12, head, "run-06")
+        created = {
+            "id": 6,
+            "html_url": "https://github.com/owner/repo/pull/12#issuecomment-6",
+            "issue_url": "https://api.github.com/repos/owner/repo/issues/12",
+            "user": {"login": "agent"},
+            "body": plan.body,
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+        self.frozen_clock()
+        with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12, "head": {"sha": head}}), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[historical_plain, historical_typed]), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, json.dumps(created), "")) as mutation:
+            action = cli.request_automated_review("owner/repo", 12, "codex", head, "run-06", False, None)
+
+        self.assertEqual(action["status"], "posted")
+        self.assertEqual(action["request"]["comment_id"], 6)
+        mutation.assert_called_once()
+
+    def test_invalid_typed_marker_conflicts_only_for_its_full_head(self) -> None:
+        head = "e" * 40
+        old_head = "f" * 40
+        plan = build_request("codex", "owner/repo", 12, head, "run-07")
+        invalid_current = {
+            **self.canonical_request(head, comment_id=7, request_key="old-current"),
+            "body": plan.body.replace("request_fingerprint=", "request_fingerprint=0"),
+        }
+        invalid_old = {
+            **self.canonical_request(old_head, comment_id=8, request_key="old-head"),
+            "body": self.canonical_request(old_head, comment_id=8, request_key="old-head")["body"].replace(
+                "request_fingerprint=", "request_fingerprint=0"
+            ),
+        }
+
+        conflict, exact = cli._request_conflicts([invalid_current], plan)
+        self.assertEqual(conflict, "invalid")
+        self.assertEqual(exact, [])
+        conflict, exact = cli._request_conflicts([invalid_old], plan)
+        self.assertIsNone(conflict)
+        self.assertEqual(exact, [])
 
     def test_identity_bound_waiter_requires_complete_receipt(self) -> None:
         stdout = io.StringIO()
@@ -289,7 +344,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "6.0.0")
+        self.assertEqual(payload["version"], "6.0.1")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -318,7 +373,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "6.0.0")
+        self.assertEqual(payload["version"], "6.0.1")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -547,7 +602,28 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(payload["request_binding"], "recognized")
         self.assertEqual(payload["request"]["comment_id"], request["id"])
+        self.assertEqual(payload["request"], saved)
+        self.assertEqual(payload["request"]["status"], "posted")
         exact_comment.assert_called_once_with("repos/owner/repo/issues/comments/99")
+
+    def test_identity_bound_check_ignores_historical_unbound_and_different_head_requests(self) -> None:
+        head = "a" * 40
+        old_head = "b" * 40
+        exact = self.canonical_request(head, comment_id=99, created_at="2026-07-11T12:01:00Z")
+        saved = self.canonical_receipt(head, comment_id=99, created_at="2026-07-11T12:01:00Z")
+        historical_plain = {"id": 97, "body": "@codex review", "created_at": "2026-07-01T12:00:00Z"}
+        historical_typed = self.canonical_request(old_head, comment_id=98, request_key="old-run")
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(comments=[historical_plain, historical_typed, exact]),
+        ), mock.patch.object(cli, "_api_object", return_value=exact):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head, saved)
+
+        self.assertEqual(payload["request_binding"], "recognized")
+        self.assertEqual(payload["review_state"], "pending")
+        self.assertEqual(payload["request"], saved)
+        self.assertNotIn("status", payload["request_observation"])
 
     def test_check_codex_reports_acknowledged_request(self) -> None:
         head = "b" * 40
@@ -561,7 +637,10 @@ class ReviewsContractTests(unittest.TestCase):
             payload = cli.check_automated_review("owner/repo", 12, "codex", head)
 
         self.assertEqual(payload["review_state"], "acknowledged")
-        self.assertTrue(payload["request"]["acknowledged"])
+        self.assertTrue(payload["request_observation"]["acknowledged"])
+        self.assertEqual(payload["request"]["kind"], "observed-request")
+        self.assertNotIn("status", payload["request"])
+        self.assertNotIn("identity_fingerprint", payload["request"])
 
     def test_check_codex_detects_terminal_clean_conversation_comment(self) -> None:
         head = "f5dc037d8d3978df85a6e59f68ebad38e75953b0"
@@ -825,6 +904,31 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(payload["review_state"], "stale")
         self.assertFalse(payload["head_is_current"])
 
+    def test_check_head_drift_wins_over_invalid_saved_binding(self) -> None:
+        requested_head = "f" * 40
+        current_head = "e" * 40
+        saved = self.canonical_receipt(requested_head)
+        edited = {**self.canonical_request(requested_head), "body": "@codex review"}
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": current_head}}), mock.patch.object(
+            cli,
+            "gh_api_paginated_list",
+            side_effect=self.automated_review_api(),
+        ), mock.patch.object(cli, "_api_object", return_value=edited):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", requested_head, saved)
+
+        self.assertEqual(payload["request_binding"], "invalid")
+        self.assertEqual(payload["review_state"], "stale")
+        self.assertFalse(payload["head_is_current"])
+
+        with mock.patch.object(cli, "resolve_repo", return_value="owner/repo"), mock.patch.object(
+            cli, "check_automated_review", return_value=payload
+        ), contextlib.redirect_stdout(io.StringIO()):
+            code = cli.main([
+                "--json", "check", "--provider", "codex", "--repo", "owner/repo",
+                "--pr", "12", "--head", requested_head,
+            ])
+        self.assertEqual(code, 3)
+
     def test_check_rejects_ambiguous_head_prefix(self) -> None:
         with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": "a" * 40}}):
             with self.assertRaises(cli.ReviewError) as raised:
@@ -925,6 +1029,24 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(exit_code, 4)
         self.assertEqual(payload["attempts"], 1)
+        sleep.assert_not_called()
+
+    def test_wait_head_drift_wins_over_binding_failure(self) -> None:
+        stale = {
+            "request_binding": "invalid",
+            "review_state": "stale",
+            "repo": "owner/repo",
+            "pr": 12,
+        }
+        with mock.patch.object(cli, "check_automated_review", return_value=stale), mock.patch.object(
+            cli.time, "sleep"
+        ) as sleep:
+            payload, exit_code = cli.wait_for_automated_review(
+                "owner/repo", 12, "codex", None, 120, 1, 2, self.canonical_receipt("a" * 40)
+            )
+
+        self.assertEqual(exit_code, 3)
+        self.assertEqual(payload["review_state"], "stale")
         sleep.assert_not_called()
 
     def test_check_maps_api_failures_to_exit_four(self) -> None:

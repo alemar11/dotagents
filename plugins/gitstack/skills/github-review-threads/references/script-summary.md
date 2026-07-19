@@ -56,7 +56,10 @@ URL, and creation time. `wait` requires that receipt and fetches that exact id.
 Both `check` and `wait` return `data.provider`, `data.request_binding`,
 `data.review_state`, `data.head`, `data.current_head`, `data.head_is_current`,
 `data.observation_fingerprint`, plus normalized review, request,
-terminal-comment, and selected terminal evidence. Request bindings are
+terminal-comment, and selected terminal evidence. An identity-bound check
+returns the saved request receipt unchanged; a receipt-less diagnostic uses a
+`kind=observed-request` metadata object and never returns a persistable receipt.
+Acknowledgment flags are in `data.request_observation`. Request bindings are
 `absent`, `recognized`, `unbound`, `invalid`, `unknown`, or `ambiguous`.
 Review states are orthogonal: `not-requested`, `acknowledged`, `pending`,
 `clean`, `findings`, `stale`, and `error`. `error` is terminal provider-authored failure
