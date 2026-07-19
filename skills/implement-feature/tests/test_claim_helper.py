@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV6Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV7Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -178,7 +178,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_goal_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV6Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV7Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
@@ -362,6 +362,24 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertFalse(doctor["claim_root_exists"])
         self.assertIsNone(doctor["claim_store_error_code"])
         self.assertFalse(self.claim_root.exists())
+
+    def test_claim_checkout_map_matches_registration_contract(self) -> None:
+        acquired = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"),
+                env=self.env,
+            ).stdout
+        )["claim"]
+        self.assertEqual(
+            set(acquired["repository_checkouts"][0]),
+            {"checkout", "git_common_dir"},
+        )
+        packets = (ROOT / "references/run-state-packets.md").read_text()
+        self.assertIn(
+            "exact `{git_common_dir, checkout}` claim map",
+            packets,
+        )
+        self.assertNotIn("exact `{repository, checkout}` claim map", packets)
 
     def test_claim_store_permission_errors_are_not_state_conflicts(self) -> None:
         for error_number in (errno.EACCES, errno.EPERM, errno.EROFS):

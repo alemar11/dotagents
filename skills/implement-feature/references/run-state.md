@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v6 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v7 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -86,6 +86,10 @@ hand-authored projections.
 
 ## Root Title And Portfolio Goal
 
+Derive each `objective` from its current bundle; require exact
+`CI when configured`. Never reuse Goal/ledger text/fingerprint; helper rejects
+unconditional-CI registration and active state.
+
 `total_spec_count` includes only implementation-eligible Feature Specs and
 excludes coordination-only parent/global artifacts. Derive
 exactly `👨🏻‍💻 Feature Orchestrator` for one or
@@ -95,11 +99,8 @@ or scheduling input. After registration, set and observe the calling task title 
 or dispatch, then apply `root-title-observed`. Call `get_goal`; adopt a matching
 interrupted registration or call `create_goal` without `token_budget`, then
 apply `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`;
-a missing active Goal is never recreated during recovery.
-
-Root and worker Goals remain active during review waits and all nonterminal
-closeout work. They transition to complete only through staged terminal
-closeout.
+a missing active Goal is never recreated during recovery. The entry gate returns
+`new-root-required` for a blocked root Goal; never adopt or replace it.
 
 ## Review Timing
 

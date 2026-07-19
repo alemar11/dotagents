@@ -14,6 +14,10 @@ heartbeat automation are not required. Prior evidence, background agents, and fi
 access are insufficient. Missing support is `unsupported-runtime` without
 asking permission or performing mutation.
 
+Call `get_goal` once in the root. If `blocked`, return `new-root-required` before
+authorization/run-state reads, require a fresh App task, preserve prior
+artifacts, and never adopt/update that Goal.
+
 Run `scripts/delivery-preflight --json doctor` and require authenticated `gh`
 plus API reachability before external freshness checks. Missing capability is
 `unsupported-runtime`; do not reinterpret it as CI absence.
@@ -51,7 +55,9 @@ Perform one complete read-only pass:
    singular/plural root title. Require one task per Spec at most, one delivery
    per affected repository, and no more than three nonterminal tasks. Record
    live title drift without repairing it during this pass.
-6. Call `get_goal` in the root and every recorded task. Pending registration may
+6. Rederive the portfolio objective from the bundle; require exact
+   `CI when configured` and its fingerprint as a hard cut. Call `get_goal` in
+   the root and every recorded task. Pending registration may
    observe a matching active Goal or no Goal; do not adopt or create it
    during this pass. Active Goals must match their objective and fingerprint.
    Completed Goal readback requires a matching terminal seal stage. A sealed or
@@ -86,7 +92,8 @@ only through `post-terminal-drift-recorded` and block archive.
 For `portfolio_goal_state=pending`, first repair and observe the root title,
 then apply `root-title-observed`. Adopt a matching Goal observed in the pass or,
 only when none exists, call `create_goal` once without `token_budget`; apply
-`portfolio-goal-activated`. A different unfinished Goal is `needs-owner`.
+`portfolio-goal-activated`. A different unfinished Goal is `needs-owner`; a
+blocked root Goal never reaches this phase.
 
 For a nonterminal task, require exact source assignment, task ref, derived display title,
 profile, matching active Goal, and complete managed

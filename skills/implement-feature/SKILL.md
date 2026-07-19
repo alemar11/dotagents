@@ -8,14 +8,12 @@ description: Execute ready Feature Spec bundles in visible ChatGPT desktop app t
 ## Purpose
 
 Use this Codex-dependent skill only when the owner explicitly invokes $implement-feature
-or asks to run Implement Feature in the ChatGPT desktop
-app. It is the single App-only implementation adapter: it never plans, repairs
-planning artifacts, or invokes another orchestrator.
+in the ChatGPT desktop app. It is the single App-only implementation adapter:
+it never plans, repairs planning artifacts, or invokes another orchestrator.
 
-The root owns authorization, intake, the active-root claim, the typed run state,
-review deadlines, reconciliation, and final status. Exactly one visible App
-task owns each
-implementation-eligible Feature Spec through the only successful App result:
+The root owns intake, the active-root claim, typed run state,
+review deadlines, reconciliation, and final status. Exactly one visible App task
+owns each implementation-eligible Feature Spec through the only successful App result:
 `pull-request-ready-for-merge-but-not-merged`.
 
 ## Mandatory Runtime Surface Gate
@@ -28,7 +26,10 @@ Goal-tool support. Goal state must support targeted readback and normal
 `pending` to `active` to `complete` progress for both root and worker tasks.
 Goal pause/resume and App heartbeat automation are not part of this runtime
 contract. This gate does not create a task to inspect task-local tools.
-Filesystem, CLI, local skill, or background-agent access does not prove this
+Call `get_goal` once in the root. A `blocked` Goal returns `new-root-required`
+before authorization: require a fresh App task; do not read
+sources, preflight, claim, create artifacts, or call `create_goal`/`update_goal`.
+Prior artifacts stay untouched. CLI/background-agent access does not prove this
 surface. If any capability is absent or unverifiable, return
 `unsupported-runtime` without asking permission or creating artifacts.
 
@@ -114,7 +115,8 @@ Goal, task, tracker write, or source mutation was created.
 
 ## Controller Loop
 
-0. **SURFACE** — prove the required App and Goal surfaces.
+0. **SURFACE** — prove the required App and Goal surfaces; reject a blocked root
+   Goal as `new-root-required`.
 1. **AUTHORIZE** — verify the model policy and obtain the fixed-flow grant.
 2. **SNAPSHOT** — acquire the complete bundle once, retain it only as temporary
    read-only intake data, and derive the candidate delivery repository/branch set.
@@ -138,7 +140,7 @@ Goal, task, tracker write, or source mutation was created.
    and fixed 180-day prune once in the root. Warnings are nonblocking.
 7. **REGISTER** — call `ledger create` with authorization/sources, complete Spec
    registry, one delivery per affected repository, its validated preflight
-   fingerprint and CI availability, portfolio objective, and
+   fingerprint and CI availability, freshly derived current-contract portfolio objective, and
    `portfolio_goal_state=pending`;
    persist `root_task_title`, then set and observe the calling task title. Only
    then reconcile with `get_goal`; otherwise call `create_goal`. Persist active

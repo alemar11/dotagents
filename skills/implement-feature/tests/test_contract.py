@@ -16,11 +16,14 @@ def run_app_preclaim_fixture(
     permission: str,
     bundle_ready: bool,
     goal_surface_available: bool = True,
+    root_goal_state: str | None = None,
 ) -> tuple[str, list[str], list[str]]:
     observations = ["surface"]
     mutations: list[str] = []
     if not surface_available or not goal_surface_available:
         return "unsupported-runtime", observations, mutations
+    if root_goal_state == "blocked":
+        return "new-root-required", observations, mutations
     observations.append("authorization")
     if permission != "granted-by-authorized-user":
         return "permission-denied", observations, mutations
@@ -1009,6 +1012,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("already recorded at the fixed terminal result", normalized_worker)
         self.assertIn("must not resume implementation", normalized_worker)
         self.assertIn("finish that transition only", normalized_worker)
+        for text in (normalized_run_state, normalized_worker):
+            self.assertIn("CI when configured", text)
+            self.assertIn("never reuse", text.lower())
+        self.assertIn("rejects unconditional-CI registration and active state", normalized_run_state)
+        self.assertIn(
+            'PORTFOLIO_OBJECTIVE_CI_CLAUSE = "CI when configured"',
+            self.read("scripts/ledger-cache"),
+        )
+        self.assertIn(
+            "freshly derived portfolio Goal text containing exact `CI when configured`",
+            packets,
+        )
 
         surface = " ".join(
             skill.split("## Mandatory Runtime Surface Gate", 1)[1]
@@ -1189,7 +1204,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "6.0.0"', helper)
+        self.assertIn('__version__ = "7.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1200,18 +1215,23 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_v4_event_packet_registry_matches_the_v6_runtime(self) -> None:
+    def test_v4_event_packet_registry_matches_the_v7_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "6.0.0"',
+            '__version__ = "7.0.0"',
             'LEDGER_SCHEMA_VERSION = "4.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "4.0.0"',
         ):
             self.assertIn(constant, helper)
         self.assertIn("| `schema_version` | `4.0.0` |", packets)
+        self.assertIn(
+            "exact `{git_common_dir, checkout}` claim map",
+            packets,
+        )
+        self.assertNotIn("exact `{repository, checkout}` claim map", packets)
         self.assertIn("Active state accepts only ledger schema `4.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
@@ -1519,6 +1539,17 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 self.assertEqual(observed, observations)
                 self.assertEqual(mutations, [])
 
+        outcome, observed, mutations = run_app_preclaim_fixture(
+            surface_available=True,
+            goal_surface_available=True,
+            root_goal_state="blocked",
+            permission="not-requested",
+            bundle_ready=True,
+        )
+        self.assertEqual(outcome, "new-root-required")
+        self.assertEqual(observed, ["surface"])
+        self.assertEqual(mutations, [])
+
         outcome, observations, mutations = run_app_preclaim_fixture(
             surface_available=True,
             permission="granted-by-authorized-user",
@@ -1545,6 +1576,22 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )[1].split("## Mandatory Run Authorization", 1)[0]
         self.assertIn("Goal pause/resume", surface_contract)
         self.assertIn("not part of this runtime contract", " ".join(surface_contract.split()))
+        compact_surface = " ".join(surface_contract.split())
+        for token in (
+            "Call `get_goal` once in the root",
+            "`blocked` Goal",
+            "`new-root-required`",
+            "before authorization",
+            "do not read sources, preflight, claim",
+            "Prior artifacts stay untouched",
+        ):
+            self.assertIn(token, compact_surface)
+
+        recovery = " ".join(
+            self.read("references/recovery-validation.md").split()
+        )
+        self.assertIn("before authorization/run-state reads", recovery)
+        self.assertIn("never adopt/update that Goal", recovery)
 
     def test_multi_repo_requires_one_task_and_all_managed_checkouts(self) -> None:
         text = " ".join(self.read("references/multi-repo-workspace.md").split())
