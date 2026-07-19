@@ -37,6 +37,7 @@ from code_wiki.pilot.runner import (  # noqa: E402
     _sanitize_source_metadata,
     _seed_staging_outputs,
     _validate_study_brief,
+    run_pilot,
 )
 from code_wiki.pilot.runtime import (  # noqa: E402
     CodexExecutor,
@@ -1112,6 +1113,32 @@ class CodeWikiPilotTests(unittest.TestCase):
                 ["git", "status", "--porcelain=v1"], cwd=repo, check=True, capture_output=True, text=True
             ).stdout
             self.assertEqual(source_status_after, source_status_before)
+
+    def test_fixture_run_does_not_probe_codex_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo, commit = self.create_repo(root)
+            fixture = self.write_fixture(root, "baseline")
+            with mock.patch(
+                "code_wiki.pilot.runner._codex_version",
+                side_effect=AssertionError("fixture execution must not probe Codex"),
+            ):
+                return_code, manifest = run_pilot(
+                    mode="baseline",
+                    repo=str(repo),
+                    commit=commit,
+                    out=str(root / "fixture-output"),
+                    model="fixture-model",
+                    reasoning_effort="high",
+                    executor_fixture=str(fixture),
+                    cache_root=str(root / "cache"),
+                )
+
+            self.assertEqual(return_code, 0, manifest["error"])
+            self.assertEqual(
+                manifest["identity"]["codex_cli_version"],
+                "fixture-not-invoked",
+            )
 
     def test_fixture_backed_repair_is_bounded_and_second_validation_passes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

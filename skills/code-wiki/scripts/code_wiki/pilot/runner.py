@@ -1169,7 +1169,7 @@ def run_pilot(
         output_root=output_root,
         model=model,
         reasoning_effort=reasoning_effort,
-        codex_version=_codex_version(),
+        codex_version="fixture-not-invoked" if executor_fixture else _codex_version(),
         execution_evidence="fixture" if executor_fixture else "live",
     )
     _persist(output_root, manifest)
