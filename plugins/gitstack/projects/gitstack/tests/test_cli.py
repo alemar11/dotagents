@@ -7,6 +7,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -262,6 +263,87 @@ class CliContractTests(unittest.TestCase):
             with self.assertRaises(GitStackError) as raised:
                 _find_open_pr("owner/repo", "feature", Path("/tmp/repo"))
         self.assertEqual(raised.exception.code, "ambiguous_pull_request")
+
+    def test_malformed_publish_response_recovers_from_one_exact_head_read_back(self) -> None:
+        state = {
+            "repo": "owner/repo", "root": "/tmp/repo", "branch": "feature",
+            "default_branch": "main", "on_default_branch": False,
+            "upstream": "origin/feature", "needs_push": False, "dirty": False,
+            "status": [], "existing_pull_request": None,
+        }
+        pull = {
+            "number": 7, "html_url": "https://github.com/owner/repo/pull/7",
+            "title": "`title` $HOME", "body": "$(command)\nUnicode ✓",
+            "draft": True, "created_at": "2026-07-20T12:00:00Z",
+            "user": {"login": "agent"},
+            "head": {"ref": "feature", "repo": {"full_name": "owner/repo"}},
+            "base": {"ref": "main", "repo": {"full_name": "owner/repo"}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text(pull["title"], encoding="utf-8")
+            body_file.write_text(pull["body"], encoding="utf-8")
+            with mock.patch("gitstack.publish.preflight", return_value=state), \
+                 mock.patch("gitstack.publish._viewer_login", return_value="agent"), \
+                 mock.patch("gitstack.publish.api_request", return_value=Result(0, "not-json", "")) as mutation, \
+                 mock.patch("gitstack.publish._find_open_pr", return_value={"number": 7}) as lookup, \
+                 mock.patch("gitstack.publish._read_pull_request", return_value=pull) as read_back, \
+                 mock.patch("gitstack.publish.datetime") as clock:
+                clock.now.return_value = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
+                result = open_pr(
+                    repo=None, title_file=str(title_file), body_file=str(body_file),
+                    draft=True, base="main", dry_run=False, expected_worktree_fingerprint=None,
+                )
+
+        self.assertEqual(result["status"], "recovered")
+        self.assertEqual(result["pull_request"]["number"], 7)
+        mutation.assert_called_once()
+        lookup.assert_called_once()
+        read_back.assert_called_once()
+
+    def test_malformed_publish_response_missing_or_mismatched_read_back_is_ambiguous(self) -> None:
+        state = {
+            "repo": "owner/repo", "root": "/tmp/repo", "branch": "feature",
+            "default_branch": "main", "on_default_branch": False,
+            "upstream": "origin/feature", "needs_push": False, "dirty": False,
+            "status": [], "existing_pull_request": None,
+        }
+        title = "`title` $HOME"
+        body = "$(command)\nUnicode ✓"
+        mismatched = {
+            "number": 7, "html_url": "https://github.com/owner/repo/pull/7",
+            "title": title, "body": "different", "draft": True,
+            "created_at": "2026-07-20T12:00:00Z", "user": {"login": "agent"},
+            "head": {"ref": "feature", "repo": {"full_name": "owner/repo"}},
+            "base": {"ref": "main", "repo": {"full_name": "owner/repo"}},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            title_file = Path(directory) / "title.txt"
+            body_file = Path(directory) / "body.md"
+            title_file.write_text(title, encoding="utf-8")
+            body_file.write_text(body, encoding="utf-8")
+            for lookup_result, read_result in ((None, mismatched), ({"number": 7}, mismatched)):
+                with self.subTest(lookup_result=lookup_result), \
+                     mock.patch("gitstack.publish.preflight", return_value=state), \
+                     mock.patch("gitstack.publish._viewer_login", return_value="agent"), \
+                     mock.patch("gitstack.publish.api_request", return_value=Result(0, "not-json", "")), \
+                     mock.patch("gitstack.publish._find_open_pr", return_value=lookup_result) as lookup, \
+                     mock.patch("gitstack.publish._read_pull_request", return_value=read_result) as read_back, \
+                     mock.patch("gitstack.publish.datetime") as clock:
+                    clock.now.return_value = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
+                    with self.assertRaises(GitStackError) as raised:
+                        open_pr(
+                            repo=None, title_file=str(title_file), body_file=str(body_file),
+                            draft=True, base="main", dry_run=False, expected_worktree_fingerprint=None,
+                        )
+
+                self.assertEqual(raised.exception.code, "provider_write_ambiguous")
+                rendered = json.dumps(raised.exception.details, ensure_ascii=False)
+                self.assertNotIn(title, rendered)
+                self.assertNotIn(body, rendered)
+                lookup.assert_called_once()
+                self.assertEqual(read_back.call_count, 0 if lookup_result is None else 1)
 
 
 if __name__ == "__main__":

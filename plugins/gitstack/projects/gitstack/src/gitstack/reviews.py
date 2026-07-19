@@ -20,7 +20,9 @@ from .provider_text import (
     API_VERSION,
     ProviderText,
     api_request,
+    prove_mutation,
     read_text_file,
+    response_text_matches,
     require_worktree,
     verify_response_text,
     verify_worktree_unchanged,
@@ -652,20 +654,38 @@ def _verify_pr_target(repo: str, pr: int) -> dict[str, Any]:
     return payload
 
 
-def _created_after(item: dict[str, Any], started_at: str) -> bool:
-    return str(item.get("created_at") or "") >= started_at
+def _in_creation_window(item: dict[str, Any], field: str, started_at: str, finished_at: str) -> bool:
+    timestamp = str(item.get(field) or "")
+    return bool(timestamp and started_at <= timestamp <= finished_at)
 
 
 def _proof(item: dict[str, Any], body: ProviderText, *, target: dict[str, Any], status: str) -> dict[str, Any]:
-    try:
-        verify_response_text(item, body)
-    except GitStackError as exc:
-        raise _review_error(exc) from exc
+    verify_response_text(item, body)
     object_id = item.get("id")
     url = item.get("html_url")
     if not isinstance(object_id, int) or not isinstance(url, str) or not url:
-        raise ReviewError("GitHub response omitted provider object identity.", code="provider_identity_missing", exit_code=65)
+        raise GitStackError("GitHub response omitted provider object identity.", code="provider_identity_missing", exit_code=65)
     return {"status": status, "id": object_id, "url": url, "target": target, "text": body.proof()}
+
+
+def _proof_failure(message: str, code: str) -> GitStackError:
+    return GitStackError(message, code=code, exit_code=65)
+
+
+def _item_login(item: dict[str, Any]) -> str:
+    user = item.get("user")
+    return str(user.get("login") or "") if isinstance(user, dict) else ""
+
+
+def _read_back_list(endpoint: str) -> list[dict[str, Any]]:
+    try:
+        return gh_api_paginated_list(endpoint)
+    except ReviewError as exc:
+        raise GitStackError(
+            "GitHub exact-target read-back failed.",
+            code=exc.code,
+            exit_code=exc.exit_code,
+        ) from exc
 
 
 def _guarded_result(
@@ -705,29 +725,39 @@ def post_conversation_comment(
     actor = _viewer_login()
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", f"repos/{repo}/issues/{pr}/comments", {"body": body.text})
-    if result.returncode:
+    finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    def prove(item: dict[str, Any]) -> dict[str, Any]:
+        if (
+            not str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}")
+            or _item_login(item) != actor
+            or not _in_creation_window(item, "created_at", started_at, finished_at)
+        ):
+            raise _proof_failure("Comment response did not match the intended creation.", "provider_target_mismatch")
+        _proof(item, body, target=target, status="posted")
+        return item
+
+    def read_back() -> dict[str, Any]:
         matches = [
-            item for item in gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
-            if str((item.get("user") or {}).get("login") or "") == actor
-            and str(item.get("body") or "").encode("utf-8") == body.data
-            and _created_after(item, started_at)
+            item for item in _read_back_list(f"repos/{repo}/issues/{pr}/comments")
+            if _item_login(item) == actor
+            and response_text_matches(item, body)
+            and _in_creation_window(item, "created_at", started_at, finished_at)
+            and str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}")
         ]
         if len(matches) != 1:
-            raise ReviewError(
-                "Comment creation is unconfirmed after one exact-target read-back; do not retry blindly.",
-                code="provider_write_ambiguous", exit_code=result.returncode,
-                details={"target": target, "matches": len(matches), "text": body.proof()},
-            )
-        item, status = matches[0], "recovered"
-    else:
-        try:
-            item = json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
-            raise ReviewError("Comment response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
-        status = "posted"
-    if not isinstance(item, dict) or not str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}"):
-        raise ReviewError("Comment response did not match the intended PR.", code="provider_target_mismatch", exit_code=65)
-    return _guarded_result(_proof(item, body, target=target, status=status), before)
+            raise _proof_failure("Comment read-back did not uniquely prove the creation.", "provider_read_back_not_unique")
+        return prove(matches[0])
+
+    try:
+        proof = prove_mutation(
+            result, prove_response=prove, read_back=read_back, target=target,
+            text=body.proof(), ambiguous_message="Comment creation is unconfirmed after one exact-target read-back; do not retry blindly.",
+        )
+        status = "recovered" if proof.recovered else "posted"
+        return _guarded_result(_proof(proof.value, body, target=target, status=status), before)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
 
 
 def reply_to_review_comment(
@@ -752,30 +782,41 @@ def reply_to_review_comment(
     actor = _viewer_login()
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", endpoint, {"body": body.text})
-    if result.returncode:
+    finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    def prove(item: dict[str, Any]) -> dict[str, Any]:
+        if (
+            item.get("in_reply_to_id") != comment_id
+            or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
+            or _item_login(item) != actor
+            or not _in_creation_window(item, "created_at", started_at, finished_at)
+        ):
+            raise _proof_failure("Review reply did not match the intended creation.", "provider_target_mismatch")
+        _proof(item, body, target=target, status="replied")
+        return item
+
+    def read_back() -> dict[str, Any]:
         matches = [
-            item for item in gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
+            item for item in _read_back_list(f"repos/{repo}/pulls/{pr}/comments")
             if item.get("in_reply_to_id") == comment_id
-            and str((item.get("user") or {}).get("login") or "") == actor
-            and str(item.get("body") or "").encode("utf-8") == body.data
-            and _created_after(item, started_at)
+            and _item_login(item) == actor
+            and response_text_matches(item, body)
+            and _in_creation_window(item, "created_at", started_at, finished_at)
+            and str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
         ]
         if len(matches) != 1:
-            raise ReviewError(
-                "Review reply is unconfirmed after one exact-thread read-back; do not retry blindly.",
-                code="provider_write_ambiguous", exit_code=result.returncode,
-                details={"target": target, "matches": len(matches), "text": body.proof()},
-            )
-        item, status = matches[0], "recovered"
-    else:
-        try:
-            item = json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
-            raise ReviewError("Review reply response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
-        status = "replied"
-    if not isinstance(item, dict) or item.get("in_reply_to_id") != comment_id or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
-        raise ReviewError("Review reply response did not match the intended thread.", code="provider_target_mismatch", exit_code=65)
-    return _guarded_result(_proof(item, body, target=target, status=status), before)
+            raise _proof_failure("Review reply read-back did not uniquely prove the creation.", "provider_read_back_not_unique")
+        return prove(matches[0])
+
+    try:
+        proof = prove_mutation(
+            result, prove_response=prove, read_back=read_back, target=target,
+            text=body.proof(), ambiguous_message="Review reply is unconfirmed after one exact-thread read-back; do not retry blindly.",
+        )
+        status = "recovered" if proof.recovered else "replied"
+        return _guarded_result(_proof(proof.value, body, target=target, status=status), before)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
 
 
 def edit_comment(
@@ -799,31 +840,45 @@ def edit_comment(
         before = require_worktree(expected_worktree_fingerprint)
     except GitStackError as exc:
         raise _review_error(exc) from exc
-    if str(current.get("body") or "").encode("utf-8") == body.data:
-        return _guarded_result(_proof(current, body, target=target, status="reused"), before)
+    if response_text_matches(current, body):
+        try:
+            return _guarded_result(_proof(current, body, target=target, status="reused"), before)
+        except GitStackError as exc:
+            raise _review_error(exc) from exc
     if dry_run:
         return {"status": "dry-run", "target": target, "text": body.proof(), "transport": {"method": "PATCH", "endpoint": endpoint, "api_version": API_VERSION}}
+    actor = _viewer_login()
+    if _item_login(current) != actor:
+        raise ReviewError("Authenticated identity does not own the requested comment.", code="provider_identity_mismatch", exit_code=65)
     result = api_request("PATCH", endpoint, {"body": body.text})
-    if result.returncode:
-        item = _api_object(endpoint)
-        if str(item.get("body") or "").encode("utf-8") != body.data:
-            raise ReviewError(
-                "Comment edit is unconfirmed after one exact-object read-back; do not retry blindly.",
-                code="provider_write_ambiguous", exit_code=result.returncode,
-                details={"target": target, "text": body.proof()},
-            )
-        status = "recovered"
-    else:
+
+    def prove(item: dict[str, Any]) -> dict[str, Any]:
+        item_target_url = item.get("issue_url") if kind == "conversation" else item.get("pull_request_url")
+        if (
+            item.get("id") != comment_id
+            or not str(item_target_url or "").endswith(f"/repos/{repo}/{target_noun}/{pr}")
+            or _item_login(item) != actor
+        ):
+            raise _proof_failure("Comment edit did not match the intended object.", "provider_target_mismatch")
+        _proof(item, body, target=target, status="edited")
+        return item
+
+    def read_back() -> dict[str, Any]:
         try:
-            item = json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
-            raise ReviewError("Comment edit response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
-        status = "edited"
-    if not isinstance(item, dict):
-        raise ReviewError("Comment edit returned an unexpected response.", code="provider_response_invalid", exit_code=65)
-    if item.get("id") != comment_id:
-        raise ReviewError("Comment edit response identity did not match the requested comment.", code="provider_target_mismatch", exit_code=65)
-    return _guarded_result(_proof(item, body, target=target, status=status), before)
+            item = _api_object(endpoint)
+        except ReviewError as exc:
+            raise _proof_failure("Comment edit read-back failed.", exc.code) from exc
+        return prove(item)
+
+    try:
+        proof = prove_mutation(
+            result, prove_response=prove, read_back=read_back, target=target,
+            text=body.proof(), ambiguous_message="Comment edit is unconfirmed after one exact-object read-back; do not retry blindly.",
+        )
+        status = "recovered" if proof.recovered else "edited"
+        return _guarded_result(_proof(proof.value, body, target=target, status=status), before)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
 
 
 def submit_review(
@@ -848,30 +903,43 @@ def submit_review(
     actor = _viewer_login()
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", endpoint, {"body": body.text, "event": provider_event})
-    if result.returncode:
+    finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+    def prove(item: dict[str, Any]) -> dict[str, Any]:
+        if (
+            _item_login(item) != actor
+            or item.get("state") != expected_state
+            or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
+            or str(item.get("commit_id") or "") != target["head"]
+            or not _in_creation_window(item, "submitted_at", started_at, finished_at)
+        ):
+            raise _proof_failure("Review did not match the intended target and event.", "provider_target_mismatch")
+        _proof(item, body, target=target, status="submitted")
+        return item
+
+    def read_back() -> dict[str, Any]:
         matches = [
-            item for item in gh_api_paginated_list(endpoint)
-            if str((item.get("user") or {}).get("login") or "") == actor
+            item for item in _read_back_list(endpoint)
+            if _item_login(item) == actor
             and item.get("state") == expected_state
-            and str(item.get("body") or "").encode("utf-8") == body.data
-            and str(item.get("submitted_at") or "") >= started_at
+            and response_text_matches(item, body)
+            and str(item.get("commit_id") or "") == target["head"]
+            and _in_creation_window(item, "submitted_at", started_at, finished_at)
+            and str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
         ]
         if len(matches) != 1:
-            raise ReviewError(
-                "Review submission is unconfirmed after one exact-target read-back; do not retry blindly.",
-                code="provider_write_ambiguous", exit_code=result.returncode,
-                details={"target": target, "matches": len(matches), "text": body.proof()},
-            )
-        item, status = matches[0], "recovered"
-    else:
-        try:
-            item = json.loads(result.stdout)
-        except json.JSONDecodeError as exc:
-            raise ReviewError("Review response was not valid JSON.", code="provider_response_invalid", exit_code=65) from exc
-        status = "submitted"
-    if not isinstance(item, dict) or item.get("state") != expected_state or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
-        raise ReviewError("Review response did not match the intended target and event.", code="provider_target_mismatch", exit_code=65)
-    return _guarded_result(_proof(item, body, target=target, status=status), before)
+            raise _proof_failure("Review read-back did not uniquely prove the submission.", "provider_read_back_not_unique")
+        return prove(matches[0])
+
+    try:
+        proof = prove_mutation(
+            result, prove_response=prove, read_back=read_back, target=target,
+            text=body.proof(), ambiguous_message="Review submission is unconfirmed after one exact-target read-back; do not retry blindly.",
+        )
+        status = "recovered" if proof.recovered else "submitted"
+        return _guarded_result(_proof(proof.value, body, target=target, status=status), before)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
 
 
 def render_text(payload: dict[str, Any]) -> str:

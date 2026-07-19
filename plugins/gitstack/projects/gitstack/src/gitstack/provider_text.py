@@ -7,13 +7,14 @@ import stat
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Generic, TypeVar
 
 from .common import GitStackError, Result, checked
 
 API_VERSION = "2026-03-10"
 ACCEPT_HEADER = "Accept: application/vnd.github+json"
 VERSION_HEADER = f"X-GitHub-Api-Version: {API_VERSION}"
+ProofValue = TypeVar("ProofValue")
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,12 @@ class ProviderText:
             "bytes": len(self.data),
             "sha256": self.sha256,
         }
+
+
+@dataclass(frozen=True)
+class MutationProof(Generic[ProofValue]):
+    value: ProofValue
+    recovered: bool
 
 
 def read_text_file(
@@ -152,14 +159,60 @@ def parse_api_object(result: Result) -> dict[str, Any]:
     return payload
 
 
-def verify_response_text(payload: dict[str, Any], expected: ProviderText, *, field: str = "body") -> None:
-    actual = payload.get(field)
-    if not isinstance(actual, str) or actual.encode("utf-8") != expected.data:
+def prove_mutation(
+    result: Result,
+    *,
+    prove_response: Callable[[dict[str, Any]], ProofValue],
+    read_back: Callable[[], ProofValue],
+    target: dict[str, Any],
+    text: dict[str, Any],
+    ambiguous_message: str,
+) -> MutationProof[ProofValue]:
+    response_failure = "provider_write_unconfirmed"
+    if result.returncode == 0:
+        try:
+            return MutationProof(prove_response(parse_api_object(result)), recovered=False)
+        except GitStackError as exc:
+            response_failure = exc.code
+
+    try:
+        recovered = read_back()
+    except GitStackError as exc:
         raise GitStackError(
-            "GitHub response text did not match the submitted byte fingerprint.",
-            code="provider_text_mismatch",
-            exit_code=65,
-        )
+            ambiguous_message,
+            code="provider_write_ambiguous",
+            exit_code=result.returncode or 65,
+            details={
+                "target": target,
+                "text": text,
+                "response": {
+                    "code": response_failure,
+                    "transport_exit_code": result.returncode,
+                },
+                "read_back": {"code": exc.code},
+            },
+        ) from exc
+    return MutationProof(recovered, recovered=True)
+
+
+def verify_response_text(payload: dict[str, Any], expected: ProviderText, *, field: str = "body") -> None:
+    if response_text_matches(payload, expected, field=field):
+        return
+    raise GitStackError(
+        "GitHub response text did not match the submitted byte fingerprint.",
+        code="provider_text_mismatch",
+        exit_code=65,
+    )
+
+
+def response_text_matches(payload: dict[str, Any], expected: ProviderText, *, field: str = "body") -> bool:
+    actual = payload.get(field)
+    if not isinstance(actual, str):
+        return False
+    try:
+        return actual.encode("utf-8") == expected.data
+    except UnicodeEncodeError:
+        return False
 
 
 def worktree_snapshot(cwd: Path | None = None) -> dict[str, Any]:

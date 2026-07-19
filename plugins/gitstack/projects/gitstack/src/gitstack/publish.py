@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +9,7 @@ from .common import GitStackError, REPO_PATTERN, checked, normalize_remote, run
 from .provider_text import (
     API_VERSION,
     api_request,
-    parse_api_object,
+    prove_mutation,
     read_text_file,
     require_worktree,
     verify_response_text,
@@ -138,11 +139,17 @@ def _verified_pull_request(
     draft: bool,
     title: Any,
     body: Any,
+    actor: str | None = None,
+    started_at: str | None = None,
+    finished_at: str | None = None,
 ) -> dict[str, Any]:
     verify_response_text(payload, title, field="title")
     verify_response_text(payload, body)
     head = payload.get("head") if isinstance(payload.get("head"), dict) else {}
     base_payload = payload.get("base") if isinstance(payload.get("base"), dict) else {}
+    head_repo = head.get("repo") if isinstance(head.get("repo"), dict) else {}
+    base_repo = base_payload.get("repo") if isinstance(base_payload.get("repo"), dict) else {}
+    user = payload.get("user") if isinstance(payload.get("user"), dict) else {}
     number = payload.get("number")
     html_url = payload.get("html_url")
     if (
@@ -155,6 +162,20 @@ def _verified_pull_request(
     ):
         raise GitStackError(
             "GitHub pull-request response did not match the intended target.",
+            code="provider_target_mismatch",
+            exit_code=65,
+        )
+    if actor is not None and (
+        user.get("login") != actor
+        or head_repo.get("full_name") != repo
+        or base_repo.get("full_name") != repo
+        or not isinstance(payload.get("created_at"), str)
+        or not started_at
+        or not finished_at
+        or not started_at <= payload["created_at"] <= finished_at
+    ):
+        raise GitStackError(
+            "GitHub pull-request response did not prove the intended creation lineage.",
             code="provider_target_mismatch",
             exit_code=65,
         )
@@ -183,6 +204,25 @@ def _read_pull_request(repo: str, number: int, root: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise GitStackError("Pull-request read-back returned an unexpected response.", code="provider_response_invalid", exit_code=65)
     return payload
+
+
+def _viewer_login(root: Path) -> str:
+    result = checked(
+        [
+            "gh", "api", "user", "--method", "GET",
+            "--header", "Accept: application/vnd.github+json",
+            "--header", f"X-GitHub-Api-Version: {API_VERSION}",
+        ],
+        root,
+    )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise GitStackError("Could not parse authenticated GitHub identity.", code="provider_identity_missing", exit_code=65) from exc
+    login = payload.get("login") if isinstance(payload, dict) else None
+    if not isinstance(login, str) or not login:
+        raise GitStackError("Could not resolve authenticated GitHub identity.", code="provider_identity_missing", exit_code=65)
+    return login
 
 
 def open_pr(
@@ -234,25 +274,37 @@ def open_pr(
             "text": {"title": title.proof(), "body": body.proof()},
             "preflight": state,
         }
+    actor = _viewer_login(root)
+    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", f"repos/{state['repo']}/pulls", request, cwd=root)
-    status = "created"
-    if result.returncode:
+    finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    target = {"repo": state["repo"], "head": state["branch"], "base": selected_base, "draft": draft}
+    text = {"title": title.proof(), "body": body.proof()}
+
+    def prove(payload: dict[str, Any]) -> dict[str, Any]:
+        return _verified_pull_request(
+            payload, repo=state["repo"], branch=state["branch"], base=selected_base,
+            draft=draft, title=title, body=body, actor=actor,
+            started_at=started_at, finished_at=finished_at,
+        )
+
+    def read_back() -> dict[str, Any]:
         recovered = _find_open_pr(state["repo"], state["branch"], root)
         if recovered is None:
             raise GitStackError(
-                "Pull-request creation is unconfirmed after one exact-head read-back; do not retry blindly.",
-                code="provider_write_ambiguous",
-                exit_code=result.returncode,
-                details={"target": {"repo": state["repo"], "head": state["branch"]}, "read_back": "not-found"},
+                "Exact-head pull-request read-back found no matching object.",
+                code="provider_read_back_not_unique",
+                exit_code=65,
             )
         payload = _read_pull_request(state["repo"], int(recovered["number"]), root)
-        status = "recovered"
-    else:
-        payload = parse_api_object(result)
-    verified = _verified_pull_request(
-        payload, repo=state["repo"], branch=state["branch"], base=selected_base,
-        draft=draft, title=title, body=body,
+        return prove(payload)
+
+    proof = prove_mutation(
+        result, prove_response=prove, read_back=read_back, target=target, text=text,
+        ambiguous_message="Pull-request creation is unconfirmed after one exact-head read-back; do not retry blindly.",
     )
+    status = "recovered" if proof.recovered else "created"
+    verified = proof.value
     try:
         worktree_after = verify_worktree_unchanged(worktree_before, root)
     except GitStackError as exc:

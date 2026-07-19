@@ -6,13 +6,28 @@ import json
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from gitstack import reviews as cli
+from gitstack.common import GitStackError, Result
+from gitstack.provider_text import ProviderText
 
 class ReviewsContractTests(unittest.TestCase):
+    HOSTILE = "`ticks` $(command) ${HOME} $PATH 'single' \"double\"\n-leading\nUnicode ✓ 🚀"
+
+    def provider_body(self) -> ProviderText:
+        return ProviderText("body", self.HOSTILE.encode("utf-8"), self.HOSTILE)
+
+    def frozen_clock(self):
+        patcher = mock.patch.object(cli, "datetime")
+        clock = patcher.start()
+        self.addCleanup(patcher.stop)
+        clock.now.return_value = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
+        return clock
+
     def automated_review_api(self, *, reviews=None, inline=None, comments=None, reactions=None):
         payloads = {
             "pulls/12/reviews": reviews or [],
@@ -165,6 +180,170 @@ class ReviewsContractTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
         self.assertNotIn(hostile, stdout.getvalue() + stderr.getvalue())
+
+    def test_malformed_comment_response_recovers_from_one_unique_read_back(self) -> None:
+        self.frozen_clock()
+        body = self.provider_body()
+        item = {
+            "id": 41, "html_url": "https://github.com/owner/repo/issues/12#issuecomment-41",
+            "issue_url": "https://api.github.com/repos/owner/repo/issues/12",
+            "user": {"login": "agent"}, "body": body.text,
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+        unprovable_responses = (
+            "not-json",
+            "[]",
+            json.dumps({"body": body.text}),
+            json.dumps({**item, "user": "agent"}),
+            json.dumps({**item, "issue_url": "https://api.github.com/repos/owner/other/issues/12"}),
+            json.dumps({**item, "body": "different"}),
+            json.dumps({**item, "body": "\ud800"}),
+        )
+        for response in unprovable_responses:
+            with self.subTest(response=response[:20]), \
+                 mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12}), \
+                 mock.patch.object(cli, "require_worktree", return_value=None), \
+                 mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+                 mock.patch.object(cli, "api_request", return_value=Result(0, response, "")) as mutation, \
+                 mock.patch.object(cli, "gh_api_paginated_list", return_value=[item]) as read_back:
+                action = cli.post_conversation_comment("owner/repo", 12, body, False, None)
+
+            self.assertEqual(action["status"], "recovered")
+            self.assertEqual(action["id"], 41)
+            mutation.assert_called_once()
+            read_back.assert_called_once()
+
+    def test_malformed_comment_response_with_missing_read_back_is_ambiguous_and_redacted(self) -> None:
+        self.frozen_clock()
+        body = self.provider_body()
+        with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12}), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "not-json", "")), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[]) as read_back, \
+             self.assertRaises(cli.ReviewError) as raised:
+            cli.post_conversation_comment("owner/repo", 12, body, False, None)
+
+        self.assertEqual(raised.exception.code, "provider_write_ambiguous")
+        self.assertEqual(raised.exception.details["response"]["code"], "provider_response_invalid")
+        self.assertNotIn(body.text, json.dumps(raised.exception.details, ensure_ascii=False))
+        read_back.assert_called_once()
+
+    def test_recovered_comment_preserves_identity_when_worktree_post_check_fails(self) -> None:
+        self.frozen_clock()
+        body = self.provider_body()
+        item = {
+            "id": 42, "html_url": "https://github.com/owner/repo/issues/12#issuecomment-42",
+            "issue_url": "https://api.github.com/repos/owner/repo/issues/12",
+            "user": {"login": "agent"}, "body": body.text,
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+        before = {"fingerprint": "a" * 64}
+        drift = GitStackError(
+            "The provider mutation completed, but the Git worktree fingerprint changed.",
+            code="provider_write_partial_success", exit_code=65,
+        )
+        with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12}), \
+             mock.patch.object(cli, "require_worktree", return_value=before), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "not-json", "")), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[item]), \
+             mock.patch.object(cli, "verify_worktree_unchanged", side_effect=drift), \
+             self.assertRaises(cli.ReviewError) as raised:
+            cli.post_conversation_comment("owner/repo", 12, body, False, before["fingerprint"])
+
+        self.assertEqual(raised.exception.code, "provider_write_partial_success")
+        self.assertEqual(raised.exception.details["action"]["status"], "recovered")
+        self.assertEqual(raised.exception.details["action"]["id"], 42)
+        self.assertNotIn(body.text, json.dumps(raised.exception.details, ensure_ascii=False))
+
+    def test_malformed_reply_response_recovers_and_duplicate_read_back_is_ambiguous(self) -> None:
+        self.frozen_clock()
+        body = self.provider_body()
+        parent = {"id": 55, "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12"}
+        item = {
+            "id": 56, "html_url": "https://github.com/owner/repo/pull/12#discussion_r56",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "in_reply_to_id": 55, "user": {"login": "agent"}, "body": body.text,
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+        common = [
+            mock.patch.object(cli, "_api_object", return_value=parent),
+            mock.patch.object(cli, "require_worktree", return_value=None),
+            mock.patch.object(cli, "_viewer_login", return_value="agent"),
+            mock.patch.object(cli, "api_request", return_value=Result(0, "[]", "")),
+        ]
+        with common[0], common[1], common[2], common[3], \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[item]) as read_back:
+            action = cli.reply_to_review_comment("owner/repo", 12, 55, body, False, None)
+        self.assertEqual(action["status"], "recovered")
+        read_back.assert_called_once()
+
+        with mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "[]", "")), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[item, item]) as duplicate, \
+             self.assertRaises(cli.ReviewError) as raised:
+            cli.reply_to_review_comment("owner/repo", 12, 55, body, False, None)
+        self.assertEqual(raised.exception.code, "provider_write_ambiguous")
+        duplicate.assert_called_once()
+
+    def test_malformed_edit_response_recovers_and_mismatched_read_back_is_ambiguous(self) -> None:
+        body = self.provider_body()
+        current = {
+            "id": 61, "html_url": "https://github.com/owner/repo/issues/12#issuecomment-61",
+            "issue_url": "https://api.github.com/repos/owner/repo/issues/12",
+            "user": {"login": "agent"}, "body": "old",
+        }
+        updated = {**current, "body": body.text}
+        with mock.patch.object(cli, "_api_object", side_effect=[current, updated]) as read_object, \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "not-json", "")):
+            action = cli.edit_comment("owner/repo", 12, 61, "conversation", body, False, None)
+        self.assertEqual(action["status"], "recovered")
+        self.assertEqual(read_object.call_count, 2)
+
+        mismatched = {**updated, "id": 62}
+        with mock.patch.object(cli, "_api_object", side_effect=[current, mismatched]) as read_object, \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "not-json", "")), \
+             self.assertRaises(cli.ReviewError) as raised:
+            cli.edit_comment("owner/repo", 12, 61, "conversation", body, False, None)
+        self.assertEqual(raised.exception.code, "provider_write_ambiguous")
+        self.assertNotIn(body.text, json.dumps(raised.exception.details, ensure_ascii=False))
+        self.assertEqual(read_object.call_count, 2)
+
+    def test_malformed_review_response_recovers_and_duplicate_read_back_is_ambiguous(self) -> None:
+        self.frozen_clock()
+        body = self.provider_body()
+        head = "a" * 40
+        review = {
+            "id": 71, "html_url": "https://github.com/owner/repo/pull/12#pullrequestreview-71",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "user": {"login": "agent"}, "state": "APPROVED", "body": body.text,
+            "commit_id": head, "submitted_at": "2026-07-20T12:00:00Z",
+        }
+        with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12, "head": {"sha": head}}), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "not-json", "")), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[review]) as read_back:
+            action = cli.submit_review("owner/repo", 12, "approve", body, False, None)
+        self.assertEqual(action["status"], "recovered")
+        read_back.assert_called_once()
+
+        with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12, "head": {"sha": head}}), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=Result(0, "not-json", "")), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[review, review]) as duplicate, \
+             self.assertRaises(cli.ReviewError) as raised:
+            cli.submit_review("owner/repo", 12, "approve", body, False, None)
+        self.assertEqual(raised.exception.code, "provider_write_ambiguous")
+        duplicate.assert_called_once()
 
     def test_check_codex_reports_findings_for_expected_head(self) -> None:
         head = "a" * 40
