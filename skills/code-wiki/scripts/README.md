@@ -1,17 +1,60 @@
 # code-wiki Helper Scripts
 
-`scripts/code-wiki` is the only public executable surface for this skill.
+`scripts/code-wiki` is the only public executable surface for this skill. The
+`scripts/code_wiki/` package is shipped internal runtime code; docs, tests, and
+examples must use the launcher instead of package modules.
 
-The `scripts/code_wiki/` package is shipped internal runtime code used by that
-launcher. Skill docs, tests, and examples should call `scripts/code-wiki ...`
-instead of running Python module files directly.
+Start with:
 
-Public commands:
+```bash
+scripts/code-wiki --help
+scripts/code-wiki --version
+scripts/code-wiki --json doctor
+```
 
-- `scripts/code-wiki --version`
-- `scripts/code-wiki inventory --repo <repo-path> --out <wiki-out>/data/inventory.json`
-- `scripts/code-wiki synthesize --repo <repo-path> --inventory <wiki-out>/data/inventory.json --out <wiki-out>/data/claim-matrix.json`
-- `scripts/code-wiki scaffold --out <wiki-out> --title <repo-name>`
-- `scripts/code-wiki evidence-link --repo <repo-path> --evidence <path:start-end> [--html]`
-- `scripts/code-wiki evidence-link --batch --repo <repo-path> --in <refs.txt|json|-> [--html]`
-- `scripts/code-wiki validate --wiki <wiki-out> [--strict]`
+`scripts/code_wiki/version.py` is the single semver source and currently
+reports `0.7.0`. The standard-library-only CLI keeps existing inventory,
+synthesize, scaffold, evidence-link, and validate commands compatible.
+
+## Opt-In Pilot
+
+The pilot is never selected by an ordinary Code Wiki request. An explicit run
+uses the unchanged baseline or the two-node candidate (`study -> render`):
+source-bearing nodes use the non-bypass workspace sandbox, while `render` uses
+an ephemeral named permission profile that can read only minimal runtime files
+and its declared input view and can write only its working and staging roots.
+
+```bash
+scripts/code-wiki --json pilot run \
+  --mode <baseline|node-graph> \
+  --repo <clean-git-repo> \
+  --commit <commit> \
+  --out <output-outside-repo> \
+  --model <model> \
+  --reasoning-effort <low|medium|high|xhigh>
+
+scripts/code-wiki --json pilot compare \
+  --baseline-run <baseline-out>/run.json \
+  --candidate-run <candidate-out>/run.json \
+  --out <comparison-out>
+```
+
+`doctor` is read-only and invokes no model or key creation. Pilot runs create
+disposable clean snapshots under `~/.cache/dotagents/skills/code-wiki/pilot/`;
+the first live run also creates a mode-0600 provenance key there. Durable
+wikis, raw JSONL/stderr, manifests, reader evidence, and comparisons remain
+under the selected output. Nested Codex calls use fresh ephemeral contexts,
+explicit model and effort, and a non-bypass workspace sandbox whose sole added
+writable root is a per-node staging directory.
+
+`--executor-fixture` and `--cache-root` are explicit test-only run options.
+They emit `execution_evidence=fixture`, cannot produce a promotion decision,
+and may be used together only with a cache root disjoint from source and
+output. The runner-owned execution-provenance receipt binds this classification
+to complete manifest evidence and raw stdout/stderr invocation hashes. Live
+receipts are signed with the per-user key, and comparison independently verifies
+them. A passing candidate records exactly two generation calls; its one optional
+bounded repair is a visible third call, while reader usage stays in the reader
+bucket. Under `--json`, command errors return an
+`ok=false` object without credentials. See `../references/pilot.md` for typed
+manifest fields, safety rules, exact thresholds, and result semantics.
