@@ -222,6 +222,8 @@ class CodexExecutor:
                     self.model,
                     "--config",
                     f'model_reasoning_effort="{self.reasoning_effort}"',
+                    "--config",
+                    'shell_environment_policy.exclude=["^OPENAI_API_KEY$"]',
                     "--cd",
                     str(working_directory),
                     "--skip-git-repo-check",

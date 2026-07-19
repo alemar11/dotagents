@@ -471,6 +471,10 @@ class CodeWikiPilotTests(unittest.TestCase):
             self.assertEqual(writable_additions, [output])
             self.assertNotIn(snapshot, writable_additions)
             self.assertIn("--skip-git-repo-check", command)
+            self.assertIn(
+                'shell_environment_policy.exclude=["^OPENAI_API_KEY$"]',
+                command,
+            )
 
     def test_source_free_executor_uses_restricted_permission_profile(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
