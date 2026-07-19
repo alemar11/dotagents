@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "7.0.0"
-LEDGER_SCHEMA_VERSION = "4.0.0"
+__version__ = "8.0.0"
+LEDGER_SCHEMA_VERSION = "5.0.0"
 REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -108,6 +108,7 @@ EVENT_TYPES = {
     "review-wait-started",
     "review-wait-invoked",
     "review-observed",
+    "autoreview-observed",
     "gate-observed",
     "task-terminal-sealed",
     "task-goal-completed",
@@ -140,6 +141,10 @@ REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
 REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"}
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
+AUTOREVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
+AUTOREVIEW_TERMINAL_STATES = {
+    "fix-required", "verification-clean", "terminal-clean", "terminal-composite-clean"
+}
 PROJECTIONS = {"status", "dispatch", "recovery", "terminal"}
 PORTFOLIO_OBJECTIVE_CI_CLAUSE = "CI when configured"
 
@@ -1329,6 +1334,63 @@ def seal_state_fingerprint(state: dict[str, Any]) -> None:
     state["content_fingerprint"] = state_payload_fingerprint(state)
 
 
+def validate_autoreview_summary(
+    value: Any,
+    field: str,
+    *,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> dict[str, Any]:
+    try:
+        item = exact_object(
+            value,
+            {
+                "lineage_id", "parent_evidence_fingerprint", "evidence_fingerprint",
+                "review_phase", "terminal_state", "head_sha", "base_ref",
+                "merge_base_sha", "target_fingerprint", "changed_files",
+                "full_reviews", "fix_verifications", "open_findings",
+                "prompt_characters", "elapsed_seconds", "evidence_ref", "observed_at",
+            },
+            field,
+        )
+        for name in ("lineage_id", "evidence_fingerprint", "target_fingerprint"):
+            canonical_fingerprint(item[name], f"{field}.{name}")
+        if item["parent_evidence_fingerprint"] is not None:
+            canonical_fingerprint(item["parent_evidence_fingerprint"], f"{field}.parent_evidence_fingerprint")
+        if item["review_phase"] not in AUTOREVIEW_PHASES or item["terminal_state"] not in AUTOREVIEW_TERMINAL_STATES:
+            raise CacheError(error_code, f"{field} uses invalid canonical values", exit_code)
+        if not REVISION_RE.fullmatch(nonempty(item["head_sha"], f"{field}.head_sha")):
+            raise CacheError(error_code, f"{field}.head_sha is invalid", exit_code)
+        if not REVISION_RE.fullmatch(nonempty(item["merge_base_sha"], f"{field}.merge_base_sha")):
+            raise CacheError(error_code, f"{field}.merge_base_sha is invalid", exit_code)
+        nonempty(item["base_ref"], f"{field}.base_ref")
+        nonempty(item["evidence_ref"], f"{field}.evidence_ref")
+        parse_timestamp(item["observed_at"], f"{field}.observed_at")
+        if not isinstance(item["changed_files"], list) or not item["changed_files"] or len(item["changed_files"]) > MAX_ALLOWED_PATHS_PER_REPOSITORY:
+            raise CacheError(error_code, f"{field}.changed_files is invalid", exit_code)
+        if any(not isinstance(path, str) or not path or path.startswith("/") or ".." in Path(path).parts for path in item["changed_files"]):
+            raise CacheError(error_code, f"{field}.changed_files is unsafe", exit_code)
+        for name in ("full_reviews", "fix_verifications", "prompt_characters", "elapsed_seconds"):
+            if not isinstance(item[name], int) or isinstance(item[name], bool) or item[name] < 0:
+                raise CacheError(error_code, f"{field}.{name} is invalid", exit_code)
+        if item["full_reviews"] not in {1, 2}:
+            raise CacheError(error_code, f"{field}.full_reviews exceeds the lineage budget", exit_code)
+        if not isinstance(item["open_findings"], list) or len(item["open_findings"]) > 64:
+            raise CacheError(error_code, f"{field}.open_findings is invalid", exit_code)
+        for index, row in enumerate(item["open_findings"]):
+            exact_object(row, {"finding_id", "finding"}, f"{field}.open_findings[{index}]")
+            canonical_fingerprint(row["finding_id"], f"{field}.open_findings[{index}].finding_id")
+            if not isinstance(row["finding"], dict):
+                raise CacheError(error_code, f"{field}.open_findings[{index}].finding is invalid", exit_code)
+        if item["terminal_state"] in {"terminal-clean", "terminal-composite-clean", "verification-clean"} and item["open_findings"]:
+            raise CacheError(error_code, f"{field} clean state has open findings", exit_code)
+        return item
+    except CacheError as exc:
+        if exc.code == error_code:
+            raise
+        raise CacheError(error_code, exc.message, exit_code, exc.details) from exc
+
+
 def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
     required = {
         "schema_version",
@@ -1542,6 +1604,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "published",
                         "observation_evidence_ref",
                         "tracker_dirty_after_revision_key",
+                        "autoreview",
                     },
                     delivery_field,
                 )
@@ -1656,6 +1719,13 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         raise CacheError("integrity-failure", "run-state pull request is not canonical", 5)
                 if not isinstance(delivery["committed"], bool) or not isinstance(delivery["published"], bool):
                     raise CacheError("integrity-failure", "run-state delivery publication state is invalid", 5)
+                if delivery["autoreview"] is not None:
+                    validate_autoreview_summary(
+                        delivery["autoreview"],
+                        f"{delivery_field}.autoreview",
+                        error_code="integrity-failure",
+                        exit_code=5,
+                    )
             if item["seal"] is not None:
                 exact_object(
                     item["seal"],
@@ -2444,6 +2514,7 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                     "preflight_key": delivery["preflight_key"],
                     "revision_key": revision["revision_key"] if revision else None,
                     "pr": copy.deepcopy(delivery["pr"]),
+                    "autoreview": copy.deepcopy(delivery["autoreview"]),
                     "gates": delivery_gates,
                     "tracker_dirty": delivery["tracker_dirty_after_revision_key"] is not None,
                 }
@@ -2534,6 +2605,15 @@ def render_markdown(state: dict[str, Any]) -> str:
                     lines.append(
                         f"| `{task['task_key']}:{delivery['delivery_key']}` | `{gate}` | `{item['state']}` | {item['evidence_ref']} |"
                     )
+    lines.extend(["", "## AutoReview Chains", "", "| delivery | state | full | delta | evidence |", "| --- | --- | ---: | ---: | --- |"])
+    for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
+        for delivery in task["deliveries"]:
+            item = delivery["autoreview"]
+            if item:
+                lines.append(
+                    f"| `{task['task_key']}:{delivery['delivery_key']}` | `{item['terminal_state']}` | "
+                    f"{item['full_reviews']} | {item['fix_verifications']} | {item['evidence_ref']} |"
+                )
     lines.extend(["", "## Review Warnings", ""])
     warnings = review_warnings(state)
     if warnings:
@@ -2631,6 +2711,7 @@ def new_state(
                 "published": False,
                 "observation_evidence_ref": None,
                 "tracker_dirty_after_revision_key": None,
+                "autoreview": None,
             }
             for delivery in item["deliveries"]
         ]
@@ -3499,6 +3580,77 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         review["wait_state"] = "complete"
         return True
 
+    if event_type == "autoreview-observed":
+        event = exact_object(raw, {"type", "task_key", "delivery_key", "evidence"}, event_type)
+        delivery = delivery_by_key(task, check_lower_kebab(event["delivery_key"], "delivery_key"))
+        revision = delivery["revision"]
+        if revision is None:
+            raise CacheError("state-conflict", "AutoReview evidence requires a current delivery revision", 4)
+        if not isinstance(event["evidence"], dict) or "observed_at" in event["evidence"]:
+            raise CacheError("invalid-input", "AutoReview event evidence is invalid", 2)
+        candidate = validate_autoreview_summary(
+            {**event["evidence"], "observed_at": observed_at},
+            "autoreview-observed.evidence",
+        )
+        if (
+            candidate["head_sha"] != revision["head_sha"]
+            or candidate["base_ref"] != revision["base_ref"]
+            or candidate["merge_base_sha"] != revision["merge_base_sha"]
+        ):
+            raise CacheError("state-conflict", "AutoReview evidence does not match the current delivery revision", 4)
+        prior = delivery["autoreview"]
+        if prior is None or candidate["lineage_id"] != prior["lineage_id"]:
+            if candidate["review_phase"] != "full" or candidate["parent_evidence_fingerprint"] is not None or candidate["full_reviews"] != 1:
+                raise CacheError("state-conflict", "a new AutoReview lineage must start with one full review", 4)
+            if prior is not None and (
+                candidate["base_ref"] == prior["base_ref"]
+                and candidate["merge_base_sha"] == prior["merge_base_sha"]
+                and set(candidate["changed_files"]).issubset(set(prior["changed_files"]))
+            ):
+                raise CacheError("state-conflict", "AutoReview lineage reset lacks base or scope drift", 4)
+            expected_state = "fix-required" if candidate["open_findings"] else "terminal-clean"
+            if candidate["terminal_state"] != expected_state:
+                raise CacheError("state-conflict", "new AutoReview lineage has an invalid terminal state", 4)
+        else:
+            if candidate["parent_evidence_fingerprint"] != prior["evidence_fingerprint"]:
+                raise CacheError("state-conflict", "AutoReview evidence parent is stale", 4)
+            if candidate["base_ref"] != prior["base_ref"] or candidate["merge_base_sha"] != prior["merge_base_sha"]:
+                raise CacheError("state-conflict", "an AutoReview lineage cannot cross base drift", 4)
+            if candidate["review_phase"] == "fix-verification" and candidate["head_sha"] == prior["head_sha"]:
+                raise CacheError("state-conflict", "fix verification made no revision progress", 4)
+            if candidate["review_phase"] == "disposition" and candidate["head_sha"] != prior["head_sha"]:
+                raise CacheError("state-conflict", "finding disposition cannot change the reviewed revision", 4)
+            if candidate["review_phase"] == "full":
+                raise CacheError("state-conflict", "an existing lineage cannot restart a full review", 4)
+            if candidate["changed_files"] != prior["changed_files"]:
+                raise CacheError("state-conflict", "AutoReview lineage changed its original path scope", 4)
+            expected_full = prior["full_reviews"] + (1 if candidate["review_phase"] == "terminal-full" else 0)
+            expected_delta = prior["fix_verifications"] + (1 if candidate["review_phase"] == "fix-verification" else 0)
+            if candidate["full_reviews"] != expected_full or candidate["fix_verifications"] != expected_delta:
+                raise CacheError("state-conflict", "AutoReview counters are not monotonic", 4)
+            if candidate["review_phase"] == "terminal-full":
+                if prior["terminal_state"] != "verification-clean":
+                    raise CacheError("state-conflict", "terminal full requires verification-clean evidence", 4)
+                expected_state = "fix-required" if candidate["open_findings"] else "terminal-clean"
+            elif candidate["review_phase"] == "disposition":
+                if prior["terminal_state"] != "fix-required" or candidate["open_findings"]:
+                    raise CacheError("state-conflict", "disposition must close a finding-required state", 4)
+                expected_state = "terminal-composite-clean"
+            else:
+                if prior["terminal_state"] not in {"fix-required", "terminal-clean", "terminal-composite-clean"}:
+                    raise CacheError("state-conflict", "fix verification has no actionable parent state", 4)
+                expected_state = "fix-required" if candidate["open_findings"] else (
+                    "verification-clean"
+                    if prior["terminal_state"] == "fix-required" and prior["full_reviews"] == 1
+                    else "terminal-composite-clean"
+                )
+            if candidate["terminal_state"] != expected_state:
+                raise CacheError("state-conflict", "AutoReview phase and terminal state are inconsistent", 4)
+        if prior is not None and all(prior.get(key) == candidate.get(key) for key in candidate if key != "observed_at"):
+            return False
+        delivery["autoreview"] = candidate
+        return True
+
     if event_type == "gate-observed":
         event = exact_object(
             raw,
@@ -3538,6 +3690,22 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "codex-review gate requires a clean review or an evidenced accepted timeout",
                 4,
             )
+        if gate == "autoreview" and event["state"] == "passed":
+            autoreview = scoped_delivery["autoreview"] if scoped_delivery is not None else None
+            revision = scoped_delivery["revision"] if scoped_delivery is not None else None
+            if (
+                autoreview is None
+                or autoreview["terminal_state"] not in {"terminal-clean", "terminal-composite-clean"}
+                or revision is None
+                or autoreview["head_sha"] != revision["head_sha"]
+                or autoreview["base_ref"] != revision["base_ref"]
+                or autoreview["merge_base_sha"] != revision["merge_base_sha"]
+            ):
+                raise CacheError(
+                    "state-conflict",
+                    "autoreview gate requires terminal evidence for the current delivery revision",
+                    4,
+                )
         evidence = nonempty(event["evidence_ref"], "evidence_ref")
         candidate = {
             "task_key": task_key,

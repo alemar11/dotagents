@@ -154,7 +154,9 @@ move and unchanged body for `source-moved`. It dirties/invalidates the delivery;
 commit/push, report the new `revision-observed`, then current committed/published
 `delivery-observed` before final gates. Publish/update each PR against the
 discovered default branch. Outside the ready mutation's shell chain, record its
-exact number and URL. Rerun validation and `$autoreview`, then convert any draft
+exact number and URL. Run validation and `$autoreview`; when it or PR review
+returns accepted findings, load `autoreview-fix-loop.md` and follow its typed
+delta chain. Then convert any draft
 to ready-for-review only by exact identity; a `gh` fallback is
 `gh pr ready <number> --repo <owner/repo>`. Selectorless or branch inference is
 forbidden. Re-read the same number; require unchanged URL and `isDraft=false`.
@@ -164,8 +166,9 @@ registered `not-configured` state without polling, prepare derived tracker
 closeout, and check current GitHub mergeability. Declare terminal merge-ready
 only while each PR lifecycle is `OPEN`, mergeability is conflict-free, and every
 required base update, approval, and merge-queue eligibility condition passes.
-Unknown or pending mergeability blocks; never enqueue or merge. Any later head
-or base change repeats the invalidated final gates.
+Unknown or pending mergeability blocks; never enqueue or merge. A later head
+change continues the evidence chain when the helper proves the same scope; a
+base, merge-base, repository, or path-set expansion starts a new full lineage.
 Follow the generated issues' dependency order inside the task; do not create a
 task per issue.
 

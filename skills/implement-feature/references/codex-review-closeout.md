@@ -25,8 +25,9 @@ number, and the exact URL
 must repeat that identity. A malformed, non-GitHub, or mismatched URL blocks
 before review timing begins.
 
-Actionable findings return the task to fix, focused validation, `$autoreview`,
-push, and a new current-revision review. A head, base, merge base, PR identity,
+Actionable findings return to fix, focused validation, AutoReview's
+`codex-review` delta route, push, typed evidence, and current-revision review;
+never add a full review to the lineage. A head, base, merge base, PR identity,
 material diff, repository-rule, tracker delivery, evidence-target, or relevant
 documentation change invalidates affected delivery-revision gates and the
 complete task-revision-set gates. Resolve review threads only after fix proof.
@@ -143,7 +144,7 @@ For local Markdown, first finish substantive acceptance, integration proof,
 and any knowledge closeout. Then perform only the predeclared local move in its
 owning delivery. The typed move dirties tracker delivery state and invalidates
 the old revision set. Commit and push it, observe the new head containing the
-move, rerun final validation and `$autoreview`, convert drafts to
+move, rerun final validation and establish terminal `$autoreview` evidence, convert drafts to
 ready-for-review, then obtain current-revision review and CI before terminal
 merge-ready state. Report closeout as prepared because the default branch sees
 it only after later merge.

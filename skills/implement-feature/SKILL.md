@@ -58,14 +58,14 @@ merge, release, or deployment.
 
 - Success means real `OPEN`, non-draft, conflict-free pull requests against each
   repository's discovered default branch, at their current heads, with mandatory
-  `$autoreview`, Codex review request, CI when configured, integration, tracker-closeout,
+  terminal `$autoreview`, Codex review, CI, integration, tracker-closeout,
   mergeability,
   approval, update, and merge-queue eligibility gates satisfied. Unknown or
   pending evidence blocks except the exact evidenced 45-minute
   `timeout-accepted` review result. Never enqueue or merge.
 - Every terminal PR targets its discovered default branch; the base is derived
   and verified, never selected by the user or source. A draft is only a vehicle;
-  convert it to ready-for-review after substantive proof and `$autoreview`, before
+  convert it to ready-for-review after substantive proof and terminal `$autoreview`, before
   current-revision review and CI. This transition is not the terminal result.
 - Use only App-managed worktrees. Never create raw Git worktrees, rotate the
   caller checkout, or implement in the root or a background worker.
@@ -231,17 +231,17 @@ states are cold evidence, never recovery input.
 
 ## Delivery And Final Report
 
-Before review or terminal acceptance, load `references/gates.md` and
+Before terminal work, load `references/gates.md` and
 `references/codex-review-closeout.md`. The visible task owns implementation,
-validation, commits, publication, `$autoreview`, current-revision review/fixes,
-CI when configured, tracker-closeout preparation, ready-for-review transition, and merge-ready
-proof for every affected repository. The root verifies the evidence and never
-enqueues or merges.
+validation, publication, `$autoreview`, current-revision review/fixes, CI when
+configured, tracker closeout, and merge-ready proof; the root only verifies and
+never enqueues or merges. On accepted AutoReview or PR findings, also load
+`references/autoreview-fix-loop.md` before fixes.
 
 For a local source, after current task-set acceptance/integration/domain proof,
 move only predeclared refs in their deliveries. The move dirties delivery state
 and invalidates old evidence. Commit/push, observe the new revision, rerun
-validation and `$autoreview`, convert drafts to
+validation and terminal `$autoreview`, convert drafts to
 ready-for-review, obtain current-revision review, then configured CI or explicit
 `not-configured` terminal revalidation, and terminal proof.
 Hosted and local issues remain open until a later default-branch merge.

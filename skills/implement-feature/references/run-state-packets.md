@@ -85,6 +85,7 @@ values are refs or digests, never pasted output.
 | `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_ref` |
 | `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `wait_invoked_at`, `provider_timeout` |
 | `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_ref`, `provider_state`, `observation_fingerprint`, `disposition`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
+| `autoreview-observed` | `task_key`, `delivery_key`, `evidence` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
 | `task-goal-completed` | `task_key`, `seal_fingerprint`, `goal_evidence_ref`, `completion_evidence_ref` |
@@ -123,6 +124,10 @@ Task states are `pending`, `created`, `implementing`, `validating`, `draft-pr`,
 states are `pending`, `active`, and `complete`.
 Review provider/disposition values are `waiting|findings|clean|failed` and
 `timeout-accepted|fix-required|accepted|blocked`.
+
+`autoreview-observed.evidence` flattens the helper envelope's lineage, phase,
+target, counters, open findings, metrics, and ref; omit closed history and
+`observed_at`. Full count is 1–2; every unbounded delta advances `head_sha`.
 
 | gate scope | gates | required identity |
 | --- | --- | --- |

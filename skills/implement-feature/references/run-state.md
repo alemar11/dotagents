@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v7 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v8 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,7 +14,7 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `4.0.0` created from registration
+Active state accepts only ledger schema `5.0.0` created from registration
 schema `4.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
@@ -46,7 +46,8 @@ identity, title, profile, Goal, lifecycle, dependencies, gates, blocker, and
 next action; identity comes from refs, never display titles. Its nonempty
 `deliveries[]` has one stable task-unique `delivery_key` per affected Git
 repository, owning repository/GitHub identity, branch/default base, CI and
-preflight state, paths, tracker moves, checkout, PR/revision, review, and gates.
+preflight state, paths, tracker moves, checkout, PR/revision, compact AutoReview
+chain, review, and gates.
 No managed `(repository, checkout)` pair may serve two Specs.
 
 Bind the complete isolated checkout map with `managed-checkouts-observed`

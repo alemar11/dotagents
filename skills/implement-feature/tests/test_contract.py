@@ -1204,7 +1204,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "7.0.0"', helper)
+        self.assertIn('__version__ = "8.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1215,14 +1215,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_v4_event_packet_registry_matches_the_v7_runtime(self) -> None:
+    def test_v5_event_packet_registry_matches_the_v8_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "7.0.0"',
-            'LEDGER_SCHEMA_VERSION = "4.0.0"',
+            '__version__ = "8.0.0"',
+            'LEDGER_SCHEMA_VERSION = "5.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "4.0.0"',
         ):
             self.assertIn(constant, helper)
@@ -1232,7 +1232,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `4.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `5.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -1988,7 +1988,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            92_500,
+            93_750,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -1998,7 +1998,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            96_500,
+            97_750,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE

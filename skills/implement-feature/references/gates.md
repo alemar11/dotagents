@@ -57,7 +57,7 @@ dirty/conflicting, stale-required, closed, merged, or blocked truth fails.
 Never enqueue or merge.
 
 A draft is only an intermediate vehicle. After substantive implementation,
-focused validation, and `$autoreview`, convert it to ready-for-review with
+focused validation, and terminal `$autoreview` evidence, convert it to ready-for-review with
 `isDraft=false`; only then obtain approval and final rule evidence. Do not make
 draft status a circular prerequisite for mergeability. The transition is not
 terminal.
@@ -69,6 +69,9 @@ revision-set key contains every delivery evidence key. Bind
 `scope-acceptance`, `integration-validation`, and optional `domain-closeout` to
 that set; bind `focused-validation`, `full-validation`, and `autoreview` per
 delivery key. Partial sets fail.
+
+The `autoreview` gate requires terminal `autoreview-observed` evidence for the
+current head/base/merge-base; repository or scope drift starts a new lineage.
 
 ## Domain Knowledge Closeout Gate
 
@@ -106,7 +109,7 @@ fingerprint; it marks that tracker delivery dirty and invalidates the current
 revision set, then commit and push the move, establish a newer tuple through
 `revision-observed`, and bind current committed/published lifecycle through
 `delivery-observed`. Only that newer published observation clears dirt. Then
-rerun final validation and `$autoreview`, convert drafts to ready-for-review,
+rerun final validation and establish terminal `$autoreview` evidence, convert drafts to ready-for-review,
 then obtain current-revision review and configured CI, or independently
 revalidate explicit `not-configured`, before terminal merge-ready state.
 Record closeout as prepared; completion reaches the default branch only after a

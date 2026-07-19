@@ -24,10 +24,12 @@ remain blocking.
 
 ## Active And Archived State
 
-Keep resumable ledger-schema `4.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v7 is the
+Keep resumable ledger-schema `5.0.0` state as absolute direct-child `.json` files under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v8 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
+Before linking v8, let every prior-doctor active schema-4 run finish; never
+migrate or delete it. Archives remain readable.
 
 Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire fingerprint,
 never a `sha256:` value or receipt fingerprint.

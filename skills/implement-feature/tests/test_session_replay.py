@@ -523,7 +523,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "7.0.0")
+            self.assertEqual(created["version"], "8.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None

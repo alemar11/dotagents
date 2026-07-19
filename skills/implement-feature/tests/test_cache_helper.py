@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV7Tests(unittest.TestCase):
+class LedgerCacheV8Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -583,7 +583,31 @@ class LedgerCacheV7Tests(unittest.TestCase):
         )
 
     def pass_terminal_gates(self, revision: dict) -> None:
-        events = []
+        events = [
+            {
+                "type": "autoreview-observed",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "evidence": {
+                    "lineage_id": "a" * 64,
+                    "parent_evidence_fingerprint": None,
+                    "evidence_fingerprint": "b" * 64,
+                    "review_phase": "full",
+                    "terminal_state": "terminal-clean",
+                    "head_sha": revision["head_sha"],
+                    "base_ref": revision["base_ref"],
+                    "merge_base_sha": revision["merge_base_sha"],
+                    "target_fingerprint": "c" * 64,
+                    "changed_files": ["skills/implement-feature/SKILL.md"],
+                    "full_reviews": 1,
+                    "fix_verifications": 0,
+                    "open_findings": [],
+                    "prompt_characters": 100,
+                    "elapsed_seconds": 1,
+                    "evidence_ref": "autoreview://fixture/clean",
+                },
+            }
+        ]
         revision_set = CACHE_RUNTIME.current_revision_set_key(self.state()["tasks"][0])
         for gate in sorted(CACHE_RUNTIME.TASK_STATIC_GATES):
             events.append(
@@ -740,12 +764,12 @@ class LedgerCacheV7Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v7_offline_and_read_only(self) -> None:
+    def test_doctor_is_v8_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "7.0.0")
+        self.assertEqual(version, "8.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1194,6 +1218,104 @@ class LedgerCacheV7Tests(unittest.TestCase):
         self.assertNotIn("scope-acceptance", task["gates"])
         self.assertIn("dotagents:missing-current-review", task["terminal_blockers"])
         self.assertEqual(projection["warnings"], [])
+
+    def test_autoreview_gate_requires_typed_terminal_evidence_and_revision_progress(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        binding = CACHE_RUNTIME.delivery_evidence_key(delivery)
+        gate = {
+            "type": "gate-observed", "task_key": self.task_key,
+            "delivery_key": "dotagents", "gate": "autoreview", "state": "passed",
+            "binding_key": binding, "evidence_ref": "proof://autoreview/free-form",
+        }
+        self.error(self.apply([gate], check=False), "state-conflict")
+
+        initial = {
+            "lineage_id": "a" * 64, "parent_evidence_fingerprint": None,
+            "evidence_fingerprint": "b" * 64, "review_phase": "full",
+            "terminal_state": "fix-required", "head_sha": revision["head_sha"],
+            "base_ref": revision["base_ref"], "merge_base_sha": revision["merge_base_sha"],
+            "target_fingerprint": "c" * 64,
+            "changed_files": ["skills/implement-feature/SKILL.md"],
+            "full_reviews": 1, "fix_verifications": 0,
+            "open_findings": [{"finding_id": "d" * 64, "finding": {"title": "Fix me"}}],
+            "prompt_characters": 100, "elapsed_seconds": 1,
+            "evidence_ref": "autoreview://fixture/finding",
+        }
+        self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": initial}])
+        bypass = {
+            **initial,
+            "parent_evidence_fingerprint": initial["evidence_fingerprint"],
+            "evidence_fingerprint": "9" * 64,
+            "review_phase": "terminal-full",
+            "terminal_state": "terminal-clean",
+            "full_reviews": 2,
+            "open_findings": [],
+            "evidence_ref": "autoreview://fixture/bypass",
+        }
+        self.error(
+            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": bypass}], check=False),
+            "state-conflict",
+        )
+        no_progress = {
+            **initial,
+            "parent_evidence_fingerprint": initial["evidence_fingerprint"],
+            "evidence_fingerprint": "e" * 64,
+            "review_phase": "fix-verification",
+            "terminal_state": "verification-clean",
+            "fix_verifications": 1,
+            "open_findings": [],
+            "evidence_ref": "autoreview://fixture/no-progress",
+        }
+        self.error(
+            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": no_progress}], check=False),
+            "state-conflict",
+        )
+        reset = {
+            **initial,
+            "lineage_id": "f" * 64,
+            "evidence_fingerprint": "0" * 64,
+            "terminal_state": "terminal-clean",
+            "open_findings": [],
+            "evidence_ref": "autoreview://fixture/unjustified-reset",
+        }
+        self.error(
+            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": reset}], check=False),
+            "state-conflict",
+        )
+
+    def test_autoreview_lineage_cannot_cross_merge_base_drift(self) -> None:
+        self.bootstrap_active_task()
+        first = self.observe_revision()
+        self.observe_delivery(first)
+        initial = {
+            "lineage_id": "a" * 64, "parent_evidence_fingerprint": None,
+            "evidence_fingerprint": "b" * 64, "review_phase": "full",
+            "terminal_state": "terminal-clean", "head_sha": first["head_sha"],
+            "base_ref": first["base_ref"], "merge_base_sha": first["merge_base_sha"],
+            "target_fingerprint": "c" * 64,
+            "changed_files": ["skills/implement-feature/SKILL.md"],
+            "full_reviews": 1, "fix_verifications": 0, "open_findings": [],
+            "prompt_characters": 100, "elapsed_seconds": 1,
+            "evidence_ref": "autoreview://fixture/first",
+        }
+        self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": initial}])
+        second = self.observe_revision(head="e" * 40, merge_base="f" * 40)
+        self.observe_delivery(second)
+        continued = {
+            **initial,
+            "parent_evidence_fingerprint": initial["evidence_fingerprint"],
+            "evidence_fingerprint": "d" * 64,
+            "review_phase": "fix-verification", "terminal_state": "terminal-composite-clean",
+            "head_sha": second["head_sha"], "merge_base_sha": second["merge_base_sha"],
+            "fix_verifications": 1, "evidence_ref": "autoreview://fixture/drift",
+        }
+        self.error(
+            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": continued}], check=False),
+            "state-conflict",
+        )
 
     def test_review_wait_is_fixed_45_minutes_and_timeout_requires_warning(self) -> None:
         self.bootstrap_active_task()
