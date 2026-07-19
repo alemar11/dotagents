@@ -16,7 +16,7 @@ Spec. Internal subagents remain governed by the parent task contract.
 | Field | Value |
 | --- | --- |
 | `model` | `gpt-5.6-sol` |
-| `thinking_default` | `high` |
+| `thinking_default` | `medium` |
 | `thinking_allowed` | `medium`, `high`, `xhigh` |
 
 Never pass `none`, `minimal`, `low`, `max`, `ultra`, or another thinking value.
@@ -47,14 +47,16 @@ this order:
      data-loss risk;
    - concurrency, distributed state, ordering, retries, idempotency, or other
      coordination-sensitive behavior.
-2. Select `medium` only when all of these are true:
-   - one repository and one bounded subsystem;
-   - localized, routine behavior with no architectural change;
-   - explicit deterministic acceptance criteria and validation;
-   - no `xhigh` trait, migration, compatibility boundary, or irreversible
-     operation.
-3. Select `high` for every other execution-ready Spec and whenever the evidence
-   does not justify either exception.
+2. Select `high` when no `xhigh` trait applies and the execution-ready Spec has
+   any of these traits:
+   - multiple interacting components or layers within one repository;
+   - correctness depends on several state transitions, failure modes, or
+     substantial behavioral edge cases;
+   - nontrivial integration or implementation tradeoffs across established
+     contracts;
+   - correctness requires coordinated validation across multiple test or
+     runtime surfaces.
+3. Select `medium` for every other execution-ready Spec.
 
 Issue count, changed-file count, or path count alone never selects a level.
 Missing, stale, ambiguous, or contradictory implementation evidence remains

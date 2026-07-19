@@ -26,8 +26,8 @@ For `visible_app_task_permission=not-requested`, state this exact disclosure:
 > prepare hosted issue closeout, and move, commit, and push completed local issue
 > files when used. AutoReview sends Git status, staged/unstaged diffs, and every
 > non-ignored untracked file to Codex; no extra authorization. Tasks use
-> `gpt-5.6-sol`: `medium` only for routine localized
-> work, `xhigh` for risky or cross-system work, and `high` otherwise. Codex
+> `gpt-5.6-sol`: `medium` by default, `high` for complex multi-part work, and
+> `xhigh` for risky or cross-system work. Codex
 > waits up to 45 minutes for each requested review. If a review is still pending
 > at that deadline, it records a persistent warning on the pull request, reports
 > the warning to you, and continues the remaining gates without treating the

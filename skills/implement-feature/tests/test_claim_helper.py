@@ -265,7 +265,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     ),
                     "task_model": task_policy["model"],
                     "task_thinking": task_policy["thinking_default"],
-                    "thinking_reason": "default-high-fixture",
+                    "thinking_reason": "default-medium-fixture",
                     "goal_evidence_ref": (
                         f"goal-{claim['root_id']}-{index}" if source_recorded else "none"
                     ),
@@ -1336,7 +1336,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "task_ref": "task-root-a-2",
                 "task_model": first_spec["task_model"],
                 "task_thinking": first_spec["task_thinking"],
-                "thinking_reason": "default-high-fixture-2",
+                "thinking_reason": "default-medium-fixture-2",
                 "goal_evidence_ref": "goal-root-a-2",
                 "managed_checkouts": json.loads(
                     json.dumps(first_spec["managed_checkouts"])
@@ -1675,8 +1675,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
         embedded_spec = embedded["task_adoption"]["specs"][0]
         self.assertEqual(embedded_spec["task_ref"], "task-root-a-1")
         self.assertEqual(embedded_spec["task_model"], "gpt-5.6-sol")
-        self.assertEqual(embedded_spec["task_thinking"], "high")
-        self.assertEqual(embedded_spec["thinking_reason"], "default-high-fixture")
+        self.assertEqual(embedded_spec["task_thinking"], "medium")
+        self.assertEqual(embedded_spec["thinking_reason"], "default-medium-fixture")
         recovered = json.loads(
             run_claim(
                 "--json",
@@ -1724,8 +1724,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
         no_task = next(spec for spec in specs if spec["task_state"] == "no-task")
         self.assertEqual(no_task["task_ref"], "none")
         self.assertEqual(no_task["task_model"], "gpt-5.6-sol")
-        self.assertEqual(no_task["task_thinking"], "high")
-        self.assertEqual(no_task["thinking_reason"], "default-high-fixture")
+        self.assertEqual(no_task["task_thinking"], "medium")
+        self.assertEqual(no_task["thinking_reason"], "default-medium-fixture")
         self.assertEqual(no_task["goal_evidence_ref"], "none")
         self.assertEqual(no_task["managed_checkouts"], [])
 

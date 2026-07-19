@@ -248,8 +248,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "commit, and push completed local issue files when used. AutoReview "
             "sends Git status, staged/unstaged diffs, and every non-ignored "
             "untracked file to Codex; no extra authorization. Tasks use "
-            "`gpt-5.6-sol`: `medium` only for routine localized work, `xhigh` for "
-            "risky or cross-system work, and `high` otherwise. Codex waits up to "
+            "`gpt-5.6-sol`: `medium` by default, `high` for complex multi-part "
+            "work, and `xhigh` for risky or cross-system work. Codex waits up to "
             "45 minutes for each requested review. If a review is still pending "
             "at that deadline, it records a persistent warning on the pull request, "
             "reports the warning to you, and continues the remaining gates without "
@@ -316,7 +316,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             return re.findall(r"`([^`]+)`", row)[1:]
 
         self.assertEqual(values("model"), ["gpt-5.6-sol"])
-        self.assertEqual(values("thinking_default"), ["high"])
+        self.assertEqual(values("thinking_default"), ["medium"])
         self.assertEqual(
             values("thinking_allowed"), ["medium", "high", "xhigh"]
         )
