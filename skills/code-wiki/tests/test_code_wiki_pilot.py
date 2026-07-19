@@ -683,6 +683,39 @@ class CodeWikiPilotTests(unittest.TestCase):
             os.symlink(target_b, link, target_is_directory=True)
             self.assertNotEqual(hash_path(artifact), target_a_hash)
 
+    def test_artifact_hash_includes_root_symlink_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target_a = root / "target-a.md"
+            target_b = root / "target-b.md"
+            target_a.write_text("same contents\n", encoding="utf-8")
+            target_b.write_text("same contents\n", encoding="utf-8")
+            artifact = root / "artifact.md"
+
+            os.symlink(target_a, artifact)
+            target_a_hash = hash_path(artifact)
+            self.assertNotEqual(target_a_hash, hash_path(target_a))
+
+            artifact.unlink()
+            os.symlink(target_b, artifact)
+            self.assertNotEqual(hash_path(artifact), target_a_hash)
+
+            directory_a = root / "directory-a"
+            directory_b = root / "directory-b"
+            directory_a.mkdir()
+            directory_b.mkdir()
+            (directory_a / "index.html").write_text("same contents\n", encoding="utf-8")
+            (directory_b / "index.html").write_text("same contents\n", encoding="utf-8")
+            directory_artifact = root / "wiki"
+
+            os.symlink(directory_a, directory_artifact, target_is_directory=True)
+            directory_a_hash = hash_path(directory_artifact)
+            self.assertNotEqual(directory_a_hash, hash_path(directory_a))
+
+            directory_artifact.unlink()
+            os.symlink(directory_b, directory_artifact, target_is_directory=True)
+            self.assertNotEqual(hash_path(directory_artifact), directory_a_hash)
+
     def test_baseline_workflow_identity_hashes_the_exact_prompt_files(self) -> None:
         context, workflow_hashes = _load_baseline_workflow()
         expected_paths = (

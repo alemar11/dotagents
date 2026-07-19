@@ -25,7 +25,10 @@ def sha256_file(path: Path) -> str:
 
 
 def hash_path(path: Path, *, exclude_git_metadata: bool = False) -> str:
-    """Hash one file or directory, including relative names and empty directories."""
+    """Hash one file, directory, or symlink without following link targets."""
+    if path.is_symlink():
+        target = os.readlink(path)
+        return hashlib.sha256(f"L\0.\0{target}\0".encode("utf-8")).hexdigest()
     if path.is_file():
         return sha256_file(path)
     if not path.is_dir():
