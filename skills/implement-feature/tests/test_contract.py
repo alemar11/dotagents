@@ -863,13 +863,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("control-plane", options)
         self.assertNotIn("control-plane", packets)
 
-        self.assertIn('__version__ = "18.1.0"', cache_helper)
+        self.assertIn('__version__ = "19.0.0"', cache_helper)
         self.assertIn('LEDGER_SCHEMA_VERSION = "14.0.0"', cache_helper)
         self.assertIn(
             '__version__ = "4.0.0"', self.read("scripts/execution-manifest")
         )
         self.assertIn(
-            'VERSION = "2.1.0"',
+            'VERSION = "3.0.0"',
             (REPO / "skills/autoreview/scripts/autoreview").read_text(),
         )
         self.assertIn(
@@ -883,6 +883,20 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py"
             ).read_text(),
         )
+
+    def test_removed_standalone_autoreview_projection_route_has_no_runtime_references(self) -> None:
+        runtime_paths = [
+            REPO / "skills/implement-feature/SKILL.md",
+            REPO / "skills/autoreview/SKILL.md",
+            *sorted((REPO / "skills/implement-feature/references").glob("*.md")),
+            *sorted((REPO / "skills/autoreview/references").glob("*.md")),
+            REPO / "skills/implement-feature/scripts/ledger-cache",
+            REPO / "skills/autoreview/scripts/autoreview",
+        ]
+        for path in runtime_paths:
+            content = path.read_text()
+            self.assertNotIn("ledger-cache autoreview next", content, str(path))
+            self.assertNotIn("autoreview.next", content, str(path))
 
     def test_visible_progress_dedup_is_transient_post_reconciliation_and_bounded(
         self,
@@ -1029,14 +1043,22 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/codex-review-closeout.md",
         )
         sizes = lambda paths: sum(len(self.read(path).encode("utf-8")) for path in paths)
-        self.assertLessEqual(sizes(loaded), 114_502)
-        self.assertLessEqual(sizes(loaded + ("references/execution-manifest.md",)), 125_899)
-        self.assertLessEqual(sizes(loaded + ("references/multi-repo-workspace.md",)), 118_788)
+        self.assertLessEqual(sizes(loaded), 115_200)
+        self.assertLessEqual(sizes(loaded + ("references/execution-manifest.md",)), 126_600)
+        self.assertLessEqual(sizes(loaded + ("references/multi-repo-workspace.md",)), 119_500)
+        controller_route = (
+            "references/controller.md",
+            "references/worker.md",
+            "references/autoreview-fix-loop.md",
+            "references/review-mutation-authority.md",
+        )
+        self.assertLess(sizes(controller_route), sizes(loaded))
+        self.assertLessEqual(len(controller_route) - 1, 3)
 
-        self.assertIn('__version__ = "18.1.0"', self.read("scripts/ledger-cache"))
+        self.assertIn('__version__ = "19.0.0"', self.read("scripts/ledger-cache"))
         self.assertIn('LEDGER_SCHEMA_VERSION = "14.0.0"', self.read("scripts/ledger-cache"))
         self.assertIn('__version__ = "4.0.0"', self.read("scripts/execution-manifest"))
-        self.assertIn('VERSION = "2.1.0"', (REPO / "skills/autoreview/scripts/autoreview").read_text())
+        self.assertIn('VERSION = "3.0.0"', (REPO / "skills/autoreview/scripts/autoreview").read_text())
         self.assertIn('PROTOCOL_VERSION = "2.0.0"', (REPO / "skills/autoreview/scripts/autoreview_protocol.py").read_text())
         self.assertIn('__version__ = "5.0.0"', (REPO / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py").read_text())
 
@@ -1870,7 +1892,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "18.1.0"', helper)
+        self.assertIn('__version__ = "19.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         self.assertIn("review-authority", helper)
         for removed in (
@@ -1890,7 +1912,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "18.1.0"',
+            '__version__ = "19.0.0"',
             'LEDGER_SCHEMA_VERSION = "14.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
         ):
@@ -2686,14 +2708,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         # model while the worker prompt remains at its existing ceiling.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            114_512,
+            115_200,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
         # Bounded execution stays branch-loaded; normal, manifest, and
         # multi-repository paths retain explicit measured ceilings.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
-            126_000,
+            126_600,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -2703,7 +2725,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            118_900,
+            119_500,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE

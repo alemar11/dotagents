@@ -105,7 +105,7 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 2.1.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 3.0.0")
 
     def test_findings_prepare_owns_canonical_ids(self) -> None:
         finding = {
@@ -1008,6 +1008,28 @@ class AutoreviewContractTests(unittest.TestCase):
             payload = json.loads(stderr.getvalue())
             self.assertEqual(payload["error_code"], "managed-reservation-required")
             self.assertIn("model_call_started=false", payload["error"])
+
+    def test_managed_reservation_hard_cuts_legacy_and_open_envelopes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, payload in (
+                ("legacy", {"command": "autoreview.next", "action": "full"}),
+                (
+                    "open",
+                    {
+                        "ok": True,
+                        "command": "controller.next",
+                        "controller_schema_version": "1.0.0",
+                        "unexpected": "caller-selected-phase",
+                    },
+                ),
+            ):
+                path = root / f"{name}.json"
+                path.write_text(json.dumps(payload))
+                args = cli.parse_args(["--reservation-file", str(path)])
+                with self.assertRaises(cli.AutoreviewError) as rejected:
+                    cli.load_managed_reservation(args)
+                self.assertEqual(rejected.exception.code, "reservation-invalid")
 
 
 if __name__ == "__main__":

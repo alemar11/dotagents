@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -21,7 +22,7 @@ protocol = importlib.util.module_from_spec(PROTOCOL_SPEC)
 sys.modules[PROTOCOL_SPEC.name] = protocol
 PROTOCOL_SPEC.loader.exec_module(protocol)
 
-VERSION = "2.1.0"
+VERSION = "3.0.0"
 
 MAX_REVIEW_OUTPUT_BYTES = 128 * 1024
 INVALID_OUTPUT_PREVIEW_BYTES = 2048
@@ -1912,53 +1913,176 @@ def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
             raise AutoreviewError(
                 "managed checkout requires a protocol reservation before AutoReview launch; model_call_started=false",
                 code="managed-reservation-required",
-                recovery="run-ledger-cache-autoreview-next",
+                recovery="run-ledger-cache-controller-next",
             )
         return None
     reservation = load_json_file(args.reservation_file, "reservation file")
     required = {
-        "ok", "command", "version", "ledger_schema_version", "ledger", "root_id",
-        "expected_claim_fingerprint", "task_key", "delivery_key", "generation",
-        "current_state_fingerprint", "prior_evidence", "hosted_obligation",
-        "protocol_version", "action", "packet", "allowed_transitions",
-        "completion_criterion", "blockers", "projection_fingerprint", "reservation_event",
+        "ok", "command", "controller_schema_version", "tool_version",
+        "ledger_schema_version", "ledger", "portfolio_key", "root_id", "binding",
+        "decision", "phase", "target", "action", "action_owner", "packet_template",
+        "allowed_transitions", "completion_criterion", "blockers",
+        "required_contracts", "projection_fingerprint",
     }
-    if set(reservation) != required or reservation["command"] != "autoreview.next" or reservation["protocol_version"] != protocol.PROTOCOL_VERSION:
-        raise AutoreviewError("managed reservation packet is invalid", code="reservation-invalid", recovery="derive-next-action-again")
-    event = reservation["reservation_event"]
-    if reservation["action"] is None or not isinstance(event, dict) or reservation["blockers"]:
+    if set(reservation) != required or reservation["command"] != "controller.next" or reservation["controller_schema_version"] != "1.0.0":
+        raise AutoreviewError("managed controller envelope is invalid", code="reservation-invalid", recovery="derive-next-action-again")
+    expected_projection = hashlib.sha256(
+        json.dumps(
+            {key: value for key, value in reservation.items() if key != "projection_fingerprint"},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    if reservation["projection_fingerprint"] != expected_projection:
+        raise AutoreviewError("managed controller envelope fingerprint is invalid", code="reservation-invalid", recovery="derive-next-action-again")
+    template = reservation["packet_template"]
+    if not isinstance(template, dict) or set(template) != {
+        "schema_version", "packet_kind", "executor", "bound_arguments",
+        "required_inputs", "result_event_types",
+    }:
+        raise AutoreviewError("managed action template is invalid", code="reservation-invalid", recovery="derive-next-action-again")
+    if (
+        reservation["decision"] != "action"
+        or reservation["action"] != "launch-autoreview-action"
+        or reservation["phase"] != "delivery-autoreview-launch"
+        or reservation["action_owner"] != "visible-task"
+        or template["schema_version"] != "1.0.0"
+        or template["packet_kind"] != "execution-command"
+        or template["executor"] != "visible-task"
+        or template["required_inputs"] != []
+        or template["result_event_types"] != ["autoreview-attempt-observed", "autoreview-observed"]
+        or reservation["allowed_transitions"] != [{
+            "result": "observed",
+            "event_types": ["autoreview-attempt-observed", "autoreview-observed"],
+            "next_phase": "delivery-autoreview",
+        }]
+        or reservation["completion_criterion"] != {
+            "kind": "external-or-ledger-predicate",
+            "predicate": "reserved-autoreview-action-reaches-one-terminal-attempt",
+        }
+        or reservation["required_contracts"] != [{
+            "contract_id": "autoreview-fix-loop",
+            "path": "references/autoreview-fix-loop.md",
+        }]
+        or reservation["blockers"]
+    ):
+        raise AutoreviewError("managed controller action is not launchable", code="action-not-allowed", recovery="resolve-blockers")
+    bound = template["bound_arguments"]
+    required_bound = {
+        "ledger", "root_id", "expected_claim_fingerprint", "expected_generation",
+        "expected_state_fingerprint", "target", "task_state",
+        "task_observation_fingerprint", "revision_key", "autoreview_projection",
+        "prior_evidence", "hosted_obligation", "reservation_event",
+    }
+    if not isinstance(bound, dict) or set(bound) != required_bound:
+        raise AutoreviewError("managed controller arguments are invalid", code="reservation-invalid", recovery="derive-next-action-again")
+    if (
+        not isinstance(bound["ledger"], str)
+        or not Path(bound["ledger"]).is_absolute()
+        or not isinstance(bound["root_id"], str)
+        or not bound["root_id"]
+        or not isinstance(bound["expected_claim_fingerprint"], str)
+        or not re.fullmatch(r"[0-9a-f]{64}", bound["expected_claim_fingerprint"])
+        or not isinstance(bound["expected_generation"], int)
+        or isinstance(bound["expected_generation"], bool)
+        or bound["expected_generation"] < 1
+        or not isinstance(bound["expected_state_fingerprint"], str)
+        or not re.fullmatch(r"[0-9a-f]{64}", bound["expected_state_fingerprint"])
+    ):
+        raise AutoreviewError("managed controller arguments have invalid types", code="reservation-invalid", recovery="derive-next-action-again")
+    controller_command = [
+        str(Path(__file__).resolve().parents[2] / "implement-feature/scripts/ledger-cache"),
+        "--json", "controller", "next",
+        "--ledger", bound["ledger"],
+        "--root-id", bound["root_id"],
+        "--expected-claim-fingerprint", bound["expected_claim_fingerprint"],
+    ]
+    live_result = subprocess.run(controller_command, text=True, capture_output=True)
+    try:
+        live_envelope = json.loads(live_result.stdout) if live_result.stdout else None
+    except json.JSONDecodeError as exc:
+        raise AutoreviewError(
+            "live controller verification returned invalid output; model_call_started=false",
+            code="reservation-stale",
+            recovery="derive-next-action-again",
+        ) from exc
+    if live_result.returncode or live_envelope != reservation:
+        raise AutoreviewError(
+            "managed controller envelope is no longer live; model_call_started=false",
+            code="reservation-stale",
+            recovery="derive-next-action-again",
+        )
+    event = bound["reservation_event"]
+    projection = bound["autoreview_projection"]
+    target = reservation["target"]
+    if (
+        not isinstance(event, dict)
+        or not isinstance(projection, dict)
+        or target != bound["target"]
+        or target.get("scope") != "delivery"
+        or target.get("task_key") != event.get("task_key")
+        or target.get("delivery_key") != event.get("delivery_key")
+        or event.get("projection") != projection
+        or projection.get("protocol_version") != protocol.PROTOCOL_VERSION
+        or projection.get("action") is None
+        or projection.get("packet") is None
+    ):
         raise AutoreviewError("managed reservation has no launchable action", code="action-not-allowed", recovery="resolve-blockers")
-    ledger = Path(reservation["ledger"])
+    ledger = Path(bound["ledger"])
     try:
         state = json.loads(ledger.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         raise AutoreviewError("managed ledger is unreadable", code="reservation-invalid", recovery="needs-owner") from exc
     delivery = next(
         (
-            delivery for task in state.get("tasks", []) if task.get("task_key") == reservation["task_key"]
-            for delivery in task.get("deliveries", []) if delivery.get("delivery_key") == reservation["delivery_key"]
+            delivery for task in state.get("tasks", []) if task.get("task_key") == target["task_key"]
+            for delivery in task.get("deliveries", []) if delivery.get("delivery_key") == target["delivery_key"]
         ),
         None,
     )
     active = delivery.get("autoreview_reservation") if isinstance(delivery, dict) else None
-    if not isinstance(active, dict) or active.get("reservation_id") != event.get("reservation_id") or active.get("state") != "reserved":
+    task = next((task for task in state.get("tasks", []) if task.get("task_key") == target["task_key"]), None)
+    observation = task.get("current_observation") if isinstance(task, dict) else None
+    revision = delivery.get("revision") if isinstance(delivery, dict) else None
+    if (
+        state.get("generation") != bound["expected_generation"]
+        or state.get("content_fingerprint") != bound["expected_state_fingerprint"]
+        or state.get("portfolio", {}).get("root_id") != bound["root_id"]
+        or state.get("claim", {}).get("fingerprint") != bound["expected_claim_fingerprint"]
+        or reservation.get("root_id") != bound["root_id"]
+        or reservation.get("ledger") != bound["ledger"]
+        or reservation.get("binding") != {
+            "generation": bound["expected_generation"],
+            "state_fingerprint": bound["expected_state_fingerprint"],
+            "claim_fingerprint": bound["expected_claim_fingerprint"],
+        }
+        or not isinstance(active, dict)
+        or active.get("reservation_id") != event.get("reservation_id")
+        or active.get("state") != "reserved"
+        or active.get("projection") != projection
+        or active.get("expected_state_fingerprint") != event.get("expected_state_fingerprint")
+        or task.get("state") != bound["task_state"]
+        or (observation.get("observation_fingerprint") if isinstance(observation, dict) else None)
+        != bound["task_observation_fingerprint"]
+        or (revision.get("revision_key") if isinstance(revision, dict) else None) != bound["revision_key"]
+    ):
         raise AutoreviewError("managed reservation is not active in the ledger", code="reservation-stale", recovery="derive-next-action-again")
-    packet = reservation["packet"]
+    packet = projection["packet"]
     args.mode = packet["mode"]
     args.review_phase = packet["action"]
     args.base = packet["target"]["base_ref"]
     args.evidence_output = args.candidate_output
-    args._managed_prior = reservation["prior_evidence"]
-    args._managed_obligation = reservation["hosted_obligation"]
+    args._managed_prior = bound["prior_evidence"]
+    args._managed_obligation = bound["hosted_obligation"]
     args._managed_target = packet["target"]
-    if reservation["prior_evidence"] is not None:
+    if bound["prior_evidence"] is not None:
         args.prior_evidence = args.reservation_file
     if args.review_phase == "fix-verification":
-        obligation = reservation["hosted_obligation"]
+        obligation = bound["hosted_obligation"]
         if obligation is not None:
             args.finding_file = obligation["finding_set_ref"]
         else:
-            rows = reservation["prior_evidence"]["finding_state"]["open"]
+            rows = bound["prior_evidence"]["finding_state"]["open"]
             finding_path = Path(args.attempt_file).with_suffix(".findings.json")
             payload = {
                 "finding_source": "autoreview",
@@ -1969,7 +2093,22 @@ def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
             }
             finding_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
             args.finding_file = str(finding_path)
-    return reservation
+    return {
+        "ledger": bound["ledger"],
+        "root_id": bound["root_id"],
+        "expected_claim_fingerprint": bound["expected_claim_fingerprint"],
+        "task_key": target["task_key"],
+        "delivery_key": target["delivery_key"],
+        "prior_evidence": bound["prior_evidence"],
+        "hosted_obligation": bound["hosted_obligation"],
+        "protocol_version": projection["protocol_version"],
+        "action": projection["action"],
+        "packet": projection["packet"],
+        "allowed_transitions": projection["allowed_transitions"],
+        "completion_criterion": projection["completion_criterion"],
+        "projection_fingerprint": projection["projection_fingerprint"],
+        "reservation_event": event,
+    }
 
 
 def ledger_apply_events(reservation: dict[str, Any], events: list[dict[str, Any]], operation_id: str, *, dry_run: bool) -> dict[str, Any]:

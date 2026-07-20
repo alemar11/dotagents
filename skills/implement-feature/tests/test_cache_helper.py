@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -19,11 +20,22 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = SKILL_ROOT.parents[1]
 TOOL = SKILL_ROOT / "scripts/ledger-cache"
 CLAIM_TOOL = SKILL_ROOT / "scripts/active-root-claim"
+AUTOREVIEW_TOOL = REPOSITORY / "skills/autoreview/scripts/autoreview"
 LOADER = importlib.machinery.SourceFileLoader("ledger_cache_runtime", str(TOOL))
 SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
 assert SPEC is not None
 CACHE_RUNTIME = importlib.util.module_from_spec(SPEC)
 LOADER.exec_module(CACHE_RUNTIME)
+AUTOREVIEW_LOADER = importlib.machinery.SourceFileLoader(
+    "autoreview_controller_runtime", str(AUTOREVIEW_TOOL)
+)
+AUTOREVIEW_SPEC = importlib.util.spec_from_loader(
+    AUTOREVIEW_LOADER.name, AUTOREVIEW_LOADER
+)
+assert AUTOREVIEW_SPEC is not None
+AUTOREVIEW_RUNTIME = importlib.util.module_from_spec(AUTOREVIEW_SPEC)
+sys.modules[AUTOREVIEW_LOADER.name] = AUTOREVIEW_RUNTIME
+AUTOREVIEW_LOADER.exec_module(AUTOREVIEW_RUNTIME)
 
 
 def run_tool(
@@ -373,6 +385,27 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def state(self) -> dict:
         return json.loads(self.ledger.read_text())
+
+    def controller_next(self, *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        assert self.claim is not None
+        return self.run_cache(
+            "--json",
+            "controller",
+            "next",
+            "--ledger",
+            str(self.ledger),
+            "--root-id",
+            self.claim["root_id"],
+            "--expected-claim-fingerprint",
+            self.claim["fingerprint"],
+            check=check,
+        )
+
+    def autoreview_controller_projection(self) -> tuple[dict, dict]:
+        controller = parse_result(self.controller_next())
+        self.assertEqual(controller["action"], "reserve-autoreview-action")
+        arguments = controller["packet_template"]["bound_arguments"]
+        return controller, arguments
 
     def read_projection(self, projection: str) -> subprocess.CompletedProcess[str]:
         return self.run_cache(
@@ -1525,13 +1558,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
         return value
 
     def record_autoreview(self, evidence: dict) -> None:
-        result = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
-        )
-        reservation = result["reservation_event"]
+        _, arguments = self.autoreview_controller_projection()
+        reservation = arguments["reservation_event"]
         self.assertIsNotNone(reservation)
         self.apply([reservation])
         reservation_id = reservation["reservation_id"]
@@ -1579,13 +1607,9 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_autoreview_reservation_dry_run_uses_real_apply_path_and_exact_state(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        projection = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
-        )
-        event = projection["reservation_event"]
+        projection, arguments = self.autoreview_controller_projection()
+        event = arguments["reservation_event"]
+        self.assertEqual(projection["packet_template"]["result_event_types"], ["autoreview-action-reserved"])
         state = self.state()
         before = self.ledger.read_bytes()
         operation_id = self.next_operation_id()
@@ -1616,13 +1640,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_autoreview_reservation_allows_one_launch_and_no_release_after_start(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        projection = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
-        )
-        reservation = projection["reservation_event"]
+        _, arguments = self.autoreview_controller_projection()
+        reservation = arguments["reservation_event"]
         self.apply([reservation])
 
         conflicting = copy.deepcopy(reservation)
@@ -1667,16 +1686,38 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
         self.error(release, "state-conflict")
 
+    def test_managed_autoreview_revalidates_live_claim_before_model_launch(self) -> None:
+        self.bootstrap_active_task()
+        self.observe_revision()
+        _, arguments = self.autoreview_controller_projection()
+        self.apply([arguments["reservation_event"]])
+        launch = parse_result(self.controller_next())
+        self.assertEqual(launch["action"], "launch-autoreview-action")
+        envelope = self.write_packet(launch, "controller-launch-envelope")
+        args = AUTOREVIEW_RUNTIME.parse_args(
+            [
+                "--reservation-file", str(envelope),
+                "--attempt-file", str(self.home / "autoreview-attempt.jsonl"),
+                "--candidate-output", str(self.home / "autoreview-candidate.json"),
+                "--operation-output", str(self.home / "autoreview-operation.json"),
+            ]
+        )
+        managed = AUTOREVIEW_RUNTIME.load_managed_reservation(args)
+        self.assertIsNotNone(managed)
+        self.assertEqual(managed["action"], "full")
+
+        assert self.claim is not None
+        (self.claim_root / f"{self.claim['root_id']}.json").unlink()
+        with self.assertRaises(AUTOREVIEW_RUNTIME.AutoreviewError) as rejected:
+            AUTOREVIEW_RUNTIME.load_managed_reservation(args)
+        self.assertEqual(rejected.exception.code, "reservation-stale")
+        self.assertIn("model_call_started=false", str(rejected.exception))
+
     def test_consumed_failed_autoreview_attempt_requires_owner_and_cannot_reserve_again(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        projection = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
-        )
-        reservation = projection["reservation_event"]
+        _, arguments = self.autoreview_controller_projection()
+        reservation = arguments["reservation_event"]
         self.apply([reservation])
         attempt_id = "d" * 64
         base = {
@@ -1695,15 +1736,11 @@ class LedgerCacheV18Tests(unittest.TestCase):
             {**base, "attempt_state": "failed", "model_call_started": True},
         ])
 
-        blocked = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
-        )
+        blocked = parse_result(self.controller_next())
         self.assertIsNone(blocked["action"])
-        self.assertIsNone(blocked["reservation_event"])
-        self.assertIn("autoreview-attempt-consumed-failed-needs-owner", blocked["blockers"])
+        self.assertIsNone(blocked["packet_template"])
+        self.assertEqual(blocked["decision"], "blocked")
+        self.assertEqual(blocked["blockers"][0]["code"], "autoreview-attempt-consumed-failed")
         delivery = self.state()["tasks"][0]["deliveries"][0]
         self.assertEqual(delivery["autoreview_reservation"]["state"], "consumed-failed")
 
@@ -1897,13 +1934,170 @@ class LedgerCacheV18Tests(unittest.TestCase):
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "18.1.0")
+        self.assertEqual(version, "19.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
         self.assertEqual(doctor["archive_count"], 0)
         self.assertEqual(before, self.snapshot_tree(self.home))
         self.assertFalse(self.cache_root.exists())
+
+    def test_controller_registry_fixture_is_exhaustive_strict_and_bounded(self) -> None:
+        fixture = json.loads(
+            (SKILL_ROOT / "tests/fixtures/controller-replay-v1.json").read_text()
+        )
+        CACHE_RUNTIME.validate_controller_registry()
+        actual = [
+            [
+                action,
+                spec["rank"],
+                spec["phase"],
+                spec["owner"],
+                spec["packet_kind"],
+                len(spec["contracts"]),
+            ]
+            for action, spec in sorted(
+                CACHE_RUNTIME.CONTROLLER_ACTIONS.items(),
+                key=lambda item: item[1]["rank"],
+            )
+        ]
+        self.assertEqual(actual, fixture["registry"])
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_TASK_STATE_ACTIONS, fixture["visible_task_states"])
+        self.assertEqual(len(actual), fixture["metrics"]["registry_actions"])
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_PROJECTION_SCHEMA_VERSION, "1.0.0")
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_TEMPLATE_SCHEMA_VERSION, "1.0.0")
+        self.assertEqual(CACHE_RUNTIME.LEDGER_SCHEMA_VERSION, fixture["ledger_schema_version"])
+        self.assertEqual(CACHE_RUNTIME.REGISTRATION_SCHEMA_VERSION, fixture["registration_schema_version"])
+        self.assertFalse(any("merge" in action and action != "steer-mergeability" for action, *_ in actual))
+        for action, spec in CACHE_RUNTIME.CONTROLLER_ACTIONS.items():
+            limit = 4 if spec["phase"] == "operation-recovery" else 3
+            self.assertLessEqual(len(spec["contracts"]), limit, action)
+            self.assertEqual(
+                sorted(event for row in spec["transitions"] for event in row["event_types"]),
+                sorted(spec["events"]),
+            )
+            self.assertEqual(
+                set(spec["bound_argument_types"]),
+                set(CACHE_RUNTIME.CONTROLLER_BASE_BOUND_ARGUMENT_TYPES)
+                | set(CACHE_RUNTIME.CONTROLLER_ACTION_BOUND_ARGUMENT_TYPES.get(action, {})),
+            )
+
+    def test_controller_next_is_claim_bound_deterministic_and_byte_read_only(self) -> None:
+        claim = self.acquire()
+        self.create()
+        before = self.snapshot_tree(self.home)
+        first_raw = self.controller_next().stdout
+        second_raw = self.controller_next().stdout
+        after = self.snapshot_tree(self.home)
+        self.assertEqual(first_raw, second_raw)
+        self.assertEqual(before, after)
+
+        result = json.loads(first_raw)
+        self.assertEqual(result["action"], "observe-root-title")
+        self.assertEqual(result["binding"]["claim_fingerprint"], claim["fingerprint"])
+        self.assertEqual(result["binding"]["generation"], 1)
+        self.assertEqual(result["binding"]["state_fingerprint"], self.state()["content_fingerprint"])
+        self.assertEqual(
+            set(result),
+            {
+                "ok", "command", "controller_schema_version", "tool_version",
+                "ledger_schema_version", "ledger", "portfolio_key", "root_id",
+                "binding", "decision", "phase", "target", "action",
+                "action_owner", "packet_template", "allowed_transitions",
+                "completion_criterion", "blockers", "required_contracts",
+                "projection_fingerprint",
+            },
+        )
+        self.assertEqual(
+            set(result["packet_template"]),
+            {"schema_version", "packet_kind", "executor", "bound_arguments", "required_inputs", "result_event_types"},
+        )
+        self.assertNotIn("packet", result)
+
+        for mutation in ("unknown-bound-argument", "wrong-bound-type", "unknown-input-type"):
+            candidate = copy.deepcopy(result)
+            if mutation == "unknown-bound-argument":
+                candidate["packet_template"]["bound_arguments"]["manual_phase"] = "implementation"
+            elif mutation == "wrong-bound-type":
+                candidate["packet_template"]["bound_arguments"]["expected_generation"] = "1"
+            else:
+                candidate["packet_template"]["required_inputs"][0]["type"] = "free-form"
+            candidate["projection_fingerprint"] = CACHE_RUNTIME.request_fingerprint(
+                {key: value for key, value in candidate.items() if key != "projection_fingerprint"}
+            )
+            with self.assertRaises(CACHE_RUNTIME.CacheError, msg=mutation):
+                CACHE_RUNTIME.validate_controller_response(candidate)
+
+    def test_controller_rejects_released_replaced_and_stale_claims(self) -> None:
+        original = self.acquire()
+        self.create()
+        # Release and takeover both durably remove the old active claim file;
+        # the controller must reject the old envelope before inspecting state.
+        (self.claim_root / f"{original['root_id']}.json").unlink()
+        released = self.run_cache(
+            "--json", "controller", "next", "--ledger", str(self.ledger),
+            "--root-id", original["root_id"],
+            "--expected-claim-fingerprint", original["fingerprint"],
+            check=False,
+        )
+        self.error(released, "state-conflict")
+
+        replacement = self.acquire(root_id="root-b")
+        stale = self.run_cache(
+            "--json", "controller", "next", "--ledger", str(self.ledger),
+            "--root-id", replacement["root_id"],
+            "--expected-claim-fingerprint", original["fingerprint"],
+            check=False,
+        )
+        self.error(stale, "state-conflict")
+        rebound = self.controller_next(check=False)
+        self.error(rebound, "state-conflict")
+
+    def test_standalone_autoreview_next_route_is_removed(self) -> None:
+        result = self.run_cache("--json", "autoreview", "next", check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("invalid choice", result.stderr)
+
+    def test_controller_replays_every_visible_phase_and_aggregates_concurrent_tasks(self) -> None:
+        self.bootstrap_active_task()
+        fixture = json.loads(
+            (SKILL_ROOT / "tests/fixtures/controller-replay-v1.json").read_text()
+        )
+        base = self.state()
+        decisions: list[tuple[str, str]] = []
+        for task_state, expected_action in fixture["visible_task_states"].items():
+            state = copy.deepcopy(base)
+            state["tasks"][0]["state"] = task_state
+            state["tasks"][0]["current_observation"]["observed_status"] = task_state
+            projection = CACHE_RUNTIME.derive_controller_projection(self.ledger, state)
+            decisions.append((task_state, projection["action"]))
+            self.assertEqual(projection["decision"], "action")
+            self.assertEqual(projection["action"], expected_action)
+            self.assertNotIn("manual_phase", projection["packet_template"]["bound_arguments"])
+
+        concurrent = copy.deepcopy(base)
+        second = copy.deepcopy(concurrent["tasks"][0])
+        second["task_key"] = "spec-233"
+        second["source_id"] = "https://github.com/example/dotagents/issues/233"
+        second["state"] = "implementing"
+        second["current_observation"]["observed_status"] = "implementing"
+        concurrent["tasks"].append(second)
+        second_source = copy.deepcopy(concurrent["sources"][0])
+        second_source["task_key"] = "spec-233"
+        second_source["source_id"] = "https://github.com/example/dotagents/issues/233"
+        second_source["source_spec_ref"] = second_source["source_id"]
+        concurrent["sources"].append(second_source)
+        first = CACHE_RUNTIME.derive_controller_projection(self.ledger, concurrent)
+        second_projection = CACHE_RUNTIME.derive_controller_projection(
+            self.ledger, copy.deepcopy(concurrent)
+        )
+        self.assertEqual(first, second_projection)
+        self.assertEqual(first["action"], "steer-implementation")
+        self.assertEqual(
+            first["packet_template"]["bound_arguments"]["task_keys"],
+            ["spec-232", "spec-233"],
+        )
+        self.assertEqual(len(decisions), len(fixture["visible_task_states"]))
 
     def test_create_rejects_unknown_fields_and_claim_mismatches_then_succeeds(self) -> None:
         claim = self.acquire()
@@ -2489,14 +2683,16 @@ class LedgerCacheV18Tests(unittest.TestCase):
         initial = self.autoreview_evidence()
         self.record_autoreview(initial)
         self.apply([gate])
-        next_action = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
+        next_action = parse_result(self.controller_next())
+        self.assertNotEqual(next_action["action"], "reserve-autoreview-action")
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        projection = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.next_projection(
+            delivery["autoreview"],
+            target=delivery["committed_revision"]["target"],
+            hosted_obligation=None,
         )
-        self.assertIsNone(next_action["action"])
-        self.assertEqual(next_action["completion_criterion"], "complete")
+        self.assertIsNone(projection["action"])
+        self.assertEqual(projection["completion_criterion"], "complete")
 
     def test_autoreview_lineage_cannot_cross_merge_base_drift(self) -> None:
         self.bootstrap_active_task()
@@ -2547,14 +2743,10 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.apply(
             [{"type": "committed-revision-observed", "task_key": self.task_key, "delivery_key": "dotagents", "target": changed, "evidence_ref": "git://semantic-drift"}]
         )
-        next_action = parse_result(
-            self.run_cache(
-                "--json", "autoreview", "next", "--ledger", str(self.ledger),
-                "--task-key", self.task_key, "--delivery-key", "dotagents",
-            )
-        )
+        _, arguments = self.autoreview_controller_projection()
+        next_action = arguments["autoreview_projection"]
         self.assertEqual(next_action["action"], "full")
-        self.assertIsNone(next_action["prior_evidence"])
+        self.assertIsNone(arguments["prior_evidence"])
         self.assertIsNone(next_action["packet"]["prior_evidence_fingerprint"])
         replacement = self.autoreview_evidence()
         replacement["lineage_id"] = "4" * 64
@@ -2613,9 +2805,10 @@ class LedgerCacheV18Tests(unittest.TestCase):
         }
         event = {"type": "autoreview-hosted-finding-obligated", "task_key": self.task_key, "delivery_key": "dotagents", "obligation": obligation}
         self.apply([event])
-        next_action = parse_result(self.run_cache("--json", "autoreview", "next", "--ledger", str(self.ledger), "--task-key", self.task_key, "--delivery-key", "dotagents"))
+        _, arguments = self.autoreview_controller_projection()
+        next_action = arguments["autoreview_projection"]
         self.assertEqual(next_action["action"], "fix-verification")
-        self.assertEqual(next_action["hosted_obligation"]["finding_comment_ids"], [])
+        self.assertEqual(arguments["hosted_obligation"]["finding_comment_ids"], [])
         self.assertEqual(self.apply([event]).returncode, 0)
 
     def test_review_wait_is_fixed_45_minutes_and_timeout_requires_warning(self) -> None:

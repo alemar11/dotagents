@@ -203,7 +203,10 @@ Useful options:
   documented in `references/evidence-chain.md`.
 - `--reservation-file`, `--attempt-file`, `--candidate-output`, and
   `--operation-output`: execute the protocol-derived action for a managed
-  Implement Feature checkout. Managed callers cannot select mode, phase,
+  Implement Feature checkout. `--reservation-file` must be the complete
+  `launch-autoreview-action` envelope emitted by the typed Implement Feature
+  controller and still match its active ledger reservation. Managed callers
+  cannot select mode, phase,
   target, prompt, or parent evidence.
 - `findings template|prepare`: emit a strict draft without caller-generated ids,
   then validate authoritative fields and generate canonical ids locally. These

@@ -1,5 +1,9 @@
 # Run-State Packet Registry
 
+This file owns writable registration and event packets. After registration,
+`controller.md` independently owns the read-only next-action response and
+`packet_template`; a template is not a writable packet or launch authority.
+
 Load this file only immediately before a registration or event write. Packet
 files are short-lived strict JSON inputs, not recovery state. Reuse one stable
 32-character lowercase-hex `operation_id` only for retries of the same bytes.

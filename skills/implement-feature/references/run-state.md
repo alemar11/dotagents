@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v18 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v19 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -29,7 +29,13 @@ packet. It is the sole strict field registry.
 scripts/ledger-cache --json ledger create --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --operation-id '<unique-operation-id>' --registration-file '<absolute-registration-json>'
 scripts/ledger-cache --json ledger apply --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --expected-generation '<current-generation>' --operation-id '<unique-operation-id>' --events-file '<absolute-events-json>'
 scripts/ledger-cache --json ledger read --ledger '<absolute-active-json>' --projection 'status|dispatch|recovery|terminal|diagnostics'
+scripts/ledger-cache --json controller next --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>'
 ```
+
+After registration, `references/controller.md` is the sole phase/action,
+packet-template, transition, completion, blocker, owner, and contract-routing
+registry. The existing ledger projections remain diagnostic or specialized
+state views; callers do not choose a phase or contract set from them.
 
 `expected_generation` is compare-and-swap authority. A stale generation
 changes nothing and requires a fresh projection. Replaying the same

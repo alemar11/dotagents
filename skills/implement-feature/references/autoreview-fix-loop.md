@@ -14,11 +14,13 @@ canonical reviewed patch. PR identity is separate publication fact: pushing
 the same commit attaches the PR to the existing lineage and never triggers a
 second review.
 
-Run `ledger-cache autoreview next`; it alone returns the next action, managed
-packet, allowed transitions, completion criterion, blockers, current state
-fingerprint, and reservation event. Apply that event atomically before launch.
+Run the exact `ledger-cache controller next` command from `controller.md`. Its
+`reserve-autoreview-action` template embeds AutoReview's unchanged pure next
+projection and exact reservation event. Apply that event atomically; rerun the
+controller; then pass only its `launch-autoreview-action` envelope plus the
+active ledger reservation to managed AutoReview.
 Workers never choose mode, phase, parent, prompt, or local fallback. AutoReview
-also scans active schema-11 ledgers, so omitting managed flags cannot escape the
+also scans active schema-14 ledgers, so omitting managed flags cannot escape the
 reservation requirement.
 
 Reservations are generation/state-fingerprint bound, one-use, and have no TTL.
@@ -32,7 +34,7 @@ one logical review phase. The repair changes no reservation, target, phase,
 parent, finding set, bundle, model, search policy, manifest command attempt, or
 worker prompt/path budget. Once either launch starts, process interruption
 cannot relaunch it. A second invalid output consumes the reservation as
-`consumed-failed`, returns `needs-owner`, and `autoreview next` refuses a new
+`consumed-failed`, returns `needs-owner`, and the controller refuses a new
 reservation. A valid candidate is quarantined with an immutable operation file;
 the producer runs the real ledger apply path in dry-run mode before handoff.
 Interrupted apply reuses the exact candidate bytes and stable operation id.
@@ -44,7 +46,7 @@ canonical ids. Prepare each supported AutoReview invocation as an
 `execution-manifest` command, then run and verify its receipt before recording
 evidence.
 The manifest's fixed 60-minute outer deadline supervises the AutoReview and
-nested Codex process group only. AutoReview v2 remains the semantic model-attempt
+nested Codex process group only. AutoReview protocol 2.0.0 remains the semantic model-attempt
 authority. On outer timeout, output limit, cancellation, interruption, or
 cleanup failure, reconcile the existing typed attempt. If `model-started` is
 durable, never relaunch or reserve a replacement model call. Manifest liveness

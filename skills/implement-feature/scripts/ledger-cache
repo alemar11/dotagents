@@ -22,10 +22,12 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "18.1.0"
+__version__ = "19.0.0"
 LEDGER_SCHEMA_VERSION = "14.0.0"
 REGISTRATION_SCHEMA_VERSION = "7.0.0"
 DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "1.0.0"
+CONTROLLER_PROJECTION_SCHEMA_VERSION = "1.0.0"
+CONTROLLER_TEMPLATE_SCHEMA_VERSION = "1.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -244,6 +246,16 @@ NODE_ID_RE = re.compile(r"^[A-Za-z0-9_=-]+$")
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
 PROJECTIONS = {"status", "dispatch", "recovery", "terminal", "diagnostics"}
+CONTROLLER_DECISIONS = {"action", "waiting", "blocked", "terminal"}
+CONTROLLER_SCOPES = {"portfolio", "task", "delivery", "closeout"}
+CONTROLLER_OWNERS = {
+    "root-orchestrator", "visible-task", "authorized-owner", "external-merge-workflow"
+}
+CONTROLLER_PACKET_KINDS = {
+    "ledger-event", "app-operation", "goal-operation", "worker-phase",
+    "execution-command", "gitstack-operation", "claim-operation",
+    "archive-operation", "owner-handoff",
+}
 DIAGNOSTIC_EVIDENCE_STATES = {"current", "stale", "incomplete"}
 TERMINAL_VERIFICATION_STATES = {"incomplete", "clean", "invalidated"}
 PORTFOLIO_OBJECTIVE_CI_CLAUSE = "CI when configured"
@@ -7141,80 +7153,775 @@ def apply_ledger(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def autoreview_next(args: argparse.Namespace) -> dict[str, Any]:
-    ledger = canonical_active_ledger(args.ledger)
-    state = load_state(ledger)
-    task = task_by_key(state, check_lower_kebab(args.task_key, "task_key"))
-    delivery = delivery_by_key(task, check_lower_kebab(args.delivery_key, "delivery_key"))
-    blockers: list[str] = []
-    if delivery["managed_checkout"] is None:
-        blockers.append("managed-checkout-missing")
-    if delivery["committed_revision"] is None:
-        blockers.append("clean-committed-revision-missing")
-    current = delivery["autoreview_reservation"]
-    if current is not None and current["state"] == "reserved":
-        blockers.append("action-already-reserved")
-    if current is not None and current["state"] == "consumed-failed":
-        blockers.append("autoreview-attempt-consumed-failed-needs-owner")
-    open_obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
-    if len(open_obligations) > 1:
-        blockers.append("multiple-hosted-obligations")
-    reset = delivery["lineage_reset_authority"]
-    reset_pending = reset is not None and reset["state"] == "target-observed"
-    projection_parent = None if reset_pending else delivery["autoreview"]
-    if delivery["committed_revision"] is None:
-        projection = {
-            "protocol_version": AUTOREVIEW_PROTOCOL.PROTOCOL_VERSION,
-            "action": None,
-            "packet": None,
-            "allowed_transitions": [],
-            "completion_criterion": "terminal-clean-or-terminal-composite-clean",
-            "blockers": sorted(blockers),
-        }
-        projection["projection_fingerprint"] = AUTOREVIEW_PROTOCOL.fingerprint(projection)
-    else:
-        projection = AUTOREVIEW_PROTOCOL.next_projection(
-            projection_parent,
-            target=delivery["committed_revision"]["target"],
-            hosted_obligation=open_obligations[0] if open_obligations else None,
-            blockers=blockers,
-        )
-    reservation_event = None
-    if projection["action"] is not None:
-        reservation_id = AUTOREVIEW_PROTOCOL.fingerprint(
-            {
-                "ledger": str(ledger),
-                "task_key": task["task_key"],
-                "delivery_key": delivery["delivery_key"],
-                "state_fingerprint": state["content_fingerprint"],
-                "projection_fingerprint": projection["projection_fingerprint"],
-            }
-        )
-        reservation_event = {
-            "type": "autoreview-action-reserved",
-            "task_key": task["task_key"],
-            "delivery_key": delivery["delivery_key"],
-            "reservation_id": reservation_id,
-            "expected_state_fingerprint": state["content_fingerprint"],
-            "projection": projection,
-        }
+def controller_input(name: str, value_type: str, source: str, validation: str) -> dict[str, str]:
+    return {"name": name, "type": value_type, "source": source, "validation": validation}
+
+
+CONTROLLER_ACTIONS: dict[str, dict[str, Any]] = {
+    "observe-root-title": {
+        "rank": 10, "phase": "baseline-registration", "owner": "root-orchestrator",
+        "packet_kind": "app-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("title_observation", "object", "app-readback", "exact-persisted-root-title")],
+        "events": ["root-title-observed"], "completion": "root-title-evidence-is-current",
+        "contracts": [("run-state", "references/run-state.md")],
+    },
+    "dispatch-baseline-tasks": {
+        "rank": 20, "phase": "baseline-task-setup", "owner": "root-orchestrator",
+        "packet_kind": "app-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("task_creation_results", "array", "app-readback", "complete-app-managed-task-identities")],
+        "events": ["managed-checkouts-observed", "task-observed"], "completion": "all-selected-baseline-tasks-are-bound",
+        "contracts": [("worker", "references/worker.md"), ("baseline-validation", "references/baseline-validation.md")],
+    },
+    "observe-baseline-tasks": {
+        "rank": 30, "phase": "baseline-task-setup", "owner": "root-orchestrator",
+        "packet_kind": "app-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("task_observations", "array", "direct-task-readback", "complete-full-read-and-checkout-evidence")],
+        "events": ["managed-checkouts-observed", "task-observed"], "completion": "all-baseline-task-bindings-are-current",
+        "contracts": [("worker", "references/worker.md"), ("baseline-validation", "references/baseline-validation.md")],
+    },
+    "complete-implementation-baseline": {
+        "rank": 40, "phase": "baseline-validation", "owner": "root-orchestrator",
+        "packet_kind": "worker-phase", "executor": "visible-task",
+        "inputs": [controller_input("baseline_receipts", "array", "execution-manifest", "complete-registered-baseline-receipt-set")],
+        "events": ["implementation-baseline-accepted", "portfolio-preimplementation-aborted"],
+        "completion": "atomic-baseline-is-accepted-or-preimplementation-aborted",
+        "contracts": [("baseline-validation", "references/baseline-validation.md"), ("worker", "references/worker.md")],
+    },
+    "activate-root-goal": {
+        "rank": 50, "phase": "goal-activation", "owner": "root-orchestrator",
+        "packet_kind": "goal-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("goal_readback", "object", "goal-readback", "matching-objective-active-goal")],
+        "events": ["portfolio-goal-activated"], "completion": "root-goal-is-active-and-recorded",
+        "contracts": [("run-state", "references/run-state.md")],
+    },
+    "reconcile-command-attempt": {
+        "rank": 1, "phase": "operation-recovery", "owner": "root-orchestrator",
+        "packet_kind": "execution-command", "executor": "visible-task",
+        "inputs": [controller_input("command_observation", "object", "execution-manifest", "same-attempt-terminal-or-cleanup-evidence")],
+        "events": ["execution-command-launch-observed", "execution-command-cancellation-authorized", "execution-command-terminal-observed"],
+        "completion": "selected-command-attempt-is-terminal",
+        "contracts": [("recovery-validation", "references/recovery-validation.md")],
+    },
+    "reconcile-provider-mutation": {
+        "rank": 2, "phase": "operation-recovery", "owner": "root-orchestrator",
+        "packet_kind": "gitstack-operation", "executor": "visible-task",
+        "inputs": [controller_input("provider_observation", "object", "gitstack-readback", "one-exact-artifact-or-needs-owner")],
+        "events": ["review-provider-mutation-started", "review-provider-mutation-observed"],
+        "completion": "provider-mutation-journal-is-terminal",
+        "contracts": [("review-mutation-authority", "references/review-mutation-authority.md"), ("recovery-validation", "references/recovery-validation.md")],
+    },
+    "reconcile-autoreview-attempt": {
+        "rank": 3, "phase": "operation-recovery", "owner": "root-orchestrator",
+        "packet_kind": "execution-command", "executor": "visible-task",
+        "inputs": [controller_input("autoreview_observation", "object", "autoreview-attempt-journal", "same-reservation-terminal-evidence")],
+        "events": ["autoreview-attempt-observed", "autoreview-observed"],
+        "completion": "autoreview-attempt-is-terminal-and-evidence-is-recorded",
+        "contracts": [("autoreview-fix-loop", "references/autoreview-fix-loop.md"), ("recovery-validation", "references/recovery-validation.md")],
+    },
+    "dispatch-ready-tasks": {
+        "rank": 60, "phase": "scheduling", "owner": "root-orchestrator",
+        "packet_kind": "app-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("dispatch_readbacks", "array", "app-readback", "exact-selected-task-identities")],
+        "events": ["task-observed"], "completion": "selected-ready-tasks-have-current-full-reads",
+        "contracts": [("worker", "references/worker.md"), ("gates", "references/gates.md")],
+    },
+    "reserve-autoreview-action": {
+        "rank": 80, "phase": "delivery-autoreview", "owner": "root-orchestrator",
+        "packet_kind": "ledger-event", "executor": "root-orchestrator", "inputs": [],
+        "events": ["autoreview-action-reserved"], "completion": "autoreview-reservation-is-active",
+        "contracts": [("autoreview-fix-loop", "references/autoreview-fix-loop.md")],
+    },
+    "launch-autoreview-action": {
+        "rank": 81, "phase": "delivery-autoreview-launch", "owner": "visible-task",
+        "packet_kind": "execution-command", "executor": "visible-task", "inputs": [],
+        "events": ["autoreview-attempt-observed", "autoreview-observed"],
+        "completion": "reserved-autoreview-action-reaches-one-terminal-attempt",
+        "contracts": [("autoreview-fix-loop", "references/autoreview-fix-loop.md")],
+    },
+    "request-codex-review": {
+        "rank": 90, "phase": "delivery-review-request", "owner": "root-orchestrator",
+        "packet_kind": "gitstack-operation", "executor": "visible-task",
+        "inputs": [controller_input("request_receipt", "object", "gitstack-request-readback", "exact-current-head-typed-request-receipt")],
+        "events": ["review-provider-mutation-reserved", "review-provider-mutation-started", "review-provider-mutation-observed", "review-wait-started"],
+        "completion": "review-request-is-durable-and-wait-is-started",
+        "contracts": [("review-mutation-authority", "references/review-mutation-authority.md"), ("gates", "references/gates.md")],
+    },
+    "invoke-review-wait": {
+        "rank": 91, "phase": "delivery-review-wait", "owner": "root-orchestrator",
+        "packet_kind": "gitstack-operation", "executor": "visible-task",
+        "inputs": [controller_input("wait_invoked_at", "timestamp", "worker-launch-clock", "nonfuture-within-fixed-review-deadline")],
+        "events": ["review-wait-invoked"], "completion": "single-review-wait-launch-is-durable",
+        "contracts": [("gates", "references/gates.md"), ("review-mutation-authority", "references/review-mutation-authority.md")],
+    },
+    "reconcile-review-wait": {
+        "rank": 92, "phase": "delivery-review-wait", "owner": "root-orchestrator",
+        "packet_kind": "gitstack-operation", "executor": "visible-task",
+        "inputs": [controller_input("review_observation", "object", "gitstack-wait-result", "exact-request-revision-and-immutable-deadline")],
+        "events": ["review-observed", "review-thread-resolved"], "completion": "current-review-has-one-bound-observation",
+        "contracts": [("gates", "references/gates.md"), ("recovery-validation", "references/recovery-validation.md"), ("review-mutation-authority", "references/review-mutation-authority.md")],
+    },
+    "apply-current-gate-evidence": {
+        "rank": 100, "phase": "delivery-gates", "owner": "root-orchestrator",
+        "packet_kind": "ledger-event", "executor": "root-orchestrator",
+        "inputs": [controller_input("gate_evidence", "array", "visible-task-and-provider-readback", "current-scope-bound-gate-evidence")],
+        "events": ["gate-observed", "delivery-scope-observed", "validation-nonregression-observed"],
+        "completion": "current-required-gate-evidence-is-recorded",
+        "contracts": [("gates", "references/gates.md"), ("worker", "references/worker.md")],
+    },
+    "seal-task": {
+        "rank": 110, "phase": "task-closeout", "owner": "root-orchestrator",
+        "packet_kind": "ledger-event", "executor": "root-orchestrator",
+        "inputs": [controller_input("seal_evidence_ref", "string", "independent-terminal-verification", "nonempty-current-proof-reference")],
+        "events": ["task-terminal-sealed"], "completion": "task-is-sealed-at-current-revision-set",
+        "contracts": [("gates", "references/gates.md")],
+    },
+    "record-terminal-handoff": {
+        "rank": 111, "phase": "task-closeout", "owner": "root-orchestrator",
+        "packet_kind": "ledger-event", "executor": "root-orchestrator",
+        "inputs": [controller_input("handoff_evidence", "object", "current-terminal-proof", "exact-pr-ready-external-merge-handoff")],
+        "events": ["terminal-handoff-recorded"], "completion": "unchanged-seal-has-terminal-handoff",
+        "contracts": [("gates", "references/gates.md")],
+    },
+    "verify-portfolio": {
+        "rank": 120, "phase": "portfolio-closeout", "owner": "root-orchestrator",
+        "packet_kind": "ledger-event", "executor": "root-orchestrator",
+        "inputs": [controller_input("verification_evidence_ref", "string", "independent-terminal-verification", "nonempty-portfolio-proof-reference")],
+        "events": ["portfolio-terminal-verified"], "completion": "portfolio-terminal-verification-is-durable",
+        "contracts": [("gates", "references/gates.md")],
+    },
+    "complete-root-goal": {
+        "rank": 130, "phase": "portfolio-closeout", "owner": "root-orchestrator",
+        "packet_kind": "goal-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("goal_completion_readback", "object", "goal-readback", "matching-complete-root-goal")],
+        "events": ["portfolio-goal-completed"], "completion": "root-goal-completion-is-read-back-and-recorded",
+        "contracts": [("run-state", "references/run-state.md"), ("gates", "references/gates.md")],
+    },
+    "release-and-archive": {
+        "rank": 140, "phase": "portfolio-archive", "owner": "root-orchestrator",
+        "packet_kind": "archive-operation", "executor": "root-orchestrator",
+        "inputs": [controller_input("archive_evidence_ref", "string", "terminal-closeout", "nonempty-terminal-archive-reference")],
+        "events": [], "completion": "claim-is-released-and-ledger-is-archived",
+        "contracts": [("run-state", "references/run-state.md")],
+    },
+}
+
+for _name, _rank, _phase, _contracts in (
+    ("steer-implementation", 70, "implementation", [("worker", "references/worker.md")]),
+    ("steer-validation", 71, "validation", [("worker", "references/worker.md"), ("gates", "references/gates.md")]),
+    ("steer-publication", 72, "publication", [("worker", "references/worker.md"), ("gates", "references/gates.md")]),
+    ("steer-ready-transition", 73, "ready-transition", [("worker", "references/worker.md"), ("gates", "references/gates.md")]),
+    ("steer-review-fix", 74, "review-fix", [("worker", "references/worker.md"), ("autoreview-fix-loop", "references/autoreview-fix-loop.md"), ("review-mutation-authority", "references/review-mutation-authority.md")]),
+    ("steer-ci", 75, "ci", [("worker", "references/worker.md"), ("gates", "references/gates.md")]),
+    ("steer-tracker-closeout", 76, "tracker-closeout", [("worker", "references/worker.md"), ("gates", "references/gates.md")]),
+    ("steer-mergeability", 77, "mergeability", [("worker", "references/worker.md"), ("gates", "references/gates.md")]),
+):
+    CONTROLLER_ACTIONS[_name] = {
+        "rank": _rank, "phase": _phase, "owner": "root-orchestrator",
+        "packet_kind": "worker-phase", "executor": "visible-task",
+        "inputs": [controller_input("task_observations", "array", "direct-task-readback", f"current-{_phase}-full-read-evidence")],
+        "events": ["task-observed"], "completion": f"selected-tasks-leave-or-complete-{_phase}",
+        "contracts": _contracts,
+    }
+
+CONTROLLER_BASE_BOUND_ARGUMENT_TYPES = {
+    "ledger": "absolute-path", "root_id": "identifier",
+    "expected_claim_fingerprint": "sha256", "expected_generation": "positive-integer",
+    "expected_state_fingerprint": "sha256", "target": "target",
+}
+CONTROLLER_ACTION_BOUND_ARGUMENT_TYPES: dict[str, dict[str, str]] = {
+    "dispatch-baseline-tasks": {"task_keys": "task-key-array"},
+    "observe-baseline-tasks": {"task_keys": "task-key-array"},
+    "dispatch-ready-tasks": {"task_keys": "task-key-array"},
+    "reconcile-command-attempt": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "attempt_id": "operation-id", "attempt_state": "lower-kebab"},
+    "reconcile-provider-mutation": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "reservation_id": "sha256", "attempt_state": "lower-kebab"},
+    "reconcile-autoreview-attempt": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "reservation_id": "sha256", "attempt_state": "lower-kebab"},
+    "reserve-autoreview-action": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "autoreview_projection": "object", "prior_evidence": "nullable-object", "hosted_obligation": "nullable-object", "reservation_event": "object"},
+    "launch-autoreview-action": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "autoreview_projection": "object", "prior_evidence": "nullable-object", "hosted_obligation": "nullable-object", "reservation_event": "object"},
+    "request-codex-review": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256"},
+    "invoke-review-wait": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "wait_started_at": "timestamp", "wait_deadline": "timestamp", "request_receipt": "object"},
+    "reconcile-review-wait": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256", "wait_started_at": "timestamp", "wait_deadline": "timestamp", "wait_invoked_at": "timestamp", "provider_timeout": "nonnegative-integer", "request_receipt": "object"},
+    "apply-current-gate-evidence": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_key": "nullable-sha256"},
+    "seal-task": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "revision_set_key": "sha256", "seal_candidate_fingerprint": "sha256"},
+    "record-terminal-handoff": {"task_state": "task-state", "task_observation_fingerprint": "nullable-sha256", "seal_fingerprint": "sha256"},
+    "verify-portfolio": {"verification_fingerprint": "sha256"},
+    "complete-root-goal": {"verification_fingerprint": "sha256"},
+}
+for _phase_action in (
+    "steer-implementation", "steer-validation", "steer-publication",
+    "steer-ready-transition", "steer-review-fix", "steer-ci",
+    "steer-tracker-closeout", "steer-mergeability",
+):
+    CONTROLLER_ACTION_BOUND_ARGUMENT_TYPES[_phase_action] = {"task_keys": "task-key-array", "task_states": "task-state-map"}
+
+CONTROLLER_ACTION_TRANSITIONS: dict[str, list[dict[str, Any]]] = {
+    "observe-root-title": [{"result": "recorded", "event_types": ["root-title-observed"], "next_phase": "baseline-task-setup"}],
+    "dispatch-baseline-tasks": [{"result": "recorded", "event_types": ["managed-checkouts-observed", "task-observed"], "next_phase": "baseline-task-setup"}],
+    "observe-baseline-tasks": [{"result": "recorded", "event_types": ["managed-checkouts-observed", "task-observed"], "next_phase": "baseline-validation"}],
+    "complete-implementation-baseline": [
+        {"result": "accepted", "event_types": ["implementation-baseline-accepted"], "next_phase": "goal-activation"},
+        {"result": "aborted", "event_types": ["portfolio-preimplementation-aborted"], "next_phase": "preimplementation-aborted"},
+    ],
+    "activate-root-goal": [{"result": "activated", "event_types": ["portfolio-goal-activated"], "next_phase": "scheduling"}],
+    "reconcile-command-attempt": [{"result": "reconciled", "event_types": ["execution-command-launch-observed", "execution-command-cancellation-authorized", "execution-command-terminal-observed"], "next_phase": "current-task-phase"}],
+    "reconcile-provider-mutation": [{"result": "reconciled", "event_types": ["review-provider-mutation-started", "review-provider-mutation-observed"], "next_phase": "current-delivery-phase"}],
+    "reconcile-autoreview-attempt": [{"result": "reconciled", "event_types": ["autoreview-attempt-observed", "autoreview-observed"], "next_phase": "delivery-autoreview"}],
+    "dispatch-ready-tasks": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "implementation"}],
+    "reserve-autoreview-action": [{"result": "reserved", "event_types": ["autoreview-action-reserved"], "next_phase": "delivery-autoreview-launch"}],
+    "launch-autoreview-action": [{"result": "observed", "event_types": ["autoreview-attempt-observed", "autoreview-observed"], "next_phase": "delivery-autoreview"}],
+    "request-codex-review": [{"result": "requested", "event_types": ["review-provider-mutation-reserved", "review-provider-mutation-started", "review-provider-mutation-observed", "review-wait-started"], "next_phase": "delivery-review-wait"}],
+    "invoke-review-wait": [{"result": "invoked", "event_types": ["review-wait-invoked"], "next_phase": "delivery-review-wait"}],
+    "reconcile-review-wait": [{"result": "observed", "event_types": ["review-observed", "review-thread-resolved"], "next_phase": "review-fix-or-ci"}],
+    "apply-current-gate-evidence": [{"result": "recorded", "event_types": ["gate-observed", "delivery-scope-observed", "validation-nonregression-observed"], "next_phase": "current-task-phase"}],
+    "seal-task": [{"result": "sealed", "event_types": ["task-terminal-sealed"], "next_phase": "task-closeout"}],
+    "record-terminal-handoff": [{"result": "recorded", "event_types": ["terminal-handoff-recorded"], "next_phase": "portfolio-closeout"}],
+    "verify-portfolio": [{"result": "verified", "event_types": ["portfolio-terminal-verified"], "next_phase": "portfolio-closeout"}],
+    "complete-root-goal": [{"result": "completed", "event_types": ["portfolio-goal-completed"], "next_phase": "portfolio-archive"}],
+    "release-and-archive": [{"result": "completed", "event_types": [], "next_phase": "terminal"}],
+    "steer-implementation": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "implementation-or-validation"}],
+    "steer-validation": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "validation-or-publication"}],
+    "steer-publication": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "publication-or-ready-transition"}],
+    "steer-ready-transition": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "ready-transition-or-review"}],
+    "steer-review-fix": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "review-fix-or-review"}],
+    "steer-ci": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "ci-or-tracker-closeout"}],
+    "steer-tracker-closeout": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "tracker-closeout-or-mergeability"}],
+    "steer-mergeability": [{"result": "observed", "event_types": ["task-observed"], "next_phase": "mergeability-or-task-closeout"}],
+}
+for _action, _types in CONTROLLER_ACTION_BOUND_ARGUMENT_TYPES.items():
+    CONTROLLER_ACTIONS[_action]["bound_argument_types"] = {
+        **CONTROLLER_BASE_BOUND_ARGUMENT_TYPES, **_types,
+    }
+for _action, _spec in CONTROLLER_ACTIONS.items():
+    _spec.setdefault("bound_argument_types", dict(CONTROLLER_BASE_BOUND_ARGUMENT_TYPES))
+    _spec["transitions"] = CONTROLLER_ACTION_TRANSITIONS[_action]
+    _spec["completion_kind"] = (
+        "ledger-predicate"
+        if _spec["packet_kind"] == "ledger-event"
+        else "external-or-ledger-predicate"
+    )
+
+CONTROLLER_TASK_STATE_ACTIONS = {
+    "created": "steer-implementation",
+    "implementing": "steer-implementation",
+    "validating": "steer-validation",
+    "draft-pr": "steer-publication",
+    "marking-ready-for-review": "steer-ready-transition",
+    "fixing-review": "steer-review-fix",
+    "ci": "steer-ci",
+    "preparing-tracker-closeout": "steer-tracker-closeout",
+    "checking-mergeability": "steer-mergeability",
+    "terminal-sealed": "steer-mergeability",
+}
+
+
+def validate_controller_registry() -> None:
+    ranks: set[int] = set()
+    for action, spec in CONTROLLER_ACTIONS.items():
+        if not LOWER_KEBAB_RE.fullmatch(action) or set(spec) != {
+            "rank", "phase", "owner", "packet_kind", "executor", "inputs",
+            "events", "completion", "completion_kind", "contracts", "bound_argument_types", "transitions",
+        }:
+            raise CacheError("integrity-failure", "controller action registry is invalid", 5)
+        if spec["rank"] in ranks or spec["owner"] not in CONTROLLER_OWNERS or spec["executor"] not in CONTROLLER_OWNERS:
+            raise CacheError("integrity-failure", "controller action rank or owner is invalid", 5)
+        ranks.add(spec["rank"])
+        if spec["packet_kind"] not in CONTROLLER_PACKET_KINDS or not LOWER_KEBAB_RE.fullmatch(spec["phase"]):
+            raise CacheError("integrity-failure", "controller action phase or packet kind is invalid", 5)
+        if any(event not in EVENT_TYPES for event in spec["events"]):
+            raise CacheError("integrity-failure", "controller action event route is invalid", 5)
+        limit = 4 if spec["phase"] == "operation-recovery" else 3
+        if not spec["contracts"] or len(spec["contracts"]) > limit:
+            raise CacheError("integrity-failure", "controller contract route exceeds its bound", 5)
+        for item in spec["inputs"]:
+            if (
+                set(item) != {"name", "type", "source", "validation"}
+                or item["type"] not in {"array", "object", "string", "timestamp"}
+                or not LOWER_KEBAB_RE.fullmatch(item["source"])
+                or not LOWER_KEBAB_RE.fullmatch(item["validation"])
+            ):
+                raise CacheError("integrity-failure", "controller input descriptor is invalid", 5)
+        if set(spec["bound_argument_types"]) != set(CONTROLLER_BASE_BOUND_ARGUMENT_TYPES) | set(CONTROLLER_ACTION_BOUND_ARGUMENT_TYPES.get(action, {})):
+            raise CacheError("integrity-failure", "controller bound-argument registry is invalid", 5)
+        if not spec["transitions"]:
+            raise CacheError("integrity-failure", "controller transition registry is empty", 5)
+        routed_events: list[str] = []
+        for transition in spec["transitions"]:
+            if (
+                set(transition) != {"result", "event_types", "next_phase"}
+                or not isinstance(transition["event_types"], list)
+                or any(event not in spec["events"] for event in transition["event_types"])
+                or not isinstance(transition["result"], str)
+                or not LOWER_KEBAB_RE.fullmatch(transition["result"])
+                or not isinstance(transition["next_phase"], str)
+                or not LOWER_KEBAB_RE.fullmatch(transition["next_phase"])
+            ):
+                raise CacheError("integrity-failure", "controller transition row is invalid", 5)
+            routed_events.extend(transition["event_types"])
+        if sorted(routed_events) != sorted(spec["events"]):
+            raise CacheError("integrity-failure", "controller transition event coverage is invalid", 5)
+        for contract_id, path in spec["contracts"]:
+            contract_path = Path(__file__).resolve().parent.parent / path
+            if (
+                not LOWER_KEBAB_RE.fullmatch(contract_id)
+                or not re.fullmatch(r"references/[a-z0-9-]+\.md", path)
+                or not contract_path.is_file()
+            ):
+                raise CacheError("integrity-failure", "controller contract route is invalid", 5)
+
+
+def controller_type_matches(value: Any, value_type: str) -> bool:
+    if value_type == "absolute-path":
+        return isinstance(value, str) and Path(value).is_absolute()
+    if value_type == "identifier":
+        return isinstance(value, str) and bool(ID_RE.fullmatch(value))
+    if value_type == "sha256":
+        return isinstance(value, str) and bool(FINGERPRINT_RE.fullmatch(value))
+    if value_type == "nullable-sha256":
+        return value is None or (isinstance(value, str) and bool(FINGERPRINT_RE.fullmatch(value)))
+    if value_type == "positive-integer":
+        return isinstance(value, int) and not isinstance(value, bool) and value > 0
+    if value_type == "nonnegative-integer":
+        return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+    if value_type == "target":
+        if not isinstance(value, dict) or set(value) != {"scope", "task_key", "delivery_key"} or value["scope"] not in CONTROLLER_SCOPES:
+            return False
+        task_key = value["task_key"]
+        delivery_key = value["delivery_key"]
+        if task_key is not None and (not isinstance(task_key, str) or not LOWER_KEBAB_RE.fullmatch(task_key)):
+            return False
+        if delivery_key is not None and (not isinstance(delivery_key, str) or not LOWER_KEBAB_RE.fullmatch(delivery_key)):
+            return False
+        if value["scope"] == "portfolio":
+            return task_key is None and delivery_key is None
+        if value["scope"] == "task":
+            return task_key is not None and delivery_key is None
+        if value["scope"] == "delivery":
+            return task_key is not None and delivery_key is not None
+        return delivery_key is None
+    if value_type == "task-key-array":
+        return isinstance(value, list) and bool(value) and value == sorted(set(value)) and all(isinstance(item, str) and LOWER_KEBAB_RE.fullmatch(item) for item in value)
+    if value_type == "task-state-map":
+        return isinstance(value, dict) and bool(value) and all(isinstance(key, str) and LOWER_KEBAB_RE.fullmatch(key) and item in TASK_STATES for key, item in value.items())
+    if value_type == "task-state":
+        return value in TASK_STATES
+    if value_type == "operation-id":
+        return isinstance(value, str) and bool(TRANSACTION_ID_RE.fullmatch(value))
+    if value_type == "lower-kebab":
+        return isinstance(value, str) and bool(LOWER_KEBAB_RE.fullmatch(value))
+    if value_type == "timestamp":
+        try:
+            return parse_timestamp(value, "controller.timestamp") is not None
+        except CacheError:
+            return False
+    if value_type == "object":
+        return isinstance(value, dict)
+    if value_type == "nullable-object":
+        return value is None or isinstance(value, dict)
+    return False
+
+
+def validate_controller_bound_arguments(action: str, value: Any) -> dict[str, Any]:
+    spec = CONTROLLER_ACTIONS[action]
+    if not isinstance(value, dict) or set(value) != set(spec["bound_argument_types"]):
+        raise CacheError("integrity-failure", f"controller {action} bound arguments are not closed", 5)
+    for field, value_type in spec["bound_argument_types"].items():
+        if not controller_type_matches(value[field], value_type):
+            raise CacheError("integrity-failure", f"controller {action}.{field} has invalid type", 5)
+    return value
+
+
+def controller_target(scope: str, task: dict[str, Any] | None = None, delivery: dict[str, Any] | None = None) -> dict[str, Any]:
+    if scope not in CONTROLLER_SCOPES:
+        raise CacheError("integrity-failure", "controller target scope is invalid", 5)
     return {
-        "ok": True,
-        "command": "autoreview.next",
-        "version": __version__,
-        "ledger_schema_version": LEDGER_SCHEMA_VERSION,
+        "scope": scope,
+        "task_key": task["task_key"] if task is not None else None,
+        "delivery_key": delivery["delivery_key"] if delivery is not None else None,
+    }
+
+
+def controller_autoreview_context(
+    ledger: Path, state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None]:
+    obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
+    if len(obligations) > 1:
+        raise CacheError("integrity-failure", "delivery has multiple open hosted obligations", 5)
+    reset = delivery["lineage_reset_authority"]
+    parent = None if reset is not None and reset["state"] == "target-observed" else delivery["autoreview"]
+    if delivery["committed_revision"] is None:
+        raise CacheError("state-conflict", "AutoReview action requires a committed revision", 4)
+    projection = AUTOREVIEW_PROTOCOL.next_projection(
+        parent,
+        target=delivery["committed_revision"]["target"],
+        hosted_obligation=obligations[0] if obligations else None,
+    )
+    if projection["action"] is None:
+        raise CacheError("state-conflict", "AutoReview protocol has no next action", 4)
+    return projection, copy.deepcopy(parent), copy.deepcopy(obligations[0]) if obligations else None
+
+
+def controller_bound_arguments(
+    action: str,
+    ledger: Path,
+    state: dict[str, Any],
+    target: dict[str, Any],
+    task: dict[str, Any] | None,
+    delivery: dict[str, Any] | None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
         "ledger": str(ledger),
         "root_id": state["portfolio"]["root_id"],
         "expected_claim_fingerprint": state["claim"]["fingerprint"],
-        "task_key": task["task_key"],
-        "delivery_key": delivery["delivery_key"],
-        "generation": state["generation"],
-        "current_state_fingerprint": state["content_fingerprint"],
-        "prior_evidence": copy.deepcopy(projection_parent),
-        "hosted_obligation": copy.deepcopy(open_obligations[0]) if open_obligations else None,
-        **projection,
-        "reservation_event": reservation_event,
+        "expected_generation": state["generation"],
+        "expected_state_fingerprint": state["content_fingerprint"],
+        "target": target,
     }
+    if action == "dispatch-baseline-tasks":
+        base["task_keys"] = [item["task_key"] for item in sorted(state["tasks"], key=lambda row: row["source_id"]) if item["task_ref"] is None]
+    elif action == "observe-baseline-tasks":
+        selected = [item for item in state["tasks"] if item["task_ref"] is not None and item["state"] not in {"merge-ready", "failed"}]
+        base["task_keys"] = [item["task_key"] for item in sorted(selected, key=lambda row: row["source_id"])]
+    elif action == "dispatch-ready-tasks":
+        base["task_keys"] = list((extra or {}).get("task_keys", []))
+    elif task is not None:
+        base["task_state"] = task["state"]
+        base["task_observation_fingerprint"] = (
+            task["current_observation"]["observation_fingerprint"] if task["current_observation"] else None
+        )
+    if delivery is not None:
+        base["revision_key"] = delivery["revision"]["revision_key"] if delivery["revision"] else None
+    if action in {"reserve-autoreview-action", "launch-autoreview-action"}:
+        assert task is not None and delivery is not None
+        if action == "reserve-autoreview-action":
+            projection, parent, obligation = controller_autoreview_context(ledger, state, task, delivery)
+            reservation_id = AUTOREVIEW_PROTOCOL.fingerprint({
+                "ledger": str(ledger), "task_key": task["task_key"],
+                "delivery_key": delivery["delivery_key"],
+                "state_fingerprint": state["content_fingerprint"],
+                "projection_fingerprint": projection["projection_fingerprint"],
+            })
+            reservation_event = {
+                "type": "autoreview-action-reserved", "task_key": task["task_key"],
+                "delivery_key": delivery["delivery_key"], "reservation_id": reservation_id,
+                "expected_state_fingerprint": state["content_fingerprint"], "projection": projection,
+            }
+        else:
+            reservation = delivery["autoreview_reservation"]
+            if reservation is None or reservation["state"] != "reserved":
+                raise CacheError("integrity-failure", "launch action lacks an active AutoReview reservation", 5)
+            projection = copy.deepcopy(reservation["projection"])
+            reset = delivery["lineage_reset_authority"]
+            parent = None if reset is not None and reset["state"] == "target-observed" else copy.deepcopy(delivery["autoreview"])
+            obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
+            obligation = copy.deepcopy(obligations[0]) if obligations else None
+            reservation_event = {
+                "type": "autoreview-action-reserved", "task_key": task["task_key"],
+                "delivery_key": delivery["delivery_key"], "reservation_id": reservation["reservation_id"],
+                "expected_state_fingerprint": reservation["expected_state_fingerprint"], "projection": projection,
+            }
+        base.update({
+            "autoreview_projection": projection,
+            "prior_evidence": parent,
+            "hosted_obligation": obligation,
+            "reservation_event": reservation_event,
+        })
+    if extra:
+        base.update(extra)
+    return validate_controller_bound_arguments(action, base)
+
+
+def controller_packet_template(
+    action: str, ledger: Path, state: dict[str, Any], target: dict[str, Any],
+    task: dict[str, Any] | None = None, delivery: dict[str, Any] | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    spec = CONTROLLER_ACTIONS[action]
+    template = {
+        "schema_version": CONTROLLER_TEMPLATE_SCHEMA_VERSION,
+        "packet_kind": spec["packet_kind"],
+        "executor": spec["executor"],
+        "bound_arguments": controller_bound_arguments(action, ledger, state, target, task, delivery, extra),
+        "required_inputs": copy.deepcopy(spec["inputs"]),
+        "result_event_types": list(spec["events"]),
+    }
+    if set(template) != {"schema_version", "packet_kind", "executor", "bound_arguments", "required_inputs", "result_event_types"}:
+        raise CacheError("integrity-failure", "controller packet template field set is invalid", 5)
+    return template
+
+
+def controller_action_response(
+    ledger: Path, state: dict[str, Any], action: str, target: dict[str, Any],
+    task: dict[str, Any] | None = None, delivery: dict[str, Any] | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    spec = CONTROLLER_ACTIONS[action]
+    response = {
+        "ok": True,
+        "command": "controller.next",
+        "controller_schema_version": CONTROLLER_PROJECTION_SCHEMA_VERSION,
+        "tool_version": __version__,
+        "ledger_schema_version": LEDGER_SCHEMA_VERSION,
+        "ledger": str(ledger),
+        "portfolio_key": state["portfolio"]["key"],
+        "root_id": state["portfolio"]["root_id"],
+        "binding": {
+            "generation": state["generation"],
+            "state_fingerprint": state["content_fingerprint"],
+            "claim_fingerprint": state["claim"]["fingerprint"],
+        },
+        "decision": "action",
+        "phase": spec["phase"],
+        "target": target,
+        "action": action,
+        "action_owner": spec["owner"],
+        "packet_template": controller_packet_template(action, ledger, state, target, task, delivery, extra),
+        "allowed_transitions": copy.deepcopy(spec["transitions"]),
+        "completion_criterion": {"kind": spec["completion_kind"], "predicate": spec["completion"]},
+        "blockers": [],
+        "required_contracts": [
+            {"contract_id": contract_id, "path": path}
+            for contract_id, path in spec["contracts"]
+        ],
+        "projection_fingerprint": "",
+    }
+    response["projection_fingerprint"] = request_fingerprint({key: value for key, value in response.items() if key != "projection_fingerprint"})
+    return validate_controller_response(response)
+
+
+def controller_non_action_response(
+    ledger: Path, state: dict[str, Any], decision: str, phase: str,
+    blockers: list[dict[str, str]], *, target: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    if decision not in {"waiting", "blocked", "terminal"}:
+        raise CacheError("integrity-failure", "controller non-action decision is invalid", 5)
+    response = {
+        "ok": True, "command": "controller.next",
+        "controller_schema_version": CONTROLLER_PROJECTION_SCHEMA_VERSION,
+        "tool_version": __version__, "ledger_schema_version": LEDGER_SCHEMA_VERSION,
+        "ledger": str(ledger), "portfolio_key": state["portfolio"]["key"],
+        "root_id": state["portfolio"]["root_id"],
+        "binding": {"generation": state["generation"], "state_fingerprint": state["content_fingerprint"], "claim_fingerprint": state["claim"]["fingerprint"]},
+        "decision": decision, "phase": phase,
+        "target": target or controller_target("portfolio"),
+        "action": None, "action_owner": None, "packet_template": None,
+        "allowed_transitions": [],
+        "completion_criterion": {
+            "kind": "terminal-state" if decision == "terminal" else "external-or-ledger-predicate",
+            "predicate": "wait-condition-changed-or-ledger-transitioned" if decision == "waiting" else phase,
+        },
+        "blockers": blockers, "required_contracts": [], "projection_fingerprint": "",
+    }
+    response["projection_fingerprint"] = request_fingerprint({key: value for key, value in response.items() if key != "projection_fingerprint"})
+    return validate_controller_response(response)
+
+
+def validate_controller_response(value: Any) -> dict[str, Any]:
+    fields = {
+        "ok", "command", "controller_schema_version", "tool_version",
+        "ledger_schema_version", "ledger", "portfolio_key", "root_id", "binding",
+        "decision", "phase", "target", "action", "action_owner", "packet_template",
+        "allowed_transitions", "completion_criterion", "blockers", "required_contracts",
+        "projection_fingerprint",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        raise CacheError("integrity-failure", "controller response field set is invalid", 5)
+    if (
+        value["ok"] is not True or value["command"] != "controller.next"
+        or value["controller_schema_version"] != CONTROLLER_PROJECTION_SCHEMA_VERSION
+        or value["tool_version"] != __version__ or value["ledger_schema_version"] != LEDGER_SCHEMA_VERSION
+        or value["decision"] not in CONTROLLER_DECISIONS
+        or not isinstance(value["phase"], str) or not LOWER_KEBAB_RE.fullmatch(value["phase"])
+        or not controller_type_matches(value["target"], "target")
+        or not controller_type_matches(value["ledger"], "absolute-path")
+        or not isinstance(value["portfolio_key"], str)
+        or not LOWER_KEBAB_RE.fullmatch(value["portfolio_key"])
+        or not controller_type_matches(value["root_id"], "identifier")
+        or not isinstance(value["blockers"], list)
+        or not isinstance(value["allowed_transitions"], list)
+        or not isinstance(value["required_contracts"], list)
+    ):
+        raise CacheError("integrity-failure", "controller response identity is invalid", 5)
+    binding = value["binding"]
+    if not isinstance(binding, dict) or set(binding) != {"generation", "state_fingerprint", "claim_fingerprint"}:
+        raise CacheError("integrity-failure", "controller response binding is invalid", 5)
+    if not controller_type_matches(binding["generation"], "positive-integer") or not controller_type_matches(binding["state_fingerprint"], "sha256") or not controller_type_matches(binding["claim_fingerprint"], "sha256"):
+        raise CacheError("integrity-failure", "controller response binding values are invalid", 5)
+    criterion = value["completion_criterion"]
+    if not isinstance(criterion, dict) or set(criterion) != {"kind", "predicate"} or criterion["kind"] not in {"ledger-predicate", "external-or-ledger-predicate", "terminal-state"} or not isinstance(criterion["predicate"], str) or not LOWER_KEBAB_RE.fullmatch(criterion["predicate"]):
+        raise CacheError("integrity-failure", "controller completion criterion is invalid", 5)
+    for blocker in value["blockers"]:
+        if (
+            not isinstance(blocker, dict)
+            or set(blocker) != {"code", "scope", "recovery"}
+            or blocker["scope"] not in CONTROLLER_SCOPES
+            or not isinstance(blocker["code"], str)
+            or not LOWER_KEBAB_RE.fullmatch(blocker["code"])
+            or not isinstance(blocker["recovery"], str)
+            or not LOWER_KEBAB_RE.fullmatch(blocker["recovery"])
+        ):
+            raise CacheError("integrity-failure", "controller blocker is invalid", 5)
+    if value["decision"] == "action":
+        action = value["action"]
+        if (
+            action not in CONTROLLER_ACTIONS
+            or value["action_owner"] != CONTROLLER_ACTIONS[action]["owner"]
+            or value["phase"] != CONTROLLER_ACTIONS[action]["phase"]
+            or value["blockers"]
+        ):
+            raise CacheError("integrity-failure", "controller action cross-fields are invalid", 5)
+        template = value["packet_template"]
+        if not isinstance(template, dict) or set(template) != {"schema_version", "packet_kind", "executor", "bound_arguments", "required_inputs", "result_event_types"}:
+            raise CacheError("integrity-failure", "controller packet template is invalid", 5)
+        spec = CONTROLLER_ACTIONS[action]
+        if template["schema_version"] != CONTROLLER_TEMPLATE_SCHEMA_VERSION or template["packet_kind"] != spec["packet_kind"] or template["executor"] != spec["executor"] or template["required_inputs"] != spec["inputs"] or template["result_event_types"] != spec["events"]:
+            raise CacheError("integrity-failure", "controller packet template route is invalid", 5)
+        validate_controller_bound_arguments(action, template["bound_arguments"])
+        if value["target"] != template["bound_arguments"]["target"]:
+            raise CacheError("integrity-failure", "controller target binding is invalid", 5)
+        if value["allowed_transitions"] != spec["transitions"] or criterion != {"kind": spec["completion_kind"], "predicate": spec["completion"]}:
+            raise CacheError("integrity-failure", "controller transition or completion route is invalid", 5)
+        expected_contracts = [{"contract_id": item[0], "path": item[1]} for item in spec["contracts"]]
+        if value["required_contracts"] != expected_contracts:
+            raise CacheError("integrity-failure", "controller required contracts are invalid", 5)
+    elif any(value[field] is not None for field in ("action", "action_owner", "packet_template")) or value["allowed_transitions"] or value["required_contracts"]:
+        raise CacheError("integrity-failure", "controller non-action cross-fields are invalid", 5)
+    if value["decision"] == "blocked" and not value["blockers"]:
+        raise CacheError("integrity-failure", "blocked controller response lacks a blocker", 5)
+    expected = request_fingerprint({key: item for key, item in value.items() if key != "projection_fingerprint"})
+    if value["projection_fingerprint"] != expected:
+        raise CacheError("integrity-failure", "controller projection fingerprint is invalid", 5)
+    return value
+
+
+def derive_controller_projection(ledger: Path, state: dict[str, Any]) -> dict[str, Any]:
+    validate_controller_registry()
+    if state["closeout"]["post_terminal_drift"] is not None:
+        blocker = {"code": "post-terminal-drift", "scope": "portfolio", "recovery": "authorized-owner-fresh-run"}
+        return controller_non_action_response(ledger, state, "blocked", "post-terminal-drift", [blocker], target=controller_target("closeout"))
+
+    ordered_tasks = sorted(state["tasks"], key=lambda row: (row["source_id"], row["task_key"]))
+    for task in ordered_tasks:
+        for delivery in sorted(task["deliveries"], key=lambda row: row["delivery_key"]):
+            for attempt in delivery["command_attempts"]:
+                if attempt["state"] != "terminal":
+                    return controller_action_response(ledger, state, "reconcile-command-attempt", controller_target("delivery", task, delivery), task, delivery, {"attempt_id": attempt["attempt_id"], "attempt_state": attempt["state"]})
+            for mutation in delivery["review_provider_mutations"]:
+                if mutation["attempt_state"] not in {"completed", "failed-or-ambiguous"}:
+                    return controller_action_response(ledger, state, "reconcile-provider-mutation", controller_target("delivery", task, delivery), task, delivery, {"reservation_id": mutation["reservation"]["reservation_id"], "attempt_state": mutation["attempt_state"]})
+            reservation = delivery["autoreview_reservation"]
+            if reservation is not None and reservation["state"] == "consumed-failed":
+                blocker = {"code": "autoreview-attempt-consumed-failed", "scope": "delivery", "recovery": "authorized-owner"}
+                return controller_non_action_response(ledger, state, "blocked", "operation-recovery", [blocker], target=controller_target("delivery", task, delivery))
+            if reservation is not None and reservation["state"] == "reserved":
+                records = [row for row in delivery["autoreview_attempts"] if row["reservation_id"] == reservation["reservation_id"]]
+                if records:
+                    return controller_action_response(ledger, state, "reconcile-autoreview-attempt", controller_target("delivery", task, delivery), task, delivery, {"reservation_id": reservation["reservation_id"], "attempt_state": records[-1]["state"]})
+                return controller_action_response(ledger, state, "launch-autoreview-action", controller_target("delivery", task, delivery), task, delivery)
+
+    if state["portfolio"]["root_task_title_evidence_ref"] is None:
+        return controller_action_response(ledger, state, "observe-root-title", controller_target("portfolio"))
+    if any(task["task_ref"] is None for task in ordered_tasks):
+        return controller_action_response(ledger, state, "dispatch-baseline-tasks", controller_target("portfolio"))
+    if any(task["current_observation"] is None or any(delivery["managed_checkout"] is None for delivery in task["deliveries"]) for task in ordered_tasks):
+        return controller_action_response(ledger, state, "observe-baseline-tasks", controller_target("portfolio"))
+    if any(task["implementation_baseline"] == "pending" for task in ordered_tasks):
+        return controller_action_response(ledger, state, "complete-implementation-baseline", controller_target("portfolio"))
+    if state["closeout"]["preimplementation_abort"] is not None:
+        return controller_non_action_response(ledger, state, "terminal", "preimplementation-aborted", [])
+    if state["goal"]["state"] == "pending":
+        return controller_action_response(ledger, state, "activate-root-goal", controller_target("portfolio"))
+
+    attention = [task for task in ordered_tasks if task["state"] in {"blocked", "needs-owner", "failed"}]
+    if attention:
+        task = attention[0]
+        blocker = {"code": f"task-state-{task['state']}", "scope": "task", "recovery": "authorized-owner"}
+        return controller_non_action_response(ledger, state, "blocked", "task-attention", [blocker], target=controller_target("task", task))
+
+    for task in ordered_tasks:
+        if task["seal"] is None and seal_candidate_fingerprint(state, task) is not None:
+            return controller_action_response(ledger, state, "seal-task", controller_target("closeout", task), task, extra={"revision_set_key": current_revision_set_key(task), "seal_candidate_fingerprint": seal_candidate_fingerprint(state, task)})
+        if task["seal"] is not None and terminal_handoff(state, task) is None:
+            return controller_action_response(ledger, state, "record-terminal-handoff", controller_target("closeout", task), task, extra={"seal_fingerprint": task["seal"]["seal_fingerprint"]})
+    verification_candidate = portfolio_verification_candidate(state)
+    verified = verification_candidate is not None and state["closeout"]["portfolio_terminal_verification_fingerprint"] == verification_candidate
+    if verification_candidate is not None and not verified:
+        return controller_action_response(ledger, state, "verify-portfolio", controller_target("closeout"), extra={"verification_fingerprint": verification_candidate})
+    if verified and state["goal"]["state"] == "active":
+        return controller_action_response(ledger, state, "complete-root-goal", controller_target("closeout"), extra={"verification_fingerprint": verification_candidate})
+    if verified and state["goal"]["state"] == "complete":
+        return controller_action_response(ledger, state, "release-and-archive", controller_target("closeout"))
+
+    dispatch = project_state(state, "dispatch")
+    if dispatch["ready_task_keys"]:
+        return controller_action_response(ledger, state, "dispatch-ready-tasks", controller_target("portfolio"), extra={"task_keys": dispatch["ready_task_keys"]})
+
+    for task in ordered_tasks:
+        for delivery in sorted(task["deliveries"], key=lambda row: row["delivery_key"]):
+            if delivery["committed_revision"] is not None:
+                try:
+                    projection, _, _ = controller_autoreview_context(ledger, state, task, delivery)
+                except CacheError as exc:
+                    if exc.code != "state-conflict":
+                        raise
+                else:
+                    if projection["action"] is not None:
+                        return controller_action_response(ledger, state, "reserve-autoreview-action", controller_target("delivery", task, delivery), task, delivery)
+            review = current_review(state, task, delivery)
+            if delivery["revision"] is not None and task["state"] in {"review-polling", "fixing-review", "ci", "preparing-tracker-closeout", "checking-mergeability"}:
+                if review is None:
+                    return controller_action_response(ledger, state, "request-codex-review", controller_target("delivery", task, delivery), task, delivery)
+                if review["wait_state"] == "active-wait" and review["wait_invoked_at"] is None:
+                    return controller_action_response(ledger, state, "invoke-review-wait", controller_target("delivery", task, delivery), task, delivery, {"wait_started_at": review["wait_started_at"], "wait_deadline": review["wait_deadline"], "request_receipt": review["request_receipt"]})
+                if review["wait_state"] == "active-wait":
+                    return controller_action_response(ledger, state, "reconcile-review-wait", controller_target("delivery", task, delivery), task, delivery, {"wait_started_at": review["wait_started_at"], "wait_deadline": review["wait_deadline"], "wait_invoked_at": review["wait_invoked_at"], "provider_timeout": review["provider_timeout"], "request_receipt": review["request_receipt"]})
+
+    waiting = [task for task in ordered_tasks if task["state"] == "dependency-wait"]
+    runnable = [task for task in ordered_tasks if task["state"] not in {"dependency-wait", "terminal-sealed", "merge-ready"}]
+    if waiting and not runnable:
+        return controller_non_action_response(ledger, state, "waiting", "dependency-wait", [], target=controller_target("portfolio"))
+    if all(task["state"] == "merge-ready" for task in ordered_tasks):
+        return controller_non_action_response(ledger, state, "terminal", "pull-request-ready-for-merge-but-not-merged", [])
+    phase_candidates: list[tuple[int, str, dict[str, Any]]] = []
+    for task in ordered_tasks:
+        action = CONTROLLER_TASK_STATE_ACTIONS.get(task["state"])
+        if task["state"] == "review-polling":
+            reviews = [current_review(state, task, delivery) for delivery in task["deliveries"]]
+            has_findings = any(
+                review is not None and review["observations"]
+                and review["observations"][-1]["disposition"] == "fix-required"
+                for review in reviews
+            )
+            action = "steer-review-fix" if has_findings else "steer-ci"
+        if action is not None:
+            phase_candidates.append((CONTROLLER_ACTIONS[action]["rank"], action, task))
+    if not phase_candidates:
+        raise CacheError("integrity-failure", "controller found no action for a nonterminal task state", 5)
+    _, selected_action, _ = min(phase_candidates, key=lambda item: (item[0], item[2]["source_id"], item[2]["task_key"]))
+    selected_tasks = [task for _, action, task in phase_candidates if action == selected_action]
+    task_keys = sorted(task["task_key"] for task in selected_tasks)
+    task_states = {task["task_key"]: task["state"] for task in sorted(selected_tasks, key=lambda item: item["task_key"])}
+    return controller_action_response(
+        ledger, state, selected_action, controller_target("portfolio"),
+        extra={"task_keys": task_keys, "task_states": task_states},
+    )
+
+
+def controller_next(args: argparse.Namespace) -> dict[str, Any]:
+    ledger = canonical_active_ledger(args.ledger)
+    root_id = check_id(args.root_id, "root_id")
+    expected_fingerprint = canonical_fingerprint(args.expected_claim_fingerprint, "expected_claim_fingerprint")
+    with locked_claim_store(create=False, exclusive=False) as claims:
+        claim = active_claim(claims, root_id, expected_fingerprint, ledger)
+        state = load_state(ledger)
+        if (
+            state["portfolio"]["root_id"] != root_id
+            or state["claim"]["fingerprint"] != expected_fingerprint
+            or state["portfolio"]["repositories"] != claim["repositories"]
+            or state["portfolio"]["repository_checkouts"] != claim["repository_checkouts"]
+            or sorted(item["source_id"] for item in state["sources"]) != sorted(claim["sources"])
+        ):
+            raise CacheError("state-conflict", "controller ledger binding differs from the active claim", 4)
+        return derive_controller_projection(ledger, state)
 
 
 def read_ledger(args: argparse.Namespace) -> dict[str, Any]:
@@ -8143,12 +8850,12 @@ def build_parser() -> argparse.ArgumentParser:
     archive.add_argument("--root-id", required=True)
     archive.add_argument("--reason", choices=["terminal", "preimplementation-abort"], default="terminal")
 
-    autoreview = nouns.add_parser("autoreview", help="Derive the next managed AutoReview protocol action.")
-    autoreview_verbs = autoreview.add_subparsers(dest="verb", required=True)
-    next_action = autoreview_verbs.add_parser("next", help="Return the next action, packet, transitions, blockers, and reservation event.")
+    controller = nouns.add_parser("controller", help="Derive one live-claim-bound post-registration action.")
+    controller_verbs = controller.add_subparsers(dest="verb", required=True)
+    next_action = controller_verbs.add_parser("next", help="Return one strict read-only next-action projection.")
     next_action.add_argument("--ledger", required=True)
-    next_action.add_argument("--task-key", required=True)
-    next_action.add_argument("--delivery-key", required=True)
+    next_action.add_argument("--root-id", required=True)
+    next_action.add_argument("--expected-claim-fingerprint", required=True)
 
     archive_noun = nouns.add_parser("archive", help="Inspect, verify, or prune archived ledgers.")
     archive_verbs = archive_noun.add_subparsers(dest="verb", required=True)
@@ -8174,8 +8881,8 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.verb == "review-authority":
             return review_mutation_authority(args)
         return archive_ledgers(args)
-    if args.noun == "autoreview":
-        return autoreview_next(args)
+    if args.noun == "controller":
+        return controller_next(args)
     if args.verb == "list":
         return list_archives()
     if args.verb == "verify":
