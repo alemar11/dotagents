@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV13Tests(unittest.TestCase):
+class LedgerCacheV14Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -452,6 +452,251 @@ class LedgerCacheV13Tests(unittest.TestCase):
         self.assertEqual(task["state"], "implementing")
         self.assertIsNone(task["dependency_wait"])
         self.assertNotEqual(task["state"], "blocked")
+
+    def test_review_provider_mutation_guard_is_cas_bound_append_only_and_replay_safe(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        state = self.state()
+        receipt = self.request_receipt(revision, request_key="mutation-request")
+        protocol = CACHE_RUNTIME.REVIEW_MUTATION
+        operation_id = protocol.operation_id_for_request(
+            receipt["repository"], receipt["pr_number"], receipt["head_sha"],
+            receipt["request_key"], receipt["request_fingerprint"],
+        )
+        packet = protocol.build_reservation(
+            mutation_kind="review-request",
+            repository=receipt["repository"],
+            pr_number=receipt["pr_number"],
+            head_sha=receipt["head_sha"],
+            task_key=self.task_key,
+            delivery_key="dotagents",
+            operation_id=operation_id,
+            request_key=receipt["request_key"],
+            request_fingerprint=receipt["request_fingerprint"],
+            thread_id=None,
+            thread_fingerprint=None,
+            finding_comment_id=None,
+            body_fingerprint=receipt["body_fingerprint"],
+            reply_receipt_fingerprint=None,
+            expected_generation=state["generation"],
+            expected_state_fingerprint=state["content_fingerprint"],
+            expected_claim_fingerprint=state["claim"]["fingerprint"],
+            expected_task_state=state["tasks"][0]["state"],
+        )
+        packet_fp = protocol.packet_fingerprint(packet)
+        reserve = {
+            "type": "review-provider-mutation-reserved",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "reservation": packet,
+            "packet_fingerprint": packet_fp,
+            "evidence_ref": "app-task://root-a/review-reservation",
+        }
+        self.apply([reserve])
+        journal = self.state()["tasks"][0]["deliveries"][0]["review_provider_mutations"]
+        self.assertEqual(journal[0]["attempt_state"], "prepared")
+        self.assertNotIn("attempt_state", journal[0]["reservation"])
+        authority_packet = self.write_packet(packet, "authority")
+        not_started = self.run_cache(
+            "--json", "ledger", "review-authority", "--ledger", str(self.ledger),
+            "--reservation-file", str(authority_packet), check=False,
+        )
+        self.error(not_started, "state-conflict")
+
+        start = {
+            "type": "review-provider-mutation-started",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "reservation_id": packet["reservation_id"],
+            "operation_id": packet["operation_id"],
+            "packet_fingerprint": packet_fp,
+            "evidence_ref": "app-task://root-a/review-mutation-started",
+        }
+        self.apply([start])
+        authority = parse_result(
+            self.run_cache(
+                "--json", "ledger", "review-authority", "--ledger", str(self.ledger),
+                "--reservation-file", str(authority_packet),
+            )
+        )
+        self.assertEqual(authority["authority"], "review-provider-mutation-started")
+        self.assertEqual(authority["packet_fingerprint"], packet_fp)
+        result = {
+            "type": "review-provider-mutation-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "reservation_id": packet["reservation_id"],
+            "operation_id": packet["operation_id"],
+            "attempt_state": "completed",
+            "result_fingerprint": hashlib.sha256(b"request-receipt-401").hexdigest(),
+            "receipt_ref": "gitstack://request/401",
+            "recovery_state": "reconciled",
+            "evidence_ref": "app-task://worker-232/request-result",
+        }
+        self.apply([result])
+        journal = self.state()["tasks"][0]["deliveries"][0]["review_provider_mutations"]
+        self.assertEqual(journal[0]["attempt_state"], "completed")
+        self.assertEqual(
+            [phase["attempt_state"] for phase in journal[0]["phase_history"]],
+            ["prepared", "mutation-started", "completed"],
+        )
+
+        # The top-level projection is part of the integrity boundary, not a
+        # cache of only the lifecycle enum.  Recompute the outer state
+        # fingerprint so validation reaches the mutation projection check.
+        tampered = copy.deepcopy(self.state())
+        tampered["tasks"][0]["deliveries"][0]["review_provider_mutations"][0][
+            "receipt_ref"
+        ] = "gitstack://request/tampered"
+        tampered["content_fingerprint"] = CACHE_RUNTIME.state_payload_fingerprint(tampered)
+        with self.assertRaisesRegex(
+            CACHE_RUNTIME.CacheError,
+            "review provider mutation projection does not match final phase",
+        ):
+            CACHE_RUNTIME.validate_state(tampered, self.ledger)
+
+        malformed = copy.deepcopy(self.state())
+        malformed["tasks"][0]["deliveries"][0]["review_provider_mutations"][0][
+            "phase_history"
+        ][0] = "not-an-object"
+        malformed["content_fingerprint"] = CACHE_RUNTIME.state_payload_fingerprint(malformed)
+        with self.assertRaisesRegex(
+            CACHE_RUNTIME.CacheError,
+            r"phase_history\[0\]",
+        ):
+            CACHE_RUNTIME.validate_state(malformed, self.ledger)
+
+        # A delayed duplicate of each message is a no-op, even though its
+        # original packet generation is no longer current.
+        self.apply([reserve])
+        self.apply([start])
+        self.apply([result])
+        replayed = self.apply([result], operation_id=self.next_operation_id())
+        self.assertEqual(parse_result(replayed)["mutation_state"], "unchanged")
+
+        # Root bookkeeping may be wrapped by the typed dependency wait. Exact
+        # delayed replays remain no-ops while the effective resume phase is
+        # preserved; new authority cannot be reserved with the stale packet.
+        self.apply([{
+            "type": "task-dependency-wait-started",
+            "task_key": self.task_key,
+            "resume_state": "implementing",
+            "reason": "persisting review result",
+            "summary_ref": "app-task://worker-232/review-bookkeeping",
+            "evidence_ref": "app-task://root-a/review-wait",
+        }])
+        self.apply([reserve], operation_id=self.next_operation_id())
+        self.apply([start], operation_id=self.next_operation_id())
+        self.apply([result], operation_id=self.next_operation_id())
+        self.apply([{
+            "type": "task-dependency-wait-resolved",
+            "task_key": self.task_key,
+            "resume_state": "implementing",
+            "evidence_ref": "app-task://root-a/review-resumed",
+        }])
+        self.assertEqual(self.state()["tasks"][0]["state"], "implementing")
+
+        # A result that advances the task is ordered inside one CAS batch:
+        # wait-started -> result -> wait-resolved -> task transition.
+        transition_state = self.state()
+        transition_receipt = self.request_receipt(revision, request_key="transition-request")
+        transition_operation_id = protocol.operation_id_for_request(
+            transition_receipt["repository"],
+            transition_receipt["pr_number"],
+            transition_receipt["head_sha"],
+            transition_receipt["request_key"],
+            transition_receipt["request_fingerprint"],
+        )
+        transition_packet = protocol.build_reservation(
+            mutation_kind="review-request",
+            repository=receipt["repository"], pr_number=receipt["pr_number"],
+            head_sha=receipt["head_sha"], task_key=self.task_key,
+            delivery_key="dotagents", operation_id=transition_operation_id,
+            request_key="transition-request", request_fingerprint=transition_receipt["request_fingerprint"],
+            thread_id=None, thread_fingerprint=None, finding_comment_id=None,
+            body_fingerprint=transition_receipt["body_fingerprint"], reply_receipt_fingerprint=None,
+            expected_generation=transition_state["generation"],
+            expected_state_fingerprint=transition_state["content_fingerprint"],
+            expected_claim_fingerprint=transition_state["claim"]["fingerprint"],
+            expected_task_state="implementing",
+        )
+        transition_fp = protocol.packet_fingerprint(transition_packet)
+        self.apply([{
+            "type": "review-provider-mutation-reserved", "task_key": self.task_key,
+            "delivery_key": "dotagents", "reservation": transition_packet,
+            "packet_fingerprint": transition_fp, "evidence_ref": "app-task://root-a/transition-reserved",
+        }])
+        self.apply([{
+            "type": "review-provider-mutation-started", "task_key": self.task_key,
+            "delivery_key": "dotagents", "reservation_id": transition_packet["reservation_id"],
+            "operation_id": transition_packet["operation_id"], "packet_fingerprint": transition_fp,
+            "evidence_ref": "app-task://root-a/transition-started",
+        }])
+        transition_result = {
+            "type": "review-provider-mutation-observed", "task_key": self.task_key,
+            "delivery_key": "dotagents", "reservation_id": transition_packet["reservation_id"],
+            "operation_id": transition_packet["operation_id"], "attempt_state": "completed",
+            "result_fingerprint": hashlib.sha256(b"transition-result").hexdigest(),
+            "receipt_ref": "gitstack://request/transition", "recovery_state": "reconciled",
+            "evidence_ref": "app-task://worker-232/transition-result",
+        }
+        self.apply([
+            {
+                "type": "task-dependency-wait-started", "task_key": self.task_key,
+                "resume_state": "implementing", "reason": "persisting a state-changing result",
+                "summary_ref": "app-task://worker-232/transition-bookkeeping",
+                "evidence_ref": "app-task://root-a/transition-wait",
+            },
+            transition_result,
+            {
+                "type": "task-dependency-wait-resolved", "task_key": self.task_key,
+                "resume_state": "implementing", "evidence_ref": "app-task://root-a/transition-resolved",
+            },
+            self.task_event(state="validating"),
+        ])
+        self.assertEqual(self.state()["tasks"][0]["state"], "validating")
+
+        # A result without a durable start cannot cross the authority boundary.
+        second_state = self.state()
+        second_receipt = self.request_receipt(revision, request_key="second-request")
+        second_operation_id = protocol.operation_id_for_request(
+            second_receipt["repository"],
+            second_receipt["pr_number"],
+            second_receipt["head_sha"],
+            second_receipt["request_key"],
+            second_receipt["request_fingerprint"],
+        )
+        second_packet = protocol.build_reservation(
+            mutation_kind="review-request",
+            repository=receipt["repository"], pr_number=receipt["pr_number"], head_sha=receipt["head_sha"],
+            task_key=self.task_key, delivery_key="dotagents",
+            operation_id=second_operation_id, request_key="second-request",
+            request_fingerprint=second_receipt["request_fingerprint"], thread_id=None,
+            thread_fingerprint=None, finding_comment_id=None, body_fingerprint=second_receipt["body_fingerprint"],
+            reply_receipt_fingerprint=None, expected_generation=second_state["generation"],
+            expected_state_fingerprint=second_state["content_fingerprint"],
+            expected_claim_fingerprint=second_state["claim"]["fingerprint"],
+            expected_task_state=second_state["tasks"][0]["state"],
+        )
+        second_fp = protocol.packet_fingerprint(second_packet)
+        self.apply([{
+            "type": "review-provider-mutation-reserved", "task_key": self.task_key,
+            "delivery_key": "dotagents", "reservation": second_packet,
+            "packet_fingerprint": second_fp, "evidence_ref": "app-task://root-a/second-reservation",
+        }])
+        invalid_result = {
+            **result,
+            "reservation_id": second_packet["reservation_id"],
+            "operation_id": second_packet["operation_id"],
+        }
+        rejected = self.apply([invalid_result], check=False)
+        self.error(rejected, "state-conflict")
+
+        # Mutation packets retain their own exact revision evidence. A later
+        # PR head must not make the historical append-only journal invalid.
+        self.observe_revision(head="e" * 40, merge_base="f" * 40)
+        CACHE_RUNTIME.validate_state(self.state(), self.ledger)
     def direct_event(self, state: dict, event: dict, now: datetime) -> None:
         changed = CACHE_RUNTIME.apply_event(state, event, now)
         self.assertTrue(changed)
@@ -612,7 +857,14 @@ class LedgerCacheV13Tests(unittest.TestCase):
             "head_sha": head_sha,
             "request_key": request_key,
         })
-        body = f"@codex review {head_sha}\n\n<!-- {schema}\nrequest_key={request_key}\nrequest_fingerprint={request_fingerprint}\n-->"
+        operation_id = CACHE_RUNTIME.REVIEW_MUTATION.operation_id_for_request(
+            repository, pr_number, head_sha, request_key, request_fingerprint
+        )
+        body = (
+            f"@codex review {head_sha}\n\n<!-- {schema}\n"
+            f"request_key={request_key}\nrequest_fingerprint={request_fingerprint}\n-->\n\n"
+            f"{CACHE_RUNTIME.REVIEW_MUTATION.operation_marker(operation_id)}"
+        )
         body_fingerprint = hashlib.sha256(body.encode()).hexdigest()
         request_ref = f"https://github.com/{repository}/pull/{pr_number}#issuecomment-{comment_id}"
         identity_fingerprint = fingerprint({
@@ -1163,12 +1415,12 @@ class LedgerCacheV13Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v13_offline_and_read_only(self) -> None:
+    def test_doctor_is_v14_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "13.0.0")
+        self.assertEqual(version, "14.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])

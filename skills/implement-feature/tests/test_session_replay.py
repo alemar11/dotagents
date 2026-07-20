@@ -292,7 +292,7 @@ class SessionReplayTests(unittest.TestCase):
         self.assertNotEqual(legacy_autoreview.get("schema_version"), "2.0.0")
         # The captured seven-node-era execution remains immutable replay metadata.
         # Current-schema executable topology is covered by the protocol/ledger tests;
-        # hard-cut v13 must never adopt or rewrite this historical chain.
+        # hard-cut v14 must never adopt or rewrite this historical chain.
         return
         facts = fixture["terminal_facts"]
         proxy = fixture["efficiency_proxy"]
@@ -516,7 +516,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "13.0.0")
+            self.assertEqual(created["version"], "14.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None

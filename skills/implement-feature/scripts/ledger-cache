@@ -22,8 +22,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "13.0.0"
-LEDGER_SCHEMA_VERSION = "10.0.0"
+__version__ = "14.0.0"
+LEDGER_SCHEMA_VERSION = "11.0.0"
 REGISTRATION_SCHEMA_VERSION = "5.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -40,6 +40,7 @@ MAX_OPERATIONS = 512
 MAX_REVIEWS = 256
 MAX_REVIEW_OBSERVATIONS = 1
 MAX_REVIEW_RECONCILIATIONS = 1
+MAX_REVIEW_PROVIDER_MUTATIONS = 16
 MAX_PROJECTED_REVIEW_WARNING_BYTES = 24 * 1024
 MAX_GATES = 2048
 MAX_HANDOFFS = 512
@@ -123,6 +124,9 @@ EVENT_TYPES = {
     "review-observed",
     "review-reconciled",
     "review-thread-resolved",
+    "review-provider-mutation-reserved",
+    "review-provider-mutation-started",
+    "review-provider-mutation-observed",
     "autoreview-hosted-finding-obligated",
     "autoreview-action-reserved",
     "autoreview-reservation-released",
@@ -210,6 +214,62 @@ sys.modules[PROTOCOL_SPEC.name] = AUTOREVIEW_PROTOCOL
 PROTOCOL_SPEC.loader.exec_module(AUTOREVIEW_PROTOCOL)
 
 
+def _review_mutation_paths() -> Iterator[Path]:
+    """Yield the installed GitStack-owned protocol module locations."""
+
+    development_root = Path(__file__).resolve().parents[3]
+    yield development_root / "plugins/gitstack/projects/gitstack/src/gitstack/review_mutation.py"
+    for home_root in (Path.home() / ".codex/plugins/cache", Path.home() / ".agents/plugins/cache"):
+        try:
+            owners = list(home_root.iterdir()) if home_root.is_dir() else []
+        except OSError:
+            owners = []
+        for owner in owners:
+            if owner.is_symlink() or not owner.is_dir():
+                continue
+            plugin_root = owner / "gitstack"
+            try:
+                versions = list(plugin_root.iterdir()) if plugin_root.is_dir() else []
+            except OSError:
+                versions = []
+            for version in sorted(versions, key=lambda path: path.name, reverse=True):
+                if version.is_symlink() or not version.is_dir():
+                    continue
+                yield version / "projects/gitstack/src/gitstack/review_mutation.py"
+
+
+def _load_review_mutation() -> tuple[Path | None, Any | None]:
+    """Load the one physical GitStack protocol when provider state is used.
+
+    The cache helper remains usable for version/doctor on installations where
+    GitStack is absent; review-mutation commands fail closed at their typed
+    boundary instead of crashing during module import.
+    """
+
+    seen: set[Path] = set()
+    for candidate in _review_mutation_paths():
+        candidate = Path(os.path.abspath(os.fspath(candidate)))
+        if candidate in seen or candidate.is_symlink() or not candidate.is_file():
+            continue
+        seen.add(candidate)
+        spec = importlib.util.spec_from_file_location(
+            "dotagents_gitstack_review_mutation", candidate
+        )
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return candidate, module
+    return None, None
+
+
+REVIEW_MUTATION_MODULE_PATH, REVIEW_MUTATION = _load_review_mutation()
+REVIEW_MUTATION_FIELDS = (
+    REVIEW_MUTATION.RESERVATION_FIELDS if REVIEW_MUTATION is not None else frozenset()
+)
+
+
 class CacheError(Exception):
     def __init__(self, code: str, message: str, exit_code: int, details: Any = None):
         super().__init__(message)
@@ -217,6 +277,16 @@ class CacheError(Exception):
         self.message = message
         self.exit_code = exit_code
         self.details = details or {}
+
+
+def require_review_mutation() -> Any:
+    if REVIEW_MUTATION is None:
+        raise CacheError(
+            "state-conflict",
+            "GitStack review-mutation protocol is not installed; refusing provider state access",
+            4,
+        )
+    return REVIEW_MUTATION
 
 
 def cache_root() -> Path:
@@ -474,10 +544,14 @@ def validate_review_request_receipt(
     )
     if receipt["request_fingerprint"] != expected_request_fingerprint:
         raise CacheError(error_code, f"{field}.request_fingerprint does not match the request identity", exit_code)
+    protocol = require_review_mutation()
     body = (
         f"@codex review {head_sha}\n\n<!-- {REQUEST_RECEIPT_SCHEMA}\n"
         f"request_key={request_key}\n"
         f"request_fingerprint={expected_request_fingerprint}\n"
+        "-->\n\n"
+        f"<!-- {protocol.RESERVATION_SCHEMA}\n"
+        f"operation_id={protocol.operation_id_for_request(repository, pr_number, head_sha, request_key, expected_request_fingerprint)}\n"
         "-->"
     )
     expected_body_fingerprint = hashlib.sha256(body.encode()).hexdigest()
@@ -2011,6 +2085,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "autoreview",
                         "autoreview_reservation",
                         "autoreview_attempts",
+                        "review_provider_mutations",
                         "hosted_obligations",
                         "lineage_reset_authority",
                     },
@@ -2158,6 +2233,113 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     )
                 if not isinstance(delivery["autoreview_attempts"], list) or not isinstance(delivery["hosted_obligations"], list):
                     raise CacheError("integrity-failure", "run-state AutoReview journals are invalid", 5)
+                if not isinstance(delivery["review_provider_mutations"], list):
+                    raise CacheError("integrity-failure", "run-state review provider mutation journal is invalid", 5)
+                if len(delivery["review_provider_mutations"]) > MAX_REVIEW_PROVIDER_MUTATIONS:
+                    raise CacheError("integrity-failure", "run-state review provider mutation journal exceeds its bound", 5)
+                mutation_ids: set[str] = set()
+                mutation_operations: set[str] = set()
+                mutation_states = {"prepared", "mutation-started", "completed", "failed-or-ambiguous"}
+                allowed_transitions = {
+                    "prepared": {"prepared", "mutation-started"},
+                    "mutation-started": {"mutation-started", "completed", "failed-or-ambiguous"},
+                    "completed": {"completed"},
+                    "failed-or-ambiguous": {"failed-or-ambiguous"},
+                }
+                protocol = require_review_mutation() if delivery["review_provider_mutations"] else None
+                for mutation_index, mutation in enumerate(delivery["review_provider_mutations"]):
+                    mutation_field = f"{delivery_field}.review_provider_mutations[{mutation_index}]"
+                    exact_object(
+                        mutation,
+                        {
+                            "reservation",
+                            "packet_fingerprint",
+                            "attempt_state",
+                            "phase_history",
+                            "result_fingerprint",
+                            "receipt_ref",
+                            "recovery_state",
+                            "evidence_ref",
+                            "recorded_at",
+                        },
+                        mutation_field,
+                    )
+                    try:
+                        assert protocol is not None
+                        protocol.validate_reservation_packet(mutation["reservation"])
+                    except (KeyError, protocol.ReservationError) as exc:
+                        raise CacheError("integrity-failure", f"{mutation_field} reservation is invalid", 5) from exc
+                    reservation = mutation["reservation"]
+                    packet_fp = canonical_fingerprint(mutation["packet_fingerprint"], f"{mutation_field}.packet_fingerprint")
+                    if packet_fp != protocol.packet_fingerprint(reservation):
+                        raise CacheError("integrity-failure", "review provider mutation packet fingerprint is invalid", 5)
+                    reservation_id = reservation["reservation_id"]
+                    operation_id = reservation["operation_id"]
+                    if reservation_id in mutation_ids or operation_id in mutation_operations:
+                        raise CacheError("integrity-failure", "review provider mutation identity is duplicated", 5)
+                    mutation_ids.add(reservation_id)
+                    mutation_operations.add(operation_id)
+                    if reservation["task_key"] != item["task_key"] or reservation["delivery_key"] != delivery["delivery_key"]:
+                        raise CacheError("integrity-failure", "review provider mutation task or delivery binding is invalid", 5)
+                    if reservation["repository"] != github_repository:
+                        raise CacheError("integrity-failure", "review provider mutation repository binding is invalid", 5)
+                    # The reservation carries the immutable PR/head evidence
+                    # for this append-only entry. A later commit must not make
+                    # an already-started or completed mutation invalid merely
+                    # because the delivery's current revision moved forward.
+                    if mutation["attempt_state"] not in mutation_states:
+                        raise CacheError("integrity-failure", "review provider mutation attempt state is invalid", 5)
+                    if not isinstance(mutation["phase_history"], list) or not mutation["phase_history"]:
+                        raise CacheError("integrity-failure", "review provider mutation phase history is invalid", 5)
+                    first_phase = exact_object(
+                        mutation["phase_history"][0],
+                        {"attempt_state", "evidence_ref", "result_fingerprint", "receipt_ref", "recovery_state", "recorded_at"},
+                        f"{mutation_field}.phase_history[0]",
+                    )
+                    if first_phase["attempt_state"] != "prepared":
+                        raise CacheError("integrity-failure", "review provider mutation history must begin prepared", 5)
+                    previous_state = "prepared"
+                    for phase_index, phase in enumerate(mutation["phase_history"]):
+                        exact_object(
+                            phase,
+                            {"attempt_state", "evidence_ref", "result_fingerprint", "receipt_ref", "recovery_state", "recorded_at"},
+                            f"{mutation_field}.phase_history[{phase_index}]",
+                        )
+                        if phase["attempt_state"] not in mutation_states:
+                            raise CacheError("integrity-failure", "review provider mutation phase is invalid", 5)
+                        if phase["attempt_state"] not in allowed_transitions[previous_state]:
+                            raise CacheError("integrity-failure", "review provider mutation lifecycle transition is invalid", 5)
+                        if phase["result_fingerprint"] is not None:
+                            canonical_fingerprint(phase["result_fingerprint"], f"{mutation_field}.phase_history[{phase_index}].result_fingerprint")
+                        if phase["receipt_ref"] is not None:
+                            nonempty(phase["receipt_ref"], f"{mutation_field}.phase_history[{phase_index}].receipt_ref")
+                        if phase["recovery_state"] not in {"none", "reconciled", "needs-owner"}:
+                            raise CacheError("integrity-failure", "review provider mutation recovery state is invalid", 5)
+                        parse_timestamp(phase["recorded_at"], f"{mutation_field}.phase_history[{phase_index}].recorded_at")
+                        previous_state = phase["attempt_state"]
+                    if mutation["attempt_state"] != previous_state:
+                        raise CacheError("integrity-failure", "review provider mutation projection is stale", 5)
+                    final_phase = mutation["phase_history"][-1]
+                    for field in (
+                        "result_fingerprint",
+                        "receipt_ref",
+                        "recovery_state",
+                        "evidence_ref",
+                        "recorded_at",
+                    ):
+                        if mutation[field] != final_phase[field]:
+                            raise CacheError(
+                                "integrity-failure",
+                                "review provider mutation projection does not match final phase",
+                                5,
+                            )
+                    if mutation["result_fingerprint"] is not None:
+                        canonical_fingerprint(mutation["result_fingerprint"], f"{mutation_field}.result_fingerprint")
+                    if mutation["receipt_ref"] is not None:
+                        nonempty(mutation["receipt_ref"], f"{mutation_field}.receipt_ref")
+                    if mutation["recovery_state"] not in {"none", "reconciled", "needs-owner"}:
+                        raise CacheError("integrity-failure", "review provider mutation recovery state is invalid", 5)
+                    parse_timestamp(mutation["recorded_at"], f"{mutation_field}.recorded_at")
                 for obligation in delivery["hosted_obligations"]:
                     try:
                         AUTOREVIEW_PROTOCOL.validate_hosted_obligation(obligation["artifact"])
@@ -2635,6 +2817,19 @@ def current_review(
         and item["revision_key"] == revision["revision_key"]
     ]
     return matches[-1] if matches else None
+
+
+def current_review_provider_mutation(
+    delivery: dict[str, Any], reservation_id: str
+) -> dict[str, Any] | None:
+    matches = [
+        item
+        for item in delivery["review_provider_mutations"]
+        if item["reservation"]["reservation_id"] == reservation_id
+    ]
+    if len(matches) > 1:
+        raise CacheError("integrity-failure", "review provider mutation reservation is duplicated", 5)
+    return matches[0] if matches else None
 
 
 def review_timeout_warning_body(review: dict[str, Any]) -> str:
@@ -3192,6 +3387,9 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                     "revision_key": revision["revision_key"] if revision else None,
                     "pr": copy.deepcopy(delivery["pr"]),
                     "autoreview": copy.deepcopy(delivery["autoreview"]),
+                    "review_provider_mutations": copy.deepcopy(
+                        delivery["review_provider_mutations"]
+                    ),
                     "review_result": review_result_projection(current_review(state, task, delivery)),
                     "gates": delivery_gates,
                     "tracker_dirty": delivery["tracker_dirty_after_revision_key"] is not None,
@@ -3419,6 +3617,7 @@ def new_state(
                 "autoreview": None,
                 "autoreview_reservation": None,
                 "autoreview_attempts": [],
+                "review_provider_mutations": [],
                 "hosted_obligations": [],
                 "lineage_reset_authority": None,
             }
@@ -3941,6 +4140,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type in {
         "delivery-preflight-observed", "committed-revision-observed", "revision-observed", "delivery-observed", "review-wait-started",
         "review-wait-invoked", "review-observed", "review-reconciled", "review-thread-resolved",
+        "review-provider-mutation-reserved", "review-provider-mutation-started", "review-provider-mutation-observed",
         "autoreview-hosted-finding-obligated", "autoreview-action-reserved",
         "autoreview-reservation-released", "autoreview-attempt-observed",
         "autoreview-lineage-reset-authorized", "autoreview-observed",
@@ -3949,6 +4149,201 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         delivery = delivery_by_key(task, delivery_key)
     else:
         delivery = None
+
+    if event_type in {
+        "review-provider-mutation-reserved",
+        "review-provider-mutation-started",
+        "review-provider-mutation-observed",
+    }:
+        assert delivery is not None
+        if state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "review provider mutation requires an active root Goal", 4)
+        if task["state"] not in DEPENDENCY_WAIT_RESUME_STATES and not (
+            task["state"] == "dependency-wait"
+            and task["dependency_wait"] is not None
+            and task["dependency_wait"]["resume_state"] in DEPENDENCY_WAIT_RESUME_STATES
+        ):
+            raise CacheError(
+                "state-conflict",
+                "review provider mutation authority requires an active resumable task phase",
+                4,
+            )
+
+    if event_type == "review-provider-mutation-reserved":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "reservation", "packet_fingerprint", "evidence_ref"},
+            event_type,
+        )
+        assert delivery is not None
+        protocol = require_review_mutation()
+        try:
+            reservation = protocol.validate_reservation_packet(event["reservation"])
+            packet_fp = protocol.packet_fingerprint(reservation)
+        except protocol.ReservationError as exc:
+            raise CacheError("invalid-input", f"review provider reservation is invalid: {exc}", 2) from exc
+        if event["packet_fingerprint"] != packet_fp:
+            raise CacheError("state-conflict", "review provider reservation fingerprint is stale", 4)
+        if (
+            reservation["task_key"] != task_key
+            or reservation["delivery_key"] != delivery["delivery_key"]
+            or reservation["repository"] != delivery["github_repository"]
+        ):
+            raise CacheError("state-conflict", "review provider reservation target differs from the delivery", 4)
+        revision = delivery["revision"]
+        if (
+            revision is None
+            or reservation["pr_number"] != revision["pr_number"]
+            or reservation["head_sha"] != revision["head_sha"]
+        ):
+            raise CacheError("state-conflict", "review provider reservation is not bound to the current exact revision", 4)
+        existing = current_review_provider_mutation(delivery, reservation["reservation_id"])
+        if existing is not None:
+            if (
+                existing["reservation"] == reservation
+                and existing["packet_fingerprint"] == packet_fp
+            ):
+                return False
+            raise CacheError("state-conflict", "review provider reservation identity changed", 4)
+        effective_task_state = (
+            task["dependency_wait"]["resume_state"]
+            if task["state"] == "dependency-wait" and task["dependency_wait"] is not None
+            else task["state"]
+        )
+        if (
+            reservation["expected_generation"] != state["generation"]
+            or reservation["expected_state_fingerprint"] != state["content_fingerprint"]
+            or reservation["expected_claim_fingerprint"] != state["claim"]["fingerprint"]
+            or reservation["expected_task_state"] != effective_task_state
+        ):
+            raise CacheError("state-conflict", "review provider reservation ledger binding is stale", 4)
+        evidence_ref = nonempty(event["evidence_ref"], "evidence_ref")
+        if any(
+            item["reservation"]["operation_id"] == reservation["operation_id"]
+            for item in delivery["review_provider_mutations"]
+        ):
+            raise CacheError("state-conflict", "review provider operation identity is already reserved", 4)
+        if len(delivery["review_provider_mutations"]) >= MAX_REVIEW_PROVIDER_MUTATIONS:
+            raise CacheError("state-conflict", "review provider mutation journal bound reached", 4)
+        phase = {
+            "attempt_state": "prepared",
+            "evidence_ref": evidence_ref,
+            "result_fingerprint": None,
+            "receipt_ref": None,
+            "recovery_state": "none",
+            "recorded_at": observed_at,
+        }
+        delivery["review_provider_mutations"].append(
+            {
+                "reservation": copy.deepcopy(reservation),
+                "packet_fingerprint": packet_fp,
+                "attempt_state": "prepared",
+                "phase_history": [phase],
+                "result_fingerprint": None,
+                "receipt_ref": None,
+                "recovery_state": "none",
+                "evidence_ref": evidence_ref,
+                "recorded_at": observed_at,
+            }
+        )
+        return True
+
+    if event_type == "review-provider-mutation-started":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "reservation_id", "operation_id", "packet_fingerprint", "evidence_ref"},
+            event_type,
+        )
+        assert delivery is not None
+        reservation_id = canonical_fingerprint(event["reservation_id"], "reservation_id")
+        entry = current_review_provider_mutation(delivery, reservation_id)
+        if entry is None:
+            raise CacheError("state-conflict", "review provider mutation start lacks its reservation", 4)
+        reservation = entry["reservation"]
+        if (
+            event["operation_id"] != reservation["operation_id"]
+            or event["packet_fingerprint"] != entry["packet_fingerprint"]
+        ):
+            raise CacheError("state-conflict", "review provider mutation start identity changed", 4)
+        if entry["attempt_state"] == "prepared":
+            phase = {
+                "attempt_state": "mutation-started",
+                "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+                "result_fingerprint": None,
+                "receipt_ref": None,
+                "recovery_state": "none",
+                "recorded_at": observed_at,
+            }
+            entry["phase_history"].append(phase)
+            entry["attempt_state"] = "mutation-started"
+            entry["evidence_ref"] = phase["evidence_ref"]
+            entry["recorded_at"] = observed_at
+            return True
+        if any(
+            phase["attempt_state"] == "mutation-started"
+            and phase["evidence_ref"] == event["evidence_ref"]
+            for phase in entry["phase_history"]
+        ):
+            return False
+        raise CacheError("state-conflict", "review provider mutation has already started or finished", 4)
+
+    if event_type == "review-provider-mutation-observed":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "reservation_id", "operation_id",
+                "attempt_state", "result_fingerprint", "receipt_ref", "recovery_state", "evidence_ref",
+            },
+            event_type,
+        )
+        assert delivery is not None
+        reservation_id = canonical_fingerprint(event["reservation_id"], "reservation_id")
+        entry = current_review_provider_mutation(delivery, reservation_id)
+        if entry is None:
+            raise CacheError("state-conflict", "review provider mutation result lacks its reservation", 4)
+        reservation = entry["reservation"]
+        if event["operation_id"] != reservation["operation_id"]:
+            raise CacheError("state-conflict", "review provider mutation result identity changed", 4)
+        attempt_state = event["attempt_state"]
+        if attempt_state not in {"completed", "failed-or-ambiguous"}:
+            raise CacheError("invalid-input", "review provider mutation result state is invalid", 2)
+        result_fp = canonical_fingerprint(event["result_fingerprint"], "result_fingerprint")
+        receipt_ref = nonempty(event["receipt_ref"], "receipt_ref")
+        recovery_state = event["recovery_state"]
+        if recovery_state not in {"none", "reconciled", "needs-owner"}:
+            raise CacheError("invalid-input", "review provider mutation recovery state is invalid", 2)
+        if attempt_state == "completed" and recovery_state == "needs-owner":
+            raise CacheError("state-conflict", "completed provider mutation cannot require owner recovery", 4)
+        if attempt_state == "failed-or-ambiguous" and recovery_state != "needs-owner":
+            raise CacheError("state-conflict", "ambiguous provider mutation must fail closed to needs-owner", 4)
+        if entry["attempt_state"] == attempt_state:
+            if (
+                entry["result_fingerprint"] == result_fp
+                and entry["receipt_ref"] == receipt_ref
+                and entry["recovery_state"] == recovery_state
+                and entry["evidence_ref"] == event["evidence_ref"]
+            ):
+                return False
+            raise CacheError("state-conflict", "review provider mutation result changed", 4)
+        if entry["attempt_state"] != "mutation-started":
+            raise CacheError("state-conflict", "review provider mutation result precedes durable start", 4)
+        evidence_ref = nonempty(event["evidence_ref"], "evidence_ref")
+        phase = {
+            "attempt_state": attempt_state,
+            "evidence_ref": evidence_ref,
+            "result_fingerprint": result_fp,
+            "receipt_ref": receipt_ref,
+            "recovery_state": recovery_state,
+            "recorded_at": observed_at,
+        }
+        entry["phase_history"].append(phase)
+        entry["attempt_state"] = attempt_state
+        entry["result_fingerprint"] = result_fp
+        entry["receipt_ref"] = receipt_ref
+        entry["recovery_state"] = recovery_state
+        entry["evidence_ref"] = evidence_ref
+        entry["recorded_at"] = observed_at
+        return True
 
     if event_type == "delivery-preflight-observed":
         event = exact_object(
@@ -5223,6 +5618,76 @@ def read_ledger(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def review_mutation_authority(args: argparse.Namespace) -> dict[str, Any]:
+    """Prove that one immutable packet has reached the durable start phase.
+
+    This is a read-only bridge for GitStack.  The ledger remains the only
+    owner of root authorization and lifecycle transitions; GitStack receives
+    only the proof that its exact packet is the currently started journal
+    entry.  No state or reservation file is modified here.
+    """
+
+    ledger = canonical_active_ledger(args.ledger)
+    raw_packet = read_json_file(args.reservation_file, "reservation_file")
+    protocol = require_review_mutation()
+    try:
+        packet = protocol.validate_reservation_packet(raw_packet)
+        packet_fp = protocol.packet_fingerprint(packet)
+    except (KeyError, protocol.ReservationError) as exc:
+        raise CacheError("invalid-input", f"review provider reservation is invalid: {exc}", 2) from exc
+    with locked_claim_store(create=False, exclusive=False) as claims:
+        state = load_state(ledger)
+        active_claim(claims, state["portfolio"]["root_id"], state["claim"]["fingerprint"], ledger)
+        task = task_by_key(state, packet["task_key"])
+        delivery = delivery_by_key(task, packet["delivery_key"])
+        matches = [
+            item
+            for item in delivery["review_provider_mutations"]
+            if item["reservation"]["reservation_id"] == packet["reservation_id"]
+        ]
+        if len(matches) != 1:
+            raise CacheError(
+                "state-conflict",
+                "review provider reservation is not durably journaled exactly once",
+                4,
+            )
+        entry = matches[0]
+        if entry["reservation"] != packet or entry["packet_fingerprint"] != packet_fp:
+            raise CacheError("state-conflict", "review provider reservation journal identity changed", 4)
+        if entry["attempt_state"] != "mutation-started":
+            raise CacheError(
+                "state-conflict",
+                "review provider reservation has not reached its durable start phase",
+                4,
+            )
+        if state["goal"]["state"] != "active":
+            raise CacheError("state-conflict", "root Goal is not active", 4)
+        if task["state"] not in DEPENDENCY_WAIT_RESUME_STATES and not (
+            task["state"] == "dependency-wait"
+            and task["dependency_wait"] is not None
+            and task["dependency_wait"]["resume_state"] in DEPENDENCY_WAIT_RESUME_STATES
+        ):
+            raise CacheError("state-conflict", "task is not in an active resumable phase", 4)
+        start_phase = entry["phase_history"][-1]
+        if start_phase["attempt_state"] != "mutation-started":
+            raise CacheError("integrity-failure", "review provider start projection is invalid", 5)
+        return {
+            "ok": True,
+            "command": "ledger.review-authority",
+            "version": __version__,
+            "ledger_schema_version": LEDGER_SCHEMA_VERSION,
+            "authority": "review-provider-mutation-started",
+            "ledger": str(ledger),
+            "root_id": state["portfolio"]["root_id"],
+            "generation": state["generation"],
+            "content_fingerprint": state["content_fingerprint"],
+            "reservation_id": packet["reservation_id"],
+            "operation_id": packet["operation_id"],
+            "packet_fingerprint": packet_fp,
+            "start_evidence_ref": start_phase["evidence_ref"],
+        }
+
+
 def metadata_for(
     *,
     ledger: Path,
@@ -6047,6 +6512,12 @@ def build_parser() -> argparse.ArgumentParser:
     read = ledger_verbs.add_parser("read", help="Read one bounded derived projection.")
     read.add_argument("--ledger", required=True)
     read.add_argument("--projection", choices=sorted(PROJECTIONS), required=True)
+    authority = ledger_verbs.add_parser(
+        "review-authority",
+        help="Prove one exact review mutation is durably started without changing state.",
+    )
+    authority.add_argument("--ledger", required=True)
+    authority.add_argument("--reservation-file", required=True)
     archive = ledger_verbs.add_parser("archive", help="Archive terminal typed run state.")
     archive.add_argument("--ledger", required=True)
     archive.add_argument("--evidence-ref", required=True)
@@ -6080,6 +6551,8 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
             return apply_ledger(args)
         if args.verb == "read":
             return read_ledger(args)
+        if args.verb == "review-authority":
+            return review_mutation_authority(args)
         return archive_ledgers(args)
     if args.noun == "autoreview":
         return autoreview_next(args)
