@@ -42,6 +42,10 @@ from .review_thread import (
     build_resolution_receipt,
     validate_reply_receipt,
 )
+from .terminal_evidence import (
+    build_terminal_evidence_receipt,
+    validate_terminal_evidence_receipt,
+)
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
 CODEX_TERMINAL_PREFIX = re.compile(r"(?im)^\s*Codex Review\s*:")
@@ -264,10 +268,41 @@ def provider_terminal_comment_any(
         return None
     return {
         "comment_id": comment.get("id"),
+        "html_url": comment.get("html_url"),
+        "body": body,
+        "user": comment.get("user"),
         "created_at": created_at,
         "reviewed_head": reviewed_head,
         "outcome": outcome,
     }
+
+
+def review_failure_classification(
+    *,
+    binding: str,
+    status: str | None,
+    head_is_current: bool,
+    request_error_code: str | None,
+) -> tuple[str | None, str | None]:
+    """Return the stable machine failure mapping consumed by typed ledgers."""
+
+    if not head_is_current or status == "stale":
+        return "head-drift", "head_drift"
+    if status == "error":
+        return "provider-terminal-error", "provider_terminal_error"
+    if binding == "ambiguous":
+        return "ambiguous-provider-evidence", "ambiguous_review_evidence"
+    if binding == "invalid":
+        if request_error_code == "request_correlation_failure":
+            return "request-correlation-failure", request_error_code
+        return "provider-config-failure", request_error_code or "request_receipt_invalid"
+    if binding == "unknown":
+        if request_error_code == "request_correlation_failure":
+            return "request-correlation-failure", request_error_code
+        return "provider-api-failure", request_error_code or "provider_api_failure"
+    if binding == "unbound":
+        return "request-correlation-failure", "request_unbound"
+    return None, None
 
 
 def stable_observation_fingerprint(payload: dict[str, Any]) -> str:
@@ -429,8 +464,10 @@ def check_automated_review(
     selected_receipt: dict[str, Any] | None = None
     selected_plan: RequestPlan | None = saved_plan
     request_error: str | None = None
+    request_error_code: str | None = None
     if request_identity is not None and saved_plan is None:
         binding = "invalid"
+        request_error_code = "request_receipt_invalid"
     elif saved_plan is not None:
         binding = "unknown"
         try:
@@ -439,11 +476,15 @@ def check_automated_review(
             if not _comment_for_plan(selected_request, saved_plan) or not receipt_matches(saved_plan, selected_request, request_identity):
                 binding = "invalid"
                 request_error = "The persisted request receipt does not match the exact provider comment."
+                request_error_code = "request_correlation_failure"
             else:
                 binding = "recognized"
                 selected_receipt = request_identity
         except (ReviewError, KeyError, TypeError, ValueError) as exc:
             request_error = str(exc)
+            request_error_code = (
+                exc.code if isinstance(exc, ReviewError) else "provider_response_invalid"
+            )
     else:
         candidate_plan: RequestPlan | None = None
         for item in conversation:
@@ -458,6 +499,7 @@ def check_automated_review(
                         break
                 else:
                     binding = "ambiguous"
+                    request_error_code = "ambiguous_review_evidence"
                     break
         if binding == "absent" and candidate_plan is not None and selected_request is not None:
             binding = "recognized"
@@ -469,11 +511,17 @@ def check_automated_review(
             ) if head_is_current else (None, [])
             if conflict:
                 binding = conflict
+                request_error_code = (
+                    "ambiguous_review_evidence"
+                    if conflict == "ambiguous"
+                    else "request_correlation_failure"
+                )
             elif any(
                 parse_request(item.get("body") or "", provider, repo, pr).classification == "unbound"
                 for item in conversation
             ):
                 binding = "unbound"
+                request_error_code = "request_unbound"
 
     plan = selected_plan
 
@@ -481,8 +529,10 @@ def check_automated_review(
         conflict, exact = _request_conflicts(conversation, plan)
         if conflict == "ambiguous" or len(exact) > 1:
             binding = "ambiguous"
+            request_error_code = "ambiguous_review_evidence"
         elif conflict == "invalid":
             binding = conflict
+            request_error_code = "request_correlation_failure"
 
     request_created_at = (
         str(selected_receipt.get("created_at") or "")
@@ -496,6 +546,7 @@ def check_automated_review(
         except ReviewError as exc:
             binding = "unknown"
             request_error = str(exc)
+            request_error_code = exc.code or "provider_api_failure"
 
     current_request_reviews = [
         item for item in head_reviews
@@ -644,6 +695,7 @@ def check_automated_review(
         },
         "request": request_payload,
         "request_error": request_error,
+        "request_error_code": request_error_code,
         "request_observation": {
             "acknowledged": "eyes" in reactions,
             "clean_reaction": "+1" in reactions,
@@ -657,8 +709,182 @@ def check_automated_review(
         },
         "evidence": evidence,
     }
+    failure_kind, error_code = review_failure_classification(
+        binding=binding,
+        status=status,
+        head_is_current=head_is_current,
+        request_error_code=request_error_code,
+    )
+    payload["failure_kind"] = failure_kind
+    payload["error_code"] = error_code
     payload["observation_fingerprint"] = stable_observation_fingerprint(payload)
     return payload
+
+
+def terminal_provider_evidence(
+    repo: str,
+    pr: int,
+    provider: str,
+    expected_head: str,
+    request_identity: dict[str, Any],
+) -> dict[str, Any]:
+    """Independently prove one exact-lineage provider terminal comment."""
+
+    is_provider_author(provider, "")
+    try:
+        head = validate_full_head(expected_head)
+        saved = validate_receipt(
+            request_identity,
+            provider=provider,
+            repository=repo,
+            pr_number=pr,
+            expected_head=head,
+        )
+    except ValueError as exc:
+        raise ReviewError(str(exc), code="terminal_evidence_request_mismatch", exit_code=64) from exc
+
+    pull = gh_json(["api", f"repos/{repo}/pulls/{pr}", "-H", "Accept: application/vnd.github+json"])
+    if not isinstance(pull, dict) or not isinstance((pull.get("head") or {}).get("sha"), str):
+        raise ReviewError(
+            "Pull request response did not include an exact head SHA.",
+            code="terminal_evidence_invalid",
+            exit_code=4,
+        )
+    current_head = str((pull.get("head") or {}).get("sha") or "").lower()
+    if current_head != head:
+        raise ReviewError(
+            "The pull request head changed before terminal evidence verification.",
+            code="terminal_evidence_head_drift",
+            exit_code=3,
+        )
+
+    plan = build_request(provider, repo, pr, head, str(saved["request_key"]))
+    try:
+        request_comment = _api_object(f"repos/{repo}/issues/comments/{saved['comment_id']}")
+    except ReviewError as exc:
+        raise ReviewError(
+            "The exact typed review request comment is unavailable.",
+            code="terminal_evidence_request_mismatch",
+            exit_code=4,
+        ) from exc
+    if not _comment_for_plan(request_comment, plan) or not receipt_matches(plan, request_comment, saved):
+        raise ReviewError(
+            "The exact typed review request comment no longer matches its receipt.",
+            code="terminal_evidence_request_mismatch",
+            exit_code=4,
+        )
+
+    reviews = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/reviews")
+    inline_comments = gh_api_paginated_list(f"repos/{repo}/pulls/{pr}/comments")
+    conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
+    request_created_at = str(saved["created_at"])
+
+    later_requests = [
+        item
+        for item in conversation
+        if str(item.get("created_at") or "") > request_created_at
+        and parse_request(item.get("body") or "", provider, repo, pr).classification != "absent"
+    ]
+    if later_requests:
+        raise ReviewError(
+            "A later or overlapping Codex request makes the request lineage ambiguous.",
+            code="terminal_evidence_ambiguous",
+            exit_code=4,
+        )
+
+    terminal_comments = [
+        (item, parsed)
+        for item in conversation
+        if str(item.get("created_at") or "") > request_created_at
+        and (parsed := provider_terminal_comment_any(item, provider)) is not None
+    ]
+    if not terminal_comments:
+        raise ReviewError(
+            "No terminal provider artifact exists for the exact request lineage.",
+            code="terminal_evidence_not_found",
+            exit_code=2,
+        )
+    if any(not sha_matches(parsed["reviewed_head"], head) for _, parsed in terminal_comments):
+        raise ReviewError(
+            "Terminal provider artifacts disagree with the exact request head.",
+            code="terminal_evidence_ambiguous",
+            exit_code=4,
+        )
+    if len(terminal_comments) != 1:
+        raise ReviewError(
+            "Multiple terminal provider artifacts match the exact request lineage.",
+            code="terminal_evidence_ambiguous",
+            exit_code=4,
+        )
+
+    conflicting_findings = [
+        item
+        for item in inline_comments
+        if authored_by(item, provider)
+        and item.get("in_reply_to_id") is None
+        and str(item.get("created_at") or "") > request_created_at
+        and sha_matches(item.get("commit_id"), head)
+    ]
+    conflicting_reviews = []
+    for item in reviews:
+        if (
+            not authored_by(item, provider)
+            or not sha_matches(item.get("commit_id"), head)
+            or str(item.get("submitted_at") or "") <= request_created_at
+        ):
+            continue
+        body = str(item.get("body") or "")
+        state = str(item.get("state") or "").upper()
+        if state in {"CHANGES_REQUESTED", "DISMISSED"} or CODEX_FINDINGS_RESULT.search(body) or CODEX_ERROR_RESULT.search(body):
+            conflicting_reviews.append(item)
+    if conflicting_findings or conflicting_reviews:
+        raise ReviewError(
+            "Conflicting provider findings or terminal outcomes exist for the exact request lineage.",
+            code="terminal_evidence_ambiguous",
+            exit_code=4,
+        )
+
+    artifact, parsed = terminal_comments[0]
+    artifact_id = artifact.get("id")
+    if not isinstance(artifact_id, int) or isinstance(artifact_id, bool) or artifact_id < 1:
+        raise ReviewError(
+            "The terminal provider artifact lacks an exact identity.",
+            code="terminal_evidence_invalid",
+            exit_code=4,
+        )
+    exact_artifact = _api_object(f"repos/{repo}/issues/comments/{artifact_id}")
+    exact_parsed = provider_terminal_comment_any(exact_artifact, provider)
+    if (
+        exact_parsed is None
+        or exact_artifact.get("body") != artifact.get("body")
+        or exact_artifact.get("html_url") != artifact.get("html_url")
+        or exact_artifact.get("created_at") != artifact.get("created_at")
+        or str(((exact_artifact.get("user") or {}).get("login")) or "")
+        != str(((artifact.get("user") or {}).get("login")) or "")
+        or exact_parsed["reviewed_head"] != parsed["reviewed_head"]
+        or exact_parsed["outcome"] != parsed["outcome"]
+    ):
+        raise ReviewError(
+            "The exact terminal provider artifact changed during verification.",
+            code="terminal_evidence_invalid",
+            exit_code=4,
+        )
+
+    receipt_value = build_terminal_evidence_receipt(
+        provider=provider,
+        repository=repo,
+        pr_number=pr,
+        head_sha=head,
+        request_receipt=saved,
+        artifact={
+            **exact_artifact,
+            "reviewed_head_token": exact_parsed["reviewed_head"],
+            "outcome": exact_parsed["outcome"],
+        },
+        verified_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    )
+    validate_terminal_evidence_receipt(receipt_value)
+    return receipt_value
 
 
 def wait_for_automated_review(
@@ -1804,6 +2030,20 @@ def build_parser() -> argparse.ArgumentParser:
     submit.add_argument("--dry-run", action="store_true")
     submit.add_argument("--expected-worktree-fingerprint")
     submit.add_argument("--allow-non-project", action="store_true")
+    terminal = subparsers.add_parser(
+        "terminal-evidence",
+        help="Verify one typed exact-head terminal provider artifact read-only.",
+    )
+    terminal.add_argument("--provider", required=True, help="Automated review provider. Currently: codex.")
+    terminal.add_argument("--pr", required=True, help="Pull request number.")
+    terminal.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
+    terminal.add_argument("--head", required=True, help="Full 40-character expected reviewed head SHA.")
+    terminal.add_argument(
+        "--request-receipt-file",
+        required=True,
+        help="Absolute UTF-8 JSON file containing the complete typed request receipt.",
+    )
+    terminal.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
     for command, help_text in (
         ("check", "Inspect automated review state once and exit."),
         ("wait", "Wait for an automated review to complete or time out."),
@@ -1840,7 +2080,7 @@ def main(argv: list[str] | None = None) -> int:
     except ReviewError as exc:
         raw = list(argv or [])
         if "--json" in raw:
-            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait"}), "")])
+            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait", "terminal-evidence"}), "")])
         else:
             print(exc.message, file=sys.stderr)
         return exc.exit_code
@@ -1856,13 +2096,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
             print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
         return 0 if payload["ok"] else 1
-    if args.command not in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait"}:
+    if args.command not in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait", "terminal-evidence"}:
         parser.print_help()
         return 0
     try:
         pr = positive_int(args.pr, "pr")
         repo = resolve_repo(args.repo, allow_non_project=args.allow_non_project)
-        if args.command in {"check", "wait"}:
+        if args.command in {"check", "wait", "terminal-evidence"}:
             request_identity = None
             if args.request_receipt_file:
                 try:
@@ -1874,13 +2114,22 @@ def main(argv: list[str] | None = None) -> int:
                     raise ReviewError("The request receipt file must contain one JSON object.", code="invalid_request", exit_code=64) from exc
                 if not isinstance(request_identity, dict):
                     raise ReviewError("The request receipt file must contain one JSON object.", code="invalid_request", exit_code=64)
-            if args.command == "wait" and request_identity is None:
+            if args.command in {"wait", "terminal-evidence"} and request_identity is None:
                 raise ReviewError(
                     "The identity-bound automated review waiter requires --request-receipt-file.",
                     code="request_binding_required",
                     exit_code=64,
                 )
-            if args.command == "check":
+            if args.command == "terminal-evidence":
+                payload = terminal_provider_evidence(
+                    repo,
+                    pr,
+                    args.provider,
+                    args.head,
+                    request_identity,
+                )
+                exit_code = 0
+            elif args.command == "check":
                 payload = check_automated_review(repo, pr, args.provider, args.head, request_identity)
                 binding = str(payload.get("request_binding") or "unknown")
                 if payload.get("review_state") == "stale":
@@ -1984,7 +2233,7 @@ def main(argv: list[str] | None = None) -> int:
             print(render_text(payload), end="")
         return 0
     except ReviewError as exc:
-        if args.command in {"check", "wait"} and exc.code == "command_failed":
+        if args.command in {"check", "wait", "terminal-evidence"} and exc.code == "command_failed":
             exc = ReviewError(exc.message, code="api_error", exit_code=4)
         if args.json:
             emit_error(exc, [args.command or ""])

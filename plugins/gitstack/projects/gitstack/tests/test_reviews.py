@@ -16,6 +16,7 @@ from gitstack.common import GitStackError, Result
 from gitstack.provider_text import ProviderText
 from gitstack.review_request import build_request, parse_request, receipt, validate_receipt
 from gitstack.review_thread import build_reply_receipt, validate_reply_receipt, validate_resolution_receipt
+from gitstack.terminal_evidence import validate_terminal_evidence_receipt
 
 class ReviewsContractTests(unittest.TestCase):
     HOSTILE = "`ticks` $(command) ${HOME} $PATH 'single' \"double\"\n-leading\nUnicode ✓ 🚀"
@@ -127,14 +128,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "7.0.1")
+        self.assertEqual(stdout.getvalue().strip(), "7.1.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "7.0.1")
+        self.assertEqual(payload["version"], "7.1.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -162,7 +163,7 @@ class ReviewsContractTests(unittest.TestCase):
             with self.subTest(state=state):
                 self.assertIn(f"`{state}`", review_contract)
         self.assertIn(
-            "`inspect`, `check`, `wait`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve`",
+            "`inspect`, `check`, `wait`, `terminal-evidence`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve`",
             options,
         )
 
@@ -263,6 +264,80 @@ class ReviewsContractTests(unittest.TestCase):
                         repository="owner/repo",
                         pr_number=12,
                     )
+
+    def test_terminal_evidence_returns_one_exact_fingerprinted_receipt(self) -> None:
+        head = "e" * 40
+        request = self.canonical_request(head)
+        saved = self.canonical_receipt(head)
+        artifact = {
+            "id": 101,
+            "html_url": "https://github.com/owner/repo/pull/12#issuecomment-101",
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: No issues found.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:05:00Z",
+        }
+        self.frozen_clock()
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), \
+             mock.patch.object(
+                 cli,
+                 "gh_api_paginated_list",
+                 side_effect=[[], [], [request, artifact]],
+             ), \
+             mock.patch.object(cli, "_api_object", side_effect=[request, artifact]):
+            result = cli.terminal_provider_evidence("owner/repo", 12, "codex", head, saved)
+
+        self.assertEqual(result["schema"], "gitstack-terminal-provider-evidence:v1")
+        self.assertEqual(result["outcome"], "clean")
+        self.assertEqual(result["resolved_head_sha"], head)
+        self.assertEqual(result["request_identity_fingerprint"], saved["identity_fingerprint"])
+        self.assertNotIn("body", result)
+        self.assertIs(validate_terminal_evidence_receipt(result), result)
+
+    def test_terminal_evidence_rejects_ambiguous_or_conflicting_lineage(self) -> None:
+        head = "e" * 40
+        request = self.canonical_request(head)
+        saved = self.canonical_receipt(head)
+        artifact = {
+            "id": 101,
+            "html_url": "https://github.com/owner/repo/pull/12#issuecomment-101",
+            "user": {"login": "chatgpt-codex-connector[bot]"},
+            "body": f"Codex Review: No issues found.\n\n**Reviewed commit:** `{head[:10]}`",
+            "created_at": "2026-07-15T13:05:00Z",
+        }
+        later_request = self.canonical_request(
+            head,
+            comment_id=102,
+            created_at="2026-07-15T13:06:00Z",
+        )
+        cases = {
+            "later-request": ([], [], [request, artifact, later_request]),
+            "duplicate-artifact": ([], [], [request, artifact, {**artifact, "id": 103, "html_url": "https://github.com/owner/repo/pull/12#issuecomment-103"}]),
+            "inline-finding": ([], [{**self.finding(head=head), "created_at": "2026-07-15T13:04:00Z", "user": {"login": "chatgpt-codex-connector[bot]"}}], [request, artifact]),
+            "formal-conflict": ([{"id": 7, "user": {"login": "chatgpt-codex-connector[bot]"}, "commit_id": head, "submitted_at": "2026-07-15T13:04:00Z", "state": "CHANGES_REQUESTED", "body": "Found issues"}], [], [request, artifact]),
+        }
+        for name, payloads in cases.items():
+            with self.subTest(name=name), \
+                 mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), \
+                 mock.patch.object(cli, "gh_api_paginated_list", side_effect=list(payloads)), \
+                 mock.patch.object(cli, "_api_object", return_value=request), \
+                 self.assertRaises(cli.ReviewError) as raised:
+                cli.terminal_provider_evidence("owner/repo", 12, "codex", head, saved)
+            self.assertEqual(raised.exception.code, "terminal_evidence_ambiguous")
+
+    def test_terminal_evidence_reproves_request_and_current_head(self) -> None:
+        head = "e" * 40
+        saved = self.canonical_receipt(head)
+        edited = {**self.canonical_request(head), "body": "@codex review"}
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), \
+             mock.patch.object(cli, "_api_object", return_value=edited), \
+             self.assertRaises(cli.ReviewError) as request_mismatch:
+            cli.terminal_provider_evidence("owner/repo", 12, "codex", head, saved)
+        self.assertEqual(request_mismatch.exception.code, "terminal_evidence_request_mismatch")
+
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": "f" * 40}}), \
+             self.assertRaises(cli.ReviewError) as head_drift:
+            cli.terminal_provider_evidence("owner/repo", 12, "codex", head, saved)
+        self.assertEqual(head_drift.exception.code, "terminal_evidence_head_drift")
 
     def test_uncertain_typed_request_recovers_once_or_returns_request_unknown(self) -> None:
         head = "d" * 40
@@ -399,7 +474,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "7.0.1")
+        self.assertEqual(payload["version"], "7.1.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -428,7 +503,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "7.0.1")
+        self.assertEqual(payload["version"], "7.1.0")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -1227,6 +1302,40 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertIsNone(payload["review_state"])
         self.assertEqual(payload["request_binding"], "unbound")
+        self.assertEqual(payload["failure_kind"], "request-correlation-failure")
+        self.assertEqual(payload["error_code"], "request_unbound")
+
+    def test_saved_request_failure_classification_is_machine_stable(self) -> None:
+        head = "b" * 40
+        saved = self.canonical_receipt(head)
+        edited = {**self.canonical_request(head), "body": "@codex review"}
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), \
+             mock.patch.object(
+                 cli,
+                 "gh_api_paginated_list",
+                 side_effect=self.automated_review_api(),
+             ), \
+             mock.patch.object(cli, "_api_object", return_value=edited):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head, saved)
+        self.assertEqual(payload["request_binding"], "invalid")
+        self.assertEqual(payload["failure_kind"], "request-correlation-failure")
+        self.assertEqual(payload["error_code"], "request_correlation_failure")
+
+        with mock.patch.object(cli, "gh_json", return_value={"head": {"sha": head}}), \
+             mock.patch.object(
+                 cli,
+                 "gh_api_paginated_list",
+                 side_effect=self.automated_review_api(),
+             ), \
+             mock.patch.object(
+                 cli,
+                 "_api_object",
+                 side_effect=cli.ReviewError("api unavailable", code="api_error", exit_code=4),
+             ):
+            payload = cli.check_automated_review("owner/repo", 12, "codex", head, saved)
+        self.assertEqual(payload["request_binding"], "unknown")
+        self.assertEqual(payload["failure_kind"], "provider-api-failure")
+        self.assertEqual(payload["error_code"], "api_error")
 
     def test_review_request_rejects_different_sha_with_same_prefix(self) -> None:
         head = "abcdef0" + "1" * 33

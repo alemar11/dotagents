@@ -17,6 +17,7 @@
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
+<plugin-root>/scripts/gitstack --json reviews terminal-evidence --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
 ```
 
 Resolve `<plugin-root>` as two directories above the directory containing the owning
@@ -96,6 +97,21 @@ callers can suppress unchanged ledger and progress updates.
 `data.review.finding_comment_ids` is the sorted addressable inline-comment
 subset and its length equals `data.review.findings`. A terminal provider
 `findings` verdict may have an empty subset.
+
+`check` and `wait` expose stable `failure_kind` and `error_code` fields. A
+typed request-comment mismatch is `request-correlation-failure` only when the
+machine code is `request_correlation_failure`; API, authentication,
+configuration, provider-terminal, head-drift, and ambiguity failures remain
+separate.
+
+`terminal-evidence` re-proves the complete typed request receipt and exact
+request comment, unchanged full PR head, bounded request lineage, authenticated
+provider actor, exact terminal comment body fingerprint and outcome. It rejects
+later or overlapping requests, duplicate or multiple plausible artifacts,
+inline findings, findings/error formal reviews, conflicting terminal outcomes,
+and edited or deleted request/artifact comments. Success returns one
+`gitstack-terminal-provider-evidence:v1` receipt; it performs no mutation,
+request, wait, retry, or deadline operation.
 
 ## Discussion Comments
 

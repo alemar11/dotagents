@@ -30,6 +30,7 @@ Resolve `<plugin-root>` as two directories above the directory containing this
 <plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
+<plugin-root>/scripts/gitstack --json reviews terminal-evidence --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
 <plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
 <plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --reply-receipt-file <absolute-receipt-file> --expected-worktree-fingerprint <sha256>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
@@ -54,6 +55,9 @@ reactions into one current-head state and one stable observation fingerprint.
    Never accept review evidence from an older head. Reuse the returned
    `observation_fingerprint`; unchanged observations are not state transitions
    and must not cause caller-side ledger writes or progress messages.
+   Use `reviews terminal-evidence` only to independently verify one exact typed
+   request lineage after a caller has recorded a correlation failure. It is a
+   read-only proof operation, never a replacement request or waiter.
 2. Group duplicates and classify feedback as actionable, already addressed,
    informational, obsolete, or requiring a user decision.
 3. Present or honor the selected actionable set. Do not silently implement

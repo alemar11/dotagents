@@ -15,7 +15,7 @@ lower-kebab.
 | `issue_operation` | `create`, `edit`, `set-type`, `remove-type`, `create-label`, `add-label`, `remove-label`, `comment`, `attach-parent`, `remove-parent`, `add-sub-issue`, `remove-sub-issue`, `close`, `reopen` | none | The one issue lifecycle operation being requested. |
 | `commit_operation` | `commit-only`, `commit-and-push`, `push-only` | none | The local Git operation owned by Git Commit. |
 | `commit_kind` | `regular`, `fixup`, `amend-fixup` | `regular` | The commit form for a commit-producing operation. Non-regular kinds require an exact `target_commit`. |
-| `review_operation` | `inspect`, `check`, `wait`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve` | none | The one pull-request review operation being requested. |
+| `review_operation` | `inspect`, `check`, `wait`, `terminal-evidence`, `request`, `comment`, `edit-comment`, `submit-review`, `reply`, `resolve` | none | The one pull-request review operation being requested. |
 | `release_operation` | `inspect`, `create-tag`, `draft`, `publish`, `upload-asset`, `delete` | `inspect` | The requested tag or GitHub Release lifecycle operation. |
 
 Keep an operation separate from its issue, PR, release, label, or relationship
