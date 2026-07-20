@@ -1260,7 +1260,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "11.0.0"', helper)
+        self.assertIn('__version__ = "12.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1271,7 +1271,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v11_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v12_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md") + self.read(
             "references/review-reconciliation.md"
@@ -1279,8 +1279,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "11.0.0"',
-            'LEDGER_SCHEMA_VERSION = "8.0.0"',
+            '__version__ = "12.0.0"',
+            'LEDGER_SCHEMA_VERSION = "9.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "4.0.0"',
         ):
             self.assertIn(constant, helper)
@@ -1290,7 +1290,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `8.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `9.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -1342,6 +1342,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
                     re.findall(r"`([^`]+)`", match.group(2))
                 )
         self.assertEqual(packet_fields, runtime_fields)
+
+    def test_autoreview_producer_and_ledger_import_one_protocol_file(self) -> None:
+        producer = self.read("../autoreview/scripts/autoreview")
+        ledger = self.read("scripts/ledger-cache")
+        protocol_path = (ROOT.parent / "autoreview/scripts/autoreview_protocol.py").resolve()
+        self.assertTrue(protocol_path.is_file())
+        self.assertIn('with_name("autoreview_protocol.py")', producer)
+        self.assertIn('autoreview/scripts/autoreview_protocol.py', ledger)
+        self.assertNotIn("AUTOREVIEW_PHASES =", ledger)
+        self.assertNotIn("AUTOREVIEW_TERMINAL_STATES =", ledger)
+        self.assertNotIn('REVIEW_PHASES = {"full"', producer)
+        self.assertEqual(ledger.count("validate_transition("), 1)
 
     def test_review_reconciliation_is_branch_only_and_has_no_legacy_adoption(self) -> None:
         skill = self.read("SKILL.md")
@@ -2065,7 +2077,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         manifest_path = successful_path + ("references/execution-manifest.md",)
         # Typed thread resolution stays branch-loaded: the normal successful,
         # manifest, and multi-repository paths remain within their existing
-        # ceilings at 98,309, 105,617, and 102,358 bytes respectively.
+        # ceilings at 98,376, 105,684, and 102,425 bytes respectively.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
             105_757,

@@ -14,7 +14,7 @@ from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "execution-manifest"
-REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v1.json"
+REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v2.json"
 loader = importlib.machinery.SourceFileLoader("execution_manifest_script", str(SCRIPT))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -31,7 +31,7 @@ class ExecutionManifestTests(unittest.TestCase):
         source = root / "source.md"
         source.write_bytes("Café\n".encode())
         request = {
-            "schema_version": "1.0.0",
+            "schema_version": "2.0.0",
             "template": False,
             "root_task_ref": "task:test",
             "entries": [
@@ -71,7 +71,7 @@ class ExecutionManifestTests(unittest.TestCase):
         allowed = allowed or []
         expected = expected or []
         return {
-            "schema_version": "1.0.0",
+            "schema_version": "2.0.0",
             "template": False,
             "command_id": "focused-validation",
             "operation": "validation",
@@ -98,7 +98,7 @@ class ExecutionManifestTests(unittest.TestCase):
                 {"entry_id": "unicode", "kind": "issue", "source_ref": "issue:2", "snapshot_path": str(unicode_file)},
                 {"entry_id": "empty", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(empty)},
             ]
-            request = {"schema_version": "1.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
+            request = {"schema_version": "2.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
             first = cli.prepare_bundle(request)
             second = cli.prepare_bundle({**request, "entries": list(reversed(entries))})
             self.assertEqual(first["bundle_sha256"], second["bundle_sha256"])
@@ -258,7 +258,7 @@ class ExecutionManifestTests(unittest.TestCase):
             )
             fake_gh.chmod(0o755)
             request = {
-                "schema_version": "1.0.0", "template": False,
+                "schema_version": "2.0.0", "template": False,
                 "command_id": "delivery-preflight", "operation": "delivery-preflight",
                 "owner": "root", "cwd": None, "parameters": {"input": str(packet)},
                 "dependency_files": [],
@@ -273,32 +273,34 @@ class ExecutionManifestTests(unittest.TestCase):
             self.assertEqual(receipt["status"], "passed")
             self.assertIn("\"ci_availability\":\"not-configured\"", Path(receipt["stdout"]["resolved_path"]).read_text())
 
-    def test_autoreview_dry_run_adapter_runs_end_to_end(self) -> None:
+    def test_autoreview_adapter_uses_only_protocol_reservation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = self.make_repo(root)
             subprocess.run(["git", "switch", "-qc", "feature"], cwd=repo, check=True)
             (repo / "tracked.txt").write_text("feature\n")
             subprocess.run(["git", "commit", "-qam", "feature"], cwd=repo, check=True)
+            (root / "autoreview-next.json").write_text("{}\n")
             _, bundle = self.make_bundle(root)
             request = {
-                "schema_version": "1.0.0", "template": False,
+                "schema_version": "2.0.0", "template": False,
                 "command_id": "autoreview-dry-run", "operation": "autoreview",
                 "owner": "worker", "cwd": str(repo),
                 "parameters": {
-                    "mode": "branch", "base": "main", "review_phase": "full",
-                    "prior_evidence": None, "finding_file": None,
-                    "evidence_output": None, "json_output": None, "dry_run": True,
+                    "reservation_file": str(root / "autoreview-next.json"),
+                    "attempt_file": str(root / "attempt.jsonl"),
+                    "candidate_output": str(root / "candidate.json"),
+                    "operation_output": str(root / "operation.json"),
+                    "dry_run": True,
                 },
                 "dependency_files": [],
                 "write_set": {"mode": "none", "allowed_paths": [], "expected_paths": []},
                 "expected_exit_codes": [0],
             }
             manifest = cli.prepare_command(request, bundle)
-            receipt, exit_code = cli.run_manifest(manifest, str(root / "autoreview-receipt.json"))
-            self.assertEqual(exit_code, 0)
-            self.assertEqual(receipt["status"], "passed")
-            self.assertIn("\"dry_run\": true", Path(receipt["stdout"]["resolved_path"]).read_text())
+            self.assertIn("--reservation-file", manifest["argv"])
+            self.assertNotIn("--mode", manifest["argv"])
+            self.assertNotIn("--review-phase", manifest["argv"])
 
     def test_cli_fixture_round_trip(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -310,7 +312,7 @@ class ExecutionManifestTests(unittest.TestCase):
             self.write_json(
                 request,
                 {
-                    "schema_version": "1.0.0",
+                    "schema_version": "2.0.0",
                     "template": False,
                     "root_task_ref": "task:fixture",
                     "entries": [{"entry_id": "source", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(source)}],

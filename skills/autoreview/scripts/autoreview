@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import subprocess
@@ -12,13 +13,21 @@ import textwrap
 from pathlib import Path
 from typing import Any
 
-VERSION = "1.2.0"
+PROTOCOL_PATH = Path(__file__).resolve().with_name("autoreview_protocol.py")
+PROTOCOL_SPEC = importlib.util.spec_from_file_location("dotagents_autoreview_protocol", PROTOCOL_PATH)
+if PROTOCOL_SPEC is None or PROTOCOL_SPEC.loader is None:
+    raise RuntimeError(f"cannot load shared AutoReview protocol: {PROTOCOL_PATH}")
+protocol = importlib.util.module_from_spec(PROTOCOL_SPEC)
+sys.modules[PROTOCOL_SPEC.name] = protocol
+PROTOCOL_SPEC.loader.exec_module(protocol)
+
+VERSION = "2.0.0"
 
 PRIORITIES = {0, 1, 2, 3}
 FINDING_CATEGORIES = {"bug", "security", "regression", "test-gap", "maintainability"}
 REVIEW_OUTCOMES = {"pass", "fail"}
-REVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
-TERMINAL_STATES = {"fix-required", "verification-clean", "terminal-clean", "terminal-composite-clean"}
+REVIEW_PHASES = protocol.REVIEW_PHASES
+TERMINAL_STATES = protocol.TERMINAL_STATES
 
 SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -255,6 +264,7 @@ def run_with_heartbeat(
     input_text: str,
     label: str,
     heartbeat_seconds: int,
+    on_started: Any | None = None,
 ) -> subprocess.CompletedProcess[str]:
     started = time_monotonic()
     proc = subprocess.Popen(
@@ -265,6 +275,13 @@ def run_with_heartbeat(
         stderr=subprocess.PIPE,
         text=True,
     )
+    if on_started is not None:
+        try:
+            on_started(proc.pid)
+        except BaseException:
+            proc.kill()
+            proc.wait()
+            raise
     first_communicate = True
     while True:
         try:
@@ -513,8 +530,10 @@ def merge_base(repo: Path, base_ref: str, head: str = "HEAD") -> str:
 
 
 def repository_id(repo: Path) -> str:
-    origin = git(repo, "config", "--get", "remote.origin.url", check=False).strip()
-    return sha256_text(origin or str(repo.resolve()))
+    common = git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+    if not common:
+        raise AutoreviewError("review repository identity is unavailable")
+    return str(Path(common).resolve())
 
 
 def finding_id(finding: dict[str, Any]) -> str:
@@ -532,99 +551,10 @@ def load_json_file(path: str, label: str) -> dict[str, Any]:
 
 
 def validate_evidence(value: dict[str, Any]) -> dict[str, Any]:
-    required = {
-        "schema_version", "review_phase", "lineage_id", "parent_evidence_fingerprint",
-        "repository_id", "target", "counts", "finding_state", "report",
-        "terminal_state", "metrics", "evidence_fingerprint",
-    }
-    if set(value) != required or value.get("schema_version") != "1.0.0":
-        raise AutoreviewError("prior evidence has an unsupported schema")
-    if value.get("review_phase") not in REVIEW_PHASES or value.get("terminal_state") not in TERMINAL_STATES:
-        raise AutoreviewError("prior evidence has invalid canonical values")
-    if evidence_fingerprint(value) != value.get("evidence_fingerprint"):
-        raise AutoreviewError("prior evidence fingerprint mismatch")
-    hex64 = lambda item: isinstance(item, str) and len(item) == 64 and all(char in "0123456789abcdef" for char in item)
-    for field in ("lineage_id", "repository_id", "evidence_fingerprint"):
-        if not hex64(value.get(field)):
-            raise AutoreviewError(f"prior evidence {field} is invalid")
-    parent = value.get("parent_evidence_fingerprint")
-    if parent is not None and not hex64(parent):
-        raise AutoreviewError("prior evidence parent fingerprint is invalid")
-    target = value.get("target")
-    counts = value.get("counts")
-    finding_state = value.get("finding_state")
-    if not isinstance(target, dict) or set(target) != {
-        "mode", "base_ref", "merge_base_sha", "head_sha", "target_fingerprint", "changed_files"
-    }:
-        raise AutoreviewError("prior evidence target is invalid")
-    if target.get("mode") != "branch" or not isinstance(target.get("changed_files"), list):
-        raise AutoreviewError("incremental evidence requires a branch target")
-    if (
-        not isinstance(target.get("base_ref"), str) or not target["base_ref"]
-        or not isinstance(target.get("merge_base_sha"), str) or len(target["merge_base_sha"]) not in {40, 64}
-        or not isinstance(target.get("head_sha"), str) or len(target["head_sha"]) not in {40, 64}
-        or not hex64(target.get("target_fingerprint"))
-        or not target["changed_files"] or len(target["changed_files"]) != len(set(target["changed_files"]))
-    ):
-        raise AutoreviewError("prior evidence target values are invalid")
-    for path in target["changed_files"]:
-        if not isinstance(path, str) or not path or Path(path).is_absolute() or ".." in Path(path).parts:
-            raise AutoreviewError("prior evidence changed file is invalid")
-    if not isinstance(counts, dict) or set(counts) != {"full_reviews", "fix_verifications"}:
-        raise AutoreviewError("prior evidence counters are invalid")
-    if (
-        not isinstance(counts["full_reviews"], int) or isinstance(counts["full_reviews"], bool)
-        or counts["full_reviews"] not in {1, 2}
-        or not isinstance(counts["fix_verifications"], int) or isinstance(counts["fix_verifications"], bool)
-        or counts["fix_verifications"] < 0
-    ):
-        raise AutoreviewError("prior evidence counter values are invalid")
-    if not isinstance(finding_state, dict) or set(finding_state) != {"open", "resolved", "rejected"}:
-        raise AutoreviewError("prior evidence finding state is invalid")
-    if not all(isinstance(finding_state[name], list) for name in finding_state):
-        raise AutoreviewError("prior evidence finding lists are invalid")
-    open_ids: set[str] = set()
-    for index, row in enumerate(finding_state["open"]):
-        if not isinstance(row, dict) or set(row) != {"finding_id", "finding"} or not hex64(row.get("finding_id")):
-            raise AutoreviewError(f"prior evidence open finding {index} is invalid")
-        validate_finding(index, row["finding"], set(target["changed_files"]))
-        if finding_id(row["finding"]) != row["finding_id"] or row["finding_id"] in open_ids:
-            raise AutoreviewError(f"prior evidence open finding {index} fingerprint is invalid")
-        open_ids.add(row["finding_id"])
-    if any(not hex64(item) for item in finding_state["resolved"]) or len(finding_state["resolved"]) != len(set(finding_state["resolved"])):
-        raise AutoreviewError("prior evidence resolved findings are invalid")
-    for index, row in enumerate(finding_state["rejected"]):
-        if not isinstance(row, dict) or set(row) != {"finding_id", "finding", "disposition", "reason"} or row.get("disposition") != "rejected":
-            raise AutoreviewError(f"prior evidence rejected finding {index} is invalid")
-        validate_finding(index, row["finding"], set(target["changed_files"]))
-        if finding_id(row["finding"]) != row.get("finding_id") or not row.get("reason"):
-            raise AutoreviewError(f"prior evidence rejected finding {index} fingerprint is invalid")
-    report = value.get("report")
-    if not isinstance(report, dict):
-        raise AutoreviewError("prior evidence report is invalid")
-    if value["review_phase"] == "fix-verification":
-        base_report = {key: report.get(key) for key in ("findings", "review_outcome", "review_explanation", "review_confidence")}
-        validate_report(base_report, set(target["changed_files"]))
-        verified = report.get("verified_findings")
-        if not isinstance(verified, list):
-            raise AutoreviewError("prior verification report is invalid")
-        for index, item in enumerate(verified):
-            if not isinstance(item, dict) or set(item) != {"finding_id", "resolution", "explanation", "confidence"}:
-                raise AutoreviewError(f"prior verified finding {index} is invalid")
-            if not hex64(item["finding_id"]) or item["resolution"] not in {"resolved", "unresolved"} or not item["explanation"] or not number_in_range(item["confidence"]):
-                raise AutoreviewError(f"prior verified finding {index} has invalid values")
-    else:
-        validate_report(report, set(target["changed_files"]))
-    metrics = value.get("metrics")
-    if not isinstance(metrics, dict) or set(metrics) != {"prompt_characters", "elapsed_seconds"}:
-        raise AutoreviewError("prior evidence metrics are invalid")
-    if any(not isinstance(metrics[name], int) or isinstance(metrics[name], bool) or metrics[name] < 0 for name in metrics):
-        raise AutoreviewError("prior evidence metric values are invalid")
-    if open_ids and value["terminal_state"] != "fix-required":
-        raise AutoreviewError("prior evidence with open findings must require a fix")
-    if not open_ids and value["terminal_state"] == "fix-required":
-        raise AutoreviewError("prior evidence fix-required state has no open findings")
-    return value
+    try:
+        return protocol.validate_evidence(value)
+    except protocol.ProtocolError as exc:
+        raise AutoreviewError(str(exc), code=exc.code, recovery=exc.recovery) from exc
 
 
 def load_finding_file(
@@ -892,6 +822,7 @@ def run_codex(args: argparse.Namespace, repo: Path, prompt: str, schema: dict[st
             input_text=prompt,
             label="codex",
             heartbeat_seconds=args.heartbeat_seconds,
+            on_started=getattr(args, "_on_model_started", None),
         )
         if result.returncode != 0:
             detail = result.stderr or result.stdout or "codex exec failed without output"
@@ -1109,15 +1040,46 @@ def make_evidence(
     prior: dict[str, Any] | None = None,
     accepted: list[dict[str, Any]] | None = None,
     rejected: list[dict[str, Any]] | None = None,
+    hosted_obligation: dict[str, Any] | None = None,
+    target_override: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     head = current_head(repo)
+    repo_id = repository_id(repo)
+    review_scope = list(prior["target"]["review_scope"]) if prior else sorted(changed)
+    review_target_key = protocol.make_review_target_key(
+        repository_id=repo_id, base_ref=base_ref, review_scope=review_scope
+    )
+    reviewed_patch_fingerprint = sha256_text(branch_bundle(repo, base_ref))
+    target = {
+        "repository_id": repo_id,
+        "base_ref": base_ref,
+        "merge_base_sha": merge_base(repo, base_ref),
+        "head_sha": head,
+        "review_scope": review_scope,
+        "review_target_key": review_target_key,
+        "reviewed_patch_fingerprint": reviewed_patch_fingerprint,
+        "phase_input_fingerprint": bundle_fingerprint,
+        "committed_revision_key": protocol.make_committed_revision_key(
+            review_target_key=review_target_key,
+            head_sha=head,
+            reviewed_patch_fingerprint=reviewed_patch_fingerprint,
+        ),
+    }
+    if target_override is not None:
+        target_override = protocol.validate_target(target_override)
+        for field in ("repository_id", "base_ref", "merge_base_sha", "head_sha", "reviewed_patch_fingerprint"):
+            if target_override[field] != target[field]:
+                raise AutoreviewError(
+                    f"reserved target {field} differs from the current committed patch",
+                    code="reservation-stale",
+                    recovery="derive-next-action-again",
+                )
+        target = dict(target_override)
     if prior is None:
-        lineage_id = sha256_text(canonical_json({
-            "repository_id": repository_id(repo), "base_ref": base_ref,
-            "merge_base_sha": merge_base(repo, base_ref), "head_sha": head,
-            "changed_files": sorted(changed),
-        }))
-        counts = {"full_reviews": 1, "fix_verifications": 0}
+        lineage_id = protocol.fingerprint(
+            {"review_target_key": review_target_key, "initial_committed_revision_key": target["committed_revision_key"]}
+        )
+        counts = {"full_reviews": 1, "terminal_full_reviews": 0, "fix_verifications": 0, "model_calls": 1}
         resolved: list[str] = []
         rejected_rows: list[dict[str, Any]] = []
     else:
@@ -1125,8 +1087,11 @@ def make_evidence(
         counts = dict(prior["counts"])
         if phase == "terminal-full":
             counts["full_reviews"] += 1
+            counts["terminal_full_reviews"] += 1
+            counts["model_calls"] += 1
         elif phase == "fix-verification":
             counts["fix_verifications"] += 1
+            counts["model_calls"] += 1
         resolved = list(prior["finding_state"]["resolved"])
         rejected_rows = list(prior["finding_state"]["rejected"])
     if phase == "fix-verification":
@@ -1159,23 +1124,24 @@ def make_evidence(
     else:
         terminal_state = "fix-required"
     evidence: dict[str, Any] = {
-        "schema_version": "1.0.0",
+        "schema_version": protocol.EVIDENCE_SCHEMA_VERSION,
+        "protocol_version": protocol.PROTOCOL_VERSION,
         "review_phase": phase,
         "lineage_id": lineage_id,
         "parent_evidence_fingerprint": prior["evidence_fingerprint"] if prior else None,
-        "repository_id": repository_id(repo),
-        "target": {
-            "mode": "branch", "base_ref": base_ref, "merge_base_sha": merge_base(repo, base_ref),
-            "head_sha": head, "target_fingerprint": bundle_fingerprint,
-            "changed_files": list(prior["target"]["changed_files"]) if prior else sorted(changed),
-        },
+        "target": target,
         "counts": counts,
         "finding_state": {"open": open_rows, "resolved": resolved, "rejected": rejected_rows},
+        "hosted_obligation_id": hosted_obligation["obligation_id"] if hosted_obligation else None,
         "report": report,
         "terminal_state": terminal_state,
         "metrics": {"prompt_characters": prompt_characters, "elapsed_seconds": elapsed_seconds},
     }
-    evidence["evidence_fingerprint"] = evidence_fingerprint(evidence)
+    evidence["evidence_fingerprint"] = protocol.evidence_fingerprint(evidence)
+    try:
+        protocol.validate_transition(prior, evidence, hosted_obligation=hosted_obligation)
+    except protocol.ProtocolError as exc:
+        raise AutoreviewError(str(exc), code=exc.code, recovery=exc.recovery) from exc
     return evidence
 
 
@@ -1312,7 +1278,7 @@ def run_review(args: argparse.Namespace) -> int:
         raise AutoreviewError("evidence chains require branch mode")
     prior: dict[str, Any] | None = None
     if args.review_phase == "terminal-full":
-        prior = validate_evidence(load_json_file(args.prior_evidence, "prior evidence"))
+        prior = validate_evidence(getattr(args, "_managed_prior", None) or load_json_file(args.prior_evidence, "prior evidence"))
         validate_lineage(repo, target_ref, changed, prior)
         if prior["terminal_state"] != "verification-clean":
             raise AutoreviewError("terminal-full requires a clean verification chain")
@@ -1352,6 +1318,7 @@ def run_review(args: argparse.Namespace) -> int:
             phase=args.review_phase, repo=repo, base_ref=target_ref,
             bundle_fingerprint=target_fingerprint, changed=changed, report=report,
             prompt_characters=len(prompt), elapsed_seconds=elapsed, prior=prior,
+            target_override=getattr(args, "_managed_target", None),
         )
         Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
     rendered = human_report(report)
@@ -1366,11 +1333,12 @@ def run_review(args: argparse.Namespace) -> int:
 
 def validate_lineage(repo: Path, base_ref: str, changed: set[str], prior: dict[str, Any]) -> None:
     target = prior["target"]
-    if prior["repository_id"] != repository_id(repo) or target["base_ref"] != base_ref:
+    if target["repository_id"] != repository_id(repo) or target["base_ref"] != base_ref:
         raise AutoreviewError("repository or base changed", code="lineage-invalidated", recovery="start-new-full-lineage")
-    if target["merge_base_sha"] != merge_base(repo, base_ref):
-        raise AutoreviewError("merge base changed", code="lineage-invalidated", recovery="start-new-full-lineage")
-    if not changed.issubset(set(target["changed_files"])):
+    current_patch = sha256_text(branch_bundle(repo, base_ref))
+    if target["merge_base_sha"] != merge_base(repo, base_ref) and current_patch != target["reviewed_patch_fingerprint"]:
+        raise AutoreviewError("rebase changed the canonical reviewed patch", code="lineage-invalidated", recovery="request-lineage-reset-authority")
+    if not changed.issubset(set(target["review_scope"])):
         raise AutoreviewError("review scope expanded to new paths", code="lineage-invalidated", recovery="start-new-full-lineage")
 
 
@@ -1381,12 +1349,12 @@ def run_fix_verification(args: argparse.Namespace) -> int:
     target, base_ref = choose_target(repo, args.mode, args.base)
     if target != "branch" or base_ref is None or is_dirty(repo):
         raise AutoreviewError("fix-verification requires a clean committed branch target")
-    prior = validate_evidence(load_json_file(args.prior_evidence, "prior evidence"))
+    prior = validate_evidence(getattr(args, "_managed_prior", None) or load_json_file(args.prior_evidence, "prior evidence"))
     full_changed = changed_paths(repo, "branch", base_ref, args.commit)
     validate_lineage(repo, base_ref, full_changed, prior)
     source, accepted, rejected = load_finding_file(args.finding_file, prior)
     delta, delta_paths, ranges = delta_bundle(repo, prior["target"]["head_sha"])
-    if not delta_paths.issubset(set(prior["target"]["changed_files"])):
+    if not delta_paths.issubset(set(prior["target"]["review_scope"])):
         raise AutoreviewError("fix delta expands the reviewed path set", code="lineage-invalidated", recovery="start-new-full-lineage")
     prompt = build_verification_prompt(repo, delta, accepted, load_extra_prompt(args), load_datasets(args))
     if args.dry_run:
@@ -1409,6 +1377,8 @@ def run_fix_verification(args: argparse.Namespace) -> int:
         bundle_fingerprint=sha256_text(delta), changed=full_changed, report=report,
         prompt_characters=len(prompt), elapsed_seconds=elapsed, prior=prior,
         accepted=accepted, rejected=rejected,
+        hosted_obligation=getattr(args, "_managed_obligation", None),
+        target_override=getattr(args, "_managed_target", None),
     )
     Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
     rendered = human_report({key: report[key] for key in ("findings", "review_outcome", "review_explanation", "review_confidence")})
@@ -1425,7 +1395,7 @@ def run_disposition(args: argparse.Namespace) -> int:
     target, base_ref = choose_target(repo, args.mode, args.base)
     if target != "branch" or base_ref is None or is_dirty(repo):
         raise AutoreviewError("disposition requires a clean committed branch target")
-    prior = validate_evidence(load_json_file(args.prior_evidence, "prior evidence"))
+    prior = validate_evidence(getattr(args, "_managed_prior", None) or load_json_file(args.prior_evidence, "prior evidence"))
     if current_head(repo) != prior["target"]["head_sha"]:
         raise AutoreviewError("disposition requires the unchanged reviewed head", code="lineage-invalidated", recovery="use-fix-verification")
     changed = changed_paths(repo, "branch", base_ref, args.commit)
@@ -1441,8 +1411,9 @@ def run_disposition(args: argparse.Namespace) -> int:
     }
     evidence = make_evidence(
         phase="disposition", repo=repo, base_ref=base_ref,
-        bundle_fingerprint=prior["target"]["target_fingerprint"], changed=changed,
+        bundle_fingerprint=prior["target"]["phase_input_fingerprint"], changed=changed,
         report=report, prompt_characters=0, elapsed_seconds=0, prior=prior,
+        target_override=getattr(args, "_managed_target", None),
         rejected=rejected,
     )
     Path(args.evidence_output).write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
@@ -1579,6 +1550,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--evidence-output", help="Write a validated review-chain evidence envelope.")
     parser.add_argument("--prior-evidence", help="Prior review-chain evidence envelope.")
     parser.add_argument("--finding-file", help="Canonical accepted/rejected finding intake for fix verification.")
+    parser.add_argument("--reservation-file", help="Protocol-derived Implement Feature reservation packet.")
+    parser.add_argument("--attempt-file", help="Append-only managed attempt journal.")
+    parser.add_argument("--candidate-output", help="Quarantined current-schema evidence candidate.")
+    parser.add_argument("--operation-output", help="Write the exact ingest operation for interrupted-apply recovery.")
     parser.add_argument(
         "--heartbeat-seconds",
         type=positive_int,
@@ -1596,6 +1571,156 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def managed_owner(repo: Path) -> dict[str, Any] | None:
+    root = Path.home() / ".cache/dotagents/skills/implement-feature/ledgers"
+    if not root.is_dir():
+        return None
+    resolved = str(repo.resolve())
+    matches: list[dict[str, Any]] = []
+    for path in sorted(root.glob("*.json")):
+        try:
+            state = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(state, dict) or state.get("schema_version") != "9.0.0":
+            continue
+        for task in state.get("tasks", []):
+            for delivery in task.get("deliveries", []):
+                checkout = delivery.get("managed_checkout")
+                if isinstance(checkout, dict) and checkout.get("checkout") == resolved:
+                    matches.append({"ledger": str(path), "task_key": task.get("task_key"), "delivery_key": delivery.get("delivery_key")})
+    if len(matches) > 1:
+        raise AutoreviewError(
+            "managed checkout ownership is ambiguous",
+            code="managed-checkout-ambiguous",
+            recovery="needs-owner",
+        )
+    return matches[0] if matches else None
+
+
+def append_attempt(path_value: str, record: dict[str, Any], *, create: bool = False) -> None:
+    path = Path(path_value)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    prior: list[dict[str, Any]] = []
+    if path.exists():
+        try:
+            prior = [json.loads(line) for line in path.read_text().splitlines() if line]
+        except (OSError, json.JSONDecodeError) as exc:
+            raise AutoreviewError("attempt journal is unreadable", code="attempt-invalid", recovery="needs-owner") from exc
+    elif not create:
+        raise AutoreviewError("attempt journal is missing", code="attempt-invalid", recovery="needs-owner")
+    if create and prior:
+        raise AutoreviewError("reservation already has an attempt journal", code="review-relaunch-forbidden", recovery="resume-identical-operation")
+    try:
+        protocol.validate_attempt_transition(prior, record)
+    except protocol.ProtocolError as exc:
+        raise AutoreviewError(str(exc), code=exc.code, recovery=exc.recovery) from exc
+    payload = {
+        "schema_version": protocol.ATTEMPT_SCHEMA_VERSION,
+        **record,
+        "parent_record_fingerprint": protocol.fingerprint(prior[-1]) if prior else None,
+    }
+    mode = "x" if create and not path.exists() else "a"
+    with path.open(mode) as handle:
+        handle.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
+    if not args.reservation_file:
+        owner = managed_owner(repo_root())
+        if owner is not None:
+            raise AutoreviewError(
+                "managed checkout requires a protocol reservation before AutoReview launch; model_call_started=false",
+                code="managed-reservation-required",
+                recovery="run-ledger-cache-autoreview-next",
+            )
+        return None
+    reservation = load_json_file(args.reservation_file, "reservation file")
+    required = {
+        "ok", "command", "version", "ledger_schema_version", "ledger", "root_id",
+        "expected_claim_fingerprint", "task_key", "delivery_key", "generation",
+        "current_state_fingerprint", "prior_evidence", "hosted_obligation",
+        "protocol_version", "action", "packet", "allowed_transitions",
+        "completion_criterion", "blockers", "projection_fingerprint", "reservation_event",
+    }
+    if set(reservation) != required or reservation["command"] != "autoreview.next" or reservation["protocol_version"] != protocol.PROTOCOL_VERSION:
+        raise AutoreviewError("managed reservation packet is invalid", code="reservation-invalid", recovery="derive-next-action-again")
+    event = reservation["reservation_event"]
+    if reservation["action"] is None or not isinstance(event, dict) or reservation["blockers"]:
+        raise AutoreviewError("managed reservation has no launchable action", code="action-not-allowed", recovery="resolve-blockers")
+    ledger = Path(reservation["ledger"])
+    try:
+        state = json.loads(ledger.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise AutoreviewError("managed ledger is unreadable", code="reservation-invalid", recovery="needs-owner") from exc
+    delivery = next(
+        (
+            delivery for task in state.get("tasks", []) if task.get("task_key") == reservation["task_key"]
+            for delivery in task.get("deliveries", []) if delivery.get("delivery_key") == reservation["delivery_key"]
+        ),
+        None,
+    )
+    active = delivery.get("autoreview_reservation") if isinstance(delivery, dict) else None
+    if not isinstance(active, dict) or active.get("reservation_id") != event.get("reservation_id") or active.get("state") != "reserved":
+        raise AutoreviewError("managed reservation is not active in the ledger", code="reservation-stale", recovery="derive-next-action-again")
+    packet = reservation["packet"]
+    args.mode = packet["mode"]
+    args.review_phase = packet["action"]
+    args.base = packet["target"]["base_ref"]
+    args.evidence_output = args.candidate_output
+    args._managed_prior = reservation["prior_evidence"]
+    args._managed_obligation = reservation["hosted_obligation"]
+    args._managed_target = packet["target"]
+    if reservation["prior_evidence"] is not None:
+        args.prior_evidence = args.reservation_file
+    if args.review_phase == "fix-verification":
+        obligation = reservation["hosted_obligation"]
+        if obligation is not None:
+            args.finding_file = obligation["finding_set_ref"]
+        else:
+            rows = reservation["prior_evidence"]["finding_state"]["open"]
+            finding_path = Path(args.attempt_file).with_suffix(".findings.json")
+            payload = {
+                "finding_source": "autoreview",
+                "findings": [
+                    {**row, "disposition": "accepted", "reason": "Accepted by the managed implementation run."}
+                    for row in rows
+                ],
+            }
+            finding_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            args.finding_file = str(finding_path)
+    return reservation
+
+
+def ledger_apply_events(reservation: dict[str, Any], events: list[dict[str, Any]], operation_id: str, *, dry_run: bool) -> dict[str, Any]:
+    ledger = Path(reservation["ledger"])
+    state = json.loads(ledger.read_text())
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        json.dump(events, handle, sort_keys=True, separators=(",", ":"))
+        events_path = Path(handle.name)
+    command = [
+        str(Path(__file__).resolve().parents[2] / "implement-feature/scripts/ledger-cache"),
+        "--json", "ledger", "apply", "--ledger", str(ledger), "--root-id", reservation["root_id"],
+        "--expected-claim-fingerprint", reservation["expected_claim_fingerprint"],
+        "--expected-generation", str(state["generation"]), "--expected-state-fingerprint", state["content_fingerprint"],
+        "--operation-id", operation_id, "--events-file", str(events_path),
+    ]
+    if dry_run:
+        command.append("--dry-run")
+    try:
+        result = subprocess.run(command, text=True, capture_output=True)
+        payload = json.loads(result.stdout) if result.stdout else {}
+        if result.returncode:
+            raise AutoreviewError(
+                f"managed ledger apply failed: {payload}", code="ledger-preflight-failed", recovery="needs-owner"
+            )
+        return payload
+    finally:
+        events_path.unlink(missing_ok=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     raw_argv = argv or sys.argv[1:]
     positional_probe = [item for item in raw_argv if item != "--json"]
@@ -1608,7 +1733,107 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "doctor":
             return doctor(args)
-        return run_review(args)
+        managed = load_managed_reservation(args)
+        if managed is None:
+            return run_review(args)
+        if not args.attempt_file or not args.candidate_output or not args.operation_output:
+            raise AutoreviewError(
+                "managed AutoReview requires --attempt-file, --candidate-output, and --operation-output; model_call_started=false",
+                code="managed-artifacts-required",
+                recovery="regenerate-managed-manifest",
+            )
+        prohibited = {
+            "--mode", "--review-phase", "--base", "--commit", "--prompt", "--prompt-file",
+            "--dataset", "--prior-evidence", "--finding-file", "--evidence-output",
+        }
+        if any(item.split("=", 1)[0] in prohibited for item in raw_argv):
+            raise AutoreviewError(
+                "managed callers cannot select mode, phase, target, prompt, or evidence parents; model_call_started=false",
+                code="managed-caller-control-forbidden",
+                recovery="use-reservation-packet-only",
+            )
+        reservation_id = managed["reservation_event"]["reservation_id"]
+        attempt_id = protocol.fingerprint({"reservation_id": reservation_id, "attempt_file": str(Path(args.attempt_file).resolve())})
+        event_base = {
+            "type": "autoreview-attempt-observed",
+            "task_key": managed["task_key"],
+            "delivery_key": managed["delivery_key"],
+            "reservation_id": reservation_id,
+            "attempt_id": attempt_id,
+            "candidate_fingerprint": None,
+            "operation_id": None,
+            "evidence_ref": f"autoreview-attempt://{attempt_id}",
+        }
+        prepared_record = {"state": "prepared", "model_call_started": False, "attempt_id": attempt_id, "reservation_id": reservation_id}
+        append_attempt(args.attempt_file, prepared_record, create=True)
+        prepared_event = {**event_base, "attempt_state": "prepared", "model_call_started": False}
+        ledger_apply_events(
+            managed, [prepared_event],
+            protocol.fingerprint({"attempt_id": attempt_id, "state": "prepared"})[:32], dry_run=False,
+        )
+        launched = False
+
+        def model_started(pid: int) -> None:
+            nonlocal launched
+            launched = True
+            record = {"state": "model-started", "model_call_started": True, "attempt_id": attempt_id, "reservation_id": reservation_id, "pid": pid}
+            append_attempt(args.attempt_file, record)
+            event = {**event_base, "attempt_state": "model-started", "model_call_started": True}
+            ledger_apply_events(
+                managed, [event],
+                protocol.fingerprint({"attempt_id": attempt_id, "state": "model-started"})[:32], dry_run=False,
+            )
+
+        args._on_model_started = model_started
+        try:
+            exit_code = run_review(args)
+            candidate = validate_evidence(load_json_file(args.candidate_output, "candidate evidence"))
+            candidate_fingerprint = protocol.fingerprint(candidate)
+            operation_id = protocol.fingerprint(
+                {"reservation_id": reservation_id, "candidate_fingerprint": candidate_fingerprint}
+            )[:32]
+            completed_record = {
+                "state": "completed", "model_call_started": launched,
+                "attempt_id": attempt_id, "reservation_id": reservation_id,
+                "candidate_fingerprint": candidate_fingerprint, "operation_id": operation_id,
+            }
+            append_attempt(args.attempt_file, completed_record)
+            completed_event = {
+                **event_base, "attempt_state": "completed", "model_call_started": launched,
+                "candidate_fingerprint": candidate_fingerprint, "operation_id": operation_id,
+            }
+            observed_event = {
+                "type": "autoreview-observed", "task_key": managed["task_key"],
+                "delivery_key": managed["delivery_key"], "reservation_id": reservation_id,
+                "candidate_fingerprint": candidate_fingerprint, "operation_id": operation_id,
+                "evidence_ref": str(Path(args.candidate_output).resolve()), "evidence": candidate,
+            }
+            operation = {
+                "schema_version": protocol.PROTOCOL_VERSION,
+                "operation_id": operation_id,
+                "ledger": managed["ledger"],
+                "reservation_id": reservation_id,
+                "candidate_path": str(Path(args.candidate_output).resolve()),
+                "candidate_fingerprint": candidate_fingerprint,
+                "events": [completed_event, observed_event],
+            }
+            Path(args.operation_output).write_text(json.dumps(operation, indent=2, sort_keys=True) + "\n")
+            ledger_apply_events(managed, operation["events"], operation_id, dry_run=True)
+            return exit_code
+        except BaseException:
+            records = [json.loads(line) for line in Path(args.attempt_file).read_text().splitlines() if line]
+            if records and records[-1]["state"] not in {"completed", "failed"}:
+                failed_record = {
+                    "state": "failed", "model_call_started": launched,
+                    "attempt_id": attempt_id, "reservation_id": reservation_id,
+                }
+                append_attempt(args.attempt_file, failed_record)
+                failed_event = {**event_base, "attempt_state": "failed", "model_call_started": launched}
+                ledger_apply_events(
+                    managed, [failed_event],
+                    protocol.fingerprint({"attempt_id": attempt_id, "state": "failed"})[:32], dry_run=False,
+                )
+            raise
     except AutoreviewError as exc:
         if args.json:
             print(

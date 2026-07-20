@@ -242,6 +242,8 @@ def validate_evidence(value: Any) -> dict[str, Any]:
     )
     if item["schema_version"] != EVIDENCE_SCHEMA_VERSION or item["protocol_version"] != PROTOCOL_VERSION:
         raise ProtocolError("schema-unsupported", "AutoReview evidence schema is unsupported")
+    if item["evidence_fingerprint"] != evidence_fingerprint(item):
+        raise ProtocolError("evidence-fingerprint-mismatch", "evidence fingerprint mismatch")
     phase = item["review_phase"]
     if phase not in REVIEW_PHASES or item["terminal_state"] not in TERMINAL_STATES:
         raise ProtocolError("protocol-invalid", "evidence uses an invalid phase or terminal state")
@@ -273,8 +275,6 @@ def validate_evidence(value: Any) -> dict[str, Any]:
     if item["parent_evidence_fingerprint"] is None:
         if item["terminal_state"] != _expected_result(None, phase, open_findings):
             raise ProtocolError("transition-invalid", "initial evidence terminal state is inconsistent")
-    if item["evidence_fingerprint"] != evidence_fingerprint(item):
-        raise ProtocolError("evidence-fingerprint-mismatch", "evidence fingerprint is stale")
     return item
 
 

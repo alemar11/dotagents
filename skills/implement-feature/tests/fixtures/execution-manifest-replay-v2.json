@@ -1,7 +1,7 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "bundle_request": {
-    "schema_version": "1.0.0",
+    "schema_version": "2.0.0",
     "template": false,
     "root_task_ref": "task:replay",
     "entries": [
@@ -14,7 +14,7 @@
     ]
   },
   "validation_request": {
-    "schema_version": "1.0.0",
+    "schema_version": "2.0.0",
     "template": false,
     "command_id": "replay-validation",
     "operation": "validation",

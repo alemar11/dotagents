@@ -60,9 +60,16 @@ metrics, and its parent fingerprint. Do not edit it manually.
 Deletion-only regressions point to the nearest surviving current line, or line
 1 under the deleted path when the file has no surviving line.
 
-Repository, base, merge-base, or changed-path expansion returns
-`lineage-invalidated` with `recovery=start-new-full-lineage`. A new lineage
-starts with `full`; never disguise an expanded scope as a fix delta.
+Repository, base, or review-scope drift invalidates the lineage. A merge-base
+SHA change preserves it only when the canonical reviewed patch fingerprint and
+scope remain equivalent; otherwise explicit lineage-reset authority is
+required. A new lineage starts with `full`; never disguise semantic target
+drift as a fix delta.
+
+Managed Implement Feature runs derive every action through `ledger-cache
+autoreview next`. They reserve before launch and do not accept caller-selected
+mode, phase, prompt, or evidence parent. Publication facts attach to the
+existing clean committed revision and do not reset lineage.
 
 Terminal states are:
 
@@ -78,6 +85,9 @@ If the same finding recurs without a substantive head change, stop with
 `review-no-progress`; do not retry indefinitely.
 
 ## Commands
+
+These explicit phase commands are standalone-only. Managed Implement Feature
+runs use the reserved packet and artifact paths emitted by its manifest.
 
 ```bash
 scripts/autoreview --json findings template --finding-source codex-review \

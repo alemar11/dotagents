@@ -192,6 +192,10 @@ Useful options:
 - `--review-phase`, `--prior-evidence`, `--finding-file`, and
   `--evidence-output`: create or continue the committed-branch evidence chain
   documented in `references/evidence-chain.md`.
+- `--reservation-file`, `--attempt-file`, `--candidate-output`, and
+  `--operation-output`: execute the protocol-derived action for a managed
+  Implement Feature checkout. Managed callers cannot select mode, phase,
+  target, prompt, or parent evidence.
 - `findings template|prepare`: emit a strict draft without caller-generated ids,
   then validate authoritative fields and generate canonical ids locally. These
   operations never call Codex or consume review budget.

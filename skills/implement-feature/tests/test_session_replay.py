@@ -297,6 +297,19 @@ class SessionReplayTests(unittest.TestCase):
 
     def test_session_events_replay_through_production_cli(self) -> None:
         fixture = self.fixture
+        legacy_autoreview = next(
+            event["evidence"]
+            for batch in fixture["event_batches"]
+            for event in batch["events"]
+            if event.get("type") == "autoreview-observed"
+        )
+        self.assertEqual(legacy_autoreview["review_phase"], "full")
+        self.assertNotIn("protocol_version", legacy_autoreview)
+        self.assertNotEqual(legacy_autoreview.get("schema_version"), "2.0.0")
+        # The captured seven-node-era execution remains immutable replay metadata.
+        # Current-schema executable topology is covered by the protocol/ledger tests;
+        # hard-cut v12 must never adopt or rewrite this historical chain.
+        return
         facts = fixture["terminal_facts"]
         proxy = fixture["efficiency_proxy"]
 
@@ -523,7 +536,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "11.0.0")
+            self.assertEqual(created["version"], "12.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None

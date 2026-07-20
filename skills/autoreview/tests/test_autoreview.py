@@ -104,7 +104,7 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 1.2.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 2.0.0")
 
     def test_findings_prepare_owns_canonical_ids(self) -> None:
         finding = {
@@ -182,33 +182,45 @@ class AutoreviewContractTests(unittest.TestCase):
         self.assertEqual(cli.REVIEW_PHASES, {"full", "fix-verification", "disposition", "terminal-full"})
 
     def test_evidence_fingerprint_detects_tampering(self) -> None:
+        review_target_key = cli.protocol.make_review_target_key(
+            repository_id="/repo/.git", base_ref="origin/main", review_scope=["src/app.py"]
+        )
+        committed_revision_key = cli.protocol.make_committed_revision_key(
+            review_target_key=review_target_key,
+            head_sha="d" * 40,
+            reviewed_patch_fingerprint="e" * 64,
+        )
         evidence = {
-            "schema_version": "1.0.0",
+            "schema_version": "2.0.0",
+            "protocol_version": "2.0.0",
             "review_phase": "full",
             "lineage_id": "a" * 64,
             "parent_evidence_fingerprint": None,
-            "repository_id": "b" * 64,
             "target": {
-                "mode": "branch", "base_ref": "origin/main", "merge_base_sha": "c" * 40,
-                "head_sha": "d" * 40, "target_fingerprint": "e" * 64,
-                "changed_files": ["src/app.py"],
+                "repository_id": "/repo/.git", "base_ref": "origin/main", "merge_base_sha": "c" * 40,
+                "head_sha": "d" * 40, "review_scope": ["src/app.py"],
+                "review_target_key": review_target_key,
+                "reviewed_patch_fingerprint": "e" * 64,
+                "phase_input_fingerprint": "e" * 64,
+                "committed_revision_key": committed_revision_key,
             },
-            "counts": {"full_reviews": 1, "fix_verifications": 0},
+            "counts": {"full_reviews": 1, "terminal_full_reviews": 0, "fix_verifications": 0, "model_calls": 1},
             "finding_state": {"open": [], "resolved": [], "rejected": []},
+            "hosted_obligation_id": None,
             "report": {"findings": [], "review_outcome": "pass", "review_explanation": "Clean.", "review_confidence": 1.0},
             "terminal_state": "terminal-clean",
             "metrics": {"prompt_characters": 10, "elapsed_seconds": 1},
         }
-        evidence["evidence_fingerprint"] = cli.evidence_fingerprint(evidence)
+        evidence["evidence_fingerprint"] = cli.protocol.evidence_fingerprint(evidence)
         self.assertEqual(cli.validate_evidence(evidence), evidence)
         evidence["terminal_state"] = "fix-required"
         with self.assertRaisesRegex(cli.AutoreviewError, "fingerprint mismatch"):
             cli.validate_evidence(evidence)
 
-        evidence["evidence_fingerprint"] = cli.evidence_fingerprint(evidence)
+        evidence["evidence_fingerprint"] = cli.protocol.evidence_fingerprint(evidence)
         evidence["counts"]["full_reviews"] = "one"
-        evidence["evidence_fingerprint"] = cli.evidence_fingerprint(evidence)
-        with self.assertRaisesRegex(cli.AutoreviewError, "counter values"):
+        evidence["evidence_fingerprint"] = cli.protocol.evidence_fingerprint(evidence)
+        with self.assertRaisesRegex(cli.AutoreviewError, "counts.full_reviews"):
             cli.validate_evidence(evidence)
 
     def test_verification_findings_must_point_to_delta_lines(self) -> None:
@@ -293,7 +305,7 @@ class AutoreviewContractTests(unittest.TestCase):
             )
             disposition = json.loads(disposition_evidence.read_text())
             self.assertEqual(disposition["terminal_state"], "terminal-composite-clean")
-            self.assertEqual(disposition["counts"], {"full_reviews": 1, "fix_verifications": 0})
+            self.assertEqual(disposition["counts"], {"full_reviews": 1, "terminal_full_reviews": 0, "fix_verifications": 0, "model_calls": 1})
 
             (repo / "app.py").write_text("value = 3\n" + feature_tail)
             subprocess.run(["git", "commit", "-am", "fix"], cwd=repo, check=True, capture_output=True)
@@ -318,7 +330,7 @@ class AutoreviewContractTests(unittest.TestCase):
             )
             delta = json.loads(delta_evidence.read_text())
             self.assertEqual(delta["terminal_state"], "verification-clean")
-            self.assertEqual(delta["target"]["changed_files"], first["target"]["changed_files"])
+            self.assertEqual(delta["target"]["review_scope"], first["target"]["review_scope"])
             self.assertLessEqual(
                 delta["metrics"]["prompt_characters"],
                 int(first["metrics"]["prompt_characters"] * 0.35),
@@ -334,7 +346,7 @@ class AutoreviewContractTests(unittest.TestCase):
             )
             terminal = json.loads(terminal_evidence.read_text())
             self.assertEqual(terminal["terminal_state"], "terminal-clean")
-            self.assertEqual(terminal["counts"], {"full_reviews": 2, "fix_verifications": 1})
+            self.assertEqual(terminal["counts"], {"full_reviews": 2, "terminal_full_reviews": 1, "fix_verifications": 1, "model_calls": 3})
 
     def test_codex_review_intake_cannot_replace_open_autoreview_findings(self) -> None:
         finding = {
@@ -617,6 +629,93 @@ class AutoreviewContractTests(unittest.TestCase):
         secret = os.environ.get("OPENAI_API_KEY")
         if secret:
             self.assertNotIn(secret, payload["error"])
+
+    def test_fake_model_launch_is_counted_only_after_popen_and_cannot_relaunch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            counter = root / "launch-count"
+            fake_model = root / "fake-model.py"
+            fake_model.write_text(
+                "from pathlib import Path\n"
+                f"p = Path({str(counter)!r})\n"
+                "n = int(p.read_text()) if p.exists() else 0\n"
+                "p.write_text(str(n + 1))\n"
+                "print('ok')\n",
+                encoding="utf-8",
+            )
+            started: list[int] = []
+            result = cli.run_with_heartbeat(
+                [sys.executable, str(fake_model)],
+                root,
+                input_text="",
+                label="fake-reviewer",
+                heartbeat_seconds=1,
+                on_started=started.append,
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(counter.read_text(), "1")
+            self.assertEqual(len(started), 1)
+
+            journal = root / "attempt.jsonl"
+            identity = {"attempt_id": "a" * 64, "reservation_id": "b" * 64}
+            cli.append_attempt(
+                str(journal),
+                {**identity, "state": "prepared", "model_call_started": False},
+                create=True,
+            )
+            cli.append_attempt(
+                str(journal),
+                {**identity, "state": "model-started", "model_call_started": True},
+            )
+            cli.append_attempt(
+                str(journal),
+                {**identity, "state": "failed", "model_call_started": True},
+            )
+            with self.assertRaisesRegex(cli.AutoreviewError, "already has an attempt journal"):
+                cli.append_attempt(
+                    str(journal),
+                    {**identity, "state": "prepared", "model_call_started": False},
+                    create=True,
+                )
+            self.assertEqual(counter.read_text(), "1")
+
+    def test_managed_checkout_without_reservation_fails_before_review_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            repo = home / "managed-checkout"
+            repo.mkdir()
+            ledger_root = home / ".cache/dotagents/skills/implement-feature/ledgers"
+            ledger_root.mkdir(parents=True)
+            (ledger_root / "active.json").write_text(
+                json.dumps(
+                    {
+                        "schema_version": "9.0.0",
+                        "tasks": [
+                            {
+                                "task_key": "feature-task",
+                                "deliveries": [
+                                    {
+                                        "delivery_key": "app",
+                                        "managed_checkout": {"checkout": str(repo.resolve())},
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            stderr = io.StringIO()
+            with mock.patch.dict(os.environ, {"HOME": str(home)}):
+                with mock.patch.object(cli, "repo_root", return_value=repo):
+                    with mock.patch.object(cli, "run_review") as run_review:
+                        with contextlib.redirect_stderr(stderr):
+                            code = cli.main(["--json"])
+            self.assertEqual(code, 2)
+            self.assertFalse(run_review.called)
+            payload = json.loads(stderr.getvalue())
+            self.assertEqual(payload["error_code"], "managed-reservation-required")
+            self.assertIn("model_call_started=false", payload["error"])
 
 
 if __name__ == "__main__":

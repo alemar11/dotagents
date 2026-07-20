@@ -3,7 +3,7 @@
 Load this reference before preparing a source bundle or executing delivery
 preflight, worker validation, or AutoReview through a command manifest.
 `scripts/execution-manifest` is the shipped standard-library Python artifact;
-its schema version is `1.0.0` and its CLI version is `1.0.0`.
+its schema version is `2.0.0` and its CLI version is `2.0.0`.
 
 ## Boundary
 
@@ -73,7 +73,7 @@ required, resolves literal argv and tool records, copies `bundle_sha256`, and
 generates argv, gate, and manifest fingerprints. Receipts contain observations
 only; callers author none of their fields.
 
-These are hard-cut `1.0.0` exact-object schemas. There are no aliases, command
+These are hard-cut `2.0.0` exact-object schemas. There are no aliases, command
 string inputs, migrations, or legacy packet readers.
 
 `validation.parameters.argv` is a nonempty literal string array. A string

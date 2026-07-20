@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 
-__version__ = "1.0.0"
-SCHEMA_VERSION = "1.0.0"
+__version__ = "2.0.0"
+SCHEMA_VERSION = "2.0.0"
 MAX_PACKET_BYTES = 1024 * 1024
 MAX_OUTPUT_BYTES = 128 * 1024
 COMMAND_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -24,7 +24,6 @@ HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 SHELL_OPERATORS = {"|", "||", "&", "&&", ";", "<", ">", ">>", "2>", "2>>"}
 SHELL_WRAPPERS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "cmd", "powershell", "pwsh"}
 OPERATIONS = {"delivery-preflight", "validation", "autoreview"}
-REVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
 
 
 class ManifestError(Exception):
@@ -435,10 +434,11 @@ def command_template(operation: str) -> dict[str, Any]:
         base["parameters"] = {"argv": ["python3", "-m", "unittest"]}
     else:
         base["parameters"] = {
-            "mode": "branch", "base": "origin/main", "review_phase": "full",
-            "prior_evidence": None, "finding_file": None,
-            "evidence_output": "/absolute/path/to/evidence.json",
-            "json_output": None, "dry_run": False,
+            "reservation_file": "/absolute/path/to/autoreview-next.json",
+            "attempt_file": "/absolute/path/to/autoreview-attempt.jsonl",
+            "candidate_output": "/absolute/path/to/autoreview-candidate.json",
+            "operation_output": "/absolute/path/to/autoreview-operation.json",
+            "dry_run": False,
         }
     return base
 
@@ -516,13 +516,11 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
         else:
             exact_object(
                 params,
-                {"mode", "base", "review_phase", "prior_evidence", "finding_file", "evidence_output", "json_output", "dry_run"},
+                {"reservation_file", "attempt_file", "candidate_output", "operation_output", "dry_run"},
                 "parameters",
             )
-            if params["mode"] not in {"local", "branch", "commit"} or params["review_phase"] not in REVIEW_PHASES or not isinstance(params["dry_run"], bool):
-                raise ManifestError("invalid-input", "AutoReview parameters use invalid canonical values", "regenerate-from-template")
-            if params["mode"] == "branch" and not isinstance(params["base"], str):
-                raise ManifestError("invalid-input", "branch AutoReview requires base", "regenerate-from-template")
+            if not isinstance(params["dry_run"], bool):
+                raise ManifestError("invalid-input", "AutoReview dry_run must be boolean", "regenerate-from-template")
             helper = Path(__file__).resolve().parents[2] / "autoreview/scripts/autoreview"
             codex, codex_kind, codex_ref = resolve_executable("codex", cwd)
             git, git_kind, git_ref = resolve_executable("git", cwd)
@@ -533,19 +531,17 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
                     tool_record("git", git, git_kind, git_ref),
                 ]
             )
-            argv = [str(helper), "--json", "--mode", params["mode"], "--review-phase", params["review_phase"], "--codex-bin", str(codex)]
-            if params["base"] is not None:
-                argv.extend(["--base", nonempty(params["base"], "parameters.base")])
-            for field, flag in (("prior_evidence", "--prior-evidence"), ("finding_file", "--finding-file")):
-                if params[field] is not None:
-                    path = absolute_path(params[field], f"parameters.{field}", existing=True)
-                    argv.extend([flag, str(path)])
-                    dependencies.append(file_record(path, source_kind="generated-packet", source_ref=field))
-            for field, flag in (("evidence_output", "--evidence-output"), ("json_output", "--json-output")):
-                if params[field] is not None:
-                    path = absolute_path(params[field], f"parameters.{field}")
-                    argv.extend([flag, str(path)])
-                    outputs.append(str(path))
+            reservation = absolute_path(params["reservation_file"], "parameters.reservation_file", existing=True)
+            attempt = absolute_path(params["attempt_file"], "parameters.attempt_file")
+            candidate = absolute_path(params["candidate_output"], "parameters.candidate_output")
+            operation_output = absolute_path(params["operation_output"], "parameters.operation_output")
+            dependencies.append(file_record(reservation, source_kind="generated-packet", source_ref="autoreview-reservation"))
+            outputs.extend([str(attempt), str(candidate), str(operation_output)])
+            argv = [
+                str(helper), "--json", "--codex-bin", str(codex),
+                "--reservation-file", str(reservation), "--attempt-file", str(attempt),
+                "--candidate-output", str(candidate), "--operation-output", str(operation_output),
+            ]
             if params["dry_run"]:
                 argv.append("--dry-run")
             if write_request["mode"] != "none":

@@ -76,6 +76,27 @@ def evidence(
     return value
 
 
+def obligation(parent: dict, *, marker: str, finding_comment_ids: list[str]) -> dict:
+    return {
+        "schema_version": "2.0.0",
+        "obligation_id": marker * 64,
+        "review_target_key": parent["target"]["review_target_key"],
+        "prior_lineage_id": parent["lineage_id"],
+        "prior_evidence_fingerprint": parent["evidence_fingerprint"],
+        "source_committed_revision_key": parent["target"]["committed_revision_key"],
+        "repository_id": "/repo/.git",
+        "github_repository": "example/repo",
+        "pr_number": 1,
+        "request_receipt_fingerprint": "b" * 64,
+        "observation_fingerprint": "c" * 64,
+        "provider_evidence_fingerprint": "d" * 64,
+        "finding_count": 1,
+        "finding_comment_ids": finding_comment_ids,
+        "finding_set_ref": "/tmp/findings.json",
+        "finding_set_fingerprint": "e" * 64,
+    }
+
+
 class AutoReviewProtocolTests(unittest.TestCase):
     def test_identity_separates_target_revision_and_publication(self) -> None:
         first = target()
@@ -121,27 +142,49 @@ class AutoReviewProtocolTests(unittest.TestCase):
 
     def test_hosted_finding_after_terminal_routes_to_focused_verification(self) -> None:
         terminal = evidence()
-        obligation = {
-            "schema_version": "2.0.0",
-            "obligation_id": "a" * 64,
-            "review_target_key": terminal["target"]["review_target_key"],
-            "prior_lineage_id": terminal["lineage_id"],
-            "prior_evidence_fingerprint": terminal["evidence_fingerprint"],
-            "source_committed_revision_key": terminal["target"]["committed_revision_key"],
-            "repository_id": "/repo/.git",
-            "github_repository": "example/repo",
-            "pr_number": 1,
-            "request_receipt_fingerprint": "b" * 64,
-            "observation_fingerprint": "c" * 64,
-            "provider_evidence_fingerprint": "d" * 64,
-            "finding_count": 1,
-            "finding_comment_ids": [],
-            "finding_set_ref": "/tmp/findings.json",
-            "finding_set_fingerprint": "e" * 64,
-        }
-        projection = PROTOCOL.next_projection(terminal, target=terminal["target"], hosted_obligation=obligation)
+        summary = obligation(terminal, marker="a", finding_comment_ids=[])
+        projection = PROTOCOL.next_projection(terminal, target=terminal["target"], hosted_obligation=summary)
         self.assertEqual(projection["action"], "fix-verification")
         self.assertEqual(projection["packet"]["prompt_route"], "managed-fix-verification")
+
+    def test_repeated_hosted_cycles_continue_after_terminal_composite(self) -> None:
+        initial = evidence(terminal_state="fix-required", open_findings=[{"finding_id": "1" * 64}])
+        fixed = evidence(
+            phase="fix-verification", parent=initial,
+            target_value=target(head="5" * 40, patch="6" * 64),
+            terminal_state="verification-clean",
+        )
+        PROTOCOL.validate_transition(initial, fixed)
+        terminal_full = evidence(
+            phase="terminal-full", parent=fixed,
+            target_value=target(head="5" * 40, patch="6" * 64),
+            terminal_state="fix-required", open_findings=[{"finding_id": "2" * 64}],
+        )
+        PROTOCOL.validate_transition(fixed, terminal_full)
+        composite = evidence(
+            phase="fix-verification", parent=terminal_full,
+            target_value=target(head="7" * 40, patch="8" * 64),
+            terminal_state="terminal-composite-clean",
+        )
+        PROTOCOL.validate_transition(terminal_full, composite)
+        first_obligation = obligation(composite, marker="9", finding_comment_ids=[])
+        first_hosted = evidence(
+            phase="fix-verification", parent=composite,
+            target_value=target(head="a" * 40, patch="b" * 64),
+            terminal_state="terminal-composite-clean",
+            hosted_obligation_id=first_obligation["obligation_id"],
+        )
+        PROTOCOL.validate_transition(composite, first_hosted, hosted_obligation=first_obligation)
+        second_obligation = obligation(first_hosted, marker="f", finding_comment_ids=["inline-42"])
+        second_hosted = evidence(
+            phase="fix-verification", parent=first_hosted,
+            target_value=target(head="c" * 40, patch="d" * 64),
+            terminal_state="terminal-composite-clean",
+            hosted_obligation_id=second_obligation["obligation_id"],
+        )
+        PROTOCOL.validate_transition(first_hosted, second_hosted, hosted_obligation=second_obligation)
+        self.assertEqual(second_hosted["counts"]["full_reviews"], 2)
+        self.assertEqual(second_hosted["counts"]["terminal_full_reviews"], 1)
 
     def test_attempt_history_distinguishes_prepared_from_model_started(self) -> None:
         prepared = {"state": "prepared", "model_call_started": False}
