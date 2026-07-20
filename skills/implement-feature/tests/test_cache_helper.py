@@ -3877,6 +3877,115 @@ class LedgerCacheV18Tests(unittest.TestCase):
             )
         self.assertEqual(findings.exception.details["reason"], "reconciliation-artifact-not-clean")
 
+    def test_monitored_pr_237_replay_uses_generic_terminal_reconciliation(self) -> None:
+        fixture = json.loads(
+            (SKILL_ROOT / "tests/fixtures/monitored-pr-237-replay-v1.json").read_text()
+        )
+        run = fixture["executable_run"]
+        expected = fixture["expected_controller"]
+        self.acquire()
+        registration = self.registration_for()
+        registration["sources"][0]["deliveries"][0]["github_repository"] = run["repository"]
+        self.refresh_registration_fingerprints(registration)
+        self.create(registration=registration)
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(), self.task_event(state="created"),
+        ])
+        self.apply([self.baseline_acceptance_event()])
+        state = self.state()
+        self.apply([{"type": "portfolio-goal-activated", "goal_evidence_ref": "app-task://root-a/goal", "objective_fingerprint": state["portfolio"]["objective_fingerprint"]}])
+        self.apply([{
+            "type": "revision-observed", "task_key": self.task_key, "delivery_key": "dotagents",
+            "head_sha": run["head_sha"], "base_ref": "main", "merge_base_sha": "b" * 40,
+            "repository": registration["sources"][0]["deliveries"][0]["repository"],
+            "github_repository": run["repository"], "pr_number": run["pr_number"],
+            "pr_url": f"https://github.com/{run['repository']}/pull/{run['pr_number']}",
+            "evidence_ref": "fixture://monitored-pr-237/revision",
+        }])
+        revision = self.state()["tasks"][0]["deliveries"][0]["revision"]
+        self.assertEqual(run["observed_revision_key"], "fd0128f3a85a78122aba69cd2283f262655e83fac170f77a5e3411645e2ec1d5")
+        self.apply([{
+            "type": "delivery-observed", "task_key": self.task_key, "delivery_key": "dotagents",
+            "revision_key": revision["revision_key"], "pr": {
+                "repository": revision["repository"], "github_repository": run["repository"],
+                "number": run["pr_number"], "url": revision["pr_url"], "state": "open", "is_draft": False,
+                "head_sha": run["head_sha"], "base_ref": "main", "merge_base_sha": "b" * 40,
+                "mergeable": True, "merge_state": "clean", "closing_refs": [self.source_ref],
+            }, "committed": True, "published": True, "evidence_ref": "fixture://monitored-pr-237/delivery",
+        }])
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+
+        request_receipt = self.request_receipt(
+            revision, comment_id=run["request_comment_id"], request_key=run["request_key"],
+            created_at=run["request_created_at"],
+        )
+        request_receipt["repository"] = run["repository"]
+        request_receipt["body_fingerprint"] = run["request_body_fingerprint"]
+        self.record_mock_owned_result(
+            owner="gitstack", operation="request", outcome="created",
+            facts={"request_receipt": request_receipt},
+        )
+        _, failed, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="request-correlation-failure",
+            facts={"request_receipt": request_receipt},
+        )
+
+        controller = parse_result(self.controller_next())
+        self.assertEqual(controller["action"], expected["action"])
+        required_contract_paths = [item["path"] for item in controller["required_contracts"]]
+        self.assertEqual(required_contract_paths, expected["required_contracts"])
+        self.assertEqual(len(required_contract_paths), 3)
+        failed_result = self.read_controller_result(
+            controller, owner="gitstack",
+            result_fingerprint=controller["packet_template"]["evidence_descriptors"][0]["result_fingerprint"],
+        )["owner_result"]
+        self.assertEqual(failed_result, failed)
+        self.record_mock_owned_result(
+            owner="gitstack", operation="reconcile-terminal", outcome="clean-verified",
+            input_value={"prior_failed_result": failed_result, "request_receipt": request_receipt},
+        )
+
+        operations = self.state()["operations"]
+        self.assertEqual(len([row for row in operations if row["record_kind"] == "owned-operation-started" and row["owner_operation"] == "request"]), 1)
+        self.assertEqual(len([row for row in operations if row["record_kind"] == "owned-operation-started" and row["owner_operation"] == "wait"]), 1)
+        self.assertEqual(len([row for row in operations if row["record_kind"] == "owned-operation-result" and row["owner_operation"] == "reconcile-terminal"]), 1)
+        self.assertFalse(any("merge" in row.get("owner_operation", "") for row in operations))
+        self.assertNotEqual(fixture["historical_provenance"]["head_sha"], revision["head_sha"])
+
+        self.pass_terminal_gates(revision)
+        seal = parse_result(self.read_projection("terminal"))["tasks"][0]
+        self.apply([{
+            "type": "task-terminal-sealed", "task_key": self.task_key,
+            "revision_set_key": seal["revision_set_key"], "seal_fingerprint": seal["seal_candidate_fingerprint"],
+            "evidence_ref": "fixture://monitored-pr-237/seal",
+        }])
+        sealed = self.state()["tasks"][0]
+        self.apply([{
+            "type": "terminal-handoff-recorded", "task_key": self.task_key,
+            "seal_fingerprint": sealed["seal"]["seal_fingerprint"], "handoff_kind": "pull-request-ready",
+            "authority": "external-merge-required", "evidence_ref": revision["pr_url"],
+            "next_action": "Human may merge after final inspection.",
+        }])
+        self.assertEqual(self.state()["tasks"][0]["state"], "merge-ready")
+
+    def test_monitored_pr_237_values_are_isolated_to_fixture_test_or_non_executable_note(self) -> None:
+        values = (
+            "470b8f4fab9f60c9f2cbd33489db49c2d82d9b5c", "5016589104", "5016644000",
+            "5016657271", "fd0128f3a85a78122aba69cd2283f262655e83fac170f77a5e3411645e2ec1d5",
+        )
+        allowed = {
+            SKILL_ROOT / "tests/fixtures/monitored-pr-237-replay-v1.json",
+            Path(__file__),
+            SKILL_ROOT / "references/review-reconciliation.md",  # Explicitly non-executable historical motivation.
+        }
+        for path in SKILL_ROOT.rglob("*"):
+            if not path.is_file() or ".git" in path.parts or "__pycache__" in path.parts or path in allowed:
+                continue
+            contents = path.read_text(errors="replace")
+            self.assertFalse(any(value in contents for value in values), path)
+
     def test_review_failure_mapping_rejects_caller_classification_combinations(self) -> None:
         self.bootstrap_active_task()
         self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")

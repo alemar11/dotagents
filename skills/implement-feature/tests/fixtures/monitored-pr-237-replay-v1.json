@@ -1,0 +1,47 @@
+{
+  "schema": "implement-feature-monitored-replay:v1",
+  "fixture_kind": "sanitized-observed-replay",
+  "sanitization": {
+    "preserved": ["repository", "pr_number", "head_sha", "comment_id", "timestamps", "revision_key"],
+    "replaced": ["comment_body", "request_body", "body_fingerprint", "claim_id", "operation_id"],
+    "replacement_rule": "deterministic-sha256-fixture-values"
+  },
+  "historical_provenance": {
+    "head_sha": "470b8f4fab9f60c9f2cbd33489db49c2d82d9b5c",
+    "request_comment_id": 5016589104
+  },
+  "executable_run": {
+    "repository": "ambrogio-dev/yn-ai-workflows",
+    "pr_number": 237,
+    "head_sha": "03dca5ad3e5603be343c9b927e372e25f5671f1e",
+    "observed_revision_key": "fd0128f3a85a78122aba69cd2283f262655e83fac170f77a5e3411645e2ec1d5",
+    "request_comment_id": 5016644000,
+    "clean_comment_id": 5016657271,
+    "clean_comment_created_at": "2026-07-19T17:17:20Z",
+    "request_created_at": "2026-07-19T17:06:00Z",
+    "correlation_failure_observed_at": "2026-07-19T17:10:00Z",
+    "terminal_evidence_verified_at": "2026-07-19T17:18:00Z",
+    "request_key": "d7b9d7db28b45bd2ab55b9998456d00e3a1a8e272845cbbc0c6b2915243177ba",
+    "request_body_fingerprint": "de7a7a6690b2e6f09a91a2f548e3ed7e3f5d5ef2c4e5b9960c45fe1d46a4d0b3",
+    "operation_id": "7d8750faab1e6fe940b05b8fbde36026"
+  },
+    "expected_controller": {
+    "action": "execute-gitstack-terminal-reconciliation",
+    "required_contracts": [
+      "references/worker.md",
+      "references/review-mutation-authority.md",
+      "references/recovery-validation.md"
+    ]
+  },
+  "expected_metrics": {
+    "authorized_grants": 1,
+    "request_posts": 1,
+    "wait_starts": 1,
+    "wait_invocations": 1,
+    "request_reposts": 0,
+    "wait_retries": 0,
+    "deadline_resets": 0,
+    "terminal_reconciliations": 1,
+    "merge_actions": 0
+  }
+}
