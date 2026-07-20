@@ -30,6 +30,8 @@ Resolve `<plugin-root>` as two directories above the directory containing this
 <plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --reply-receipt-file <absolute-receipt-file> --expected-worktree-fingerprint <sha256>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
 ```
 
@@ -65,13 +67,17 @@ reactions into one current-head state and one stable observation fingerprint.
 6. Post replies, edit comments, submit reviews, or resolve threads only when the
    user explicitly authorizes publication or a calling workflow supplies exact
    PR/action authority. Never infer it from an inspect or review request.
-   A failed or unreadable mutation gets one exact-target read-back and no blind
-   retry. Preserve returned partial-success evidence if the provider write is
-   confirmed but the worktree guard fails.
-7. Resolve a thread only after its requested change is implemented and
-   validated, or when an authorized disposition clearly explains why no change
-   is appropriate. Never substitute a top-level PR comment for a thread reply
-   silently.
+   Reply only to one returned `finding_comment_ids` entry and persist the
+   complete typed reply receipt. Resolve by passing that receipt unchanged to
+   `reviews resolve`; never assemble a GraphQL thread id. A failed or unreadable
+   mutation gets one exact-target read-back and no blind retry. Preserve
+   returned partial-success evidence if the provider write is confirmed but
+   the worktree guard fails.
+7. The v1 typed resolver is limited to actionable findings whose requested
+   change was implemented and validated. It re-reads the exact finding, reply,
+   head, and thread membership before resolving. `already-resolved` is a safe
+   no-op only after the same proof succeeds; it does not identify who resolved
+   the thread. Never substitute a top-level PR comment for a thread reply.
 8. After pushing a review fix, request a fresh automated review with a new
    request key when required and check or wait against the new full head SHA.
    If a bounded wait times out and

@@ -135,6 +135,24 @@ def api_request(method: str, endpoint: str, payload: dict[str, Any], *, cwd: Pat
     )
 
 
+def graphql_request(query: str, variables: dict[str, Any]) -> Result:
+    command = ["gh", "api", "graphql", "--input", "-"]
+    try:
+        completed = subprocess.run(
+            command,
+            input=json_request({"query": query, "variables": variables}),
+            capture_output=True,
+            shell=False,
+        )
+    except FileNotFoundError:
+        return Result(127, "", "gh is not installed or not on PATH.")
+    return Result(
+        completed.returncode,
+        completed.stdout.decode("utf-8", errors="replace"),
+        completed.stderr.decode("utf-8", errors="replace"),
+    )
+
+
 def parse_api_object(result: Result) -> dict[str, Any]:
     if result.returncode:
         raise GitStackError(

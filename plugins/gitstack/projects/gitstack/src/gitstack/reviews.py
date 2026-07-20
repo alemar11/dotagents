@@ -20,6 +20,7 @@ from .provider_text import (
     API_VERSION,
     ProviderText,
     api_request,
+    graphql_request,
     prove_mutation,
     read_text_file,
     response_text_matches,
@@ -35,6 +36,11 @@ from .review_request import (
     receipt_matches,
     validate_receipt,
     validate_full_head,
+)
+from .review_thread import (
+    build_reply_receipt,
+    build_resolution_receipt,
+    validate_reply_receipt,
 )
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
@@ -605,6 +611,20 @@ def check_automated_review(
         request_payload = _observed_request_metadata(plan, selected_request)
     else:
         request_payload = {}
+    finding_comment_ids = sorted(
+        int(item["id"])
+        for item in current_request_findings
+        if isinstance(item.get("id"), int) and not isinstance(item.get("id"), bool)
+    )
+    if (
+        len(finding_comment_ids) != len(current_request_findings)
+        or len(finding_comment_ids) != len(set(finding_comment_ids))
+    ):
+        raise ReviewError(
+            "Provider inline findings omitted unique REST comment identities.",
+            code="provider_response_invalid",
+            exit_code=4,
+        )
     payload = {
         "repo": repo,
         "pr": pr,
@@ -619,6 +639,7 @@ def check_automated_review(
             "latest_id": latest_formal_review.get("id") if latest_formal_review else None,
             "submitted_at": latest_formal_review.get("submitted_at") if latest_formal_review else None,
             "findings": len(current_request_findings),
+            "finding_comment_ids": finding_comment_ids,
         },
         "request": request_payload,
         "request_error": request_error,
@@ -702,71 +723,156 @@ def snippet(text: str, limit: int = 220) -> str:
     return compact[: limit - 3] + "..." if len(compact) > limit else compact
 
 
-def review_threads(repo: str, pr: int, include_resolved: bool) -> list[dict[str, Any]]:
-    owner, repo_name = repo.split("/", 1)
+def _review_thread_context(thread_id: str) -> dict[str, Any]:
     query = """
-query($owner: String!, $repo: String!, $number: Int!, $after: String) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) {
-      reviewThreads(first: 50, after: $after) {
+query($id: ID!, $after: String) {
+  node(id: $id) {
+    ... on PullRequestReviewThread {
+      id
+      isResolved
+      isOutdated
+      viewerCanResolve
+      path
+      line
+      startLine
+      repository { nameWithOwner }
+      pullRequest { number state headRefOid }
+      comments(first: 100, after: $after) {
         pageInfo { hasNextPage endCursor }
         nodes {
-          isResolved
-          isOutdated
-          path
-          line
-          startLine
-          comments(first: 100) {
-            nodes {
-              databaseId
-              body
-              createdAt
-              updatedAt
-              author { login }
-            }
-          }
+          id
+          databaseId
+          body
+          createdAt
+          updatedAt
+          author { login }
         }
       }
     }
   }
 }
 """.strip()
-    entries: list[dict[str, Any]] = []
+    comments: list[dict[str, Any]] = []
+    context: dict[str, Any] | None = None
+    after: str | None = None
+    while True:
+        payload = graphql(query, {"id": thread_id, "after": after})
+        node = (payload.get("data") or {}).get("node") if isinstance(payload, dict) else None
+        if not isinstance(node, dict) or node.get("id") != thread_id:
+            raise ReviewError("Review thread was not found.", code="review_thread_not_found", exit_code=4)
+        current = {
+            "thread_id": str(node["id"]),
+            "is_resolved": bool(node.get("isResolved")),
+            "is_outdated": bool(node.get("isOutdated")),
+            "viewer_can_resolve": bool(node.get("viewerCanResolve")),
+            "path": str(node.get("path") or ""),
+            "line": node.get("line"),
+            "start_line": node.get("startLine"),
+            "repository": str((node.get("repository") or {}).get("nameWithOwner") or ""),
+            "pr_number": (node.get("pullRequest") or {}).get("number"),
+            "pr_state": str((node.get("pullRequest") or {}).get("state") or "").lower(),
+            "head_sha": str((node.get("pullRequest") or {}).get("headRefOid") or ""),
+        }
+        if context is not None and context != current:
+            raise ReviewError("Review thread identity changed during pagination.", code="review_thread_mismatch", exit_code=4)
+        context = current
+        connection = node.get("comments") or {}
+        comments.extend(item for item in connection.get("nodes") or [] if isinstance(item, dict))
+        page_info = connection.get("pageInfo") or {}
+        if not page_info.get("hasNextPage"):
+            break
+        after = page_info.get("endCursor")
+        if not after:
+            raise ReviewError("Review thread pagination omitted its cursor.", code="provider_response_invalid", exit_code=65)
+    assert context is not None
+    context["comments"] = comments
+    return context
+
+
+def _review_thread_ids(repo: str, pr: int) -> list[str]:
+    owner, repo_name = repo.split("/", 1)
+    query = """
+query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { id }
+      }
+    }
+  }
+}
+""".strip()
+    thread_ids: list[str] = []
     after: str | None = None
     while True:
         payload = graphql(query, {"owner": owner, "repo": repo_name, "number": pr, "after": after})
-        threads = (((payload.get("data") or {}).get("repository") or {}).get("pullRequest") or {}).get("reviewThreads") or {}
+        pull = ((payload.get("data") or {}).get("repository") or {}).get("pullRequest") if isinstance(payload, dict) else None
+        if not isinstance(pull, dict):
+            raise ReviewError("Pull request review threads were not found.", code="provider_target_mismatch", exit_code=65)
+        threads = pull.get("reviewThreads") or {}
         for thread in threads.get("nodes") or []:
-            if not isinstance(thread, dict):
-                continue
-            resolved = bool(thread.get("isResolved"))
-            outdated = bool(thread.get("isOutdated"))
-            active = (not resolved) and (not outdated)
-            if not include_resolved and not active:
-                continue
-            for comment in ((thread.get("comments") or {}).get("nodes") or []):
-                if isinstance(comment, dict) and comment.get("databaseId"):
-                    entries.append(
-                        {
-                            "type": "review_thread_comment",
-                            "comment_id": int(comment["databaseId"]),
-                            "author": ((comment.get("author") or {}).get("login") or ""),
-                            "updated": comment.get("updatedAt") or comment.get("createdAt") or "",
-                            "body": comment.get("body") or "",
-                            "body_preview": snippet(comment.get("body") or ""),
-                            "path": thread.get("path") or "",
-                            "line": thread.get("line"),
-                            "start_line": thread.get("startLine"),
-                            "is_resolved": resolved,
-                            "is_outdated": outdated,
-                        }
-                    )
+            if isinstance(thread, dict) and isinstance(thread.get("id"), str):
+                thread_ids.append(thread["id"])
         page_info = threads.get("pageInfo") or {}
         if not page_info.get("hasNextPage"):
             break
         after = page_info.get("endCursor")
         if not after:
-            break
+            raise ReviewError("Review thread pagination omitted its cursor.", code="provider_response_invalid", exit_code=65)
+    if len(thread_ids) != len(set(thread_ids)):
+        raise ReviewError("Review thread pagination returned duplicate identities.", code="review_thread_mismatch", exit_code=4)
+    return thread_ids
+
+
+def _finding_thread(repo: str, pr: int, finding_comment_id: int, finding_node_id: str) -> dict[str, Any]:
+    matches: list[dict[str, Any]] = []
+    for thread_id in _review_thread_ids(repo, pr):
+        context = _review_thread_context(thread_id)
+        if context["repository"] != repo or context["pr_number"] != pr:
+            raise ReviewError("Review thread does not belong to the requested PR.", code="review_thread_mismatch", exit_code=4)
+        if any(
+            item.get("id") == finding_node_id and item.get("databaseId") == finding_comment_id
+            for item in context["comments"]
+        ):
+            matches.append(context)
+    if len(matches) != 1:
+        raise ReviewError(
+            "The exact review finding did not map to one unique thread.",
+            code="review_thread_not_found" if not matches else "review_thread_mismatch",
+            exit_code=4,
+        )
+    return matches[0]
+
+
+def review_threads(repo: str, pr: int, include_resolved: bool) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for thread_id in _review_thread_ids(repo, pr):
+        thread = _review_thread_context(thread_id)
+        resolved = thread["is_resolved"]
+        outdated = thread["is_outdated"]
+        if not include_resolved and (resolved or outdated):
+            continue
+        for comment in thread["comments"]:
+            if isinstance(comment.get("databaseId"), int):
+                entries.append(
+                    {
+                        "type": "review_thread_comment",
+                        "thread_id": thread_id,
+                        "comment_id": int(comment["databaseId"]),
+                        "comment_node_id": comment.get("id"),
+                        "author": ((comment.get("author") or {}).get("login") or ""),
+                        "updated": comment.get("updatedAt") or comment.get("createdAt") or "",
+                        "body": comment.get("body") or "",
+                        "body_preview": snippet(comment.get("body") or ""),
+                        "path": thread["path"],
+                        "line": thread["line"],
+                        "start_line": thread["start_line"],
+                        "is_resolved": resolved,
+                        "is_outdated": outdated,
+                        "viewer_can_resolve": thread["viewer_can_resolve"],
+                    }
+                )
     return entries
 
 
@@ -1111,22 +1217,48 @@ def request_automated_review(
 def reply_to_review_comment(
     repo: str,
     pr: int,
+    head: str,
     comment_id: int,
     body: ProviderText,
     dry_run: bool,
     expected_worktree_fingerprint: str | None,
 ) -> dict[str, Any]:
+    try:
+        reply_head = validate_full_head(head)
+    except ValueError as exc:
+        raise ReviewError(str(exc), code="invalid_arguments", exit_code=64) from exc
+    _verify_pr_head(repo, pr, reply_head)
     parent = _api_object(f"repos/{repo}/pulls/comments/{comment_id}")
     if not str(parent.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
         raise ReviewError("Review comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
+    if parent.get("id") != comment_id or not isinstance(parent.get("node_id"), str):
+        raise ReviewError("Review finding omitted its exact provider identity.", code="provider_identity_missing", exit_code=65)
+    try:
+        finding_head = validate_full_head(str(parent.get("commit_id") or ""))
+    except ValueError as exc:
+        raise ReviewError("Review finding omitted its full commit identity.", code="provider_identity_missing", exit_code=65) from exc
+    thread = _finding_thread(repo, pr, comment_id, parent["node_id"])
     try:
         before = require_worktree(expected_worktree_fingerprint)
     except GitStackError as exc:
         raise _review_error(exc) from exc
-    target = {"repo": repo, "pr": pr, "kind": "review-reply", "parent_id": comment_id}
+    target = {
+        "repo": repo,
+        "pr": pr,
+        "head": reply_head,
+        "kind": "review-reply",
+        "thread_id": thread["thread_id"],
+        "finding_comment_id": comment_id,
+        "finding_node_id": parent["node_id"],
+    }
     endpoint = f"repos/{repo}/pulls/{pr}/comments/{comment_id}/replies"
     if dry_run:
-        return {"status": "dry-run", "target": target, "text": body.proof(), "transport": {"method": "POST", "endpoint": endpoint, "api_version": API_VERSION}}
+        return {
+            "status": "dry-run",
+            "target": target,
+            "text": body.proof(),
+            "transport": {"method": "POST", "endpoint": endpoint, "api_version": API_VERSION},
+        }
     actor = _viewer_login()
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", endpoint, {"body": body.text})
@@ -1138,6 +1270,7 @@ def reply_to_review_comment(
             or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
             or _item_login(item) != actor
             or not _in_creation_window(item, "created_at", started_at, finished_at)
+            or not isinstance(item.get("node_id"), str)
         ):
             raise _proof_failure("Review reply did not match the intended creation.", "provider_target_mismatch")
         _proof(item, body, target=target, status="replied")
@@ -1162,9 +1295,213 @@ def reply_to_review_comment(
             text=body.proof(), ambiguous_message="Review reply is unconfirmed after one exact-thread read-back; do not retry blindly.",
         )
         status = "recovered" if proof.recovered else "replied"
-        return _guarded_result(_proof(proof.value, body, target=target, status=status), before)
+        action = _proof(proof.value, body, target=target, status=status)
+        action["reply"] = build_reply_receipt(
+            repository=repo,
+            pr_number=pr,
+            finding_head_sha=finding_head,
+            reply_head_sha=reply_head,
+            thread_id=thread["thread_id"],
+            finding=parent,
+            reply=proof.value,
+            body_fingerprint=body.sha256,
+            status=status,
+        )
+        return _guarded_result(action, before)
     except GitStackError as exc:
         raise _review_error(exc) from exc
+
+
+def _validate_reply_remote(
+    repo: str,
+    pr: int,
+    head: str,
+    receipt_value: object,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+        saved = validate_reply_receipt(receipt_value)
+        expected_head = validate_full_head(head)
+    except ValueError as exc:
+        raise ReviewError(str(exc), code="reply_receipt_invalid", exit_code=64) from exc
+    if saved["repository"] != repo or saved["pr_number"] != pr or saved["reply_head_sha"] != expected_head:
+        raise ReviewError("Reply receipt does not match the exact resolution target.", code="review_thread_mismatch", exit_code=4)
+    _verify_pr_head(repo, pr, expected_head)
+    finding = _api_object(f"repos/{repo}/pulls/comments/{saved['finding_comment_id']}")
+    reply = _api_object(f"repos/{repo}/pulls/comments/{saved['reply_comment_id']}")
+    if (
+        finding.get("id") != saved["finding_comment_id"]
+        or finding.get("node_id") != saved["finding_node_id"]
+        or finding.get("html_url") != saved["finding_ref"]
+        or finding.get("created_at") != saved["finding_created_at"]
+        or finding.get("commit_id") != saved["finding_head_sha"]
+        or not str(finding.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
+    ):
+        raise ReviewError("Review finding no longer matches its reply receipt.", code="evidence_reply_mismatch", exit_code=4)
+    try:
+        reply_bytes = str(reply.get("body") or "").encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise ReviewError("Evidence reply body cannot be verified as UTF-8.", code="evidence_reply_mismatch", exit_code=4) from exc
+    if (
+        reply.get("id") != saved["reply_comment_id"]
+        or reply.get("node_id") != saved["reply_node_id"]
+        or reply.get("in_reply_to_id") != saved["finding_comment_id"]
+        or _item_login(reply) != saved["reply_author"]
+        or reply.get("html_url") != saved["reply_ref"]
+        or reply.get("created_at") != saved["reply_created_at"]
+        or hashlib.sha256(reply_bytes).hexdigest() != saved["body_fingerprint"]
+        or not str(reply.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
+    ):
+        raise ReviewError("Evidence reply no longer matches its immutable receipt.", code="evidence_reply_mismatch", exit_code=4)
+    thread = _review_thread_context(saved["thread_id"])
+    if thread["repository"] != repo or thread["pr_number"] != pr or thread["head_sha"] != expected_head:
+        raise ReviewError("Review thread does not match the exact repository, PR, and head.", code="review_thread_mismatch", exit_code=4)
+    if thread["is_outdated"]:
+        raise ReviewError("Outdated review threads are not eligible for typed resolution.", code="review_thread_outdated", exit_code=4)
+    node_ids = {item.get("id") for item in thread["comments"]}
+    if saved["finding_node_id"] not in node_ids or saved["reply_node_id"] not in node_ids:
+        raise ReviewError("Finding and evidence reply are not members of the exact thread.", code="evidence_reply_not_found", exit_code=4)
+    return saved, thread
+
+
+def _resolution_result_thread(payload: object) -> dict[str, Any]:
+    if not isinstance(payload, dict) or payload.get("errors"):
+        raise ReviewError("Review-thread mutation returned GraphQL errors.", code="provider_response_invalid", exit_code=65)
+    thread = (((payload.get("data") or {}).get("resolveReviewThread") or {}).get("thread"))
+    if not isinstance(thread, dict):
+        raise ReviewError("Review-thread mutation omitted its target.", code="provider_response_invalid", exit_code=65)
+    return {
+        "thread_id": thread.get("id"),
+        "is_resolved": bool(thread.get("isResolved")),
+        "is_outdated": bool(thread.get("isOutdated")),
+        "viewer_can_resolve": bool(thread.get("viewerCanResolve")),
+        "repository": str((thread.get("repository") or {}).get("nameWithOwner") or ""),
+        "pr_number": (thread.get("pullRequest") or {}).get("number"),
+        "pr_state": str((thread.get("pullRequest") or {}).get("state") or "").lower(),
+        "head_sha": str((thread.get("pullRequest") or {}).get("headRefOid") or ""),
+    }
+
+
+def _prove_resolved_thread(
+    thread: dict[str, Any],
+    saved: dict[str, Any],
+    *,
+    mutation_may_have_applied: bool,
+) -> None:
+    if thread.get("head_sha") != saved["reply_head_sha"]:
+        raise ReviewError(
+            "The pull-request head moved across the review-thread resolution window.",
+            code="resolution_head_drift",
+            exit_code=4,
+            details={"mutation_may_have_applied": mutation_may_have_applied},
+        )
+    if (
+        thread.get("thread_id") != saved["thread_id"]
+        or thread.get("repository") != saved["repository"]
+        or thread.get("pr_number") != saved["pr_number"]
+        or thread.get("pr_state") != "open"
+    ):
+        raise ReviewError(
+            "Review-thread resolution target changed.",
+            code="review_thread_mismatch",
+            exit_code=4,
+            details={"mutation_may_have_applied": mutation_may_have_applied},
+        )
+    if not thread.get("is_resolved"):
+        raise ReviewError(
+            "Review-thread resolution is unknown after one exact read-back; do not retry blindly.",
+            code="resolution_unknown",
+            exit_code=4,
+            details={"mutation_may_have_applied": mutation_may_have_applied},
+        )
+
+
+def resolve_review_thread(
+    repo: str,
+    pr: int,
+    head: str,
+    reply_receipt: object,
+    dry_run: bool,
+    expected_worktree_fingerprint: str | None,
+) -> dict[str, Any]:
+    saved, thread = _validate_reply_remote(repo, pr, head, reply_receipt)
+    try:
+        before = require_worktree(expected_worktree_fingerprint)
+    except GitStackError as exc:
+        raise _review_error(exc) from exc
+    target = {
+        "repo": repo,
+        "pr": pr,
+        "head": saved["reply_head_sha"],
+        "kind": "review-thread",
+        "thread_id": saved["thread_id"],
+        "finding_comment_id": saved["finding_comment_id"],
+    }
+    observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    if thread["is_resolved"]:
+        receipt_value = build_resolution_receipt(saved, status="already-resolved", observed_at=observed_at)
+        return _guarded_result(
+            {"status": "already-resolved", "target": target, "resolution": receipt_value, "mutation_may_have_applied": False},
+            before,
+        )
+    if not thread["viewer_can_resolve"]:
+        raise ReviewError("Authenticated viewer cannot resolve the exact review thread.", code="review_thread_not_resolvable", exit_code=4)
+    if dry_run:
+        return _guarded_result(
+            {
+                "status": "dry-run",
+                "target": target,
+                "reply_identity_fingerprint": saved["identity_fingerprint"],
+                "mutation_may_have_applied": False,
+            },
+            before,
+        )
+    mutation = """
+mutation($threadId: ID!) {
+  resolveReviewThread(input: {threadId: $threadId}) {
+    thread {
+      id
+      isResolved
+      isOutdated
+      viewerCanResolve
+      repository { nameWithOwner }
+      pullRequest { number state headRefOid }
+    }
+  }
+}
+""".strip()
+    result = graphql_request(mutation, {"threadId": saved["thread_id"]})
+    status = "resolved"
+    proven: dict[str, Any] | None = None
+    if result.returncode == 0:
+        try:
+            proven = _resolution_result_thread(json.loads(result.stdout))
+            _prove_resolved_thread(proven, saved, mutation_may_have_applied=True)
+        except (json.JSONDecodeError, ReviewError):
+            proven = None
+    if proven is None:
+        status = "recovered"
+        try:
+            proven = _review_thread_context(saved["thread_id"])
+            _prove_resolved_thread(proven, saved, mutation_may_have_applied=True)
+        except ReviewError as exc:
+            if exc.code in {"resolution_head_drift", "resolution_unknown", "review_thread_mismatch"}:
+                raise
+            raise ReviewError(
+                "Review-thread mutation may have applied, but exact read-back failed; do not retry, undo, or fall back.",
+                code="resolution_unknown",
+                exit_code=4,
+                details={"mutation_may_have_applied": True, "read_back": {"code": exc.code}},
+            ) from exc
+    observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    receipt_value = build_resolution_receipt(saved, status=status, observed_at=observed_at)
+    action = {
+        "status": status,
+        "target": target,
+        "resolution": receipt_value,
+        "mutation_may_have_applied": True,
+        "transport": {"method": "POST", "endpoint": "graphql:resolveReviewThread"},
+    }
+    return _guarded_result(action, before)
 
 
 def edit_comment(
@@ -1369,11 +1706,20 @@ def build_parser() -> argparse.ArgumentParser:
     reply = subparsers.add_parser("reply", help="Reply to one pull-request review comment.")
     reply.add_argument("--pr", required=True)
     reply.add_argument("--repo")
+    reply.add_argument("--head", required=True, help="Full 40-character current PR head SHA.")
     reply.add_argument("--comment-id", required=True)
     reply.add_argument("--body-file", required=True)
     reply.add_argument("--dry-run", action="store_true")
     reply.add_argument("--expected-worktree-fingerprint")
     reply.add_argument("--allow-non-project", action="store_true")
+    resolve = subparsers.add_parser("resolve", help="Resolve one exact review thread from its typed evidence-reply receipt.")
+    resolve.add_argument("--pr", required=True)
+    resolve.add_argument("--repo")
+    resolve.add_argument("--head", required=True, help="Full 40-character current PR head SHA.")
+    resolve.add_argument("--reply-receipt-file", required=True, help="Absolute UTF-8 JSON file containing the typed reply receipt.")
+    resolve.add_argument("--dry-run", action="store_true")
+    resolve.add_argument("--expected-worktree-fingerprint")
+    resolve.add_argument("--allow-non-project", action="store_true")
     edit = subparsers.add_parser("edit-comment", help="Edit one conversation or review comment.")
     edit.add_argument("--pr", required=True)
     edit.add_argument("--repo")
@@ -1427,7 +1773,7 @@ def main(argv: list[str] | None = None) -> int:
     except ReviewError as exc:
         raw = list(argv or [])
         if "--json" in raw:
-            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "edit-comment", "submit-review", "check", "wait"}), "")])
+            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait"}), "")])
         else:
             print(exc.message, file=sys.stderr)
         return exc.exit_code
@@ -1443,7 +1789,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
             print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
         return 0 if payload["ok"] else 1
-    if args.command not in {"address", "comment", "request", "reply", "edit-comment", "submit-review", "check", "wait"}:
+    if args.command not in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait"}:
         parser.print_help()
         return 0
     try:
@@ -1522,6 +1868,28 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 print(render_text(payload), end="")
             return 0
+        if args.command == "resolve":
+            try:
+                receipt_text = read_text_file(args.reply_receipt_file, field="reply-receipt").text
+                reply_receipt = json.loads(receipt_text)
+            except (GitStackError, json.JSONDecodeError, TypeError) as exc:
+                if isinstance(exc, GitStackError):
+                    raise _review_error(exc) from exc
+                raise ReviewError("The reply receipt file must contain one JSON object.", code="reply_receipt_invalid", exit_code=64) from exc
+            action = resolve_review_thread(
+                repo,
+                pr,
+                args.head,
+                reply_receipt,
+                args.dry_run,
+                args.expected_worktree_fingerprint,
+            )
+            payload = {"repo": repo, "pr": pr, "action": action}
+            if args.json:
+                emit_success(payload, ["resolve"])
+            else:
+                print(json.dumps(payload, indent=2))
+            return 0
         if args.command in {"reply", "edit-comment", "submit-review"}:
             try:
                 body = read_text_file(args.body_file, field="body")
@@ -1529,7 +1897,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise _review_error(exc) from exc
             if args.command == "reply":
                 comment_id = positive_int(args.comment_id, "comment-id")
-                action = reply_to_review_comment(repo, pr, comment_id, body, args.dry_run, args.expected_worktree_fingerprint)
+                action = reply_to_review_comment(repo, pr, args.head, comment_id, body, args.dry_run, args.expected_worktree_fingerprint)
             elif args.command == "edit-comment":
                 comment_id = positive_int(args.comment_id, "comment-id")
                 action = edit_comment(repo, pr, comment_id, args.kind, body, args.dry_run, args.expected_worktree_fingerprint)

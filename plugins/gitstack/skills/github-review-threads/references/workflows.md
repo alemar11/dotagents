@@ -63,12 +63,16 @@ By default, resolved or outdated review threads are omitted. Add
 
 ## Reply To One Review Comment
 
-First list comments, then reply to exactly one provider review-comment id:
+First inspect the current-head result. `review.finding_comment_ids` is the
+addressable inline subset and its length equals `review.findings`; a terminal
+`findings` verdict may legitimately have zero addressable inline findings.
+Reply to exactly one listed REST review-comment id and bind the reply to the
+current full head:
 
 ```bash
 <plugin-root>/scripts/gitstack --json repo snapshot
-<plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
-<plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --body-file <absolute-message-file> --expected-worktree-fingerprint <sha256>
 ```
 
 Write reply text to an absolute UTF-8 regular non-symlink file outside the
@@ -79,6 +83,32 @@ verified.
 Use `--dry-run` unless the user already approved posting or a calling workflow
 supplies `mutation_mode=apply`, the exact PR and comment id, reply body, and
 `review_operation=reply`.
+
+The successful result contains a typed reply receipt binding repository, PR,
+finding head, reply head, exact finding and reply REST and GraphQL node ids,
+thread id, author, URLs, timestamps, and body and identity fingerprints.
+Persist the receipt unchanged.
+
+## Resolve One Actionable Finding
+
+Resolve only after the requested fix and evidence reply are complete:
+
+```bash
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --reply-receipt-file <absolute-receipt-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --reply-receipt-file <absolute-receipt-file> --expected-worktree-fingerprint <sha256>
+```
+
+The resolver validates the complete receipt, re-reads the exact REST finding
+and reply, paginates every GraphQL review-thread and comment page, and requires
+one unique thread containing both exact node ids in the exact repository and
+PR. It checks the current head before and after mutation. `already-resolved`
+is idempotent only after all the same proof succeeds and makes no claim about
+who resolved the thread.
+
+If the mutation may have applied but exact read-back or head proof is
+uncertain, the typed error includes `mutation_may_have_applied=true`. Do not
+retry, undo, or fall back to raw GraphQL. V1 does not resolve no-change
+dispositions.
 
 ## Edit Comments Or Submit Reviews
 
@@ -119,5 +149,5 @@ gh pr comment <number> --repo <owner/repo> --body-file <message-file>
 gh pr view <number> --repo <owner/repo> --comments
 ```
 
-There is no direct legacy fallback for typed review requests; use GitStack's
-typed operation so the request receipt and exact-head binding are preserved.
+There is no direct legacy fallback for typed review requests or typed thread
+resolution; use GitStack so receipts and exact-head bindings are preserved.

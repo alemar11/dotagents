@@ -10,7 +10,8 @@
 <plugin-root>/scripts/gitstack --json repo snapshot
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
 <plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key>
-<plugin-root>/scripts/gitstack reviews reply --repo <owner/repo> --pr <number> --comment-id <id> --body-file <absolute-message-file>
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --body-file <absolute-message-file>
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --reply-receipt-file <absolute-receipt-file>
 <plugin-root>/scripts/gitstack reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file>
@@ -92,6 +93,9 @@ for a replacement SHA-bearing comment.
 `wait` also returns `attempts`, `state_transitions`, and `unchanged_attempts`.
 The observation fingerprint excludes those counters and elapsed time, so
 callers can suppress unchanged ledger and progress updates.
+`data.review.finding_comment_ids` is the sorted addressable inline-comment
+subset and its length equals `data.review.findings`. A terminal provider
+`findings` verdict may have an empty subset.
 
 ## Discussion Comments
 
@@ -101,11 +105,26 @@ body files and accept optional `--expected-worktree-fingerprint` protection.
 Dry-run and result envelopes contain only byte counts, SHA-256 fingerprints,
 target identity, and transport metadata; they never contain provider text.
 
-Successful writes return provider object id and URL, exact target identity, and
+Successful discussion writes return provider object id and URL, exact target identity, and
 the submitted body fingerprint. An ambiguous write performs one read-back and
 returns `provider_write_ambiguous` without retrying. A confirmed write followed
 by worktree drift returns `provider_write_partial_success` with the confirmed
 provider identity in error details.
+
+`reply` requires the full current head and returns a
+`gitstack-review-thread-reply:v1` receipt with immutable finding, reply,
+repository, PR, head, thread, author, URL, timestamp, and fingerprint identity.
+`resolve` accepts only that complete receipt, discovers the unique thread by
+the exact finding GraphQL node id with full pagination, re-proves both REST
+comments and thread membership, and returns a
+`gitstack-review-thread-resolution:v1` receipt. Stable success statuses are
+`resolved`, `recovered`, and `already-resolved`; dry-run is `planned`.
+
+Wrong repository, PR, head, finding, reply, thread, body, author, or timestamp;
+missing or duplicate thread matches; missing evidence; and unsupported thread
+state fail closed. When a resolution write may have landed but read-back or
+head proof is uncertain, error details set
+`mutation_may_have_applied=true`; callers must not retry or use raw GraphQL.
 
 ## Maintenance Source
 

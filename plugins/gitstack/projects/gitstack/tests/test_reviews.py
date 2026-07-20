@@ -15,6 +15,7 @@ from gitstack import reviews as cli
 from gitstack.common import GitStackError, Result
 from gitstack.provider_text import ProviderText
 from gitstack.review_request import build_request, parse_request, receipt, validate_receipt
+from gitstack.review_thread import build_reply_receipt, validate_reply_receipt, validate_resolution_receipt
 
 class ReviewsContractTests(unittest.TestCase):
     HOSTILE = "`ticks` $(command) ${HOME} $PATH 'single' \"double\"\n-leading\nUnicode ✓ 🚀"
@@ -67,19 +68,73 @@ class ReviewsContractTests(unittest.TestCase):
         plan = build_request("codex", "owner/repo", 12, head, f"request-{comment_id}")
         return receipt(plan, request, status="posted")
 
+    def finding(self, *, comment_id: int = 55, head: str | None = None) -> dict[str, object]:
+        return {
+            "id": comment_id,
+            "node_id": f"PRRC_finding_{comment_id}",
+            "html_url": f"https://github.com/owner/repo/pull/12#discussion_r{comment_id}",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "commit_id": head or "a" * 40,
+            "created_at": "2026-07-20T11:00:00Z",
+        }
+
+    def reply(self, body: ProviderText, *, comment_id: int = 56, parent_id: int = 55) -> dict[str, object]:
+        return {
+            "id": comment_id,
+            "node_id": f"PRRC_reply_{comment_id}",
+            "html_url": f"https://github.com/owner/repo/pull/12#discussion_r{comment_id}",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "in_reply_to_id": parent_id,
+            "user": {"login": "agent"},
+            "body": body.text,
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+
+    def thread(self, *, resolved: bool = False, outdated: bool = False, head: str | None = None) -> dict[str, object]:
+        return {
+            "thread_id": "PRRT_thread_55",
+            "is_resolved": resolved,
+            "is_outdated": outdated,
+            "viewer_can_resolve": True,
+            "repository": "owner/repo",
+            "pr_number": 12,
+            "pr_state": "open",
+            "head_sha": head or "b" * 40,
+            "path": "src/example.py",
+            "line": 12,
+            "start_line": 12,
+            "comments": [
+                {"id": "PRRC_finding_55", "databaseId": 55},
+                {"id": "PRRC_reply_56", "databaseId": 56},
+            ],
+        }
+
+    def reply_receipt(self, body: ProviderText) -> dict[str, object]:
+        return build_reply_receipt(
+            repository="owner/repo",
+            pr_number=12,
+            finding_head_sha="a" * 40,
+            reply_head_sha="b" * 40,
+            thread_id="PRRT_thread_55",
+            finding=self.finding(),
+            reply=self.reply(body),
+            body_fingerprint=body.sha256,
+            status="replied",
+        )
+
     def test_version(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "6.0.1")
+        self.assertEqual(stdout.getvalue().strip(), "7.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "6.0.1")
+        self.assertEqual(payload["version"], "7.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -344,7 +399,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "6.0.1")
+        self.assertEqual(payload["version"], "7.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -373,7 +428,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "6.0.1")
+        self.assertEqual(payload["version"], "7.0.0")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -381,18 +436,22 @@ class ReviewsContractTests(unittest.TestCase):
             handle.write("Fixed `x` and $(not-run).")
             handle.flush()
             stdout = io.StringIO()
-            parent = {"id": 123456, "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12"}
-            with mock.patch.object(cli, "_api_object", return_value=parent), \
+            head = "b" * 40
+            parent = self.finding(comment_id=123456)
+            thread = {**self.thread(head=head), "thread_id": "PRRT_thread_123456"}
+            with mock.patch.object(cli, "_verify_pr_head"), \
+                 mock.patch.object(cli, "_api_object", return_value=parent), \
+                 mock.patch.object(cli, "_finding_thread", return_value=thread), \
                  mock.patch.object(cli, "require_worktree", return_value=None), \
                  contextlib.redirect_stdout(stdout):
                 code = cli.main([
                     "--json", "reply", "--repo", "owner/repo", "--pr", "12",
-                    "--comment-id", "123456", "--body-file", handle.name, "--dry-run",
+                    "--head", head, "--comment-id", "123456", "--body-file", handle.name, "--dry-run",
                 ])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         action = payload["data"]["action"]
-        self.assertEqual(action["target"]["parent_id"], 123456)
+        self.assertEqual(action["target"]["finding_comment_id"], 123456)
         self.assertEqual(action["transport"]["endpoint"], "repos/owner/repo/pulls/12/comments/123456/replies")
         self.assertNotIn("not-run", json.dumps(payload))
 
@@ -488,34 +547,151 @@ class ReviewsContractTests(unittest.TestCase):
     def test_malformed_reply_response_recovers_and_duplicate_read_back_is_ambiguous(self) -> None:
         self.frozen_clock()
         body = self.provider_body()
-        parent = {"id": 55, "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12"}
-        item = {
-            "id": 56, "html_url": "https://github.com/owner/repo/pull/12#discussion_r56",
-            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
-            "in_reply_to_id": 55, "user": {"login": "agent"}, "body": body.text,
-            "created_at": "2026-07-20T12:00:00Z",
-        }
+        parent = self.finding()
+        item = self.reply(body)
+        head = "b" * 40
         common = [
+            mock.patch.object(cli, "_verify_pr_head"),
             mock.patch.object(cli, "_api_object", return_value=parent),
+            mock.patch.object(cli, "_finding_thread", return_value=self.thread(head=head)),
             mock.patch.object(cli, "require_worktree", return_value=None),
             mock.patch.object(cli, "_viewer_login", return_value="agent"),
             mock.patch.object(cli, "api_request", return_value=Result(0, "[]", "")),
         ]
-        with common[0], common[1], common[2], common[3], \
+        with common[0], common[1], common[2], common[3], common[4], common[5], \
              mock.patch.object(cli, "gh_api_paginated_list", return_value=[item]) as read_back:
-            action = cli.reply_to_review_comment("owner/repo", 12, 55, body, False, None)
+            action = cli.reply_to_review_comment("owner/repo", 12, head, 55, body, False, None)
         self.assertEqual(action["status"], "recovered")
+        self.assertEqual(action["reply"]["thread_id"], "PRRT_thread_55")
+        validate_reply_receipt(action["reply"])
         read_back.assert_called_once()
 
-        with mock.patch.object(cli, "_api_object", return_value=parent), \
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "_finding_thread", return_value=self.thread(head=head)), \
              mock.patch.object(cli, "require_worktree", return_value=None), \
              mock.patch.object(cli, "_viewer_login", return_value="agent"), \
              mock.patch.object(cli, "api_request", return_value=Result(0, "[]", "")), \
              mock.patch.object(cli, "gh_api_paginated_list", return_value=[item, item]) as duplicate, \
              self.assertRaises(cli.ReviewError) as raised:
-            cli.reply_to_review_comment("owner/repo", 12, 55, body, False, None)
+            cli.reply_to_review_comment("owner/repo", 12, head, 55, body, False, None)
         self.assertEqual(raised.exception.code, "provider_write_ambiguous")
         duplicate.assert_called_once()
+
+    def test_thread_discovery_paginates_threads_and_comments_and_matches_node_id(self) -> None:
+        thread_pages = [
+            {"data": {"repository": {"pullRequest": {"reviewThreads": {
+                "nodes": [{"id": "PRRT_other"}],
+                "pageInfo": {"hasNextPage": True, "endCursor": "next"},
+            }}}}},
+            {"data": {"repository": {"pullRequest": {"reviewThreads": {
+                "nodes": [{"id": "PRRT_thread_55"}],
+                "pageInfo": {"hasNextPage": False, "endCursor": None},
+            }}}}},
+        ]
+        other = {**self.thread(), "thread_id": "PRRT_other", "comments": []}
+        wanted = self.thread()
+        with mock.patch.object(cli, "graphql", side_effect=thread_pages) as graphql:
+            self.assertEqual(cli._review_thread_ids("owner/repo", 12), ["PRRT_other", "PRRT_thread_55"])
+        self.assertEqual(graphql.call_count, 2)
+        with mock.patch.object(cli, "_review_thread_ids", return_value=["PRRT_other", "PRRT_thread_55"]), \
+             mock.patch.object(cli, "_review_thread_context", side_effect=[other, wanted]):
+            selected = cli._finding_thread("owner/repo", 12, 55, "PRRC_finding_55")
+        self.assertEqual(selected["thread_id"], "PRRT_thread_55")
+
+    def test_resolution_dry_run_and_already_resolved_require_typed_reply(self) -> None:
+        body = self.provider_body()
+        saved = self.reply_receipt(body)
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())), \
+             mock.patch.object(cli, "require_worktree", return_value=None):
+            action = cli.resolve_review_thread("owner/repo", 12, "b" * 40, saved, True, None)
+        self.assertEqual(action["status"], "dry-run")
+        self.assertFalse(action["mutation_may_have_applied"])
+
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread(resolved=True))), \
+             mock.patch.object(cli, "require_worktree", return_value=None):
+            action = cli.resolve_review_thread("owner/repo", 12, "b" * 40, saved, False, None)
+        self.assertEqual(action["status"], "already-resolved")
+        validate_resolution_receipt(action["resolution"])
+
+    def test_resolution_success_and_ambiguous_response_recovery(self) -> None:
+        self.frozen_clock()
+        body = self.provider_body()
+        saved = self.reply_receipt(body)
+        resolved = self.thread(resolved=True)
+        response = {
+            "data": {"resolveReviewThread": {"thread": {
+                "id": resolved["thread_id"],
+                "isResolved": True,
+                "isOutdated": False,
+                "viewerCanResolve": True,
+                "repository": {"nameWithOwner": "owner/repo"},
+                "pullRequest": {"number": 12, "state": "OPEN", "headRefOid": "b" * 40},
+            }}}
+        }
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "graphql_request", return_value=Result(0, json.dumps(response), "")):
+            action = cli.resolve_review_thread("owner/repo", 12, "b" * 40, saved, False, None)
+        self.assertEqual(action["status"], "resolved")
+        validate_resolution_receipt(action["resolution"])
+
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "graphql_request", return_value=Result(1, "", "transport failed")), \
+             mock.patch.object(cli, "_review_thread_context", return_value=resolved) as read_back:
+            action = cli.resolve_review_thread("owner/repo", 12, "b" * 40, saved, False, None)
+        self.assertEqual(action["status"], "recovered")
+        read_back.assert_called_once_with("PRRT_thread_55")
+
+    def test_resolution_uncertainty_and_head_drift_fail_closed(self) -> None:
+        body = self.provider_body()
+        saved = self.reply_receipt(body)
+        for read_back, code in (
+            (self.thread(resolved=False), "resolution_unknown"),
+            (self.thread(resolved=True, head="c" * 40), "resolution_head_drift"),
+        ):
+            with self.subTest(code=code), \
+                 mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())), \
+                 mock.patch.object(cli, "require_worktree", return_value=None), \
+                 mock.patch.object(cli, "graphql_request", return_value=Result(1, "", "failed")), \
+                 mock.patch.object(cli, "_review_thread_context", return_value=read_back), \
+                 self.assertRaises(cli.ReviewError) as raised:
+                cli.resolve_review_thread("owner/repo", 12, "b" * 40, saved, False, None)
+            self.assertEqual(raised.exception.code, code)
+            self.assertTrue(raised.exception.details["mutation_may_have_applied"])
+
+    def test_resolution_rejects_wrong_pr_wrong_thread_and_missing_reply(self) -> None:
+        body = self.provider_body()
+        saved = self.reply_receipt(body)
+        with self.assertRaises(cli.ReviewError) as wrong_pr:
+            cli.resolve_review_thread("owner/repo", 99, "b" * 40, saved, True, None)
+        self.assertEqual(wrong_pr.exception.code, "review_thread_mismatch")
+
+        with self.assertRaises(cli.ReviewError) as missing:
+            cli.resolve_review_thread("owner/repo", 12, "b" * 40, None, True, None)
+        self.assertEqual(missing.exception.code, "reply_receipt_invalid")
+
+        thread = self.thread()
+        thread["comments"] = [thread["comments"][0]]
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "_api_object", side_effect=[self.finding(), self.reply(body=body)]), \
+             mock.patch.object(cli, "_review_thread_context", return_value=thread), \
+             self.assertRaises(cli.ReviewError) as wrong_thread:
+            cli.resolve_review_thread("owner/repo", 12, "b" * 40, saved, True, None)
+        self.assertEqual(wrong_thread.exception.code, "evidence_reply_not_found")
+
+    def test_reply_receipt_rejects_identity_changes(self) -> None:
+        saved = self.reply_receipt(self.provider_body())
+        for field, value in (
+            ("finding_node_id", "PRRC_other"),
+            ("reply_node_id", "PRRC_other"),
+            ("reply_author", "other"),
+            ("body_fingerprint", "0" * 64),
+        ):
+            changed = {**saved, field: value}
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                validate_reply_receipt(changed)
 
     def test_malformed_edit_response_recovers_and_mismatched_read_back_is_ambiguous(self) -> None:
         body = self.provider_body()
@@ -588,6 +764,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(payload["review_state"], "findings")
         self.assertEqual(payload["request_binding"], "recognized")
         self.assertEqual(payload["review"]["findings"], 1)
+        self.assertEqual(payload["review"]["finding_comment_ids"], [8])
 
     def test_identity_bound_check_fetches_receipt_comment_id(self) -> None:
         head = "a" * 40
@@ -685,6 +862,8 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(payload["review_state"], "findings")
         self.assertEqual(payload["evidence"]["kind"], "provider-comment")
+        self.assertEqual(payload["review"]["findings"], 0)
+        self.assertEqual(payload["review"]["finding_comment_ids"], [])
 
     def test_check_codex_detects_terminal_error_conversation_comment(self) -> None:
         head = "a" * 40
