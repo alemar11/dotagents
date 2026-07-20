@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import ast
+import importlib.machinery
+import importlib.util
 import re
 import unittest
 from pathlib import Path
@@ -157,6 +159,69 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def read(self, relative: str) -> str:
         return (ROOT / relative).read_text()
 
+    def test_gitstack_owns_one_shared_review_mutation_protocol(self) -> None:
+        source = (
+            REPO
+            / "plugins"
+            / "gitstack"
+            / "projects"
+            / "gitstack"
+            / "src"
+            / "gitstack"
+            / "review_mutation.py"
+        ).resolve()
+        ledger_path = ROOT / "scripts" / "ledger-cache"
+        ledger_loader = importlib.machinery.SourceFileLoader(
+            "test_ledger_cache_runtime", str(ledger_path)
+        )
+        ledger_spec = importlib.util.spec_from_loader(
+            "test_ledger_cache_runtime", ledger_loader
+        )
+        assert ledger_spec is not None and ledger_spec.loader is not None
+        ledger = importlib.util.module_from_spec(ledger_spec)
+        ledger_spec.loader.exec_module(ledger)
+        gitstack_spec = importlib.util.spec_from_file_location("test_gitstack_review_mutation", source)
+        assert gitstack_spec is not None and gitstack_spec.loader is not None
+        gitstack = importlib.util.module_from_spec(gitstack_spec)
+        gitstack_spec.loader.exec_module(gitstack)
+
+        self.assertEqual(Path(ledger.REVIEW_MUTATION.__file__).resolve(), source)
+        self.assertEqual(Path(gitstack.__file__).resolve(), source)
+        self.assertEqual(ledger.REVIEW_MUTATION_FIELDS, gitstack.RESERVATION_FIELDS)
+        self.assertNotIn("attempt_state", gitstack.RESERVATION_FIELDS)
+        helper = ledger_path.read_text(encoding="utf-8")
+        self.assertNotIn("RESERVATION_FIELDS = {", helper)
+        self.assertNotIn("MUTATION_KINDS = {", helper)
+
+    def test_worker_action_guard_matrix_names_durable_owners(self) -> None:
+        run_state = self.read("references/run-state.md")
+        worker = self.read("references/worker.md")
+        packets = self.read("references/run-state-packets.md")
+        autoreview = self.read("references/autoreview-fix-loop.md")
+        authority = self.read("references/review-mutation-authority.md")
+        for action, guard, proof in (
+            ("request POST", "review-provider-mutation-started", "request receipt"),
+            ("provider wait launch", "review-wait-invoked", "one invocation"),
+            ("observation/finding handling", "review-observed", "review-thread-resolved"),
+            ("AutoReview fix verification", "autoreview-action-reserved", "autoreview-attempt-observed"),
+            ("terminal closeout", "task-terminal-sealed", "terminal-handoff-recorded"),
+        ):
+            self.assertIn(action, authority)
+            self.assertIn(guard, authority)
+            self.assertIn(proof, authority)
+        for kind in ("review-request", "review-warning", "review-reply", "review-resolution"):
+            self.assertIn(kind, authority)
+        self.assertIn("review-mutation-authority.md", worker)
+        self.assertIn("review-provider-mutation-observed", packets)
+        self.assertIn("review-provider-mutation-observed", self.read("scripts/ledger-cache"))
+        self.assertIn("reservation event", autoreview)
+        self.assertIn("autoreview-attempt-observed", packets)
+        self.assertIn("task-terminal-sealed", packets)
+        self.assertIn("duplicate\nfield/transition tables", authority)
+        self.assertIn("managed-only", authority)
+        self.assertIn("ledger review-authority", authority)
+        self.assertIn("self-consistent packet alone is not authority", authority)
+
     def runtime_paths(self) -> list[Path]:
         files = [ROOT / "SKILL.md", ROOT / "agents/openai.yaml"]
         files.extend(sorted((ROOT / "references").rglob("*.md")))
@@ -181,6 +246,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/gates.md",
             "references/spec-backed-delivery.md",
             "references/codex-review-closeout.md",
+            "references/review-mutation-authority.md",
             "references/review-reconciliation.md",
             "references/recovery-validation.md",
             "references/multi-repo-workspace.md",
@@ -1180,7 +1246,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("typed GitStack request operation", normalized)
         self.assertIn("does not run through or extend `execution-manifest`", normalized)
         self.assertIn("does not define Codex review-request content", normalized)
-        self.assertIn("`reviews comment --body-file ... --expected-worktree-fingerprint ...`", closeout)
+        self.assertIn(
+            "`reviews comment --body-file ... --reservation-file ... --ledger-file ... --expected-worktree-fingerprint ...`",
+            closeout,
+        )
         self.assertIn("old snapshots and old temporary files are not recovery authority", normalized)
 
         unsafe = re.compile(r"--(?:title|body|description|comment)(?:=|\s+)[\"']|\s-[fF]\s+body=")
@@ -1257,8 +1326,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "13.0.0"', helper)
+        self.assertIn('__version__ = "14.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
+        self.assertIn("review-authority", helper)
         for removed in (
             "references/ledger.md",
             "references/ledger-template.md",
@@ -1268,7 +1338,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v13_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v14_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md") + self.read(
             "references/review-reconciliation.md"
@@ -1276,8 +1346,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "13.0.0"',
-            'LEDGER_SCHEMA_VERSION = "10.0.0"',
+            '__version__ = "14.0.0"',
+            'LEDGER_SCHEMA_VERSION = "11.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "5.0.0"',
         ):
             self.assertIn(constant, helper)
@@ -1287,7 +1357,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `10.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `11.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)

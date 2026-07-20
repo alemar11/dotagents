@@ -109,6 +109,17 @@ newer committed and published observation clears tracker dirt. Rerun gates.
 
 ## Review Wait Recovery
 
+Before replaying any review mutation, require the exact immutable reservation
+packet, its ledger `review-provider-mutation-reserved` and
+`review-provider-mutation-started` events, and the packet fingerprint bound to
+the current generation/state/claim. The packet has no mutable attempt field.
+The consumed marker is durable before provider dispatch; after it exists,
+recovery may perform one read-only exact-artifact reconciliation only. A unique
+marker-plus-target/body/actor artifact completes the journal. Missing,
+conflicting, or ambiguous evidence records `failed-or-ambiguous` and
+`needs-owner`; it never retries, resets the 45-minute deadline, deletes a
+marker, or recreates a reservation.
+
 Before any resumed provider-text mutation, reload the transport contract in
 `worker.md`, recreate the opaque text file from current authorized data, and
 take a fresh GitStack `repo snapshot` in the exact managed checkout. Require

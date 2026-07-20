@@ -113,7 +113,8 @@ For every GitStack provider-text mutation other than the typed review request:
    worktree fingerprint. Do not print or persist the text itself as transport
    proof.
 
-Use `reviews request --request-key` for Codex; it owns the body and receipt. Use
+Use `reviews request --request-key --reservation-file --ledger-file` for Codex; load
+`review-mutation-authority.md`; it owns the body and receipt. Use
 `reviews comment`, exact-head one-target `reviews reply`, receipt-bound
 `reviews resolve`, `reviews edit-comment`, and `reviews submit-review` for their
 matching operations. `reviews address` is

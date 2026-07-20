@@ -14,7 +14,7 @@ Run `ledger-cache autoreview next`; it alone returns the next action, managed
 packet, allowed transitions, completion criterion, blockers, current state
 fingerprint, and reservation event. Apply that event atomically before launch.
 Workers never choose mode, phase, parent, prompt, or local fallback. AutoReview
-also scans active schema-10 ledgers, so omitting managed flags cannot escape the
+also scans active schema-11 ledgers, so omitting managed flags cannot escape the
 reservation requirement.
 
 Reservations are generation/state-fingerprint bound, one-use, and have no TTL.

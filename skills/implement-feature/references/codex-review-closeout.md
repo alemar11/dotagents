@@ -53,10 +53,10 @@ by `task_key`, `delivery_key`, and the exact delivery `revision_key`. Store
 the exact PR URL, complete GitStack request receipt, request binding,
 provider/result/disposition, bounded observation fingerprints,
 `wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
-and the optional durable timeout-warning reference.
-
-Before request, call GitStack's typed request operation with the exact current
-full head and caller-supplied `request_key`. It owns the strict canonical
+and the optional durable timeout-warning reference. Load
+`review-mutation-authority.md` before provider mutation. Before request, call
+GitStack's typed request operation with its reservation file, exact current
+full head, and caller-supplied `request_key`. It owns the strict canonical
 provider body, current-head preflight, one POST, one read-only recovery, and
 complete receipt. Apply `review-wait-started` with it before invoking the
 identity-bound waiter; the event persists it, and the waiter fetches the
@@ -125,9 +125,10 @@ Revision: <exact revision_key>
 This is not a clean review verdict. A later merge workflow must re-check this pull request for late Codex findings before merge.
 ```
 
-Write that exact body to an absolute file without interpolation, capture the
+Write that exact body to an absolute file without interpolation, prepare its
+`review-warning` reservation, apply reserved/started, capture the
 managed checkout's GitStack worktree fingerprint, then post it with one typed
-`reviews comment --body-file ... --expected-worktree-fingerprint ...` call.
+`reviews comment --body-file ... --reservation-file ... --ledger-file ... --expected-worktree-fingerprint ...` call.
 Require the canonical issue-comment URL and id, exact PR target, expected body
 byte count/SHA-256, and unchanged worktree proof. On an ambiguous response use
 only GitStack's one read-back result; never post the warning again blindly.

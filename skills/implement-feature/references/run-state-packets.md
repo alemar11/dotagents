@@ -74,6 +74,9 @@ values are refs or digests, never pasted output.
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref` |
 | `task-dependency-wait-started` | `task_key`, `resume_state`, `reason`, `summary_ref`, `evidence_ref` |
 | `task-dependency-wait-resolved` | `task_key`, `resume_state`, `evidence_ref` |
+| `review-provider-mutation-reserved` | `task_key`, `delivery_key`, `reservation`, `packet_fingerprint`, `evidence_ref` |
+| `review-provider-mutation-started` | `task_key`, `delivery_key`, `reservation_id`, `operation_id`, `packet_fingerprint`, `evidence_ref` |
+| `review-provider-mutation-observed` | `task_key`, `delivery_key`, `reservation_id`, `operation_id`, `attempt_state`, `result_fingerprint`, `receipt_ref`, `recovery_state`, `evidence_ref` |
 | `committed-revision-observed` | `task_key`, `delivery_key`, `target`, `evidence_ref` |
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |

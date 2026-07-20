@@ -9,12 +9,12 @@
 <plugin-root>/scripts/gitstack --json doctor
 <plugin-root>/scripts/gitstack --json repo snapshot
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
-<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key>
-<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --body-file <absolute-message-file>
-<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --reply-receipt-file <absolute-receipt-file>
+<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
 <plugin-root>/scripts/gitstack reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file>
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --body-file <absolute-message-file>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
 <plugin-root>/scripts/gitstack --json reviews terminal-evidence --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
@@ -118,6 +118,9 @@ request, wait, retry, or deadline operation.
 `address` is read-only. Use `comment`, one-target `reply`, `edit-comment`, and
 `submit-review` for mutations. They require absolute regular non-symlink UTF-8
 body files and accept optional `--expected-worktree-fingerprint` protection.
+Its JSON thread entries include the exact current `head_sha` and
+`thread_fingerprint` needed by typed `reviews prepare`; callers must use those
+values rather than recreating the canonical fingerprint.
 Dry-run and result envelopes contain only byte counts, SHA-256 fingerprints,
 target identity, and transport metadata; they never contain provider text.
 
