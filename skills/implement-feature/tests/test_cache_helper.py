@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV14Tests(unittest.TestCase):
+class LedgerCacheV15Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -63,6 +63,10 @@ class LedgerCacheV14Tests(unittest.TestCase):
         self.home_patch = mock.patch.dict(os.environ, {"HOME": str(self.home)})
         self.home_patch.start()
         self.addCleanup(self.home_patch.stop)
+        (self.home / ".gitignore_global").write_text(".DS_Store\n")
+        (self.home / ".gitconfig").write_text(
+            "[core]\n\texcludesFile = " + str(self.home / ".gitignore_global") + "\n"
+        )
         self.cache_root = self.home / ".cache/dotagents/skills/implement-feature"
         self.claim_root = self.cache_root / "claims"
         self.ledger_root = self.cache_root / "ledgers"
@@ -150,8 +154,11 @@ class LedgerCacheV14Tests(unittest.TestCase):
         objective = (
             "Implement the registered Feature Spec portfolio with CI when configured"
         )
-        return {
-            "schema_version": "5.0.0",
+        registration = {
+            "schema_version": "6.0.0",
+            "bundle_sha256": hashlib.sha256(b"bundle-fixture").hexdigest(),
+            "execution_scope_fingerprint": "0" * 64,
+            "authorization_fingerprint": "0" * 64,
             "root_task_ref": "app-task://root-a",
             "root_checkout": str(REPOSITORY),
             "objective": objective,
@@ -186,6 +193,17 @@ class LedgerCacheV14Tests(unittest.TestCase):
                                 b"delivery-preflight-fixture"
                             ).hexdigest(),
                             "preflight_evidence_ref": "delivery-preflight://fixture",
+                            "validation_plan": [
+                                {
+                                    "validation_key": "full-validation",
+                                    "command_id": "full-validation",
+                                    "adapter": "clean-exit-v1",
+                                    "policy": "clean-required",
+                                    "authored_argv_fingerprint": hashlib.sha256(b"authored-argv").hexdigest(),
+                                    "projected_argv_fingerprint": hashlib.sha256(b"projected-argv").hexdigest(),
+                                    "tool_identities_fingerprint": hashlib.sha256(b"tool-identities").hexdigest(),
+                                }
+                            ],
                         }
                     ],
                     "dependency_ids": [],
@@ -197,6 +215,37 @@ class LedgerCacheV14Tests(unittest.TestCase):
                 }
             ],
         }
+        self.refresh_registration_fingerprints(registration)
+        return registration
+
+    def refresh_registration_fingerprints(self, registration: dict) -> None:
+        scope_payload = {
+            "bundle_sha256": registration["bundle_sha256"],
+            "sources": [
+                {
+                    "task_key": source["task_key"],
+                    "source_fingerprint": source["source_fingerprint"],
+                    "deliveries": [
+                        {
+                            key: (
+                                [CACHE_RUNTIME.canonical_allowed_path(path, "allowed_path") for path in delivery[key]]
+                                if key == "allowed_paths" else delivery[key]
+                            )
+                            for key in ("delivery_key", "repository", "target_branch", "allowed_paths", "validation_plan")
+                        }
+                        for delivery in source["deliveries"]
+                    ],
+                }
+                for source in registration["sources"]
+            ],
+        }
+        registration["execution_scope_fingerprint"] = CACHE_RUNTIME.request_fingerprint(scope_payload)
+        registration["authorization_fingerprint"] = CACHE_RUNTIME.request_fingerprint(
+            {
+                "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
+                "permission_evidence_ref": registration["permission_evidence_ref"],
+            }
+        )
 
     def install_takeover_evidence(
         self,
@@ -361,35 +410,124 @@ class LedgerCacheV14Tests(unittest.TestCase):
 
     def checkout_event(self) -> dict:
         assert self.registration is not None
-        delivery = self.registration["sources"][0]["deliveries"][0]
-        return {
-            "type": "managed-checkouts-observed",
-            "task_key": self.task_key,
-            "task_ref": "app-task://worker-232",
-            "managed_checkouts": [
+        deliveries = self.registration["sources"][0]["deliveries"]
+        managed_checkouts = []
+        for delivery in deliveries:
+            checkout = (
+                REPOSITORY
+                if delivery["repository"] == self.claim["repositories"][0]
+                else Path(delivery["repository"]).parent
+            )
+            head = subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            tree = subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "HEAD^{tree}"],
+                text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            status = subprocess.run(
+                ["git", "-C", str(checkout), "status", "--porcelain=v2", "--untracked-files=all", "-z"],
+                capture_output=True,
+                check=True,
+            ).stdout
+            managed_checkouts.append(
                 {
                     "delivery_key": delivery["delivery_key"],
                     "repository": delivery["repository"],
                     "target_branch": delivery["target_branch"],
-                    "checkout": str(REPOSITORY),
-                    "git_top_level": str(REPOSITORY),
-                    "baseline_revision": subprocess.run(
-                        ["git", "-C", str(REPOSITORY), "rev-parse", "HEAD"],
-                        text=True,
-                        capture_output=True,
-                        check=True,
-                    ).stdout.strip(),
-                    "isolation_evidence_ref": "app-task://worker-232/worktree",
+                    "checkout": str(checkout),
+                    "git_top_level": str(checkout),
+                    "baseline_revision": head,
+                    "baseline_tree_sha": tree,
+                    "baseline_status_fingerprint": hashlib.sha256(status).hexdigest(),
+                    "execution_scope_fingerprint": self.registration["execution_scope_fingerprint"],
+                    "isolation_evidence_ref": f"app-task://worker-232/worktree/{delivery['delivery_key']}",
                 }
-            ],
+            )
+        return {
+            "type": "managed-checkouts-observed",
+            "task_key": self.task_key,
+            "task_ref": "app-task://worker-232",
+            "managed_checkouts": managed_checkouts,
             "evidence_ref": "app-task://worker-232/checkout-map",
+        }
+
+    def baseline_acceptance_event(self) -> dict:
+        state = self.state()
+        baselines = []
+        for task in state["tasks"]:
+            for delivery in task["deliveries"]:
+                checkout = delivery["managed_checkout"]
+                assert checkout is not None
+                for plan in delivery["validation_plan"]:
+                    observation = {
+                        "adapter": plan["adapter"],
+                        "policy": plan["policy"],
+                        "execution_scope_fingerprint": state["authorization"]["execution_scope_fingerprint"],
+                        "authored_argv_fingerprint": plan["authored_argv_fingerprint"],
+                        "argv_fingerprint": plan["projected_argv_fingerprint"],
+                        "checkout_identity": {
+                            "checkout": checkout["checkout"],
+                            "branch": delivery["target_branch"],
+                            "head_sha": checkout["baseline_revision"],
+                            "tree_sha": checkout["baseline_tree_sha"],
+                            "status_sha256": checkout["baseline_status_fingerprint"],
+                            "status_clean": True,
+                        },
+                        "tool_identities_fingerprint": plan["tool_identities_fingerprint"],
+                        "result": "clean",
+                        "diagnostics": [],
+                        "diagnostic_set_fingerprint": CACHE_RUNTIME.request_fingerprint([]),
+                    }
+                    manifest = {
+                        "schema_version": "3.0.0",
+                        "operation": "baseline-validation",
+                        "manifest_sha256": hashlib.sha256(b"manifest").hexdigest(),
+                        "argv_fingerprint": plan["projected_argv_fingerprint"],
+                        "baseline": {
+                            "adapter": plan["adapter"],
+                            "policy": plan["policy"],
+                            "execution_scope_fingerprint": state["authorization"]["execution_scope_fingerprint"],
+                            "authored_argv_fingerprint": plan["authored_argv_fingerprint"],
+                        },
+                    }
+                    receipt = {
+                        "schema_version": "3.0.0",
+                        "status": "passed",
+                        "manifest_sha256": manifest["manifest_sha256"],
+                        "receipt_sha256": hashlib.sha256(b"receipt").hexdigest(),
+                        "baseline_observation": observation,
+                    }
+                    stem = f"{task['task_key']}-{delivery['delivery_key']}-{plan['validation_key']}"
+                    manifest_path = self.home / f"baseline-manifest-{stem}.json"
+                    receipt_path = self.home / f"baseline-receipt-{stem}.json"
+                    manifest_path.write_text(json.dumps(manifest, sort_keys=True) + "\n")
+                    receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n")
+                    baselines.append(
+                        {
+                            "task_key": task["task_key"],
+                            "delivery_key": delivery["delivery_key"],
+                            "validation_key": plan["validation_key"],
+                            "manifest_file": str(manifest_path),
+                            "manifest_bytes_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                            "receipt_file": str(receipt_path),
+                            "receipt_bytes_sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+                        }
+                    )
+        return {
+            "type": "implementation-baseline-accepted",
+            "expected_generation": state["generation"],
+            "expected_state_fingerprint": state["content_fingerprint"],
+            "expected_claim_fingerprint": state["claim"]["fingerprint"],
+            "execution_scope_fingerprint": state["authorization"]["execution_scope_fingerprint"],
+            "baselines": baselines,
+            "evidence_ref": "baseline://accepted",
         }
 
     def bootstrap_active_task(self) -> None:
         self.acquire()
         self.create()
-        state = self.state()
-        objective_fingerprint = state["portfolio"]["objective_fingerprint"]
         self.apply(
             [
                 {
@@ -397,13 +535,19 @@ class LedgerCacheV14Tests(unittest.TestCase):
                     "title": "👨🏻‍💻 Feature Orchestrator",
                     "evidence_ref": "app-task://root-a/title",
                 },
+                self.checkout_event(),
+                self.task_event(state="created"),
+            ]
+        )
+        self.apply([self.baseline_acceptance_event()])
+        state = self.state()
+        self.apply(
+            [
                 {
                     "type": "portfolio-goal-activated",
                     "goal_evidence_ref": "app-task://root-a/goal",
-                    "objective_fingerprint": objective_fingerprint,
+                    "objective_fingerprint": state["portfolio"]["objective_fingerprint"],
                 },
-                self.checkout_event(),
-                self.task_event(state="created"),
                 self.task_event(state="implementing"),
             ]
         )
@@ -765,7 +909,7 @@ class LedgerCacheV14Tests(unittest.TestCase):
     ) -> dict:
         assert self.registration is not None
         repository = self.registration["sources"][0]["deliveries"][0]["repository"]
-        scope = ["skills/implement-feature/"]
+        scope = ["skills/implement-feature"]
         patch_fingerprint = hashlib.sha256(f"patch:{head}".encode()).hexdigest()
         review_target_key = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_review_target_key(
             repository_id=repository,
@@ -1263,8 +1407,41 @@ class LedgerCacheV14Tests(unittest.TestCase):
         )
         self.error(release, "state-conflict")
 
+    def observe_nonregression_and_scope(self, revision: dict) -> None:
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        plan = delivery["validation_plan"][0]
+        diagnostics: list[dict] = []
+        self.apply(
+            [
+                {
+                    "type": "validation-nonregression-observed",
+                    "task_key": self.task_key,
+                    "delivery_key": delivery["delivery_key"],
+                    "validation_key": plan["validation_key"],
+                    "revision_key": revision["revision_key"],
+                    "adapter": plan["adapter"],
+                    "policy": plan["policy"],
+                    "argv_fingerprint": plan["projected_argv_fingerprint"],
+                    "tool_identities_fingerprint": plan["tool_identities_fingerprint"],
+                    "diagnostics": diagnostics,
+                    "diagnostic_set_fingerprint": CACHE_RUNTIME.request_fingerprint(diagnostics),
+                    "evidence_ref": "validation://nonregression/full",
+                },
+                {
+                    "type": "delivery-scope-observed",
+                    "task_key": self.task_key,
+                    "delivery_key": delivery["delivery_key"],
+                    "revision_key": revision["revision_key"],
+                    "changed_paths": delivery["committed_revision"]["target"]["review_scope"],
+                    "untracked_paths": [],
+                    "evidence_ref": "git://scope/current",
+                },
+            ]
+        )
+
     def pass_terminal_gates(self, revision: dict) -> None:
         self.record_autoreview(self.autoreview_evidence())
+        self.observe_nonregression_and_scope(revision)
         events = []
         revision_set = CACHE_RUNTIME.current_revision_set_key(self.state()["tasks"][0])
         for gate in sorted(CACHE_RUNTIME.TASK_STATIC_GATES):
@@ -1415,12 +1592,12 @@ class LedgerCacheV14Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v14_offline_and_read_only(self) -> None:
+    def test_doctor_is_v15_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "14.0.0")
+        self.assertEqual(version, "15.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1599,26 +1776,15 @@ class LedgerCacheV14Tests(unittest.TestCase):
         self.error(unsupported, "invalid-input")
         self.assertEqual(self.state()["generation"], 2)
 
-    def test_registered_preflight_makes_dispatch_reachable_before_revision(self) -> None:
+    def test_atomic_baseline_makes_dispatch_reachable_before_revision(self) -> None:
         self.acquire()
         self.create()
-        self.apply(
-            [
-                {
-                    "type": "gate-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": None,
-                    "gate": "dependency-integration",
-                    "state": "passed",
-                    "binding_key": None,
-                    "evidence_ref": "proof://dependency-integration",
-                },
-            ]
-        )
+        self.apply([self.checkout_event(), self.task_event(state="created")])
         task = self.state()["tasks"][0]
         self.assertIsNone(task["deliveries"][0]["revision"])
         dispatch = parse_result(self.read_projection("dispatch"))
         self.assertEqual(dispatch["ready_task_keys"], [])
+        self.apply([self.baseline_acceptance_event()])
         objective_fingerprint = self.state()["portfolio"]["objective_fingerprint"]
         self.apply(
             [
@@ -1634,8 +1800,105 @@ class LedgerCacheV14Tests(unittest.TestCase):
                 },
             ]
         )
-        dispatch = parse_result(self.read_projection("dispatch"))
-        self.assertEqual(dispatch["ready_task_keys"], [self.task_key])
+        self.apply([self.task_event(state="implementing")])
+        self.assertEqual(self.state()["tasks"][0]["state"], "implementing")
+
+    def test_baseline_cas_rejects_partial_stale_drifted_and_tampered_grants(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        valid = self.baseline_acceptance_event()
+        candidates = []
+        partial = copy.deepcopy(valid)
+        partial["baselines"] = []
+        candidates.append(partial)
+        stale = copy.deepcopy(valid)
+        stale["expected_generation"] -= 1
+        candidates.append(stale)
+        scope_drift = copy.deepcopy(valid)
+        scope_drift["execution_scope_fingerprint"] = "f" * 64
+        candidates.append(scope_drift)
+        for candidate in candidates:
+            self.error(self.apply([candidate], check=False), "state-conflict")
+            self.assertEqual(self.state()["tasks"][0]["implementation_baseline"], "pending")
+
+        tool_drift = copy.deepcopy(valid)
+        row = tool_drift["baselines"][0]
+        receipt_path = Path(row["receipt_file"])
+        receipt = json.loads(receipt_path.read_text())
+        receipt["baseline_observation"]["tool_identities_fingerprint"] = "e" * 64
+        receipt_path.write_text(json.dumps(receipt, sort_keys=True) + "\n")
+        row["receipt_bytes_sha256"] = hashlib.sha256(receipt_path.read_bytes()).hexdigest()
+        self.error(self.apply([tool_drift], check=False), "state-conflict")
+
+        tampered = self.baseline_acceptance_event()
+        tampered_path = Path(tampered["baselines"][0]["receipt_file"])
+        tampered_path.write_bytes(tampered_path.read_bytes() + b" ")
+        self.error(self.apply([tampered], check=False), "state-conflict")
+        self.assertEqual(self.state()["tasks"][0]["implementation_baseline"], "pending")
+
+    def test_prebaseline_workers_have_no_goal_delivery_review_or_gate_authority(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        objective = self.state()["portfolio"]["objective_fingerprint"]
+        denied = [
+            {"type": "portfolio-goal-activated", "goal_evidence_ref": "app-task://root-a/goal", "objective_fingerprint": objective},
+            {
+                "type": "gate-observed", "task_key": self.task_key, "delivery_key": None,
+                "gate": "dependency-integration", "state": "passed", "binding_key": None,
+                "evidence_ref": "proof://premature-gate",
+            },
+            {
+                "type": "committed-revision-observed", "task_key": self.task_key,
+                "delivery_key": "dotagents", "target": {}, "evidence_ref": "git://premature-revision",
+            },
+        ]
+        for event in denied:
+            self.error(self.apply([event], check=False), "state-conflict")
+        state = self.state()
+        self.assertEqual(state["goal"]["state"], "pending")
+        self.assertEqual(state["gates"], [])
+        self.assertIsNone(state["tasks"][0]["deliveries"][0]["committed_revision"])
+
+    def test_preimplementation_abort_releases_and_archives_without_goal_state(self) -> None:
+        self.acquire()
+        self.create()
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        evidence = "planning://baseline-required/232"
+        self.apply([{
+            "type": "portfolio-preimplementation-aborted",
+            "reason": "The declared validation has no provably read-only baseline projection.",
+            "task_stop_evidence": [{
+                "task_key": self.task_key,
+                "task_ref": "app-task://worker-232",
+                "evidence_ref": "app-task://worker-232/archived",
+            }],
+            "evidence_ref": evidence,
+        }])
+        state = self.state()
+        self.assertEqual(state["goal"]["state"], "pending")
+        self.assertEqual(state["tasks"][0]["implementation_baseline"], "planning-required")
+        self.release(reason="preimplementation-abort", evidence=evidence)
+        archived = parse_result(self.run_cache(
+            "--json", "ledger", "archive", "--ledger", str(self.ledger),
+            "--root-id", "root-a", "--reason", "preimplementation-abort",
+            "--evidence-ref", evidence,
+        ))["archives"][0]
+        self.assertEqual(archived["archive_reason"], "preimplementation-abort")
+        self.assertFalse(self.ledger.exists())
 
     def test_not_configured_ci_is_reported_and_never_accepts_a_ci_gate(self) -> None:
         self.acquire()
@@ -1660,16 +1923,19 @@ class LedgerCacheV14Tests(unittest.TestCase):
                     "title": "👨🏻‍💻 Feature Orchestrator",
                     "evidence_ref": "app-task://root-a/title",
                 },
-                {
-                    "type": "portfolio-goal-activated",
-                    "goal_evidence_ref": "app-task://root-a/goal",
-                    "objective_fingerprint": objective_fingerprint,
-                },
                 self.checkout_event(),
                 self.task_event(state="created"),
-                self.task_event(state="implementing"),
             ]
         )
+        self.apply([self.baseline_acceptance_event()])
+        self.apply([
+            {
+                "type": "portfolio-goal-activated",
+                "goal_evidence_ref": "app-task://root-a/goal",
+                "objective_fingerprint": objective_fingerprint,
+            },
+            self.task_event(state="implementing"),
+        ])
         revision = self.observe_revision()
         rejected = self.apply(
             [
@@ -1781,12 +2047,30 @@ class LedgerCacheV14Tests(unittest.TestCase):
                     f"delivery-preflight-{index}".encode()
                 ).hexdigest(),
                 "preflight_evidence_ref": f"delivery-preflight://{index}",
+                "validation_plan": copy.deepcopy(
+                    self.registration_for(claim)["sources"][0]["deliveries"][0]["validation_plan"]
+                ),
             }
             for index, repository in enumerate(claim["repositories"], start=1)
         ]
         registration["sources"][0]["tracker_repository"] = claim["repositories"][0]
+        self.refresh_registration_fingerprints(registration)
         self.create(registration=registration)
         self.assertEqual(len(self.state()["tasks"][0]["deliveries"]), 2)
+        self.apply([
+            {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
+            self.checkout_event(),
+            self.task_event(state="created"),
+        ])
+        atomic = self.baseline_acceptance_event()
+        partial = copy.deepcopy(atomic)
+        partial["baselines"] = partial["baselines"][:1]
+        self.error(self.apply([partial], check=False), "state-conflict")
+        self.assertTrue(all(not delivery["baseline_validations"] for delivery in self.state()["tasks"][0]["deliveries"]))
+        self.apply([atomic])
+        accepted = self.state()["tasks"][0]
+        self.assertEqual(accepted["implementation_baseline"], "accepted")
+        self.assertTrue(all(delivery["baseline_validations"] for delivery in accepted["deliveries"]))
 
         old_shape = self.registration_for(claim)
         source = old_shape["sources"][0]
@@ -1809,16 +2093,16 @@ class LedgerCacheV14Tests(unittest.TestCase):
                     "title": "👨🏻‍💻 Feature Orchestrator",
                     "evidence_ref": "app-task://root-a/title",
                 },
-                {
-                    "type": "portfolio-goal-activated",
-                    "goal_evidence_ref": "app-task://root-a/goal",
-                    "objective_fingerprint": objective_fingerprint,
-                },
+                self.checkout_event(),
+                self.task_event(state="created"),
             ]
         )
-        before_checkout = self.apply([self.task_event(state="created")], check=False)
-        self.error(before_checkout, "state-conflict")
-        self.apply([self.checkout_event(), self.task_event(state="created")])
+        self.apply([self.baseline_acceptance_event()])
+        self.apply([{
+            "type": "portfolio-goal-activated",
+            "goal_evidence_ref": "app-task://root-a/goal",
+            "objective_fingerprint": objective_fingerprint,
+        }])
         wrong_profile = self.apply(
             [self.task_event(state="implementing", model="gpt-5.6-terra")], check=False
         )
@@ -1848,6 +2132,8 @@ class LedgerCacheV14Tests(unittest.TestCase):
         first = self.observe_revision()
         self.observe_delivery(first)
         self.start_clean_review(first)
+        self.record_autoreview(self.autoreview_evidence())
+        self.observe_nonregression_and_scope(first)
         revision_set = CACHE_RUNTIME.current_revision_set_key(self.state()["tasks"][0])
         self.apply(
             [
@@ -1862,7 +2148,7 @@ class LedgerCacheV14Tests(unittest.TestCase):
                 }
             ]
         )
-        second = self.observe_revision(head="c" * 40, merge_base="d" * 40)
+        second = self.observe_revision(head="c" * 40)
         projection = parse_result(self.read_projection("status"))
         task = projection["tasks"][0]
         self.assertNotEqual(second["revision_key"], first["revision_key"])
@@ -2979,12 +3265,15 @@ class LedgerCacheV14Tests(unittest.TestCase):
         self.apply(
             [
                 {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://root-a/title"},
-                {"type": "portfolio-goal-activated", "goal_evidence_ref": "app-task://root-a/goal", "objective_fingerprint": objective_fingerprint},
                 self.checkout_event(),
                 self.task_event(state="created"),
-                self.task_event(state="implementing"),
             ]
         )
+        self.apply([self.baseline_acceptance_event()])
+        self.apply([
+            {"type": "portfolio-goal-activated", "goal_evidence_ref": "app-task://root-a/goal", "objective_fingerprint": objective_fingerprint},
+            self.task_event(state="implementing"),
+        ])
         revision = self.observe_revision()
         self.observe_delivery(revision)
         self.start_clean_review(revision)
@@ -3010,6 +3299,7 @@ class LedgerCacheV14Tests(unittest.TestCase):
 
     def test_takeover_create_derives_recorded_adoption_from_live_claim(self) -> None:
         claim = self.acquire()
+        registration = self.registration_for(claim)
         snapshot = copy.deepcopy(claim)
         snapshot["root_id"] = "root-old"
         snapshot["fingerprint"] = CACHE_RUNTIME.claim_fingerprint(snapshot)
@@ -3064,7 +3354,7 @@ class LedgerCacheV14Tests(unittest.TestCase):
         claim_path = self.claim_root / "root-a.json"
         claim_path.write_text(json.dumps(claim, indent=2, sort_keys=True) + "\n")
         self.claim = claim
-        created = parse_result(self.create())
+        created = parse_result(self.create(registration=registration))
         self.assertEqual(created["mutation_state"], "created")
         task = self.state()["tasks"][0]
         self.assertEqual(task["adoption"]["origin_root_id"], "root-old")
@@ -3128,6 +3418,7 @@ class LedgerCacheV14Tests(unittest.TestCase):
             }
         )
         registration["sources"].append(second)
+        self.refresh_registration_fingerprints(registration)
         created = parse_result(self.create(registration=registration))
         self.assertEqual(created["mutation_state"], "created")
         evidence_by_source = {

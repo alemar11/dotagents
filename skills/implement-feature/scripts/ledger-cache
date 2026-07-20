@@ -22,9 +22,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "14.0.0"
-LEDGER_SCHEMA_VERSION = "11.0.0"
-REGISTRATION_SCHEMA_VERSION = "5.0.0"
+__version__ = "15.0.0"
+LEDGER_SCHEMA_VERSION = "12.0.0"
+REGISTRATION_SCHEMA_VERSION = "6.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -46,11 +46,11 @@ MAX_GATES = 2048
 MAX_HANDOFFS = 512
 MAX_OUTPUT_BYTES = 128 * 1024
 MAX_PACKET_BYTES = 1024 * 1024
-READ_ARCHIVE_REASONS = {"terminal", "legacy-cutover"}
+READ_ARCHIVE_REASONS = {"terminal", "preimplementation-abort", "legacy-cutover"}
 CLAIM_SCHEMA_VERSION = "6.0.0"
 TAKEOVER_SCHEMA_VERSION = "2.0.0"
-RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
-RELEASE_REASONS = {"terminal"}
+RELEASE_RECEIPT_SCHEMA_VERSION = "2.0.0"
+RELEASE_REASONS = {"terminal", "preimplementation-abort"}
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 LOWER_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 GITHUB_REPOSITORY_RE = re.compile(
@@ -111,6 +111,10 @@ EVENT_TYPES = {
     "portfolio-goal-activated",
     "portfolio-goal-completed",
     "managed-checkouts-observed",
+    "implementation-baseline-accepted",
+    "validation-nonregression-observed",
+    "delivery-scope-observed",
+    "portfolio-preimplementation-aborted",
     "delivery-preflight-observed",
     "task-observed",
     "task-dependency-wait-started",
@@ -973,6 +977,9 @@ def claim_artifact_error(
 
     required = {
         "schema_version",
+        "bundle_sha256",
+        "execution_scope_fingerprint",
+        "authorization_fingerprint",
         "transaction_id",
         "candidate_claim",
         "replaced_claims",
@@ -1474,6 +1481,9 @@ def takeover_adoptions(claim: dict[str, Any]) -> dict[str, dict[str, Any]]:
 def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> dict[str, Any]:
     required = {
         "schema_version",
+        "bundle_sha256",
+        "execution_scope_fingerprint",
+        "authorization_fingerprint",
         "root_task_ref",
         "root_checkout",
         "objective",
@@ -1486,6 +1496,13 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     registration = exact_object(value, required, "registration")
     if registration["schema_version"] != REGISTRATION_SCHEMA_VERSION:
         raise CacheError("invalid-input", "registration schema is unsupported", 2)
+    bundle_sha256 = canonical_fingerprint(registration["bundle_sha256"], "registration.bundle_sha256")
+    execution_scope_fingerprint = canonical_fingerprint(
+        registration["execution_scope_fingerprint"], "registration.execution_scope_fingerprint"
+    )
+    authorization_fingerprint = canonical_fingerprint(
+        registration["authorization_fingerprint"], "registration.authorization_fingerprint"
+    )
     root_task_ref = nonempty(registration["root_task_ref"], "registration.root_task_ref")
     root_checkout = canonical_absolute_path(registration["root_checkout"], "registration.root_checkout")
     objective = nonempty(registration["objective"], "registration.objective")
@@ -1576,6 +1593,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
             "ci_availability",
             "preflight_key",
             "preflight_evidence_ref",
+            "validation_plan",
         }
         deliveries: list[dict[str, Any]] = []
         delivery_keys: set[str] = set()
@@ -1620,6 +1638,46 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
                     f"{delivery_field}.allowed_paths contains normalized duplicates",
                     2,
                 )
+            validation_raw = delivery["validation_plan"]
+            if not isinstance(validation_raw, list) or not validation_raw:
+                raise CacheError("invalid-input", f"{delivery_field}.validation_plan is invalid", 2)
+            validation_plan = []
+            validation_keys: set[str] = set()
+            adapter_policies = {
+                "clean-exit-v1": "clean-required",
+                "prettier-check-v1": "unchanged-outside-scope-allowed",
+            }
+            for validation_index, validation_raw_item in enumerate(validation_raw):
+                validation_field = f"{delivery_field}.validation_plan[{validation_index}]"
+                validation = exact_object(
+                    validation_raw_item,
+                    {
+                        "validation_key", "command_id", "adapter", "policy",
+                        "authored_argv_fingerprint", "projected_argv_fingerprint",
+                        "tool_identities_fingerprint",
+                    },
+                    validation_field,
+                )
+                validation_key = check_lower_kebab(validation["validation_key"], f"{validation_field}.validation_key")
+                if validation_key in validation_keys:
+                    raise CacheError("invalid-input", f"{validation_field} duplicates a validation key", 2)
+                validation_keys.add(validation_key)
+                adapter = validation["adapter"]
+                if adapter not in adapter_policies or validation["policy"] != adapter_policies[adapter]:
+                    raise CacheError("invalid-input", f"{validation_field} adapter policy is not canonical", 2)
+                validation_plan.append(
+                    {
+                        "validation_key": validation_key,
+                        "command_id": check_lower_kebab(validation["command_id"], f"{validation_field}.command_id"),
+                        "adapter": adapter,
+                        "policy": validation["policy"],
+                        "authored_argv_fingerprint": canonical_fingerprint(validation["authored_argv_fingerprint"], f"{validation_field}.authored_argv_fingerprint"),
+                        "projected_argv_fingerprint": canonical_fingerprint(validation["projected_argv_fingerprint"], f"{validation_field}.projected_argv_fingerprint"),
+                        "tool_identities_fingerprint": canonical_fingerprint(validation["tool_identities_fingerprint"], f"{validation_field}.tool_identities_fingerprint"),
+                    }
+                )
+            if validation_plan != sorted(validation_plan, key=lambda row: row["validation_key"]):
+                raise CacheError("invalid-input", f"{delivery_field}.validation_plan is not canonically sorted", 2)
             deliveries.append(
                 {
                     "delivery_key": delivery_key,
@@ -1643,6 +1701,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
                         delivery["preflight_evidence_ref"],
                         f"{delivery_field}.preflight_evidence_ref",
                     ),
+                    "validation_plan": validation_plan,
                 }
             )
             if deliveries[-1]["ci_availability"] not in CI_AVAILABILITIES:
@@ -1824,7 +1883,35 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         )
     if ledger.stem != check_id(ledger.stem, "portfolio_key"):
         raise CacheError("invalid-input", "ledger portfolio key is invalid", 2)
+    scope_payload = {
+        "bundle_sha256": bundle_sha256,
+        "sources": [
+            {
+                "task_key": source["task_key"],
+                "source_fingerprint": source["source_fingerprint"],
+                "deliveries": [
+                    {
+                        key: delivery[key]
+                        for key in (
+                            "delivery_key", "repository", "target_branch", "allowed_paths", "validation_plan"
+                        )
+                    }
+                    for delivery in source["deliveries"]
+                ],
+            }
+            for source in normalized_sources
+        ],
+    }
+    if request_fingerprint(scope_payload) != execution_scope_fingerprint:
+        raise CacheError("state-conflict", "registration execution scope fingerprint does not match", 4)
+    if request_fingerprint(
+        {"execution_scope_fingerprint": execution_scope_fingerprint, "permission_evidence_ref": permission}
+    ) != authorization_fingerprint:
+        raise CacheError("state-conflict", "registration authorization fingerprint does not match", 4)
     return {
+        "bundle_sha256": bundle_sha256,
+        "execution_scope_fingerprint": execution_scope_fingerprint,
+        "authorization_fingerprint": authorization_fingerprint,
         "root_task_ref": root_task_ref,
         "root_checkout": root_checkout,
         "objective": objective,
@@ -1927,7 +2014,10 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
         exact_object(value["claim"], {"fingerprint"}, "run_state.claim")
         exact_object(
             value["authorization"],
-            {"visible_app_task_permission", "evidence_ref"},
+            {
+                "visible_app_task_permission", "evidence_ref", "bundle_sha256",
+                "execution_scope_fingerprint", "authorization_fingerprint",
+            },
             "run_state.authorization",
         )
         exact_object(
@@ -1961,6 +2051,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                 "portfolio_terminal_verification_fingerprint",
                 "portfolio_terminal_evidence_ref",
                 "post_terminal_drift",
+                "preimplementation_abort",
             },
             "run_state.closeout",
         )
@@ -2004,6 +2095,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             "deliveries",
             "seal",
             "post_terminal_drift",
+            "implementation_baseline",
         }
         for index, item in enumerate(value["sources"]):
             exact_object(item, source_keys, f"run_state.sources[{index}]")
@@ -2020,6 +2112,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             check_lower_kebab(item["task_key"], f"run_state.tasks[{index}].task_key")
             if item["state"] not in TASK_STATES:
                 raise CacheError("integrity-failure", "run-state task state is invalid", 5)
+            if item["implementation_baseline"] not in {"pending", "accepted", "planning-required", "blocked"}:
+                raise CacheError("integrity-failure", "run-state implementation baseline is invalid", 5)
             if (item["state"] == "dependency-wait") != (item["dependency_wait"] is not None):
                 raise CacheError("integrity-failure", "run-state dependency wait presence is invalid", 5)
             if item["dependency_wait"] is not None:
@@ -2071,6 +2165,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "target_branch",
                         "default_base",
                         "allowed_paths",
+                        "validation_plan",
                         "ci_availability",
                         "preflight_key",
                         "preflight_evidence_ref",
@@ -2088,6 +2183,9 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "review_provider_mutations",
                         "hosted_obligations",
                         "lineage_reset_authority",
+                        "baseline_validations",
+                        "nonregression_validations",
+                        "scope_observation",
                     },
                     delivery_field,
                 )
@@ -2109,6 +2207,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     raise CacheError(
                         "integrity-failure", "run-state CI availability is invalid", 5
                     )
+                if not isinstance(delivery["baseline_validations"], list) or not isinstance(delivery["nonregression_validations"], list):
+                    raise CacheError("integrity-failure", "run-state validation evidence is invalid", 5)
                 canonical_fingerprint(
                     delivery["preflight_key"], f"{delivery_field}.preflight_key"
                 )
@@ -2138,6 +2238,9 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                             "git_top_level",
                             "baseline_revision",
                             "isolation_evidence_ref",
+                            "baseline_tree_sha",
+                            "baseline_status_fingerprint",
+                            "execution_scope_fingerprint",
                         },
                         f"{delivery_field}.managed_checkout",
                     )
@@ -3585,6 +3688,18 @@ def new_state(
                     for delivery in item["deliveries"]
                     if delivery["repository"] == repository
                 )
+                checkout_path = nonempty(checkout.get("checkout"), "adoption.checkout")
+                tree_result = subprocess.run(
+                    ["git", "-C", checkout_path, "rev-parse", "HEAD^{tree}"],
+                    text=True,
+                    capture_output=True,
+                )
+                status_result = subprocess.run(
+                    ["git", "-C", checkout_path, "status", "--porcelain=v2", "--untracked-files=all", "-z"],
+                    capture_output=True,
+                )
+                if tree_result.returncode or status_result.returncode:
+                    raise CacheError("invalid-input", "adopted checkout baseline cannot be observed", 2)
                 _, verified_checkout = validate_managed_checkout(
                     {
                         "delivery_key": delivery["delivery_key"],
@@ -3593,6 +3708,9 @@ def new_state(
                         "checkout": checkout.get("checkout"),
                         "git_top_level": checkout.get("git_top_level"),
                         "baseline_revision": checkout.get("baseline_revision"),
+                        "baseline_tree_sha": tree_result.stdout.strip(),
+                        "baseline_status_fingerprint": hashlib.sha256(status_result.stdout).hexdigest(),
+                        "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
                         "isolation_evidence_ref": checkout.get(
                             "isolation_evidence_ref"
                         ),
@@ -3620,6 +3738,9 @@ def new_state(
                 "review_provider_mutations": [],
                 "hosted_obligations": [],
                 "lineage_reset_authority": None,
+                "baseline_validations": [],
+                "nonregression_validations": [],
+                "scope_observation": None,
             }
             for delivery in item["deliveries"]
         ]
@@ -3657,6 +3778,7 @@ def new_state(
                 "deliveries": deliveries,
                 "seal": None,
                 "post_terminal_drift": None,
+                "implementation_baseline": "pending",
             }
         )
     title = ROOT_TITLES["single" if len(tasks) == 1 else "multiple"]
@@ -3683,6 +3805,9 @@ def new_state(
         "authorization": {
             "visible_app_task_permission": "granted-by-authorized-user",
             "evidence_ref": registration["permission_evidence_ref"],
+            "bundle_sha256": registration["bundle_sha256"],
+            "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
+            "authorization_fingerprint": registration["authorization_fingerprint"],
         },
         "goal": {
             "state": "pending",
@@ -3707,6 +3832,7 @@ def new_state(
             "portfolio_terminal_verification_fingerprint": None,
             "portfolio_terminal_evidence_ref": None,
             "post_terminal_drift": None,
+            "preimplementation_abort": None,
         },
     }
     seal_state_fingerprint(state)
@@ -3824,6 +3950,9 @@ def validate_managed_checkout(
             "checkout",
             "git_top_level",
             "baseline_revision",
+            "baseline_tree_sha",
+            "baseline_status_fingerprint",
+            "execution_scope_fingerprint",
             "isolation_evidence_ref",
         },
         field,
@@ -3866,10 +3995,51 @@ def validate_managed_checkout(
     )
     if baseline_check.returncode:
         raise CacheError("invalid-input", f"{field}.baseline_revision is not a commit", 2)
+    head_result = subprocess.run(
+        ["git", "-C", checkout, "rev-parse", "HEAD"], text=True, capture_output=True
+    )
+    tree_result = subprocess.run(
+        ["git", "-C", checkout, "rev-parse", "HEAD^{tree}"], text=True, capture_output=True
+    )
+    status_result = subprocess.run(
+        ["git", "-C", checkout, "status", "--porcelain=v2", "--untracked-files=all", "-z"],
+        capture_output=True,
+    )
+    baseline_tree = nonempty(item["baseline_tree_sha"], f"{field}.baseline_tree_sha")
+    baseline_status = canonical_fingerprint(item["baseline_status_fingerprint"], f"{field}.baseline_status_fingerprint")
+    execution_scope = canonical_fingerprint(item["execution_scope_fingerprint"], f"{field}.execution_scope_fingerprint")
+    identity_mismatches: list[str] = []
+    if head_result.returncode or head_result.stdout.strip() != baseline:
+        identity_mismatches.append("revision")
+    if tree_result.returncode or tree_result.stdout.strip() != baseline_tree:
+        identity_mismatches.append("tree")
+    if status_result.returncode:
+        identity_mismatches.append("status-command")
+    elif status_result.stdout:
+        identity_mismatches.append("git-visible-mutation")
+    elif hashlib.sha256(status_result.stdout).hexdigest() != baseline_status:
+        identity_mismatches.append("status-fingerprint")
+    if identity_mismatches:
+        status_paths = sorted(
+            {
+                entry.decode("utf-8", errors="replace").split(" ")[-1]
+                for entry in status_result.stdout.split(b"\0")
+                if entry
+            }
+        )
+        raise CacheError(
+            "state-conflict",
+            f"{field} baseline checkout identity changed: {','.join(identity_mismatches)}"
+            + (f" ({','.join(status_paths)})" if status_paths else ""),
+            4,
+        )
     return delivery, {
         "checkout": checkout,
         "git_top_level": git_top_level,
         "baseline_revision": baseline,
+        "baseline_tree_sha": baseline_tree,
+        "baseline_status_fingerprint": baseline_status,
+        "execution_scope_fingerprint": execution_scope,
         "isolation_evidence_ref": nonempty(
             item["isolation_evidence_ref"], f"{field}.isolation_evidence_ref"
         ),
@@ -3903,6 +4073,110 @@ def source_move_blockers(
     return blockers
 
 
+def baseline_artifact(path_value: Any, expected_sha256: Any, field: str) -> dict[str, Any]:
+    path = Path(canonical_absolute_path(path_value, field))
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_PACKET_BYTES:
+        raise CacheError("invalid-input", f"{field} is not a safe baseline artifact", 2)
+    data = path.read_bytes()
+    expected = canonical_fingerprint(expected_sha256, f"{field}_bytes_sha256")
+    if hashlib.sha256(data).hexdigest() != expected:
+        raise CacheError("state-conflict", f"{field} bytes changed", 4)
+    try:
+        value = json.loads(data)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise CacheError("invalid-input", f"{field} is unreadable JSON", 2) from exc
+    if not isinstance(value, dict):
+        raise CacheError("invalid-input", f"{field} must contain one object", 2)
+    return value
+
+
+def path_in_scope(path: str, allowed_paths: list[str]) -> bool:
+    return any(path == allowed.rstrip("/") or path.startswith(allowed.rstrip("/") + "/") for allowed in allowed_paths)
+
+
+def validate_baseline_row(state: dict[str, Any], raw: Any, field: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    row = exact_object(
+        raw,
+        {
+            "task_key", "delivery_key", "validation_key", "manifest_file",
+            "manifest_bytes_sha256", "receipt_file", "receipt_bytes_sha256",
+        },
+        field,
+    )
+    task = task_by_key(state, check_lower_kebab(row["task_key"], f"{field}.task_key"))
+    delivery = delivery_by_key(task, check_lower_kebab(row["delivery_key"], f"{field}.delivery_key"))
+    validation_key = check_lower_kebab(row["validation_key"], f"{field}.validation_key")
+    plan = next((item for item in delivery["validation_plan"] if item["validation_key"] == validation_key), None)
+    if plan is None:
+        raise CacheError("state-conflict", f"{field} validation is not registered", 4)
+    checkout = delivery["managed_checkout"]
+    if checkout is None:
+        raise CacheError("state-conflict", f"{field} lacks a managed checkout", 4)
+    manifest = baseline_artifact(row["manifest_file"], row["manifest_bytes_sha256"], f"{field}.manifest_file")
+    receipt = baseline_artifact(row["receipt_file"], row["receipt_bytes_sha256"], f"{field}.receipt_file")
+    if manifest.get("schema_version") != "3.0.0" or manifest.get("operation") != "baseline-validation":
+        raise CacheError("state-conflict", f"{field} manifest is not baseline v3", 4)
+    if receipt.get("schema_version") != "3.0.0" or receipt.get("status") != "passed":
+        raise CacheError("state-conflict", f"{field} receipt is not a passed baseline v3 receipt", 4)
+    if receipt.get("manifest_sha256") != manifest.get("manifest_sha256"):
+        raise CacheError("state-conflict", f"{field} receipt is bound to another manifest", 4)
+    baseline = manifest.get("baseline")
+    observation = receipt.get("baseline_observation")
+    if not isinstance(baseline, dict) or not isinstance(observation, dict):
+        raise CacheError("state-conflict", f"{field} baseline evidence is incomplete", 4)
+    expected_pairs = {
+        "adapter": plan["adapter"],
+        "policy": plan["policy"],
+        "execution_scope_fingerprint": state["authorization"]["execution_scope_fingerprint"],
+        "authored_argv_fingerprint": plan["authored_argv_fingerprint"],
+    }
+    if any(baseline.get(key) != value or observation.get(key) != value for key, value in expected_pairs.items()):
+        raise CacheError("state-conflict", f"{field} baseline identity differs from registration", 4)
+    if manifest.get("argv_fingerprint") != plan["projected_argv_fingerprint"] or observation.get("argv_fingerprint") != plan["projected_argv_fingerprint"]:
+        raise CacheError("state-conflict", f"{field} projected argv differs from registration", 4)
+    if observation.get("tool_identities_fingerprint") != plan["tool_identities_fingerprint"]:
+        raise CacheError("state-conflict", f"{field} tool identity differs from registration", 4)
+    identity = observation.get("checkout_identity")
+    if not isinstance(identity, dict) or (
+        identity.get("checkout") != checkout["checkout"]
+        or identity.get("branch") != delivery["target_branch"]
+        or identity.get("head_sha") != checkout["baseline_revision"]
+        or identity.get("tree_sha") != checkout["baseline_tree_sha"]
+        or identity.get("status_sha256") != checkout["baseline_status_fingerprint"]
+        or identity.get("status_clean") is not True
+    ):
+        raise CacheError("state-conflict", f"{field} checkout identity differs from managed baseline", 4)
+    diagnostics = observation.get("diagnostics")
+    if not isinstance(diagnostics, list) or diagnostics != sorted(diagnostics, key=lambda item: item.get("path", "")):
+        raise CacheError("state-conflict", f"{field} diagnostics are not canonical", 4)
+    observed_paths: set[str] = set()
+    for index, diagnostic in enumerate(diagnostics):
+        item = exact_object(diagnostic, {"path", "diagnostic_fingerprint", "content_sha256"}, f"{field}.diagnostics[{index}]")
+        path = canonical_allowed_path(item["path"], f"{field}.diagnostics[{index}].path")
+        if path in observed_paths:
+            raise CacheError("state-conflict", f"{field} diagnostics contain duplicates", 4)
+        observed_paths.add(path)
+        canonical_fingerprint(item["diagnostic_fingerprint"], f"{field}.diagnostic_fingerprint")
+        content = canonical_fingerprint(item["content_sha256"], f"{field}.content_sha256")
+        candidate = Path(checkout["checkout"]) / path
+        if candidate.is_symlink() or not candidate.is_file() or hashlib.sha256(candidate.read_bytes()).hexdigest() != content:
+            raise CacheError("state-conflict", f"{field} diagnostic content changed", 4)
+    if observation.get("diagnostic_set_fingerprint") != request_fingerprint(diagnostics):
+        raise CacheError("state-conflict", f"{field} diagnostic set fingerprint changed", 4)
+    if observation.get("result") not in {"clean", "unchanged-debt-candidate"}:
+        raise CacheError("state-conflict", f"{field} baseline requires planning", 4)
+    return delivery, {
+        "validation_key": validation_key,
+        "manifest_file": str(Path(row["manifest_file"])),
+        "manifest_bytes_sha256": row["manifest_bytes_sha256"],
+        "receipt_file": str(Path(row["receipt_file"])),
+        "receipt_bytes_sha256": row["receipt_bytes_sha256"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "receipt_sha256": receipt["receipt_sha256"],
+        "observation": copy.deepcopy(observation),
+    }
+
+
 def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if not isinstance(raw, dict) or raw.get("type") not in EVENT_TYPES:
         raise CacheError("invalid-input", "event type is missing or unsupported", 2)
@@ -3925,6 +4199,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raise CacheError("invalid-input", "Goal objective fingerprint does not match", 2)
         if state["portfolio"]["root_task_title_evidence_ref"] is None:
             raise CacheError("state-conflict", "Goal cannot activate before root title evidence", 4)
+        if any(task["implementation_baseline"] != "accepted" for task in state["tasks"]):
+            raise CacheError("state-conflict", "Goal cannot activate before atomic implementation baseline acceptance", 4)
         evidence = nonempty(event["goal_evidence_ref"], "goal_evidence_ref")
         if state["goal"]["state"] == "active" and state["goal"]["evidence_ref"] == evidence:
             return False
@@ -3937,6 +4213,96 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "completion_evidence_ref": None,
             }
         )
+        return True
+
+    if event_type == "implementation-baseline-accepted":
+        event = exact_object(
+            raw,
+            {
+                "type", "expected_generation", "expected_state_fingerprint",
+                "expected_claim_fingerprint", "execution_scope_fingerprint",
+                "baselines", "evidence_ref",
+            },
+            event_type,
+        )
+        if state["goal"]["state"] != "pending" or any(task["implementation_baseline"] != "pending" for task in state["tasks"]):
+            raise CacheError("state-conflict", "implementation baseline acceptance is out of order", 4)
+        if (
+            event["expected_generation"] != state["generation"]
+            or event["expected_state_fingerprint"] != state["content_fingerprint"]
+            or event["expected_claim_fingerprint"] != state["claim"]["fingerprint"]
+            or event["execution_scope_fingerprint"] != state["authorization"]["execution_scope_fingerprint"]
+        ):
+            raise CacheError("state-conflict", "implementation baseline CAS identity is stale", 4)
+        raw_baselines = event["baselines"]
+        expected_keys = {
+            (task["task_key"], delivery["delivery_key"], plan["validation_key"])
+            for task in state["tasks"]
+            for delivery in task["deliveries"]
+            for plan in delivery["validation_plan"]
+        }
+        if not isinstance(raw_baselines, list) or len(raw_baselines) != len(expected_keys):
+            raise CacheError("state-conflict", "implementation baseline set is incomplete", 4)
+        accepted: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        observed_keys: set[tuple[str, str, str]] = set()
+        for index, raw_baseline in enumerate(raw_baselines):
+            delivery, baseline = validate_baseline_row(state, raw_baseline, f"baselines[{index}]")
+            key = (raw_baseline["task_key"], raw_baseline["delivery_key"], raw_baseline["validation_key"])
+            if key in observed_keys:
+                raise CacheError("state-conflict", "implementation baseline set contains duplicates", 4)
+            observed_keys.add(key)
+            accepted.setdefault((key[0], key[1]), []).append(baseline)
+        if observed_keys != expected_keys:
+            raise CacheError("state-conflict", "implementation baseline set differs from registration", 4)
+        for task in state["tasks"]:
+            for delivery in task["deliveries"]:
+                delivery["baseline_validations"] = sorted(
+                    accepted[(task["task_key"], delivery["delivery_key"])],
+                    key=lambda item: item["validation_key"],
+                )
+            task["implementation_baseline"] = "accepted"
+        nonempty(event["evidence_ref"], "evidence_ref")
+        return True
+
+    if event_type == "portfolio-preimplementation-aborted":
+        event = exact_object(raw, {"type", "reason", "task_stop_evidence", "evidence_ref"}, event_type)
+        if state["goal"]["state"] != "pending" or any(task["implementation_baseline"] == "accepted" for task in state["tasks"]):
+            raise CacheError("state-conflict", "preimplementation abort is no longer available", 4)
+        if any(
+            delivery["revision"] is not None
+            or delivery["committed_revision"] is not None
+            or delivery["autoreview_reservation"] is not None
+            or delivery["autoreview_attempts"]
+            or delivery["review_provider_mutations"]
+            for task in state["tasks"] for delivery in task["deliveries"]
+        ) or state["reviews"] or state["gates"]:
+            raise CacheError("state-conflict", "preimplementation abort found mutation authority or delivery evidence", 4)
+        stops = event["task_stop_evidence"]
+        if not isinstance(stops, list) or len(stops) != len(state["tasks"]):
+            raise CacheError("state-conflict", "preimplementation abort lacks complete task-stop evidence", 4)
+        for task, stop in zip(sorted(state["tasks"], key=lambda item: item["task_key"]), stops):
+            stop = exact_object(stop, {"task_key", "task_ref", "evidence_ref"}, "task_stop_evidence")
+            if stop["task_key"] != task["task_key"] or stop["task_ref"] != task["task_ref"]:
+                raise CacheError("state-conflict", "preimplementation task-stop identity changed", 4)
+            nonempty(stop["evidence_ref"], "task_stop_evidence.evidence_ref")
+            for delivery in task["deliveries"]:
+                checkout = delivery["managed_checkout"]
+                if checkout is None:
+                    continue
+                status = subprocess.run(
+                    ["git", "-C", checkout["checkout"], "status", "--porcelain=v2", "--untracked-files=all", "-z"],
+                    capture_output=True,
+                )
+                head = subprocess.run(["git", "-C", checkout["checkout"], "rev-parse", "HEAD"], text=True, capture_output=True)
+                if status.returncode or status.stdout or head.returncode or head.stdout.strip() != checkout["baseline_revision"]:
+                    raise CacheError("state-conflict", "preimplementation abort checkout was mutated", 4)
+            task["implementation_baseline"] = "planning-required"
+            task["state"] = "blocked"
+            task["attention_reason"] = nonempty(event["reason"], "reason")
+        state["closeout"]["preimplementation_abort"] = {
+            "reason": event["reason"],
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+        }
         return True
 
     if event_type == "portfolio-terminal-verified":
@@ -3989,6 +4355,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     task_key = check_lower_kebab(raw.get("task_key"), "task_key")
     task = task_by_key(state, task_key)
 
+    if task["implementation_baseline"] != "accepted" and event_type not in {"managed-checkouts-observed", "task-observed"}:
+        raise CacheError("state-conflict", "worker is baseline-only before atomic implementation baseline acceptance", 4)
+
     if task["seal"] is not None and event_type not in {
         "terminal-handoff-recorded",
         "post-terminal-drift-recorded",
@@ -4018,6 +4387,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             if delivery["delivery_key"] in normalized:
                 raise CacheError("invalid-input", "managed checkout map duplicates a delivery", 2)
             normalized[delivery["delivery_key"]] = checkout
+            if checkout["execution_scope_fingerprint"] != state["authorization"]["execution_scope_fingerprint"]:
+                raise CacheError("state-conflict", "managed checkout execution scope differs from authorization", 4)
         if set(normalized) != {item["delivery_key"] for item in task["deliveries"]}:
             raise CacheError("invalid-input", "managed checkout map must cover every delivery", 2)
         global_keys = {
@@ -4049,6 +4420,84 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             delivery["managed_checkout"] = normalized[delivery["delivery_key"]]
         return True
 
+    if event_type == "validation-nonregression-observed":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "validation_key", "revision_key",
+                "adapter", "policy", "argv_fingerprint", "tool_identities_fingerprint",
+                "diagnostics", "diagnostic_set_fingerprint", "evidence_ref",
+            },
+            event_type,
+        )
+        delivery = delivery_by_key(task, check_lower_kebab(event["delivery_key"], "delivery_key"))
+        if delivery["revision"] is None or event["revision_key"] != delivery["revision"]["revision_key"]:
+            raise CacheError("state-conflict", "nonregression observation is not current", 4)
+        key = check_lower_kebab(event["validation_key"], "validation_key")
+        plan = next((item for item in delivery["validation_plan"] if item["validation_key"] == key), None)
+        baseline = next((item for item in delivery["baseline_validations"] if item["validation_key"] == key), None)
+        if plan is None or baseline is None:
+            raise CacheError("state-conflict", "nonregression observation lacks its baseline", 4)
+        if (
+            event["adapter"] != plan["adapter"]
+            or event["policy"] != plan["policy"]
+            or event["argv_fingerprint"] != plan["projected_argv_fingerprint"]
+            or event["tool_identities_fingerprint"] != plan["tool_identities_fingerprint"]
+        ):
+            raise CacheError("state-conflict", "nonregression command identity drifted", 4)
+        diagnostics = event["diagnostics"]
+        if not isinstance(diagnostics, list) or diagnostics != sorted(diagnostics, key=lambda row: row.get("path", "")):
+            raise CacheError("invalid-input", "nonregression diagnostics are not canonical", 2)
+        for index, diagnostic in enumerate(diagnostics):
+            exact_object(diagnostic, {"path", "diagnostic_fingerprint", "content_sha256"}, f"diagnostics[{index}]")
+            canonical_allowed_path(diagnostic["path"], f"diagnostics[{index}].path")
+            canonical_fingerprint(diagnostic["diagnostic_fingerprint"], f"diagnostics[{index}].diagnostic_fingerprint")
+            canonical_fingerprint(diagnostic["content_sha256"], f"diagnostics[{index}].content_sha256")
+        if event["diagnostic_set_fingerprint"] != request_fingerprint(diagnostics):
+            raise CacheError("state-conflict", "nonregression diagnostic fingerprint changed", 4)
+        baseline_diagnostics = baseline["observation"]["diagnostics"]
+        allowed_outside = [row for row in baseline_diagnostics if not path_in_scope(row["path"], delivery["allowed_paths"])]
+        if diagnostics != allowed_outside:
+            raise CacheError("state-conflict", "outside-scope debt changed or in-scope debt remains", 4)
+        candidate = {
+            "validation_key": key,
+            "revision_key": event["revision_key"],
+            "adapter": event["adapter"],
+            "policy": event["policy"],
+            "argv_fingerprint": event["argv_fingerprint"],
+            "tool_identities_fingerprint": event["tool_identities_fingerprint"],
+            "diagnostics": copy.deepcopy(diagnostics),
+            "diagnostic_set_fingerprint": event["diagnostic_set_fingerprint"],
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+        }
+        delivery["nonregression_validations"] = [row for row in delivery["nonregression_validations"] if row["validation_key"] != key]
+        delivery["nonregression_validations"].append(candidate)
+        delivery["nonregression_validations"].sort(key=lambda row: row["validation_key"])
+        return True
+
+    if event_type == "delivery-scope-observed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "revision_key", "changed_paths", "untracked_paths", "evidence_ref"},
+            event_type,
+        )
+        delivery = delivery_by_key(task, check_lower_kebab(event["delivery_key"], "delivery_key"))
+        if delivery["revision"] is None or event["revision_key"] != delivery["revision"]["revision_key"]:
+            raise CacheError("state-conflict", "delivery scope observation is not current", 4)
+        changed = [canonical_allowed_path(path, "changed_paths") for path in event["changed_paths"]]
+        untracked = [canonical_allowed_path(path, "untracked_paths") for path in event["untracked_paths"]]
+        if changed != sorted(set(changed)) or untracked:
+            raise CacheError("state-conflict", "delivery scope observation is dirty or noncanonical", 4)
+        if any(not path_in_scope(path, delivery["allowed_paths"]) for path in changed):
+            raise CacheError("state-conflict", "delivery scope expands beyond authorization", 4)
+        delivery["scope_observation"] = {
+            "revision_key": event["revision_key"],
+            "changed_paths": changed,
+            "untracked_paths": [],
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+        }
+        return True
+
     if event_type == "task-observed":
         event = exact_object(
             raw,
@@ -4077,13 +4526,19 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if event["task_assignment_fingerprint"] != task["task_assignment_fingerprint"]:
             raise CacheError("state-conflict", "task assignment fingerprint changed", 4)
         state_value = event["state"]
+        if task["implementation_baseline"] != "accepted" and state_value != "created":
+            raise CacheError("state-conflict", "baseline-only worker cannot leave created state", 4)
         if state_value in {"dependency-wait", "merge-ready", "terminal-sealed"}:
             raise CacheError("invalid-input", "task-observed cannot perform managed transitions", 2)
         if state_value not in TASK_STATES or state_value not in TASK_TRANSITIONS[task["state"]]:
             raise CacheError("state-conflict", f"invalid task transition: {task['state']} -> {state_value}", 4)
         if state_value in ACTIVE_TASK_STATES and title_evidence is None:
             raise CacheError("state-conflict", "task cannot run before title evidence", 4)
-        if state_value in ACTIVE_TASK_STATES and state["goal"]["state"] != "active":
+        if (
+            state_value in ACTIVE_TASK_STATES
+            and not (task["implementation_baseline"] != "accepted" and state_value == "created")
+            and state["goal"]["state"] != "active"
+        ):
             raise CacheError("state-conflict", "task cannot run before the root Goal is active", 4)
         candidate = {
             "task_title": title,
@@ -4521,6 +4976,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if current and all(current[field] == candidate[field] for field in candidate if field != "observed_at"):
             return False
         delivery["revision"] = candidate
+        delivery["nonregression_validations"] = []
+        delivery["scope_observation"] = None
         delivery["committed"] = False
         delivery["published"] = False
         delivery["observation_evidence_ref"] = None
@@ -5244,6 +5701,24 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                     "autoreview gate requires terminal evidence for the current delivery revision",
                     4,
                 )
+        if gate in {"focused-validation", "full-validation"} and event["state"] == "passed":
+            if scoped_delivery is None or {
+                row["validation_key"] for row in scoped_delivery["nonregression_validations"]
+            } != {row["validation_key"] for row in scoped_delivery["validation_plan"]}:
+                raise CacheError("state-conflict", "validation gate lacks complete baseline nonregression evidence", 4)
+        if gate == "scope-acceptance" and event["state"] == "passed":
+            for candidate_delivery in task["deliveries"]:
+                scope = candidate_delivery["scope_observation"]
+                revision = candidate_delivery["revision"]
+                if scope is None or revision is None or scope["revision_key"] != revision["revision_key"]:
+                    raise CacheError("state-conflict", "scope acceptance lacks current delivery scope evidence", 4)
+                if {
+                    row["validation_key"] for row in candidate_delivery["nonregression_validations"]
+                } != {row["validation_key"] for row in candidate_delivery["validation_plan"]}:
+                    raise CacheError("state-conflict", "scope acceptance lacks complete nonregression evidence", 4)
+                autoreview = candidate_delivery["autoreview"]
+                if autoreview is None or sorted(autoreview["target"]["review_scope"]) != scope["changed_paths"]:
+                    raise CacheError("state-conflict", "AutoReview scope differs from committed delivery scope", 4)
         evidence = nonempty(event["evidence_ref"], "evidence_ref")
         candidate = {
             "task_key": task_key,
@@ -5698,12 +6173,13 @@ def metadata_for(
     archived_at: datetime,
     evidence_ref: str,
     root_id: str,
+    archive_reason: str,
 ) -> dict[str, Any]:
     archive_id = f"{compact_timestamp(archived_at)}--{ledger.stem}--{state_hash[:12]}"
     return {
         "schema_version": WRITE_METADATA_SCHEMA_VERSION,
         "archive_id": archive_id,
-        "archive_reason": "terminal",
+        "archive_reason": archive_reason,
         "archive_group": None,
         "archived_at": format_timestamp(archived_at),
         "portfolio_key": ledger.stem,
@@ -5982,13 +6458,14 @@ def terminal_release_receipt(
     size_bytes: int,
     required: bool,
     expected_claim_fingerprint: str | None = None,
+    release_reason: str = "terminal",
 ) -> Path | None:
     matches = [
         item
         for item in claim_state["release_receipts"]
         if item["root_id"] == root_id
         and item["ledger_ref"] == str(ledger)
-        and item["release_reason"] == "terminal"
+        and item["release_reason"] == release_reason
         and item["evidence_ref"] == evidence_ref
     ]
     if len(matches) > 1:
@@ -6034,6 +6511,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
     root_id = check_id(args.root_id, "root_id")
     ledger_value = args.ledger[0] if isinstance(args.ledger, list) else args.ledger
     ledger = canonical_active_ledger(ledger_value)
+    archive_reason = args.reason
     ensure_safe_cache_chain(archive_root(), "archive root")
     completed: dict[str, Any] | None = None
     receipt_path: Path | None = None
@@ -6054,7 +6532,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
             )
         existing = find_completed_archive(
             ledger,
-            archive_reason="terminal",
+            archive_reason=archive_reason,
             archive_group=None,
             evidence_ref=evidence_ref,
             root_id=root_id,
@@ -6079,6 +6557,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 size_bytes=existing["state_size_bytes"],
                 required=False,
                 expected_claim_fingerprint=archived_state["claim"]["fingerprint"],
+                release_reason=archive_reason,
             )
             completed = existing
         else:
@@ -6090,13 +6569,16 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 )
             state = load_state(ledger)
             terminal = terminal_projection(state)
-            if not terminal["eligible"]:
-                raise CacheError(
-                    "state-conflict",
-                    "run state is not terminal",
-                    4,
-                    {"blockers": terminal["blockers"]},
-                )
+            if archive_reason == "terminal":
+                if not terminal["eligible"]:
+                    raise CacheError(
+                        "state-conflict", "run state is not terminal", 4,
+                        {"blockers": terminal["blockers"]},
+                    )
+            else:
+                abort = state["closeout"]["preimplementation_abort"]
+                if state["goal"]["state"] != "pending" or not isinstance(abort, dict) or abort["evidence_ref"] != evidence_ref:
+                    raise CacheError("state-conflict", "run state is not a verified preimplementation abort", 4)
             state_hash = sha256_file(ledger)
             state_size = ledger.stat().st_size
             receipt_path = terminal_release_receipt(
@@ -6108,6 +6590,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                 size_bytes=state_size,
                 required=True,
                 expected_claim_fingerprint=state["claim"]["fingerprint"],
+                release_reason=archive_reason,
             )
             markdown = render_markdown(state).encode()
             markdown_hash = hashlib.sha256(markdown).hexdigest()
@@ -6132,6 +6615,7 @@ def archive_ledgers(args: argparse.Namespace) -> dict[str, Any]:
                     archived_at=utc_now(),
                     evidence_ref=evidence_ref,
                     root_id=root_id,
+                    archive_reason=archive_reason,
                 )
                 final = archive_parent(metadata) / metadata["archive_id"]
                 archive_root().mkdir(parents=True, exist_ok=True)
@@ -6522,6 +7006,7 @@ def build_parser() -> argparse.ArgumentParser:
     archive.add_argument("--ledger", required=True)
     archive.add_argument("--evidence-ref", required=True)
     archive.add_argument("--root-id", required=True)
+    archive.add_argument("--reason", choices=["terminal", "preimplementation-abort"], default="terminal")
 
     autoreview = nouns.add_parser("autoreview", help="Derive the next managed AutoReview protocol action.")
     autoreview_verbs = autoreview.add_subparsers(dest="verb", required=True)

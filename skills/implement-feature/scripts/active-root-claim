@@ -22,11 +22,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "13.0.0"
+__version__ = "14.0.0"
 SCHEMA_VERSION = "6.0.0"
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "2.0.0"
-RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
-RELEASE_REASON = "terminal"
+RELEASE_RECEIPT_SCHEMA_VERSION = "2.0.0"
+RELEASE_REASONS = {"terminal", "preimplementation-abort"}
 LEDGER_CACHE_PATH = Path(__file__).resolve().with_name("ledger-cache")
 TASK_MODEL_POLICY_PATH = (
     Path(__file__).resolve().parents[1] / "references/task-model-policy.md"
@@ -1051,7 +1051,7 @@ def load_ledger_runtime() -> Any:
 
 
 def terminal_ledger_snapshot(
-    claim: dict[str, Any], ledger: Path, evidence: str
+    claim: dict[str, Any], ledger: Path, evidence: str, reason: str
 ) -> tuple[str, int]:
     try:
         payload = read_stable_regular_bytes(ledger)
@@ -1088,7 +1088,7 @@ def terminal_ledger_snapshot(
             f"claim ledger ownership does not match the active claim: {ledger}",
             4,
         )
-    if state["closeout"]["portfolio_terminal_evidence_ref"] != evidence:
+    if reason == "terminal" and state["closeout"]["portfolio_terminal_evidence_ref"] != evidence:
         raise ClaimError(
             "state-conflict",
             f"terminal release evidence does not match the verified ledger: {ledger}",
@@ -1100,20 +1100,32 @@ def terminal_ledger_snapshot(
                 ],
             },
         )
-    if not terminal["archive_ready"]:
+    if reason == "terminal" and not terminal["archive_ready"]:
         raise ClaimError(
             "state-conflict",
             f"claim ledger is not archive-ready terminal state: {ledger}",
             4,
             {"ledger_ref": str(ledger), "blockers": terminal["blockers"]},
         )
+    if reason == "preimplementation-abort":
+        abort = state["closeout"].get("preimplementation_abort")
+        if (
+            state["goal"]["state"] != "pending"
+            or not isinstance(abort, dict)
+            or abort.get("evidence_ref") != evidence
+            or any(task.get("implementation_baseline") == "accepted" for task in state["tasks"])
+            or state["reviews"]
+            or state["gates"]
+            or state["handoffs"]
+        ):
+            raise ClaimError("state-conflict", f"claim ledger is not a verified preimplementation abort: {ledger}", 4)
     return hashlib.sha256(payload).hexdigest(), len(payload)
 
 
-def build_release_receipt(claim: dict[str, Any], *, evidence: str) -> dict[str, Any]:
+def build_release_receipt(claim: dict[str, Any], *, evidence: str, reason: str) -> dict[str, Any]:
     ledger = Path(canonical_ledger_ref(claim["ledger_ref"], persisted=True))
     ledger_sha256, ledger_size_bytes = terminal_ledger_snapshot(
-        claim, ledger, evidence
+        claim, ledger, evidence, reason
     )
     value = {
         "schema_version": RELEASE_RECEIPT_SCHEMA_VERSION,
@@ -1122,7 +1134,7 @@ def build_release_receipt(claim: dict[str, Any], *, evidence: str) -> dict[str, 
         "ledger_ref": str(ledger),
         "ledger_sha256": ledger_sha256,
         "ledger_size_bytes": ledger_size_bytes,
-        "release_reason": RELEASE_REASON,
+        "release_reason": reason,
         "evidence_ref": evidence,
         "released_at": timestamp(),
     }
@@ -1145,7 +1157,7 @@ def validate_release_receipt(value: Any, path: Path) -> dict[str, Any]:
     }
     if not isinstance(value, dict) or set(value) != required:
         raise ClaimError("state-conflict", f"release receipt schema mismatch: {path}", 4)
-    if value["release_reason"] != RELEASE_REASON:
+    if value["release_reason"] not in RELEASE_REASONS:
         root_id = value.get("root_id")
         raise ClaimError(
             "state-conflict",
@@ -1691,7 +1703,7 @@ def release(args: argparse.Namespace) -> dict[str, Any]:
             raise ClaimError("not-found", f"claim not found: {root_id}", 3)
         if claim["fingerprint"] != expected_fingerprint:
             raise ClaimError("state-conflict", "claim ownership fingerprint mismatch", 4)
-        receipt = build_release_receipt(claim, evidence=evidence)
+        receipt = build_release_receipt(claim, evidence=evidence, reason=args.release_reason)
         persist_release_receipt(root, receipt)
         unlink_durable(root / f"{root_id}.json")
     return {
@@ -1798,7 +1810,7 @@ def build_parser() -> argparse.ArgumentParser:
     release_parser.add_argument("--root-id", required=True)
     release_parser.add_argument("--expected-fingerprint", required=True)
     release_parser.add_argument(
-        "--release-reason", required=True, choices=(RELEASE_REASON,)
+        "--release-reason", required=True, choices=sorted(RELEASE_REASONS)
     )
     release_parser.add_argument("--evidence", required=True)
     takeover_parser = verbs.add_parser("takeover", help="Replace the exact verified-stale conflicting roots.")
