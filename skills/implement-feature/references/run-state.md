@@ -22,8 +22,9 @@ remain byte-identical cold evidence that can only be read, verified, or pruned.
 
 ## Command Contract
 
-Load `run-state-packets.md` immediately before writing a registration or event
-packet. It is the sole strict field registry.
+Before registration load `packets-registration.md`. After registration, load
+only the controller-selected phase packet contract immediately before a write.
+The controller packet template owns generic envelope and binding fields.
 
 ```text
 scripts/ledger-cache --json ledger create --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --operation-id '<unique-operation-id>' --registration-file '<absolute-registration-json>'
@@ -113,7 +114,7 @@ AutoReview, review, gate, and partial-acceptance state.
 
 ## Gate Scopes And Invalidation
 
-Each `gate-observed` has one scope from `run-state-packets.md`:
+Each `gate-observed` has one scope from `packets-gates.md`:
 `task-static` dependency integration uses null keys; `delivery-revision` uses
 the delivery key plus its delivery evidence binding; `task-revision-set` uses
 the complete set key with no delivery. The delivery evidence key binds its
@@ -125,12 +126,11 @@ reusable only for an unchanged complete target; unknown or pending truth blocks.
 
 ## Closed Event Registry
 
-`run-state-packets.md` is the sole closed event-name and field registry. Events
-represent only its material transitions and carry bounded evidence refs; unknown
-fields fail. Emit nothing for unchanged polls, wait timeouts, repeated task
-text, or claim heartbeats. Persist digests/refs rather than outputs or
-transcripts; never persist Wave Reports, Recovery Packets, no-progress rows, or
-hand-authored projections.
+The controller-selected packet contract is the sole owner of its phase event
+family. Unknown fields fail. Emit nothing for unchanged polls, wait timeouts,
+repeated task text, or claim heartbeats. Persist digests/refs rather than
+outputs or transcripts; never persist Wave Reports, Recovery Packets,
+no-progress rows, or hand-authored projections.
 
 ## Root Title And Portfolio Goal
 
@@ -224,10 +224,16 @@ takeover replaced that claim, the old root stops. Revalidate surfaces, sources,
 titles, root Goal, assignments, full checkouts, revisions, reviews, and gates. `recovery` is
 guidance, not external truth.
 
+After the separately granted five-minute stale threshold is proven, create the
+prepared-takeover journal before deleting any prior claim. The journal remains
+an ownership record containing the full replaced-claim snapshot and validated
+per-Spec adoption data until `claim recover-takeover` completes or proves the
+same prepared transaction already completed.
+
 ## Bounds And Projections
 
-`run-state-packets.md` bounds all input, state growth, and output. Canonical
-paths reject absolute/backslash/empty/parent traversal.
+`ledger-cache` bounds all input, state growth, and output. Canonical paths
+reject absolute/backslash/empty/parent traversal.
 
 `status` reports bounded identity and progress, `dispatch` reports only the
 derived ready set and capacity, `recovery` reports freshness inputs, and

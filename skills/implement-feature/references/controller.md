@@ -1,21 +1,48 @@
 # Typed Next-Action Controller
 
-This file owns post-registration routing. The root runs only:
+After registration, run only:
 
 ```text
 scripts/ledger-cache --json controller next --ledger <absolute-ledger> --root-id <root-id> --expected-claim-fingerprint <64hex>
 ```
 
-The read-only projection is bound to the active root claim, ledger generation,
-state fingerprint, task observation, delivery revision, and App-managed
-checkout. A released claim or changed binding fails closed. Repeating the
-command against unchanged state is byte-for-byte read-only.
+The read-only result is bound to the live claim, ledger generation and state
+fingerprint, task observation, delivery revision, and App-managed checkout.
+Changed or released authority fails closed. Repeating against unchanged state
+is byte-for-byte read-only.
 
-The controller never launches a task or model, performs a provider mutation,
-selects merge/enqueue/deploy work, or grants Goal/worktree authority. Its
-template is selection data, not launch authority.
+## Exclusive Routing
 
-## Controller 2.0.0 envelope
+The controller registry in `scripts/ledger-cache` is the sole canonical mapping
+from action to `required_contracts`. The returned list is exhaustive and final.
+Load exactly those paths; never add, remove, reorder, or conditionally select a
+contract from prose. Every branch predicate—including recovery kind, owned
+operation, reply/resolve eligibility, and closeout stage—is resolved from
+validated typed state before the response is emitted.
+
+Each writable action names exactly one phase packet contract sufficient for its
+phase-specific inputs and evidence. The typed `packet_template` and helper
+validator own the generic envelope, common binding arguments, CAS, and result
+shape; Markdown packet contracts do not reproduce them.
+
+Missing files, unexpected paths, duplicate contracts, stale content, excessive
+contract counts/bytes, or a response that differs from the live registry fails
+closed before action or mutation. Callers never choose a phase, contract set,
+packet event, owner operation, or transition.
+
+## Contract Loading And Cache
+
+Key transient context reuse by exact absolute installation/worktree path plus
+content SHA-256. Reuse only when that key is certainly still live in the
+current prompt context. This is a prompt optimization, never caller authority,
+ledger state, recovery evidence, or persisted truth.
+
+Compaction, uncertain retention, recovery/takeover, changed bytes, or changed
+path invalidates the transient cache. Reload only the current response's
+complete set. A file change between response validation and action execution
+is stale authority and fails closed. Never preload a later phase.
+
+## Controller 2.0.0 Envelope
 
 Every response has exactly `ok`, `command`, `controller_schema_version`,
 `tool_version`, `ledger_schema_version`, `ledger`, `portfolio_key`, `root_id`,
@@ -23,80 +50,31 @@ Every response has exactly `ok`, `command`, `controller_schema_version`,
 `packet_template`, `allowed_transitions`, `completion_criterion`, `blockers`,
 `required_contracts`, and `projection_fingerprint`.
 
-Non-owner actions retain their closed execution template. A GitStack or
-AutoReview action has only:
+The controller never launches a task or model, mutates a provider, grants Goal
+or worktree authority, or selects merge, enqueue, deploy, or post-merge work.
+Its template is validated selection data, not launch authority.
 
-- `schema_version=2.0.0` and `packet_kind=owned-operation`;
-- `executor=visible-task`;
-- `operation={owner,name,contract_version}`;
-- immutable `authority_binding`;
-- zero or more generic start, result, or follow-up evidence descriptors; and
-- `accepted_result={schema,operation}`.
+Owned GitStack and AutoReview actions expose only their owner/operation identity,
+immutable authority binding, generic evidence descriptors, accepted result,
+and closed outcome-to-next-phase rows. Provider receipts, prose, transport,
+model attempts, owner schemas, and result details remain owned by those tools.
 
-It contains no provider receipt fields, model-attempt fields, command line,
-prompt, body, transport, owner result schema, or ledger event list. Those
-registries belong only to the owning tool. `allowed_transitions` for an owned
-action consists only of `{outcome,next_phase}` rows from the closed
-`owner + operation + outcome` mapper.
-
-## Owned action registry
-
-| Rank | Controller action | Owned operation | Outcomes and next phase |
-|---:|---|---|---|
-| 2 | `execute-gitstack-mutation-reconciliation` | GitStack `reconcile-mutation` | recovered effect -> original next phase; missing, conflicting, or ambiguous -> owner |
-| 3 | `reconcile-autoreview-operation` | AutoReview `reconcile-attempt` | terminal clean -> gates; verification clean -> AutoReview; findings -> review fix; interrupted -> recovery; consumed failure -> owner |
-| 4 | `execute-gitstack-terminal-reconciliation` | GitStack `reconcile-terminal` | verified clean -> gates; verified findings -> review fix |
-| 5 | `resume-gitstack-wait` | GitStack `wait` | original-deadline clean/findings/pending/failure mapping; never a new waiter |
-| 81 | `execute-autoreview-phase` | AutoReview `run-phase` | terminal clean -> gates; verification clean -> AutoReview; findings -> review fix; failure -> owner |
-| 90 | `execute-gitstack-request` | GitStack `request` | created or recognized -> wait |
-| 92 | `execute-gitstack-wait` | GitStack `wait` | clean -> gates; findings -> review fix; deadline pending -> warning; correlation failure -> reconciliation; provider failure -> owner |
-| 93 | `execute-gitstack-warning` | GitStack `warning` | posted or recognized -> gates |
-| 94 | `execute-gitstack-reply` | GitStack `reply` | posted or recognized -> resolution |
-| 95 | `execute-gitstack-resolve` | GitStack `resolve` | resolved or already resolved -> gates |
-
-Baseline, scheduling, worker-phase, gate, seal, handoff, Goal, verification, and
-archive actions keep their existing ownership and ordering. Recovery ranks
-before baseline, closeout, delivery operations, and worker phases. Tasks sort
-by source id then task key; deliveries sort by delivery key.
-
-## Started and result boundary
+## Started And Result Boundary
 
 Preparation and owner validation are read-only. Immediately before a physical
-mutation, waiter, or model launch, the owner calls:
+mutation, waiter, or AutoReview launch, call `operation start`. The bridge
+reruns the owner validator, requires exact live controller equality, revalidates
+claim/CAS/task/revision/checkout authority, and atomically records one generic
+started receipt. A second start returns `reconcile-required`; recovery reads the
+original request and receipt and never relaunches or reposts.
 
-```text
-scripts/ledger-cache --json operation start --owner <gitstack|autoreview> --request-file <absolute-json> --ledger <absolute-ledger>
-```
+`operation record-result` invokes the owner's request-correlated validator,
+requires the exact start and current binding, and records the opaque owner
+result plus normalized orchestration outcome. Identical replay is idempotent;
+a different result fails closed. Terminal reconciliation appends a linked
+superseding result and never rewrites history.
 
-The installation-owned bridge reruns the owner validator, requires exact live
-controller equality, revalidates claim/CAS/task/revision/checkout authority,
-and atomically appends one `owned-operation-started` receipt. A second start
-fails with `reconcile-required`; only `operation read-start` may recover the
-receipt. Reconciliation never launches or reposts.
-
-After process loss, `operation read-request` returns the opaque original owner
-request named by an exact generic start descriptor. Completed follow-ups use
-`operation read-result`: it accepts only a current live controller envelope
-that names the exact source result fingerprint, then returns the opaque owner
-result, owner projection, and immutable source binding. A finding result may
-remain bound to its prior revision while the current controller authorizes a
-reply on the fixed revision; the bridge never interprets owner fields.
-
-`operation record-result` calls the owner's request-correlated result validator,
-requires the exact started receipt and current live binding, and appends one
-opaque owner result plus normalized orchestration fields. The same result is
-idempotent. A different result for the same start fails closed. GitStack
-terminal reconciliation may append a separately started superseding result
-only when its owner-validated prior result is already present with identical
-lineage; history is never rewritten.
-
-Unknown owners, operations, schemas, outcomes, or outcome mappings fail closed.
-Owner results cannot select arbitrary ledger events. Schema 15.0.0 rejects the
-retired provider-mutation, review-wait, AutoReview reservation, attempt, and
-observation event routes.
-
-The immutable GitStack deadline remains exactly 45 minutes. Deadline-pending
-routes only to the one persistent warning operation; only its recorded result
-produces `timeout-accepted`. Provider failure never starts a second waiter.
-AutoReview keeps one logical phase, primary launch plus at most one invalid-
-output repair, and reconciliation after any launch never launches again.
+Unknown owners, operations, schemas, outcomes, mappings, or result bindings fail
+closed. GitStack retains its exact 45-minute deadline and single waiter.
+AutoReview retains one logical phase, one primary launch, at most one invalid-
+output repair, and reconciliation without relaunch.

@@ -1,0 +1,79 @@
+# Root Bootstrap
+
+This file owns the complete pre-registration order. It applies only after the
+runtime surface gate in `SKILL.md` passes and before the ledger exists.
+
+## Closed Contract Selection
+
+Build one read-only source snapshot, then select the full bootstrap set from
+facts already present in that snapshot:
+
+- Always load `spec-backed-delivery.md`, `execution-manifest.md`, and
+  `baseline-validation.md` for snapshot, delivery preflight, intake, and
+  validation-plan derivation.
+- Also load `multi-repo-workspace.md` when any Spec names more than one affected
+  repository or the complete bundle contains partial plus integration Specs.
+- Load `app-control-plane-delays.md` only when an App task identity/title or
+  root Goal observation is already delayed or ambiguous.
+- Load `options.md` and `task-model-policy.md` only after intake and preflight
+  succeed and authorization is ready to ask.
+- After authorization is granted, load `run-state.md`, `cache-lifecycle.md`, and
+  `packets-registration.md` for claim, maintenance, and registration.
+
+These predicates are final. Never add a contract later from prose or omit a
+selected contract. Missing, contradictory, or unreadable selection evidence
+fails before claim.
+
+## Snapshot, Preflight, And Intake
+
+Take one exact-byte snapshot of the durable Feature Spec and complete generated
+issue graph. Reuse it for canonical bundle preparation, fingerprints, intake,
+authorization, and registration. Refetch and rerun preflight before claim when
+proven drift occurs; changed identity after authorization is
+`authorization-stale`.
+
+Normalize GitHub shorthand `owner/repository#N` to
+`https://github.com/owner/repository/issues/N` for helper claim/task identity;
+preserve the shorthand as the authoritative artifact ref and never pass it
+directly to a helper.
+
+Prepare and verify the delivery-preflight manifest before authorization.
+Require authenticated GitHub push/PR capability plus readable lifecycle,
+default-base, mergeability/conflicts, repository policy, and definitive CI
+classification `configured|not-configured`. Unknown capability returns
+`delivery-preflight-failed` with no artifacts. `not-configured` is valid.
+
+Validate stable refs, the complete acyclic graphs, earlier-only dependencies,
+one executable owner per `(repository,target_branch_name)`, repository and path
+scope, validation adapters, acceptance criteria, integration gates, local
+tracker destinations, domain-closeout ownership, and fixed model profiles.
+Missing or contradictory execution evidence is `planning-required`. An
+explicit non-App target is `unsupported-app-delivery-target`. Never repair or
+mutate the source artifacts.
+
+Sort ready candidates by canonical claim/task source id. Greedily select within
+the remaining three-task capacity only pairwise path-disjoint work, treating
+ancestor/descendant scopes as overlapping. A downstream is ready only after
+every upstream ref is merged; merge-ready-but-unmerged is still a dependency
+wait. Never serialize, force-bind, or schedule around a duplicate executable
+`(repository,target_branch_name)` owner.
+
+## Authorization, Claim, And Registration
+
+Render the deterministic complete scope summary and ask the single question
+owned by `options.md`. A grant binds the exact execution-scope fingerprint.
+
+Run `active-root-claim --json doctor`, canonicalize repository and source
+identities, and acquire the complete portfolio claim before cache or ledger
+mutation. Qualify local refs with their Git common directory. A live overlap is
+`needs-owner`; a stale conflict follows the separately authorized takeover
+contract in `run-state.md` and never permits partial replacement.
+
+After claim, synchronously run the cache doctor and fixed 180-day prune once in
+root. Then create one schema-7 registration packet through
+`packets-registration.md`, create schema-15 state, set and observe the derived
+root title, and enter the controller loop. Goal state remains internal
+`pending`; do not call `create_goal` yet.
+
+Pre-claim failure reports exact evidence and proves that no claim, ledger,
+Goal, task, tracker write, or source mutation exists.

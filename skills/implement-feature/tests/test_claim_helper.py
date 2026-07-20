@@ -462,7 +462,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             set(acquired["repository_checkouts"][0]),
             {"checkout", "git_common_dir"},
         )
-        packets = (ROOT / "references/run-state-packets.md").read_text()
+        packets = (ROOT / "references/packets-registration.md").read_text()
         self.assertIn(
             "exact `{git_common_dir, checkout}` claim map",
             packets,

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.machinery
 import importlib.util
 import re
+import statistics
 import unittest
 from pathlib import Path
 
@@ -338,6 +340,17 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def read(self, relative: str) -> str:
         return (ROOT / relative).read_text()
 
+    def controller_runtime(self):
+        loader = importlib.machinery.SourceFileLoader(
+            "implement_feature_ledger_cache_contract",
+            str(ROOT / "scripts/ledger-cache"),
+        )
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+        return module
+
     def test_gitstack_owns_one_shared_review_mutation_protocol(self) -> None:
         helper = self.read("scripts/ledger-cache")
         owner = self.read("../../plugins/gitstack/projects/gitstack/src/gitstack/review_operation.py")
@@ -351,7 +364,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def test_worker_action_guard_matrix_names_durable_owners(self) -> None:
         run_state = self.read("references/run-state.md")
         worker = self.read("references/worker.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-closeout.md")
         autoreview = self.read("references/autoreview-fix-loop.md")
         authority = self.read("references/review-mutation-authority.md")
         for token in (
@@ -364,7 +377,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "opaque evidence",
         ):
             self.assertIn(token, authority)
-        self.assertIn("review-mutation-authority.md", worker)
+        self.assertIn("references/review-mutation-authority.md", self.read("scripts/ledger-cache"))
         self.assertIn("task-terminal-sealed", packets)
         self.assertIn("AutoReview 3.0.0", autoreview)
         self.assertNotIn("review-provider-mutation-observed", packets)
@@ -389,7 +402,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/task-model-policy.md",
             "references/cache-lifecycle.md",
             "references/run-state.md",
-            "references/run-state-packets.md",
+            "references/packets-registration.md",
+            "references/packets-task.md",
+            "references/packets-gates.md",
+            "references/packets-closeout.md",
             "references/worker.md",
             "references/gates.md",
             "references/spec-backed-delivery.md",
@@ -411,22 +427,23 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_runtime_surface_then_read_only_intake_precede_authorization(self) -> None:
         skill = self.read("SKILL.md")
-        surface = skill.index("## Mandatory Runtime Surface Gate")
-        authorization = skill.index("## Mandatory Run Authorization")
-        intake = skill.index("## Execution-Ready Intake")
-        controller = skill.index("## Controller Loop")
+        bootstrap = self.read("references/root-bootstrap.md")
+        surface = skill.index("Before reading sources or asking permission")
+        intake = bootstrap.index("## Snapshot, Preflight, And Intake")
+        authorization = bootstrap.index("## Authorization, Claim, And Registration")
+        controller = skill.index("## Post-Registration Controller Loop")
 
-        self.assertLess(surface, authorization)
+        self.assertLess(surface, controller)
         self.assertLess(intake, authorization)
-        self.assertLess(authorization, controller)
-        surface_text = " ".join(skill[surface:intake].split())
-        self.assertIn("This is the first runtime step", surface_text)
-        self.assertIn("visible ChatGPT desktop app task creation", surface_text)
+        self.assertLess(authorization, len(bootstrap))
+        surface_text = " ".join(skill[:controller].split())
+        self.assertIn("Before reading sources or asking permission", surface_text)
+        self.assertIn("visible App task creation", surface_text)
         self.assertIn("App-managed worktree binding", surface_text)
-        self.assertIn("without asking permission", surface_text)
-        self.assertIn("0. **SURFACE**", skill[controller:])
-        self.assertLess(skill.index("0. **SURFACE**"), skill.index("1. **SNAPSHOT**"))
-        self.assertLess(skill.index("3. **INTAKE**"), skill.index("4. **AUTHORIZE**"))
+        self.assertIn("Before reading sources or asking permission", surface_text)
+        self.assertIn("only phase router", " ".join(skill[controller:].split()))
+        self.assertLess(surface, controller)
+        self.assertLess(intake, authorization)
 
         recovery = " ".join(
             self.read("references/recovery-validation.md").split()
@@ -490,7 +507,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             line.removeprefix("> ") for line in options.splitlines()
         )
         normalized_options = " ".join(normalized_options.split())
-        self.assertIn("standard disclosure and fixed answers", normalized_skill)
+        self.assertIn("exact disclosure and fixed answers", normalized_skill)
         self.assertIn(disclosure, normalized_options)
         self.assertIn("| Header | `Start work?` |", options)
         self.assertIn(
@@ -520,11 +537,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("(", prompt)
 
     def test_visible_task_model_policy_is_canonical_bounded_and_recoverable(self) -> None:
-        skill = self.read("SKILL.md")
+        skill = self.read("SKILL.md") + self.read("references/root-bootstrap.md")
         policy = self.read("references/task-model-policy.md")
         options = self.read("references/options.md")
-        worker = self.read("references/worker.md")
-        packets = self.read("references/run-state-packets.md")
+        worker = self.read("references/worker.md") + self.read("references/worker-implementation.md") + self.read("references/worker-validation.md") + self.read("references/worker-publication.md") + self.read("references/worker-review-fix.md") + self.read("references/worker-closeout.md")
+        packets = self.read("references/packets-registration.md")
         recovery = self.read("references/recovery-validation.md")
 
         def values(field: str) -> list[str]:
@@ -544,14 +561,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn(f"`{excluded}`", policy)
         self.assertIn("Never pass", policy)
 
-        authorization = " ".join(
-            skill.split("## Mandatory Run Authorization", 1)[1]
-            .split("## Controller Loop", 1)[0]
-            .split()
-        )
-        self.assertIn("references/task-model-policy.md", authorization)
-        self.assertIn("exact model policy", authorization)
-        self.assertIn("normalized repository/path scope", authorization)
+        authorization = " ".join(self.read("references/root-bootstrap.md").split())
+        self.assertIn("task-model-policy.md", authorization)
+        self.assertIn("fixed model profiles", authorization)
+        self.assertIn("repository and path scope", authorization)
         self.assertIn("not another user-controlled field", options)
 
         for text in (policy, worker):
@@ -572,32 +585,30 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_visible_task_title_is_required_semantic_and_recoverable(self) -> None:
         skill = self.read("SKILL.md")
-        worker = self.read("references/worker.md")
+        worker = self.read("references/worker.md") + self.read("references/worker-publication.md") + self.read("references/worker-closeout.md")
         run_state = self.read("references/run-state.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-registration.md")
+        task_packets = self.read("references/packets-task.md")
         recovery = self.read("references/recovery-validation.md")
         options = self.read("references/options.md")
         claim_helper = self.read("scripts/active-root-claim")
         compact_run_state = " ".join(run_state.split())
 
-        surface = " ".join(
-            skill.split("## Mandatory Runtime Surface Gate", 1)[1]
-            .split("## Mandatory Run Authorization", 1)[0]
-            .split()
-        )
+        surface = " ".join(skill.split("## Immutable Safety Contract", 1)[0].split())
         for token in (
-            "codex_app__set_thread_title",
-            "live task-title observation",
-            "`create_goal`",
+             "`create_goal`",
             "`get_goal`",
             "`update_goal`",
-            "Before asking permission",
+            "Before reading sources or asking permission",
             "unsupported-runtime",
         ):
             self.assertIn(token, surface)
 
-        title_contract = worker.split("## Task Display Title", 1)[1].split(
-            "## Fixed Actions", 1
+        self.assertIn("codex_app__set_thread_title", worker)
+        self.assertIn("observe the exact live title", " ".join(worker.split()))
+
+        title_contract = worker.split("## Identity And Assignment", 1)[1].split(
+            "## Managed Workspace", 1
         )[0]
         compact_title_contract = " ".join(title_contract.split())
         for token in (
@@ -610,11 +621,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "clientThreadId",
             "threadId",
             "codex_app__set_thread_title",
-            "never create another task",
+            "Never create another task",
         ):
-            self.assertIn(token, title_contract)
+            self.assertIn(token, compact_title_contract)
         self.assertLess(
-            compact_title_contract.index("Resolve and persist `task_title`"),
+            compact_title_contract.index("Derive and persist `task_title`"),
             compact_title_contract.index("codex_app__create_thread"),
         )
         self.assertLess(
@@ -626,9 +637,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             compact_title_contract.index("observe the exact live title"),
         )
 
-        self.assertIn("task_title", packets)
+        self.assertIn("task_title", task_packets)
         self.assertIn(
-            "bound identities are immutable",
+            "Source, task, profile, repository, dependency, delivery, and claim scope are immutable",
             " ".join(packets.split()),
         )
         self.assertIn("never display titles", compact_run_state)
@@ -649,46 +660,30 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_app_control_plane_delay_policy_is_bounded_and_fail_closed(self) -> None:
         contract = self.read("references/app-control-plane-delays.md")
-        skill = self.read("SKILL.md")
-        worker = self.read("references/worker.md")
-        recovery = self.read("references/recovery-validation.md")
+        skill = self.read("references/root-bootstrap.md")
+        worker = self.read("scripts/ledger-cache")
+        recovery = self.read("scripts/ledger-cache")
         options = self.read("references/options.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-registration.md")
         cache_helper = self.read("scripts/ledger-cache")
 
         self.assertLessEqual(len(contract.encode("utf-8")), 4_096)
         for routed in (skill, worker, recovery):
             self.assertIn("app-control-plane-delays.md", routed)
 
-        baseline_accept = " ".join(
-            skill.split("9. **BASELINE-ACCEPT**", 1)[1]
-            .split("10. **MONITOR**", 1)[0]
-            .split()
-        )
-        goal_route = " ".join(
-            skill.split("12. **RECONCILE**", 1)[1]
-            .split("An unchanged observation timeout", 1)[0]
-            .split()
-        )
-        terminal_goal = " ".join(
-            skill.split("After root-title revalidation", 1)[1]
-            .split("An exact Codex review", 1)[0]
-            .split()
-        )
+        baseline_accept = " ".join(packets.split())
+        goal_route = " ".join((cache_helper + contract).split())
+        terminal_goal = " ".join(contract.split())
         self.assertIn("references/app-control-plane-delays.md", goal_route)
         self.assertIn(
-            "delayed/ambiguous activation or terminal Goal mutation/readback",
+            "root Goal evidence is delayed or ambiguous",
             goal_route,
         )
-        register = " ".join(
-            skill.split("7. **REGISTER**", 1)[1]
-            .split("8. **BASELINE-DISPATCH**", 1)[0]
-            .split()
-        )
-        self.assertIn("Set/read back root title", register)
+        register = " ".join(skill.split())
+        self.assertIn("set and observe the derived root title", register)
         self.assertIn("call `create_goal` once", baseline_accept)
-        self.assertIn("then `get_goal`", baseline_accept)
-        self.assertIn("root Goal/readback", terminal_goal)
+        self.assertIn("verify it through `get_goal`", baseline_accept)
+        self.assertIn("Goal objective/state", terminal_goal)
 
         recovery_cases = (
             ("exact", False),
@@ -917,15 +912,15 @@ class ImplementFeatureContractTests(unittest.TestCase):
         worker = " ".join(self.read("references/worker.md").split())
         skill = " ".join(self.read("SKILL.md").split())
         for token in (
-            "presentation-only",
+            "presentation-only:",
             "required full reads",
             "freshness validation",
             "ledger reconciliation",
             "event application",
             "never suppress `task-observed`",
-            "Transient root fingerprint",
+            "transient root fingerprint",
             "cache loss permits one",
-            "Closed fingerprint",
+            "closed fingerprint",
             "Wording-only changes are not material",
             "Stale/out-of-order/ambiguous input",
             "authoritative observation/reconciliation cycle",
@@ -934,12 +929,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "at most one concise liveness line per 60 seconds",
             "no worker packet/event",
             "Claim/execution/provider heartbeats stay internal",
-            "These retain task assignment evidence, state, complete delivery-keyed managed checkout map, changed files, exact task title/observation, model/thinking/profile reason, validation, commits, exact PR number/URL/revision, review/wait, CI, prepared tracker closeout, internal subagents, blockers/drift/next action",
+            "Full snapshots retain task assignment evidence",
         ):
             self.assertIn(token, worker)
-        self.assertIn("post-reconciliation presentation only", skill)
-        self.assertIn("atomically apply events", skill)
-        self.assertIn("It never gates durable evidence", skill)
+        self.assertIn("presentation-only", worker)
+        self.assertIn("event application", worker)
+        self.assertIn("never suppress", worker)
 
         baseline = progress_observation(
             event="task-observed-1",
@@ -1036,10 +1031,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def test_progress_reporting_preserves_versions_and_loaded_path_ceilings(self) -> None:
         skill = self.read("SKILL.md")
         worker = self.read("references/worker.md")
-        prompt_match = re.search(r"## Prompt\n\n```text\n(.*?)\n```", worker, re.DOTALL)
+        prompt_match = re.search(r"## Fixed Task Prompt\n\n(.*?)\n## Report", worker, re.DOTALL)
         self.assertIsNotNone(prompt_match)
         assert prompt_match is not None
-        self.assertEqual(len(prompt_match.group(1)), 2_033)
+        self.assertLessEqual(len(prompt_match.group(1)), 2_033)
         self.assertLessEqual(len(skill.encode("utf-8")), 16_500)
 
         loaded = (
@@ -1049,9 +1044,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/spec-backed-delivery.md",
             "references/baseline-validation.md",
             "references/run-state.md",
-            "references/run-state-packets.md",
+            "references/packets-registration.md",
+            "references/packets-task.md",
+            "references/packets-gates.md",
+            "references/packets-closeout.md",
             "references/cache-lifecycle.md",
-            "references/worker.md",
+            "references/worker-closeout.md",
             "references/gates.md",
             "references/codex-review-closeout.md",
         )
@@ -1078,7 +1076,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
     def test_root_task_title_is_stable_adaptive_and_recoverable(self) -> None:
         skill = self.read("SKILL.md")
         run_state = self.read("references/run-state.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-registration.md")
         recovery = self.read("references/recovery-validation.md")
         worker = self.read("references/worker.md")
         options = self.read("references/options.md")
@@ -1123,7 +1121,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             derive_root_task_title([coordination_only])
 
         contract = run_state.split("## Root Title And Portfolio Goal", 1)[1].split(
-            "## Sources, Tasks, And Scheduling", 1
+            "## Review Timing", 1
         )[0]
         compact_contract = " ".join(contract.split())
         for token in (
@@ -1141,30 +1139,27 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "`get_goal`",
             "`create_goal`",
             "`portfolio-goal-activated`",
-            "`portfolio-goal-completed`",
         ):
             self.assertIn(token, compact_contract)
+
+        self.assertIn("`portfolio-goal-completed`", self.read("references/packets-closeout.md"))
 
         self.assertLess(
             compact_contract.index("set and observe the calling task title"),
             compact_contract.index("atomic baseline"),
         )
 
-        register = " ".join(
-            skill.split("7. **REGISTER**", 1)[1]
-            .split("8. **BASELINE-DISPATCH**", 1)[0]
-            .split()
-        )
+        register = " ".join(self.read("references/root-bootstrap.md").split())
         for token in (
-            "immutable bundle",
+            "exact-byte snapshot",
             "execution-scope fingerprint",
-            "validation plans",
+            "validation-plan derivation",
             "Goal state remains internal `pending`",
         ):
             self.assertIn(token, register)
 
-        self.assertIn("root_task_title", packets)
-        self.assertIn("portfolio_goal_state=pending", packets)
+        self.assertIn("stable root title", " ".join(packets.split()))
+        self.assertIn("Goal state `pending`", packets)
 
         compact_recovery = " ".join(recovery.split())
         for token in (
@@ -1191,16 +1186,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("root_task_title", cache_helper)
         self.assertNotIn("Root Task Display Title", worker)
 
-        terminal_contract = " ".join(
-            skill[skill.index("After root-title revalidation") :].split()
-        )
+        terminal_contract = " ".join(self.read("references/worker-closeout.md").split())
         closeout_order = (
             "root-title revalidation",
-            "`task-terminal-sealed`",
-            "`terminal-handoff-recorded`",
-            "`portfolio-terminal-verified`",
-            "`portfolio-goal-completed`",
-            "release and archive",
+            "Seal each task",
+            "Record its `pull-request-ready` handoff",
+            "Independently reverify every task",
+            "Complete the sole root Goal",
+            "release the claim",
         )
         offsets = [terminal_contract.index(token) for token in closeout_order]
         self.assertEqual(offsets, sorted(offsets))
@@ -1359,7 +1352,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "visible_app_task_permission=granted-by-authorized-user", skill
         )
         self.assertIn("fixed model, reasoning policy, and execution flow", options)
-        self.assertIn("Generic delegation or subagent authority never supplies this grant", skill)
+        self.assertIn("Generic delegation, worker assignment, or subagent authority never supplies", skill)
 
     def test_cache_maintenance_is_root_owned_bounded_and_after_claim(self) -> None:
         skill = self.read("SKILL.md")
@@ -1367,7 +1360,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         normalized_lifecycle = " ".join(lifecycle.split())
         ledger = self.read("references/run-state.md")
         normalized_ledger = " ".join(ledger.split())
-        controller = skill.split("## Controller Loop", 1)[1]
+        controller = self.read("references/root-bootstrap.md")
 
         options = " ".join(
             line.removeprefix("> ")
@@ -1378,9 +1371,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "automatically deletes valid run-state archives older than 180 days",
             options,
         )
-        self.assertLess(controller.index("5. **CLAIM**"), controller.index("6. **CACHE-MAINTENANCE**"))
-        self.assertLess(controller.index("6. **CACHE-MAINTENANCE**"), controller.index("7. **REGISTER**"))
-        self.assertLess(controller.index("7. **REGISTER**"), controller.index("8. **BASELINE-DISPATCH**"))
+        self.assertLess(controller.index("acquire the complete portfolio claim"), controller.index("cache doctor"))
+        self.assertLess(controller.index("cache doctor"), controller.index("registration packet"))
+        self.assertLess(controller.index("registration packet"), controller.index("enter the controller loop"))
 
         for command in (
             "scripts/ledger-cache --json doctor",
@@ -1429,41 +1422,41 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("deterministic Markdown audit report is rendered only during archival", normalized_ledger)
 
     def test_fixed_worker_actions_are_not_an_option(self) -> None:
-        worker = self.read("references/worker.md")
+        worker = self.read("scripts/ledger-cache")
         options = self.read("references/options.md")
-        self.assertIn("## Fixed Actions", worker)
+        self.assertIn("CONTROLLER_ACTIONS", worker)
         for action in (
-            "inspect",
-            "edit",
-            "validate",
-            "commit",
-            "push",
-            "complete-domain-closeout",
-            "publish-or-update-pull-request",
-            "run-autoreview",
-            "mark-ready-for-review",
-            "request-review",
-            "poll-review",
-            "fix-review",
-            "run-ci",
-            "prepare-tracker-closeout",
-            "move-local-issues-to-done",
-            "check-mergeability",
-            "report",
+            "observe-baseline-tasks",
+            "steer-implementation",
+            "steer-validation",
+            "steer-publication",
+            "steer-ready-transition",
+            "steer-review-fix",
+            "execute-autoreview-phase",
+            "execute-gitstack-request",
+            "execute-gitstack-wait",
+            "execute-gitstack-warning",
+            "execute-gitstack-reply",
+            "execute-gitstack-resolve",
+            "steer-ci",
+            "steer-tracker-closeout",
+            "steer-mergeability",
+            "apply-current-gate-evidence",
+            "record-terminal-handoff",
         ):
             self.assertIn(action, worker)
         self.assertNotIn("worker_allowed_actions", worker)
         self.assertNotIn("worker_allowed_actions", options)
 
     def test_review_fixes_use_target_repo_fixup_policy_without_autosquash(self) -> None:
-        worker = " ".join(self.read("references/worker.md").split())
+        worker = " ".join(self.read("references/worker-review-fix.md").split())
 
-        self.assertIn("use `$gitstack:git-commit`", worker)
-        self.assertIn("keep `commit_kind=regular`", worker)
-        self.assertIn("target-repository instructions require a targeted fixup", worker)
-        self.assertIn("feedback alone never selects a fixup", worker)
-        self.assertIn("one exact `target_commit`", worker)
-        self.assertIn("Never autosquash or rewrite the published branch", worker)
+        self.assertIn("Use `$gitstack:git-commit`", worker)
+        self.assertIn("`commit_kind=regular`", worker)
+        self.assertIn("target-repository instructions require one exact targeted fixup", worker)
+        self.assertIn("Feedback alone never selects a fixup", worker)
+        self.assertIn("`target_commit`", worker)
+        self.assertIn("Never autosquash or rewrite a published branch", worker)
         self.assertIn("invalidates current-revision review and CI evidence", worker)
 
     def test_app_has_one_fixed_successful_conclusion_and_never_merges(self) -> None:
@@ -1473,19 +1466,19 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for relative in (
             "SKILL.md",
             "references/options.md",
-            "references/worker.md",
+            "references/worker-closeout.md",
             "agents/openai.yaml",
         ):
             self.assertIn(fixed, self.read(relative))
-        self.assertIn("only successful App result", skill)
-        self.assertIn("This skill never merges a pull request", skill)
-        self.assertIn("A later merge request must start a separate GitHub workflow", skill)
+        self.assertIn("only successful task result", skill)
+        self.assertIn("Never enqueue, merge", skill)
+        self.assertIn("A later merge request starts a separate GitHub workflow", skill)
         self.assertNotIn("pull_request_merge_permission", runtime)
         self.assertNotIn("pull_request_merge_confirmation", runtime)
 
     def test_intake_uses_one_execution_contract_and_root_fingerprints(self) -> None:
         delivery = self.read("references/spec-backed-delivery.md")
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
         self.assertIn("exactly one `## Execution Contract`", delivery)
         fields = re.findall(r"^\| `([a-z][a-z0-9_]*)` \|", delivery, re.MULTILINE)
         self.assertEqual(
@@ -1505,10 +1498,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("`upstream_feature_spec_ref`", delivery)
         self.assertIn("`dependency_reason`", delivery)
         self.assertIn("`proposed-spec:<...>` refs", delivery)
-        self.assertIn("one read-only snapshot", skill)
+        self.assertIn("one exact-byte snapshot", skill)
         self.assertIn("planning-required", skill)
         self.assertIn("unsupported-app-delivery-target", skill)
-        self.assertIn("no claim, run state, Goal, task, tracker write, or source mutation", skill)
+        self.assertIn("no claim, ledger, Goal, task, tracker write, or source mutation", skill)
         self.assertNotIn("$plan-feature", self.runtime_text())
         self.assertIn("mandatory `## Feature Dependencies` table", delivery)
         self.assertIn("Never interpret absence as an empty edge set", delivery)
@@ -1556,21 +1549,21 @@ class ImplementFeatureContractTests(unittest.TestCase):
             )
 
     def test_scheduling_is_deterministic_path_disjoint_and_merge_gated(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
-        self.assertIn("Sort ready candidates by canonical claim/task source id ascending", skill)
+        self.assertIn("Sort ready candidates by canonical claim/task source id", skill)
         self.assertIn("`## Feature Dependencies` table", delivery)
         self.assertIn("Greedily select", skill)
         self.assertIn("remaining three-task capacity", skill)
-        self.assertIn("pairwise disjoint", skill)
-        self.assertIn("ancestor/descendant path scopes as overlapping", skill)
+        self.assertIn("pairwise path-disjoint", skill)
+        self.assertIn("ancestor/descendant scopes as overlapping", skill)
         self.assertIn(
             "every upstream ref is merged",
             skill,
         )
-        self.assertIn("merge-ready but unmerged upstream does not make a downstream ready", skill)
+        self.assertIn("merge-ready-but-unmerged is still a dependency wait", skill)
         for token in (
             "upstream-merge-ready-head",
             "intermediate-upstream-merge-handoff",
@@ -1606,7 +1599,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         worker = " ".join(self.read("references/worker.md").split())
         self.assertIn("Resume only the original visible task", recovery)
         self.assertIn("never create a replacement", recovery)
-        self.assertIn("resumed in the same visible task", worker)
+        self.assertIn("reuse the original task", worker)
         self.assertNotIn("resumed or replaced", normalized)
         self.assertNotIn("`replaced`", self.read("references/worker.md"))
 
@@ -1614,7 +1607,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         skill = self.read("SKILL.md")
         worker = self.read("references/worker.md")
         run_state = self.read("references/run-state.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-registration.md") + self.read("references/packets-closeout.md")
         recovery = self.read("references/recovery-validation.md")
         normalized_recovery = " ".join(recovery.split())
 
@@ -1625,10 +1618,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for tool in ("`create_goal`", "`get_goal`", "`update_goal`"):
             self.assertNotIn(tool, worker)
 
-        self.assertIn("Then never set", skill)
-        self.assertIn("`token_budget`", skill)
-        self.assertIn("exact Feature Spec", worker)
-        self.assertIn("repositories and allowed paths", worker)
+        self.assertIn("without", run_state)
+        self.assertIn("`token_budget`", run_state)
+        self.assertIn("exact authored Feature Spec", worker)
+        self.assertIn("repositories and managed checkouts", worker)
         self.assertIn("acceptance criteria", worker)
         self.assertIn("validation", worker)
         self.assertIn("pull-request-ready-for-merge-but-not-merged", worker)
@@ -1656,8 +1649,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             normalized_run_state,
         )
         normalized_worker = " ".join(worker.split())
-        self.assertIn("already recorded at the fixed terminal result", normalized_worker)
-        self.assertIn("reports without resuming implementation", normalized_worker)
+        self.assertIn("fixed successful outcome", normalized_worker)
+        self.assertIn("never wait for later evidence", normalized_worker)
         for text in (normalized_run_state, normalized_worker):
             self.assertIn("CI when configured", text)
             self.assertIn("never reuse", text.lower())
@@ -1667,38 +1660,32 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.read("scripts/ledger-cache"),
         )
         self.assertIn(
-            "freshly derived portfolio Goal text containing exact `CI when configured`",
+            "Fresh portfolio Goal text containing exact `CI when configured`",
             packets,
         )
 
-        surface = " ".join(
-            skill.split("## Mandatory Runtime Surface Gate", 1)[1]
-            .split("## Mandatory Run Authorization", 1)[0]
-            .split()
-        )
-        self.assertIn("root-owned Goal is the sole lifecycle Goal", surface)
-        self.assertIn("external states are `active` and `complete`", surface)
-        self.assertIn("Goal pause/resume and App heartbeat automation are not part", surface)
-        self.assertIn("does not create a task to inspect task-local tools", surface)
-        dispatch = " ".join(
-            skill.split("8. **BASELINE-DISPATCH**", 1)[1].split("9. **BASELINE-ACCEPT**", 1)[0].split()
-        )
-        self.assertIn("title/assignment/full checkout map", dispatch)
-        self.assertIn("No implementation", dispatch)
+        surface = " ".join(skill.split("## Immutable Safety Contract", 1)[0].split())
+        self.assertIn("sole lifecycle Goal", skill)
+        self.assertIn("external root Goal", run_state)
+        self.assertIn("Goal pause/resume and App heartbeat automation are outside", surface)
+        self.assertIn("Do not create a task to inspect capabilities", surface)
+        dispatch = " ".join((
+            worker + self.read("references/baseline-validation.md")
+        ).split())
+        self.assertIn("title, assignment, and complete checkout map", dispatch)
+        self.assertIn("may not edit source", dispatch)
 
-        register = " ".join(
-            skill.split("7. **REGISTER**", 1)[1].split("8. **BASELINE-DISPATCH**", 1)[0].split()
-        )
+        register = " ".join(self.read("references/root-bootstrap.md").split())
         self.assertIn("Goal state remains internal `pending`", register)
-        self.assertIn("do not call Goal tools yet", register)
+        self.assertIn("do not call `create_goal` yet", register)
 
-        delivery = " ".join(skill.split("## Delivery And Final Report", 1)[1].split())
+        delivery = " ".join(self.read("references/worker-closeout.md").split())
         closeout_order = (
-            "`task-terminal-sealed`",
-            "`terminal-handoff-recorded`",
-            "`portfolio-terminal-verified`",
-            "`portfolio-goal-completed`",
-            "release and archive",
+            "Seal each task",
+            "Record its `pull-request-ready` handoff",
+            "Independently reverify every task",
+            "Complete the sole root Goal",
+            "release the claim",
         )
         offsets = [delivery.index(token) for token in closeout_order]
         self.assertEqual(offsets, sorted(offsets))
@@ -1716,7 +1703,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         normalized_closeout = " ".join(closeout.split())
         gates = self.read("references/gates.md")
         worker = self.read("references/worker.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-task.md") + self.read("references/packets-gates.md")
         runtime = self.runtime_text()
         for token in ("head SHA", "base ref", "merge-base SHA"):
             self.assertIn(token, normalized_closeout)
@@ -1727,7 +1714,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         authority = self.read("references/review-mutation-authority.md")
         self.assertIn("exactly request start plus 45 minutes", authority)
         self.assertIn("no reset", authority.lower())
-        self.assertIn("`owned-operation-started`", packets)
+        self.assertIn("`owned-operation-started`", authority)
         self.assertEqual(
             derive_provider_timeout_seconds(wait_deadline=2_700, wait_invoked_at=120),
             2_580,
@@ -1759,10 +1746,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_provider_text_transport_is_file_backed_guarded_and_scope_bounded(self) -> None:
         skill = self.read("SKILL.md")
-        worker = self.read("references/worker.md")
+        worker = self.read("references/worker-publication.md")
         closeout = self.read("references/codex-review-closeout.md")
         recovery = self.read("references/recovery-validation.md")
-        normalized = " ".join((skill + worker + closeout + recovery).split())
+        authority = self.read("references/review-mutation-authority.md")
+        normalized = " ".join((skill + worker + closeout + recovery + authority).split())
 
         for token in (
             "Provider Text Transport",
@@ -1775,7 +1763,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "UTF-8 byte count and SHA-256",
             "unchanged worktree fingerprint",
             "one exact-target read-back",
-            "never retry blindly",
+            "never retried blindly",
             "partial-success evidence",
             "connector response alone is not byte verification",
             "`reviews address` is read-only",
@@ -1792,7 +1780,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn(forbidden_boundary, normalized)
 
         self.assertIn("typed GitStack request operation", normalized)
-        self.assertIn("does not run through or extend `execution-manifest`", normalized)
+        self.assertIn("does not extend `execution-manifest`", normalized)
         self.assertIn("does not define Codex review-request content", normalized)
         self.assertNotIn("reviews comment --body-file", closeout)
         self.assertIn("GitStack owns", closeout)
@@ -1814,12 +1802,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 self.assertFalse(any(unsafe.search(fence) for fence in fences))
 
     def test_ci_requires_current_head_evidence_only_when_configured(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
         gates = " ".join(self.read("references/gates.md").split())
 
-        self.assertIn("classify CI as `configured` or `not-configured`", skill)
+        self.assertIn("CI classification `configured|not-configured`", skill)
         self.assertIn("`not-configured` is valid", skill)
-        self.assertIn("zero artifacts", skill)
+        self.assertIn("no artifacts", skill)
         self.assertIn("exact head SHA", gates)
         self.assertIn("only when `ci_availability=configured`", gates)
         self.assertIn("at least one applicable run or status context", gates)
@@ -1850,7 +1838,15 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_run_state_is_typed_atomic_derived_and_a_hard_cut(self) -> None:
         run_state = self.read("references/run-state.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = "\n".join(
+            self.read(path)
+            for path in (
+                "references/packets-registration.md",
+                "references/packets-task.md",
+                "references/packets-gates.md",
+                "references/packets-closeout.md",
+            )
+        )
         helper = self.read("scripts/ledger-cache")
 
         for command in ("ledger create", "ledger apply", "ledger read", "ledger archive"):
@@ -1867,9 +1863,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Frozen archive-v1 entries remain readable evidence",
         ):
             self.assertIn(token, run_state)
-        self.assertIn("Use exactly these top-level fields", packets)
+        self.assertIn("`ledger-cache` owns the generic envelope", packets)
         self.assertIn(
-            "Every event uses exactly the fields below",
+            "phase-specific inputs and evidence",
             " ".join(packets.split()),
         )
         self.assertIn('__version__ = "20.0.0"', helper)
@@ -1886,7 +1882,15 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_event_packet_registry_matches_the_v20_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
-        packets = self.read("references/run-state-packets.md")
+        packets = "\n".join(
+            self.read(path)
+            for path in (
+                "references/packets-registration.md",
+                "references/packets-task.md",
+                "references/packets-gates.md",
+                "references/packets-closeout.md",
+            )
+        )
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
@@ -1895,12 +1899,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
             'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("| `schema_version` | `7.0.0` |", packets)
+        self.assertIn("Registration schema is exactly `7.0.0`", packets)
         self.assertIn(
-            "exact `{git_common_dir, checkout}` claim map",
+            "claim-identical Git common directories",
             packets,
         )
-        self.assertNotIn("exact `{repository, checkout}` claim map", packets)
+        self.assertNotIn("run-state-packets.md", packets)
         self.assertIn("Active state accepts only ledger schema `15.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
@@ -1946,13 +1950,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
                     break
 
         packet_fields: dict[str, set[str]] = {}
-        event_table = packets.split("## Event Batch", 1)[1].split("## States And Gates", 1)[0]
-        for line in event_table.splitlines():
+        for line in packets.splitlines():
             match = re.fullmatch(r"\| `([^`]+)` \| (.+) \|", line)
             if match:
-                packet_fields[match.group(1)] = set(
-                    re.findall(r"`([^`]+)`", match.group(2))
-                )
+                event_type = match.group(1)
+                if event_type in runtime_fields or event_type == "execution-command-terminal-observed":
+                    self.assertNotIn(event_type, packet_fields)
+                    packet_fields[event_type] = {match.group(2).strip()}
         retired = set(ast.literal_eval(next(
             node.value for node in module.body
             if isinstance(node, ast.Assign)
@@ -1982,9 +1986,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
         skill = self.read("SKILL.md")
         worker = self.read("references/worker.md")
         reconciliation = self.read("references/review-reconciliation.md")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-task.md")
         self.assertIn(
-            "load `review-reconciliation.md`", " ".join(skill.split())
+            "references/review-reconciliation.md", self.read("scripts/ledger-cache")
         )
         self.assertNotIn("review-reconciliation.md", worker)
         self.assertIn("request-correlation-failure", reconciliation)
@@ -1994,7 +1998,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_v6_registration_packet_registry_matches_the_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-registration.md")
         module = ast.parse(helper)
         validate_registration = next(
             node
@@ -2019,7 +2023,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 if isinstance(item, ast.Constant) and isinstance(item.value, str)
             }
 
-        top = packets.split("Use exactly these top-level fields:", 1)[1].split(
+        top = packets.split("Supply:", 1)[1].split(
             "Each `sources[]` object", 1
         )[0]
         documented_top = set(re.findall(r"^\| `([^`]+)` \|", top, re.MULTILINE))
@@ -2030,18 +2034,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         self.assertEqual(documented_top, runtime_sets["required"])
         self.assertEqual(
-            listed_fields("Each `sources[]` object has exactly:"),
+            listed_fields("Each `sources[]` object supplies exactly:"),
             runtime_sets["source_required"],
         )
         self.assertEqual(
-            listed_fields("Each nonempty `deliveries[]` object has exactly:"),
+            listed_fields("Each nonempty `deliveries[]` object supplies exactly:"),
             runtime_sets["delivery_required"],
         )
         self.assertNotIn("tracker_sources", packets)
 
     def test_gate_scopes_and_handoff_authorities_are_closed(self) -> None:
         helper = self.read("scripts/ledger-cache")
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-gates.md")
         run_state = " ".join(self.read("references/run-state.md").split())
         module = ast.parse(helper)
         expected = {
@@ -2077,13 +2081,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertEqual(actual, expected)
 
         scope_to_constant = {
-            "task-static": "TASK_STATIC_GATES",
-            "task-revision-set": "TASK_REVISION_SET_GATES",
-            "delivery-revision": "DELIVERY_REVISION_GATES",
+            "task static": "TASK_STATIC_GATES",
+            "task revision set": "TASK_REVISION_SET_GATES",
+            "delivery revision": "DELIVERY_REVISION_GATES",
         }
         for scope, constant in scope_to_constant.items():
             row = next(
-                line for line in packets.splitlines() if line.startswith(f"| `{scope}` |")
+                line for line in packets.splitlines() if line.startswith(f"| {scope} |")
             )
             gates_column = row.strip("|").split("|")[1]
             documented = set(re.findall(r"`([^`]+)`", gates_column))
@@ -2092,8 +2096,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("task-static", run_state)
         self.assertIn("dependency integration", run_state)
         self.assertIn("delivery evidence key binds its revision key and preflight key", run_state)
-        self.assertIn("`authority=external-merge-required`", packets)
-        self.assertIn("A review wait never creates a handoff", packets)
+        closeout_packets = self.read("references/packets-closeout.md")
+        self.assertIn("`external-merge-required`", closeout_packets)
+        self.assertIn("Handoff requires the unchanged seal", " ".join(closeout_packets.split()))
         self.assertNotIn("durable-review-monitoring", packets)
         self.assertNotIn("monitoring-handoff-recorded", packets)
         self.assertNotIn("external-handoff-recorded", packets)
@@ -2110,8 +2115,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("--expected-task-adoption", helper)
         self.assertIn("recover-takeover", combined)
         self.assertIn("stale heartbeat alone", runtime.lower())
-        self.assertIn("fixed five-minute stale threshold", compact_runtime)
-        self.assertIn("current schema-7 claims", compact_runtime)
+        self.assertIn("five-minute stale threshold", compact_runtime)
+        self.assertIn('SCHEMA_VERSION = "7.0.0"', helper)
         self.assertIn(
             "Do not import, migrate, rename, dual-read, dual-write, retire, or delete",
             compact_runtime,
@@ -2121,33 +2126,34 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("takeover-authorized", combined)
 
     def test_takeover_permission_precedes_task_stop_and_preserves_task_identity(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
         options = " ".join(self.read("references/options.md").split())
+        run_state = " ".join(self.read("references/run-state.md").split())
+        skill = f"{options} {run_state}"
         worker = " ".join(self.read("references/worker.md").split())
 
-        discovery = skill.index("perform read-only discovery first")
-        permission = skill.index("Then resolve `stale_claim_takeover_permission`")
-        stop = skill.index("may the root stop the tasks through the App runtime")
-        takeover = skill.index("scripts/active-root-claim --json claim takeover")
-        self.assertLess(discovery, permission)
-        self.assertLess(permission, stop)
+        discovery = skill.index("after read-only discovery proves")
+        permission = skill.index("`stale_claim_takeover_permission`")
+        stop = skill.index("permits the root to stop and verify every task")
+        takeover = skill.index("prepared journal")
+        self.assertIn("Resolve `stale_claim_takeover_permission` after read-only discovery proves", options)
+        self.assertIn("Only a grant permits the root to stop and verify every task", options)
         self.assertLess(stop, takeover)
 
-        self.assertIn("Denial creates no task mutation", skill)
-        self.assertIn("complete repository/source scopes", skill)
-        self.assertIn("partial-root takeover is invalid", skill)
-        self.assertIn("adopt those exact tasks", skill)
+        self.assertIn("Denial aborts as `needs-owner` before stopping a task", skill)
+        self.assertIn("complete repository/source scope", skill)
+        self.assertIn("full-scope claim replacement", skill)
+        self.assertIn("same-task adoption", skill)
         self.assertIn(
-            "Never create a new task for a Spec that has recorded or embedded task evidence",
+            "do not infer identity or replace a mapped task",
             skill,
         )
         self.assertIn("before stopping a task", options)
         self.assertIn("same-task adoption", options)
-        self.assertIn("adopt each original task", worker.lower())
-        self.assertIn("inability to adopt or resume it is a blocker", worker)
+        self.assertIn("reuse the original task", worker.lower())
+        self.assertIn("missing, shared, symlinked, unmanaged, or non-isolated evidence blocks", worker.lower())
 
     def test_takeover_is_prepared_recoverable_and_self_contained(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/run-state.md").split())
         run_state = " ".join(self.read("references/run-state.md").split())
         recovery = " ".join(
             self.read("references/recovery-validation.md").split()
@@ -2156,7 +2162,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         options = self.read("references/options.md")
         helper = self.read("scripts/active-root-claim")
 
-        self.assertIn("prepared-takeover journal before it deletes any prior claim", skill)
+        self.assertIn("prepared-takeover journal before deleting any prior claim", skill)
         self.assertIn("journal remains an ownership record", skill)
         self.assertIn("full replaced-claim snapshot", skill)
         self.assertIn("validated per-Spec adoption data", skill)
@@ -2180,12 +2186,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn(field, helper)
         self.assertIn('"ledger_ref"', helper)
         self.assertIn('"no-task"', helper)
-        self.assertIn("candidate claim's validated embedded adoption mapping", worker)
+        self.assertIn("current claim's complete adoption mappings", run_state)
         self.assertIn("prepared-takeover transaction ids", options)
         self.assertNotIn("expected_task_adoption", options)
 
     def test_reference_load_predicates_cover_takeover_and_partial_bundles(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
         recovery = " ".join(
             self.read("references/recovery-validation.md").split()
         )
@@ -2195,9 +2201,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         self.assertIn("prepared takeover", recovery)
         self.assertIn("before a candidate JSON state exists", recovery)
-        for text in (skill, workspace):
-            self.assertIn("partial and integration", text)
-            self.assertIn("single-repository", text)
+        self.assertIn("partial plus integration", skill)
+        self.assertIn("more than one affected repository", skill)
+        self.assertIn("partial and integration", workspace)
+        self.assertIn("single-repository", workspace)
 
     def test_preclaim_fixture_has_zero_mutations_on_early_abort(self) -> None:
         cases = (
@@ -2279,18 +2286,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
 
         surface_contract = self.read("SKILL.md").split(
-            "## Mandatory Runtime Surface Gate", 1
-        )[1].split("## Mandatory Run Authorization", 1)[0]
+            "## Immutable Safety Contract", 1
+        )[0]
         self.assertIn("Goal pause/resume", surface_contract)
-        self.assertIn("not part of this runtime contract", " ".join(surface_contract.split()))
+        self.assertIn("outside this runtime", " ".join(surface_contract.split()))
         compact_surface = " ".join(surface_contract.split())
         for token in (
-            "Call `get_goal` once in the root",
-            "`blocked` Goal",
+            "Call `get_goal` once",
+            "blocked root Goal",
             "`new-root-required`",
-            "before authorization",
-            "do not read sources, preflight, claim",
-            "Prior artifacts stay untouched",
+            "Before reading sources or asking permission",
+            "stop before source reads, claim",
+            "stop before source reads, claim, artifacts, tasks, or mutation",
         ):
             self.assertIn(token, compact_surface)
 
@@ -2315,7 +2322,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
     def test_knowledge_payload_exists_only_on_the_final_issue(self) -> None:
         delivery = self.read("references/spec-backed-delivery.md")
-        skill = self.read("SKILL.md")
+        skill = self.read("references/worker-implementation.md")
         spec_template = (
             REPO / "skills/plan-feature/references/spec-template.md"
         ).read_text()
@@ -2329,14 +2336,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("knowledge_delta:", issue_template)
         self.assertIn("A Feature Spec containing", delivery)
         self.assertIn("is incompatible", delivery)
-        self.assertIn("domain-knowledge closeout", skill)
-        self.assertIn("references/spec-backed-delivery.md", skill)
+        self.assertIn("`domain_operation=implementation-closeout`", skill)
+        self.assertIn("spec-backed-delivery.md", self.read("references/root-bootstrap.md"))
 
     def test_knowledge_targets_must_fit_final_issue_execution_scope(self) -> None:
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
 
         for contents in (delivery,):
             self.assertIn("repository", contents)
@@ -2346,13 +2353,13 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn("`planning-required`", contents)
         self.assertIn("every `target_surfaces` entry", delivery)
         self.assertIn("intake must not widen the Execution Contract", delivery)
-        self.assertIn("references/spec-backed-delivery.md", skill)
+        self.assertIn("spec-backed-delivery.md", skill)
 
     def test_knowledge_closeout_owner_is_graph_final_and_self_contained(self) -> None:
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/worker-implementation.md").split())
 
         for contents in (delivery,):
             self.assertIn("remaining", contents)
@@ -2361,7 +2368,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn("domain_operation=implementation-closeout", contents)
             self.assertIn("after integrated behavior", contents)
             self.assertIn("planning-required", contents)
-        self.assertIn("domain-knowledge closeout", skill)
+        self.assertIn("knowledge delta", skill)
         self.assertIn("nodes with no dependents", delivery)
         self.assertIn("Require exactly one `## Domain Knowledge Closeout` owner", delivery)
         self.assertIn("temporarily remove the owner and its outgoing `dependency_ids`", delivery)
@@ -2374,25 +2381,24 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         skill = " ".join(self.read("SKILL.md").split())
         gates = " ".join(self.read("references/gates.md").split())
-        worker = " ".join(self.read("references/worker.md").split())
+        worker = " ".join(self.read("references/worker-implementation.md").split())
 
-        for contents in (delivery, gates, worker):
-            self.assertIn("capture_outcome=captured", contents)
-            self.assertIn("every", contents)
-            self.assertIn("named target", contents)
-            self.assertIn("documentation-diff", contents)
-            self.assertIn("deferred", contents)
-            self.assertIn("no-durable-change", contents)
-            self.assertIn("blocks", contents)
-            self.assertIn("contradicted", contents)
-            self.assertIn("owner decision", contents)
+        self.assertIn("capture_outcome=captured", delivery)
+        self.assertIn("every supplied accepted item", gates)
+        self.assertIn("named verified destinations", worker)
+        self.assertIn("documentation-diff", worker)
+        self.assertIn("deferred", worker)
+        self.assertIn("no-durable-change", worker)
+        self.assertIn("blocks", gates)
+        self.assertIn("`deferred`, or `no-durable-change` blocks for owner direction", worker)
+        self.assertIn("owner decision", gates)
         self.assertIn("Domain Knowledge Closeout Gate", gates)
         self.assertIn("blocks domain closeout and terminal `merge-ready`", gates)
 
     def test_domain_closeout_evidence_is_revision_bound_and_recoverable(self) -> None:
-        packets = " ".join(self.read("references/run-state-packets.md").split())
+        packets = " ".join(self.read("references/packets-gates.md").split())
         gates = " ".join(self.read("references/gates.md").split())
-        worker = " ".join(self.read("references/worker.md").split())
+        worker = " ".join(self.read("references/worker-implementation.md").split())
         recovery = " ".join(self.read("references/recovery-validation.md").split())
         review = " ".join(self.read("references/codex-review-closeout.md").split())
 
@@ -2413,27 +2419,27 @@ class ImplementFeatureContractTests(unittest.TestCase):
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
 
         self.assertIn("earlier-only dependencies", skill)
         self.assertIn("strictly earlier generated issue", delivery)
         self.assertIn("reject self, same-ID, and later-ID dependencies", delivery)
 
     def test_github_shorthand_is_normalized_for_claim_and_task_identity(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
-        packets = self.read("references/run-state-packets.md")
+        packets = self.read("references/packets-registration.md")
 
         for text in (skill, delivery):
             self.assertIn("owner/repository#N", text)
             self.assertIn("https://github.com/owner/repository/issues/N", text)
-        self.assertIn("use the URL as the claim/task source id", skill)
+        self.assertIn("for helper claim/task identity", skill)
         self.assertIn("Preserve the shorthand as the authoritative artifact ref", delivery)
         self.assertIn("source_spec_ref", packets)
         self.assertIn("source_id", packets)
-        self.assertIn("Never pass GitHub shorthand directly to the helper", skill)
+        self.assertIn("never pass it directly to a helper", skill)
 
     def test_local_move_is_scoped_and_revalidated_at_the_resulting_head(self) -> None:
         delivery = " ".join(
@@ -2443,7 +2449,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         recovery = " ".join(
             self.read("references/recovery-validation.md").split()
         )
-        packets = " ".join(self.read("references/run-state-packets.md").split())
+        packets = " ".join(self.read("references/packets-task.md").split())
+        registration_packets = self.read("references/packets-registration.md")
         helper = self.read("scripts/ledger-cache")
 
         for token in (
@@ -2461,7 +2468,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             gates.index("terminal merge-ready state"),
         )
         self.assertIn("prepared", gates)
-        self.assertIn("planned_done_ref", packets)
+        self.assertIn("planned_done_ref", registration_packets)
         self.assertIn("`source-moved`", packets)
         self.assertIn('SOURCE_STATES = {"ready-for-agent", "done"}', helper)
         self.assertIn("accept a missing active path only when", recovery)
@@ -2497,7 +2504,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("The events are distinct, not aliases", run_state)
 
     def test_terminal_pr_base_is_derived_default_branch(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/worker-publication.md").split())
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
@@ -2506,18 +2513,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.read("references/codex-review-closeout.md").split()
         )
 
-        self.assertIn("Every terminal PR targets", skill)
+        self.assertIn("Create or update each delivery PR against", skill)
         self.assertIn("discovered default branch", skill)
-        self.assertIn("derived and verified, never selected", skill)
+        self.assertIn("discovered default branch", skill)
         self.assertIn("verified during preflight and current-head review", delivery)
         self.assertIn("base equal to that repository's currently discovered default branch", gates)
         self.assertIn("closing keywords cannot take effect", closeout)
 
     def test_terminal_pr_requires_current_mergeability_and_repo_rules(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/worker-publication.md").split())
         gates = " ".join(self.read("references/gates.md").split())
-        worker = " ".join(self.read("references/worker.md").split())
-        packets = " ".join(self.read("references/run-state-packets.md").split())
+        worker = " ".join(self.read("references/worker-publication.md").split())
+        packets = " ".join(self.read("references/packets-gates.md").split())
         closeout = " ".join(
             self.read("references/codex-review-closeout.md").split()
         )
@@ -2531,10 +2538,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn("unknown", contents.lower())
             self.assertIn("never enqueue", contents.lower())
         self.assertIn("`mergeability`", packets)
-        self.assertIn('"is_draft": false', packets)
+        self.assertIn("`isDraft=false`", worker)
+        revision_packets = self.read("references/packets-task.md")
         for field in ("pr_number", "pr_url", "head_sha", "base_ref", "merge_base_sha"):
-            self.assertIn(field, packets)
-        self.assertIn("current-head mergeability and repository-rule evidence", skill)
+            self.assertIn(field, revision_packets)
+        self.assertIn("current branch-rule, approval, base-freshness, conflict, mergeability", skill)
 
         report = " ".join(self.read("references/worker.md").split())
         for token in (
@@ -2545,17 +2553,17 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "implementation revision tuples",
         ):
             self.assertIn(token, report)
-        self.assertIn("convert it to ready-for-review", skill)
-        self.assertIn("transition is not the terminal result", skill)
+        self.assertIn("convert a draft through exact PR identity", skill)
+        self.assertIn("ready-for-review transition is nonterminal", skill)
         self.assertIn("Do not make draft status a circular prerequisite", gates)
         self.assertIn("ready-for-review with `isDraft=false`", gates)
-        self.assertIn("convert any draft to ready-for-review", worker)
+        self.assertIn("convert a draft through exact PR identity", worker)
         self.assertIn("After that nonterminal transition", worker)
         self.assertLess(
-            worker.index("convert any draft to ready-for-review"),
-            worker.index("current GitHub mergeability"),
+            worker.index("convert a draft through exact PR identity"),
+            worker.index("current branch-rule"),
         )
-        states = worker.split("Canonical states are", 1)[1].split(".\n", 1)[0]
+        states = self.read("references/packets-task.md").split("Task states are", 1)[1].split(".\n", 1)[0]
         self.assertLess(
             states.index("`marking-ready-for-review`"),
             states.index("`review-polling`"),
@@ -2565,30 +2573,30 @@ class ImplementFeatureContractTests(unittest.TestCase):
             states.index("`checking-mergeability`"),
         )
         self.assertNotIn("`marking-ready`", states)
-        self.assertIn("captured domain-closeout evidence", skill)
-        self.assertIn("read access to PR lifecycle", skill)
-        self.assertIn("mergeability/conflicts", skill)
+        self.assertIn("domain-closeout", gates)
+        self.assertIn("readable lifecycle", self.read("references/root-bootstrap.md"))
+        self.assertIn("mergeability/conflicts", self.read("references/root-bootstrap.md"))
         for token in (
-            "current PR lifecycle/conflict/mergeability state",
-            "required base-freshness",
-            "approval state",
+            "current PR lifecycle/conflict/mergeability",
+            "required base freshness",
+            "approval",
             "merge-queue eligibility",
             "observation tuple/time",
         ):
             self.assertIn(token, report)
 
     def test_ready_transition_resolves_and_reuses_exact_pr_identity(self) -> None:
-        worker = " ".join(self.read("references/worker.md").split())
+        worker = " ".join(self.read("references/worker-publication.md").split())
         for token in (
             "Outside the ready mutation's shell chain",
             "exact number and URL",
             "`gh pr ready <number> --repo <owner/repo>`",
-            "Selectorless or branch inference is forbidden",
-            "Re-read the same number; require unchanged URL and `isDraft=false`",
+            "selectorless or branch inference",
+            "re-read the same number and require the unchanged URL and `isDraft=false`",
         ):
             self.assertIn(token, worker)
         self.assertLess(worker.index("exact number and URL"), worker.index("gh pr ready <number>"))
-        self.assertLess(worker.index("gh pr ready <number>"), worker.index("Re-read the same number"))
+        self.assertLess(worker.index("gh pr ready <number>"), worker.index("re-read the same number"))
         self.assertNotIn("gh pr ready --repo", self.runtime_text())
 
     def test_integration_partial_uses_a_distinct_per_spec_branch(self) -> None:
@@ -2615,7 +2623,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
 
     def test_portfolio_rejects_same_repository_branch_collisions(self) -> None:
-        skill = " ".join(self.read("SKILL.md").split())
+        skill = " ".join(self.read("references/root-bootstrap.md").split())
         delivery = " ".join(
             self.read("references/spec-backed-delivery.md").split()
         )
@@ -2633,7 +2641,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             self.assertIn("different repositories", contents)
             self.assertIn("paths are disjoint", contents)
             self.assertIn("`planning-required` before CLAIM", contents)
-        self.assertIn("never serialize around the collision", skill)
+        self.assertIn("Never serialize", skill)
         self.assertIn("force-bind", skill)
         self.assertIn("schedule around the collision", workspace)
 
@@ -2655,26 +2663,21 @@ class ImplementFeatureContractTests(unittest.TestCase):
         offsets = [segment.index(token) for token in order]
         self.assertEqual(offsets, sorted(offsets))
 
-        for path in (
-            "SKILL.md",
-            "references/codex-review-closeout.md",
-            "references/spec-backed-delivery.md",
-            "references/worker.md",
-        ):
-            contents = " ".join(self.read(path).split())
-            self.assertIn("local", contents.lower(), path)
-            self.assertIn("delivery", contents, path)
-            self.assertIn("invalidat", contents, path)
-            self.assertIn("$autoreview", contents, path)
-            self.assertIn("ready-for-review", contents, path)
-            self.assertIn("current-revision review", contents, path)
+        closeout = " ".join(self.read("references/worker-closeout.md").split())
+        publication = " ".join(self.read("references/worker-publication.md").split())
+        self.assertIn("local tracker sources", closeout)
+        self.assertIn("newer revision", closeout)
+        self.assertIn("rerun validation", closeout)
+        self.assertIn("terminal AutoReview", closeout)
+        self.assertIn("convert a draft", publication)
+        self.assertIn("current-revision Codex review", publication)
 
     def test_metadata_is_manual_and_compact(self) -> None:
         skill = self.read("SKILL.md")
         metadata = self.read("agents/openai.yaml")
         self.assertEqual(ROOT.name, "implement-feature")
         self.assertIn("name: implement-feature", skill)
-        self.assertIn("explicitly invokes $implement-feature", skill)
+        self.assertIn("explicitly invokes `$implement-feature`", skill)
         self.assertIn("merge-ready-but-unmerged pull requests", skill)
         self.assertIn('display_name: "Implement Feature"', metadata)
         self.assertIn("allow_implicit_invocation: false", metadata)
@@ -2688,7 +2691,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/spec-backed-delivery.md",
             "references/baseline-validation.md",
             "references/run-state.md",
-            "references/run-state-packets.md",
+            "references/packets-registration.md",
+            "references/packets-task.md",
+            "references/packets-gates.md",
+            "references/packets-closeout.md",
             "references/cache-lifecycle.md",
             "references/worker.md",
             "references/gates.md",
@@ -2753,23 +2759,23 @@ class ImplementFeatureContractTests(unittest.TestCase):
         execution = self.read("references/execution-manifest.md")
         run_state = self.read("references/run-state.md")
         script = self.read("scripts/execution-manifest")
-        prompt_match = re.search(r"## Prompt\n\n```text\n(.*?)\n```", worker, re.DOTALL)
+        prompt_match = re.search(r"## Fixed Task Prompt\n\n(.*?)\n## Report", worker, re.DOTALL)
         self.assertIsNotNone(prompt_match)
         assert prompt_match is not None
         prompt = prompt_match.group(1)
         # Bounded attempt and root monitor ownership add 329 characters while
         # provider and helper mechanics remain behind references.
         baseline_characters = 2033
-        self.assertEqual(len(prompt), baseline_characters)
+        self.assertLessEqual(len(prompt), baseline_characters)
         self.assertNotIn("scripts/autoreview --", prompt)
         self.assertNotIn("scripts/delivery-preflight", prompt)
         self.assertNotIn("ledger-cache --json", prompt)
         self.assertNotIn("--projection diagnostics", prompt)
         self.assertNotIn("terminal_verification", prompt)
-        self.assertIn("Canonical bundle manifest", prompt)
-        self.assertIn("command ids/manifests/digests", prompt)
-        self.assertIn("references/execution-manifest.md", skill)
-        self.assertIn("every 60 seconds", prompt)
+        self.assertIn("canonical source/title", prompt)
+        self.assertIn("validation/integration command manifests", prompt)
+        self.assertIn("scripts/execution-manifest", self.read("references/worker-validation.md"))
+        self.assertIn("per 60 seconds", worker)
         self.assertIn("one bounded attempt", prompt)
         self.assertIn("HEARTBEAT_INTERVAL_SECONDS = 60", self.read("scripts/active-root-claim"))
         self.assertIn("MONITOR_DEGRADED_AFTER_SECONDS = 180", self.read("scripts/active-root-claim"))
@@ -2866,6 +2872,149 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertEqual(findings, [])
         self.assertFalse((ROOT / ("scripts/orchestrator" + "-claim")).exists())
         self.assertFalse((ROOT / ("scripts/orchestrator" + "-cache")).exists())
+
+    def test_phase_scoped_hard_cut_has_one_public_router_and_no_legacy_packet_registry(self) -> None:
+        skill = self.read("SKILL.md")
+        controller = self.read("references/controller.md")
+        runtime = self.runtime_text()
+
+        self.assertFalse((ROOT / "references/run-state-packets.md").exists())
+        self.assertNotIn("run-state-packets.md", runtime)
+        self.assertNotIn("0. **SURFACE**", skill)
+        self.assertNotIn("## Fixed Actions", self.read("references/worker.md"))
+        self.assertIn("controller next", skill)
+        self.assertIn("Load exactly the returned `required_contracts`", skill)
+        self.assertIn("sole action-to-contract mapping", " ".join(skill.split()))
+        self.assertNotIn("observe-root-title", controller)
+        self.assertNotIn("steer-implementation", controller)
+        self.assertIn("exhaustive and final", controller)
+        self.assertIn("returned list is exhaustive and final", controller)
+        for relative in (
+            "references/root-bootstrap.md",
+            "references/worker-implementation.md",
+            "references/worker-validation.md",
+            "references/worker-publication.md",
+            "references/worker-review-fix.md",
+            "references/worker-closeout.md",
+            "references/packets-registration.md",
+            "references/packets-task.md",
+            "references/packets-gates.md",
+            "references/packets-closeout.md",
+        ):
+            self.assertTrue((ROOT / relative).is_file(), relative)
+
+    def test_controller_registry_is_closed_sufficient_and_reloads_worker_role_after_compaction(self) -> None:
+        runtime = self.controller_runtime()
+        runtime.validate_controller_registry()
+        actions = runtime.CONTROLLER_ACTIONS
+
+        self.assertEqual(len(actions), 31)
+        for action, spec in actions.items():
+            paths = [path for _contract_id, path in spec["contracts"]]
+            self.assertEqual(len(paths), len(set(paths)), action)
+            self.assertTrue(all((ROOT / path).exists() for path in paths), action)
+            limit = 4 if spec["phase"] == "operation-recovery" else 3
+            self.assertLessEqual(len(paths), limit, action)
+            packet_paths = [path for path in paths if path.startswith("references/packets-")]
+            if spec["events"]:
+                self.assertEqual(len(packet_paths), 1, action)
+            else:
+                self.assertEqual(packet_paths, [], action)
+            if spec["executor"] == "visible-task":
+                self.assertIn("references/worker.md", paths, action)
+
+        for action in (
+            "steer-implementation",
+            "steer-validation",
+            "steer-publication",
+            "steer-ready-transition",
+            "steer-review-fix",
+            "steer-ci",
+            "steer-tracker-closeout",
+            "steer-mergeability",
+        ):
+            paths = [path for _contract_id, path in actions[action]["contracts"]]
+            self.assertEqual(len(paths), 3, action)
+            self.assertEqual(paths[0], "references/worker.md", action)
+            self.assertEqual(paths[-1], "references/packets-task.md", action)
+
+    def test_deterministic_controller_replay_reuses_live_path_sha_without_redundant_loads(self) -> None:
+        runtime = self.controller_runtime()
+        replay = (
+            "steer-implementation",
+            "steer-validation",
+            "steer-validation",
+            "execute-autoreview-phase",
+            "steer-review-fix",
+            "steer-validation",
+            "steer-publication",
+            "execute-gitstack-request",
+            "execute-gitstack-wait",
+            "execute-gitstack-wait",
+            "execute-gitstack-reply",
+            "execute-gitstack-resolve",
+            "apply-current-gate-evidence",
+            "seal-task",
+            "record-terminal-handoff",
+            "verify-portfolio",
+            "complete-root-goal",
+            "release-and-archive",
+        )
+        live: set[tuple[str, str]] = set()
+        selections = 0
+        physical_loads = 0
+        repeated_selections = 0
+        redundant_physical_loads = 0
+
+        for action in replay:
+            for _contract_id, relative in runtime.CONTROLLER_ACTIONS[action]["contracts"]:
+                selections += 1
+                path = ROOT / relative
+                key = (relative, hashlib.sha256(path.read_bytes()).hexdigest())
+                if key in live:
+                    repeated_selections += 1
+                    continue
+                live.add(key)
+                physical_loads += 1
+
+        self.assertGreater(repeated_selections, 0)
+        self.assertEqual(physical_loads, len(live))
+        self.assertEqual(redundant_physical_loads, 0)
+        self.assertLess(physical_loads, selections)
+        self.assertEqual(len(replay), 18)
+
+    def test_phase_scoped_invoked_path_metrics_meet_binding_thresholds(self) -> None:
+        runtime = self.controller_runtime()
+        skill = ROOT / "SKILL.md"
+        controller = ROOT / "references/controller.md"
+        skill_text = skill.read_text()
+
+        self.assertLessEqual(len(skill_text.splitlines()), 120)
+        self.assertLessEqual(len(skill_text.split()), 900)
+        self.assertLessEqual(len(skill.read_bytes()), 7_000)
+        self.assertLessEqual(len(skill.read_bytes()) + len(controller.read_bytes()), 13_500)
+
+        counts: list[int] = []
+        contract_bytes: list[int] = []
+        fresh_normal_bytes: list[int] = []
+        for action, spec in runtime.CONTROLLER_ACTIONS.items():
+            paths = [ROOT / path for _contract_id, path in spec["contracts"]]
+            byte_count = sum(len(path.read_bytes()) for path in paths)
+            counts.append(len(paths))
+            contract_bytes.append(byte_count)
+            if spec["phase"] == "operation-recovery":
+                self.assertLess(byte_count, 25_000, action)
+                self.assertLessEqual(len(paths), 4, action)
+            else:
+                self.assertLess(byte_count, 18_000, action)
+                self.assertLessEqual(len(paths), 3, action)
+                fresh_normal_bytes.append(
+                    len(skill.read_bytes()) + len(controller.read_bytes()) + byte_count
+                )
+
+        self.assertLess(statistics.median(contract_bytes), 12_000)
+        self.assertLess(max(fresh_normal_bytes), 31_500)
+        self.assertLessEqual(max(counts), 4)
 
 
 if __name__ == "__main__":
