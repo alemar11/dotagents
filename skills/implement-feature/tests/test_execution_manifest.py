@@ -14,7 +14,7 @@ from unittest import mock
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "execution-manifest"
-REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v2.json"
+REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v3.json"
 loader = importlib.machinery.SourceFileLoader("execution_manifest_script", str(SCRIPT))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -31,7 +31,7 @@ class ExecutionManifestTests(unittest.TestCase):
         source = root / "source.md"
         source.write_bytes("Café\n".encode())
         request = {
-            "schema_version": "2.0.0",
+            "schema_version": "3.0.0",
             "template": False,
             "root_task_ref": "task:test",
             "entries": [
@@ -71,7 +71,7 @@ class ExecutionManifestTests(unittest.TestCase):
         allowed = allowed or []
         expected = expected or []
         return {
-            "schema_version": "2.0.0",
+            "schema_version": "3.0.0",
             "template": False,
             "command_id": "focused-validation",
             "operation": "validation",
@@ -87,6 +87,33 @@ class ExecutionManifestTests(unittest.TestCase):
             "expected_exit_codes": [0],
         }
 
+    def baseline_request(self, repo: Path, argv: list[str]) -> dict[str, object]:
+        return {
+            "schema_version": "3.0.0",
+            "template": False,
+            "command_id": "baseline-validation",
+            "operation": "baseline-validation",
+            "owner": "worker",
+            "cwd": str(repo),
+            "parameters": {"argv": argv, "execution_scope_fingerprint": "a" * 64},
+            "dependency_files": [],
+            "write_set": {"mode": "none", "allowed_paths": [], "expected_paths": []},
+            "expected_exit_codes": [0],
+        }
+
+    def make_prettier(self, root: Path, body: str) -> Path:
+        tool = root / "prettier"
+        tool.write_text(
+            "#!/usr/bin/env python3\n"
+            "import sys\n"
+            "if '--version' in sys.argv:\n"
+            "    print('prettier 99.0.0')\n"
+            "    raise SystemExit(0)\n"
+            + body
+        )
+        tool.chmod(0o755)
+        return tool
+
     def test_bundle_hash_is_deterministic_and_reconstructable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -98,7 +125,7 @@ class ExecutionManifestTests(unittest.TestCase):
                 {"entry_id": "unicode", "kind": "issue", "source_ref": "issue:2", "snapshot_path": str(unicode_file)},
                 {"entry_id": "empty", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(empty)},
             ]
-            request = {"schema_version": "2.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
+            request = {"schema_version": "3.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
             first = cli.prepare_bundle(request)
             second = cli.prepare_bundle({**request, "entries": list(reversed(entries))})
             self.assertEqual(first["bundle_sha256"], second["bundle_sha256"])
@@ -110,6 +137,65 @@ class ExecutionManifestTests(unittest.TestCase):
             self.assertEqual(cli.digest(payload), first["bundle_sha256"])
             unicode_file.write_bytes("μ\n".encode())
             self.assertNotEqual(first["bundle_sha256"], cli.prepare_bundle(request)["bundle_sha256"])
+
+    def test_seven_file_prettier_baseline_is_canonical_and_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            debt_paths = [f"frontend/baseline-{index}.tsx" for index in range(1, 8)]
+            for path in debt_paths:
+                target = repo / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"const value{path[-5]}=1\n")
+            subprocess.run(["git", "add", "frontend"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-qm", "baseline debt"], cwd=repo, check=True)
+            tool = self.make_prettier(
+                root,
+                "paths = " + repr(list(reversed(debt_paths)) + [debt_paths[0]]) + "\n"
+                "for path in paths:\n"
+                "    print('[warn] ' + path)\n"
+                "print('[warn] Code style issues found in 7 files.')\n"
+                "raise SystemExit(1)\n",
+            )
+            _, bundle = self.make_bundle(root)
+            manifest = cli.prepare_command(self.baseline_request(repo, [str(tool), "--write", "."]), bundle)
+            self.assertIn("--check", manifest["argv"])
+            self.assertNotIn("--write", manifest["argv"])
+            receipt, exit_code = cli.run_manifest(manifest, str(root / "baseline-receipt.json"))
+            self.assertEqual(exit_code, 0)
+            observation = receipt["baseline_observation"]
+            self.assertEqual(observation["result"], "unchanged-debt-candidate")
+            self.assertEqual([row["path"] for row in observation["diagnostics"]], debt_paths)
+            self.assertEqual(len({row["content_sha256"] for row in observation["diagnostics"]}), 7)
+            self.assertTrue(observation["checkout_identity"]["status_clean"])
+
+    def test_baseline_rejects_unsafe_command_and_checkout_toctou(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            _, bundle = self.make_bundle(root)
+            with self.assertRaisesRegex(cli.ManifestError, "no proven read-only"):
+                cli.prepare_command(self.baseline_request(repo, [sys.executable, "-c", "print('x')"]), bundle)
+            tool = self.make_prettier(root, "raise SystemExit(0)\n")
+            manifest = cli.prepare_command(self.baseline_request(repo, [str(tool), "--check", "."]), bundle)
+            (repo / "tracked.txt").write_text("drift\n")
+            with self.assertRaises(cli.ManifestError) as error:
+                cli.run_manifest(manifest, str(root / "stale-receipt.json"))
+            self.assertIn(error.exception.code, {"baseline-checkout-dirty", "manifest-stale"})
+
+    def test_baseline_detects_git_visible_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            _, bundle = self.make_bundle(root)
+            tool = self.make_prettier(
+                root,
+                "from pathlib import Path\nPath('tracked.txt').write_text('mutated\\n')\nraise SystemExit(0)\n",
+            )
+            manifest = cli.prepare_command(self.baseline_request(repo, [str(tool), "--check", "."]), bundle)
+            with self.assertRaises(cli.ManifestError) as error:
+                cli.run_manifest(manifest, str(root / "mutation-receipt.json"))
+            self.assertEqual(error.exception.code, "baseline-checkout-dirty")
 
     def test_templates_and_unknown_fields_are_rejected(self) -> None:
         with self.assertRaisesRegex(cli.ManifestError, "unprepared template"):
@@ -258,7 +344,7 @@ class ExecutionManifestTests(unittest.TestCase):
             )
             fake_gh.chmod(0o755)
             request = {
-                "schema_version": "2.0.0", "template": False,
+                "schema_version": "3.0.0", "template": False,
                 "command_id": "delivery-preflight", "operation": "delivery-preflight",
                 "owner": "root", "cwd": None, "parameters": {"input": str(packet)},
                 "dependency_files": [],
@@ -283,7 +369,7 @@ class ExecutionManifestTests(unittest.TestCase):
             (root / "autoreview-next.json").write_text("{}\n")
             _, bundle = self.make_bundle(root)
             request = {
-                "schema_version": "2.0.0", "template": False,
+                "schema_version": "3.0.0", "template": False,
                 "command_id": "autoreview-dry-run", "operation": "autoreview",
                 "owner": "worker", "cwd": str(repo),
                 "parameters": {
@@ -312,7 +398,7 @@ class ExecutionManifestTests(unittest.TestCase):
             self.write_json(
                 request,
                 {
-                    "schema_version": "2.0.0",
+                    "schema_version": "3.0.0",
                     "template": False,
                     "root_task_ref": "task:fixture",
                     "entries": [{"entry_id": "source", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(source)}],

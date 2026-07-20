@@ -3,7 +3,7 @@
 Load this reference before preparing a source bundle or executing delivery
 preflight, worker validation, or AutoReview through a command manifest.
 `scripts/execution-manifest` is the shipped standard-library Python artifact;
-its schema version is `2.0.0` and its CLI version is `2.0.0`.
+its schema version is `3.0.0` and its CLI version is `3.0.0`.
 
 ## Boundary
 
@@ -12,6 +12,7 @@ This first version owns only:
 - immutable source-bundle fingerprints;
 - delivery-preflight command manifests;
 - literal-argv validation command manifests;
+- baseline-only validation manifests with closed diagnostic adapters;
 - AutoReview command manifests;
 - pinned tool and dependency observations;
 - Git-visible write-set checks and output checks;
@@ -56,7 +57,7 @@ Use absolute regular input/output paths:
 ```bash
 scripts/execution-manifest --json bundle template --output '<absolute-json>'
 scripts/execution-manifest --json bundle prepare --input '<absolute-json>' --output '<absolute-manifest>'
-scripts/execution-manifest --json command template --operation 'delivery-preflight|validation|autoreview' --output '<absolute-json>'
+scripts/execution-manifest --json command template --operation 'delivery-preflight|baseline-validation|validation|autoreview' --output '<absolute-json>'
 scripts/execution-manifest --json command prepare --bundle '<absolute-bundle-manifest>' --input '<absolute-json>' --output '<absolute-command-manifest>'
 ```
 
@@ -73,7 +74,7 @@ required, resolves literal argv and tool records, copies `bundle_sha256`, and
 generates argv, gate, and manifest fingerprints. Receipts contain observations
 only; callers author none of their fields.
 
-These are hard-cut `2.0.0` exact-object schemas. There are no aliases, command
+These are hard-cut `3.0.0` exact-object schemas. There are no aliases, command
 string inputs, migrations, or legacy packet readers.
 
 `validation.parameters.argv` is a nonempty literal string array. A string
@@ -82,6 +83,25 @@ environment assignments, and shell wrappers are invalid; invoke the executable
 directly. Delivery preflight derives the helper cwd and root ownership.
 AutoReview requires a worker-owned absolute managed-checkout cwd and typed mode,
 base, phase, evidence, finding, and output fields.
+
+## Baseline Validation
+
+`baseline-validation` is worker-owned and always uses `write_set.mode=none`.
+Preparation derives, rather than accepts, the adapter and policy. The closed
+adapters are `clean-exit-v1` for approved test runners and
+`prettier-check-v1` for Prettier. Prettier `--write` is projected to `--check`;
+unsupported commands return `planning-required` without launch.
+
+Preparation binds the execution-scope fingerprint, authored and projected argv,
+pinned tool identities, and a clean checkout identity containing branch, HEAD,
+tree, and Git-visible status digest. Execution requires the same identity before
+launch and after completion. Any Git-visible write fails the command.
+
+Prettier debt accepts only canonical `[warn] <repository-relative-path>` rows.
+Paths are normalized, sorted, deduplicated, required to name regular checkout
+files, and bound to exact diagnostic and content fingerprints. Nonzero,
+unpathable, ambiguous, or unsupported output fails closed. Baseline receipts
+are immutable and cannot be refreshed or reused.
 
 ## Tools, Writes, And Receipts
 

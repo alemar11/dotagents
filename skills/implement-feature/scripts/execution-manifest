@@ -15,15 +15,18 @@ from pathlib import Path
 from typing import Any
 
 
-__version__ = "2.0.0"
-SCHEMA_VERSION = "2.0.0"
+__version__ = "3.0.0"
+SCHEMA_VERSION = "3.0.0"
 MAX_PACKET_BYTES = 1024 * 1024
 MAX_OUTPUT_BYTES = 128 * 1024
 COMMAND_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+HEX40_RE = re.compile(r"^[0-9a-f]{40}$")
 SHELL_OPERATORS = {"|", "||", "&", "&&", ";", "<", ">", ">>", "2>", "2>>"}
 SHELL_WRAPPERS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "cmd", "powershell", "pwsh"}
-OPERATIONS = {"delivery-preflight", "validation", "autoreview"}
+OPERATIONS = {"delivery-preflight", "baseline-validation", "validation", "autoreview"}
+BASELINE_ADAPTERS = {"clean-exit-v1", "prettier-check-v1"}
+BASELINE_POLICIES = {"clean-required", "unchanged-outside-scope-allowed"}
 
 
 class ManifestError(Exception):
@@ -134,7 +137,7 @@ def validate_manifest(value: dict[str, Any]) -> dict[str, Any]:
     fields = {
         "schema_version", "command_id", "operation", "owner", "cwd", "argv",
         "expected_exit_codes", "dependencies", "tools", "write_set", "outputs",
-        "bundle_sha256", "argv_fingerprint", "gate_fingerprint", "manifest_sha256",
+        "bundle_sha256", "baseline", "argv_fingerprint", "gate_fingerprint", "manifest_sha256",
     }
     exact_object(value, fields, "command manifest")
     if value["schema_version"] != SCHEMA_VERSION or value["operation"] not in OPERATIONS:
@@ -190,6 +193,26 @@ def validate_manifest(value: dict[str, Any]) -> dict[str, Any]:
         raise ManifestError("manifest-schema-invalid", "command outputs must be unique", "prepare-command-again")
     for index, output in enumerate(value["outputs"]):
         absolute_path(output, f"command outputs[{index}]")
+    baseline = value["baseline"]
+    if value["operation"] == "baseline-validation":
+        baseline = exact_object(
+            baseline,
+            {
+                "adapter", "policy", "execution_scope_fingerprint",
+                "authored_argv_fingerprint", "checkout_identity",
+            },
+            "command baseline",
+        )
+        if baseline["adapter"] not in BASELINE_ADAPTERS or baseline["policy"] not in BASELINE_POLICIES:
+            raise ManifestError("manifest-schema-invalid", "baseline adapter or policy is invalid", "prepare-command-again")
+        for name in ("execution_scope_fingerprint", "authored_argv_fingerprint"):
+            if not isinstance(baseline[name], str) or not HEX64_RE.fullmatch(baseline[name]):
+                raise ManifestError("manifest-schema-invalid", f"baseline {name} is invalid", "prepare-command-again")
+        validate_checkout_identity(baseline["checkout_identity"], "command baseline checkout")
+        if value["write_set"] != {"mode": "none", "allowed_paths": [], "expected_paths": []}:
+            raise ManifestError("manifest-schema-invalid", "baseline validation must be read-only", "prepare-command-again")
+    elif baseline is not None:
+        raise ManifestError("manifest-schema-invalid", "non-baseline command has baseline state", "prepare-command-again")
     return value
 
 
@@ -207,6 +230,7 @@ def gate_fingerprint(value: dict[str, Any]) -> str:
             "write_set": value["write_set"],
             "outputs": value["outputs"],
             "bundle_sha256": value["bundle_sha256"],
+            "baseline": value["baseline"],
         }
     )
 
@@ -354,6 +378,123 @@ def validate_relative_paths(value: Any, label: str) -> list[str]:
     return sorted(result)
 
 
+def git_output(cwd: Path, git_path: str, *args: str) -> bytes:
+    result = subprocess.run(
+        [git_path, "-C", str(cwd), *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode:
+        raise ManifestError(
+            "command-cwd-invalid",
+            f"managed checkout observation failed: {' '.join(args)}",
+            "restore-managed-checkout",
+            3,
+        )
+    return result.stdout
+
+
+def checkout_identity(cwd: Path, git_path: str, *, require_clean: bool) -> dict[str, Any]:
+    top = Path(os.fsdecode(git_output(cwd, git_path, "rev-parse", "--show-toplevel")).strip()).resolve()
+    if top != cwd.resolve():
+        raise ManifestError("command-cwd-invalid", "cwd is not the managed checkout root", "restore-managed-checkout", 3)
+    head = os.fsdecode(git_output(cwd, git_path, "rev-parse", "HEAD")).strip()
+    tree = os.fsdecode(git_output(cwd, git_path, "rev-parse", "HEAD^{tree}")).strip()
+    branch = os.fsdecode(git_output(cwd, git_path, "branch", "--show-current")).strip()
+    status = git_output(cwd, git_path, "status", "--porcelain=v2", "--untracked-files=all", "-z")
+    if not HEX40_RE.fullmatch(head) or not HEX40_RE.fullmatch(tree) or not branch:
+        raise ManifestError("command-cwd-invalid", "managed checkout identity is incomplete", "restore-managed-checkout", 3)
+    if require_clean and status:
+        raise ManifestError("baseline-checkout-dirty", "baseline checkout must be Git-visible clean", "planning-required", 4)
+    return {
+        "checkout": str(cwd.resolve()),
+        "branch": branch,
+        "head_sha": head,
+        "tree_sha": tree,
+        "status_sha256": digest(status),
+        "status_clean": not status,
+    }
+
+
+def validate_checkout_identity(value: Any, label: str) -> dict[str, Any]:
+    item = exact_object(
+        value,
+        {"checkout", "branch", "head_sha", "tree_sha", "status_sha256", "status_clean"},
+        label,
+    )
+    absolute_path(item["checkout"], f"{label}.checkout")
+    nonempty(item["branch"], f"{label}.branch")
+    for name in ("head_sha", "tree_sha"):
+        if not isinstance(item[name], str) or not HEX40_RE.fullmatch(item[name]):
+            raise ManifestError("manifest-schema-invalid", f"{label}.{name} is invalid", "prepare-command-again")
+    if not isinstance(item["status_sha256"], str) or not HEX64_RE.fullmatch(item["status_sha256"]):
+        raise ManifestError("manifest-schema-invalid", f"{label}.status_sha256 is invalid", "prepare-command-again")
+    if not isinstance(item["status_clean"], bool):
+        raise ManifestError("manifest-schema-invalid", f"{label}.status_clean is invalid", "prepare-command-again")
+    return item
+
+
+def baseline_projection(argv: list[str]) -> tuple[list[str], str, str]:
+    names = [Path(token).name.lower() for token in argv]
+    prettier_index = next((index for index, name in enumerate(names) if name in {"prettier", "prettier.cjs"}), None)
+    if prettier_index is not None:
+        if "--write" in argv and "--check" in argv:
+            raise ManifestError("baseline-command-unsafe", "prettier command mixes write and check modes", "planning-required", 4)
+        projected = ["--check" if token == "--write" else token for token in argv]
+        if "--check" not in projected:
+            projected.append("--check")
+        return projected, "prettier-check-v1", "unchanged-outside-scope-allowed"
+    first = names[0]
+    safe = (
+        first in {"pytest", "cargo", "go", "npm", "pnpm", "yarn"}
+        or (first.startswith("python") and len(argv) >= 3 and argv[1] == "-m" and argv[2] in {"pytest", "unittest"})
+    )
+    if safe:
+        return argv, "clean-exit-v1", "clean-required"
+    raise ManifestError(
+        "baseline-command-unsafe",
+        "validation command has no proven read-only baseline projection",
+        "planning-required",
+        4,
+    )
+
+
+def diagnostic_path(cwd: Path, raw: str) -> str:
+    candidate = raw.strip()
+    if not candidate or Path(candidate).is_absolute() or "\\" in candidate or ".." in Path(candidate).parts:
+        raise ManifestError("baseline-diagnostic-ambiguous", "baseline diagnostic path is not canonical", "planning-required", 4)
+    normalized = Path(candidate).as_posix()
+    path = cwd / normalized
+    if path.is_symlink() or not path.is_file() or path.resolve().parent != cwd.resolve() and cwd.resolve() not in path.resolve().parents:
+        raise ManifestError("baseline-diagnostic-ambiguous", "baseline diagnostic path is outside the checkout", "planning-required", 4)
+    return normalized
+
+
+def prettier_diagnostics(cwd: Path, stdout: bytes, stderr: bytes, exit_code: int) -> list[dict[str, str]]:
+    if exit_code == 0:
+        return []
+    if exit_code != 1:
+        raise ManifestError("baseline-command-failed", "prettier baseline command failed unexpectedly", "blocked", 4)
+    paths: list[str] = []
+    for line in (stdout + b"\n" + stderr).decode("utf-8", errors="replace").splitlines():
+        if line.startswith("[warn] "):
+            value = line[7:].strip()
+            if value and not value.startswith(("Code style issues", "Forgot to run Prettier")):
+                paths.append(diagnostic_path(cwd, value))
+    paths = sorted(set(paths))
+    if not paths:
+        raise ManifestError("baseline-diagnostic-ambiguous", "prettier debt has no canonical path set", "planning-required", 4)
+    return [
+        {
+            "path": path,
+            "diagnostic_fingerprint": fingerprint({"adapter": "prettier-check-v1", "path": path}),
+            "content_sha256": digest((cwd / path).read_bytes()),
+        }
+        for path in paths
+    ]
+
+
 def bundle_template() -> dict[str, Any]:
     return {
         "schema_version": SCHEMA_VERSION,
@@ -421,7 +562,7 @@ def command_template(operation: str) -> dict[str, Any]:
         "template": True,
         "command_id": "replace-me",
         "operation": operation,
-        "owner": "worker" if operation in {"validation", "autoreview"} else "root",
+        "owner": "worker" if operation in {"baseline-validation", "validation", "autoreview"} else "root",
         "cwd": "/absolute/repository/checkout" if operation != "delivery-preflight" else None,
         "parameters": {},
         "dependency_files": [],
@@ -430,6 +571,11 @@ def command_template(operation: str) -> dict[str, Any]:
     }
     if operation == "delivery-preflight":
         base["parameters"] = {"input": "/absolute/path/to/delivery-preflight.json"}
+    elif operation == "baseline-validation":
+        base["parameters"] = {
+            "argv": ["prettier", "--check", "."],
+            "execution_scope_fingerprint": "0" * 64,
+        }
     elif operation == "validation":
         base["parameters"] = {"argv": ["python3", "-m", "unittest"]}
     else:
@@ -485,6 +631,7 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
     params = request["parameters"]
     outputs: list[str] = []
     tools: list[dict[str, Any]] = []
+    baseline: dict[str, Any] | None = None
     if operation == "delivery-preflight":
         exact_object(params, {"input"}, "parameters")
         helper = Path(__file__).resolve().with_name("delivery-preflight")
@@ -505,14 +652,35 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
             raise ManifestError("command-cwd-invalid", "cwd must be an existing directory", "restore-managed-checkout")
         if owner != "worker":
             raise ManifestError("invalid-input", f"{operation} must be worker-owned", "regenerate-from-template")
-        if operation == "validation":
-            exact_object(params, {"argv"}, "parameters")
-            argv = validate_literal_argv(params["argv"])
+        if operation in {"baseline-validation", "validation"}:
+            if operation == "baseline-validation":
+                exact_object(params, {"argv", "execution_scope_fingerprint"}, "parameters")
+                scope_fingerprint = params["execution_scope_fingerprint"]
+                if not isinstance(scope_fingerprint, str) or not HEX64_RE.fullmatch(scope_fingerprint):
+                    raise ManifestError("invalid-input", "execution_scope_fingerprint is invalid", "fill-template")
+            else:
+                exact_object(params, {"argv"}, "parameters")
+                scope_fingerprint = None
+            authored_argv = validate_literal_argv(params["argv"])
+            argv = list(authored_argv)
+            if operation == "baseline-validation":
+                if expected != [0] or write_request["mode"] != "none":
+                    raise ManifestError("invalid-input", "baseline validation derives exits and no-write policy", "regenerate-from-template")
+                argv, adapter, policy = baseline_projection(argv)
             executable, kind, ref = resolve_executable(argv[0], cwd)
             argv[0] = str(executable)
             tools.append(tool_record("validation-command", executable, kind, ref))
             git, git_kind, git_ref = resolve_executable("git", cwd)
             tools.append(tool_record("git", git, git_kind, git_ref))
+            if operation == "baseline-validation":
+                expected = [0, 1] if adapter == "prettier-check-v1" else list(range(0, 256))
+                baseline = {
+                    "adapter": adapter,
+                    "policy": policy,
+                    "execution_scope_fingerprint": scope_fingerprint,
+                    "authored_argv_fingerprint": fingerprint({"cwd": str(cwd), "argv": authored_argv}),
+                    "checkout_identity": checkout_identity(cwd, str(git), require_clean=True),
+                }
         else:
             exact_object(
                 params,
@@ -561,6 +729,7 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
         "write_set": write_set,
         "outputs": sorted(outputs),
         "bundle_sha256": bundle["bundle_sha256"],
+        "baseline": baseline,
     }
     manifest["argv_fingerprint"] = fingerprint({"cwd": manifest["cwd"], "argv": argv})
     manifest["gate_fingerprint"] = gate_fingerprint(manifest)
@@ -616,7 +785,13 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
     git_tools = [tool for tool in manifest["tools"] if tool["tool_id"] == "git"]
     if len(git_tools) != 1:
         raise ManifestError("manifest-schema-invalid", "command manifest requires one pinned git tool", "prepare-command-again")
-    before = tracked_snapshot(cwd, git_tools[0]["resolved_path"])
+    git_path = git_tools[0]["resolved_path"]
+    before = tracked_snapshot(cwd, git_path)
+    baseline_before = None
+    if manifest["operation"] == "baseline-validation":
+        baseline_before = checkout_identity(cwd, git_path, require_clean=True)
+        if baseline_before != manifest["baseline"]["checkout_identity"]:
+            raise ManifestError("manifest-stale", "baseline checkout changed before execution", "authorization-stale", 4)
     receipt = absolute_path(receipt_path, "receipt")
     receipt.parent.mkdir(parents=True, exist_ok=True)
     stdout_path = receipt.with_suffix(receipt.suffix + ".stdout")
@@ -630,7 +805,7 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
     )
     stdout_path.write_bytes(result.stdout)
     stderr_path.write_bytes(result.stderr)
-    after = tracked_snapshot(cwd, git_tools[0]["resolved_path"])
+    after = tracked_snapshot(cwd, git_path)
     changed = sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
     unexpected = [path for path in changed if not path_allowed(path, manifest["write_set"]["allowed_paths"])]
     missing = [path for path in manifest["write_set"]["expected_paths"] if not (cwd / path).exists()]
@@ -645,6 +820,30 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
     status = "passed"
     if result.returncode not in manifest["expected_exit_codes"] or unexpected or missing or missing_outputs:
         status = "failed"
+    baseline_observation = None
+    if manifest["operation"] == "baseline-validation":
+        baseline_after = checkout_identity(cwd, git_path, require_clean=True)
+        if before != after or baseline_before != baseline_after:
+            status = "failed"
+        adapter = manifest["baseline"]["adapter"]
+        if adapter == "prettier-check-v1":
+            diagnostics = prettier_diagnostics(cwd, result.stdout, result.stderr, result.returncode)
+            outcome = "clean" if not diagnostics else "unchanged-debt-candidate"
+        else:
+            diagnostics = []
+            outcome = "clean" if result.returncode == 0 else "planning-required"
+        baseline_observation = {
+            "adapter": adapter,
+            "policy": manifest["baseline"]["policy"],
+            "execution_scope_fingerprint": manifest["baseline"]["execution_scope_fingerprint"],
+            "authored_argv_fingerprint": manifest["baseline"]["authored_argv_fingerprint"],
+            "argv_fingerprint": manifest["argv_fingerprint"],
+            "checkout_identity": baseline_after,
+            "tool_identities_fingerprint": fingerprint(manifest["tools"]),
+            "result": outcome,
+            "diagnostics": diagnostics,
+            "diagnostic_set_fingerprint": fingerprint(diagnostics),
+        }
     value: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "manifest_sha256": manifest["manifest_sha256"],
@@ -659,6 +858,7 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
         "stderr": file_record(stderr_path, source_kind="command-output", source_ref="stderr"),
         "writes": {"changed_paths": changed, "unexpected_paths": unexpected, "missing_expected_paths": missing, "missing_outputs": missing_outputs},
         "outputs": output_records,
+        "baseline_observation": baseline_observation,
         "prior_receipt_sha256": None,
     }
     value["receipt_sha256"] = fingerprint(value)
@@ -671,7 +871,7 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
     fields = {
         "schema_version", "manifest_sha256", "command_id", "gate_fingerprint", "status", "exit_code",
         "cwd_observed", "argv_fingerprint", "tools", "stdout", "stderr", "writes", "outputs",
-        "prior_receipt_sha256", "receipt_sha256",
+        "baseline_observation", "prior_receipt_sha256", "receipt_sha256",
     }
     exact_object(receipt, fields, "receipt")
     if receipt["schema_version"] != SCHEMA_VERSION or receipt["receipt_sha256"] != fingerprint({key: item for key, item in receipt.items() if key != "receipt_sha256"}):
@@ -690,6 +890,30 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
         or not HEX64_RE.fullmatch(receipt["prior_receipt_sha256"])
     ):
         raise ManifestError("receipt-invalid", "prior receipt hash is invalid", "run-command-again")
+    baseline_observation = receipt["baseline_observation"]
+    if manifest["operation"] == "baseline-validation":
+        item = exact_object(
+            baseline_observation,
+            {
+                "adapter", "policy", "execution_scope_fingerprint", "authored_argv_fingerprint",
+                "argv_fingerprint", "checkout_identity", "tool_identities_fingerprint", "result",
+                "diagnostics", "diagnostic_set_fingerprint",
+            },
+            "receipt baseline observation",
+        )
+        if item["adapter"] != manifest["baseline"]["adapter"] or item["policy"] != manifest["baseline"]["policy"]:
+            raise ManifestError("receipt-invalid", "baseline observation differs from manifest", "run-command-again")
+        if item["execution_scope_fingerprint"] != manifest["baseline"]["execution_scope_fingerprint"]:
+            raise ManifestError("receipt-invalid", "baseline scope differs from manifest", "run-command-again")
+        validate_checkout_identity(item["checkout_identity"], "receipt baseline checkout")
+        if item["result"] not in {"clean", "unchanged-debt-candidate", "planning-required"}:
+            raise ManifestError("receipt-invalid", "baseline result is invalid", "run-command-again")
+        if not isinstance(item["diagnostics"], list) or item["diagnostics"] != sorted(item["diagnostics"], key=lambda row: row.get("path", "")):
+            raise ManifestError("receipt-invalid", "baseline diagnostics are not canonical", "run-command-again")
+        if item["diagnostic_set_fingerprint"] != fingerprint(item["diagnostics"]):
+            raise ManifestError("receipt-invalid", "baseline diagnostic fingerprint changed", "run-command-again")
+    elif baseline_observation is not None:
+        raise ManifestError("receipt-invalid", "non-baseline receipt has baseline observation", "run-command-again")
     if not isinstance(receipt["tools"], list) or len(receipt["tools"]) != len(manifest["tools"]):
         raise ManifestError("receipt-invalid", "receipt tool observations are invalid", "run-command-again")
     observed_tools = []
@@ -753,6 +977,8 @@ def refresh_tools(manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def reuse_receipt(manifest: dict[str, Any], prior: dict[str, Any]) -> dict[str, Any]:
+    if manifest["operation"] == "baseline-validation":
+        raise ManifestError("gate-evidence-stale", "baseline receipts are immutable and cannot be recaptured or reused", "authorization-stale", 4)
     validate_receipt(prior, manifest)
     if prior["status"] not in {"passed", "reused"}:
         raise ManifestError("gate-evidence-stale", "prior receipt does not cover this command", "run-command-again")
@@ -854,7 +1080,16 @@ def main(argv: list[str] | None = None) -> int:
             manifest = validate_manifest(read_json(args.manifest, "command manifest"))
             if args.verb == "verify":
                 value = validate_receipt(read_json(args.receipt, "receipt"), manifest)
-                result = {"ok": True, "command": "receipt-verify", "receipt_sha256": value["receipt_sha256"], "status": value["status"]}
+                result = {
+                    "ok": True,
+                    "command": "receipt-verify",
+                    "manifest_sha256": manifest["manifest_sha256"],
+                    "manifest_bytes_sha256": digest(Path(args.manifest).read_bytes()),
+                    "receipt_sha256": value["receipt_sha256"],
+                    "receipt_bytes_sha256": digest(Path(args.receipt).read_bytes()),
+                    "status": value["status"],
+                    "baseline_observation": value["baseline_observation"],
+                }
             else:
                 value = reuse_receipt(manifest, read_json(args.prior_receipt, "prior receipt"))
                 write_json(args.output, value)
