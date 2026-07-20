@@ -11,9 +11,6 @@ to 64, deliveries per task to 8, allowed paths per delivery to 128, and each
 batch to 64 events. State retains at most 512 operations, 256 reviews, and one
 final observation per review; command JSON output is at most 128 KiB.
 
-Canonical repository-relative paths reject absolute paths, backslashes, `.`,
-empty segments, parent traversal, and duplicate spellings.
-
 ## Registration Packet
 
 Use exactly these top-level fields:
@@ -58,13 +55,9 @@ read-only discovered PR base. `ci_availability` is exactly `configured` or
 `not-configured`. The preflight key is the SHA-256 of the canonical passed
 capability observation. Unknown or blocked inspection is never registered.
 
-Each affected repository occurs once in that task's `deliveries[]` and in the
-top-level set. Earlier task dependencies are acyclic; repositories/checkouts
-and sorted source ids equal the live claim. The helper derives
-`root_task_title`, `portfolio_goal_state=pending`, pending tasks, mutable
-delivery state, gates, and closeout. Missing takeover state uses this packet
-shape but derives task/no-task and checkout identity only from validated claim
-adoption mappings; bound identities are immutable.
+Each repository occurs once; dependencies are acyclic and scope equals the live
+claim. Takeover identity comes only from validated claim adoption. Creation
+derives `root_task_title` and `portfolio_goal_state=pending`; bound identities are immutable.
 
 ## Event Batch
 
@@ -79,6 +72,7 @@ values are refs or digests, never pasted output.
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
 | `delivery-preflight-observed` | `task_key`, `delivery_key`, `github_repository`, `target_branch`, `default_base`, `ci_availability`, `preflight_key`, `evidence_ref` |
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `goal_objective_fingerprint`, `goal_state`, `goal_evidence_ref`, `state`, `outcome`, `attention_reason`, `summary_ref` |
+| `committed-revision-observed` | `task_key`, `delivery_key`, `target`, `evidence_ref` |
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
 | `source-moved` | `task_key`, `from_ref`, `to_ref`, `source_fingerprint`, `tracker_repository`, `revision_set_key`, `evidence_ref` |
@@ -86,7 +80,12 @@ values are refs or digests, never pasted output.
 | `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `wait_invoked_at`, `provider_timeout` |
 | `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `request_binding`, `provider_state`, `failure_kind`, `provider_error_code`, `observation_fingerprint`, `disposition`, `finding_count`, `finding_comment_ids`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
 | `review-thread-resolved` | `task_key`, `delivery_key`, `finding_revision_key`, `resolution_revision_key`, `reply_receipt`, `resolution_receipt` |
-| `autoreview-observed` | `task_key`, `delivery_key`, `evidence` |
+| `autoreview-hosted-finding-obligated` | `task_key`, `delivery_key`, `obligation` |
+| `autoreview-action-reserved` | `task_key`, `delivery_key`, `reservation_id`, `expected_state_fingerprint`, `projection` |
+| `autoreview-reservation-released` | `task_key`, `delivery_key`, `reservation_id`, `reason` |
+| `autoreview-attempt-observed` | `task_key`, `delivery_key`, `reservation_id`, `attempt_id`, `attempt_state`, `model_call_started`, `candidate_fingerprint`, `operation_id`, `evidence_ref` |
+| `autoreview-lineage-reset-authorized` | `task_key`, `delivery_key`, `authority`, `reason`, `evidence_ref`, `prior_evidence_fingerprint`, `next_review_target_key`, `next_committed_revision_key` |
+| `autoreview-observed` | `task_key`, `delivery_key`, `reservation_id`, `candidate_fingerprint`, `operation_id`, `evidence_ref`, `evidence` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
 | `task-goal-completed` | `task_key`, `seal_fingerprint`, `goal_evidence_ref`, `completion_evidence_ref` |
@@ -100,11 +99,8 @@ exactly `delivery_key`, `repository`, absolute App-managed `checkout`, matching
 absolute `git_top_level`, registered `target_branch`, 40-hex
 `baseline_revision`, and `isolation_evidence_ref`.
 
-`revision-observed` establishes the immutable repository, PR number/URL,
-head/base/merge-base tuple for one derived `revision_key`. Its
-`github_repository` must equal the registered preflight repository, `base_ref`
-must equal its default base, and `pr_url` must equal
-`https://github.com/<github_repository>/pull/<pr_number>` exactly.
+AutoReview lifecycle details are branch-loaded from `autoreview-fix-loop.md`.
+`revision-observed` binds canonical repository, PR, head, base, and merge base.
 `delivery-observed` requires that key. Its `pr` object has exactly
 `repository`, `github_repository`, `number`, `url`, `state`, `is_draft`, `head_sha`, `base_ref`,
 `merge_base_sha`, `mergeable`, `merge_state`, and `closing_refs`; its tuple
@@ -130,12 +126,8 @@ Review provider/disposition values are `waiting|findings|clean|failed` and
 Nonfailed observations use null failure fields; failed values follow the closed
 GitStack mapping in `review-reconciliation.md` and cannot be relabeled.
 
-`autoreview-observed.evidence` flattens the helper envelope's lineage, phase,
-target, counters, open findings, metrics, and ref; omit closed history and
-`observed_at`. Full count is 1–2; every unbounded delta advances `head_sha`.
-For manifest-backed validation and AutoReview, use the verified receipt
-fingerprint in the existing `evidence_ref`; do not add packet or persisted
-state fields.
+`autoreview-observed.evidence` is the complete current-schema envelope validated
+by the shared protocol module; see `autoreview-fix-loop.md`.
 
 | gate scope | gates | required identity |
 | --- | --- | --- |

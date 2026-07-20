@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "11.0.0"
+__version__ = "12.0.0"
 SCHEMA_VERSION = "5.0.0"
 TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"

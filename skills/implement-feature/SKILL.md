@@ -229,8 +229,8 @@ Before terminal work, load `references/gates.md` and
 `references/codex-review-closeout.md`. The visible task owns implementation,
 validation, publication, `$autoreview`, current-revision review/fixes, CI when
 configured, tracker closeout, and merge-ready proof; the root only verifies and
-never enqueues or merges. On accepted AutoReview or PR findings, also load
-`references/autoreview-fix-loop.md` before fixes.
+never enqueues or merges. Load `references/autoreview-fix-loop.md` before the
+first managed AutoReview reservation or accepted AutoReview/PR finding fixes.
 
 For a local source, after current task-set acceptance/integration/domain proof,
 move only predeclared refs in their deliveries. The move dirties delivery state

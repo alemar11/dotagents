@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v11 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v12 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,7 +14,7 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `8.0.0` created from registration
+Active state accepts only ledger schema `9.0.0` created from registration
 schema `4.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
@@ -187,7 +187,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `8.0.0`.
+JSON schema before `9.0.0`.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses
 the `ledger archive` command in `cache-lifecycle.md`; active state exposes only

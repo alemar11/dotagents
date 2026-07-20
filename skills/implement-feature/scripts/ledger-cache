@@ -8,6 +8,7 @@ import copy
 import contextlib
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 import posixpath
@@ -21,8 +22,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "11.0.0"
-LEDGER_SCHEMA_VERSION = "8.0.0"
+__version__ = "12.0.0"
+LEDGER_SCHEMA_VERSION = "9.0.0"
 REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -106,6 +107,7 @@ EVENT_TYPES = {
     "delivery-preflight-observed",
     "task-observed",
     "source-moved",
+    "committed-revision-observed",
     "revision-observed",
     "delivery-observed",
     "review-wait-started",
@@ -113,6 +115,11 @@ EVENT_TYPES = {
     "review-observed",
     "review-reconciled",
     "review-thread-resolved",
+    "autoreview-hosted-finding-obligated",
+    "autoreview-action-reserved",
+    "autoreview-reservation-released",
+    "autoreview-attempt-observed",
+    "autoreview-lineage-reset-authorized",
     "autoreview-observed",
     "gate-observed",
     "task-terminal-sealed",
@@ -183,12 +190,17 @@ CODEX_PROVIDER_ACTORS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connecto
 NODE_ID_RE = re.compile(r"^[A-Za-z0-9_=-]+$")
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
-AUTOREVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
-AUTOREVIEW_TERMINAL_STATES = {
-    "fix-required", "verification-clean", "terminal-clean", "terminal-composite-clean"
-}
 PROJECTIONS = {"status", "dispatch", "recovery", "terminal"}
 PORTFOLIO_OBJECTIVE_CI_CLAUSE = "CI when configured"
+
+
+PROTOCOL_PATH = Path(__file__).resolve().parents[2] / "autoreview/scripts/autoreview_protocol.py"
+PROTOCOL_SPEC = importlib.util.spec_from_file_location("dotagents_autoreview_protocol", PROTOCOL_PATH)
+if PROTOCOL_SPEC is None or PROTOCOL_SPEC.loader is None:
+    raise RuntimeError(f"cannot load shared AutoReview protocol: {PROTOCOL_PATH}")
+AUTOREVIEW_PROTOCOL = importlib.util.module_from_spec(PROTOCOL_SPEC)
+sys.modules[PROTOCOL_SPEC.name] = AUTOREVIEW_PROTOCOL
+PROTOCOL_SPEC.loader.exec_module(AUTOREVIEW_PROTOCOL)
 
 
 class CacheError(Exception):
@@ -1758,53 +1770,9 @@ def validate_autoreview_summary(
     exit_code: int = 2,
 ) -> dict[str, Any]:
     try:
-        item = exact_object(
-            value,
-            {
-                "lineage_id", "parent_evidence_fingerprint", "evidence_fingerprint",
-                "review_phase", "terminal_state", "head_sha", "base_ref",
-                "merge_base_sha", "target_fingerprint", "changed_files",
-                "full_reviews", "fix_verifications", "open_findings",
-                "prompt_characters", "elapsed_seconds", "evidence_ref", "observed_at",
-            },
-            field,
-        )
-        for name in ("lineage_id", "evidence_fingerprint", "target_fingerprint"):
-            canonical_fingerprint(item[name], f"{field}.{name}")
-        if item["parent_evidence_fingerprint"] is not None:
-            canonical_fingerprint(item["parent_evidence_fingerprint"], f"{field}.parent_evidence_fingerprint")
-        if item["review_phase"] not in AUTOREVIEW_PHASES or item["terminal_state"] not in AUTOREVIEW_TERMINAL_STATES:
-            raise CacheError(error_code, f"{field} uses invalid canonical values", exit_code)
-        if not REVISION_RE.fullmatch(nonempty(item["head_sha"], f"{field}.head_sha")):
-            raise CacheError(error_code, f"{field}.head_sha is invalid", exit_code)
-        if not REVISION_RE.fullmatch(nonempty(item["merge_base_sha"], f"{field}.merge_base_sha")):
-            raise CacheError(error_code, f"{field}.merge_base_sha is invalid", exit_code)
-        nonempty(item["base_ref"], f"{field}.base_ref")
-        nonempty(item["evidence_ref"], f"{field}.evidence_ref")
-        parse_timestamp(item["observed_at"], f"{field}.observed_at")
-        if not isinstance(item["changed_files"], list) or not item["changed_files"] or len(item["changed_files"]) > MAX_ALLOWED_PATHS_PER_REPOSITORY:
-            raise CacheError(error_code, f"{field}.changed_files is invalid", exit_code)
-        if any(not isinstance(path, str) or not path or path.startswith("/") or ".." in Path(path).parts for path in item["changed_files"]):
-            raise CacheError(error_code, f"{field}.changed_files is unsafe", exit_code)
-        for name in ("full_reviews", "fix_verifications", "prompt_characters", "elapsed_seconds"):
-            if not isinstance(item[name], int) or isinstance(item[name], bool) or item[name] < 0:
-                raise CacheError(error_code, f"{field}.{name} is invalid", exit_code)
-        if item["full_reviews"] not in {1, 2}:
-            raise CacheError(error_code, f"{field}.full_reviews exceeds the lineage budget", exit_code)
-        if not isinstance(item["open_findings"], list) or len(item["open_findings"]) > 64:
-            raise CacheError(error_code, f"{field}.open_findings is invalid", exit_code)
-        for index, row in enumerate(item["open_findings"]):
-            exact_object(row, {"finding_id", "finding"}, f"{field}.open_findings[{index}]")
-            canonical_fingerprint(row["finding_id"], f"{field}.open_findings[{index}].finding_id")
-            if not isinstance(row["finding"], dict):
-                raise CacheError(error_code, f"{field}.open_findings[{index}].finding is invalid", exit_code)
-        if item["terminal_state"] in {"terminal-clean", "terminal-composite-clean", "verification-clean"} and item["open_findings"]:
-            raise CacheError(error_code, f"{field} clean state has open findings", exit_code)
-        return item
-    except CacheError as exc:
-        if exc.code == error_code:
-            raise
-        raise CacheError(error_code, exc.message, exit_code, exc.details) from exc
+        return AUTOREVIEW_PROTOCOL.validate_evidence(value)
+    except AUTOREVIEW_PROTOCOL.ProtocolError as exc:
+        raise CacheError(error_code, f"{field}: {exc}", exit_code, {"protocol_code": exc.code}) from exc
 
 
 def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
@@ -2020,7 +1988,12 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "published",
                         "observation_evidence_ref",
                         "tracker_dirty_after_revision_key",
+                        "committed_revision",
                         "autoreview",
+                        "autoreview_reservation",
+                        "autoreview_attempts",
+                        "hosted_obligations",
+                        "lineage_reset_authority",
                     },
                     delivery_field,
                 )
@@ -2130,6 +2103,18 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         )
                     ):
                         raise CacheError("integrity-failure", "run-state revision identity is invalid", 5)
+                if delivery["committed_revision"] is not None:
+                    committed = exact_object(
+                        delivery["committed_revision"],
+                        {"target", "evidence_ref", "observed_at"},
+                        f"{delivery_field}.committed_revision",
+                    )
+                    try:
+                        AUTOREVIEW_PROTOCOL.validate_target(committed["target"])
+                    except AUTOREVIEW_PROTOCOL.ProtocolError as exc:
+                        raise CacheError("integrity-failure", f"run-state committed revision is invalid: {exc}", 5) from exc
+                    nonempty(committed["evidence_ref"], f"{delivery_field}.committed_revision.evidence_ref")
+                    parse_timestamp(committed["observed_at"], f"{delivery_field}.committed_revision.observed_at")
                 if delivery["pr"] is not None:
                     if validate_pr(delivery["pr"], delivery, f"{delivery_field}.pr") != delivery["pr"]:
                         raise CacheError("integrity-failure", "run-state pull request is not canonical", 5)
@@ -2142,6 +2127,41 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         error_code="integrity-failure",
                         exit_code=5,
                     )
+                if delivery["autoreview_reservation"] is not None:
+                    exact_object(
+                        delivery["autoreview_reservation"],
+                        {
+                            "reservation_id", "expected_state_fingerprint", "projection",
+                            "state", "attempt_id", "candidate_fingerprint", "operation_id",
+                            "recorded_at",
+                        },
+                        f"{delivery_field}.autoreview_reservation",
+                    )
+                if not isinstance(delivery["autoreview_attempts"], list) or not isinstance(delivery["hosted_obligations"], list):
+                    raise CacheError("integrity-failure", "run-state AutoReview journals are invalid", 5)
+                for obligation in delivery["hosted_obligations"]:
+                    try:
+                        AUTOREVIEW_PROTOCOL.validate_hosted_obligation(obligation["artifact"])
+                    except (KeyError, AUTOREVIEW_PROTOCOL.ProtocolError) as exc:
+                        raise CacheError("integrity-failure", f"run-state hosted obligation is invalid: {exc}", 5) from exc
+                    if obligation.get("state") not in {"open", "consumed"}:
+                        raise CacheError("integrity-failure", "run-state hosted obligation state is invalid", 5)
+                if delivery["lineage_reset_authority"] is not None:
+                    reset = exact_object(
+                        delivery["lineage_reset_authority"],
+                        {
+                            "authority", "reason", "evidence_ref", "prior_evidence_fingerprint",
+                            "next_review_target_key", "next_committed_revision_key", "state",
+                            "consumed_by", "recorded_at",
+                        },
+                        f"{delivery_field}.lineage_reset_authority",
+                    )
+                    if reset["state"] not in {"authorized", "target-observed", "consumed"}:
+                        raise CacheError("integrity-failure", "run-state lineage reset state is invalid", 5)
+                    for name in ("prior_evidence_fingerprint", "next_review_target_key", "next_committed_revision_key"):
+                        canonical_fingerprint(reset[name], f"{delivery_field}.lineage_reset_authority.{name}")
+                    if reset["consumed_by"] is not None:
+                        canonical_fingerprint(reset["consumed_by"], f"{delivery_field}.lineage_reset_authority.consumed_by")
             if item["seal"] is not None:
                 exact_object(
                     item["seal"],
@@ -2331,7 +2351,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     or not isinstance(finding_ids, list)
                     or finding_ids != sorted(set(finding_ids))
                     or any(not isinstance(value, int) or isinstance(value, bool) or value < 1 for value in finding_ids)
-                    or finding_count != len(finding_ids)
+                    or len(finding_ids) > finding_count
+                    or (observation["provider_state"] == "findings" and finding_count < 1)
                     or (observation["provider_state"] != "findings" and finding_count != 0)
                 ):
                     raise CacheError("integrity-failure", "run-state review finding identities are invalid", 5)
@@ -3254,7 +3275,8 @@ def render_markdown(state: dict[str, Any]) -> str:
             if item:
                 lines.append(
                     f"| `{task['task_key']}:{delivery['delivery_key']}` | `{item['terminal_state']}` | "
-                    f"{item['full_reviews']} | {item['fix_verifications']} | {item['evidence_ref']} |"
+                    f"{item['counts']['full_reviews']} | {item['counts']['fix_verifications']} | "
+                    f"autoreview://{item['evidence_fingerprint']} |"
                 )
     lines.extend([
         "", "## Review Reconciliations", "",
@@ -3378,7 +3400,12 @@ def new_state(
                 "published": False,
                 "observation_evidence_ref": None,
                 "tracker_dirty_after_revision_key": None,
+                "committed_revision": None,
                 "autoreview": None,
+                "autoreview_reservation": None,
+                "autoreview_attempts": [],
+                "hosted_obligations": [],
+                "lineage_reset_authority": None,
             }
             for delivery in item["deliveries"]
         ]
@@ -3886,8 +3913,11 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         return changed
 
     if event_type in {
-        "delivery-preflight-observed", "revision-observed", "delivery-observed", "review-wait-started",
+        "delivery-preflight-observed", "committed-revision-observed", "revision-observed", "delivery-observed", "review-wait-started",
         "review-wait-invoked", "review-observed", "review-reconciled", "review-thread-resolved",
+        "autoreview-hosted-finding-obligated", "autoreview-action-reserved",
+        "autoreview-reservation-released", "autoreview-attempt-observed",
+        "autoreview-lineage-reset-authorized", "autoreview-observed",
     }:
         delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
         delivery = delivery_by_key(task, delivery_key)
@@ -3939,6 +3969,60 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if all(delivery[field] == value for field, value in candidate.items()):
             return False
         delivery.update(candidate)
+        return True
+
+    if event_type == "committed-revision-observed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "target", "evidence_ref"},
+            event_type,
+        )
+        assert delivery is not None
+        if state["goal"]["state"] != "active" or task["goal_state"] != "active":
+            raise CacheError("state-conflict", "committed revision requires active Goals", 4)
+        try:
+            target = copy.deepcopy(AUTOREVIEW_PROTOCOL.validate_target(event["target"]))
+        except AUTOREVIEW_PROTOCOL.ProtocolError as exc:
+            raise CacheError("invalid-input", str(exc), 2, {"protocol_code": exc.code}) from exc
+        if target["repository_id"] != delivery["repository"] or target["base_ref"] != delivery["default_base"]:
+            raise CacheError("state-conflict", "committed revision target differs from the managed delivery", 4)
+        if any(
+            not any(path == allowed.rstrip("/") or path.startswith(allowed.rstrip("/") + "/") for allowed in delivery["allowed_paths"])
+            for path in target["review_scope"]
+        ):
+            raise CacheError("state-conflict", "committed revision expands beyond the delivery scope", 4)
+        current = delivery["committed_revision"]
+        if current is not None:
+            old_target = current["target"]
+            if old_target["head_sha"] == target["head_sha"] and old_target != target:
+                raise CacheError("state-conflict", "committed revision identity changed for the same head", 4)
+            semantic_reset = delivery["autoreview"] is not None and (
+                old_target["review_target_key"] != target["review_target_key"]
+                or (
+                    old_target["merge_base_sha"] != target["merge_base_sha"]
+                    and not AUTOREVIEW_PROTOCOL.same_semantic_target(old_target, target)
+                )
+            )
+            if semantic_reset:
+                authority = delivery["lineage_reset_authority"]
+                prior = delivery["autoreview"]
+                if (
+                    authority is None
+                    or authority["state"] != "authorized"
+                    or authority["prior_evidence_fingerprint"] != prior["evidence_fingerprint"]
+                    or authority["next_review_target_key"] != target["review_target_key"]
+                    or authority["next_committed_revision_key"] != target["committed_revision_key"]
+                ):
+                    raise CacheError("state-conflict", "semantic target changed and requires explicit lineage reset authority", 4)
+                authority["state"] = "target-observed"
+        candidate = {
+            "target": target,
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "observed_at": observed_at,
+        }
+        if current and all(current[key] == candidate[key] for key in candidate if key != "observed_at"):
+            return False
+        delivery["committed_revision"] = candidate
         return True
 
     if event_type == "revision-observed":
@@ -4003,6 +4087,16 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             "observed_at": observed_at,
         }
         current = delivery["revision"]
+        committed_revision = delivery["committed_revision"]
+        if committed_revision is None:
+            raise CacheError("state-conflict", "publication cannot precede committed revision identity", 4)
+        committed_target = committed_revision["target"]
+        if (
+            head != committed_target["head_sha"]
+            or base != committed_target["base_ref"]
+            or merge_base != committed_target["merge_base_sha"]
+        ):
+            raise CacheError("state-conflict", "publication facts do not attach to the reviewed committed revision", 4)
         if current and all(current[field] == candidate[field] for field in candidate if field != "observed_at"):
             return False
         delivery["revision"] = candidate
@@ -4250,7 +4344,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             or not isinstance(finding_comment_ids, list)
             or finding_comment_ids != sorted(set(finding_comment_ids))
             or any(not isinstance(value, int) or isinstance(value, bool) or value < 1 for value in finding_comment_ids)
-            or finding_count != len(finding_comment_ids)
+            or len(finding_comment_ids) > finding_count
+            or (provider == "findings" and finding_count < 1)
             or (provider != "findings" and finding_count != 0)
         ):
             raise CacheError("invalid-input", "review finding identities are invalid", 2)
@@ -4437,75 +4532,240 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         finding_review["thread_resolutions"].append(candidate)
         return True
 
-    if event_type == "autoreview-observed":
-        event = exact_object(raw, {"type", "task_key", "delivery_key", "evidence"}, event_type)
-        delivery = delivery_by_key(task, check_lower_kebab(event["delivery_key"], "delivery_key"))
-        revision = delivery["revision"]
-        if revision is None:
-            raise CacheError("state-conflict", "AutoReview evidence requires a current delivery revision", 4)
-        if not isinstance(event["evidence"], dict) or "observed_at" in event["evidence"]:
-            raise CacheError("invalid-input", "AutoReview event evidence is invalid", 2)
-        candidate = validate_autoreview_summary(
-            {**event["evidence"], "observed_at": observed_at},
-            "autoreview-observed.evidence",
+    if event_type == "autoreview-hosted-finding-obligated":
+        event = exact_object(raw, {"type", "task_key", "delivery_key", "obligation"}, event_type)
+        assert delivery is not None
+        try:
+            obligation = copy.deepcopy(AUTOREVIEW_PROTOCOL.validate_hosted_obligation(event["obligation"]))
+        except AUTOREVIEW_PROTOCOL.ProtocolError as exc:
+            raise CacheError("invalid-input", str(exc), 2, {"protocol_code": exc.code}) from exc
+        prior = delivery["autoreview"]
+        committed = delivery["committed_revision"]
+        if prior is None or committed is None:
+            raise CacheError("state-conflict", "hosted finding requires an existing AutoReview lineage and committed revision", 4)
+        if (
+            obligation["prior_lineage_id"] != prior["lineage_id"]
+            or obligation["prior_evidence_fingerprint"] != prior["evidence_fingerprint"]
+            or obligation["source_committed_revision_key"] != committed["target"]["committed_revision_key"]
+            or obligation["review_target_key"] != committed["target"]["review_target_key"]
+            or obligation["github_repository"] != delivery["github_repository"]
+        ):
+            raise CacheError("state-conflict", "hosted finding obligation identity is stale", 4)
+        matches = [
+            review for review in state["reviews"]
+            if review["task_key"] == task["task_key"]
+            and review["delivery_key"] == delivery["delivery_key"]
+            and review["pr_number"] == obligation["pr_number"]
+            and request_fingerprint(review["request_receipt"]) == obligation["request_receipt_fingerprint"]
+            and any(row["observation_fingerprint"] == obligation["observation_fingerprint"] for row in review["observations"])
+        ]
+        if len(matches) != 1:
+            raise CacheError("state-conflict", "hosted finding obligation lacks one exact GitStack observation", 4)
+        matched_observation = next(
+            row for row in matches[0]["observations"]
+            if row["observation_fingerprint"] == obligation["observation_fingerprint"]
+        )
+        expected_provider_evidence = request_fingerprint(
+            {
+                "evidence_ref": matched_observation["evidence_ref"],
+                "provider_state": matched_observation["provider_state"],
+                "finding_count": matched_observation["finding_count"],
+                "finding_comment_ids": matched_observation["finding_comment_ids"],
+            }
         )
         if (
-            candidate["head_sha"] != revision["head_sha"]
-            or candidate["base_ref"] != revision["base_ref"]
-            or candidate["merge_base_sha"] != revision["merge_base_sha"]
+            matched_observation["provider_state"] != "findings"
+            or matched_observation["finding_count"] != obligation["finding_count"]
+            or matched_observation["finding_comment_ids"] != obligation["finding_comment_ids"]
+            or obligation["provider_evidence_fingerprint"] != expected_provider_evidence
+            or obligation["repository_id"] != committed["target"]["repository_id"]
         ):
-            raise CacheError("state-conflict", "AutoReview evidence does not match the current delivery revision", 4)
+            raise CacheError("state-conflict", "hosted finding obligation does not bind the exact accepted finding observation", 4)
+        for existing in delivery["hosted_obligations"]:
+            if existing["artifact"]["obligation_id"] == obligation["obligation_id"]:
+                if existing["artifact"] == obligation:
+                    return False
+                raise CacheError("state-conflict", "hosted obligation id was reused", 4)
+            if existing["state"] == "open":
+                raise CacheError("state-conflict", "another hosted finding obligation is still open", 4)
+        delivery["hosted_obligations"].append({"artifact": obligation, "state": "open", "recorded_at": observed_at, "consumed_by": None})
+        return True
+
+    if event_type == "autoreview-lineage-reset-authorized":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "authority", "reason", "evidence_ref",
+                "prior_evidence_fingerprint", "next_review_target_key", "next_committed_revision_key",
+            },
+            event_type,
+        )
+        assert delivery is not None
+        if event["authority"] != "granted-by-authorized-user":
+            raise CacheError("invalid-input", "lineage reset requires explicit owner authority", 2)
+        if delivery["autoreview_reservation"] is not None and delivery["autoreview_reservation"]["state"] == "reserved":
+            raise CacheError("state-conflict", "lineage cannot reset while an action is reserved", 4)
         prior = delivery["autoreview"]
-        if prior is None or candidate["lineage_id"] != prior["lineage_id"]:
-            if candidate["review_phase"] != "full" or candidate["parent_evidence_fingerprint"] is not None or candidate["full_reviews"] != 1:
-                raise CacheError("state-conflict", "a new AutoReview lineage must start with one full review", 4)
-            if prior is not None and (
-                candidate["base_ref"] == prior["base_ref"]
-                and candidate["merge_base_sha"] == prior["merge_base_sha"]
-                and set(candidate["changed_files"]).issubset(set(prior["changed_files"]))
-            ):
-                raise CacheError("state-conflict", "AutoReview lineage reset lacks base or scope drift", 4)
-            expected_state = "fix-required" if candidate["open_findings"] else "terminal-clean"
-            if candidate["terminal_state"] != expected_state:
-                raise CacheError("state-conflict", "new AutoReview lineage has an invalid terminal state", 4)
-        else:
-            if candidate["parent_evidence_fingerprint"] != prior["evidence_fingerprint"]:
-                raise CacheError("state-conflict", "AutoReview evidence parent is stale", 4)
-            if candidate["base_ref"] != prior["base_ref"] or candidate["merge_base_sha"] != prior["merge_base_sha"]:
-                raise CacheError("state-conflict", "an AutoReview lineage cannot cross base drift", 4)
-            if candidate["review_phase"] == "fix-verification" and candidate["head_sha"] == prior["head_sha"]:
-                raise CacheError("state-conflict", "fix verification made no revision progress", 4)
-            if candidate["review_phase"] == "disposition" and candidate["head_sha"] != prior["head_sha"]:
-                raise CacheError("state-conflict", "finding disposition cannot change the reviewed revision", 4)
-            if candidate["review_phase"] == "full":
-                raise CacheError("state-conflict", "an existing lineage cannot restart a full review", 4)
-            if candidate["changed_files"] != prior["changed_files"]:
-                raise CacheError("state-conflict", "AutoReview lineage changed its original path scope", 4)
-            expected_full = prior["full_reviews"] + (1 if candidate["review_phase"] == "terminal-full" else 0)
-            expected_delta = prior["fix_verifications"] + (1 if candidate["review_phase"] == "fix-verification" else 0)
-            if candidate["full_reviews"] != expected_full or candidate["fix_verifications"] != expected_delta:
-                raise CacheError("state-conflict", "AutoReview counters are not monotonic", 4)
-            if candidate["review_phase"] == "terminal-full":
-                if prior["terminal_state"] != "verification-clean":
-                    raise CacheError("state-conflict", "terminal full requires verification-clean evidence", 4)
-                expected_state = "fix-required" if candidate["open_findings"] else "terminal-clean"
-            elif candidate["review_phase"] == "disposition":
-                if prior["terminal_state"] != "fix-required" or candidate["open_findings"]:
-                    raise CacheError("state-conflict", "disposition must close a finding-required state", 4)
-                expected_state = "terminal-composite-clean"
-            else:
-                if prior["terminal_state"] not in {"fix-required", "terminal-clean", "terminal-composite-clean"}:
-                    raise CacheError("state-conflict", "fix verification has no actionable parent state", 4)
-                expected_state = "fix-required" if candidate["open_findings"] else (
-                    "verification-clean"
-                    if prior["terminal_state"] == "fix-required" and prior["full_reviews"] == 1
-                    else "terminal-composite-clean"
-                )
-            if candidate["terminal_state"] != expected_state:
-                raise CacheError("state-conflict", "AutoReview phase and terminal state are inconsistent", 4)
-        if prior is not None and all(prior.get(key) == candidate.get(key) for key in candidate if key != "observed_at"):
-            return False
+        if prior is None or event["prior_evidence_fingerprint"] != prior["evidence_fingerprint"]:
+            raise CacheError("state-conflict", "lineage reset authority is not bound to the current evidence tip", 4)
+        for name in ("next_review_target_key", "next_committed_revision_key"):
+            canonical_fingerprint(event[name], name)
+        current = delivery["lineage_reset_authority"]
+        if current is not None and current["state"] in {"authorized", "target-observed"}:
+            raise CacheError("state-conflict", "another lineage reset authority is still active", 4)
+        delivery["lineage_reset_authority"] = {
+            "authority": event["authority"],
+            "reason": nonempty(event["reason"], "reason"),
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "prior_evidence_fingerprint": event["prior_evidence_fingerprint"],
+            "next_review_target_key": event["next_review_target_key"],
+            "next_committed_revision_key": event["next_committed_revision_key"],
+            "state": "authorized",
+            "consumed_by": None,
+            "recorded_at": observed_at,
+        }
+        return True
+
+    if event_type == "autoreview-action-reserved":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "reservation_id", "expected_state_fingerprint", "projection"},
+            event_type,
+        )
+        assert delivery is not None
+        if event["expected_state_fingerprint"] != state["content_fingerprint"]:
+            raise CacheError("state-conflict", "AutoReview reservation state fingerprint is stale", 4)
+        if delivery["committed_revision"] is None:
+            raise CacheError("state-conflict", "AutoReview reservation requires a clean committed revision", 4)
+        open_obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
+        reset = delivery["lineage_reset_authority"]
+        projection_parent = (
+            None if reset is not None and reset["state"] == "target-observed"
+            else delivery["autoreview"]
+        )
+        expected = AUTOREVIEW_PROTOCOL.next_projection(
+            projection_parent,
+            target=delivery["committed_revision"]["target"],
+            hosted_obligation=open_obligations[0] if open_obligations else None,
+        )
+        if event["projection"] != expected or expected["action"] is None:
+            raise CacheError("state-conflict", "AutoReview reservation does not match the protocol-derived next action", 4)
+        reservation_id = canonical_fingerprint(event["reservation_id"], "reservation_id")
+        current = delivery["autoreview_reservation"]
+        if current is not None and current["state"] == "reserved":
+            if current["reservation_id"] == reservation_id and current["projection"] == expected:
+                return False
+            raise CacheError("state-conflict", "an AutoReview action is already reserved", 4)
+        delivery["autoreview_reservation"] = {
+            "reservation_id": reservation_id,
+            "expected_state_fingerprint": event["expected_state_fingerprint"],
+            "projection": copy.deepcopy(expected),
+            "state": "reserved",
+            "attempt_id": None,
+            "candidate_fingerprint": None,
+            "operation_id": None,
+            "recorded_at": observed_at,
+        }
+        return True
+
+    if event_type == "autoreview-reservation-released":
+        event = exact_object(raw, {"type", "task_key", "delivery_key", "reservation_id", "reason"}, event_type)
+        assert delivery is not None
+        reservation = delivery["autoreview_reservation"]
+        if reservation is None or reservation["reservation_id"] != event["reservation_id"] or reservation["state"] != "reserved":
+            raise CacheError("state-conflict", "AutoReview reservation is not releasable", 4)
+        if any(row["reservation_id"] == event["reservation_id"] and row["model_call_started"] for row in delivery["autoreview_attempts"]):
+            raise CacheError("state-conflict", "a launched AutoReview reservation cannot be released", 4)
+        nonempty(event["reason"], "reason")
+        reservation["state"] = "released"
+        return True
+
+    if event_type == "autoreview-attempt-observed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "reservation_id", "attempt_id", "attempt_state", "model_call_started", "candidate_fingerprint", "operation_id", "evidence_ref"},
+            event_type,
+        )
+        assert delivery is not None
+        reservation = delivery["autoreview_reservation"]
+        if reservation is None or reservation["reservation_id"] != event["reservation_id"] or reservation["state"] != "reserved":
+            raise CacheError("state-conflict", "AutoReview attempt lacks the active reservation", 4)
+        attempt_id = canonical_fingerprint(event["attempt_id"], "attempt_id")
+        records = [row for row in delivery["autoreview_attempts"] if row["attempt_id"] == attempt_id]
+        candidate = {"state": event["attempt_state"], "model_call_started": event["model_call_started"]}
+        try:
+            AUTOREVIEW_PROTOCOL.validate_attempt_transition(records, candidate)
+        except AUTOREVIEW_PROTOCOL.ProtocolError as exc:
+            raise CacheError("state-conflict", str(exc), 4, {"protocol_code": exc.code}) from exc
+        if records and any(row["reservation_id"] != event["reservation_id"] for row in records):
+            raise CacheError("state-conflict", "attempt identity crossed reservations", 4)
+        record = {
+            "reservation_id": event["reservation_id"],
+            "attempt_id": attempt_id,
+            "state": event["attempt_state"],
+            "model_call_started": event["model_call_started"],
+            "candidate_fingerprint": event["candidate_fingerprint"],
+            "operation_id": event["operation_id"],
+            "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+            "recorded_at": observed_at,
+        }
+        if record["candidate_fingerprint"] is not None:
+            canonical_fingerprint(record["candidate_fingerprint"], "candidate_fingerprint")
+        if record["operation_id"] is not None:
+            check_operation_id(record["operation_id"])
+        delivery["autoreview_attempts"].append(record)
+        reservation["attempt_id"] = attempt_id
+        if event["attempt_state"] == "failed":
+            reservation["state"] = "consumed-failed"
+        return True
+
+    if event_type == "autoreview-observed":
+        event = exact_object(
+            raw,
+            {"type", "task_key", "delivery_key", "reservation_id", "candidate_fingerprint", "operation_id", "evidence_ref", "evidence"},
+            event_type,
+        )
+        assert delivery is not None
+        reservation = delivery["autoreview_reservation"]
+        if reservation is None or reservation["state"] != "reserved" or reservation["reservation_id"] != event["reservation_id"]:
+            raise CacheError("state-conflict", "AutoReview evidence lacks its exact active reservation", 4)
+        candidate = validate_autoreview_summary(event["evidence"], "autoreview-observed.evidence")
+        candidate_fingerprint = canonical_fingerprint(event["candidate_fingerprint"], "candidate_fingerprint")
+        if candidate_fingerprint != AUTOREVIEW_PROTOCOL.fingerprint(candidate):
+            raise CacheError("state-conflict", "AutoReview candidate bytes fingerprint is stale", 4)
+        if candidate["target"] != delivery["committed_revision"]["target"]:
+            raise CacheError("state-conflict", "AutoReview evidence does not match the reserved committed revision", 4)
+        open_obligations = [row for row in delivery["hosted_obligations"] if row["state"] == "open"]
+        obligation = open_obligations[0] if open_obligations else None
+        try:
+            AUTOREVIEW_PROTOCOL.validate_transition(
+                delivery["autoreview"], candidate, hosted_obligation=obligation,
+                lineage_reset_authorized=(
+                    delivery["lineage_reset_authority"] is not None
+                    and delivery["lineage_reset_authority"]["state"] == "target-observed"
+                ),
+            )
+        except AUTOREVIEW_PROTOCOL.ProtocolError as exc:
+            raise CacheError("state-conflict", str(exc), 4, {"protocol_code": exc.code}) from exc
+        if candidate["review_phase"] != reservation["projection"]["action"]:
+            raise CacheError("state-conflict", "AutoReview evidence phase differs from the reservation", 4)
+        operation_id = check_operation_id(event["operation_id"])
+        matching_attempts = [
+            row for row in delivery["autoreview_attempts"]
+            if row["reservation_id"] == event["reservation_id"] and row["state"] == "completed"
+        ]
+        if len(matching_attempts) != 1:
+            raise CacheError("state-conflict", "AutoReview evidence requires one completed attempt", 4)
         delivery["autoreview"] = candidate
+        reservation.update({"state": "consumed", "candidate_fingerprint": candidate_fingerprint, "operation_id": operation_id})
+        if obligation is not None:
+            matching = next(row for row in delivery["hosted_obligations"] if row["artifact"]["obligation_id"] == obligation["obligation_id"])
+            matching["state"] = "consumed"
+            matching["consumed_by"] = candidate["evidence_fingerprint"]
+        if delivery["lineage_reset_authority"] is not None:
+            delivery["lineage_reset_authority"]["state"] = "consumed"
+            delivery["lineage_reset_authority"]["consumed_by"] = candidate["evidence_fingerprint"]
+        nonempty(event["evidence_ref"], "evidence_ref")
         return True
 
     if event_type == "gate-observed":
@@ -4554,9 +4814,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 autoreview is None
                 or autoreview["terminal_state"] not in {"terminal-clean", "terminal-composite-clean"}
                 or revision is None
-                or autoreview["head_sha"] != revision["head_sha"]
-                or autoreview["base_ref"] != revision["base_ref"]
-                or autoreview["merge_base_sha"] != revision["merge_base_sha"]
+                or autoreview["target"]["head_sha"] != revision["head_sha"]
+                or autoreview["target"]["base_ref"] != revision["base_ref"]
+                or autoreview["target"]["merge_base_sha"] != revision["merge_base_sha"]
             ):
                 raise CacheError(
                     "state-conflict",
@@ -4798,6 +5058,14 @@ def apply_ledger(args: argparse.Namespace) -> dict[str, Any]:
     with locked_claim_store(create=False, exclusive=True) as claims:
         claim = active_claim(claims, root_id, expected_fingerprint, ledger)
         state = load_state(ledger)
+        expected_state_fingerprint = getattr(args, "expected_state_fingerprint", None)
+        if expected_state_fingerprint is not None:
+            expected_state_fingerprint = canonical_fingerprint(expected_state_fingerprint, "expected_state_fingerprint")
+            if state["content_fingerprint"] != expected_state_fingerprint:
+                raise CacheError(
+                    "state-conflict", "expected state fingerprint is stale", 4,
+                    {"expected": expected_state_fingerprint, "actual": state["content_fingerprint"]},
+                )
         if (
             state["portfolio"]["root_id"] != root_id
             or state["portfolio"]["repositories"] != claim["repositories"]
@@ -4857,14 +5125,91 @@ def apply_ledger(args: argparse.Namespace) -> dict[str, Any]:
         )
         seal_state_fingerprint(candidate)
         validate_state(candidate, ledger)
-        replace_json_durable(ledger, candidate)
+        if not getattr(args, "dry_run", False):
+            replace_json_durable(ledger, candidate)
     return {
         "ok": True,
         "command": "ledger.apply",
         "version": __version__,
-        "mutation_state": "applied",
+        "mutation_state": "dry-run" if getattr(args, "dry_run", False) else "applied",
         "applied_event_types": event_types,
+        "candidate_content_fingerprint": candidate["content_fingerprint"],
+        "operation_id": operation_id,
         **project_state(candidate, "status"),
+    }
+
+
+def autoreview_next(args: argparse.Namespace) -> dict[str, Any]:
+    ledger = canonical_active_ledger(args.ledger)
+    state = load_state(ledger)
+    task = task_by_key(state, check_lower_kebab(args.task_key, "task_key"))
+    delivery = delivery_by_key(task, check_lower_kebab(args.delivery_key, "delivery_key"))
+    blockers: list[str] = []
+    if delivery["managed_checkout"] is None:
+        blockers.append("managed-checkout-missing")
+    if delivery["committed_revision"] is None:
+        blockers.append("clean-committed-revision-missing")
+    current = delivery["autoreview_reservation"]
+    if current is not None and current["state"] == "reserved":
+        blockers.append("action-already-reserved")
+    open_obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
+    if len(open_obligations) > 1:
+        blockers.append("multiple-hosted-obligations")
+    reset = delivery["lineage_reset_authority"]
+    reset_pending = reset is not None and reset["state"] == "target-observed"
+    projection_parent = None if reset_pending else delivery["autoreview"]
+    if delivery["committed_revision"] is None:
+        projection = {
+            "protocol_version": AUTOREVIEW_PROTOCOL.PROTOCOL_VERSION,
+            "action": None,
+            "packet": None,
+            "allowed_transitions": [],
+            "completion_criterion": "terminal-clean-or-terminal-composite-clean",
+            "blockers": sorted(blockers),
+        }
+        projection["projection_fingerprint"] = AUTOREVIEW_PROTOCOL.fingerprint(projection)
+    else:
+        projection = AUTOREVIEW_PROTOCOL.next_projection(
+            projection_parent,
+            target=delivery["committed_revision"]["target"],
+            hosted_obligation=open_obligations[0] if open_obligations else None,
+            blockers=blockers,
+        )
+    reservation_event = None
+    if projection["action"] is not None:
+        reservation_id = AUTOREVIEW_PROTOCOL.fingerprint(
+            {
+                "ledger": str(ledger),
+                "task_key": task["task_key"],
+                "delivery_key": delivery["delivery_key"],
+                "state_fingerprint": state["content_fingerprint"],
+                "projection_fingerprint": projection["projection_fingerprint"],
+            }
+        )
+        reservation_event = {
+            "type": "autoreview-action-reserved",
+            "task_key": task["task_key"],
+            "delivery_key": delivery["delivery_key"],
+            "reservation_id": reservation_id,
+            "expected_state_fingerprint": state["content_fingerprint"],
+            "projection": projection,
+        }
+    return {
+        "ok": True,
+        "command": "autoreview.next",
+        "version": __version__,
+        "ledger_schema_version": LEDGER_SCHEMA_VERSION,
+        "ledger": str(ledger),
+        "root_id": state["portfolio"]["root_id"],
+        "expected_claim_fingerprint": state["claim"]["fingerprint"],
+        "task_key": task["task_key"],
+        "delivery_key": delivery["delivery_key"],
+        "generation": state["generation"],
+        "current_state_fingerprint": state["content_fingerprint"],
+        "prior_evidence": copy.deepcopy(projection_parent),
+        "hosted_obligation": copy.deepcopy(open_obligations[0]) if open_obligations else None,
+        **projection,
+        "reservation_event": reservation_event,
     }
 
 
@@ -5698,6 +6043,8 @@ def build_parser() -> argparse.ArgumentParser:
     apply.add_argument("--expected-generation", type=int, required=True)
     apply.add_argument("--operation-id", required=True)
     apply.add_argument("--events-file", required=True)
+    apply.add_argument("--expected-state-fingerprint")
+    apply.add_argument("--dry-run", action="store_true", help="Validate the real apply path without persisting state.")
     read = ledger_verbs.add_parser("read", help="Read one bounded derived projection.")
     read.add_argument("--ledger", required=True)
     read.add_argument("--projection", choices=sorted(PROJECTIONS), required=True)
@@ -5705,6 +6052,13 @@ def build_parser() -> argparse.ArgumentParser:
     archive.add_argument("--ledger", required=True)
     archive.add_argument("--evidence-ref", required=True)
     archive.add_argument("--root-id", required=True)
+
+    autoreview = nouns.add_parser("autoreview", help="Derive the next managed AutoReview protocol action.")
+    autoreview_verbs = autoreview.add_subparsers(dest="verb", required=True)
+    next_action = autoreview_verbs.add_parser("next", help="Return the next action, packet, transitions, blockers, and reservation event.")
+    next_action.add_argument("--ledger", required=True)
+    next_action.add_argument("--task-key", required=True)
+    next_action.add_argument("--delivery-key", required=True)
 
     archive_noun = nouns.add_parser("archive", help="Inspect, verify, or prune archived ledgers.")
     archive_verbs = archive_noun.add_subparsers(dest="verb", required=True)
@@ -5728,6 +6082,8 @@ def dispatch(args: argparse.Namespace) -> dict[str, Any]:
         if args.verb == "read":
             return read_ledger(args)
         return archive_ledgers(args)
+    if args.noun == "autoreview":
+        return autoreview_next(args)
     if args.verb == "list":
         return list_archives()
     if args.verb == "verify":

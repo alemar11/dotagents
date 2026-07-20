@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV11Tests(unittest.TestCase):
+class LedgerCacheV12Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -412,7 +412,6 @@ class LedgerCacheV11Tests(unittest.TestCase):
                 self.task_event(state="implementing"),
             ]
         )
-
     def direct_event(self, state: dict, event: dict, now: datetime) -> None:
         changed = CACHE_RUNTIME.apply_event(state, event, now)
         self.assertTrue(changed)
@@ -481,8 +480,37 @@ class LedgerCacheV11Tests(unittest.TestCase):
     ) -> dict:
         assert self.registration is not None
         repository = self.registration["sources"][0]["deliveries"][0]["repository"]
+        scope = ["skills/implement-feature/"]
+        patch_fingerprint = hashlib.sha256(f"patch:{head}".encode()).hexdigest()
+        review_target_key = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_review_target_key(
+            repository_id=repository,
+            base_ref="main",
+            review_scope=scope,
+        )
+        target = {
+            "repository_id": repository,
+            "base_ref": "main",
+            "merge_base_sha": merge_base,
+            "head_sha": head,
+            "review_scope": scope,
+            "review_target_key": review_target_key,
+            "reviewed_patch_fingerprint": patch_fingerprint,
+            "phase_input_fingerprint": patch_fingerprint,
+            "committed_revision_key": CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_committed_revision_key(
+                review_target_key=review_target_key,
+                head_sha=head,
+                reviewed_patch_fingerprint=patch_fingerprint,
+            ),
+        }
         self.apply(
             [
+                {
+                    "type": "committed-revision-observed",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "target": target,
+                    "evidence_ref": f"git://committed-revision/{head}",
+                },
                 {
                     "type": "revision-observed",
                     "task_key": self.task_key,
@@ -751,9 +779,7 @@ class LedgerCacheV11Tests(unittest.TestCase):
                     "provider_state": "clean",
                     "failure_kind": None,
                     "provider_error_code": None,
-                    "observation_fingerprint": hashlib.sha256(
-                        b"clean-review"
-                    ).hexdigest(),
+                    "observation_fingerprint": hashlib.sha256(b"clean-review").hexdigest(),
                     "disposition": "accepted",
                     "finding_count": 0,
                     "finding_comment_ids": [],
@@ -765,32 +791,189 @@ class LedgerCacheV11Tests(unittest.TestCase):
             ]
         )
 
-    def pass_terminal_gates(self, revision: dict) -> None:
-        events = [
-            {
-                "type": "autoreview-observed",
-                "task_key": self.task_key,
-                "delivery_key": "dotagents",
-                "evidence": {
-                    "lineage_id": "a" * 64,
-                    "parent_evidence_fingerprint": None,
-                    "evidence_fingerprint": "b" * 64,
-                    "review_phase": "full",
-                    "terminal_state": "terminal-clean",
-                    "head_sha": revision["head_sha"],
-                    "base_ref": revision["base_ref"],
-                    "merge_base_sha": revision["merge_base_sha"],
-                    "target_fingerprint": "c" * 64,
-                    "changed_files": ["skills/implement-feature/SKILL.md"],
-                    "full_reviews": 1,
-                    "fix_verifications": 0,
-                    "open_findings": [],
-                    "prompt_characters": 100,
-                    "elapsed_seconds": 1,
-                    "evidence_ref": "autoreview://fixture/clean",
+    def autoreview_evidence(
+        self,
+        *,
+        terminal_state: str = "terminal-clean",
+        open_findings: list | None = None,
+        parent: dict | None = None,
+        phase: str = "full",
+    ) -> dict:
+        target = copy.deepcopy(self.state()["tasks"][0]["deliveries"][0]["committed_revision"]["target"])
+        counts = (
+            {"full_reviews": 1, "terminal_full_reviews": 0, "fix_verifications": 0, "model_calls": 1}
+            if parent is None else copy.deepcopy(parent["counts"])
+        )
+        if parent is not None and phase == "fix-verification":
+            counts["fix_verifications"] += 1
+            counts["model_calls"] += 1
+        if parent is not None and phase == "terminal-full":
+            counts["full_reviews"] += 1
+            counts["terminal_full_reviews"] += 1
+            counts["model_calls"] += 1
+        value = {
+            "schema_version": "2.0.0",
+            "protocol_version": "2.0.0",
+            "review_phase": phase,
+            "lineage_id": parent["lineage_id"] if parent else "a" * 64,
+            "parent_evidence_fingerprint": parent["evidence_fingerprint"] if parent else None,
+            "target": target,
+            "counts": counts,
+            "finding_state": {"open": open_findings or [], "resolved": [], "rejected": []},
+            "hosted_obligation_id": None,
+            "report": {"findings": [], "review_outcome": "fail" if open_findings else "pass"},
+            "terminal_state": terminal_state,
+            "metrics": {"prompt_characters": 100, "elapsed_seconds": 1},
+        }
+        value["evidence_fingerprint"] = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.evidence_fingerprint(value)
+        return value
+
+    def record_autoreview(self, evidence: dict) -> None:
+        result = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
+        )
+        reservation = result["reservation_event"]
+        self.assertIsNotNone(reservation)
+        self.apply([reservation])
+        reservation_id = reservation["reservation_id"]
+        attempt_id = hashlib.sha256(f"attempt:{reservation_id}".encode()).hexdigest()
+        operation_id = self.next_operation_id()
+        candidate_fingerprint = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.fingerprint(evidence)
+        base = {
+            "type": "autoreview-attempt-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "reservation_id": reservation_id,
+            "attempt_id": attempt_id,
+            "candidate_fingerprint": None,
+            "operation_id": None,
+            "evidence_ref": f"attempt://{attempt_id}",
+        }
+        self.apply(
+            [
+                {**base, "attempt_state": "prepared", "model_call_started": False},
+                {**base, "attempt_state": "model-started", "model_call_started": True},
+                {
+                    **base,
+                    "attempt_state": "completed",
+                    "model_call_started": True,
+                    "candidate_fingerprint": candidate_fingerprint,
+                    "operation_id": operation_id,
                 },
-            }
-        ]
+            ]
+        )
+        self.apply(
+            [
+                {
+                    "type": "autoreview-observed",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "reservation_id": reservation_id,
+                    "candidate_fingerprint": candidate_fingerprint,
+                    "operation_id": operation_id,
+                    "evidence_ref": f"autoreview://{evidence['evidence_fingerprint']}",
+                    "evidence": evidence,
+                }
+            ]
+        )
+
+    def test_autoreview_reservation_dry_run_uses_real_apply_path_and_exact_state(self) -> None:
+        self.bootstrap_active_task()
+        self.observe_revision()
+        projection = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
+        )
+        event = projection["reservation_event"]
+        state = self.state()
+        before = self.ledger.read_bytes()
+        operation_id = self.next_operation_id()
+        command = self.apply_command(
+            [event], expected_generation=state["generation"], operation_id=operation_id
+        )
+        dry_run = parse_result(
+            self.run_cache(
+                *command,
+                "--expected-state-fingerprint", state["content_fingerprint"],
+                "--dry-run",
+            )
+        )
+        self.assertEqual(dry_run["mutation_state"], "dry-run")
+        self.assertEqual(self.ledger.read_bytes(), before)
+        applied = parse_result(
+            self.run_cache(
+                *command,
+                "--expected-state-fingerprint", state["content_fingerprint"],
+            )
+        )
+        self.assertEqual(applied["mutation_state"], "applied")
+        self.assertEqual(
+            self.state()["tasks"][0]["deliveries"][0]["autoreview_reservation"]["reservation_id"],
+            event["reservation_id"],
+        )
+
+    def test_autoreview_reservation_allows_one_launch_and_no_release_after_start(self) -> None:
+        self.bootstrap_active_task()
+        self.observe_revision()
+        projection = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
+        )
+        reservation = projection["reservation_event"]
+        self.apply([reservation])
+
+        conflicting = copy.deepcopy(reservation)
+        conflicting["reservation_id"] = "c" * 64
+        conflicting["expected_state_fingerprint"] = self.state()["content_fingerprint"]
+        conflict = self.apply([conflicting], check=False)
+        self.error(conflict, "state-conflict")
+
+        attempt_id = "d" * 64
+        base = {
+            "type": "autoreview-attempt-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "reservation_id": reservation["reservation_id"],
+            "attempt_id": attempt_id,
+            "candidate_fingerprint": None,
+            "operation_id": None,
+            "evidence_ref": f"attempt://{attempt_id}",
+        }
+        self.apply(
+            [
+                {**base, "attempt_state": "prepared", "model_call_started": False},
+                {**base, "attempt_state": "model-started", "model_call_started": True},
+            ]
+        )
+        duplicate_launch = self.apply(
+            [{**base, "attempt_state": "model-started", "model_call_started": True}],
+            check=False,
+        )
+        self.error(duplicate_launch, "state-conflict")
+        release = self.apply(
+            [
+                {
+                    "type": "autoreview-reservation-released",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "reservation_id": reservation["reservation_id"],
+                    "reason": "caller-cancelled",
+                }
+            ],
+            check=False,
+        )
+        self.error(release, "state-conflict")
+
+    def pass_terminal_gates(self, revision: dict) -> None:
+        self.record_autoreview(self.autoreview_evidence())
+        events = []
         revision_set = CACHE_RUNTIME.current_revision_set_key(self.state()["tasks"][0])
         for gate in sorted(CACHE_RUNTIME.TASK_STATIC_GATES):
             events.append(
@@ -947,12 +1130,12 @@ class LedgerCacheV11Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v11_offline_and_read_only(self) -> None:
+    def test_doctor_is_v12_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "11.0.0")
+        self.assertEqual(version, "12.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1414,91 +1597,137 @@ class LedgerCacheV11Tests(unittest.TestCase):
             "binding_key": binding, "evidence_ref": "proof://autoreview/free-form",
         }
         self.error(self.apply([gate], check=False), "state-conflict")
-
-        initial = {
-            "lineage_id": "a" * 64, "parent_evidence_fingerprint": None,
-            "evidence_fingerprint": "b" * 64, "review_phase": "full",
-            "terminal_state": "fix-required", "head_sha": revision["head_sha"],
-            "base_ref": revision["base_ref"], "merge_base_sha": revision["merge_base_sha"],
-            "target_fingerprint": "c" * 64,
-            "changed_files": ["skills/implement-feature/SKILL.md"],
-            "full_reviews": 1, "fix_verifications": 0,
-            "open_findings": [{"finding_id": "d" * 64, "finding": {"title": "Fix me"}}],
-            "prompt_characters": 100, "elapsed_seconds": 1,
-            "evidence_ref": "autoreview://fixture/finding",
-        }
-        self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": initial}])
-        bypass = {
-            **initial,
-            "parent_evidence_fingerprint": initial["evidence_fingerprint"],
-            "evidence_fingerprint": "9" * 64,
-            "review_phase": "terminal-full",
-            "terminal_state": "terminal-clean",
-            "full_reviews": 2,
-            "open_findings": [],
-            "evidence_ref": "autoreview://fixture/bypass",
-        }
-        self.error(
-            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": bypass}], check=False),
-            "state-conflict",
+        initial = self.autoreview_evidence()
+        self.record_autoreview(initial)
+        self.apply([gate])
+        next_action = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
         )
-        no_progress = {
-            **initial,
-            "parent_evidence_fingerprint": initial["evidence_fingerprint"],
-            "evidence_fingerprint": "e" * 64,
-            "review_phase": "fix-verification",
-            "terminal_state": "verification-clean",
-            "fix_verifications": 1,
-            "open_findings": [],
-            "evidence_ref": "autoreview://fixture/no-progress",
-        }
-        self.error(
-            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": no_progress}], check=False),
-            "state-conflict",
-        )
-        reset = {
-            **initial,
-            "lineage_id": "f" * 64,
-            "evidence_fingerprint": "0" * 64,
-            "terminal_state": "terminal-clean",
-            "open_findings": [],
-            "evidence_ref": "autoreview://fixture/unjustified-reset",
-        }
-        self.error(
-            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": reset}], check=False),
-            "state-conflict",
-        )
+        self.assertIsNone(next_action["action"])
+        self.assertEqual(next_action["completion_criterion"], "complete")
 
     def test_autoreview_lineage_cannot_cross_merge_base_drift(self) -> None:
         self.bootstrap_active_task()
         first = self.observe_revision()
         self.observe_delivery(first)
-        initial = {
-            "lineage_id": "a" * 64, "parent_evidence_fingerprint": None,
-            "evidence_fingerprint": "b" * 64, "review_phase": "full",
-            "terminal_state": "terminal-clean", "head_sha": first["head_sha"],
-            "base_ref": first["base_ref"], "merge_base_sha": first["merge_base_sha"],
-            "target_fingerprint": "c" * 64,
-            "changed_files": ["skills/implement-feature/SKILL.md"],
-            "full_reviews": 1, "fix_verifications": 0, "open_findings": [],
-            "prompt_characters": 100, "elapsed_seconds": 1,
-            "evidence_ref": "autoreview://fixture/first",
-        }
-        self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": initial}])
-        second = self.observe_revision(head="e" * 40, merge_base="f" * 40)
-        self.observe_delivery(second)
-        continued = {
-            **initial,
-            "parent_evidence_fingerprint": initial["evidence_fingerprint"],
-            "evidence_fingerprint": "d" * 64,
-            "review_phase": "fix-verification", "terminal_state": "terminal-composite-clean",
-            "head_sha": second["head_sha"], "merge_base_sha": second["merge_base_sha"],
-            "fix_verifications": 1, "evidence_ref": "autoreview://fixture/drift",
-        }
-        self.error(
-            self.apply([{"type": "autoreview-observed", "task_key": self.task_key, "delivery_key": "dotagents", "evidence": continued}], check=False),
+        self.record_autoreview(self.autoreview_evidence())
+        prior_target = self.state()["tasks"][0]["deliveries"][0]["committed_revision"]["target"]
+        equivalent = copy.deepcopy(prior_target)
+        equivalent["head_sha"] = "e" * 40
+        equivalent["merge_base_sha"] = "f" * 40
+        equivalent["committed_revision_key"] = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_committed_revision_key(
+            review_target_key=equivalent["review_target_key"],
+            head_sha=equivalent["head_sha"],
+            reviewed_patch_fingerprint=equivalent["reviewed_patch_fingerprint"],
+        )
+        self.apply(
+            [{"type": "committed-revision-observed", "task_key": self.task_key, "delivery_key": "dotagents", "target": equivalent, "evidence_ref": "git://pure-rebase"}]
+        )
+        changed = copy.deepcopy(equivalent)
+        changed["head_sha"] = "1" * 40
+        changed["merge_base_sha"] = "2" * 40
+        changed["reviewed_patch_fingerprint"] = "3" * 64
+        changed["committed_revision_key"] = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_committed_revision_key(
+            review_target_key=changed["review_target_key"], head_sha=changed["head_sha"],
+            reviewed_patch_fingerprint=changed["reviewed_patch_fingerprint"],
+        )
+        error = self.error(
+            self.apply([{"type": "committed-revision-observed", "task_key": self.task_key, "delivery_key": "dotagents", "target": changed, "evidence_ref": "git://semantic-drift"}], check=False),
             "state-conflict",
         )
+        self.assertIn("lineage reset authority", error["message"])
+        prior = self.state()["tasks"][0]["deliveries"][0]["autoreview"]
+        self.apply(
+            [
+                {
+                    "type": "autoreview-lineage-reset-authorized",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "authority": "granted-by-authorized-user",
+                    "reason": "the canonical rebased patch changed semantically",
+                    "evidence_ref": "owner://lineage-reset/1",
+                    "prior_evidence_fingerprint": prior["evidence_fingerprint"],
+                    "next_review_target_key": changed["review_target_key"],
+                    "next_committed_revision_key": changed["committed_revision_key"],
+                }
+            ]
+        )
+        self.apply(
+            [{"type": "committed-revision-observed", "task_key": self.task_key, "delivery_key": "dotagents", "target": changed, "evidence_ref": "git://semantic-drift"}]
+        )
+        next_action = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
+        )
+        self.assertEqual(next_action["action"], "full")
+        self.assertIsNone(next_action["prior_evidence"])
+        self.assertIsNone(next_action["packet"]["prior_evidence_fingerprint"])
+        replacement = self.autoreview_evidence()
+        replacement["lineage_id"] = "4" * 64
+        replacement["evidence_fingerprint"] = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.evidence_fingerprint(replacement)
+        self.record_autoreview(replacement)
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        self.assertEqual(delivery["autoreview"]["lineage_id"], "4" * 64)
+        self.assertEqual(delivery["lineage_reset_authority"]["state"], "consumed")
+        self.assertEqual(
+            delivery["lineage_reset_authority"]["consumed_by"],
+            replacement["evidence_fingerprint"],
+        )
+
+    def test_summary_only_hosted_finding_creates_one_focused_obligation(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        self.record_autoreview(self.autoreview_evidence())
+        receipt = self.request_receipt(revision, request_key="summary-finding")
+        self.apply([
+            {"type": "review-wait-started", "task_key": self.task_key, "delivery_key": "dotagents", "revision_key": revision["revision_key"], "request_receipt": receipt}
+        ])
+        review = self.state()["reviews"][-1]
+        observation_fingerprint = hashlib.sha256(b"summary-only-hosted-finding").hexdigest()
+        evidence_ref = "github-review://233/summary-finding"
+        self.apply([
+            {"type": "review-wait-invoked", "task_key": self.task_key, "delivery_key": "dotagents", "revision_key": revision["revision_key"], "request_receipt": receipt, "wait_invoked_at": review["wait_started_at"], "provider_timeout": 2700},
+            {"type": "review-observed", "task_key": self.task_key, "delivery_key": "dotagents", "revision_key": revision["revision_key"], "request_receipt": receipt, "request_binding": "recognized", "provider_state": "findings", "failure_kind": None, "provider_error_code": None, "observation_fingerprint": observation_fingerprint, "disposition": "fix-required", "finding_count": 1, "finding_comment_ids": [], "evidence_ref": evidence_ref, "warning_ref": None, "warning_posted_at": None, "warning_fingerprint": None},
+        ])
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        finding_set = self.write_packet({"finding_source": "codex-review", "findings": [{"summary": "Fix the terminal comment finding."}]}, "summary-findings")
+        finding_set_fingerprint = hashlib.sha256(finding_set.read_bytes()).hexdigest()
+        provider_evidence_fingerprint = CACHE_RUNTIME.request_fingerprint({
+            "evidence_ref": evidence_ref,
+            "provider_state": "findings",
+            "finding_count": 1,
+            "finding_comment_ids": [],
+        })
+        obligation = {
+            "schema_version": "2.0.0",
+            "obligation_id": hashlib.sha256(b"summary-obligation").hexdigest(),
+            "review_target_key": delivery["committed_revision"]["target"]["review_target_key"],
+            "prior_lineage_id": delivery["autoreview"]["lineage_id"],
+            "prior_evidence_fingerprint": delivery["autoreview"]["evidence_fingerprint"],
+            "source_committed_revision_key": delivery["committed_revision"]["target"]["committed_revision_key"],
+            "repository_id": delivery["committed_revision"]["target"]["repository_id"],
+            "github_repository": delivery["github_repository"],
+            "pr_number": 233,
+            "request_receipt_fingerprint": CACHE_RUNTIME.request_fingerprint(receipt),
+            "observation_fingerprint": observation_fingerprint,
+            "provider_evidence_fingerprint": provider_evidence_fingerprint,
+            "finding_count": 1,
+            "finding_comment_ids": [],
+            "finding_set_ref": str(finding_set),
+            "finding_set_fingerprint": finding_set_fingerprint,
+        }
+        event = {"type": "autoreview-hosted-finding-obligated", "task_key": self.task_key, "delivery_key": "dotagents", "obligation": obligation}
+        self.apply([event])
+        next_action = parse_result(self.run_cache("--json", "autoreview", "next", "--ledger", str(self.ledger), "--task-key", self.task_key, "--delivery-key", "dotagents"))
+        self.assertEqual(next_action["action"], "fix-verification")
+        self.assertEqual(next_action["hosted_obligation"]["finding_comment_ids"], [])
+        self.assertEqual(self.apply([event]).returncode, 0)
 
     def test_review_wait_is_fixed_45_minutes_and_timeout_requires_warning(self) -> None:
         self.bootstrap_active_task()
@@ -1636,6 +1865,28 @@ class LedgerCacheV11Tests(unittest.TestCase):
         self.direct_event(
             state,
             {
+                "type": "committed-revision-observed",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "target": {
+                    **state["tasks"][0]["deliveries"][0]["committed_revision"]["target"],
+                    "head_sha": "e" * 40,
+                    "merge_base_sha": "f" * 40,
+                    "reviewed_patch_fingerprint": "1" * 64,
+                    "phase_input_fingerprint": "1" * 64,
+                    "committed_revision_key": CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_committed_revision_key(
+                        review_target_key=state["tasks"][0]["deliveries"][0]["committed_revision"]["target"]["review_target_key"],
+                        head_sha="e" * 40,
+                        reviewed_patch_fingerprint="1" * 64,
+                    ),
+                },
+                "evidence_ref": "git://committed-revision/after-timeout",
+            },
+            started + timedelta(minutes=47),
+        )
+        self.direct_event(
+            state,
+            {
                 "type": "revision-observed",
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
@@ -1757,11 +2008,8 @@ class LedgerCacheV11Tests(unittest.TestCase):
                 accepted_state["tasks"][0]["deliveries"][0][
                     "github_repository"
                 ] = github_repository
-                self.assertTrue(
-                    CACHE_RUNTIME.apply_event(
-                        accepted_state, accepted, observed_at
-                    )
-                )
+                with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "committed revision"):
+                    CACHE_RUNTIME.apply_event(accepted_state, accepted, observed_at)
         rejected = self.apply([event], check=False)
         error = self.error(rejected, "invalid-input")
         self.assertIn("canonical GitHub PR URL", error["message"])
@@ -2151,7 +2399,7 @@ class LedgerCacheV11Tests(unittest.TestCase):
                 "request_receipt": request_receipt, "request_binding": "recognized",
                 "provider_state": "findings", "failure_kind": None,
                 "provider_error_code": None, "observation_fingerprint": "d" * 64,
-                "disposition": "fix-required", "finding_count": 0,
+                "disposition": "fix-required", "finding_count": 1,
                 "finding_comment_ids": [], "evidence_ref": "github-review://233/provider-comment",
                 "warning_ref": None, "warning_posted_at": None, "warning_fingerprint": None,
             },
