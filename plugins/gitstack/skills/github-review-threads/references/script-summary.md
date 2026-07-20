@@ -119,6 +119,10 @@ the exact finding GraphQL node id with full pagination, re-proves both REST
 comments and thread membership, and returns a
 `gitstack-review-thread-resolution:v1` receipt. Stable success statuses are
 `resolved`, `recovered`, and `already-resolved`; dry-run is `planned`.
+Every mutation attempt gets one independent exact read-back. Proven
+`resolved` and `recovered` results set `mutation_attempted=true` and
+`mutation_may_have_applied=false`; dry-run and `already-resolved` set both to
+false.
 
 Wrong repository, PR, head, finding, reply, thread, body, author, or timestamp;
 missing or duplicate thread matches; missing evidence; and unsupported thread

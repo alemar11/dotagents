@@ -87,7 +87,9 @@ supplies `mutation_mode=apply`, the exact PR and comment id, reply body, and
 The successful result contains a typed reply receipt binding repository, PR,
 finding head, reply head, exact finding and reply REST and GraphQL node ids,
 thread id, author, URLs, timestamps, and body and identity fingerprints.
-Persist the receipt unchanged.
+GitStack re-reads the PR head after the reply proof and emits no reusable
+receipt if that post-write head cannot be proven unchanged. Persist a returned
+receipt unchanged.
 
 ## Resolve One Actionable Finding
 
@@ -101,7 +103,10 @@ Resolve only after the requested fix and evidence reply are complete:
 The resolver validates the complete receipt, re-reads the exact REST finding
 and reply, paginates every GraphQL review-thread and comment page, and requires
 one unique thread containing both exact node ids in the exact repository and
-PR. It checks the current head before and after mutation. `already-resolved`
+PR. After every mutation attempt it performs one independent exact-thread
+read-back and checks the current head. A proven success reports
+`mutation_attempted=true` and `mutation_may_have_applied=false`; an uncertain
+post-attempt failure reports both as true. `already-resolved`
 is idempotent only after all the same proof succeeds and makes no claim about
 who resolved the thread.
 

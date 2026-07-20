@@ -69,8 +69,8 @@ reactions into one current-head state and one stable observation fingerprint.
    PR/action authority. Never infer it from an inspect or review request.
    Reply only to one returned `finding_comment_ids` entry and persist the
    complete typed reply receipt. Resolve by passing that receipt unchanged to
-   `reviews resolve`; never assemble a GraphQL thread id. A failed or unreadable
-   mutation gets one exact-target read-back and no blind retry. Preserve
+   `reviews resolve`; never assemble a GraphQL thread id. Every resolution
+   mutation gets one independent exact-target read-back and no blind retry. Preserve
    returned partial-success evidence if the provider write is confirmed but
    the worktree guard fails.
 7. The v1 typed resolver is limited to actionable findings whose requested

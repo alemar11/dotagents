@@ -504,6 +504,7 @@ def check_automated_review(
     current_request_findings = [
         item for item in head_findings
         if request_created_at and str(item.get("created_at") or "") > request_created_at
+        and item.get("in_reply_to_id") is None
     ] if binding == "recognized" else []
     latest_formal_review = max(
         current_request_reviews,
@@ -1233,6 +1234,12 @@ def reply_to_review_comment(
         raise ReviewError("Review comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
     if parent.get("id") != comment_id or not isinstance(parent.get("node_id"), str):
         raise ReviewError("Review finding omitted its exact provider identity.", code="provider_identity_missing", exit_code=65)
+    if parent.get("in_reply_to_id") is not None:
+        raise ReviewError(
+            "Review replies must target the exact top-level finding.",
+            code="review_reply_parent_invalid",
+            exit_code=4,
+        )
     try:
         finding_head = validate_full_head(str(parent.get("commit_id") or ""))
     except ValueError as exc:
@@ -1296,6 +1303,24 @@ def reply_to_review_comment(
         )
         status = "recovered" if proof.recovered else "replied"
         action = _proof(proof.value, body, target=target, status=status)
+        try:
+            _verify_pr_head(repo, pr, reply_head)
+        except ReviewError as exc:
+            head_drift = exc.code == "head_drift"
+            raise ReviewError(
+                (
+                    "The pull-request head moved after the review reply mutation; do not retry blindly."
+                    if head_drift
+                    else "The pull-request head could not be proven after the review reply mutation; do not retry blindly."
+                ),
+                code="reply_head_drift" if head_drift else "reply_head_unknown",
+                exit_code=4,
+                details={
+                    "mutation_attempted": True,
+                    "mutation_may_have_applied": True,
+                    "head_check": {"code": exc.code},
+                },
+            ) from exc
         action["reply"] = build_reply_receipt(
             repository=repo,
             pr_number=pr,
@@ -1334,6 +1359,7 @@ def _validate_reply_remote(
         or finding.get("html_url") != saved["finding_ref"]
         or finding.get("created_at") != saved["finding_created_at"]
         or finding.get("commit_id") != saved["finding_head_sha"]
+        or finding.get("in_reply_to_id") is not None
         or not str(finding.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
     ):
         raise ReviewError("Review finding no longer matches its reply receipt.", code="evidence_reply_mismatch", exit_code=4)
@@ -1440,7 +1466,13 @@ def resolve_review_thread(
     if thread["is_resolved"]:
         receipt_value = build_resolution_receipt(saved, status="already-resolved", observed_at=observed_at)
         return _guarded_result(
-            {"status": "already-resolved", "target": target, "resolution": receipt_value, "mutation_may_have_applied": False},
+            {
+                "status": "already-resolved",
+                "target": target,
+                "resolution": receipt_value,
+                "mutation_attempted": False,
+                "mutation_may_have_applied": False,
+            },
             before,
         )
     if not thread["viewer_can_resolve"]:
@@ -1451,6 +1483,7 @@ def resolve_review_thread(
                 "status": "dry-run",
                 "target": target,
                 "reply_identity_fingerprint": saved["identity_fingerprint"],
+                "mutation_attempted": False,
                 "mutation_may_have_applied": False,
             },
             before,
@@ -1470,35 +1503,69 @@ mutation($threadId: ID!) {
 }
 """.strip()
     result = graphql_request(mutation, {"threadId": saved["thread_id"]})
-    status = "resolved"
-    proven: dict[str, Any] | None = None
+    response_proven = False
+    response_failure = "provider_write_unconfirmed"
+    response_mismatch: ReviewError | None = None
     if result.returncode == 0:
         try:
-            proven = _resolution_result_thread(json.loads(result.stdout))
-            _prove_resolved_thread(proven, saved, mutation_may_have_applied=True)
-        except (json.JSONDecodeError, ReviewError):
-            proven = None
-    if proven is None:
-        status = "recovered"
-        try:
-            proven = _review_thread_context(saved["thread_id"])
-            _prove_resolved_thread(proven, saved, mutation_may_have_applied=True)
+            response_thread = _resolution_result_thread(json.loads(result.stdout))
+            _prove_resolved_thread(response_thread, saved, mutation_may_have_applied=True)
+            response_proven = True
+            response_failure = "exact_state_proven"
+        except json.JSONDecodeError:
+            response_failure = "provider_response_invalid"
         except ReviewError as exc:
-            if exc.code in {"resolution_head_drift", "resolution_unknown", "review_thread_mismatch"}:
-                raise
+            response_failure = exc.code
+            if exc.code in {"resolution_head_drift", "review_thread_mismatch"}:
+                response_mismatch = exc
+
+    read_back_error: ReviewError | None = None
+    try:
+        read_back_thread = _review_thread_context(saved["thread_id"])
+        _prove_resolved_thread(read_back_thread, saved, mutation_may_have_applied=True)
+    except ReviewError as exc:
+        read_back_error = exc
+
+    uncertainty = {
+        "mutation_attempted": True,
+        "mutation_may_have_applied": True,
+        "response": {
+            "code": response_failure,
+            "transport_exit_code": result.returncode,
+        },
+        "read_back": {"code": read_back_error.code if read_back_error else "exact_state_proven"},
+    }
+    if response_mismatch is not None:
+        raise ReviewError(
+            response_mismatch.message,
+            code=response_mismatch.code,
+            exit_code=response_mismatch.exit_code,
+            details=uncertainty,
+        ) from response_mismatch
+    if read_back_error is not None:
+        if read_back_error.code in {"resolution_head_drift", "review_thread_mismatch", "resolution_unknown"}:
             raise ReviewError(
-                "Review-thread mutation may have applied, but exact read-back failed; do not retry, undo, or fall back.",
-                code="resolution_unknown",
-                exit_code=4,
-                details={"mutation_may_have_applied": True, "read_back": {"code": exc.code}},
-            ) from exc
+                read_back_error.message,
+                code=read_back_error.code,
+                exit_code=read_back_error.exit_code,
+                details=uncertainty,
+            ) from read_back_error
+        raise ReviewError(
+            "Review-thread mutation may have applied, but exact read-back failed; do not retry, undo, or fall back.",
+            code="resolution_unknown",
+            exit_code=4,
+            details=uncertainty,
+        ) from read_back_error
+
+    status = "resolved" if response_proven else "recovered"
     observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     receipt_value = build_resolution_receipt(saved, status=status, observed_at=observed_at)
     action = {
         "status": status,
         "target": target,
         "resolution": receipt_value,
-        "mutation_may_have_applied": True,
+        "mutation_attempted": True,
+        "mutation_may_have_applied": False,
         "transport": {"method": "POST", "endpoint": "graphql:resolveReviewThread"},
     }
     return _guarded_result(action, before)
