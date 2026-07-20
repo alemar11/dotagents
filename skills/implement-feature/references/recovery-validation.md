@@ -7,8 +7,8 @@ takeover and embedded-adoption recovery before a candidate JSON state exists.
 
 Before reading run state or a recorded task, verify visible ChatGPT desktop app
 task creation, App-managed worktree binding, task-title mutation and
-observation, and `create_goal`, `get_goal`, and `update_goal` in the root plus
-general task Goal support. Require first-class targeted Goal
+observation, and `create_goal`, `get_goal`, and `update_goal` in the root.
+Require first-class targeted root Goal
 `pending`/`active`/`complete` readback and updates. Goal pause/resume and App
 heartbeat automation are not required. Prior evidence, background agents, and filesystem
 access are insufficient. Missing support is `unsupported-runtime` without
@@ -58,12 +58,10 @@ Perform one complete read-only pass:
    live title drift without repairing it during this pass.
 6. Rederive the portfolio objective from the bundle; require exact
    `CI when configured` and its fingerprint as a hard cut. Call `get_goal` in
-   the root and every recorded task. Pending registration may
+   the root. Pending registration may
    observe a matching active Goal or no Goal; do not adopt or create it
-   during this pass. Active Goals must match their objective and fingerprint.
-   Completed Goal readback requires a matching terminal seal stage. A sealed or
-   terminal task with an active Goal is an interrupted closeout transition, not
-   implementation work.
+   during this pass. An active root Goal must match its objective and fingerprint.
+   Completed root Goal readback requires a matching portfolio verification.
 7. Recompute each delivery's exact PR repository, number, URL,
    head/base/merge-base tuple, review request and deadline, configured CI or
    explicit `not-configured`, PR lifecycle,
@@ -71,8 +69,8 @@ Perform one complete read-only pass:
    complete task revision set, validation, AutoReview, integration, domain
    closeout, merged dependencies, path conflicts, ready order, review deadlines,
    blockers, and next stage.
-8. For sealed tasks and completed Goals, independently reverify terminal truth.
-   Record drift candidates; do not resume work or reopen a Goal.
+8. For sealed tasks and a completed root Goal, independently reverify terminal truth.
+   Record drift candidates; do not resume work or reopen the root Goal.
 
 The recovery projection is derived guidance, not external truth. It reports
 timestamps, not wall-clock `overdue` judgments. Callers compare review deadlines
@@ -97,7 +95,7 @@ only when none exists, call `create_goal` once without `token_budget`; apply
 blocked root Goal never reaches this phase.
 
 For a nonterminal task, require exact source assignment, task ref, derived display title,
-profile, matching active Goal, and complete managed
+profile, matching assignment fingerprint, and complete managed
 checkout map. Repair title drift on that same task only after freshness passes,
 then report it through `task-observed`. Resume only the original visible task
 with its recorded profile.
@@ -138,8 +136,8 @@ If the waiter result remains pending, compare its observation time with the
 immutable 45-minute deadline. Before the deadline, continue observing the
 already-launched call; do not start another. At or after the deadline, require
 the persistent PR warning, then record the one final
-`waiting/timeout-accepted` observation with its `warning_ref`. Root and worker
-Goals remain active, the claim remains unchanged, and closeout continues. A
+`waiting/timeout-accepted` observation with its `warning_ref`. The root Goal
+remains active, the claim remains unchanged, and closeout continues. A
 missing request, access or provider failure, findings, or missing warning is a
 blocker. Never create a review schedule, pause a Goal, arm a heartbeat, or
 relaunch the provider waiter. Old-revision waits remain inert history.
@@ -150,24 +148,21 @@ Resume at the first incomplete closeout stage without requiring a later stage:
 
 1. A task with all current proof but no seal may apply
    `task-terminal-sealed`.
-2. An unchanged seal with active worker Goal may complete and read back that
-   Goal, then apply `task-goal-completed`; already-completed matching evidence
-   is adopted without another update.
-3. A completed worker Goal without terminal handoff may apply
+2. An unchanged seal without terminal handoff may apply
    `terminal-handoff-recorded` from current delivery proof.
-4. Once all tasks have terminal handoffs, independently reverify and apply
+3. Once all tasks have terminal handoffs, independently reverify and apply
    `portfolio-terminal-verified`.
-5. A verified portfolio with active root Goal may complete and read it back,
+4. A verified portfolio with active root Goal may complete and read it back,
    then apply `portfolio-goal-completed`; already-completed matching evidence is
    adopted once and derives `portfolio_goal_state=complete`.
-6. Only then run the complete terminal release/archive sequence from
+5. Only then run the complete terminal release/archive sequence from
    `cache-lifecycle.md`; an already
    released state may finish the same archive operation idempotently.
 
 These are closeout transitions, not implementation resume. Never repair or
 resume implementation during this interrupted completion transition. If any terminal fact
-changed after a seal or Goal completion, apply
-`post-terminal-drift-recorded`. It preserves irreversible Goal history, blocks
+changed after a seal or root Goal completion, apply
+`post-terminal-drift-recorded`. It preserves irreversible root Goal history, blocks
 portfolio verification or archive, and requires owner action or a fresh run.
 
 ## Prepared Takeover Without Candidate State

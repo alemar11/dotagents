@@ -21,9 +21,9 @@ owns each implementation-eligible Feature Spec through the only successful App r
 This is the first runtime step. Before asking permission, reading sources,
 persistence, or mutation, verify visible ChatGPT desktop app task creation, App-managed worktree
 binding, `codex_app__set_thread_title`, live task-title observation, and
-`create_goal`, `get_goal`, and `update_goal` in the root plus general visible-task
-Goal-tool support. Goal state must support targeted readback and normal
-`pending` to `active` to `complete` progress for both root and worker tasks.
+`create_goal`, `get_goal`, and `update_goal` in the root. The root-owned Goal is
+the sole lifecycle Goal. Ledger `pending` may precede its creation; observed
+external states are `active` and `complete`.
 Goal pause/resume and App heartbeat automation are not part of this runtime
 contract. This gate does not create a task to inspect task-local tools.
 Call `get_goal` once in the root. A `blocked` Goal returns `new-root-required`
@@ -143,7 +143,7 @@ Goal, task, tracker write, or source mutation was created.
    `create_goal`. Persist active evidence. Never set `token_budget`.
 8. **DISPATCH** — load `references/worker.md`; choose the deterministic static
    ready set; adopt/create one managed task per Spec with its profile; observe
-   title, Goal tools/objective, and complete delivery checkout map before
+   title, assignment fingerprint, and complete delivery checkout map before
    advancing beyond `created`.
 9. **MONITOR** — after one full post-dispatch snapshot, consume compact deltas
    until material transition, attention, heartbeat, or workflow deadline. Steer
@@ -162,16 +162,18 @@ read only for startup verification, anomaly or blocker diagnosis, and independen
 verification. The worker owns the single bounded provider wait; the root never
 polls the same provider in parallel. If the exact review is still pending at
 the 45-minute deadline, persist the required warning evidence and continue
-under the explicit `timeout-accepted` result. Root and worker Goals remain
-active until their normal terminal completion.
+under the explicit `timeout-accepted` result. The root Goal remains active
+until normal terminal completion.
 
 ## Scheduling
 
 A Spec is ready when every upstream ref is merged, static gates pass, and its
 registered paths do not overlap a running/selected Spec. Managed checkouts are
 post-creation evidence; requiring them here would deadlock dispatch. A merge-ready but
-unmerged upstream does not make a downstream ready. Record the dependency wait
-and exact external merge action. If all work waits on it, retain the claim and
+unmerged upstream does not make a downstream ready. Apply
+`task-dependency-wait-started` with the exact current resume phase and external
+action. Resolve only with `task-dependency-wait-resolved` bound to that same
+phase. If all work waits on it, retain the claim and
 active state and require explicit same-root resume; do not fabricate a review
 schedule, handoff, or release.
 
@@ -205,7 +207,7 @@ the journal remains an ownership record and embeds each full replaced-claim
 snapshot plus validated per-Spec adoption data. Recover through `claim status`
 and `claim recover-takeover`; adopt those exact tasks. Never create a new task
 for a Spec that has recorded or embedded task evidence. The helper accepts only
-current schema-5 claims and fails closed on unsupported claim or takeover state
+current schema-6 claims and fails closed on unsupported claim or takeover state
 without migration, retirement, or deletion.
 
 Missing candidate state is created only from complete claim-embedded task/no-task
@@ -213,14 +215,14 @@ and delivery-checkout mappings. Creation binds that exact claim. Never add an
 adoption event, rebind an existing state, or infer identity.
 
 Before task creation, resume, read, or steering, load `references/worker.md`.
-Every new task calls `create_goal` for its exact assignment. Recovery calls
-`get_goal`, verifies the recorded objective and evidence, and resumes the same
-visible task; never create another Goal or replacement task. Workers report
-evidence; only the root changes portfolio state.
+Bind every task to its immutable `task_assignment_fingerprint`. Workers never
+create, read, update, complete, or block Goals. Recovery verifies the recorded
+assignment and resumes the same visible task; never create a replacement task.
+Workers report evidence; only the root changes portfolio state.
 
 On manual resume, load `references/recovery-validation.md` before mutation and
 revalidate the runtime surface, claim, source fingerprints, repositories, root
-and task titles, Goals, managed checkouts, gates, and review waits. Archived run
+Goal and task titles, assignments, managed checkouts, gates, and review waits. Archived run
 states are cold evidence, never recovery input.
 
 ## Delivery And Final Report
@@ -241,15 +243,15 @@ ready-for-review, obtain current-revision review, then configured CI or explicit
 Hosted and local issues remain open until a later default-branch merge.
 
 For pre-CLAIM aborts, report evidence and zero mutation. Otherwise return
-run-state-derived source/title/task/Goal/checkout proof, changes, validation,
+run-state-derived source/title/task/root-Goal/checkout proof, changes, validation,
 commits, PRs/revisions, CI, domain/tracker closeout, current-head mergeability
 and repository-rule evidence, captured domain-closeout evidence, review
 warnings, blockers, recovery freshness,
 and next action.
 
 After root-title revalidation, close out only in this order:
-`task-terminal-sealed`, worker Goal/readback, `task-goal-completed`,
-`terminal-handoff-recorded`, `portfolio-terminal-verified`, root Goal/readback,
+`task-terminal-sealed`, `terminal-handoff-recorded`,
+`portfolio-terminal-verified`, root Goal/readback,
 `portfolio-goal-completed`, release and archive. Failure retains active state.
 
 An exact Codex review that remains pending after the fixed 45-minute wait is not

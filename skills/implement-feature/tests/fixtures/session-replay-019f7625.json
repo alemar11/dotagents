@@ -1,27 +1,21 @@
 {
-  "fixture_schema_version": "2.0.0",
+  "fixture_schema_version": "3.0.0",
   "methodology": {
     "kind": "session-derived-lower-envelope-counterfactual",
     "is_actual_future_token_measurement": false,
-    "description": "In a session-derived lower-envelope counterfactual, the hard cut removes 10 controller actions and 16,912 fresh tokens while holding worker usage and all monitoring waits, resumes, claim heartbeats, and state reads unchanged. It proves deterministic evidence transport and safety behavior, not the tokens a future model run will consume, and it is not a future-run guarantee."
+    "description": "In a session-derived lower-envelope counterfactual, the hard cut removes 10 controller actions and 16,912 fresh tokens while holding monitoring waits, resumes, claim heartbeats, and state reads unchanged. It proves deterministic evidence transport and safety behavior, not the tokens a future model run will consume, and it is not a future-run guarantee."
   },
   "source_sessions": {
     "root": {
       "session_id": "019f761a-59b5-74b3-97a3-f24f01dadc93",
       "evidence_file": "session-replay-019f7625-root-evidence.json",
       "evidence_sha256": "90476f6b7dc20e80a6279d09e2c4bbc80a4a860009ebedccc130be161ae52d6a"
-    },
-    "worker": {
-      "session_id": "019f7625-d192-7341-8025-6e4e96d7873c",
-      "evidence_file": "session-replay-019f7625-worker-evidence.json",
-      "evidence_sha256": "69e18921c608fd3624969c48bbe5515a56e66dba944fc30d4222d13fe6ce22c5"
     }
   },
   "efficiency_proxy": {
     "baseline": {
       "root": {"turns": 134, "fresh_tokens": 349021},
-      "worker": {"turns": 172, "fresh_tokens": 408675},
-      "combined": {"turns": 306, "fresh_tokens": 757696}
+      "combined": {"turns": 134, "fresh_tokens": 349021}
     },
     "strict_lower_envelope": {
       "matched_root_categories": [
@@ -70,10 +64,8 @@
       ],
       "counterfactual": {
         "root": {"turns": 124, "fresh_tokens": 332109},
-        "worker": {"turns": 172, "fresh_tokens": 408675},
-        "combined": {"turns": 296, "fresh_tokens": 740784},
-        "fresh_token_reduction_percent": 2.23,
-        "root_to_worker_fresh_token_percent": 81.26
+        "combined": {"turns": 124, "fresh_tokens": 332109},
+        "fresh_token_reduction_percent": 4.85
       }
     },
     "wait_reduction_sensitivity": {
@@ -82,8 +74,8 @@
       "removal_policy": "remove-cheapest-observed",
       "retained_wait_start_turns": 10,
       "retained_wait_resume_turns": 16,
-      "counterfactual_combined_fresh_tokens": 707205,
-      "fresh_token_reduction_percent": 6.66
+      "counterfactual_combined_fresh_tokens": 298530,
+      "fresh_token_reduction_percent": 14.47
     },
     "legacy_ledger_patch_attempts": 21,
     "typed_state_write_ceiling": 10,
@@ -100,8 +92,6 @@
     "root_goal_evidence_ref": "goal:thread=019f761a-59b5-74b3-97a3-f24f01dadc93;status=active;objective_fingerprint=sha256:95d0985e28887b0ef0c098bf28dfe8929b6b84dc6d63cf670f0413a04a9cf764",
     "root_goal_completion_evidence_ref": "goal:thread=019f761a-59b5-74b3-97a3-f24f01dadc93;status=complete;tokens_used=349021",
     "worker_task_ref": "019f7625-d192-7341-8025-6e4e96d7873c",
-    "worker_goal_evidence_ref": "goal:thread=019f7625-d192-7341-8025-6e4e96d7873c;status=active",
-    "worker_goal_completion_evidence_ref": "wait_threads:thread=019f7625-d192-7341-8025-6e4e96d7873c;status=completed;goal=complete;usage=408675-tokens",
     "source_spec_ref": "https://github.com/ambrogio-dev/yn-ai-workflows/issues/231",
     "feature_spec_title": "Feature Spec: Workflow Routing Contract Alignment",
     "task_title": "🧭 Feature Spec: Workflow Routing Contract Alignment",
@@ -130,7 +120,7 @@
     }
   },
   "registration": {
-    "schema_version": "4.0.0",
+    "schema_version": "5.0.0",
     "root_task_ref": "codex-task:019f761a-59b5-74b3-97a3-f24f01dadc93",
     "root_checkout": "__ROOT_CHECKOUT__",
     "objective": "Deliver Feature Spec ambrogio-dev/yn-ai-workflows#231 \"Workflow Routing Contract Alignment\" through an open, non-draft, merge-ready-but-unmerged pull request against the discovered default branch, satisfying validation, autoreview, current-revision Codex review, CI when configured, integration, tracker closeout, repository rules, and Goal closeout.",
@@ -168,7 +158,7 @@
         "task_model": "gpt-5.6-sol",
         "task_thinking": "xhigh",
         "thinking_reason": "architectural workflow contract spans FE, BE, and worker runtime validation",
-        "task_goal_objective_fingerprint": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f"
+        "task_assignment_fingerprint": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f"
       }
     ]
   },
@@ -211,9 +201,7 @@
           "thinking_reason": "architectural workflow contract spans FE, BE, and worker runtime validation",
           "task_title": "🧭 Feature Spec: Workflow Routing Contract Alignment",
           "task_title_evidence_ref": "read_thread:019f7625-d192-7341-8025-6e4e96d7873c:title",
-          "goal_objective_fingerprint": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
-          "goal_state": "active",
-          "goal_evidence_ref": "__WORKER_GOAL_EVIDENCE__",
+          "task_assignment_fingerprint": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
           "state": "created",
           "outcome": null,
           "attention_reason": null,
@@ -233,14 +221,14 @@
           "thinking_reason": "architectural workflow contract spans FE, BE, and worker runtime validation",
           "task_title": "🧭 Feature Spec: Workflow Routing Contract Alignment",
           "task_title_evidence_ref": "read_thread:019f7625-d192-7341-8025-6e4e96d7873c:title",
-          "goal_objective_fingerprint": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
-          "goal_state": "active",
-          "goal_evidence_ref": "__WORKER_GOAL_EVIDENCE__",
+          "task_assignment_fingerprint": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
           "state": "implementing",
           "outcome": null,
           "attention_reason": null,
           "summary_ref": null
         },
+        {"type": "task-dependency-wait-started", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "reason": "waiting for the root to persist review launch authority", "summary_ref": "session-replay:first-root-transition-wait", "evidence_ref": "session-replay:first-root-transition-wait-started"},
+        {"type": "task-dependency-wait-resolved", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "evidence_ref": "session-replay:first-root-transition-wait-resolved"},
         {"type": "revision-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "repository": "__REPOSITORY_ID__", "github_repository": "ambrogio-dev/yn-ai-workflows", "pr_number": 233, "pr_url": "https://github.com/ambrogio-dev/yn-ai-workflows/pull/233", "head_sha": "a12cb1d3a32ccab54a5753b6d2bf453a6c9dfec2", "base_ref": "main", "merge_base_sha": "188977f0b81eab60f3c06b5c80aab0eebea9d2e2", "evidence_ref": "session-replay:initial-head"},
         {
           "type": "delivery-observed",
@@ -287,6 +275,8 @@
       "name": "final-proof-and-review",
       "operation_id": "00000000000000000000000000000007",
       "events": [
+        {"type": "task-dependency-wait-started", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "reason": "waiting for the root to persist review disposition", "summary_ref": "session-replay:second-root-transition-wait", "evidence_ref": "session-replay:second-root-transition-wait-started"},
+        {"type": "task-dependency-wait-resolved", "task_key": "workflow-routing-contract-alignment-231", "resume_state": "implementing", "evidence_ref": "session-replay:second-root-transition-wait-resolved"},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "scope-acceptance", "state": "passed", "binding_key": "__FINAL_REVISION_SET_KEY__", "evidence_ref": "scope-and-acceptance=passed"},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": null, "gate": "integration-validation", "state": "passed", "binding_key": "__FINAL_REVISION_SET_KEY__", "evidence_ref": "cross-package-integration=passed"},
         {"type": "gate-observed", "task_key": "workflow-routing-contract-alignment-231", "delivery_key": "workflow-app", "gate": "focused-validation", "state": "passed", "binding_key": "__FINAL_DELIVERY_EVIDENCE_KEY__", "evidence_ref": "focused-FE=160"},
@@ -304,11 +294,10 @@
       ]
     },
     {
-      "name": "task-seal-goal-and-handoff",
+      "name": "task-seal-and-handoff",
       "operation_id": "00000000000000000000000000000008",
       "events": [
         {"type": "task-terminal-sealed", "task_key": "workflow-routing-contract-alignment-231", "revision_set_key": "__FINAL_REVISION_SET_KEY__", "seal_fingerprint": "__SEAL_FINGERPRINT__", "evidence_ref": "session-replay:current-proof-sealed"},
-        {"type": "task-goal-completed", "task_key": "workflow-routing-contract-alignment-231", "seal_fingerprint": "__SEAL_FINGERPRINT__", "goal_evidence_ref": "__WORKER_GOAL_EVIDENCE__", "completion_evidence_ref": "__WORKER_GOAL_COMPLETION_EVIDENCE__"},
         {"type": "terminal-handoff-recorded", "task_key": "workflow-routing-contract-alignment-231", "seal_fingerprint": "__SEAL_FINGERPRINT__", "handoff_kind": "pull-request-ready", "authority": "external-merge-required", "evidence_ref": "terminal:pr=233;head=1536a00568460e9229abc99e16396cef405bc04b;review=5012214550;ci=29653701167,29653701181", "next_action": "external owner may merge PR #233; GitHub then closes armed issues"}
       ]
     },

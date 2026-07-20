@@ -17,7 +17,7 @@ Use exactly these top-level fields:
 
 | field | value |
 | --- | --- |
-| `schema_version` | `4.0.0` |
+| `schema_version` | `5.0.0` |
 | `root_task_ref` | calling App task ref |
 | `root_checkout` | absolute root checkout |
 | `objective` | freshly derived portfolio Goal text containing exact `CI when configured` |
@@ -33,7 +33,7 @@ Each `sources[]` object has exactly:
 task_key, source_id, source_spec_ref, feature_spec_title, feature_slug,
 source_state, source_fingerprint, planned_done_ref, tracker_backend,
 tracker_repository, deliveries, dependency_ids, requires_domain_closeout,
-task_model, task_thinking, thinking_reason, task_goal_objective_fingerprint
+task_model, task_thinking, thinking_reason, task_assignment_fingerprint
 ```
 
 Each nonempty `deliveries[]` object has exactly:
@@ -71,7 +71,9 @@ values are refs or digests, never pasted output.
 | `portfolio-goal-activated` | `goal_evidence_ref`, `objective_fingerprint` |
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
 | `delivery-preflight-observed` | `task_key`, `delivery_key`, `github_repository`, `target_branch`, `default_base`, `ci_availability`, `preflight_key`, `evidence_ref` |
-| `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `goal_objective_fingerprint`, `goal_state`, `goal_evidence_ref`, `state`, `outcome`, `attention_reason`, `summary_ref` |
+| `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref` |
+| `task-dependency-wait-started` | `task_key`, `resume_state`, `reason`, `summary_ref`, `evidence_ref` |
+| `task-dependency-wait-resolved` | `task_key`, `resume_state`, `evidence_ref` |
 | `committed-revision-observed` | `task_key`, `delivery_key`, `target`, `evidence_ref` |
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
@@ -88,7 +90,6 @@ values are refs or digests, never pasted output.
 | `autoreview-observed` | `task_key`, `delivery_key`, `reservation_id`, `candidate_fingerprint`, `operation_id`, `evidence_ref`, `evidence` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
-| `task-goal-completed` | `task_key`, `seal_fingerprint`, `goal_evidence_ref`, `completion_evidence_ref` |
 | `terminal-handoff-recorded` | `task_key`, `seal_fingerprint`, `handoff_kind`, `authority`, `evidence_ref`, `next_action` |
 | `portfolio-terminal-verified` | `verification_fingerprint`, `evidence_ref` |
 | `portfolio-goal-completed` | `goal_evidence_ref`, `completion_evidence_ref`, `verification_fingerprint` |

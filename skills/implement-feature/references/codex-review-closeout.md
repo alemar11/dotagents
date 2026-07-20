@@ -145,9 +145,9 @@ history but are excluded from current status and terminal projections. A later m
 the exact PR for late Codex findings before merge.
 
 Never schedule another check, pause a Goal, arm an App heartbeat, start another
-waiter, or change the original timing fields. Root and worker Goals remain
-active through the remaining gates and complete only through their normal
-terminal transitions. Recovery observes the already-launched waiter or records
+waiter, or change the original timing fields. The root Goal remains active
+through the remaining gates and completes only through its normal terminal
+transition. Recovery observes the already-launched waiter or records
 its single final outcome; it never relaunches it.
 
 ## Tracker Closeout
@@ -176,8 +176,7 @@ or release. A timeout-accepted result continues normal closeout with its warning
 evidence; it does not create a nonterminal handoff.
 
 `terminal-handoff-recorded` is terminal-only and allowed only after
-`task-terminal-sealed` and
-`task-goal-completed`. It binds the unchanged terminal seal, next action, and
+`task-terminal-sealed`. It binds the unchanged terminal seal, next action, and
 typed `external-merge-required` authority; the seal binds the exact delivery
 revisions. After all task handoffs, the root independently verifies the
 portfolio, completes its Goal, then releases and archives. A later GitHub

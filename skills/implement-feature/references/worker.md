@@ -3,11 +3,11 @@
 ## Assignment
 
 Create exactly one visible App task per implementation-eligible Feature Spec.
-Record Spec/task/title/profile/Goal/lifecycle/results. Keep one `deliveries[]`
+Record Spec/task/title/profile/assignment/lifecycle/results. Keep one `deliveries[]`
 entry per affected repository for checkout, paths, commits, PR/revision,
 review, CI availability and configured-CI results, tracker closeout, and mergeability.
 
-Task ids, managed checkouts, Goals, PR count, and internal subagent topology are
+Task ids, managed checkouts, assignment fingerprints, PR count, and internal subagent topology are
 derived runtime evidence. They are not user options.
 
 ## Task Model Profile
@@ -46,7 +46,7 @@ through the worker prompt:
    `threadId`; never create another task.
 3. Record the concrete task ref, call `codex_app__set_thread_title` with the
    persisted `task_title`, and observe the exact live title.
-4. Advance beyond `created` only after both the title and assignment Goal are
+4. Advance beyond `created` only after both the title and assignment fingerprint are
    verified.
 
 If creation fails before a task exists, retain the resolved title for the same
@@ -153,38 +153,27 @@ If any checkout is missing or not isolated, stop as blocked. Never create,
 remove, or repair raw Git worktrees, rotate the caller checkout, or fall back to
 root or background implementation.
 
-## Goal Contract
+## Assignment And Dependency-Wait Contract
 
-The initial prompt requires a newly created task to call `create_goal` before
-work. Its assignment-scoped objective contains the exact Feature Spec,
+The root binds each newly created task to an immutable assignment fingerprint
+covering the exact Feature Spec,
 repositories and allowed paths, acceptance criteria, validation, and
 gates including AutoReview, current-revision Codex review, CI when configured,
 integration, and fixed terminal result
 `pull-request-ready-for-merge-but-not-merged`. Derive it anew; never reuse a
-prior objective or fingerprint. Do not pass `token_budget`.
+prior assignment or fingerprint. Workers do not call Goal tools.
 
-On recovery, call `get_goal`. A nonterminal task requires an active objective
-and fingerprint matching the recorded Goal evidence before implementation
-resumes. A task already recorded at the fixed terminal result requires matching
-completed Goal evidence and must not resume implementation. Never call
-`create_goal` for either recovery path. The root verifies that evidence and the
-exact live task title before advancing beyond `created` or resuming a
-nonterminal task. If any required Goal tool is unexpectedly absent after task
-creation, report an
-`unsupported-runtime` blocker on that same task. Never record an objective
-fallback or create a replacement task.
+On recovery, verify the recorded assignment fingerprint and exact live task
+title before advancing beyond `created` or resuming nonterminal work. A task
+already recorded at the fixed terminal result reports without resuming
+implementation. Never create a replacement task.
 
-Call `update_goal(status=complete)` only after root-confirmed
-`task-terminal-sealed`; read back for `task-goal-completed`, then terminal
-handoff/`merge-ready`. A pending review keeps the nonterminal task Goal active;
-if it reaches the fixed deadline, the timeout warning is recorded and the task
-continues the remaining gates. Other temporary blockers also leave Goals active;
-already-terminal task Goals remain complete. If recovery finds
-the terminal proof recorded while this Goal is still active, revalidate that
-proof, call `update_goal` with `status=complete`, persist the evidence, and
-report without resuming implementation. If the Goal already completed but its
-evidence write was interrupted, verify and persist that result without calling
-`update_goal` again.
+When the worker must wait for a root-owned transition, the root applies
+`task-dependency-wait-started`. Its `resume_state` must equal the task's exact
+current active phase. Resolution applies `task-dependency-wait-resolved` with
+that same phase; it cannot jump to a different phase. The wait remains
+nonterminal and never becomes `blocked` from elapsed turns. Authority tokens,
+deadlines, leases, and host recovery are outside this contract.
 
 ## Execution
 
@@ -227,7 +216,7 @@ task per issue.
 
 Canonical states are `created`, `implementing`, `validating`, `draft-pr`,
 `marking-ready-for-review`, `review-polling`, `fixing-review`, `ci`,
-`preparing-tracker-closeout`, `checking-mergeability`, `terminal-sealed`,
+`preparing-tracker-closeout`, `checking-mergeability`, `dependency-wait`, `terminal-sealed`,
 `merge-ready`, `blocked`, `needs-owner`, and `failed`. Post-terminal drift is a
 separate closeout record, not a task state.
 
@@ -240,7 +229,7 @@ Spec.
 
 After takeover, initialize missing state only from the candidate claim's
 validated embedded adoption mapping. Adopt each original task after verifying
-Goal and complete delivery checkouts. No task ref or managed
+its assignment fingerprint and complete delivery checkouts. No task ref or managed
 `(repository, checkout)` pair may belong to two Specs. An explicit embedded
 no-task entry with the exact pre-CLAIM profile is required before first creation,
 and that first creation must use the embedded profile without reclassification.
@@ -267,22 +256,17 @@ Validation/integration: <requirements, proof refs, command ids/manifests/digests
 Knowledge closeout: <exact final-issue delta or none>
 Canonical bundle manifest: <absolute path and manifest/bundle digests>
 
-If this is a new task, call `create_goal` with the exact assignment objective
-before implementation and omit `token_budget`. If this is a resumed task, call
-`get_goal` and verify the active objective before continuing nonterminal work.
-If this task is already terminal, verify its completed Goal and report without
-resuming implementation; if its terminal proof precedes unfinished Goal
-completion, finish that transition only. Work only in the
-managed checkouts. Use fixed actions, persist the GitStack request receipt, and
+Verify the exact assignment fingerprint before continuing nonterminal work. If
+this task is already terminal, report without resuming implementation. Never
+create, read, update, complete, or block a Goal. Work only in the managed
+checkouts. Use fixed actions, persist the GitStack request receipt, and
 pass it unchanged to the receipt-bound waiter under the root-issued 45-minute
 deadline; if pending at deadline, post/report the persistent PR warning and
 continue the remaining gates. Report arguments, readbacks, receipts, and
 internal subagents.
 Do not edit the run state, manage sibling tasks, widen scope, change delivery
 strategy, merge, release, deploy, or perform post-merge closure. Continue until
-every affected PR is ready to merge or report a concrete blocker. Call
-`update_goal` with `status=complete` only after the root confirms the immutable
-terminal seal for the complete delivery revision set.
+every affected PR is ready to merge or report a concrete blocker.
 ```
 
 ## Report
@@ -290,7 +274,7 @@ terminal seal for the complete delivery revision set.
 Report one compact typed packet after each material milestone, attention request,
 blocker, review-wait invocation, or terminal transition. Do not repeat unchanged
 state or paste full command output; the root expands evidence only for a mismatch,
-blocker, or independent terminal verification. Report task and Goal evidence,
+blocker, or independent terminal verification. Report task assignment evidence,
 state, the complete delivery-keyed managed checkout map, changed files,
 the exact task display title and observation evidence, task model, thinking
 value, and profile decision reason, validation, delivery commits, exact PR

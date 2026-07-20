@@ -127,14 +127,13 @@ Closeout must not be circular. Use this order:
 
 1. Prove every applicable static, delivery-revision, and task-revision-set gate
    at the current complete revision set; apply `task-terminal-sealed`.
-2. Complete and read back that worker Goal; apply `task-goal-completed`.
-3. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
+2. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
    `pull-request-ready` kind, fixed `external-merge-required` authority, and
    next action.
-4. After all tasks, independently reverify current proof and apply
+3. After all tasks, independently reverify current proof and apply
    `portfolio-terminal-verified`.
-5. Complete and read back the root Goal; apply `portfolio-goal-completed`.
-6. Release and archive through `cache-lifecycle.md`.
+4. Complete and read back the root Goal; apply `portfolio-goal-completed`.
+5. Release and archive through `cache-lifecycle.md`.
 
 The machine-derived terminal projection exposes readiness for each stage.
 Review monitoring retains the active claim and cannot satisfy terminal

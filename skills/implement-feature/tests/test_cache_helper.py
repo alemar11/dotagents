@@ -50,11 +50,11 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV12Tests(unittest.TestCase):
+class LedgerCacheV13Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
-    task_goal_objective = "Implement Feature Spec 232 exactly with CI when configured"
+    task_assignment_objective = "Implement Feature Spec 232 exactly with CI when configured"
 
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -75,8 +75,8 @@ class LedgerCacheV12Tests(unittest.TestCase):
         self.ledger = self.ledger_root / "portfolio-232.json"
         self.claim: dict | None = None
         self.registration: dict | None = None
-        self.task_goal_fingerprint = hashlib.sha256(
-            self.task_goal_objective.encode()
+        self.task_assignment_fingerprint = hashlib.sha256(
+            self.task_assignment_objective.encode()
         ).hexdigest()
 
     def run_cache(self, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -151,7 +151,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
             "Implement the registered Feature Spec portfolio with CI when configured"
         )
         return {
-            "schema_version": "4.0.0",
+            "schema_version": "5.0.0",
             "root_task_ref": "app-task://root-a",
             "root_checkout": str(REPOSITORY),
             "objective": objective,
@@ -193,7 +193,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
                     "task_model": "gpt-5.6-sol",
                     "task_thinking": "xhigh",
                     "thinking_reason": "contract-sensitive state transition work",
-                    "task_goal_objective_fingerprint": self.task_goal_fingerprint,
+                    "task_assignment_fingerprint": self.task_assignment_fingerprint,
                 }
             ],
         }
@@ -334,11 +334,10 @@ class LedgerCacheV12Tests(unittest.TestCase):
         self,
         *,
         state: str,
-        goal_state: str = "active",
         title_evidence: str | None = "app-task://worker/title",
         model: str = "gpt-5.6-sol",
         reasoning_effort: str = "xhigh",
-        goal_fingerprint: str | None = None,
+        assignment_fingerprint: str | None = None,
     ) -> dict:
         return {
             "type": "task-observed",
@@ -348,12 +347,8 @@ class LedgerCacheV12Tests(unittest.TestCase):
             "thinking_reason": "contract-sensitive state transition work",
             "task_title": self.task_title,
             "task_title_evidence_ref": title_evidence,
-            "goal_objective_fingerprint": goal_fingerprint
-            or self.task_goal_fingerprint,
-            "goal_state": goal_state,
-            "goal_evidence_ref": (
-                "app-task://worker-232/goal" if goal_state != "pending" else None
-            ),
+            "task_assignment_fingerprint": assignment_fingerprint
+            or self.task_assignment_fingerprint,
             "state": state,
             "outcome": (
                 "pull-request-ready-for-merge-but-not-merged"
@@ -412,6 +407,51 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 self.task_event(state="implementing"),
             ]
         )
+
+    def test_dependency_wait_binds_and_restores_the_exact_resume_phase(self) -> None:
+        self.bootstrap_active_task()
+        started = {
+            "type": "task-dependency-wait-started",
+            "task_key": self.task_key,
+            "resume_state": "implementing",
+            "reason": "waiting for a root-owned transition",
+            "summary_ref": "app-task://worker-232/dependency",
+            "evidence_ref": "app-task://root-a/dependency-started",
+        }
+        self.apply([started])
+        task = self.state()["tasks"][0]
+        self.assertEqual(task["state"], "dependency-wait")
+        self.assertEqual(task["dependency_wait"]["resume_state"], "implementing")
+        self.assertNotIn("goal_state", task)
+
+        wrong = self.apply(
+            [
+                {
+                    "type": "task-dependency-wait-resolved",
+                    "task_key": self.task_key,
+                    "resume_state": "validating",
+                    "evidence_ref": "app-task://root-a/dependency-resolved",
+                }
+            ],
+            check=False,
+        )
+        self.error(wrong, "state-conflict")
+        self.assertEqual(self.state()["tasks"][0]["state"], "dependency-wait")
+
+        self.apply(
+            [
+                {
+                    "type": "task-dependency-wait-resolved",
+                    "task_key": self.task_key,
+                    "resume_state": "implementing",
+                    "evidence_ref": "app-task://root-a/dependency-resolved",
+                }
+            ]
+        )
+        task = self.state()["tasks"][0]
+        self.assertEqual(task["state"], "implementing")
+        self.assertIsNone(task["dependency_wait"])
+        self.assertNotEqual(task["state"], "blocked")
     def direct_event(self, state: dict, event: dict, now: datetime) -> None:
         changed = CACHE_RUNTIME.apply_event(state, event, now)
         self.assertTrue(changed)
@@ -1044,13 +1084,6 @@ class LedgerCacheV12Tests(unittest.TestCase):
         self.apply(
             [
                 {
-                    "type": "task-goal-completed",
-                    "task_key": self.task_key,
-                    "seal_fingerprint": seal_fingerprint,
-                    "goal_evidence_ref": "app-task://worker-232/goal",
-                    "completion_evidence_ref": "app-task://worker-232/goal-complete",
-                },
-                {
                     "type": "terminal-handoff-recorded",
                     "task_key": self.task_key,
                     "seal_fingerprint": seal_fingerprint,
@@ -1130,12 +1163,12 @@ class LedgerCacheV12Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v12_offline_and_read_only(self) -> None:
+    def test_doctor_is_v13_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "12.0.0")
+        self.assertEqual(version, "13.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1833,7 +1866,6 @@ class LedgerCacheV12Tests(unittest.TestCase):
         CACHE_RUNTIME.validate_state(state, self.ledger)
         self.assertEqual(review["wait_state"], "complete")
         self.assertEqual(state["goal"]["state"], "active")
-        self.assertEqual(state["tasks"][0]["goal_state"], "active")
         self.assertEqual(
             CACHE_RUNTIME.review_warnings(state),
             [
@@ -2575,21 +2607,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
         now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
         stages = [("terminal-sealed", copy.deepcopy(sealed))]
 
-        worker_complete = copy.deepcopy(sealed)
-        CACHE_RUNTIME.apply_event(
-            worker_complete,
-            {
-                "type": "task-goal-completed",
-                "task_key": self.task_key,
-                "seal_fingerprint": seal_fingerprint,
-                "goal_evidence_ref": "app-task://worker-232/goal",
-                "completion_evidence_ref": "app-task://worker-232/goal-complete",
-            },
-            now,
-        )
-        stages.append(("worker-goal-complete", copy.deepcopy(worker_complete)))
-
-        handed_off = copy.deepcopy(worker_complete)
+        handed_off = copy.deepcopy(sealed)
         CACHE_RUNTIME.apply_event(
             handed_off,
             {
@@ -2634,10 +2652,6 @@ class LedgerCacheV12Tests(unittest.TestCase):
 
         for stage_name, stage in stages:
             with self.subTest(stage=stage_name):
-                task_goal_before = (
-                    stage["tasks"][0]["goal_state"],
-                    stage["tasks"][0]["goal_completion_evidence_ref"],
-                )
                 root_goal_before = (
                     stage["goal"]["state"],
                     stage["goal"]["completion_evidence_ref"],
@@ -2659,13 +2673,6 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 )
                 self.assertTrue(changed)
                 self.assertEqual(
-                    (
-                        stage["tasks"][0]["goal_state"],
-                        stage["tasks"][0]["goal_completion_evidence_ref"],
-                    ),
-                    task_goal_before,
-                )
-                self.assertEqual(
                     (stage["goal"]["state"], stage["goal"]["completion_evidence_ref"]),
                     root_goal_before,
                 )
@@ -2675,7 +2682,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 CACHE_RUNTIME.seal_state_fingerprint(stage)
                 CACHE_RUNTIME.validate_state(stage, self.ledger)
 
-    def test_pre_completion_drift_preserves_goal_fact_but_blocks_terminal_handoff(self) -> None:
+    def test_pre_handoff_drift_blocks_terminal_handoff(self) -> None:
         state = self.make_terminal_sealed_state()
         seal_fingerprint = state["tasks"][0]["seal"]["seal_fingerprint"]
         now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
@@ -2687,23 +2694,11 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 "delivery_key": "dotagents",
                 "seal_fingerprint": seal_fingerprint,
                 "drift_fingerprint": hashlib.sha256(b"pre-completion-drift").hexdigest(),
-                "reason": "The PR head changed before Goal completion was recorded.",
+                "reason": "The PR head changed before terminal handoff was recorded.",
                 "evidence_ref": "git://post-terminal-drift/pre-completion",
             },
             now,
         )
-        CACHE_RUNTIME.apply_event(
-            state,
-            {
-                "type": "task-goal-completed",
-                "task_key": self.task_key,
-                "seal_fingerprint": seal_fingerprint,
-                "goal_evidence_ref": "app-task://worker-232/goal",
-                "completion_evidence_ref": "app-task://worker-232/goal-complete",
-            },
-            now,
-        )
-        self.assertEqual(state["tasks"][0]["goal_state"], "complete")
         self.assertIsNotNone(state["tasks"][0]["post_terminal_drift"])
         with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
             CACHE_RUNTIME.apply_event(
@@ -2720,7 +2715,6 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 now,
             )
         self.assertEqual(rejected.exception.code, "state-conflict")
-        self.assertEqual(state["tasks"][0]["goal_state"], "complete")
 
     def test_local_source_move_is_proof_gated_and_marks_tracker_delivery_dirty(self) -> None:
         self.acquire()
@@ -2793,7 +2787,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
                     "task_model": "gpt-5.6-sol",
                     "task_thinking": "xhigh",
                     "thinking_reason": "contract-sensitive state transition work",
-                    "goal_evidence_ref": "app-task://old-worker/goal",
+                    "task_assignment_fingerprint": self.task_assignment_fingerprint,
                     "managed_checkouts": [checkout],
                     "evidence_ref": "takeover://task-adoption",
                 }
@@ -2823,8 +2817,9 @@ class LedgerCacheV12Tests(unittest.TestCase):
         task = self.state()["tasks"][0]
         self.assertEqual(task["adoption"]["origin_root_id"], "root-old")
         self.assertEqual(task["task_ref"], "app-task://old-worker")
-        self.assertEqual(task["goal_state"], "active")
-        self.assertEqual(task["goal_evidence_ref"], "app-task://old-worker/goal")
+        self.assertEqual(
+            task["task_assignment_fingerprint"], self.task_assignment_fingerprint
+        )
         self.assertIsNotNone(task["deliveries"][0]["managed_checkout"])
 
     def test_takeover_adoptions_bind_by_source_id_and_are_consumed_once(self) -> None:
@@ -2854,7 +2849,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 "task_model": "gpt-5.6-sol",
                 "task_thinking": "xhigh",
                 "thinking_reason": "contract-sensitive state transition work",
-                "goal_evidence_ref": "none",
+                "task_assignment_fingerprint": "none",
                 "managed_checkouts": [],
                 "evidence_ref": f"takeover://adoption/{index}",
             }
@@ -2905,7 +2900,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 "task_model": "gpt-5.6-sol",
                 "task_thinking": "xhigh",
                 "thinking_reason": "contract-sensitive state transition work",
-                "goal_evidence_ref": "none",
+                "task_assignment_fingerprint": "none",
                 "managed_checkouts": [],
                 "evidence_ref": "takeover://adoption/1",
             }
@@ -2949,7 +2944,7 @@ class LedgerCacheV12Tests(unittest.TestCase):
                 "task_model": "gpt-5.6-sol",
                 "task_thinking": "xhigh",
                 "thinking_reason": "contract-sensitive state transition work",
-                "goal_evidence_ref": "app-task://old-worker/goal",
+                "task_assignment_fingerprint": self.task_assignment_fingerprint,
                 "managed_checkouts": [
                     {
                         "repository": claim["repositories"][0],
@@ -2968,14 +2963,15 @@ class LedgerCacheV12Tests(unittest.TestCase):
         self.error(rejected, "invalid-input")
         self.assertFalse(self.ledger.exists())
 
-    def test_non_takeover_create_initializes_no_task_adoption_without_goal_evidence(self) -> None:
+    def test_non_takeover_create_initializes_no_task_adoption_without_worker_goal_state(self) -> None:
         self.acquire()
         self.create()
         task = self.state()["tasks"][0]
         self.assertEqual(task["adoption"]["task_state"], "no-task")
         self.assertIsNone(task["task_ref"])
-        self.assertEqual(task["goal_state"], "pending")
-        self.assertIsNone(task["goal_evidence_ref"])
+        self.assertEqual(task["task_assignment_fingerprint"], self.task_assignment_fingerprint)
+        self.assertNotIn("goal_state", task)
+        self.assertNotIn("goal_evidence_ref", task)
 
     def test_bounds_path_normalization_and_missing_lock_fail_closed(self) -> None:
         self.acquire()

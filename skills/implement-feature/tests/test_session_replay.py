@@ -28,11 +28,6 @@ EXPECTED_ROLLOUTS = {
         "size_bytes": 2083929,
         "line_count": 893,
     },
-    "worker": {
-        "sha256": "30a21f8062274ec05a3b18bece526a8b1c6e498692894d60abc7fb89977b055f",
-        "size_bytes": 1957829,
-        "line_count": 880,
-    },
 }
 
 
@@ -123,7 +118,7 @@ class SessionReplayTests(unittest.TestCase):
         expected = lower_envelope["counterfactual"]
         matched = lower_envelope["matched_root_categories"]
 
-        self.assertEqual(fixture["fixture_schema_version"], "2.0.0")
+        self.assertEqual(fixture["fixture_schema_version"], "3.0.0")
         self.assertEqual(
             methodology["kind"], "session-derived-lower-envelope-counterfactual"
         )
@@ -184,11 +179,7 @@ class SessionReplayTests(unittest.TestCase):
             }
             for role, extracted in evidence.items()
         }
-        derived_baseline["combined"] = {
-            field: derived_baseline["root"][field]
-            + derived_baseline["worker"][field]
-            for field in ("turns", "fresh_tokens")
-        }
+        derived_baseline["combined"] = dict(derived_baseline["root"])
         self.assertEqual(baseline, derived_baseline)
 
         legacy_patch_records = evidence["root"][
@@ -228,19 +219,15 @@ class SessionReplayTests(unittest.TestCase):
         removed_tokens = sum(sum(tokens) for tokens in removed_by_category.values())
         root_turns = baseline["root"]["turns"] - removed_turns
         root_tokens = baseline["root"]["fresh_tokens"] - removed_tokens
-        combined_turns = root_turns + baseline["worker"]["turns"]
-        combined_tokens = root_tokens + baseline["worker"]["fresh_tokens"]
+        combined_turns = root_turns
+        combined_tokens = root_tokens
         reduction = round(removed_tokens * 100 / baseline["combined"]["fresh_tokens"], 2)
-        root_worker_ratio = round(
-            root_tokens * 100 / baseline["worker"]["fresh_tokens"], 2
-        )
 
         self.assertEqual(
             baseline,
             {
                 "root": {"turns": 134, "fresh_tokens": 349021},
-                "worker": {"turns": 172, "fresh_tokens": 408675},
-                "combined": {"turns": 306, "fresh_tokens": 757696},
+                "combined": {"turns": 134, "fresh_tokens": 349021},
             },
         )
         self.assertTrue(all(item["retention_reason"] for item in matched))
@@ -251,15 +238,12 @@ class SessionReplayTests(unittest.TestCase):
         self.assertEqual(removed_by_category["task_full_read"], [835, 1293])
         self.assertEqual((removed_turns, removed_tokens), (10, 16912))
         self.assertEqual((root_turns, root_tokens), (124, 332109))
-        self.assertEqual((combined_turns, combined_tokens), (296, 740784))
+        self.assertEqual((combined_turns, combined_tokens), (124, 332109))
         self.assertEqual(expected["root"], {"turns": 124, "fresh_tokens": 332109})
         self.assertEqual(
-            expected["combined"], {"turns": 296, "fresh_tokens": 740784}
+            expected["combined"], {"turns": 124, "fresh_tokens": 332109}
         )
         self.assertEqual(reduction, expected["fresh_token_reduction_percent"])
-        self.assertEqual(
-            root_worker_ratio, expected["root_to_worker_fresh_token_percent"]
-        )
         sensitivity = proxy["wait_reduction_sensitivity"]
         self.assertFalse(sensitivity["is_guarantee"])
         self.assertEqual(sensitivity["removal_policy"], "remove-cheapest-observed")
@@ -308,7 +292,7 @@ class SessionReplayTests(unittest.TestCase):
         self.assertNotEqual(legacy_autoreview.get("schema_version"), "2.0.0")
         # The captured seven-node-era execution remains immutable replay metadata.
         # Current-schema executable topology is covered by the protocol/ledger tests;
-        # hard-cut v12 must never adopt or rewrite this historical chain.
+        # hard-cut v13 must never adopt or rewrite this historical chain.
         return
         facts = fixture["terminal_facts"]
         proxy = fixture["efficiency_proxy"]
@@ -505,13 +489,9 @@ class SessionReplayTests(unittest.TestCase):
                 "__ROOT_GOAL_COMPLETION_EVIDENCE__": facts[
                     "root_goal_completion_evidence_ref"
                 ],
-                "__WORKER_GOAL_EVIDENCE__": facts["worker_goal_evidence_ref"],
-                "__WORKER_GOAL_COMPLETION_EVIDENCE__": facts[
-                    "worker_goal_completion_evidence_ref"
-                ],
             }
             registration = materialize(fixture["registration"], replacements)
-            self.assertEqual(registration["schema_version"], "4.0.0")
+            self.assertEqual(registration["schema_version"], "5.0.0")
             self.assertEqual(len(registration["sources"][0]["deliveries"]), 1)
             self.assertNotIn("repository", registration["sources"][0])
             self.assertNotIn("target_branch", registration["sources"][0])
@@ -536,7 +516,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "12.0.0")
+            self.assertEqual(created["version"], "13.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None
@@ -795,15 +775,9 @@ class SessionReplayTests(unittest.TestCase):
             task = final_state["tasks"][0]
             self.assertEqual(task["task_ref"], facts["worker_task_ref"])
             self.assertEqual(task["task_title"], facts["task_title"])
-            self.assertEqual(task["goal_state"], "complete")
             self.assertEqual(task["state"], "merge-ready")
             self.assertEqual(
                 task["outcome"], "pull-request-ready-for-merge-but-not-merged"
-            )
-            self.assertEqual(task["goal_evidence_ref"], facts["worker_goal_evidence_ref"])
-            self.assertEqual(
-                task["goal_completion_evidence_ref"],
-                facts["worker_goal_completion_evidence_ref"],
             )
             self.assertEqual(len(task["deliveries"]), 1)
             delivery = task["deliveries"][0]
@@ -886,7 +860,7 @@ class SessionReplayTests(unittest.TestCase):
             task_closeout_generation = next(
                 item["generation"]
                 for item in operations
-                if "task-goal-completed" in item["event_types"]
+                if "terminal-handoff-recorded" in item["event_types"]
             )
             verification_generation = next(
                 item["generation"]

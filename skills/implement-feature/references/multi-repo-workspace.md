@@ -67,7 +67,7 @@ closeout. Each implementation-eligible partial is armed in its own designated
 default-branch closeout PR. If the bundle has an accepted hosted parent/global
 Feature Spec, the final integration partial's default-branch PR also arms that
 parent's fully qualified ref after every partial gate passes. After task seal
-and worker Goal completion, the root records one terminal handoff containing
+the root records one terminal handoff containing
 every delivery PR and hosted Spec closeout vehicle. After all task handoffs it
 independently verifies the portfolio, completes the root Goal, releases, and
 archives. A separate GitHub workflow owns merges and post-merge closure.

@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV12Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV13Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -174,11 +174,11 @@ class AtomicClaimHelperTests(unittest.TestCase):
         helper.claim = claim
         helper.registration = None
         helper.source_ref = claim["sources"][0]
-        helper.task_goal_fingerprint = hashlib.sha256(
-            helper.task_goal_objective.encode()
+        helper.task_assignment_fingerprint = hashlib.sha256(
+            helper.task_assignment_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV12Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV13Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
@@ -266,8 +266,12 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "task_model": task_policy["model"],
                     "task_thinking": task_policy["thinking_default"],
                     "thinking_reason": "default-medium-fixture",
-                    "goal_evidence_ref": (
-                        f"goal-{claim['root_id']}-{index}" if source_recorded else "none"
+                    "task_assignment_fingerprint": (
+                        hashlib.sha256(
+                            CACHE_TEST_RUNTIME.LedgerCacheV13Tests.task_assignment_objective.encode()
+                        ).hexdigest()
+                        if source_recorded
+                        else "none"
                     ),
                     "managed_checkouts": checkouts if source_recorded else [],
                     "evidence_ref": f"task-state-{claim['root_id']}-{index}",
@@ -337,7 +341,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "12.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "13.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -941,7 +945,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             acquired["claim"]["repository_checkouts"][0]["checkout"],
             str(self.repo.resolve()),
         )
-        self.assertEqual(acquired["claim"]["schema_version"], "5.0.0")
+        self.assertEqual(acquired["claim"]["schema_version"], "6.0.0")
         self.assertNotIn("execution_adapter", acquired["claim"])
 
     def test_bare_repository_local_source_ref_is_rejected(self) -> None:
@@ -1337,7 +1341,9 @@ class AtomicClaimHelperTests(unittest.TestCase):
                 "task_model": first_spec["task_model"],
                 "task_thinking": first_spec["task_thinking"],
                 "thinking_reason": "default-medium-fixture-2",
-                "goal_evidence_ref": "goal-root-a-2",
+                "task_assignment_fingerprint": first_spec[
+                    "task_assignment_fingerprint"
+                ],
                 "managed_checkouts": json.loads(
                     json.dumps(first_spec["managed_checkouts"])
                 ),
@@ -1726,7 +1732,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(no_task["task_model"], "gpt-5.6-sol")
         self.assertEqual(no_task["task_thinking"], "medium")
         self.assertEqual(no_task["thinking_reason"], "default-medium-fixture")
-        self.assertEqual(no_task["goal_evidence_ref"], "none")
+        self.assertEqual(no_task["task_assignment_fingerprint"], "none")
         self.assertEqual(no_task["managed_checkouts"], [])
 
     def test_recovery_rejects_changed_replaced_snapshot_and_keeps_journal(self) -> None:
@@ -1782,7 +1788,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertIn("changed after takeover preparation", blocked.stdout)
 
     def test_previous_claim_schemas_fail_closed_without_mutation(self) -> None:
-        for schema_version in ("3.0.0", "4.0.0"):
+        for schema_version in ("3.0.0", "4.0.0", "5.0.0"):
             with self.subTest(schema_version=schema_version):
                 if self.claim_root.exists():
                     for path in self.claim_root.iterdir():

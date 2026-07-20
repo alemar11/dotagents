@@ -22,9 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "12.0.0"
-SCHEMA_VERSION = "5.0.0"
-TAKEOVER_TRANSACTION_SCHEMA_VERSION = "1.0.0"
+__version__ = "13.0.0"
+SCHEMA_VERSION = "6.0.0"
+TAKEOVER_TRANSACTION_SCHEMA_VERSION = "2.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "1.0.0"
 RELEASE_REASON = "terminal"
 LEDGER_CACHE_PATH = Path(__file__).resolve().with_name("ledger-cache")
@@ -640,7 +640,7 @@ def validate_task_adoption(
             "source_spec_ref",
             "task_state",
             "task_ref",
-            "goal_evidence_ref",
+            "task_assignment_fingerprint",
             "managed_checkouts",
             "evidence_ref",
         }
@@ -681,19 +681,19 @@ def validate_task_adoption(
         if state == "no-task":
             if (
                 spec["task_ref"] != "none"
-                or spec["goal_evidence_ref"] != "none"
+                or spec["task_assignment_fingerprint"] != "none"
                 or spec["managed_checkouts"]
             ):
                 raise ClaimError("invalid-input", f"{field} no-task evidence is inconsistent", 2)
             task_ref = "none"
-            goal_ref = "none"
+            assignment_fingerprint = "none"
             checkouts: list[dict[str, str]] = []
         else:
             task_ref = nonempty_string(spec["task_ref"], f"{field}.task_ref")
-            goal_ref = nonempty_string(
-                spec["goal_evidence_ref"], f"{field}.goal_evidence_ref"
+            assignment_fingerprint = check_fingerprint(
+                spec["task_assignment_fingerprint"]
             )
-            if task_ref == "none" or goal_ref == "none" or not spec["managed_checkouts"]:
+            if task_ref == "none" or not spec["managed_checkouts"]:
                 raise ClaimError("invalid-input", f"{field} recorded task evidence is incomplete", 2)
             if task_ref in seen_tasks:
                 raise ClaimError("invalid-input", f"{field} duplicates a task ref", 2)
@@ -718,7 +718,7 @@ def validate_task_adoption(
                 "task_model": task_model,
                 "task_thinking": task_thinking,
                 "thinking_reason": thinking_reason,
-                "goal_evidence_ref": goal_ref,
+                "task_assignment_fingerprint": assignment_fingerprint,
                 "managed_checkouts": checkouts,
                 "evidence_ref": evidence_ref,
             }

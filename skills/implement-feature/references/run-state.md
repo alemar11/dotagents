@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v12 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v13 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,8 +14,8 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `9.0.0` created from registration
-schema `4.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+Active state accepts only ledger schema `10.0.0` created from registration
+schema `5.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
@@ -42,7 +42,7 @@ visible. Reads never mutate or refresh external truth.
 ## Task And Delivery Model
 
 Keep one task per implementation-eligible Feature Spec. It owns source/task
-identity, title, profile, Goal, lifecycle, dependencies, gates, blocker, and
+identity, title, profile, assignment fingerprint, lifecycle, dependencies, gates, blocker, and
 next action; identity comes from refs, never display titles. Its nonempty
 `deliveries[]` has one stable task-unique `delivery_key` per affected Git
 repository, owning repository/GitHub identity, branch/default base, CI and
@@ -51,7 +51,7 @@ chain, review, and gates.
 No managed `(repository, checkout)` pair may serve two Specs.
 
 Bind the complete isolated checkout map with `managed-checkouts-observed`
-before work passes `created`; bind task/Goal lifecycle with `task-observed`.
+before work passes `created`; bind task lifecycle with `task-observed`.
 `revision-observed` establishes the immutable delivery/PR tuple and
 `revision_key`; `delivery-observed` binds lifecycle plus committed/published
 truth to it. The events are distinct, not aliases.
@@ -117,10 +117,20 @@ machine failure classification:
 `waiting/timeout-accepted`. Only the last is valid after the deadline and needs
 the exact PR warning URL, time, and fingerprint from
 `codex-review-closeout.md`; all other warning fields are null. It passes only
-the review gate and is never clean. Keep claim and Goals active; never schedule,
+the review gate and is never clean. Keep the claim and root Goal active; never schedule,
 pause, relaunch, or create a nonterminal handoff. Projections bound current
 warnings and count omissions; superseded warnings are inert. The merge workflow
 re-checks late findings.
+
+## Typed Dependency Wait
+
+Only the root writes dependency state. `task-dependency-wait-started` requires
+an active root Goal and binds `resume_state` to the task's exact current active
+phase, plus bounded reason, summary, and evidence refs. It moves the task to
+`dependency-wait`. `task-dependency-wait-resolved` requires the same bound
+`resume_state`, restores only that phase, and clears the current wait. Repeated
+turns never promote a dependency wait to `blocked`. Do not add authority tokens,
+deadlines, leases, or host recovery to these events.
 
 ## Local Source Move
 
@@ -140,16 +150,13 @@ Closeout has one irreversible order:
 1. Require every applicable current static, delivery-revision, and
    task-revision-set gate; apply `task-terminal-sealed` for the exact complete
    delivery revision set.
-2. Call the worker Goal through `update_goal` with `status=complete`, read it
-   back, then apply `task-goal-completed`. Do not derive completion from task
-   prose.
-3. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
+2. Apply `terminal-handoff-recorded` with the unchanged seal fingerprint,
    `pull-request-ready` kind, external authority, and next merge action.
-4. After every task passes those stages, independently reverify current
+3. After every task passes those stages, independently reverify current
    external truth and apply `portfolio-terminal-verified`.
-5. Call the root Goal through `update_goal` with `status=complete`, read it back,
+4. Call the root Goal through `update_goal` with `status=complete`, read it back,
    then apply `portfolio-goal-completed`.
-6. Reverify archive eligibility, release the claim as terminal, and archive
+5. Reverify archive eligibility, release the claim as terminal, and archive
    through `cache-lifecycle.md`.
 
 The terminal projection exposes each stage without requiring a later one.
@@ -157,20 +164,19 @@ The terminal projection exposes each stage without requiring a later one.
 
 From seal onward, changed terminal truth permits only
 `post-terminal-drift-recorded`; it blocks terminal handoff, verification, and
-archive. Never reopen a Goal. Record an externally completed Goal without
-advancing closeout; correction needs owner action and a separately authorized
-fresh run.
+archive. Never reopen the root Goal. Correction needs owner action and a
+separately authorized fresh run.
 
 ## Takeover And Recovery
 
 `active-root-claim` owns takeover and its prepared journal. Existing candidate
 state validates normally. Missing state initializes only from the current
-claim's complete adoption mappings after source, task/no-task, Goal, profile,
+claim's complete adoption mappings after source, task/no-task, assignment, profile,
 and delivery-checkout verification. Creation binds the candidate claim; do not
 infer identity or replace a mapped task. A same-root resumed run keeps its exact
 claim and fingerprint; verify them before mutation. If an authorized
 takeover replaced that claim, the old root stops. Revalidate surfaces, sources,
-titles, Goals, full checkouts, revisions, reviews, and gates. `recovery` is
+titles, root Goal, assignments, full checkouts, revisions, reviews, and gates. `recovery` is
 guidance, not external truth.
 
 ## Bounds And Projections
@@ -187,7 +193,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `9.0.0`.
+JSON schema before `10.0.0`.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses
 the `ledger archive` command in `cache-lifecycle.md`; active state exposes only
