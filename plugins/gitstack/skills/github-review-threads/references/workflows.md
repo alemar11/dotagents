@@ -14,7 +14,7 @@ versioned GitStack marker and request fingerprint. Callers cannot provide or
 assemble request text. The operation reuses only one exact matching comment;
 plain, markerless, malformed, conflicting, or duplicate requests fail closed.
 
-In GitStack 8.0.0, `prepare` and `validate` remain usable by standalone
+In GitStack 5.0.0, `prepare` and `validate` remain usable by standalone
 callers for typed packet creation and inspection. Provider mutations are
 intentionally managed-only: `request`, timeout-warning `comment`, `reply`, and
 `resolve` also require `--ledger-file`, and fail closed unless the active root

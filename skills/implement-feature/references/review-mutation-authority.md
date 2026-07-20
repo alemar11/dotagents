@@ -16,7 +16,7 @@ operation id, task/delivery identity, expected ledger generation, expected
 state/claim fingerprints, expected task state, recovery policy, and transport.
 The packet has no `attempt_state`.
 
-GitStack 8.0.0 intentionally makes the four provider mutation commands
+GitStack 5.0.0 intentionally makes the four provider mutation commands
 managed-only: standalone callers may use typed `reviews prepare` and
 `reviews validate` to create and inspect the same packet, but cannot POST or
 resolve a provider artifact from a packet alone. Each mutation also receives

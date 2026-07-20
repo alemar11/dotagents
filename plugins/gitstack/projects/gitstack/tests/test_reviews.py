@@ -171,14 +171,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "8.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "5.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "8.0.0")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -590,7 +590,7 @@ class ReviewsContractTests(unittest.TestCase):
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "8.0.0")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -619,7 +619,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "8.0.0")
+        self.assertEqual(payload["version"], "5.0.0")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:

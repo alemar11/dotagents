@@ -44,7 +44,7 @@ It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
 
-GitStack 8.0.0 intentionally makes the four provider mutation commands
+GitStack 5.0.0 intentionally makes the four provider mutation commands
 (`request`, timeout-warning `comment`, `reply`, and `resolve`) managed-only:
 standalone callers may use typed `prepare`/`validate` for packet creation and
 inspection, but transport also requires the immutable reservation packet and
