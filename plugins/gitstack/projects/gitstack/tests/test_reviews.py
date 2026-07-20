@@ -105,6 +105,7 @@ class ReviewsContractTests(unittest.TestCase):
             "html_url": f"https://github.com/owner/repo/pull/12#issuecomment-{comment_id}",
             "issue_url": "https://api.github.com/repos/owner/repo/issues/12",
             "created_at": created_at,
+            "user": {"login": "agent"},
         }
 
     def canonical_receipt(self, head: str, *, comment_id: int = 99, created_at: str = "2026-07-15T13:00:00Z") -> dict[str, object]:
@@ -1758,6 +1759,93 @@ class ReviewMutationAuthorityTests(unittest.TestCase):
                 self.REQUEST_KEY, self.REQUEST_FINGERPRINT, None,
             )
         self.assertEqual(resolve.exception.code, "reservation_required")
+
+    def test_reconciliation_with_absent_marker_root_never_enters_transport(self) -> None:
+        body = ProviderText("body", b"evidence body", "evidence body")
+        request_file, request_packet, _ = self.packet_file("review-request")
+        warning_file, _, _ = self.packet_file("review-warning")
+        reply_file, _, _ = self.packet_file("review-reply")
+        saved = {
+            "repository": "owner/repo", "pr_number": 12,
+            "finding_head_sha": self.HEAD, "reply_head_sha": self.HEAD,
+            "thread_id": "PRRT_thread_55", "finding_comment_id": 55,
+            "identity_fingerprint": "e" * 64,
+        }
+        resolve_file, _, _ = self.packet_file(
+            "review-resolution", reply_receipt_fingerprint=saved["identity_fingerprint"],
+        )
+        parent = {
+            "id": 55, "node_id": "PRRC_finding_55",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r55",
+            "created_at": "2026-07-20T12:00:00Z", "in_reply_to_id": None,
+            "commit_id": self.HEAD,
+        }
+        with mock.patch.object(cli, "api_request") as post, \
+             mock.patch.object(cli, "graphql_request") as graphql, \
+             mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "_finding_thread", return_value=self.thread()), \
+             mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())):
+            calls = (
+                lambda: cli.request_automated_review(
+                    "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY, False, None,
+                    str(request_file), "/tmp/ledger", reconcile_consumed=True,
+                ),
+                lambda: cli.post_conversation_comment(
+                    "owner/repo", 12, body, False, None, self.HEAD,
+                    self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
+                    str(warning_file), "/tmp/ledger", reconcile_consumed=True,
+                ),
+                lambda: cli.reply_to_review_comment(
+                    "owner/repo", 12, self.HEAD, 55, body, False, None,
+                    self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
+                    str(reply_file), "/tmp/ledger", reconcile_consumed=True,
+                ),
+                lambda: cli.resolve_review_thread(
+                    "owner/repo", 12, self.HEAD, saved, False, None,
+                    self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
+                    str(resolve_file), "/tmp/ledger", reconcile_consumed=True,
+                ),
+            )
+            for call in calls:
+                with self.assertRaises(cli.ReviewError) as rejected:
+                    call()
+                self.assertEqual(rejected.exception.code, "reservation_not_consumed")
+            post.assert_not_called()
+            graphql.assert_not_called()
+
+    def test_owned_reply_rejects_stale_thread_identity_before_post(self) -> None:
+        body = ProviderText("body", b"evidence body", "evidence body")
+        reply_file, _, _ = self.packet_file("review-reply")
+        parent = {
+            "id": 55, "node_id": "PRRC_finding_55",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r55",
+            "created_at": "2026-07-20T12:00:00Z", "in_reply_to_id": None,
+            "commit_id": self.HEAD,
+        }
+        thread = self.thread()
+        exact_fingerprint = cli._exact_thread_fingerprint(thread, "owner/repo", 12, self.HEAD)
+        cases = (
+            ("PRRT_stale", exact_fingerprint),
+            (str(thread["thread_id"]), "f" * 64),
+        )
+        for expected_thread_id, expected_thread_fingerprint in cases:
+            with self.subTest(
+                expected_thread_id=expected_thread_id,
+                expected_thread_fingerprint=expected_thread_fingerprint,
+            ), mock.patch.object(cli, "_api_object", return_value=parent), \
+                 mock.patch.object(cli, "_finding_thread", return_value=thread), \
+                 mock.patch.object(cli, "api_request") as post, \
+                 self.assertRaises(cli.ReviewError) as rejected:
+                cli.reply_to_review_comment(
+                    "owner/repo", 12, self.HEAD, 55, body, False, None,
+                    self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
+                    str(reply_file), "/tmp/ledger", expected_thread_id=expected_thread_id,
+                    expected_thread_fingerprint=expected_thread_fingerprint,
+                )
+            self.assertEqual(rejected.exception.code, "review_thread_mismatch")
+            post.assert_not_called()
 
     def test_typed_prepare_and_validate_surface_writes_one_immutable_packet(self) -> None:
         output = self.root / "prepared.json"

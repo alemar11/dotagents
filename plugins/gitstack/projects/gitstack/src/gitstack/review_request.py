@@ -27,6 +27,8 @@ RECEIPT_FIELDS = {
     "request_ref",
     "comment_id",
     "created_at",
+    "actor",
+    "provider_identity_fingerprint",
     "status",
 }
 FULL_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -225,12 +227,15 @@ def identity_fingerprint(plan: RequestPlan, comment: dict[str, Any]) -> str:
     object_id = comment.get("id")
     html_url = comment.get("html_url")
     created_at = comment.get("created_at")
+    actor = ((comment.get("user") or {}).get("login")) if isinstance(comment.get("user"), dict) else None
     if not isinstance(object_id, int) or object_id <= 0:
         raise ValueError("The provider request comment did not include a numeric identity.")
     if not isinstance(html_url, str) or not html_url:
         raise ValueError("The provider request comment did not include a URL identity.")
     if not isinstance(created_at, str) or not created_at:
         raise ValueError("The provider request comment did not include a creation timestamp.")
+    if not isinstance(actor, str) or not actor:
+        raise ValueError("The provider request comment did not include an actor identity.")
     return _sha256(
         _canonical_json(
             {
@@ -248,6 +253,8 @@ def identity_fingerprint(plan: RequestPlan, comment: dict[str, Any]) -> str:
                 },
                 "request_ref": html_url,
                 "created_at": created_at,
+                "actor": actor,
+                "provider_identity_fingerprint": _sha256(_canonical_json({"provider": plan.provider, "actor": actor})),
             }
         )
     )
@@ -257,6 +264,7 @@ def receipt(plan: RequestPlan, comment: dict[str, Any], *, status: str) -> dict[
     if str(comment.get("body") or "") != plan.body:
         raise ValueError("The provider request comment body does not match the canonical request.")
     identity = identity_fingerprint(plan, comment)
+    actor = str(((comment.get("user") or {}).get("login")) or "")
     return {
         "schema": plan.schema,
         "provider": plan.provider,
@@ -274,6 +282,8 @@ def receipt(plan: RequestPlan, comment: dict[str, Any], *, status: str) -> dict[
         "request_ref": str(comment["html_url"]),
         "comment_id": comment["id"],
         "created_at": str(comment["created_at"]),
+        "actor": actor,
+        "provider_identity_fingerprint": _sha256(_canonical_json({"provider": plan.provider, "actor": actor})),
         "status": status,
     }
 
@@ -317,7 +327,7 @@ def validate_receipt(
     expected_ref = f"https://github.com/{repository}/pull/{pr_number}#issuecomment-{value['comment_id']}"
     if not isinstance(created_at, str) or not created_at or request_ref != expected_ref:
         raise ValueError("The typed review request receipt provider reference is invalid.")
-    for field in ("request_fingerprint", "body_fingerprint", "identity_fingerprint"):
+    for field in ("request_fingerprint", "body_fingerprint", "identity_fingerprint", "provider_identity_fingerprint"):
         if not isinstance(value[field], str) or not FINGERPRINT_PATTERN.fullmatch(value[field]):
             raise ValueError(f"The typed review request receipt {field} is invalid.")
     plan = build_request(provider, repository, pr_number, head_sha, request_key)
@@ -326,7 +336,10 @@ def validate_receipt(
         "html_url": request_ref,
         "body": plan.body,
         "created_at": created_at,
+        "user": {"login": value["actor"]},
     }
+    if not isinstance(value["actor"], str) or not value["actor"]:
+        raise ValueError("The typed review request receipt actor is invalid.")
     expected = receipt(plan, expected_comment, status=value["status"])
     if value != expected:
         raise ValueError("The typed review request receipt fingerprints do not match its exact identity and body.")

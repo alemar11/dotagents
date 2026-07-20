@@ -8,6 +8,11 @@
 <plugin-root>/scripts/gitstack doctor
 <plugin-root>/scripts/gitstack --json doctor
 <plugin-root>/scripts/gitstack --json repo snapshot
+<plugin-root>/scripts/gitstack --json reviews operation prepare --controller-envelope-file <absolute-controller-json> --input-file <absolute-input-json> --request-output <absolute-request-json>
+<plugin-root>/scripts/gitstack --json reviews operation validate-request --request-file <absolute-request-json>
+<plugin-root>/scripts/gitstack --json reviews operation execute --request-file <absolute-request-json> --result-output <absolute-result-json>
+<plugin-root>/scripts/gitstack --json reviews operation reconcile --request-file <absolute-reconciliation-request-json> --result-output <absolute-result-json>
+<plugin-root>/scripts/gitstack --json reviews operation validate-result --request-file <absolute-request-json> --result-file <absolute-result-json>
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
 <plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
 <plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
@@ -49,6 +54,37 @@ Error envelopes:
 ```
 
 The script does not write configuration files.
+
+## Owned Review Operations
+
+Managed orchestration uses the closed operations `request`, `wait`, `warning`,
+`reply`, `resolve`, `reconcile-mutation`, and `reconcile-terminal`. GitStack
+5.0.0 owns the complete `gitstack-review-operation-request:v1` and
+`gitstack-review-operation-result:v1` schemas. `prepare` and both validators are
+read-only. `execute` revalidates the exact live controller envelope and obtains
+an `implement-feature-owned-operation-start:v1` receipt from the
+installation-owned ledger bridge immediately before transport. `reconcile`
+requires the same started journal and never posts, retries, or extends a wait.
+
+Owned reply preparation reads the selected finding and its unique live thread
+read-only, derives the canonical thread id/fingerprint, and writes those values
+into the immutable request; caller-supplied thread identity is rejected.
+`resume` reloads the original started wait and its immutable 45-minute deadline,
+using one zero-timeout observation after expiry. Mutation reconciliation
+distinguishes no consumed marker, an exact marker without a provider artifact,
+a unique exact artifact, and conflicting, ambiguous, or unreadable evidence.
+A marker alone never proves provider success, and reconciliation never invokes
+mutation transport.
+
+The controller template is selection evidence, not provider authority. Request
+keys are SHA-256 identities. Wait requests require canonical UTC timestamps and
+`wait_deadline=wait_started_at+45m`; an expired deadline performs one zero-timeout
+check. Results use closed status/outcome pairs and exact per-operation facts.
+Terminal reconciliation embeds the prior failed wait result and appends only an
+independently verified clean or findings result for the identical repository,
+PR, head, typed request receipt, and provider lineage. Result admission must use
+the request-correlating validator; standalone result shape validation is not
+sufficient authority for a ledger write.
 
 ## Automated Review State
 

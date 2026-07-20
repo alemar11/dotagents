@@ -63,6 +63,17 @@ from .terminal_evidence import (
     build_terminal_evidence_receipt,
     validate_terminal_evidence_receipt,
 )
+from .review_operation import (
+    OperationError,
+    build_request as build_operation_request,
+    build_result as build_operation_result,
+    validation_descriptor as operation_validation_descriptor,
+    validate_request as validate_operation_request,
+    validate_result as validate_operation_result,
+    validate_result_for_request,
+    validate_start_receipt,
+    validate_target as validate_operation_target,
+)
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 CODEX_LOGINS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
 CODEX_TERMINAL_PREFIX = re.compile(r"(?im)^\s*Codex Review\s*:")
@@ -184,6 +195,7 @@ def _require_reservation(
     body_fingerprint: str | None = None,
     reply_receipt_fingerprint: str | None = None,
     allow_thread_fingerprint_mismatch: bool = False,
+    owned_operation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if kind not in MUTATION_KINDS:
         raise ReviewError("The requested mutation kind is not supported.", code="reservation_invalid", exit_code=4)
@@ -207,7 +219,31 @@ def _require_reservation(
             code="reservation_required",
             exit_code=4,
         )
-    packet = _read_reservation_file(path_value)
+    if owned_operation is None:
+        packet = _read_reservation_file(path_value)
+    else:
+        authority = owned_operation["authority"]
+        if kind == "review-request":
+            operation_id = operation_id_for_request(repo, pr, str(head), str(request_key), str(request_fingerprint))
+        else:
+            operation_id = operation_id_for_mutation(
+                kind, repo, pr, str(head), request_fingerprint=request_fingerprint,
+                thread_id=thread_id, finding_comment_id=finding_comment_id,
+                reply_receipt_fingerprint=reply_receipt_fingerprint,
+            )
+        packet = build_reservation(
+            mutation_kind=kind, repository=repo, pr_number=pr, head_sha=str(head),
+            task_key=authority["task_key"], delivery_key=authority["delivery_key"],
+            operation_id=operation_id, request_key=request_key,
+            request_fingerprint=request_fingerprint, thread_id=thread_id,
+            thread_fingerprint=thread_fingerprint,
+            finding_comment_id=finding_comment_id, body_fingerprint=body_fingerprint,
+            reply_receipt_fingerprint=reply_receipt_fingerprint,
+            expected_generation=authority["expected_generation"],
+            expected_state_fingerprint=authority["expected_state_fingerprint"],
+            expected_claim_fingerprint=authority["expected_claim_fingerprint"],
+            expected_task_state=authority["task_state"],
+        )
     if packet["mutation_kind"] != kind or packet["repository"] != repo or packet["pr_number"] != pr:
         raise ReviewError(
             "The reservation does not match the exact review mutation target.",
@@ -238,7 +274,8 @@ def _require_reservation(
                 code="reservation_target_mismatch",
                 exit_code=4,
             )
-    _verify_started_ledger_authority(packet, path_value, ledger_file)
+    if owned_operation is None:
+        _verify_started_ledger_authority(packet, path_value, ledger_file)
     return packet
 
 
@@ -369,12 +406,18 @@ def _verify_started_ledger_authority(
 
 
 def _read_consumed_marker(
-    packet: dict[str, Any], reservation_file: str,
+    packet: dict[str, Any], reservation_file: str, *, require_consumed: bool = False,
+    marker_observer: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Read the one-use marker without creating or changing it."""
 
     root = _reservation_cache_root()
     if not root.exists():
+        if require_consumed:
+            raise ReviewError(
+                "The started mutation has no consumed marker; recovery is missing.",
+                code="reservation_not_consumed", exit_code=4,
+            )
         return None
     if root.is_symlink() or not root.is_dir():
         raise ReviewError(
@@ -386,6 +429,11 @@ def _read_consumed_marker(
     try:
         fd = os.open(marker_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
     except FileNotFoundError:
+        if require_consumed:
+            raise ReviewError(
+                "The started mutation has no consumed marker; recovery is missing.",
+                code="reservation_not_consumed", exit_code=4,
+            )
         return None
     except OSError as exc:
         raise ReviewError(
@@ -405,13 +453,18 @@ def _read_consumed_marker(
         ) from exc
     finally:
         os.close(fd)
+    if isinstance(value, dict) and marker_observer is not None:
+        marker_observer.update(value)
     if (
         not isinstance(value, dict)
         or value.get("schema") != packet["schema"]
         or value.get("operation_id") != packet["operation_id"]
         or value.get("reservation_id") != packet["reservation_id"]
         or value.get("packet_fingerprint") != packet_fingerprint(packet)
-        or value.get("reservation_file") != str(Path(reservation_file).resolve())
+        or (
+            not require_consumed
+            and value.get("reservation_file") != str(Path(reservation_file).resolve())
+        )
     ):
         raise ReviewError(
             "The operation identity is already consumed by a conflicting reservation.",
@@ -419,6 +472,16 @@ def _read_consumed_marker(
             exit_code=4,
         )
     return value
+
+
+def _consumed_marker_fingerprint(marker: dict[str, Any]) -> str:
+    encoded = json.dumps(marker, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _with_consumed_marker(action: dict[str, Any], marker: dict[str, Any]) -> dict[str, Any]:
+    action["consumed_marker_fingerprint"] = _consumed_marker_fingerprint(marker)
+    return action
 
 
 def _recovery_required(
@@ -1081,6 +1144,9 @@ def check_automated_review(
     evidence: dict[str, Any] = {
         "kind": "none",
         "object_id": None,
+        "object_url": None,
+        "actor": None,
+        "body_fingerprint": None,
         "created_at": None,
         "outcome": None,
         "head": head,
@@ -1097,6 +1163,9 @@ def check_automated_review(
         evidence = {
             "kind": "mismatched-provider-comment",
             "object_id": mismatched.get("comment_id"),
+            "object_url": mismatched.get("html_url"),
+            "actor": _item_login(mismatched),
+            "body_fingerprint": text_fingerprint(str(mismatched.get("body") or "")),
             "created_at": mismatched.get("created_at"),
             "outcome": mismatched.get("outcome"),
             "head": mismatched.get("reviewed_head"),
@@ -1106,6 +1175,9 @@ def check_automated_review(
         evidence = {
             "kind": "provider-comment",
             "object_id": latest_terminal_comment.get("comment_id"),
+            "object_url": latest_terminal_comment.get("html_url"),
+            "actor": _item_login(latest_terminal_comment),
+            "body_fingerprint": text_fingerprint(str(latest_terminal_comment.get("body") or "")),
             "created_at": latest_terminal_comment.get("created_at"),
             "outcome": status,
             "head": latest_terminal_comment.get("reviewed_head"),
@@ -1115,6 +1187,9 @@ def check_automated_review(
         evidence = {
             "kind": "formal-review",
             "object_id": latest_formal_review.get("id"),
+            "object_url": latest_formal_review.get("html_url"),
+            "actor": _item_login(latest_formal_review),
+            "body_fingerprint": text_fingerprint(str(latest_formal_review.get("body") or "")),
             "created_at": latest_formal_review.get("submitted_at"),
             "outcome": status,
             "head": latest_formal_review.get("commit_id"),
@@ -1124,6 +1199,9 @@ def check_automated_review(
         evidence = {
             "kind": "clean-reaction",
             "object_id": selected_request.get("id") if selected_request else None,
+            "object_url": selected_request.get("html_url") if selected_request else None,
+            "actor": _item_login(selected_request or {}),
+            "body_fingerprint": text_fingerprint(str((selected_request or {}).get("body") or "")),
             "created_at": selected_request.get("created_at") if selected_request else None,
             "outcome": status,
             "head": head,
@@ -1592,6 +1670,29 @@ def _exact_thread_fingerprint(thread: dict[str, Any], repo: str, pr: int, head: 
         ) from exc
 
 
+def _reply_thread_identity(
+    repo: str, pr: int, head: str, comment_id: int,
+) -> tuple[dict[str, Any], dict[str, Any], str, str]:
+    """Read the exact top-level finding thread used by prepare and execute."""
+
+    parent = _api_object(f"repos/{repo}/pulls/comments/{comment_id}")
+    if not str(parent.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
+        raise ReviewError("Review comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
+    if parent.get("id") != comment_id or not isinstance(parent.get("node_id"), str):
+        raise ReviewError("Review finding omitted its exact provider identity.", code="provider_identity_missing", exit_code=65)
+    if parent.get("in_reply_to_id") is not None:
+        raise ReviewError(
+            "Review replies must target the exact top-level finding.",
+            code="review_reply_parent_invalid", exit_code=4,
+        )
+    try:
+        finding_head = validate_full_head(str(parent.get("commit_id") or ""))
+    except ValueError as exc:
+        raise ReviewError("Review finding omitted its full commit identity.", code="provider_identity_missing", exit_code=65) from exc
+    thread = _finding_thread(repo, pr, comment_id, parent["node_id"])
+    return parent, thread, _exact_thread_fingerprint(thread, repo, pr, head), finding_head
+
+
 def review_threads(repo: str, pr: int, include_resolved: bool) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for thread_id in _review_thread_ids(repo, pr):
@@ -1816,6 +1917,9 @@ def post_conversation_comment(
     request_fingerprint: str | None = None,
     reservation_file: str | None = None,
     ledger_file: str | None = None,
+    owned_operation: dict[str, Any] | None = None,
+    reconcile_consumed: bool = False,
+    recovery_marker: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     packet = _require_reservation(
         reservation_file,
@@ -1826,6 +1930,8 @@ def post_conversation_comment(
         head=head,
         request_key=request_key,
         request_fingerprint=request_fingerprint,
+        body_fingerprint=body.sha256 if owned_operation is not None else None,
+        owned_operation=owned_operation,
     )
     body = _marked_body(body, packet)
     try:
@@ -1833,7 +1939,10 @@ def post_conversation_comment(
     except GitStackError as exc:
         raise _review_error(exc) from exc
     target = {"repo": repo, "pr": pr, "kind": "conversation-comment"}
-    if _read_consumed_marker(packet, reservation_file or "") is not None:
+    consumed_marker = _read_consumed_marker(packet, reservation_file or "", require_consumed=reconcile_consumed, marker_observer=recovery_marker)
+    if consumed_marker is not None and recovery_marker is not None:
+        recovery_marker.update(consumed_marker)
+    if consumed_marker is not None:
         actor = _viewer_login()
         item = _reconcile_consumed_comment(
             f"repos/{repo}/issues/{pr}/comments",
@@ -1843,7 +1952,9 @@ def post_conversation_comment(
             body,
             packet,
         )
-        return _guarded_result(_proof(item, body, target=target, status="recovered"), before)
+        return _with_consumed_marker(_guarded_result(_proof(item, body, target=target, status="recovered"), before), consumed_marker)
+    if reconcile_consumed:
+        raise ReviewError("Mutation reconciliation cannot enter transport.", code="reservation_not_consumed", exit_code=4)
     _verify_pr_head(repo, pr, packet["head_sha"])
     if dry_run:
         return {
@@ -1922,6 +2033,9 @@ def request_automated_review(
     expected_worktree_fingerprint: str | None,
     reservation_file: str | None = None,
     ledger_file: str | None = None,
+    owned_operation: dict[str, Any] | None = None,
+    reconcile_consumed: bool = False,
+    recovery_marker: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     is_provider_author(provider, "")
     try:
@@ -1938,6 +2052,7 @@ def request_automated_review(
         request_key=plan.request_key,
         request_fingerprint=plan.request_fingerprint,
         body_fingerprint=plan.body_fingerprint,
+        owned_operation=owned_operation,
     )
     if packet["operation_id"] != operation_id_for_request(
         repo, pr, plan.head_sha, plan.request_key, plan.request_fingerprint
@@ -1947,8 +2062,13 @@ def request_automated_review(
             code="reservation_target_mismatch",
             exit_code=4,
         )
-    if _read_consumed_marker(packet, reservation_file or "") is not None:
-        return _reconcile_consumed_request(repo, pr, plan, packet)
+    consumed_marker = _read_consumed_marker(packet, reservation_file or "", require_consumed=reconcile_consumed, marker_observer=recovery_marker)
+    if consumed_marker is not None and recovery_marker is not None:
+        recovery_marker.update(consumed_marker)
+    if consumed_marker is not None:
+        return _with_consumed_marker(_reconcile_consumed_request(repo, pr, plan, packet), consumed_marker)
+    if reconcile_consumed:
+        raise ReviewError("Mutation reconciliation cannot enter transport.", code="reservation_not_consumed", exit_code=4)
     _verify_pr_head(repo, pr, plan.head_sha)
     conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
     conflict, exact = _request_conflicts(conversation, plan)
@@ -2092,28 +2212,24 @@ def reply_to_review_comment(
     request_fingerprint: str | None = None,
     reservation_file: str | None = None,
     ledger_file: str | None = None,
+    owned_operation: dict[str, Any] | None = None,
+    reconcile_consumed: bool = False,
+    recovery_marker: dict[str, Any] | None = None,
+    expected_thread_id: str | None = None,
+    expected_thread_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     try:
         reply_head = validate_full_head(head)
     except ValueError as exc:
         raise ReviewError(str(exc), code="invalid_arguments", exit_code=64) from exc
-    parent = _api_object(f"repos/{repo}/pulls/comments/{comment_id}")
-    if not str(parent.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
-        raise ReviewError("Review comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
-    if parent.get("id") != comment_id or not isinstance(parent.get("node_id"), str):
-        raise ReviewError("Review finding omitted its exact provider identity.", code="provider_identity_missing", exit_code=65)
-    if parent.get("in_reply_to_id") is not None:
-        raise ReviewError(
-            "Review replies must target the exact top-level finding.",
-            code="review_reply_parent_invalid",
-            exit_code=4,
-        )
-    try:
-        finding_head = validate_full_head(str(parent.get("commit_id") or ""))
-    except ValueError as exc:
-        raise ReviewError("Review finding omitted its full commit identity.", code="provider_identity_missing", exit_code=65) from exc
-    thread = _finding_thread(repo, pr, comment_id, parent["node_id"])
-    exact_thread_fingerprint = _exact_thread_fingerprint(thread, repo, pr, reply_head)
+    parent, thread, exact_thread_fingerprint, finding_head = _reply_thread_identity(
+        repo, pr, reply_head, comment_id,
+    )
+    if expected_thread_id is not None and str(thread["thread_id"]) != expected_thread_id:
+        raise ReviewError("Review thread differs from the owned request.", code="review_thread_mismatch", exit_code=4)
+    if not reconcile_consumed and expected_thread_fingerprint is not None and exact_thread_fingerprint != expected_thread_fingerprint:
+        raise ReviewError("Review thread fingerprint differs from the owned request.", code="review_thread_mismatch", exit_code=4)
+    reserved_thread_fingerprint = expected_thread_fingerprint or exact_thread_fingerprint
     packet = _require_reservation(
         reservation_file,
         ledger_file=ledger_file,
@@ -2127,9 +2243,11 @@ def reply_to_review_comment(
         # Validate the immutable pre-reply fingerprint below. A consumed
         # replay may already contain the one marker-bound reply, so the live
         # thread's comment set is intentionally allowed to differ here.
-        thread_fingerprint=exact_thread_fingerprint,
+        thread_fingerprint=reserved_thread_fingerprint,
         finding_comment_id=comment_id,
         allow_thread_fingerprint_mismatch=True,
+        body_fingerprint=body.sha256 if owned_operation is not None else None,
+        owned_operation=owned_operation,
     )
     body = _marked_body(body, packet)
     try:
@@ -2146,7 +2264,10 @@ def reply_to_review_comment(
         "finding_node_id": parent["node_id"],
     }
     endpoint = f"repos/{repo}/pulls/{pr}/comments/{comment_id}/replies"
-    if _read_consumed_marker(packet, reservation_file or "") is not None:
+    consumed_marker = _read_consumed_marker(packet, reservation_file or "", require_consumed=reconcile_consumed, marker_observer=recovery_marker)
+    if consumed_marker is not None and recovery_marker is not None:
+        recovery_marker.update(consumed_marker)
+    if consumed_marker is not None:
         try:
             recovery_thread = _review_thread_context(str(packet["thread_id"]))
         except ReviewError as exc:
@@ -2217,7 +2338,9 @@ def reply_to_review_comment(
             status="recovered",
         )
         proof["transport"] = {"method": "POST", "endpoint": endpoint, "recovered": True}
-        return _guarded_result(proof, before)
+        return _with_consumed_marker(_guarded_result(proof, before), consumed_marker)
+    if reconcile_consumed:
+        raise ReviewError("Mutation reconciliation cannot enter transport.", code="reservation_not_consumed", exit_code=4)
     _verify_pr_head(repo, pr, reply_head)
     if packet.get("thread_fingerprint") is not None and exact_thread_fingerprint != packet["thread_fingerprint"]:
         raise ReviewError(
@@ -2421,6 +2544,9 @@ def resolve_review_thread(
     request_fingerprint: str | None = None,
     reservation_file: str | None = None,
     ledger_file: str | None = None,
+    owned_operation: dict[str, Any] | None = None,
+    reconcile_consumed: bool = False,
+    recovery_marker: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     saved, thread = _validate_reply_remote(repo, pr, head, reply_receipt)
     expected_head = validate_full_head(head)
@@ -2438,6 +2564,7 @@ def resolve_review_thread(
         thread_fingerprint=exact_thread_fingerprint,
         finding_comment_id=int(saved["finding_comment_id"]),
         reply_receipt_fingerprint=str(saved["identity_fingerprint"]),
+        owned_operation=owned_operation,
     )
     try:
         before = require_worktree(expected_worktree_fingerprint)
@@ -2452,7 +2579,10 @@ def resolve_review_thread(
         "finding_comment_id": saved["finding_comment_id"],
     }
     observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-    if _read_consumed_marker(packet, reservation_file or "") is not None:
+    consumed_marker = _read_consumed_marker(packet, reservation_file or "", require_consumed=reconcile_consumed, marker_observer=recovery_marker)
+    if consumed_marker is not None and recovery_marker is not None:
+        recovery_marker.update(consumed_marker)
+    if consumed_marker is not None:
         try:
             recovery_thread = _review_thread_context(str(packet["thread_id"]))
             if _exact_thread_fingerprint(recovery_thread, repo, pr, expected_head) != packet["thread_fingerprint"]:
@@ -2469,7 +2599,7 @@ def resolve_review_thread(
                 details=exc.details,
             ) from exc
         receipt_value = build_resolution_receipt(saved, status="recovered", observed_at=observed_at)
-        return _guarded_result(
+        return _with_consumed_marker(_guarded_result(
             {
                 "status": "recovered",
                 "target": target,
@@ -2479,7 +2609,9 @@ def resolve_review_thread(
                 "transport": {"method": "POST", "endpoint": "graphql:resolveReviewThread", "recovered": True},
             },
             before,
-        )
+        ), consumed_marker)
+    if reconcile_consumed:
+        raise ReviewError("Mutation reconciliation cannot enter transport.", code="reservation_not_consumed", exit_code=4)
     if thread["is_resolved"]:
         receipt_value = build_resolution_receipt(saved, status="already-resolved", observed_at=observed_at)
         return _guarded_result(
@@ -2860,6 +2992,316 @@ def render_text(payload: dict[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _read_json_object(path_value: str, name: str) -> dict[str, Any]:
+    path = Path(path_value)
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise ReviewError(f"The {name} must be an absolute regular non-symlinked file.", code="invalid_arguments", exit_code=64)
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ReviewError(f"The {name} must contain one JSON object.", code="invalid_arguments", exit_code=64) from exc
+    if not isinstance(value, dict):
+        raise ReviewError(f"The {name} must contain one JSON object.", code="invalid_arguments", exit_code=64)
+    return value
+
+
+def _write_json_object(path_value: str, value: dict[str, Any]) -> None:
+    path = Path(path_value)
+    if not path.is_absolute() or path.is_symlink():
+        raise ReviewError("Operation output paths must be absolute and non-symlinked.", code="invalid_arguments", exit_code=64)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _owned_operation_bridge(request_file: str, command: str) -> dict[str, Any]:
+    verifier = _ledger_cache_script()
+    if verifier is None:
+        raise ReviewError("The installation-owned operation authority bridge is unavailable.", code="owned_operation_authority_unavailable", exit_code=4)
+    request = validate_operation_request(_read_json_object(request_file, "operation request"))
+    args = [
+        str(verifier), "--json", "operation", command,
+        "--owner", "gitstack", "--request-file", request_file,
+        "--ledger", request["authority"]["ledger"],
+    ]
+    result = subprocess.run(args, text=True, capture_output=True)
+    try:
+        payload = json.loads(result.stdout) if result.stdout else None
+    except json.JSONDecodeError as exc:
+        raise ReviewError("The owned-operation authority bridge returned invalid output.", code="owned_operation_authority_invalid", exit_code=4) from exc
+    if result.returncode or not isinstance(payload, dict) or payload.get("ok") is not True:
+        raise ReviewError("The owned-operation authority bridge rejected the request.", code="owned_operation_authority_rejected", exit_code=4, details=payload if isinstance(payload, dict) else None)
+    receipt_value = payload.get("data", payload).get("start_receipt")
+    try:
+        return validate_start_receipt(receipt_value, request)
+    except OperationError as exc:
+        raise ReviewError(str(exc), code="owned_operation_authority_invalid", exit_code=4) from exc
+
+
+def prepare_owned_operation(controller_file: str, input_file: str, output_file: str) -> dict[str, Any]:
+    controller = _read_json_object(controller_file, "controller envelope")
+    supplied = _read_json_object(input_file, "operation input")
+    if set(supplied) != {"target", "input"}:
+        raise ReviewError("Operation input must contain exactly target and input.", code="invalid_arguments", exit_code=64)
+    descriptor = ((controller.get("packet_template") or {}).get("operation") or {})
+    operation = str(descriptor.get("name") or "")
+    input_value = supplied["input"]
+    if isinstance(input_value, dict):
+        input_value = dict(input_value)
+        for prior_field in (
+            "prior_pending_result", "prior_findings_result",
+            "prior_reply_result", "prior_failed_result",
+        ):
+            if prior_field not in input_value:
+                continue
+            try:
+                prior_result = validate_operation_result(input_value[prior_field])
+                if (
+                    prior_result["operation"] == "reconcile-mutation"
+                    and prior_result["outcome"] == "completed-from-readback"
+                ):
+                    prior_result = validate_operation_result(
+                        prior_result["facts"]["recovered_result"]
+                    )
+            except (KeyError, OperationError) as exc:
+                raise ReviewError(
+                    f"{prior_field} is not an exact owner result.",
+                    code="owned_operation_invalid", exit_code=64,
+                ) from exc
+            input_value[prior_field] = prior_result
+    if operation == "reply":
+        expected_fields = {
+            "request_receipt", "prior_findings_result", "followup_obligation",
+            "finding_comment_id", "body_file", "body_fingerprint",
+        }
+        if not isinstance(input_value, dict) or set(input_value) != expected_fields:
+            raise ReviewError(
+                "Reply prepare input must omit owner-derived thread identity.",
+                code="invalid_arguments", exit_code=64,
+            )
+        try:
+            target = validate_operation_target(supplied["target"])
+        except OperationError as exc:
+            raise ReviewError(str(exc), code="owned_operation_invalid", exit_code=64) from exc
+        finding_comment_id = input_value["finding_comment_id"]
+        if not isinstance(finding_comment_id, int) or isinstance(finding_comment_id, bool):
+            raise ReviewError("Reply finding_comment_id is invalid.", code="invalid_arguments", exit_code=64)
+        _, thread, thread_fingerprint, _ = _reply_thread_identity(
+            target["repository"], target["pr_number"], target["head_sha"], finding_comment_id,
+        )
+        input_value = {
+            **input_value,
+            "thread_id": str(thread["thread_id"]),
+            "thread_fingerprint": thread_fingerprint,
+        }
+    try:
+        request = build_operation_request(
+            operation=operation, controller_envelope=controller,
+            target=supplied["target"], input_value=input_value,
+        )
+    except OperationError as exc:
+        raise ReviewError(str(exc), code="owned_operation_invalid", exit_code=64) from exc
+    _write_json_object(output_file, request)
+    return {"request_file": output_file, "request_fingerprint": request["request_fingerprint"], "operation_id": request["operation_id"], "operation": request["operation"]}
+
+
+def _operation_outcome(operation: str, facts: dict[str, Any], exit_code: int = 0) -> tuple[str, str]:
+    if operation == "request":
+        return "completed", "recognized-existing" if facts.get("status") == "reused" else "created"
+    if operation == "wait":
+        binding = facts.get("request_binding")
+        state = facts.get("review_state")
+        if binding != "recognized":
+            return "failed", "request-correlation-failure"
+        if state == "clean": return "completed", "clean"
+        if state == "findings": return "completed", "findings"
+        if exit_code == 124: return "completed", "pending-at-deadline"
+        return "failed", "provider-failure"
+    if operation == "warning":
+        return "completed", "recognized-existing" if facts.get("status") == "recovered" else "posted"
+    if operation == "reply":
+        return "completed", "recognized-existing" if facts.get("status") == "recovered" else "posted"
+    if operation == "resolve":
+        return "completed", "already-resolved" if facts.get("status") == "already-resolved" else "resolved"
+    if operation == "reconcile-terminal":
+        return "completed", "clean-verified" if facts.get("outcome") == "clean" else "findings-verified"
+    if operation == "reconcile-mutation":
+        states = (facts.get("marker_state"), facts.get("provider_artifact_state"))
+        if states == ("exact", "unique"):
+            return "completed", "completed-from-readback"
+        if states in {("absent", "missing"), ("exact", "missing")}:
+            return "blocked", "missing"
+        if states in {("conflicting", "missing"), ("exact", "conflicting")}:
+            return "ambiguous", "conflicting"
+        return "ambiguous", "ambiguous"
+    raise ReviewError("Unsupported owned operation outcome.", code="owned_operation_result_invalid", exit_code=4)
+
+
+def _mutation_artifact(action: dict[str, Any], receipt_value: dict[str, Any] | None = None) -> dict[str, Any]:
+    source = receipt_value or action
+    object_id = source.get("comment_id") or source.get("reply_comment_id") or source.get("object_id")
+    object_url = source.get("request_ref") or source.get("reply_ref") or source.get("url") or source.get("object_url")
+    actor = source.get("actor") or source.get("reply_author") or source.get("author")
+    body_fp = source.get("body_fingerprint") or ((action.get("text") or {}).get("sha256"))
+    return {"status": str(action.get("status") or "posted"), "object_id": int(object_id), "object_url": str(object_url), "actor": str(actor), "body_fingerprint": str(body_fp)}
+
+
+def _normalize_owned_facts(request: dict[str, Any], raw: dict[str, Any], outcome: str) -> dict[str, Any]:
+    operation, target, supplied = request["operation"], request["target"], request["input"]
+    if operation == "request":
+        receipt_value = raw["request"]
+        return {"repository": target["repository"], "pr_number": target["pr_number"], "head_sha": target["head_sha"], "provider": target["provider"], "request_receipt": receipt_value, "mutation": _mutation_artifact(raw, receipt_value)}
+    if operation == "wait":
+        state = raw.get("review_state")
+        provider_state = state if state in {"clean", "findings"} else ("pending" if outcome == "pending-at-deadline" else "failed")
+        evidence = raw.get("evidence") or {}
+        kind = evidence.get("kind") if evidence.get("kind") in {"formal-review", "provider-comment", "clean-reaction"} else "none"
+        artifact = {"kind": kind, "object_id": evidence.get("object_id") if kind != "none" else None, "object_url": evidence.get("object_url") if kind != "none" else None, "actor": evidence.get("actor") if kind != "none" else None, "body_fingerprint": evidence.get("body_fingerprint") if kind != "none" else None, "outcome": evidence.get("outcome") if kind != "none" else None}
+        return {"repository": target["repository"], "pr_number": target["pr_number"], "head_sha": target["head_sha"], "provider": target["provider"], "request_receipt": supplied["request_receipt"], "request_binding": raw.get("request_binding"), "provider_state": provider_state, "observation_fingerprint": raw.get("observation_fingerprint"), "finding_count": int((raw.get("review") or {}).get("findings") or 0), "finding_comment_ids": list((raw.get("review") or {}).get("finding_comment_ids") or []), "artifact": artifact}
+    if operation == "warning":
+        return {"request_receipt": supplied["request_receipt"], "mutation": _mutation_artifact(raw)}
+    if operation == "reply":
+        return {"request_receipt": supplied["request_receipt"], "reply_receipt": raw["reply"], "mutation": _mutation_artifact(raw, raw["reply"])}
+    if operation == "resolve":
+        return {"request_receipt": supplied["request_receipt"], "resolution_receipt": raw["resolution"]}
+    if operation == "reconcile-terminal":
+        return {"prior_result_fingerprint": supplied["prior_failed_result"]["result_fingerprint"], "request_receipt": supplied["request_receipt"], "terminal_evidence": raw}
+    if operation == "reconcile-mutation":
+        return raw
+    raise ReviewError("Unsupported owned operation normalization.", code="owned_operation_result_invalid", exit_code=4)
+
+
+def _mutation_provider_state(exc: ReviewError) -> str:
+    if exc.code in {"reservation_not_consumed", "reservation_conflict"}:
+        return "missing"
+    if exc.code == "reservation_target_mismatch":
+        return "conflicting"
+    matches = (exc.details or {}).get("matches") if isinstance(exc.details, dict) else None
+    if matches == 0:
+        return "missing"
+    if isinstance(matches, int) and matches > 1:
+        return "ambiguous"
+    return "unreadable"
+
+
+def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -> dict[str, Any]:
+    try:
+        request = validate_operation_request(_read_json_object(request_file, "operation request"))
+    except OperationError as exc:
+        raise ReviewError(str(exc), code="owned_operation_invalid", exit_code=64) from exc
+    if mode == "reconcile" and request["operation"] not in {"reconcile-mutation", "reconcile-terminal"}:
+        raise ReviewError("Only reconciliation operations may use operation reconcile.", code="owned_operation_invalid", exit_code=64)
+    if mode == "resume" and request["operation"] != "wait":
+        raise ReviewError("Only an already-started wait may use operation resume.", code="owned_operation_invalid", exit_code=64)
+    if mode == "execute" and request["operation"] in {"reconcile-mutation", "reconcile-terminal"}:
+        raise ReviewError("Reconciliation operations require operation reconcile.", code="owned_operation_invalid", exit_code=64)
+    start = _owned_operation_bridge(request_file, "start" if mode == "execute" else "read-start")
+    target, supplied = request["target"], request["input"]
+    operation = request["operation"]
+    repo, pr, head, provider = target["repository"], target["pr_number"], target["head_sha"], target["provider"]
+    exit_code = 0
+    if operation == "request":
+        facts = request_automated_review(repo, pr, provider, head, supplied["request_key"], False, request["authority"]["managed_checkout_fingerprint"], request_file, request["authority"]["ledger"], request)
+    elif operation == "wait":
+        from datetime import datetime as _datetime
+        deadline = _datetime.fromisoformat(supplied["wait_deadline"].replace("Z", "+00:00"))
+        invoked = _datetime.now(timezone.utc)
+        timeout = max(0, int((deadline - invoked).total_seconds()))
+        facts, exit_code = wait_for_automated_review(repo, pr, provider, head, timeout, 10, 30, supplied["request_receipt"])
+    elif operation == "warning":
+        body = read_text_file(supplied["body_file"], field="body")
+        if body.sha256 != supplied["body_fingerprint"]: raise ReviewError("Warning body fingerprint changed.", code="owned_operation_drift", exit_code=4)
+        receipt_value = supplied["request_receipt"]
+        facts = post_conversation_comment(repo, pr, body, False, request["authority"]["managed_checkout_fingerprint"], head, receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request["authority"]["ledger"], request)
+    elif operation == "reply":
+        body = read_text_file(supplied["body_file"], field="body")
+        if body.sha256 != supplied["body_fingerprint"]: raise ReviewError("Reply body fingerprint changed.", code="owned_operation_drift", exit_code=4)
+        receipt_value = supplied["request_receipt"]
+        facts = reply_to_review_comment(repo, pr, head, supplied["finding_comment_id"], body, False, request["authority"]["managed_checkout_fingerprint"], receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request["authority"]["ledger"], request, expected_thread_id=supplied["thread_id"], expected_thread_fingerprint=supplied["thread_fingerprint"])
+    elif operation == "resolve":
+        receipt_value = supplied["request_receipt"]
+        facts = resolve_review_thread(repo, pr, head, supplied["reply_receipt"], False, request["authority"]["managed_checkout_fingerprint"], receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request["authority"]["ledger"], request)
+    elif operation == "reconcile-terminal":
+        facts = terminal_provider_evidence(repo, pr, provider, head, supplied["request_receipt"])
+    else:
+        started_operation = supplied["started_operation"]
+        started = started_operation["request"]
+        started_target, started_input = started["target"], started["input"]
+        recovered_result = None
+        recovery_marker: dict[str, Any] = {}
+        try:
+            if started["operation"] == "request":
+                recovered_raw = request_automated_review(
+                    started_target["repository"], started_target["pr_number"], started_target["provider"],
+                    started_target["head_sha"], started_input["request_key"], False,
+                    started["authority"]["managed_checkout_fingerprint"], request_file,
+                    started["authority"]["ledger"], started, reconcile_consumed=True,
+                    recovery_marker=recovery_marker,
+                )
+            elif started["operation"] == "warning":
+                body = read_text_file(started_input["body_file"], field="body")
+                recovered_raw = post_conversation_comment(
+                    started_target["repository"], started_target["pr_number"], body, False,
+                    started["authority"]["managed_checkout_fingerprint"], started_target["head_sha"],
+                    started_input["request_receipt"]["request_key"], started_input["request_receipt"]["request_fingerprint"],
+                    request_file, started["authority"]["ledger"], started, reconcile_consumed=True,
+                    recovery_marker=recovery_marker,
+                )
+            elif started["operation"] == "reply":
+                body = read_text_file(started_input["body_file"], field="body")
+                recovered_raw = reply_to_review_comment(
+                    started_target["repository"], started_target["pr_number"], started_target["head_sha"],
+                    started_input["finding_comment_id"], body, False,
+                    started["authority"]["managed_checkout_fingerprint"],
+                    started_input["request_receipt"]["request_key"], started_input["request_receipt"]["request_fingerprint"],
+                    request_file, started["authority"]["ledger"], started, reconcile_consumed=True,
+                    recovery_marker=recovery_marker,
+                    expected_thread_id=started_input["thread_id"],
+                    expected_thread_fingerprint=started_input["thread_fingerprint"],
+                )
+            else:
+                recovered_raw = resolve_review_thread(
+                    started_target["repository"], started_target["pr_number"], started_target["head_sha"],
+                    started_input["reply_receipt"], False,
+                    started["authority"]["managed_checkout_fingerprint"],
+                    started_input["request_receipt"]["request_key"], started_input["request_receipt"]["request_fingerprint"],
+                    request_file, started["authority"]["ledger"], started, reconcile_consumed=True,
+                    recovery_marker=recovery_marker,
+                )
+            recovered_status, recovered_outcome = _operation_outcome(started["operation"], recovered_raw)
+            recovered_facts = _normalize_owned_facts(started, recovered_raw, recovered_outcome)
+            recovered_result = build_operation_result(
+                request=started, start_receipt=started_operation["start_receipt"],
+                status=recovered_status, outcome=recovered_outcome, facts=recovered_facts,
+                evidence_ref=f"gitstack-operation://recovered/{started['operation_id']}",
+            )
+            marker_state = "exact"
+            provider_artifact_state = "unique"
+        except ReviewError as exc:
+            marker_state = (
+                "conflicting" if exc.code == "reservation_conflict"
+                else "exact" if recovery_marker else "absent"
+            )
+            provider_artifact_state = _mutation_provider_state(exc)
+        verified_marker_fingerprint = (
+            _consumed_marker_fingerprint(recovery_marker) if recovery_marker else None
+        )
+        facts = {
+            "started_operation": started["operation"],
+            "marker_state": marker_state,
+            "marker_fingerprint": verified_marker_fingerprint,
+            "provider_artifact_state": provider_artifact_state,
+            "recovered_result": recovered_result,
+        }
+    status, outcome = _operation_outcome(operation, facts, exit_code)
+    normalized_facts = _normalize_owned_facts(request, facts, outcome)
+    try:
+        result = build_operation_result(request=request, start_receipt=start, status=status, outcome=outcome, facts=normalized_facts, evidence_ref=f"gitstack-operation://{request['operation_id']}")
+        validate_result_for_request(result, request)
+    except OperationError as exc:
+        raise ReviewError(str(exc), code="owned_operation_result_invalid", exit_code=4) from exc
+    _write_json_object(result_file, result)
+    return {"result_file": result_file, "result_fingerprint": result["result_fingerprint"], "status": status, "outcome": outcome}
+
+
 def doctor_payload() -> dict[str, object]:
     git_path = which("git")
     gh_path = which("gh")
@@ -2882,6 +3324,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", help="Emit a stable JSON envelope.")
     parser.add_argument("--version", action="store_true", help="Print version and exit.")
     subparsers = parser.add_subparsers(dest="command")
+    operation = subparsers.add_parser("operation", help="Prepare, validate, execute, or reconcile one closed owned review operation.")
+    operation_sub = operation.add_subparsers(dest="operation_command", required=True)
+    operation_prepare = operation_sub.add_parser("prepare", help="Prepare one immutable GitStack-owned request without side effects.")
+    operation_prepare.add_argument("--controller-envelope-file", required=True)
+    operation_prepare.add_argument("--input-file", required=True)
+    operation_prepare.add_argument("--request-output", required=True)
+    for verb, help_text in (("validate-request", "Validate one immutable request."), ("validate-result", "Validate one immutable result.")):
+        child = operation_sub.add_parser(verb, help=help_text)
+        child.add_argument("--request-file" if verb == "validate-request" else "--result-file", required=True)
+        if verb == "validate-result":
+            child.add_argument("--request-file", required=True)
+    for verb, help_text in (("execute", "Execute one authority-started owned operation."), ("resume", "Resume one already-started wait without resetting its deadline."), ("reconcile", "Reconcile one already-started operation without a new side effect.")):
+        child = operation_sub.add_parser(verb, help=help_text)
+        child.add_argument("--request-file", required=True)
+        child.add_argument("--result-output", required=True)
     subparsers.add_parser("doctor", help="Check local git and gh readiness.")
     address = subparsers.add_parser("address", help="List review context read-only.")
     address.add_argument("--pr", required=True, help="Pull request number.")
@@ -3077,6 +3534,34 @@ def main(argv: list[str] | None = None) -> int:
             return exc.exit_code
         if args.json:
             emit_success(payload, ["prepare"])
+        else:
+            print(json.dumps(payload, indent=2))
+        return 0
+    if args.command == "operation":
+        try:
+            if args.operation_command == "prepare":
+                payload = prepare_owned_operation(args.controller_envelope_file, args.input_file, args.request_output)
+            elif args.operation_command == "validate-request":
+                request = validate_operation_request(_read_json_object(args.request_file, "operation request"))
+                payload = {"request": request, "validation_descriptor": operation_validation_descriptor(request)}
+            elif args.operation_command == "validate-result":
+                request = _read_json_object(args.request_file, "operation request")
+                result = _read_json_object(args.result_file, "operation result")
+                payload = {
+                    "result": validate_result_for_request(result, request),
+                    "validation_descriptor": operation_validation_descriptor(request, result),
+                }
+            else:
+                payload = execute_owned_operation(args.request_file, args.result_output, mode=args.operation_command)
+        except (OperationError, ReviewError) as exc:
+            error = exc if isinstance(exc, ReviewError) else ReviewError(str(exc), code="owned_operation_invalid", exit_code=64)
+            if args.json:
+                emit_error(error, ["operation", args.operation_command])
+            else:
+                print(error.message, file=sys.stderr)
+            return error.exit_code
+        if args.json:
+            emit_success(payload, ["operation", args.operation_command])
         else:
             print(json.dumps(payload, indent=2))
         return 0

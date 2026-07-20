@@ -55,6 +55,19 @@ Use JSON `reviews address` as the typed source for a review thread's current
 `head_sha` and `thread_fingerprint` before preparing reply or resolution
 authority; do not reproduce the hash locally.
 
+Managed orchestration uses the closed `reviews operation` family. GitStack owns
+the complete request/result schemas for `request`, `wait`, `warning`, `reply`,
+`resolve`, `reconcile-mutation`, and `reconcile-terminal`. Preparation and
+validation are read-only. Execution must obtain a live generic started receipt
+from the installation-owned ledger bridge before transport; reconciliation
+uses the same started journal and never launches, posts, or retries.
+For an owned `reply`, prepare derives the exact live thread id and pre-reply
+fingerprint through read-only provider inspection; callers do not supply those
+fields. `resume` reloads the original wait and deadline. `reconcile-mutation`
+keeps marker absence, marker-only state, unique provider readback, and
+conflicting/ambiguous readback distinct, and never treats a consumed marker as
+sufficient proof of success.
+
 ## Workflow
 
 1. Resolve the base repository and PR, then list review threads with resolution
