@@ -42,10 +42,9 @@ ref, and merge-base SHA require:
 
 - `publication`: real PR identity, lifecycle `OPEN`, and base equal to that
   repository's currently discovered default branch;
-- `codex-review`: mandatory current-revision request with either
-  `provider_state=clean` and `disposition=accepted`,
-  or an exact 45-minute pending timeout recorded as `timeout-accepted` with a
-  persistent PR warning;
+- `codex-review`: mandatory current-revision GitStack owned result normalized
+  as `accepted`, or an exact 45-minute pending result followed by the same-
+  lineage persistent-warning result normalized as `timeout-accepted`;
 - `ci`, only when `ci_availability=configured`: at least one applicable run or
   status context on the exact head SHA and every required applicable result
   successful;
@@ -86,8 +85,9 @@ revision-set key contains every delivery evidence key. Bind
 that set; bind `focused-validation`, `full-validation`, and `autoreview` per
 delivery key. Partial sets fail.
 
-The `autoreview` gate requires terminal `autoreview-observed` evidence for the
-current head/base/merge-base; repository or scope drift starts a new lineage.
+The `autoreview` gate requires a request-correlated AutoReview owned result
+normalized as terminal clean for the current revision/checkout binding;
+repository or scope drift starts a new lineage.
 `scope-acceptance` additionally requires current canonical changed paths for
 every delivery, no untracked paths, complete non-regression evidence, and exact
 equality with each AutoReview target's review scope. An undeclared path is

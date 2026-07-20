@@ -674,7 +674,7 @@ def validate_task_adoption(
                 ledger = json.loads(ledger_path.read_text())
             except (OSError, json.JSONDecodeError) as exc:
                 raise ClaimError("state-conflict", "takeover ledger is unreadable", 4) from exc
-            if not isinstance(ledger, dict) or ledger.get("schema_version") != "14.0.0":
+            if not isinstance(ledger, dict) or ledger.get("schema_version") != "15.0.0":
                 raise ClaimError("state-conflict", "takeover ledger schema is unsupported", 4)
             if not isinstance(value["specs"], list) or not isinstance(ledger.get("tasks"), list):
                 raise ClaimError("invalid-input", "task adoption or takeover ledger tasks are invalid", 2)
@@ -1232,7 +1232,10 @@ def terminal_ledger_snapshot(
             or not isinstance(abort, dict)
             or abort.get("evidence_ref") != evidence
             or any(task.get("implementation_baseline") == "accepted" for task in state["tasks"])
-            or state["reviews"]
+            or any(
+                row.get("record_kind") in {"owned-operation-started", "owned-operation-result"}
+                for row in state["operations"]
+            )
             or state["gates"]
             or state["handoffs"]
         ):

@@ -96,25 +96,12 @@ values are refs or digests, never pasted output.
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref`, `observation` |
 | `task-dependency-wait-started` | `task_key`, `resume_state`, `reason`, `summary_ref`, `task_observation_fingerprint`, `evidence_ref` |
 | `task-dependency-wait-resolved` | `task_key`, `resume_state`, `task_observation_fingerprint`, `evidence_ref` |
-| `review-provider-mutation-reserved` | `task_key`, `delivery_key`, `reservation`, `packet_fingerprint`, `evidence_ref` |
-| `review-provider-mutation-started` | `task_key`, `delivery_key`, `reservation_id`, `operation_id`, `packet_fingerprint`, `evidence_ref` |
-| `review-provider-mutation-observed` | `task_key`, `delivery_key`, `reservation_id`, `operation_id`, `attempt_state`, `result_fingerprint`, `receipt_ref`, `recovery_state`, `evidence_ref` |
-| `committed-revision-observed` | `task_key`, `delivery_key`, `target`, `evidence_ref` |
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
 | `validation-nonregression-observed` | `task_key`, `delivery_key`, `validation_key`, `revision_key`, `adapter`, `policy`, `argv_fingerprint`, `tool_identities_fingerprint`, `diagnostics`, `diagnostic_set_fingerprint`, `evidence_ref` |
 | `delivery-scope-observed` | `task_key`, `delivery_key`, `revision_key`, `changed_paths`, `untracked_paths`, `evidence_ref` |
 | `source-moved` | `task_key`, `from_ref`, `to_ref`, `source_fingerprint`, `tracker_repository`, `revision_set_key`, `evidence_ref` |
-| `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_receipt` |
-| `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `wait_invoked_at`, `provider_timeout` |
-| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `request_binding`, `provider_state`, `failure_kind`, `provider_error_code`, `observation_fingerprint`, `disposition`, `finding_count`, `finding_comment_ids`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
-| `review-thread-resolved` | `task_key`, `delivery_key`, `finding_revision_key`, `resolution_revision_key`, `reply_receipt`, `resolution_receipt` |
-| `autoreview-hosted-finding-obligated` | `task_key`, `delivery_key`, `obligation` |
-| `autoreview-action-reserved` | `task_key`, `delivery_key`, `reservation_id`, `expected_state_fingerprint`, `projection` |
-| `autoreview-reservation-released` | `task_key`, `delivery_key`, `reservation_id`, `reason` |
-| `autoreview-attempt-observed` | `task_key`, `delivery_key`, `reservation_id`, `attempt_id`, `attempt_state`, `model_call_started`, `candidate_fingerprint`, `operation_id`, `evidence_ref` |
-| `autoreview-lineage-reset-authorized` | `task_key`, `delivery_key`, `authority`, `reason`, `evidence_ref`, `prior_evidence_fingerprint`, `next_review_target_key`, `next_committed_revision_key` |
-| `autoreview-observed` | `task_key`, `delivery_key`, `reservation_id`, `candidate_fingerprint`, `operation_id`, `evidence_ref`, `evidence` |
+| `autoreview-hosted-finding-obligated` | `task_key`, `delivery_key`, `obligation_ref`, `source_result_fingerprint`, `evidence_ref` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `task_observation_fingerprint`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
 | `terminal-handoff-recorded` | `task_key`, `seal_fingerprint`, `handoff_kind`, `authority`, `evidence_ref`, `next_action` |
@@ -151,7 +138,14 @@ newer revision clears `source-moved` tracker dirt.
 Terminal handoff uses `handoff_kind=pull-request-ready` and
 `authority=external-merge-required`. A review wait never creates a handoff.
 
-`request_receipt` is complete; binding failure exits 4, never stale or timeout.
+Owner request and result field registries do not appear in this event table.
+Schema 15.0.0 stores generic operation records: registration/ledger-event
+history, `owned-operation-started` with owner/operation/controller/binding/start
+receipt and opaque owner request, and `owned-operation-result` with exact
+start/result fingerprints, `effective_operation`, `effective_outcome`, opaque
+owner request/result, owner-validated `owner_projection`,
+normalized orchestration projection, and optional terminal
+supersession link. Retired provider/model managed events are rejected.
 
 ## States And Gates
 
@@ -162,13 +156,9 @@ Task states are `pending`, `created`, `implementing`, `validating`, `draft-pr`,
 states are `pending`, `active`, and `complete`.
 `implementation_baseline` is `pending`, `accepted`, `planning-required`, or
 `blocked`; before acceptance, task state may only remain `created`.
-Review provider/disposition values are `waiting|findings|clean|failed` and
-`timeout-accepted|fix-required|accepted|blocked`.
-Nonfailed observations use null failure fields; failed values follow the closed
-GitStack mapping in `review-reconciliation.md` and cannot be relabeled.
-
-`autoreview-observed.evidence` is the complete current-schema envelope validated
-by the shared protocol module; see `autoreview-fix-loop.md`.
+GitStack and AutoReview owner outcomes are normalized only by the closed
+`owner + operation + outcome` table described in `controller.md`; unknown
+outcomes fail closed and owners cannot supply ledger events.
 
 | gate scope | gates | required identity |
 | --- | --- | --- |

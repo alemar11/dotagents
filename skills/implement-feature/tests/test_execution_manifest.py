@@ -672,7 +672,7 @@ class ExecutionManifestTests(unittest.TestCase):
             )
             state_fingerprint = "c" * 64
             ledger = {
-                "schema_version": "14.0.0",
+                "schema_version": "15.0.0",
                 "content_fingerprint": state_fingerprint,
                 "tasks": [{
                     "deliveries": [{

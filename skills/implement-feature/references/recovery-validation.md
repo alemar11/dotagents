@@ -151,16 +151,16 @@ newer committed and published observation clears tracker dirt. Rerun gates.
 
 ## Review Wait Recovery
 
-Before replaying any review mutation, require the exact immutable reservation
-packet, its ledger `review-provider-mutation-reserved` and
-`review-provider-mutation-started` events, and the packet fingerprint bound to
-the current generation/state/claim. The packet has no mutable attempt field.
-The consumed marker is durable before provider dispatch; after it exists,
-recovery may perform one read-only exact-artifact reconciliation only. A unique
-marker-plus-target/body/actor artifact completes the journal. Missing,
-conflicting, or ambiguous evidence records `failed-or-ambiguous` and
-`needs-owner`; it never retries, resets the 45-minute deadline, deletes a
-marker, or recreates a reservation.
+Before reconciling any GitStack or AutoReview operation, require its exact
+schema-15 `owned-operation-started` record and owner request. `operation
+start` fails once a start is present. `operation read-start` recovers its
+receipt, and `operation read-request` recovers the opaque request named by the
+generic start descriptor. Completed predecessor/follow-up evidence uses
+`operation read-result`, which requires the current live controller to name
+the exact source result fingerprint and returns opaque owner evidence plus its
+generic projection and immutable source binding. The owner validates consumed
+state and performs readback only. Closed recovery outcomes never retry, reset
+the 45-minute deadline, delete a marker, or launch again.
 
 Before any resumed provider-text mutation, reload the transport contract in
 `worker.md`, recreate the opaque text file from current authorized data, and

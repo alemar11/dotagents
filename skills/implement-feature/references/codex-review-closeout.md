@@ -1,44 +1,26 @@
-# Mandatory Codex Review And Closeout
+# Codex Review Closeout
 
-## Ownership
+Load before the mandatory current-revision Codex review gate. GitStack owns the
+typed request, wait, warning, findings, reply, resolution, and reconciliation
+schemas and all provider prose. Implement Feature supplies only the controller
+operation selection, immutable authority binding, and typed evidence input.
 
-The visible Feature Spec task owns every delivery's review request, wait,
-feedback fixes, evidence replies, typed thread resolution, configured CI,
-tracker-closeout preparation, ready-for-review transition,
-and terminal proof. The root issues immutable timing assignments, reconciles
-typed evidence, and independently verifies closeout; it never takes worker work
-back as a fallback.
+The visible Feature Spec task owns delivery review, feedback fixes, configured
+CI, tracker-closeout preparation, ready-for-review transition, and terminal
+proof. The root reconciles typed evidence and independently verifies closeout;
+it never takes worker work back as a fallback.
 
-## Delivery-Revision Review
+Request review for each delivery's current exact repository, PR number and URL,
+head SHA, base ref, and merge-base SHA tuple. Reuse a result only when that
+entire tuple matches and every addressable finding is dispositioned. A head,
+base, merge base, PR identity, material diff, repository rule, tracker delivery,
+evidence target, or relevant documentation change invalidates the affected
+delivery gates.
 
-Request exactly one Codex review for each delivery's current exact repository,
-PR number and URL, head SHA, base ref, and merge-base SHA tuple. Establish the
-tuple through `revision-observed`, bind its lifecycle through
-`delivery-observed`, and apply the result through delivery-keyed
-`review-observed`. Reuse a result only when the entire tuple matches and every
-addressable inline finding is dispositioned. The review request is mandatory and has no skip
-value. Only an exact request that remains pending through its fixed deadline may
-use the explicit timeout-accepted outcome below.
-
-The revision observation must bind canonical GitHub `owner/repository`, the PR
-number, and the exact URL
-`https://github.com/<owner/repository>/pull/<number>`. The lifecycle observation
-must repeat that identity. A malformed, non-GitHub, or mismatched URL blocks
-before review timing begins.
-
-Actionable findings return to fix, focused validation, AutoReview's
-`codex-review` delta route, push, typed evidence, and current-revision review;
-never add a full review to the lineage. A head, base, merge base, PR identity,
-material diff, repository-rule, tracker delivery, evidence-target, or relevant
-documentation change invalidates affected delivery-revision gates and the
-complete task-revision-set gates. Resolve only addressable review threads after
-fix proof and an exact evidence reply. V1 does not resolve no-change
-dispositions.
-
-Before terminal sealing, require every delivery PR lifecycle `OPEN`, exact
-non-draft identity, conflict-free GitHub mergeability, required base freshness,
-approvals, and merge-queue eligibility. Unknown or pending state blocks. Never
-enqueue or merge.
+Before terminal sealing, require every delivery PR lifecycle to be `OPEN`,
+non-draft, conflict-free, and current for mergeability, base freshness,
+approval, branch rules, and merge-queue eligibility. Unknown or pending state
+blocks. Never enqueue or merge.
 
 When a nonempty accepted knowledge delta exists, a later material code,
 evidence, target, or documentation change invalidates captured domain-closeout
@@ -46,110 +28,27 @@ evidence whenever it can affect support or destinations. Rerun Project Memory
 closeout and persist fresh delta, destination, documentation-diff, and complete
 implementation revision-set evidence.
 
-## Typed Review State And Idempotency
+Use the schema-15 owned journal sequence:
 
-The run state is the sole request and timing owner. Keep one review entity keyed
-by `task_key`, `delivery_key`, and the exact delivery `revision_key`. Store
-the exact PR URL, complete GitStack request receipt, request binding,
-provider/result/disposition, bounded observation fingerprints,
-`wait_started_at`, `wait_deadline`, `wait_invoked_at`, `provider_timeout`,
-and the optional durable timeout-warning reference. Load
-`review-mutation-authority.md` before provider mutation. Before request, call
-GitStack's typed request operation with its reservation file, exact current
-full head, and caller-supplied `request_key`. It owns the strict canonical
-provider body, current-head preflight, one POST, one read-only recovery, and
-complete receipt. Apply `review-wait-started` with it before invoking the
-identity-bound waiter; the event persists it, and the waiter fetches the
-exact comment.
-Unbound, invalid, ambiguous, or unknown binding is exit 4 and never authorizes
-a repost or timeout. API, authentication, or configuration uncertainty never
-authorizes another request.
+1. `execute-gitstack-request` -> owner `request` result.
+2. `execute-gitstack-wait` -> owner `wait` result with the immutable exact
+   45-minute deadline. A launch after expiry is one zero-timeout check.
+3. Clean advances the gate; findings route to repair; proven correlation
+   failure routes to terminal reconciliation; provider failure requires exact
+   reconciliation or owner attention.
+4. `pending-at-deadline` remains `pending-warning`. Run the separately started
+   owner `warning` operation once. Only its same-lineage recorded result becomes
+   `timeout-accepted` and may pass the warning-only review gate.
 
-At the GitStack boundary, pass only the exact PR and canonical
-`review_operation`; add GitStack-owned `mutation_mode=apply` only for an
-authorized mutation. Do not pass App permission, Feature Spec, phase, or fixed
-actions, and never expose the translation as a user option.
+Never repost a request, restart or extend a deadline, launch a second waiter,
+or treat missing provider acknowledgment as correlation failure. A recognized
+typed request without provider output is pending. A later exact-lineage clean
+or findings artifact appends a GitStack terminal-reconciliation result linked
+to the earlier false observation; it never rewrites history.
 
-Every warning body crosses that boundary only through the mandatory provider-text
-transport in `worker.md`. The typed request operation builds its own body and
-uses GitStack's already-safe JSON-stdin transport; callers provide no request
-text. It owns exact-head composition, recognition, acknowledgment, request
-identity, and wait semantics.
-
-## One Fixed Wait Deadline
-
-Each delivery revision owns one 45-minute total active-wait deadline. The worker
-reports tuple/request evidence; the root atomically records
-`review-wait-started` with `wait_started_at` and the helper derives
-`wait_deadline=wait_started_at+45m`, then returns the immutable assignment.
-
-Before launch, set `wait_invoked_at=now`, require it to be at or after the
-recorded start and not later than the current clock, and compute
-`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`. The root must persist
-`review-wait-invoked` before the worker calls GitStack. That event is the single
-launch authority; once recorded, recovery never starts another waiter. For a
-positive timeout use:
-
-```text
---timeout <provider_timeout>s --interval 10s --max-interval 30s
-```
-
-The canonical invocation is
-`--timeout <provider_timeout>s --interval 10s --max-interval 30s`.
-
-At zero, perform one immediate no-wait check. Never use a provider default,
-hardcode `15m`, start before `wait_started_at`, segment, restart, wrap, or extend
-the unchanged deadline.
-
-The one provider call ends as `clean`, `findings`, `failed`, or `waiting`.
-Persist exactly one `review-observed` event for the exact request and revision:
-
-- `clean` pairs with `accepted` and no warning.
-- `findings` pairs with `fix-required` and returns to the fix loop.
-- `failed` pairs with `blocked`; request, access, authentication, configuration,
-  or provider failure is never a timeout acceptance.
-- `waiting` may pair with `timeout-accepted` only when observed at or after the
-  immutable deadline and only after a persistent PR warning has been posted. The
-  event must carry that exact PR's canonical GitHub issue-comment URL as
-  `warning_ref`; unrelated URLs and free text are invalid. It must also carry
-  the observed comment creation time as `warning_posted_at` and the SHA-256 of
-  this exact UTF-8 body as `warning_fingerprint`:
-
-```text
-Implement Feature continued because Codex review remained pending for the full 45-minute wait.
-
-Pull request: <exact pr_url>
-Review request: <exact request_receipt.request_ref>
-Revision: <exact revision_key>
-
-This is not a clean review verdict. A later merge workflow must re-check this pull request for late Codex findings before merge.
-```
-
-Write that exact body to an absolute file without interpolation, prepare its
-`review-warning` reservation, apply reserved/started, capture the
-managed checkout's GitStack worktree fingerprint, then post it with one typed
-`reviews comment --body-file ... --reservation-file ... --ledger-file ... --expected-worktree-fingerprint ...` call.
-Require the canonical issue-comment URL and id, exact PR target, expected body
-byte count/SHA-256, and unchanged worktree proof. On an ambiguous response use
-only GitStack's one read-back result; never post the warning again blindly.
-
-The helper derives the expected body from stored review identity. The comment
-timestamp must be at or after the immutable deadline and no later than the
-observation. The warning reference may not reuse the review request reference.
-
-The timeout result means only that the current revision proceeds without a returned
-Codex verdict. It is not `clean`, does not waive `$autoreview`, configured CI, mergeability,
-branch rules, approvals, base freshness, tracker closeout, or any other gate,
-and cannot override a rule that still blocks the pull request. Surface the same
-warning in the user-facing final report. Superseded revision warnings remain
-history but are excluded from current status and terminal projections. A later merge workflow must re-check
-the exact PR for late Codex findings before merge.
-
-Never schedule another check, pause a Goal, arm an App heartbeat, start another
-waiter, or change the original timing fields. The root Goal remains active
-through the remaining gates and completes only through its normal terminal
-transition. Recovery observes the already-launched waiter or records
-its single final outcome; it never relaunches it.
+The review gate remains separate from AutoReview, CI, mergeability, approvals,
+and branch rules. It grants no merge, enqueue, deploy, Goal, task, or worktree
+authority.
 
 ## Tracker Closeout
 
@@ -161,24 +60,19 @@ parent/global Feature Spec after every partial gate passes. Use fully qualified
 refs across repositories. Non-default-base PRs cannot be closeout vehicles
 because their closing keywords cannot take effect.
 
-For local Markdown, first finish substantive acceptance, integration proof,
-and any knowledge closeout. Then perform only the predeclared local move in its
-owning delivery. The typed move dirties tracker delivery state and invalidates
-the old revision set. Commit and push it, observe the new head containing the
-move, rerun final validation and establish terminal `$autoreview` evidence, convert drafts to
-ready-for-review, then obtain current-revision review and CI before terminal
-merge-ready state. Report closeout as prepared because the default branch sees
-it only after later merge.
+For local Markdown, finish substantive acceptance, integration proof, and any
+knowledge closeout first. Perform only the predeclared local move, commit and
+push it, observe the new head, rerun validation and terminal AutoReview, convert
+drafts to ready-for-review, then obtain current-revision review and CI. Report
+closeout as prepared because the default branch sees it only after later merge.
+The terminal AutoReview step is executed through the owned `$autoreview`
+operation and remains separately gated.
 
 ## Terminal Handoff Only
 
 An in-flight fixed review wait retains the active claim and creates no handoff
-or release. A timeout-accepted result continues normal closeout with its warning
-evidence; it does not create a nonterminal handoff.
-
-`terminal-handoff-recorded` is terminal-only and allowed only after
-`task-terminal-sealed`. It binds the unchanged terminal seal, next action, and
-typed `external-merge-required` authority; the seal binds the exact delivery
-revisions. After all task handoffs, the root independently verifies the
-portfolio, completes its Goal, then releases and archives. A later GitHub
+or release. `terminal-handoff-recorded` is terminal-only after
+`task-terminal-sealed`; it binds the unchanged seal and
+`external-merge-required` authority. After all task handoffs, the root verifies
+the portfolio, completes its Goal, then releases and archives. A later GitHub
 workflow owns merge and post-merge closure.

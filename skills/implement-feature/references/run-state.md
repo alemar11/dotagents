@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v19 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v20 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,7 +14,7 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `14.0.0` created from registration
+Active state accepts only ledger schema `15.0.0` created from registration
 schema `7.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
@@ -30,6 +30,7 @@ scripts/ledger-cache --json ledger create --ledger '<absolute-active-json>' --ro
 scripts/ledger-cache --json ledger apply --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --expected-generation '<current-generation>' --operation-id '<unique-operation-id>' --events-file '<absolute-events-json>'
 scripts/ledger-cache --json ledger read --ledger '<absolute-active-json>' --projection 'status|dispatch|recovery|terminal|diagnostics'
 scripts/ledger-cache --json controller next --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>'
+scripts/ledger-cache --json operation start|read-start|record-result --owner '<gitstack|autoreview>' --request-file '<absolute-json>' --ledger '<absolute-active-json>'
 ```
 
 After registration, `references/controller.md` is the sole phase/action,
@@ -151,22 +152,20 @@ a missing active Goal is never recreated during recovery. The entry gate returns
 
 ## Review Timing
 
-Keep one review per delivery revision. `review-wait-started` fixes
-`wait_deadline=wait_started_at+45m`; before GitStack,
-`review-wait-invoked` records a nonfuture timestamp and
-`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`. It is
-single-launch authority: never default, restart, or extend.
+Keep one GitStack owned-operation lineage per delivery revision. GitStack fixes
+the exact request receipt and immutable `wait_deadline=wait_started_at+45m` in
+its request. The generic started receipt is single-launch authority: never
+default, restart, extend, or return it to a second execute call.
 
-`review-observed` binds one current request/revision result and GitStack's
-machine failure classification:
-`clean/accepted`, `findings/fix-required`, `failed/blocked`, or
-`waiting/timeout-accepted`. Only the last is valid after the deadline and needs
-the exact PR warning URL, time, and fingerprint from
-`codex-review-closeout.md`; all other warning fields are null. It passes only
-the review gate and is never clean. Keep the claim and root Goal active; never schedule,
-pause, relaunch, or create a nonterminal handoff. Projections bound current
-warnings and count omissions; superseded warnings are inert. The merge workflow
-re-checks late findings.
+Schema-15 operation history appends `owned-operation-started` and
+`owned-operation-result` records. Each carries normalized task/delivery/
+revision/checkout binding; results additionally store the complete owner result
+as opaque evidence and a closed disposition/gate/recovery projection. Clean,
+findings, provider failure, and correlation failure come only from GitStack's
+request-correlated result validator. Deadline pending remains `pending-warning`
+until the same-lineage warning result is recorded as `timeout-accepted`. It
+passes only the review gate and is never clean. Superseding terminal
+reconciliation appends history and never rewrites the failed observation.
 
 ## Typed Dependency Wait
 
@@ -233,7 +232,7 @@ paths reject absolute/backslash/empty/parent traversal.
 `status` reports bounded identity and progress, `dispatch` reports only the
 derived ready set and capacity, `recovery` reports freshness inputs, and
 `terminal` reports staged closeout, review-timeout warnings, and archive
-readiness. Their shapes remain unchanged in v18. `diagnostics` schema `1.0.0`
+readiness. Their shapes remain unchanged in v20. `diagnostics` schema `1.0.0`
 is the root's user-facing read model. It binds generation/fingerprint, preserves
 typed evidence in raw fields, and adds qualified display fields. It derives
 `terminal_verification=invalidated|clean|incomplete`; only unchanged
@@ -249,7 +248,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `14.0.0`, any registration schema before `7.0.0`, or any
+JSON schema before `15.0.0`, any registration schema before `7.0.0`, or any
 legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses

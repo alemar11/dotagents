@@ -63,7 +63,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
             subprocess.run(["git", "-C", str(repository), "commit", "-qm", "base"], check=True)
         self.ledger = self.ledger_root / "fixture.json"
-        self.ledger.write_text('{"schema_version":"14.0.0","tasks":[]}\n')
+        self.ledger.write_text('{"schema_version":"15.0.0","tasks":[]}\n')
         self.adoption_index = 0
         self.env = os.environ.copy()
         self.env["HOME"] = str(self.base)
@@ -294,7 +294,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             )
         ledger_path = Path(claim["ledger_ref"])
         ledger_value = json.loads(ledger_path.read_text()) if ledger_path.exists() else {
-            "schema_version": "14.0.0",
+            "schema_version": "15.0.0",
             "tasks": [],
         }
         ledger_tasks = ledger_value.setdefault("tasks", [])

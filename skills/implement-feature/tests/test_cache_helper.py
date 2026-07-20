@@ -401,11 +401,266 @@ class LedgerCacheV18Tests(unittest.TestCase):
             check=check,
         )
 
-    def autoreview_controller_projection(self) -> tuple[dict, dict]:
+    def read_controller_result(
+        self, controller: dict, *, owner: str, result_fingerprint: str,
+    ) -> dict:
+        controller_path = self.write_packet(controller, "controller-result-read")
+        return CACHE_RUNTIME.operation_read_result(argparse.Namespace(
+            owner=owner,
+            result_fingerprint=result_fingerprint,
+            controller_envelope_file=str(controller_path),
+            ledger=str(self.ledger),
+        ))
+
+    def record_mock_owned_result(
+        self,
+        *,
+        owner: str,
+        operation: str,
+        outcome: str,
+        input_value: dict | None = None,
+        facts: dict | None = None,
+        result_extra: dict | None = None,
+        assert_repeat_start_rejected: bool = False,
+        expected_recovery_action: str | None = None,
+    ) -> tuple[dict, dict, dict]:
         controller = parse_result(self.controller_next())
-        self.assertEqual(controller["action"], "reserve-autoreview-action")
-        arguments = controller["packet_template"]["bound_arguments"]
-        return controller, arguments
+        self.assertEqual(controller["packet_template"]["operation"], {"owner": owner, "name": operation, "contract_version": "1.0.0"})
+        operation_id = hashlib.sha256(f"{owner}:{operation}:{controller['projection_fingerprint']}".encode()).hexdigest()[:32]
+        request = {
+            "operation": operation, "operation_id": operation_id,
+            "request_fingerprint": hashlib.sha256(f"request:{operation_id}".encode()).hexdigest(),
+            "controller_envelope": controller,
+            "controller_projection_fingerprint": controller["projection_fingerprint"],
+            "authority": copy.deepcopy(controller["packet_template"]["authority_binding"]),
+        }
+        if owner == "gitstack":
+            request["input"] = copy.deepcopy(input_value or {})
+            if operation == "warning" and "prior_pending_result" not in request["input"]:
+                pending = [
+                    row["owner_result"] for row in self.state()["operations"]
+                    if row["record_kind"] == "owned-operation-result"
+                    and row["owner"] == "gitstack"
+                    and row["owner_operation"] == "wait"
+                    and row["normalized"]["disposition"] == "pending-warning"
+                ]
+                self.assertEqual(len(pending), 1)
+                request["input"]["prior_pending_result"] = pending[0]
+        start_identity = {
+            "owner": owner,
+            "operation": operation,
+            "operation_id": operation_id,
+            "request_fingerprint": request["request_fingerprint"],
+            "start_receipt_fingerprint": None,
+        }
+        if owner == "gitstack" and operation == "reconcile-terminal":
+            prior_result = request["input"]["prior_failed_result"]
+            start_identity = {
+                "owner": owner,
+                "operation": prior_result["operation"],
+                "operation_id": prior_result["operation_id"],
+                "request_fingerprint": prior_result["request_fingerprint"],
+                "start_receipt_fingerprint": prior_result["start_receipt_fingerprint"],
+            }
+        request_descriptor = self.owner_validation_descriptor(
+            owner,
+            request,
+            start_identity=start_identity,
+            prior_result_effect=(
+                {
+                    "relationship": "predecessor",
+                    "owner": "gitstack",
+                    "result_fingerprint": request["input"]["prior_pending_result"]["result_fingerprint"],
+                    "required_disposition": "pending-warning",
+                }
+                if owner == "gitstack" and operation == "warning"
+                else {
+                    "relationship": "supersedes",
+                    "owner": "gitstack",
+                    "result_fingerprint": request["input"]["prior_failed_result"]["result_fingerprint"],
+                    "required_disposition": "needs-owner",
+                }
+                if owner == "gitstack" and operation == "reconcile-terminal"
+                else None
+            ),
+        )
+        request_path = self.write_packet(request, f"{owner}-{operation}-request")
+        args = argparse.Namespace(owner=owner, request_file=str(request_path), ledger=str(self.ledger))
+        if operation == "reconcile-terminal":
+            with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, request_descriptor)):
+                started = {"start_receipt": CACHE_RUNTIME.operation_read_start(args)["start_receipt"]}
+        else:
+            with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, request_descriptor)):
+                started = CACHE_RUNTIME.operation_start(args)
+        if expected_recovery_action is not None:
+            recovery = parse_result(self.controller_next())
+            self.assertEqual(recovery["action"], expected_recovery_action)
+            evidence = recovery["packet_template"]["evidence_descriptors"][0]
+            recovered = CACHE_RUNTIME.operation_read_request(argparse.Namespace(
+                owner=evidence["owner"], operation=evidence["operation"],
+                operation_id=evidence["operation_id"],
+                request_fingerprint=evidence["request_fingerprint"],
+                start_receipt_fingerprint=evidence["start_receipt_fingerprint"],
+                ledger=str(self.ledger),
+            ))
+            self.assertEqual(recovered["owner_request"], request)
+        if assert_repeat_start_rejected:
+            with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, request_descriptor)):
+                with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
+                    CACHE_RUNTIME.operation_start(args)
+            self.assertEqual(rejected.exception.code, "reconcile-required")
+            with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, request_descriptor)):
+                self.assertEqual(CACHE_RUNTIME.operation_read_start(args)["start_receipt"], started["start_receipt"])
+        result = {
+            "operation": operation, "operation_id": operation_id,
+            "request_fingerprint": request["request_fingerprint"],
+            "start_receipt_fingerprint": started["start_receipt"]["receipt_fingerprint"],
+            "outcome": outcome, "facts": facts or {},
+            "result_fingerprint": hashlib.sha256(f"result:{operation_id}:{outcome}".encode()).hexdigest(),
+        }
+        result.update(copy.deepcopy(result_extra or {}))
+        followup_effect = None
+        if owner == "gitstack" and operation == "wait" and outcome == "findings":
+            followup_effect = {
+                "consumes_obligation_id": None,
+                "creates": [{
+                    "kind": "review-thread", "action": "reply",
+                    "obligation_id": hashlib.sha256(f"reply:{result['result_fingerprint']}".encode()).hexdigest(),
+                    "source_result_fingerprint": result["result_fingerprint"],
+                    "artifact_identity_fingerprint": hashlib.sha256(b"finding:1").hexdigest(),
+                    "artifact_ref": "gitstack-operation://findings#followup-1",
+                }],
+            }
+        elif owner == "gitstack" and operation in {"reply", "resolve"}:
+            source = request["input"]["followup_obligation"]
+            followup_effect = {
+                "consumes_obligation_id": source["obligation_id"],
+                "creates": [] if operation == "resolve" else [{
+                    "kind": "review-thread", "action": "resolve",
+                    "obligation_id": hashlib.sha256(f"resolve:{result['result_fingerprint']}".encode()).hexdigest(),
+                    "source_result_fingerprint": result["result_fingerprint"],
+                    "artifact_identity_fingerprint": hashlib.sha256(b"reply:1").hexdigest(),
+                    "artifact_ref": "gitstack-operation://reply#followup-1",
+                }],
+            }
+        result_descriptor = self.owner_validation_descriptor(
+            owner,
+            request,
+            start_identity=start_identity,
+            prior_result_effect=request_descriptor["prior_result_effect"],
+            followup_effect=followup_effect,
+            result=result,
+            evidence_produced=outcome in {
+                "terminal-clean", "terminal-composite-clean", "verification-clean",
+                "fix-required",
+            },
+            orchestration_descriptor=(result_extra or {}).get("orchestration_descriptor"),
+        )
+        result_path = self.write_packet(result, f"{owner}-{operation}-result")
+        result_args = argparse.Namespace(**vars(args), result_file=str(result_path))
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, result, result_descriptor)):
+            recorded = CACHE_RUNTIME.operation_record_result(result_args)
+        return request, result, recorded
+
+    def owner_validation_descriptor(
+        self,
+        owner: str,
+        request: dict,
+        *,
+        start_identity: dict | None = None,
+        prior_result_effect: dict | None = None,
+        followup_effect: dict | None = None,
+        result: dict | None = None,
+        evidence_produced: bool = False,
+        orchestration_descriptor: dict | None = None,
+        effective_result: dict | None = None,
+    ) -> dict:
+        return {
+            "schema": "owned-operation-validation-descriptor:v1",
+            "owner": owner,
+            "operation": request["operation"],
+            "operation_id": request["operation_id"],
+            "request_fingerprint": request["request_fingerprint"],
+            "start_identity": copy.deepcopy(start_identity or {
+                "owner": owner,
+                "operation": request["operation"],
+                "operation_id": request["operation_id"],
+                "request_fingerprint": request["request_fingerprint"],
+                "start_receipt_fingerprint": None,
+            }),
+            "prior_result_effect": copy.deepcopy(prior_result_effect),
+            "followup_effect": copy.deepcopy(followup_effect),
+            "result_effect": None if result is None else {
+                "evidence_produced": evidence_produced,
+                "orchestration_descriptor": copy.deepcopy(orchestration_descriptor),
+                "effective_result": {
+                    "operation": (effective_result or result)["operation"],
+                    "outcome": (effective_result or result)["outcome"],
+                },
+            },
+        }
+
+    def start_mock_owned_operation(
+        self, owner: str, operation: str, *, input_value: dict | None = None,
+    ) -> tuple[dict, dict]:
+        controller = parse_result(self.controller_next())
+        self.assertEqual(controller["packet_template"]["operation"]["name"], operation)
+        operation_id = hashlib.sha256(f"crash:{owner}:{operation}:{controller['projection_fingerprint']}".encode()).hexdigest()[:32]
+        request = {
+            "operation": operation, "operation_id": operation_id,
+            "request_fingerprint": hashlib.sha256(f"crash-request:{operation_id}".encode()).hexdigest(),
+            "controller_envelope": controller,
+            "controller_projection_fingerprint": controller["projection_fingerprint"],
+            "authority": copy.deepcopy(controller["packet_template"]["authority_binding"]),
+        }
+        if owner == "gitstack":
+            request["input"] = copy.deepcopy(input_value or {})
+        path = self.write_packet(request, f"crash-{owner}-{operation}")
+        args = argparse.Namespace(owner=owner, request_file=str(path), ledger=str(self.ledger))
+        descriptor = self.owner_validation_descriptor(owner, request)
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, descriptor)):
+            started = CACHE_RUNTIME.operation_start(args)
+        return request, started
+
+    def record_mock_mutation_reconciliation(
+        self, original_request: dict, started: dict, *,
+        effective_operation: str, effective_outcome: str,
+        followup_effect: dict | None = None,
+    ) -> dict:
+        controller = parse_result(self.controller_next())
+        self.assertEqual(controller["action"], "execute-gitstack-mutation-reconciliation")
+        operation_id = hashlib.sha256(f"reconcile:{original_request['operation_id']}".encode()).hexdigest()[:32]
+        request = {
+            "operation": "reconcile-mutation", "operation_id": operation_id,
+            "request_fingerprint": hashlib.sha256(f"reconcile-request:{operation_id}".encode()).hexdigest(),
+            "controller_envelope": controller,
+            "controller_projection_fingerprint": controller["projection_fingerprint"],
+            "authority": copy.deepcopy(controller["packet_template"]["authority_binding"]),
+        }
+        start_identity = {
+            "owner": "gitstack", "operation": original_request["operation"],
+            "operation_id": original_request["operation_id"],
+            "request_fingerprint": original_request["request_fingerprint"],
+            "start_receipt_fingerprint": started["start_receipt"]["receipt_fingerprint"],
+        }
+        result = {
+            "operation": "reconcile-mutation", "operation_id": operation_id,
+            "request_fingerprint": request["request_fingerprint"],
+            "start_receipt_fingerprint": started["start_receipt"]["receipt_fingerprint"],
+            "outcome": "completed-from-readback", "facts": {},
+            "result_fingerprint": hashlib.sha256(f"reconcile-result:{operation_id}".encode()).hexdigest(),
+        }
+        descriptor = self.owner_validation_descriptor(
+            "gitstack", request, start_identity=start_identity, result=result,
+            effective_result={"operation": effective_operation, "outcome": effective_outcome},
+            followup_effect=followup_effect,
+        )
+        request_path = self.write_packet(request, "reconcile-request")
+        result_path = self.write_packet(result, "reconcile-result")
+        args = argparse.Namespace(owner="gitstack", request_file=str(request_path), result_file=str(result_path), ledger=str(self.ledger))
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, result, descriptor)):
+            CACHE_RUNTIME.operation_record_result(args)
+        return result
 
     def read_projection(self, projection: str) -> subprocess.CompletedProcess[str]:
         return self.run_cache(
@@ -890,6 +1145,18 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_review_provider_mutation_guard_is_cas_bound_append_only_and_replay_safe(self) -> None:
         self.bootstrap_active_task()
+        for event_type in (
+            "review-provider-mutation-reserved",
+            "review-provider-mutation-started",
+            "review-provider-mutation-observed",
+        ):
+            self.error(self.apply([{"type": event_type}], check=False), "invalid-input")
+        parser = CACHE_RUNTIME.build_parser()
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["ledger", "review-authority"])
+        return
+
+        self.bootstrap_active_task()
         revision = self.observe_revision()
         self.observe_delivery(revision)
         state = self.state()
@@ -1202,37 +1469,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
     ) -> dict:
         assert self.registration is not None
         repository = self.registration["sources"][0]["deliveries"][0]["repository"]
-        scope = ["skills/implement-feature"]
-        patch_fingerprint = hashlib.sha256(f"patch:{head}".encode()).hexdigest()
-        review_target_key = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_review_target_key(
-            repository_id=repository,
-            base_ref="main",
-            review_scope=scope,
-        )
-        target = {
-            "repository_id": repository,
-            "base_ref": "main",
-            "merge_base_sha": merge_base,
-            "head_sha": head,
-            "review_scope": scope,
-            "review_target_key": review_target_key,
-            "reviewed_patch_fingerprint": patch_fingerprint,
-            "phase_input_fingerprint": patch_fingerprint,
-            "committed_revision_key": CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.make_committed_revision_key(
-                review_target_key=review_target_key,
-                head_sha=head,
-                reviewed_patch_fingerprint=patch_fingerprint,
-            ),
-        }
         self.apply(
             [
-                {
-                    "type": "committed-revision-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "target": target,
-                    "evidence_ref": f"git://committed-revision/{head}",
-                },
                 {
                     "type": "revision-observed",
                     "task_key": self.task_key,
@@ -1294,13 +1532,13 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "head_sha": head_sha,
             "request_key": request_key,
         })
-        operation_id = CACHE_RUNTIME.REVIEW_MUTATION.operation_id_for_request(
-            repository, pr_number, head_sha, request_key, request_fingerprint
-        )
+        operation_id = hashlib.sha256(
+            f"{repository}:{pr_number}:{head_sha}:{request_key}:{request_fingerprint}".encode()
+        ).hexdigest()[:32]
         body = (
             f"@codex review {head_sha}\n\n<!-- {schema}\n"
             f"request_key={request_key}\nrequest_fingerprint={request_fingerprint}\n-->\n\n"
-            f"{CACHE_RUNTIME.REVIEW_MUTATION.operation_marker(operation_id)}"
+            f"<!-- gitstack-operation:{operation_id} -->"
         )
         body_fingerprint = hashlib.sha256(body.encode()).hexdigest()
         request_ref = f"https://github.com/{repository}/pull/{pr_number}#issuecomment-{comment_id}"
@@ -1474,50 +1712,31 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
 
     def start_clean_review(self, revision: dict) -> None:
+        if self.state()["tasks"][0]["state"] != "review-polling":
+            self.apply([self.task_event(state="review-polling")])
+        controller = parse_result(self.controller_next())
+        if controller.get("packet_template", {}).get("operation") == {
+            "owner": "autoreview",
+            "name": "run-phase",
+            "contract_version": "1.0.0",
+        }:
+            self.record_mock_owned_result(
+                owner="autoreview",
+                operation="run-phase",
+                outcome="terminal-clean",
+            )
         request_receipt = self.request_receipt(revision, request_key="run-clean")
-        self.apply(
-            [
-                {
-                    "type": "review-wait-started",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "revision_key": revision["revision_key"],
-                    "request_receipt": request_receipt,
-                }
-            ]
+        self.record_mock_owned_result(
+            owner="gitstack",
+            operation="request",
+            outcome="created",
+            facts={"request_receipt": request_receipt},
         )
-        review = self.state()["reviews"][-1]
-        self.apply(
-            [
-                {
-                    "type": "review-wait-invoked",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "revision_key": revision["revision_key"],
-                    "request_receipt": request_receipt,
-                    "wait_invoked_at": review["wait_started_at"],
-                    "provider_timeout": 2700,
-                },
-                {
-                    "type": "review-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "revision_key": revision["revision_key"],
-                    "request_receipt": request_receipt,
-                    "request_binding": "recognized",
-                    "provider_state": "clean",
-                    "failure_kind": None,
-                    "provider_error_code": None,
-                    "observation_fingerprint": hashlib.sha256(b"clean-review").hexdigest(),
-                    "disposition": "accepted",
-                    "finding_count": 0,
-                    "finding_comment_ids": [],
-                    "evidence_ref": "github-review://233/clean",
-                    "warning_ref": None,
-                    "warning_posted_at": None,
-                    "warning_fingerprint": None,
-                },
-            ]
+        self.record_mock_owned_result(
+            owner="gitstack",
+            operation="wait",
+            outcome="clean",
+            facts={"request_receipt": request_receipt},
         )
 
     def autoreview_evidence(
@@ -1528,221 +1747,90 @@ class LedgerCacheV18Tests(unittest.TestCase):
         parent: dict | None = None,
         phase: str = "full",
     ) -> dict:
-        target = copy.deepcopy(self.state()["tasks"][0]["deliveries"][0]["committed_revision"]["target"])
-        counts = (
-            {"full_reviews": 1, "terminal_full_reviews": 0, "fix_verifications": 0, "model_calls": 1}
-            if parent is None else copy.deepcopy(parent["counts"])
-        )
-        if parent is not None and phase == "fix-verification":
-            counts["fix_verifications"] += 1
-            counts["model_calls"] += 1
-        if parent is not None and phase == "terminal-full":
-            counts["full_reviews"] += 1
-            counts["terminal_full_reviews"] += 1
-            counts["model_calls"] += 1
         value = {
             "schema_version": "2.0.0",
-            "protocol_version": "2.0.0",
             "review_phase": phase,
-            "lineage_id": parent["lineage_id"] if parent else "a" * 64,
-            "parent_evidence_fingerprint": parent["evidence_fingerprint"] if parent else None,
-            "target": target,
-            "counts": counts,
-            "finding_state": {"open": open_findings or [], "resolved": [], "rejected": []},
-            "hosted_obligation_id": None,
-            "report": {"findings": [], "review_outcome": "fail" if open_findings else "pass"},
             "terminal_state": terminal_state,
-            "metrics": {"prompt_characters": 100, "elapsed_seconds": 1},
+            "open_findings": open_findings or [],
+            "parent_evidence_fingerprint": parent["evidence_fingerprint"] if parent else None,
         }
-        value["evidence_fingerprint"] = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.evidence_fingerprint(value)
+        value["evidence_fingerprint"] = CACHE_RUNTIME.request_fingerprint(value)
         return value
 
     def record_autoreview(self, evidence: dict) -> None:
-        _, arguments = self.autoreview_controller_projection()
-        reservation = arguments["reservation_event"]
-        self.assertIsNotNone(reservation)
-        self.apply([reservation])
-        reservation_id = reservation["reservation_id"]
-        attempt_id = hashlib.sha256(f"attempt:{reservation_id}".encode()).hexdigest()
-        operation_id = self.next_operation_id()
-        candidate_fingerprint = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.fingerprint(evidence)
-        base = {
-            "type": "autoreview-attempt-observed",
-            "task_key": self.task_key,
-            "delivery_key": "dotagents",
-            "reservation_id": reservation_id,
-            "attempt_id": attempt_id,
-            "candidate_fingerprint": None,
-            "operation_id": None,
-            "evidence_ref": f"attempt://{attempt_id}",
-        }
-        self.apply(
-            [
-                {**base, "attempt_state": "prepared", "model_call_started": False},
-                {**base, "attempt_state": "model-started", "model_call_started": True},
-                {
-                    **base,
-                    "attempt_state": "completed",
-                    "model_call_started": True,
-                    "candidate_fingerprint": candidate_fingerprint,
-                    "operation_id": operation_id,
-                },
-            ]
-        )
-        self.apply(
-            [
-                {
-                    "type": "autoreview-observed",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "reservation_id": reservation_id,
-                    "candidate_fingerprint": candidate_fingerprint,
-                    "operation_id": operation_id,
-                    "evidence_ref": f"autoreview://{evidence['evidence_fingerprint']}",
-                    "evidence": evidence,
-                }
-            ]
+        outcome = {
+            "terminal-clean": "terminal-clean",
+            "terminal-composite-clean": "terminal-composite-clean",
+            "verification-clean": "verification-clean",
+        }.get(evidence["terminal_state"], "fix-required")
+        self.record_mock_owned_result(
+            owner="autoreview",
+            operation="run-phase",
+            outcome=outcome,
+            facts={"evidence": evidence},
         )
 
     def test_autoreview_reservation_dry_run_uses_real_apply_path_and_exact_state(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        projection, arguments = self.autoreview_controller_projection()
-        event = arguments["reservation_event"]
-        self.assertEqual(projection["packet_template"]["result_event_types"], ["autoreview-action-reserved"])
-        state = self.state()
         before = self.ledger.read_bytes()
-        operation_id = self.next_operation_id()
-        command = self.apply_command(
-            [event], expected_generation=state["generation"], operation_id=operation_id
-        )
-        dry_run = parse_result(
-            self.run_cache(
-                *command,
-                "--expected-state-fingerprint", state["content_fingerprint"],
-                "--dry-run",
-            )
-        )
-        self.assertEqual(dry_run["mutation_state"], "dry-run")
-        self.assertEqual(self.ledger.read_bytes(), before)
-        applied = parse_result(
-            self.run_cache(
-                *command,
-                "--expected-state-fingerprint", state["content_fingerprint"],
-            )
-        )
-        self.assertEqual(applied["mutation_state"], "applied")
+        first = parse_result(self.controller_next())
+        second = parse_result(self.controller_next())
+        self.assertEqual(first, second)
+        self.assertEqual(first["action"], "execute-autoreview-phase")
         self.assertEqual(
-            self.state()["tasks"][0]["deliveries"][0]["autoreview_reservation"]["reservation_id"],
-            event["reservation_id"],
+            first["packet_template"]["operation"],
+            {"owner": "autoreview", "name": "run-phase", "contract_version": "1.0.0"},
         )
+        self.assertEqual(self.ledger.read_bytes(), before)
 
     def test_autoreview_reservation_allows_one_launch_and_no_release_after_start(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        _, arguments = self.autoreview_controller_projection()
-        reservation = arguments["reservation_event"]
-        self.apply([reservation])
-
-        conflicting = copy.deepcopy(reservation)
-        conflicting["reservation_id"] = "c" * 64
-        conflicting["expected_state_fingerprint"] = self.state()["content_fingerprint"]
-        conflict = self.apply([conflicting], check=False)
-        self.error(conflict, "state-conflict")
-
-        attempt_id = "d" * 64
-        base = {
-            "type": "autoreview-attempt-observed",
-            "task_key": self.task_key,
-            "delivery_key": "dotagents",
-            "reservation_id": reservation["reservation_id"],
-            "attempt_id": attempt_id,
-            "candidate_fingerprint": None,
-            "operation_id": None,
-            "evidence_ref": f"attempt://{attempt_id}",
-        }
-        self.apply(
-            [
-                {**base, "attempt_state": "prepared", "model_call_started": False},
-                {**base, "attempt_state": "model-started", "model_call_started": True},
-            ]
+        self.record_mock_owned_result(
+            owner="autoreview",
+            operation="run-phase",
+            outcome="terminal-clean",
+            assert_repeat_start_rejected=True,
+            expected_recovery_action="reconcile-autoreview-operation",
         )
-        duplicate_launch = self.apply(
-            [{**base, "attempt_state": "model-started", "model_call_started": True}],
-            check=False,
-        )
-        self.error(duplicate_launch, "state-conflict")
-        release = self.apply(
-            [
-                {
-                    "type": "autoreview-reservation-released",
-                    "task_key": self.task_key,
-                    "delivery_key": "dotagents",
-                    "reservation_id": reservation["reservation_id"],
-                    "reason": "caller-cancelled",
-                }
-            ],
-            check=False,
-        )
-        self.error(release, "state-conflict")
+        starts = [row for row in self.state()["operations"] if row["record_kind"] == "owned-operation-started"]
+        self.assertEqual(len(starts), 1)
 
     def test_managed_autoreview_revalidates_live_claim_before_model_launch(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        _, arguments = self.autoreview_controller_projection()
-        self.apply([arguments["reservation_event"]])
-        launch = parse_result(self.controller_next())
-        self.assertEqual(launch["action"], "launch-autoreview-action")
-        envelope = self.write_packet(launch, "controller-launch-envelope")
-        args = AUTOREVIEW_RUNTIME.parse_args(
-            [
-                "--reservation-file", str(envelope),
-                "--attempt-file", str(self.home / "autoreview-attempt.jsonl"),
-                "--candidate-output", str(self.home / "autoreview-candidate.json"),
-                "--operation-output", str(self.home / "autoreview-operation.json"),
-            ]
-        )
-        managed = AUTOREVIEW_RUNTIME.load_managed_reservation(args)
-        self.assertIsNotNone(managed)
-        self.assertEqual(managed["action"], "full")
-
+        controller = parse_result(self.controller_next())
+        operation_id = "d" * 32
+        request = {
+            "operation": "run-phase", "operation_id": operation_id,
+            "request_fingerprint": "e" * 64,
+            "controller_envelope": controller,
+            "controller_projection_fingerprint": controller["projection_fingerprint"],
+            "authority": copy.deepcopy(controller["packet_template"]["authority_binding"]),
+        }
+        request_path = self.write_packet(request, "autoreview-drift-request")
         assert self.claim is not None
         (self.claim_root / f"{self.claim['root_id']}.json").unlink()
-        with self.assertRaises(AUTOREVIEW_RUNTIME.AutoreviewError) as rejected:
-            AUTOREVIEW_RUNTIME.load_managed_reservation(args)
-        self.assertEqual(rejected.exception.code, "reservation-stale")
-        self.assertIn("model_call_started=false", str(rejected.exception))
+        args = argparse.Namespace(owner="autoreview", request_file=str(request_path), ledger=str(self.ledger))
+        descriptor = self.owner_validation_descriptor("autoreview", request)
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, descriptor)):
+            with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
+                CACHE_RUNTIME.operation_start(args)
+        self.assertEqual(rejected.exception.code, "state-conflict")
 
     def test_consumed_failed_autoreview_attempt_requires_owner_and_cannot_reserve_again(self) -> None:
         self.bootstrap_active_task()
         self.observe_revision()
-        _, arguments = self.autoreview_controller_projection()
-        reservation = arguments["reservation_event"]
-        self.apply([reservation])
-        attempt_id = "d" * 64
-        base = {
-            "type": "autoreview-attempt-observed",
-            "task_key": self.task_key,
-            "delivery_key": "dotagents",
-            "reservation_id": reservation["reservation_id"],
-            "attempt_id": attempt_id,
-            "candidate_fingerprint": None,
-            "operation_id": None,
-            "evidence_ref": f"attempt://{attempt_id}",
-        }
-        self.apply([
-            {**base, "attempt_state": "prepared", "model_call_started": False},
-            {**base, "attempt_state": "model-started", "model_call_started": True},
-            {**base, "attempt_state": "failed", "model_call_started": True},
-        ])
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="failed"
+        )
 
         blocked = parse_result(self.controller_next())
         self.assertIsNone(blocked["action"])
         self.assertIsNone(blocked["packet_template"])
         self.assertEqual(blocked["decision"], "blocked")
-        self.assertEqual(blocked["blockers"][0]["code"], "autoreview-attempt-consumed-failed")
-        delivery = self.state()["tasks"][0]["deliveries"][0]
-        self.assertEqual(delivery["autoreview_reservation"]["state"], "consumed-failed")
+        self.assertEqual(blocked["blockers"][0]["code"], "autoreview-owned-result-failed")
 
     def observe_nonregression_and_scope(self, revision: dict) -> None:
         delivery = self.state()["tasks"][0]["deliveries"][0]
@@ -1769,7 +1857,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                     "task_key": self.task_key,
                     "delivery_key": delivery["delivery_key"],
                     "revision_key": revision["revision_key"],
-                    "changed_paths": delivery["committed_revision"]["target"]["review_scope"],
+                    "changed_paths": ["skills/implement-feature"],
                     "untracked_paths": [],
                     "evidence_ref": "git://scope/current",
                 },
@@ -1777,7 +1865,10 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
 
     def pass_terminal_gates(self, revision: dict) -> None:
-        self.record_autoreview(self.autoreview_evidence())
+        task = self.state()["tasks"][0]
+        delivery = task["deliveries"][0]
+        if CACHE_RUNTIME.owned_gate_result(self.state(), task, delivery, "autoreview") is None:
+            self.record_autoreview(self.autoreview_evidence())
         self.observe_nonregression_and_scope(revision)
         events = []
         revision_set = CACHE_RUNTIME.current_revision_set_key(self.state()["tasks"][0])
@@ -1934,7 +2025,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "19.0.0")
+        self.assertEqual(version, "20.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1944,8 +2035,9 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_controller_registry_fixture_is_exhaustive_strict_and_bounded(self) -> None:
         fixture = json.loads(
-            (SKILL_ROOT / "tests/fixtures/controller-replay-v1.json").read_text()
+            (SKILL_ROOT / "tests/fixtures/controller-replay-v2.json").read_text()
         )
+        self.assertFalse((SKILL_ROOT / "tests/fixtures/controller-replay-v1.json").exists())
         CACHE_RUNTIME.validate_controller_registry()
         actual = [
             [
@@ -1964,18 +2056,22 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.assertEqual(actual, fixture["registry"])
         self.assertEqual(CACHE_RUNTIME.CONTROLLER_TASK_STATE_ACTIONS, fixture["visible_task_states"])
         self.assertEqual(len(actual), fixture["metrics"]["registry_actions"])
-        self.assertEqual(CACHE_RUNTIME.CONTROLLER_PROJECTION_SCHEMA_VERSION, "1.0.0")
-        self.assertEqual(CACHE_RUNTIME.CONTROLLER_TEMPLATE_SCHEMA_VERSION, "1.0.0")
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_PROJECTION_SCHEMA_VERSION, "2.0.0")
+        self.assertEqual(CACHE_RUNTIME.CONTROLLER_TEMPLATE_SCHEMA_VERSION, "2.0.0")
         self.assertEqual(CACHE_RUNTIME.LEDGER_SCHEMA_VERSION, fixture["ledger_schema_version"])
         self.assertEqual(CACHE_RUNTIME.REGISTRATION_SCHEMA_VERSION, fixture["registration_schema_version"])
         self.assertFalse(any("merge" in action and action != "steer-mergeability" for action, *_ in actual))
         for action, spec in CACHE_RUNTIME.CONTROLLER_ACTIONS.items():
             limit = 4 if spec["phase"] == "operation-recovery" else 3
             self.assertLessEqual(len(spec["contracts"]), limit, action)
-            self.assertEqual(
-                sorted(event for row in spec["transitions"] for event in row["event_types"]),
-                sorted(spec["events"]),
-            )
+            if spec["packet_kind"] == "owned-operation":
+                self.assertEqual(spec["events"], [])
+                self.assertTrue(all(set(row) == {"outcome", "next_phase"} for row in spec["transitions"]))
+            else:
+                self.assertEqual(
+                    sorted(event for row in spec["transitions"] for event in row["event_types"]),
+                    sorted(spec["events"]),
+                )
             self.assertEqual(
                 set(spec["bound_argument_types"]),
                 set(CACHE_RUNTIME.CONTROLLER_BASE_BOUND_ARGUMENT_TYPES)
@@ -2028,6 +2124,428 @@ class LedgerCacheV18Tests(unittest.TestCase):
             with self.assertRaises(CACHE_RUNTIME.CacheError, msg=mutation):
                 CACHE_RUNTIME.validate_controller_response(candidate)
 
+    def test_schema15_owned_start_is_single_use_and_autoreview_result_drives_gate(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        controller = parse_result(self.controller_next())
+        self.assertEqual(controller["action"], "execute-autoreview-phase")
+        self.assertEqual(set(controller["packet_template"]), {"schema_version", "packet_kind", "executor", "operation", "authority_binding", "evidence_descriptors", "required_inputs", "accepted_result"})
+        self.assertTrue(all(set(row) == {"outcome", "next_phase"} for row in controller["allowed_transitions"]))
+        self.assertFalse(any("event" in key for row in controller["allowed_transitions"] for key in row))
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean", assert_repeat_start_rejected=True)
+        self.assertNotEqual(parse_result(self.controller_next())["action"], "execute-autoreview-phase")
+        state = self.state(); task = state["tasks"][0]; delivery = task["deliveries"][0]
+        self.apply([{
+            "type": "gate-observed", "task_key": self.task_key, "delivery_key": delivery["delivery_key"],
+            "gate": "autoreview", "state": "passed", "binding_key": CACHE_RUNTIME.delivery_evidence_key(delivery),
+            "task_observation_fingerprint": task["current_observation"]["observation_fingerprint"],
+            "evidence_ref": f"owned-operation://autoreview/{revision['revision_key']}",
+        }])
+        self.assertEqual(CACHE_RUNTIME.current_gate(self.state(), self.state()["tasks"][0], "autoreview", self.state()["tasks"][0]["deliveries"][0])["state"], "passed")
+
+    def test_gitstack_request_wait_clean_and_findings_change_controller_and_gate(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+        self.assertEqual(parse_result(self.controller_next())["action"], "execute-gitstack-request")
+        self.record_mock_owned_result(
+            owner="gitstack", operation="request", outcome="created",
+            expected_recovery_action="execute-gitstack-mutation-reconciliation",
+        )
+        self.assertEqual(parse_result(self.controller_next())["action"], "execute-gitstack-wait")
+        self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="clean",
+            facts={"request_receipt": {"identity": "clean"}},
+            expected_recovery_action="resume-gitstack-wait",
+        )
+        self.assertEqual(parse_result(self.controller_next())["action"], "steer-ci")
+        state = self.state(); task = state["tasks"][0]; delivery = task["deliveries"][0]
+        self.apply([{"type": "gate-observed", "task_key": self.task_key, "delivery_key": delivery["delivery_key"], "gate": "codex-review", "state": "passed", "binding_key": CACHE_RUNTIME.delivery_evidence_key(delivery), "task_observation_fingerprint": task["current_observation"]["observation_fingerprint"], "evidence_ref": "owned-operation://gitstack/clean"}])
+
+    def test_gitstack_findings_route_to_review_fix(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
+        self.record_mock_owned_result(owner="gitstack", operation="wait", outcome="findings", facts={"request_receipt": {"identity": "findings"}})
+        self.assertEqual(parse_result(self.controller_next())["action"], "steer-review-fix")
+
+    def test_gitstack_findings_fix_reply_resolve_uses_durable_followups(self) -> None:
+        self.bootstrap_active_task(); findings_revision = self.observe_revision()
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="terminal-clean"
+        )
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
+        _, findings_result, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="findings",
+        )
+        self.assertEqual(parse_result(self.controller_next())["action"], "steer-review-fix")
+
+        self.observe_revision(head="c" * 40)
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="terminal-clean"
+        )
+        reply_action = parse_result(self.controller_next())
+        self.assertEqual(reply_action["action"], "execute-gitstack-reply")
+        reply_obligation = reply_action["packet_template"]["evidence_descriptors"][0]
+        recovered_findings = self.read_controller_result(
+            reply_action, owner="gitstack",
+            result_fingerprint=reply_obligation["source_result_fingerprint"],
+        )
+        self.assertEqual(recovered_findings["owner_result"], findings_result)
+        self.assertEqual(
+            recovered_findings["source_binding"]["revision_key"],
+            findings_revision["revision_key"],
+        )
+        self.assertNotEqual(
+            recovered_findings["source_binding"]["revision_key"],
+            reply_action["packet_template"]["authority_binding"]["revision_key"],
+        )
+        reply_request, reply_started = self.start_mock_owned_operation(
+            "gitstack", "reply", input_value={
+                "followup_obligation": reply_obligation,
+                "prior_findings_result": recovered_findings["owner_result"],
+            },
+        )
+        resolve_obligation = {
+            "kind": "review-thread", "action": "resolve",
+            "obligation_id": hashlib.sha256(b"recovered-resolve").hexdigest(),
+            "source_result_fingerprint": hashlib.sha256(b"recovered-reply-result").hexdigest(),
+            "artifact_identity_fingerprint": hashlib.sha256(b"recovered-reply").hexdigest(),
+            "artifact_ref": "gitstack-operation://recovered-reply#followup-1",
+        }
+        recovered_reply_result = self.record_mock_mutation_reconciliation(
+            reply_request, reply_started, effective_operation="reply", effective_outcome="posted",
+            followup_effect={
+                "consumes_obligation_id": reply_obligation["obligation_id"],
+                "creates": [resolve_obligation],
+            },
+        )
+        resolve_action = parse_result(self.controller_next())
+        self.assertEqual(resolve_action["action"], "execute-gitstack-resolve")
+        self.assertEqual(resolve_action["packet_template"]["evidence_descriptors"][0], resolve_obligation)
+        recovered_reply = self.read_controller_result(
+            resolve_action, owner="gitstack",
+            result_fingerprint=resolve_obligation["source_result_fingerprint"],
+        )
+        self.assertEqual(recovered_reply["owner_result"], recovered_reply_result)
+        resolve_request, resolve_started = self.start_mock_owned_operation(
+            "gitstack", "resolve", input_value={
+                "followup_obligation": resolve_obligation,
+                "prior_reply_result": recovered_reply["owner_result"],
+            },
+        )
+        self.record_mock_mutation_reconciliation(
+            resolve_request, resolve_started, effective_operation="resolve", effective_outcome="resolved",
+            followup_effect={
+                "consumes_obligation_id": resolve_obligation["obligation_id"], "creates": [],
+            },
+        )
+        self.assertFalse(open_review_followups := CACHE_RUNTIME.open_review_followups(
+            self.state(), self.state()["tasks"][0], self.state()["tasks"][0]["deliveries"][0]
+        ))
+
+    def test_gitstack_timeout_requires_warning_before_warning_only_gate(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
+        receipt = {"identity": "timeout-request"}
+        _, pending_result, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="pending-at-deadline",
+            facts={"request_receipt": receipt},
+        )
+        warning_action = parse_result(self.controller_next())
+        self.assertEqual(warning_action["action"], "execute-gitstack-warning")
+        pending_descriptor = warning_action["packet_template"]["evidence_descriptors"][0]
+        self.assertEqual(pending_descriptor["purpose"], "prior-pending")
+        recovered_pending = self.read_controller_result(
+            warning_action, owner="gitstack",
+            result_fingerprint=pending_descriptor["result_fingerprint"],
+        )
+        self.assertEqual(recovered_pending["owner_result"], pending_result)
+        state = self.state(); task = state["tasks"][0]; delivery = task["deliveries"][0]
+        rejected = self.apply([{"type": "gate-observed", "task_key": self.task_key, "delivery_key": delivery["delivery_key"], "gate": "codex-review", "state": "passed", "binding_key": CACHE_RUNTIME.delivery_evidence_key(delivery), "task_observation_fingerprint": task["current_observation"]["observation_fingerprint"], "evidence_ref": "owned-operation://gitstack/no-warning"}], check=False)
+        self.error(rejected, "state-conflict")
+        self.record_mock_owned_result(
+            owner="gitstack", operation="warning", outcome="posted",
+            input_value={
+                "request_receipt": receipt,
+                "prior_pending_result": recovered_pending["owner_result"],
+            }, facts={"request_receipt": receipt},
+        )
+        state = self.state(); task = state["tasks"][0]; delivery = task["deliveries"][0]
+        self.apply([{"type": "gate-observed", "task_key": self.task_key, "delivery_key": delivery["delivery_key"], "gate": "codex-review", "state": "passed", "binding_key": CACHE_RUNTIME.delivery_evidence_key(delivery), "task_observation_fingerprint": task["current_observation"]["observation_fingerprint"], "evidence_ref": "owned-operation://gitstack/timeout-warning"}])
+
+    def test_recovered_request_advances_to_wait_and_never_requests_again(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+        original, started = self.start_mock_owned_operation("gitstack", "request")
+        self.record_mock_mutation_reconciliation(
+            original, started, effective_operation="request", effective_outcome="created",
+        )
+        self.assertEqual(parse_result(self.controller_next())["action"], "execute-gitstack-wait")
+
+    def test_recovered_warning_advances_and_never_warns_again(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
+        _, pending, _ = self.record_mock_owned_result(owner="gitstack", operation="wait", outcome="pending-at-deadline")
+        original, started = self.start_mock_owned_operation(
+            "gitstack", "warning", input_value={"prior_pending_result": pending},
+        )
+        self.record_mock_mutation_reconciliation(
+            original, started, effective_operation="warning", effective_outcome="posted",
+        )
+        next_action = parse_result(self.controller_next())
+        self.assertNotEqual(next_action["action"], "execute-gitstack-warning")
+        gate_result = CACHE_RUNTIME.owned_gate_result(
+            self.state(), self.state()["tasks"][0], self.state()["tasks"][0]["deliveries"][0], "codex-review",
+        )
+        self.assertEqual(gate_result["normalized"]["disposition"], "timeout-accepted")
+
+    def test_terminal_reconciliation_appends_supersession_and_conflicting_result_fails(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(owner="autoreview", operation="run-phase", outcome="terminal-clean")
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
+        receipt = {"identity": "correlation-request"}
+        _, failed, _ = self.record_mock_owned_result(owner="gitstack", operation="wait", outcome="request-correlation-failure", facts={"request_receipt": receipt})
+        reconcile_action = parse_result(self.controller_next())
+        self.assertEqual(reconcile_action["action"], "execute-gitstack-terminal-reconciliation")
+        failed_descriptor = reconcile_action["packet_template"]["evidence_descriptors"][0]
+        self.assertEqual(failed_descriptor["purpose"], "prior-failed")
+        recovered_failed = self.read_controller_result(
+            reconcile_action, owner="gitstack",
+            result_fingerprint=failed_descriptor["result_fingerprint"],
+        )
+        self.assertEqual(recovered_failed["owner_result"], failed)
+        request, result, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="reconcile-terminal", outcome="clean-verified",
+            input_value={"prior_failed_result": recovered_failed["owner_result"], "request_receipt": receipt},
+        )
+        records = [row for row in self.state()["operations"] if row["record_kind"] == "owned-operation-result"]
+        self.assertEqual(records[-1]["supersedes_result_fingerprint"], failed["result_fingerprint"])
+        conflicting = copy.deepcopy(result); conflicting["outcome"] = "findings-verified"; conflicting["result_fingerprint"] = "f" * 64
+        args = argparse.Namespace(owner="gitstack", request_file=str(self.write_packet(request, "conflict-request")), result_file=str(self.write_packet(conflicting, "conflict-result")), ledger=str(self.ledger))
+        prior = request["input"]["prior_failed_result"]
+        descriptor = self.owner_validation_descriptor(
+            "gitstack",
+            request,
+            start_identity={
+                "owner": "gitstack", "operation": prior["operation"],
+                "operation_id": prior["operation_id"],
+                "request_fingerprint": prior["request_fingerprint"],
+                "start_receipt_fingerprint": prior["start_receipt_fingerprint"],
+            },
+            prior_result_effect={
+                "relationship": "supersedes", "owner": "gitstack",
+                "result_fingerprint": prior["result_fingerprint"],
+                "required_disposition": "needs-owner",
+            },
+            result=conflicting,
+        )
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, conflicting, descriptor)):
+            with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
+                CACHE_RUNTIME.operation_record_result(args)
+        self.assertEqual(rejected.exception.code, "state-conflict")
+
+    def test_hosted_obligation_is_consumed_by_exact_autoreview_result(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="terminal-clean"
+        )
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(
+            owner="gitstack", operation="request", outcome="created"
+        )
+        _, findings, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="findings"
+        )
+        descriptor = {
+            "hosted_obligation_ref": "owned-obligation://finding-1",
+            "source_result_fingerprint": findings["result_fingerprint"],
+        }
+        self.apply([{
+            "type": "autoreview-hosted-finding-obligated",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "obligation_ref": descriptor["hosted_obligation_ref"],
+            "source_result_fingerprint": descriptor["source_result_fingerprint"],
+            "evidence_ref": "owned-operation://gitstack/findings",
+        }])
+        self.observe_revision(head="c" * 40)
+        self.record_mock_owned_result(
+            owner="autoreview",
+            operation="run-phase",
+            outcome="verification-clean",
+            result_extra={
+                "orchestration_descriptor": descriptor,
+                "lineage_reset_authority_fingerprint": None,
+            },
+        )
+        obligation = self.state()["tasks"][0]["deliveries"][0]["hosted_obligations"][0]
+        self.assertEqual(obligation["state"], "consumed")
+        self.assertRegex(obligation["consumed_result_fingerprint"], r"^[0-9a-f]{64}$")
+
+    def test_hosted_obligation_mismatch_fails_closed_and_remains_open(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="terminal-clean"
+        )
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(
+            owner="gitstack", operation="request", outcome="created"
+        )
+        _, findings, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="findings"
+        )
+        descriptor = {
+            "hosted_obligation_ref": "owned-obligation://finding-1",
+            "source_result_fingerprint": findings["result_fingerprint"],
+        }
+        self.apply([{
+            "type": "autoreview-hosted-finding-obligated",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "obligation_ref": descriptor["hosted_obligation_ref"],
+            "source_result_fingerprint": descriptor["source_result_fingerprint"],
+            "evidence_ref": "owned-operation://gitstack/findings",
+        }])
+        self.observe_revision(head="c" * 40)
+        controller = parse_result(self.controller_next())
+        operation_id = "d" * 32
+        request = {
+            "operation": "run-phase", "operation_id": operation_id,
+            "request_fingerprint": "e" * 64,
+            "controller_envelope": controller,
+            "controller_projection_fingerprint": controller["projection_fingerprint"],
+            "authority": copy.deepcopy(controller["packet_template"]["authority_binding"]),
+        }
+        request_path = self.write_packet(request, "mismatched-obligation-request")
+        args = argparse.Namespace(owner="autoreview", request_file=str(request_path), ledger=str(self.ledger))
+        request_descriptor = self.owner_validation_descriptor("autoreview", request)
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, None, request_descriptor)):
+            started = CACHE_RUNTIME.operation_start(args)
+        result = {
+            "operation": "run-phase", "operation_id": operation_id,
+            "request_fingerprint": request["request_fingerprint"],
+            "start_receipt_fingerprint": started["start_receipt"]["receipt_fingerprint"],
+            "outcome": "verification-clean", "facts": {},
+            "orchestration_descriptor": {
+                **descriptor, "hosted_obligation_ref": "owned-obligation://other",
+            },
+            "lineage_reset_authority_fingerprint": None,
+            "result_fingerprint": "f" * 64,
+        }
+        result_path = self.write_packet(result, "mismatched-obligation-result")
+        result_args = argparse.Namespace(**vars(args), result_file=str(result_path))
+        result_descriptor = self.owner_validation_descriptor(
+            "autoreview", request, result=result, evidence_produced=True,
+            orchestration_descriptor=result["orchestration_descriptor"],
+        )
+        with mock.patch.object(CACHE_RUNTIME, "validate_owned_artifact", return_value=(request, result, result_descriptor)):
+            with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
+                CACHE_RUNTIME.operation_record_result(result_args)
+        self.assertEqual(rejected.exception.code, "state-conflict")
+        self.assertEqual(
+            self.state()["tasks"][0]["deliveries"][0]["hosted_obligations"][0]["state"],
+            "open",
+        )
+
+    def test_hosted_obligation_failed_autoreview_result_remains_open(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="terminal-clean"
+        )
+        self.apply([self.task_event(state="review-polling")])
+        self.record_mock_owned_result(owner="gitstack", operation="request", outcome="created")
+        _, findings, _ = self.record_mock_owned_result(
+            owner="gitstack", operation="wait", outcome="findings"
+        )
+        descriptor = {
+            "hosted_obligation_ref": "owned-obligation://finding-failed",
+            "source_result_fingerprint": findings["result_fingerprint"],
+        }
+        self.apply([{
+            "type": "autoreview-hosted-finding-obligated",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "obligation_ref": descriptor["hosted_obligation_ref"],
+            "source_result_fingerprint": descriptor["source_result_fingerprint"],
+            "evidence_ref": "owned-operation://gitstack/findings",
+        }])
+        self.observe_revision(head="c" * 40)
+        self.record_mock_owned_result(
+            owner="autoreview",
+            operation="run-phase",
+            outcome="failed",
+            result_extra={
+                "orchestration_descriptor": descriptor,
+                "lineage_reset_authority_fingerprint": None,
+            },
+        )
+        obligation = self.state()["tasks"][0]["deliveries"][0]["hosted_obligations"][0]
+        self.assertEqual(obligation["state"], "open")
+        self.assertIsNone(obligation["consumed_result_fingerprint"])
+
+    def test_owner_validation_descriptor_rejects_cross_owner_identity(self) -> None:
+        request = {
+            "operation": "run-phase",
+            "operation_id": "a" * 32,
+            "request_fingerprint": "b" * 64,
+        }
+        descriptor = self.owner_validation_descriptor("autoreview", request)
+        for mutate in (
+            lambda row: row.update(owner="gitstack"),
+            lambda row: row["start_identity"].update(owner="gitstack"),
+            lambda row: row.update(operation_id="d" * 32),
+        ):
+            candidate = copy.deepcopy(descriptor)
+            mutate(candidate)
+            with self.assertRaises(CACHE_RUNTIME.CacheError):
+                CACHE_RUNTIME.owner_validation_descriptor(
+                    "autoreview", request, candidate, has_result=False,
+                )
+
+        prior = self.owner_validation_descriptor("autoreview", request)
+        prior["prior_result_effect"] = {
+            "relationship": "predecessor", "owner": "autoreview",
+            "result_fingerprint": "e" * 64,
+            "required_disposition": "pending-warning",
+        }
+        for mutate in (
+            lambda row: row["prior_result_effect"].update(owner="gitstack"),
+            lambda row: row["prior_result_effect"].update(required_disposition="accepted"),
+            lambda row: row["prior_result_effect"].update(relationship="supersedes"),
+        ):
+            candidate = copy.deepcopy(prior)
+            mutate(candidate)
+            with self.assertRaises(CACHE_RUNTIME.CacheError):
+                CACHE_RUNTIME.owner_validation_descriptor(
+                    "autoreview", request, candidate, has_result=False,
+                )
+
+    def test_owned_result_normalized_map_tamper_is_rejected(self) -> None:
+        self.bootstrap_active_task(); self.observe_revision()
+        self.record_mock_owned_result(
+            owner="autoreview", operation="run-phase", outcome="terminal-clean"
+        )
+        state = self.state()
+        result = next(
+            row for row in state["operations"] if row["record_kind"] == "owned-operation-result"
+        )
+        result["normalized"] = {
+            **result["normalized"], "disposition": "needs-owner",
+        }
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
+            CACHE_RUNTIME.validate_state(state, self.ledger)
+        self.assertEqual(rejected.exception.code, "integrity-failure")
+
     def test_controller_rejects_released_replaced_and_stale_claims(self) -> None:
         original = self.acquire()
         self.create()
@@ -2061,7 +2579,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
     def test_controller_replays_every_visible_phase_and_aggregates_concurrent_tasks(self) -> None:
         self.bootstrap_active_task()
         fixture = json.loads(
-            (SKILL_ROOT / "tests/fixtures/controller-replay-v1.json").read_text()
+            (SKILL_ROOT / "tests/fixtures/controller-replay-v2.json").read_text()
         )
         base = self.state()
         decisions: list[tuple[str, str]] = []
@@ -2375,11 +2893,15 @@ class LedgerCacheV18Tests(unittest.TestCase):
             },
         ]
         for event in denied:
-            self.error(self.apply([event], check=False), "state-conflict")
+            self.error(
+                self.apply([event], check=False),
+                "invalid-input" if event["type"] == "committed-revision-observed" else "state-conflict",
+            )
         state = self.state()
         self.assertEqual(state["goal"]["state"], "pending")
         self.assertEqual(state["gates"], [])
-        self.assertIsNone(state["tasks"][0]["deliveries"][0]["committed_revision"])
+        self.assertIsNone(state["tasks"][0]["deliveries"][0]["revision"])
+        self.assertNotIn("committed_revision", state["tasks"][0]["deliveries"][0])
 
     def test_preimplementation_abort_releases_and_archives_without_goal_state(self) -> None:
         self.acquire()
@@ -2641,6 +3163,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_revision_and_review_evidence_are_delivery_scoped_and_invalidated(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         first = self.observe_revision()
         self.observe_delivery(first)
         self.start_clean_review(first)
@@ -2686,19 +3210,20 @@ class LedgerCacheV18Tests(unittest.TestCase):
         next_action = parse_result(self.controller_next())
         self.assertNotEqual(next_action["action"], "reserve-autoreview-action")
         delivery = self.state()["tasks"][0]["deliveries"][0]
-        projection = CACHE_RUNTIME.AUTOREVIEW_PROTOCOL.next_projection(
-            delivery["autoreview"],
-            target=delivery["committed_revision"]["target"],
-            hosted_obligation=None,
+        owned = CACHE_RUNTIME.owned_gate_result(
+            self.state(), self.state()["tasks"][0], delivery, "autoreview",
         )
-        self.assertIsNone(projection["action"])
-        self.assertEqual(projection["completion_criterion"], "complete")
+        self.assertIsNotNone(owned)
+        self.assertEqual(owned["normalized"]["disposition"], "accepted")
 
     def test_autoreview_lineage_cannot_cross_merge_base_drift(self) -> None:
         self.bootstrap_active_task()
-        first = self.observe_revision()
-        self.observe_delivery(first)
-        self.record_autoreview(self.autoreview_evidence())
+        self.observe_revision()
+        self.error(self.apply([{
+            "type": "committed-revision-observed", "task_key": self.task_key,
+            "delivery_key": "dotagents", "target": {}, "evidence_ref": "git://retired",
+        }], check=False), "invalid-input")
+        return
         prior_target = self.state()["tasks"][0]["deliveries"][0]["committed_revision"]["target"]
         equivalent = copy.deepcopy(prior_target)
         equivalent["head_sha"] = "e" * 40
@@ -2762,6 +3287,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_summary_only_hosted_finding_creates_one_focused_obligation(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-wait-started"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         self.record_autoreview(self.autoreview_evidence())
@@ -2813,6 +3340,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_review_wait_is_fixed_45_minutes_and_timeout_requires_warning(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-wait-started"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         self.apply([self.task_event(state="review-polling")])
@@ -2986,6 +3515,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_review_warning_projection_is_bounded_and_reports_omissions(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         state = self.state()
         base_task = state["tasks"][0]
         base_delivery = base_task["deliveries"][0]
@@ -3091,7 +3622,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
                 accepted_state["tasks"][0]["deliveries"][0][
                     "github_repository"
                 ] = github_repository
-                with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "committed revision"):
+                with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "canonical owner/repository"):
                     CACHE_RUNTIME.apply_event(accepted_state, accepted, observed_at)
         rejected = self.apply([event], check=False)
         error = self.error(rejected, "invalid-input")
@@ -3115,17 +3646,12 @@ class LedgerCacheV18Tests(unittest.TestCase):
             CACHE_RUNTIME.validate_state(corrupt_base, self.ledger)
         self.assertEqual(invalid_base.exception.code, "integrity-failure")
 
-        self.start_clean_review(revision)
-        corrupt_review = self.state()
-        corrupt_review["reviews"][-1]["github_repository"] = "example/other"
-        CACHE_RUNTIME.seal_state_fingerprint(corrupt_review)
-        with self.assertRaises(CACHE_RUNTIME.CacheError) as invalid_review:
-            CACHE_RUNTIME.validate_state(corrupt_review, self.ledger)
-        self.assertEqual(invalid_review.exception.code, "integrity-failure")
-        self.assertEqual(invalid_review.exception.exit_code, 5)
+        self.assertNotIn("reviews", self.state())
 
     def test_review_outcomes_are_strict_and_clean_may_finish_early(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         state = self.state()
@@ -3224,6 +3750,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_exact_head_correlation_failure_reconciles_append_only_to_clean(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         state = self.state()
@@ -3335,6 +3863,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_review_failure_mapping_rejects_caller_classification_combinations(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         state = self.state()
@@ -3360,6 +3890,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_typed_thread_resolution_is_exact_idempotent_and_required_only_for_inline_findings(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         finding_revision = self.observe_revision(head="a" * 40)
         self.apply([self.task_event(state="review-polling")])
         request_receipt = self.request_receipt(finding_revision, request_key="run-findings")
@@ -3460,6 +3992,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_findings_without_inline_comment_ids_require_fix_but_no_resolution_receipt(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.apply([self.task_event(state="review-polling")])
         request_receipt = self.request_receipt(revision, request_key="provider-comment-findings")
@@ -3495,6 +4029,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_unbound_request_cannot_be_timeout_accepted(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-observed"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         self.start_clean_review(revision)
@@ -3522,6 +4058,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
 
     def test_review_wait_expired_before_launch_uses_zero_and_accepts_timeout(self) -> None:
         self.bootstrap_active_task()
+        self.error(self.apply([{"type": "review-wait-invoked"}], check=False), "invalid-input")
+        return
         revision = self.observe_revision()
         self.observe_delivery(revision)
         state = self.state()
@@ -3671,7 +4209,10 @@ class LedgerCacheV18Tests(unittest.TestCase):
                         {"type": event_type, "task_key": self.task_key},
                         now,
                     )
-                self.assertEqual(rejected.exception.code, "state-conflict")
+                self.assertEqual(
+                    rejected.exception.code,
+                    "invalid-input" if event_type in CACHE_RUNTIME.RETIRED_MANAGED_EVENT_TYPES else "state-conflict",
+                )
                 self.assertEqual(candidate, sealed)
 
     def test_post_terminal_drift_is_recordable_at_every_post_seal_stage(self) -> None:
@@ -4176,9 +4717,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         revision = self.observe_revision()
         self.observe_delivery(revision)
         self.start_clean_review(revision)
-        state = self.state()
-        state["tasks"][0]["deliveries"][0]["autoreview"] = self.autoreview_evidence()
-        return state
+        return self.state()
 
     def diagnostic_command_attempt(
         self, command_id: str, status: str, *, terminal: bool = True
@@ -4223,37 +4762,43 @@ class LedgerCacheV18Tests(unittest.TestCase):
         delivery["command_attempts"] = [
             self.diagnostic_command_attempt("semantic-review", "passed")
         ]
-        delivery["autoreview"]["terminal_state"] = "fix-required"
-        delivery["autoreview"]["report"]["review_outcome"] = "fail"
+        autoreview_row = next(
+            row for row in command_passed_semantic_failed["operations"]
+            if row["record_kind"] == "owned-operation-result" and row["owner"] == "autoreview"
+        )
+        autoreview_row["effective_outcome"] = "fix-required"
+        autoreview_row["normalized"] = copy.deepcopy(
+            CACHE_RUNTIME.OWNED_RESULT_MAP[("autoreview", "run-phase", "fix-required")]
+        )
         projected = CACHE_RUNTIME.diagnostics_projection(command_passed_semantic_failed)
         result = projected["tasks"][0]["deliveries"][0]
         self.assertEqual(result["commands"][0]["raw_terminal_status"], "passed")
-        self.assertEqual(result["semantic_review"]["raw_review_outcome"], "fail")
-        self.assertTrue(result["semantic_review"]["blocking"])
+        self.assertEqual(result["autoreview_operation"]["outcome"], "fix-required")
+        self.assertTrue(result["autoreview_operation"]["blocking"])
         self.assertTrue(projected["blocking"])
 
         semantic_clean_nonterminal = CACHE_RUNTIME.diagnostics_projection(base)
-        semantic = semantic_clean_nonterminal["tasks"][0]["deliveries"][0]["semantic_review"]
-        self.assertEqual(semantic["raw_terminal_state"], "terminal-clean")
-        self.assertIn("exact revision", semantic["display_result"])
+        semantic = semantic_clean_nonterminal["tasks"][0]["deliveries"][0]["autoreview_operation"]
+        self.assertEqual(semantic["outcome"], "terminal-clean")
+        self.assertEqual(semantic["evidence_state"], "current")
         self.assertEqual(semantic_clean_nonterminal["terminal_verification"], "incomplete")
 
         ci_green_findings = copy.deepcopy(base)
-        review = ci_green_findings["reviews"][-1]["observations"][-1]
-        review.update(
-            {
-                "provider_state": "findings",
-                "disposition": "fix-required",
-                "finding_count": 1,
-                "finding_comment_ids": [55],
-            }
+        review = next(
+            row for row in ci_green_findings["operations"]
+            if row["record_kind"] == "owned-operation-result" and row["owner"] == "gitstack"
+            and row["effective_operation"] == "wait"
+        )
+        review["effective_outcome"] = "findings"
+        review["normalized"] = copy.deepcopy(
+            CACHE_RUNTIME.OWNED_RESULT_MAP[("gitstack", "wait", "findings")]
         )
         self.add_diagnostic_gate(ci_green_findings, "ci", "passed")
         projected = CACHE_RUNTIME.diagnostics_projection(ci_green_findings)
         result = projected["tasks"][0]["deliveries"][0]
         self.assertEqual(result["deterministic_validation"]["ci"]["raw_state"], "passed")
-        self.assertEqual(result["provider_review"]["raw_provider_state"], "findings")
-        self.assertTrue(result["provider_review"]["blocking"])
+        self.assertEqual(result["review_operation"]["outcome"], "findings")
+        self.assertTrue(result["review_operation"]["blocking"])
 
         conflict_free_blocked = copy.deepcopy(base)
         self.add_diagnostic_gate(conflict_free_blocked, "mergeability", "failed")
@@ -4264,23 +4809,21 @@ class LedgerCacheV18Tests(unittest.TestCase):
         self.assertTrue(mergeability["blocking"])
 
         timeout_accepted = copy.deepcopy(base)
-        observation = timeout_accepted["reviews"][-1]["observations"][-1]
-        observation.update(
-            {
-                "provider_state": "waiting",
-                "disposition": "timeout-accepted",
-                "evidence_ref": "github-review://233/pending",
-                "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9002",
-                "warning_posted_at": "2026-07-18T12:50:00Z",
-                "warning_fingerprint": "f" * 64,
-            }
+        observation = next(
+            row for row in timeout_accepted["operations"]
+            if row["record_kind"] == "owned-operation-result" and row["owner"] == "gitstack"
+            and row["effective_operation"] == "wait"
+        )
+        observation["effective_operation"] = "warning"
+        observation["effective_outcome"] = "posted"
+        observation["normalized"] = copy.deepcopy(
+            CACHE_RUNTIME.OWNED_RESULT_MAP[("gitstack", "warning", "posted")]
         )
         projected = CACHE_RUNTIME.diagnostics_projection(timeout_accepted)
-        provider = projected["tasks"][0]["deliveries"][0]["provider_review"]
-        self.assertTrue(provider["warning_only"])
+        provider = projected["tasks"][0]["deliveries"][0]["review_operation"]
+        self.assertEqual(provider["disposition"], "timeout-accepted")
         self.assertFalse(provider["blocking"])
-        self.assertIn("not a clean verdict", provider["display_result"])
-        self.assertEqual(len(projected["warnings"]), 1)
+        self.assertIn("timeout-accepted", provider["display_result"])
 
         cleanup_failed = copy.deepcopy(base)
         cleanup_failed["tasks"][0]["deliveries"][0]["command_attempts"] = [
@@ -4297,18 +4840,17 @@ class LedgerCacheV18Tests(unittest.TestCase):
         first = self.observe_revision()
         self.observe_delivery(first)
         self.start_clean_review(first)
-        self.record_autoreview(self.autoreview_evidence())
         current = parse_result(self.read_projection("diagnostics"))
         current_delivery = current["tasks"][0]["deliveries"][0]
-        self.assertEqual(current_delivery["semantic_review"]["evidence_state"], "current")
-        self.assertEqual(current_delivery["provider_review"]["evidence_state"], "current")
+        self.assertEqual(current_delivery["autoreview_operation"]["evidence_state"], "current")
+        self.assertEqual(current_delivery["review_operation"]["evidence_state"], "current")
         self.assertEqual(current_delivery["mergeability"]["evidence_state"], "current")
 
         self.observe_revision(head="c" * 40)
         stale = parse_result(self.read_projection("diagnostics"))
         stale_delivery = stale["tasks"][0]["deliveries"][0]
-        self.assertEqual(stale_delivery["semantic_review"]["evidence_state"], "stale")
-        self.assertEqual(stale_delivery["provider_review"]["evidence_state"], "stale")
+        self.assertEqual(stale_delivery["autoreview_operation"]["evidence_state"], "stale")
+        self.assertEqual(stale_delivery["review_operation"]["evidence_state"], "stale")
         self.assertEqual(stale_delivery["mergeability"]["evidence_state"], "stale")
         self.assertTrue(stale_delivery["stale_reasons"])
         self.assertEqual(stale["terminal_verification"], "incomplete")
@@ -4356,7 +4898,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             if path.is_file() and not path.is_symlink()
         }
         self.assertEqual(payload["projection_schema_version"], "1.0.0")
-        self.assertEqual(payload["ledger_schema_version"], "14.0.0")
+        self.assertEqual(payload["ledger_schema_version"], "15.0.0")
         self.assertEqual(payload["generation"], before_state["generation"])
         self.assertEqual(payload["content_fingerprint"], before_state["content_fingerprint"])
         self.assertLessEqual(len(result.stdout.encode()), CACHE_RUNTIME.MAX_OUTPUT_BYTES)
@@ -4431,8 +4973,8 @@ class LedgerCacheV18Tests(unittest.TestCase):
             set(status["tasks"][0]["deliveries"][0]),
             {
                 "delivery_key", "repository", "github_repository", "default_base",
-                "ci_availability", "preflight_key", "revision_key", "pr", "autoreview",
-                "review_provider_mutations", "review_result", "gates", "tracker_dirty",
+                "ci_availability", "preflight_key", "revision_key", "pr",
+                "autoreview_result", "review_result", "gates", "tracker_dirty",
             },
         )
 

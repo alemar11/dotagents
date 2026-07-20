@@ -1,79 +1,52 @@
 # AutoReview Fix Loop
 
-AutoReview authority begins only after atomic implementation baseline
-acceptance and root Goal activation. Baseline-only workers may not reserve an
-action, prepare an attempt, or make a model call.
+AutoReview authority begins only after atomic baseline acceptance and root Goal
+activation. Create a scoped local commit with no pending Git-visible changes,
+then record the exact committed target and revision.
 
-Load before the first AutoReview reservation and again after AutoReview or a
-hosted Codex review returns an accepted finding.
+AutoReview 3.0.0 owns the closed `run-phase` and `reconcile-attempt` operations,
+managed controller envelope validation, protocol/evidence 2.0.0, attempt journal
+2.1.0, phase packet, prompt/model attempt, evidence, and bounded invalid-output
+repair. Implement Feature owns phase/disposition/gate mapping but does not copy
+AutoReview request, result, evidence, or attempt field registries.
 
-Create a scoped local commit with no pending Git-visible changes before push. Record
-`committed-revision-observed` with a stable `review_target_key` for
-repository/base/review scope and a `committed_revision_key` for exact head plus
-canonical reviewed patch. PR identity is separate publication fact: pushing
-the same commit attaches the PR to the existing lineage and never triggers a
-second review.
+Run `ledger-cache controller next`. For `execute-autoreview-phase`, AutoReview
+prepares a request from the selected phase and immutable target/prior evidence/
+hosted obligation. Preparation and validation launch nothing. Immediately
+before the phase, `operation start` must atomically issue the generic started
+receipt after live claim/CAS/task/revision/checkout and exact controller
+equality checks. A second start fails; a controller envelope alone is never
+model authority.
 
-Run the exact `ledger-cache controller next` command from `controller.md`. Its
-`reserve-autoreview-action` template embeds AutoReview's unchanged pure next
-projection and exact reservation event. Apply that event atomically; rerun the
-controller; then pass only its `launch-autoreview-action` envelope plus the
-active ledger reservation to managed AutoReview.
-Workers never choose mode, phase, parent, prompt, or local fallback. AutoReview
-also scans active schema-14 ledgers, so omitting managed flags cannot escape the
-reservation requirement.
+One logical model phase has one primary launch plus only the existing bounded
+invalid-output repair. The append-only attempt journal records `prepared`,
+`model-started`, optional `repair-prepared` and `repair-model-started`, then
+`completed` or `failed`. A disposition phase may complete with zero launches.
+A second invalid output is consumed-failed. After any launch, interruption or
+crash never launches again; `reconcile-attempt` binds the exact original
+request, started receipt, attempt id, complete journal, launch count, target,
+revision, phase, evidence parent/lineage, and hosted obligation. A recovered
+completed attempt returns its exact terminal evidence.
 
-Reservations are generation/state-fingerprint bound, one-use, and have no TTL.
-Release is allowed only before model launch. Attempts append `prepared`, then
-`model-started` only after successful `Popen`, then `completed` or `failed`.
-The ledger keeps that existing lifecycle. AutoReview's external attempt journal
-may additionally record one helper-owned `repair-prepared` and
-`repair-model-started` pair for schema-parse or semantic-invariant output; its
-`model_launch_count` counts both physical launches while evidence still counts
-one logical review phase. The repair changes no reservation, target, phase,
-parent, finding set, bundle, model, search policy, manifest command attempt, or
-worker prompt/path budget. Once either launch starts, process interruption
-cannot relaunch it. A second invalid output consumes the reservation as
-`consumed-failed`, returns `needs-owner`, and the controller refuses a new
-reservation. A valid candidate is quarantined with an immutable operation file;
-the producer runs the real ledger apply path in dry-run mode before handoff.
-Interrupted apply reuses the exact candidate bytes and stable operation id.
+`operation record-result` calls AutoReview's `validate_result_for_request` and
+appends one opaque owner result plus normalized orchestration state. The same
+result is idempotent; a different terminal result for the same start fails
+closed. Terminal clean/composite-clean advances the current-revision AutoReview
+gate, `verification-clean` selects the next owner phase, findings select review
+fix, interruption stays in reconciliation, and consumed failure requires owner
+attention.
 
-Follow AutoReview's `references/evidence-chain.md` on the committed branch.
-Create finding drafts without ids and run AutoReview's `findings prepare`
-operation; it alone validates authoritative finding fields and generates the
-canonical ids. Prepare each supported AutoReview invocation as an
-`execution-manifest` command, then run and verify its receipt before recording
-evidence.
-The manifest's fixed 60-minute outer deadline supervises the AutoReview and
-nested Codex process group only. AutoReview protocol 2.0.0 remains the semantic model-attempt
-authority. On outer timeout, output limit, cancellation, interruption, or
-cleanup failure, reconcile the existing typed attempt. If `model-started` is
-durable, never relaunch or reserve a replacement model call. Manifest liveness
-does not alter that attempt or reset any provider-review deadline.
-Batch accepted fixes, commit a substantive revision, run focused proof,
-then use `fix-verification`; delta rounds have no numeric cap but each must
-advance the head. After first-full fixes reach `verification-clean`, run the
-only `terminal-full`. Later accepted findings, including terminal-full or PR
-review findings, close through delta evidence as `terminal-composite-clean`.
-Never run a third full in one lineage; no revision progress becomes
-`needs-owner`. Record every helper result through `autoreview-observed` using
-the strict packet registry.
-If every open finding is rejected, use AutoReview's no-Codex `disposition`
-phase on the unchanged head instead of inventing a fix revision.
+Follow AutoReview's evidence-chain contract. Fix verification requires a new
+committed head. After first-full fixes reach `verification-clean`, run the only
+`terminal-full`. Later accepted findings close through delta evidence as
+`terminal-composite-clean`. Never run a third full. If every finding is
+rejected, use the no-model `disposition` phase on the unchanged head.
 
-Hosted findings first create one typed obligation bound to the exact GitStack
-request receipt, observation, provider evidence, accepted finding-set artifact,
-prior evidence tip, source committed revision, repository, and PR. Inline
-findings retain their real comment ids; summary-only findings use an empty id
-list. The obligation is consumed exactly once by focused fix verification.
-Repeated hosted finding cycles after `terminal-composite-clean` remain in the
-same lineage.
+Hosted findings remain one typed obligation bound to exact GitStack request,
+provider evidence, accepted finding set, prior evidence tip, source revision,
+repository, and PR. AutoReview alone validates consumption. Merge-base-only
+change preserves lineage only for the same canonical patch and scope; semantic
+target drift still requires explicit owner-authorized lineage reset.
 
-A merge-base SHA change alone does not reset lineage. Preserve continuity only
-when review scope and canonical reviewed patch fingerprint are equivalent.
-Semantic target drift requires `autoreview-lineage-reset-authorized` with
-explicit owner authority bound to the exact prior evidence fingerprint and
-next target/revision keys, then one new initial full. Reparenting, aliases,
-legacy adoption, migration, hand-authored fingerprints, deadline resets, and
-extra full reviews are rejected.
+No AutoReview operation grants provider mutation, merge, enqueue, deploy,
+Goal, task, or worktree authority.

@@ -54,17 +54,12 @@ For a local Markdown issue, move is legal only when its tracker-owning repositor
 and exact active plus derived `done/` paths are already in the Execution Contract and
 exposed by the App-managed checkout.
 
-Give GitStack only exact PR, `review_operation`, and `mutation_mode=apply` for an
-authorized mutation. Before `poll-review`, report tuple/request evidence and
-require root-issued `revision_key`, `wait_started_at`, and `wait_deadline`.
-Before launch set `wait_invoked_at=now`, compute
-`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`, and report both.
-Start GitStack only after the root persists `review-wait-invoked`; that event is
-single-launch authority. Use 10s/30s bounds when positive and one immediate
-no-wait check at zero. Never relaunch, default, or segment it. Bind each result
-to the persisted receipt and exact revision. Binding failure exits 4, not stale
-or timeout-eligible; pending at 45 minutes requires the PR warning and
-`timeout-accepted`.
+Give GitStack only the controller-selected owned operation and immutable
+authority/evidence descriptors. A prepared request is read-only. GitStack may
+launch transport or its waiter only after atomically obtaining the generic
+`owned-operation-started` receipt; a repeated start requires owner
+reconciliation and never relaunches. GitStack owns its exact deadline,
+zero-timeout check, request receipt, result correlation, and warning packet.
 
 ## Provider Text Transport
 
