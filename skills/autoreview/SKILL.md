@@ -186,6 +186,9 @@ scripts/autoreview --mode commit --commit HEAD
 scripts/autoreview --json doctor
 scripts/autoreview --json findings template --finding-source codex-review --output /tmp/autoreview-finding-draft.json
 scripts/autoreview --json findings prepare --input /tmp/autoreview-finding-draft.json --output /tmp/autoreview-findings.json
+scripts/autoreview --json operation prepare --controller-envelope-file /tmp/controller.json --input-file /tmp/autoreview-input.json --request-output /tmp/autoreview-request.json
+scripts/autoreview --json operation execute --request-file /tmp/autoreview-request.json --attempt-file /tmp/autoreview-attempt.jsonl --candidate-output /tmp/autoreview-candidate.json --result-output /tmp/autoreview-result.json
+scripts/autoreview --json operation reconcile --request-file /tmp/autoreview-reconcile-request.json --attempt-file /tmp/autoreview-attempt.jsonl --candidate-output /tmp/autoreview-candidate.json --result-output /tmp/autoreview-result.json
 ```
 
 Useful options:
@@ -201,13 +204,13 @@ Useful options:
 - `--review-phase`, `--prior-evidence`, `--finding-file`, and
   `--evidence-output`: create or continue the committed-branch evidence chain
   documented in `references/evidence-chain.md`.
-- `--reservation-file`, `--attempt-file`, `--candidate-output`, and
-  `--operation-output`: execute the protocol-derived action for a managed
-  Implement Feature checkout. `--reservation-file` must be the complete
-  `launch-autoreview-action` envelope emitted by the typed Implement Feature
-  controller and still match its active ledger reservation. Managed callers
-  cannot select mode, phase,
-  target, prompt, or parent evidence.
+- `operation prepare|validate-request|execute|reconcile|validate-result` is the
+  managed hard-cut surface. AutoReview 3.0.0 owns
+  `autoreview-operation-request:v1` and `autoreview-operation-result:v1`.
+  Preparation and validation are read-only. Execution obtains a generic live
+  started receipt immediately before a model phase; reconciliation reads the
+  same attempt journal and never launches again. Retired managed controller
+  reservation packets are rejected before model launch.
 - `findings template|prepare`: emit a strict draft without caller-generated ids,
   then validate authoritative fields and generate canonical ids locally. These
   operations never call Codex or consume review budget.

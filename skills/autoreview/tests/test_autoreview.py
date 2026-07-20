@@ -1006,7 +1006,7 @@ class AutoreviewContractTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertFalse(run_review.called)
             payload = json.loads(stderr.getvalue())
-            self.assertEqual(payload["error_code"], "managed-reservation-required")
+            self.assertEqual(payload["error_code"], "owned-operation-required")
             self.assertIn("model_call_started=false", payload["error"])
 
     def test_managed_reservation_hard_cuts_legacy_and_open_envelopes(self) -> None:

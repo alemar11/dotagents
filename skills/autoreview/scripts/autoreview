@@ -22,6 +22,16 @@ protocol = importlib.util.module_from_spec(PROTOCOL_SPEC)
 sys.modules[PROTOCOL_SPEC.name] = protocol
 PROTOCOL_SPEC.loader.exec_module(protocol)
 
+OPERATION_PATH = Path(__file__).resolve().with_name("autoreview_operation.py")
+OPERATION_SPEC = importlib.util.spec_from_file_location("dotagents_autoreview_operation", OPERATION_PATH)
+if OPERATION_SPEC is None or OPERATION_SPEC.loader is None:
+    raise RuntimeError(f"cannot load AutoReview operation protocol: {OPERATION_PATH}")
+owned_operation = importlib.util.module_from_spec(OPERATION_SPEC)
+sys.modules[OPERATION_SPEC.name] = owned_operation
+# The operation module imports the canonical public protocol name.
+sys.modules.setdefault("autoreview_protocol", protocol)
+OPERATION_SPEC.loader.exec_module(owned_operation)
+
 VERSION = "3.0.0"
 
 MAX_REVIEW_OUTPUT_BYTES = 128 * 1024
@@ -1911,11 +1921,16 @@ def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
         owner = managed_owner(repo_root())
         if owner is not None:
             raise AutoreviewError(
-                "managed checkout requires a protocol reservation before AutoReview launch; model_call_started=false",
-                code="managed-reservation-required",
-                recovery="run-ledger-cache-controller-next",
+                "managed checkout requires an AutoReview owned-operation request; model_call_started=false",
+                code="owned-operation-required",
+                recovery="prepare-owned-operation",
             )
         return None
+    raise AutoreviewError(
+        "managed controller reservation packets were removed by the AutoReview 3.0.0 hard cut; model_call_started=false",
+        code="reservation-invalid",
+        recovery="prepare-owned-operation",
+    )
     reservation = load_json_file(args.reservation_file, "reservation file")
     required = {
         "ok", "command", "controller_schema_version", "tool_version",
@@ -2138,11 +2153,182 @@ def ledger_apply_events(reservation: dict[str, Any], events: list[dict[str, Any]
         events_path.unlink(missing_ok=True)
 
 
+def operation_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="autoreview operation")
+    sub = parser.add_subparsers(dest="verb", required=True)
+    prepare = sub.add_parser("prepare")
+    prepare.add_argument("--controller-envelope-file", required=True)
+    prepare.add_argument("--input-file", required=True)
+    prepare.add_argument("--request-output", required=True)
+    validate_request_parser = sub.add_parser("validate-request")
+    validate_request_parser.add_argument("--request-file", required=True)
+    validate_result_parser = sub.add_parser("validate-result")
+    validate_result_parser.add_argument("--request-file", required=True)
+    validate_result_parser.add_argument("--result-file", required=True)
+    for verb in ("execute", "reconcile"):
+        child = sub.add_parser(verb)
+        child.add_argument("--request-file", required=True)
+        child.add_argument("--attempt-file", required=True)
+        child.add_argument("--candidate-output", required=True)
+        child.add_argument("--result-output", required=True)
+    return parser
+
+
+def _operation_json(path_value: str, label: str) -> dict[str, Any]:
+    path = Path(path_value)
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise AutoreviewError(f"{label} must be an absolute regular file", code="operation-invalid", recovery="regenerate-operation")
+    return load_json_file(path_value, label)
+
+
+def _write_operation_json(path_value: str, value: dict[str, Any]) -> None:
+    path = Path(path_value)
+    if not path.is_absolute() or path.is_symlink():
+        raise AutoreviewError("operation output must be an absolute non-symlink path", code="operation-invalid", recovery="use-absolute-output")
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+
+
+def _operation_bridge(request_file: str, request: dict[str, Any], command: str) -> dict[str, Any]:
+    bridge = Path(__file__).resolve().parents[2] / "implement-feature/scripts/ledger-cache"
+    if not bridge.is_file() or bridge.is_symlink() or not os.access(bridge, os.X_OK):
+        raise AutoreviewError("installation-owned operation bridge is unavailable", code="operation-authority-unavailable", recovery="needs-owner")
+    call = [str(bridge), "--json", "operation", command, "--owner", "autoreview", "--request-file", request_file, "--ledger", request["authority"]["ledger"]]
+    result = subprocess.run(call, text=True, capture_output=True)
+    try:
+        payload = json.loads(result.stdout) if result.stdout else None
+    except json.JSONDecodeError as exc:
+        raise AutoreviewError("operation bridge returned invalid output", code="operation-authority-invalid", recovery="needs-owner") from exc
+    if result.returncode or not isinstance(payload, dict) or payload.get("ok") is not True:
+        raise AutoreviewError("operation bridge rejected the request", code="operation-authority-rejected", recovery="derive-next-action-again")
+    receipt_value = payload.get("data", payload).get("start_receipt")
+    try:
+        receipt_request = request if request["operation"] == "run-phase" else owned_operation.validate_started_operation(request["started_operation"])["request"]
+        return owned_operation.validate_start_receipt(receipt_value, receipt_request)
+    except owned_operation.OperationError as exc:
+        raise AutoreviewError(str(exc), code="operation-authority-invalid", recovery="needs-owner") from exc
+
+
+def _operation_attempt_facts(attempt_file: str, evidence_value: dict[str, Any] | None) -> dict[str, Any]:
+    records = load_attempt_journal(Path(attempt_file))
+    if not records:
+        raise AutoreviewError("attempt journal is empty", code="operation-attempt-invalid", recovery="needs-owner")
+    last = records[-1]
+    return {
+        "attempt_id": last["attempt_id"],
+        "model_call_started": bool(last["model_call_started"]),
+        "model_launch_count": int(last["model_launch_count"]),
+        "candidate_fingerprint": last.get("candidate_fingerprint"),
+        "evidence": evidence_value,
+        "attempt_journal": records,
+        "attempt_journal_fingerprint": protocol.fingerprint(records),
+    }
+
+
+def run_operation_command(raw: list[str]) -> int:
+    json_mode = "--json" in raw
+    args = operation_parser().parse_args([item for item in raw[1:] if item != "--json"])
+    try:
+        if args.verb == "prepare":
+            controller = _operation_json(args.controller_envelope_file, "controller envelope")
+            supplied = _operation_json(args.input_file, "operation input")
+            if set(supplied) != {"target", "prior_evidence", "hosted_obligation", "orchestration_descriptor", "lineage_reset_authority", "requested_phase", "started_operation"}:
+                raise AutoreviewError("operation input field set is invalid", code="operation-invalid", recovery="regenerate-operation")
+            descriptor = ((controller.get("packet_template") or {}).get("operation") or {})
+            request = owned_operation.build_request(
+                operation=str(descriptor.get("name") or ""), controller_envelope=controller,
+                target=supplied["target"], prior_evidence=supplied["prior_evidence"],
+                hosted_obligation=supplied["hosted_obligation"],
+                orchestration_descriptor=supplied["orchestration_descriptor"],
+                lineage_reset_authority=supplied["lineage_reset_authority"],
+                requested_phase=supplied["requested_phase"],
+                started_operation=supplied["started_operation"],
+            )
+            _write_operation_json(args.request_output, request)
+            payload = {"ok": True, "command": "operation.prepare", "request_file": args.request_output, "request_fingerprint": request["request_fingerprint"]}
+        elif args.verb == "validate-request":
+            request = owned_operation.validate_request(_operation_json(args.request_file, "operation request"))
+            payload = {"ok": True, "command": "operation.validate-request", "request_fingerprint": request["request_fingerprint"], "validation_descriptor": owned_operation.validation_descriptor(request)}
+        elif args.verb == "validate-result":
+            request = owned_operation.validate_request(_operation_json(args.request_file, "operation request"))
+            result = owned_operation.validate_result_for_request(_operation_json(args.result_file, "operation result"), request)
+            payload = {"ok": True, "command": "operation.validate-result", "result_fingerprint": result["result_fingerprint"], "validation_descriptor": owned_operation.validation_descriptor(request, result)}
+        else:
+            request = owned_operation.validate_request(_operation_json(args.request_file, "operation request"))
+            if (args.verb == "execute") != (request["operation"] == "run-phase"):
+                raise AutoreviewError("operation verb does not match request", code="operation-invalid", recovery="regenerate-operation")
+            start = _operation_bridge(args.request_file, request, "start" if args.verb == "execute" else "read-start")
+            attempt_path = Path(args.attempt_file)
+            if not attempt_path.is_absolute() or attempt_path.is_symlink():
+                raise AutoreviewError("attempt file must be absolute", code="operation-invalid", recovery="use-absolute-output")
+            if args.verb == "reconcile":
+                records = load_attempt_journal(attempt_path)
+                started = owned_operation.validate_started_operation(request["started_operation"])
+                if records != started["attempt_journal"]:
+                    raise AutoreviewError("attempt journal differs from reconciliation request", code="operation-attempt-invalid", recovery="derive-next-action-again")
+                last = records[-1]
+                evidence_value = _operation_json(args.candidate_output, "candidate evidence") if Path(args.candidate_output).is_file() else None
+                outcome = evidence_value["terminal_state"] if last["state"] == "completed" and evidence_value is not None else ("consumed-failed" if last["state"] == "failed" else "interrupted")
+                status = "completed" if outcome in protocol.TERMINAL_STATES else {"consumed-failed": "failed", "interrupted": "blocked"}[outcome]
+            else:
+                attempt_id = protocol.fingerprint({"operation_id": request["operation_id"], "request_fingerprint": request["request_fingerprint"], "start_receipt_fingerprint": start["receipt_fingerprint"]})
+                append_attempt(args.attempt_file, attempt_record(transition="prepared", attempt_id=attempt_id, reservation_id=start["receipt_fingerprint"], model_launch_count=0), create=True)
+                review_args = parse_args([])
+                packet = request["phase_projection"]["packet"]
+                review_args.mode = packet["mode"]
+                review_args.review_phase = packet["action"]
+                review_args.base = packet["target"]["base_ref"]
+                review_args.evidence_output = args.candidate_output
+                review_args._managed_prior = request["prior_evidence"]
+                review_args._managed_obligation = request["hosted_obligation"]
+                review_args._managed_target = packet["target"]
+                review_args._resolved_model = configured_codex_model()
+                launches = 0
+                def started(pid: int) -> None:
+                    nonlocal launches
+                    launches = 1
+                    append_attempt(args.attempt_file, attempt_record(transition="model-started", attempt_id=attempt_id, reservation_id=start["receipt_fingerprint"], model_launch_count=1, pid=pid, prompt_fingerprint=review_args._active_prompt_fingerprint))
+                def repair_prepare(exc: ReviewOutputError, _original: str, repair: str) -> None:
+                    append_attempt(args.attempt_file, attempt_record(transition="repair-prepared", attempt_id=attempt_id, reservation_id=start["receipt_fingerprint"], model_launch_count=1, invalid_output=invalid_output_record(review_args, exc, f"{attempt_path}#repair"), prompt_fingerprint=sha256_text(repair)))
+                def repair_started(pid: int) -> None:
+                    nonlocal launches
+                    launches = 2
+                    append_attempt(args.attempt_file, attempt_record(transition="repair-model-started", attempt_id=attempt_id, reservation_id=start["receipt_fingerprint"], model_launch_count=2, pid=pid, prompt_fingerprint=review_args._active_prompt_fingerprint))
+                review_args._on_model_started = started
+                review_args._prepare_invalid_output_repair = repair_prepare
+                review_args._start_invalid_output_repair = repair_started
+                review_args._validate_invalid_output_repair = lambda _prompt, _schema: None
+                try:
+                    run_review(review_args)
+                    evidence_value = validate_evidence(_operation_json(args.candidate_output, "candidate evidence"))
+                    candidate_fp = evidence_value["evidence_fingerprint"]
+                    append_attempt(args.attempt_file, attempt_record(transition="completed", attempt_id=attempt_id, reservation_id=start["receipt_fingerprint"], model_launch_count=launches, candidate_fingerprint=candidate_fp, operation_id=request["operation_id"]))
+                    outcome, status = evidence_value["terminal_state"], "completed"
+                except BaseException:
+                    records = load_attempt_journal(attempt_path)
+                    if records[-1]["state"] not in {"completed", "failed"}:
+                        append_attempt(args.attempt_file, attempt_record(transition="failed", attempt_id=attempt_id, reservation_id=start["receipt_fingerprint"], model_launch_count=launches))
+                    evidence_value = None
+                    outcome, status = "failed", "failed"
+            facts = _operation_attempt_facts(args.attempt_file, evidence_value)
+            result = owned_operation.build_result(request=request, start_receipt=start, status=status, outcome=outcome, facts=facts, evidence_ref=f"autoreview-operation://{request['operation_id']}")
+            owned_operation.validate_result_for_request(result, request)
+            _write_operation_json(args.result_output, result)
+            payload = {"ok": True, "command": f"operation.{args.verb}", "result_file": args.result_output, "result_fingerprint": result["result_fingerprint"], "outcome": outcome}
+        print(json.dumps(payload, indent=2, sort_keys=True) if json_mode else payload)
+        return 0
+    except (AutoreviewError, owned_operation.OperationError, protocol.ProtocolError) as exc:
+        error = {"ok": False, "error": str(exc), "error_code": getattr(exc, "code", "operation-invalid"), "recovery": getattr(exc, "recovery", "needs-owner")}
+        print(json.dumps(error, indent=2, sort_keys=True), file=sys.stderr)
+        return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     raw_argv = argv or sys.argv[1:]
     positional_probe = [item for item in raw_argv if item != "--json"]
     if positional_probe and positional_probe[0] == "findings":
         return run_findings_command(raw_argv)
+    if positional_probe and positional_probe[0] == "operation":
+        return run_operation_command(raw_argv)
     args = parse_args(raw_argv)
     if args.version:
         print(f"autoreview {VERSION}")
