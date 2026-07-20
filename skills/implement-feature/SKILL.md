@@ -7,9 +7,9 @@ description: Execute ready Feature Spec bundles in visible ChatGPT desktop app t
 
 ## Purpose
 
-Use this Codex-dependent skill only when the owner explicitly invokes $implement-feature
-in the ChatGPT desktop app. It is the single App-only implementation adapter:
-it never plans, repairs planning artifacts, or invokes another orchestrator.
+Use this skill only when the owner explicitly invokes $implement-feature in the
+ChatGPT desktop app. It is the single App-only implementation adapter and never
+plans or repairs planning artifacts.
 
 The root owns intake, the active-root claim, typed run state,
 review deadlines, reconciliation, and final status. Exactly one visible App task
@@ -59,14 +59,14 @@ merge, release, or deployment.
 - Success means real `OPEN`, non-draft, conflict-free pull requests against each
   repository's discovered default branch, at their current heads, with mandatory
   terminal `$autoreview`, Codex review, CI, integration, tracker-closeout,
-  mergeability,
-  approval, update, and merge-queue eligibility gates satisfied. Unknown or
-  pending evidence blocks except the exact evidenced 45-minute
-  `timeout-accepted` review result. Never enqueue or merge.
+  mergeability, approval, update, and merge-queue eligibility gates satisfied.
+  Unknown or pending evidence blocks except exact 45-minute `timeout-accepted`.
+  Never enqueue or merge.
 - Every terminal PR targets its discovered default branch; the base is derived
   and verified, never selected by the user or source. A draft is only a vehicle;
-  convert it to ready-for-review after substantive proof and terminal `$autoreview`, before
-  current-revision review and CI. This transition is not the terminal result.
+  convert it to ready-for-review after substantive proof and terminal
+  `$autoreview`, before current-revision review and CI. This transition is not
+  the terminal result.
 - Use only App-managed worktrees. Never create raw Git worktrees, rotate the
   caller checkout, or implement in the root or a background worker.
 - Create exactly one visible task per Feature Spec, including a multi-repository
@@ -86,10 +86,9 @@ merge, release, or deployment.
 ## Execution-Ready Intake
 
 After authorization, load `references/spec-backed-delivery.md` and take one
-read-only snapshot of the durable Spec/issue graph. Derive and
-preflight its deliveries, then reuse the exact bytes for intake and
-fingerprinting. On proven drift, discard/refetch and rerun preflight before
-CLAIM.
+read-only snapshot of the durable Spec/issue graph. Derive/preflight deliveries and reuse
+the exact bytes for intake and fingerprinting. Proven drift requires refetch
+and preflight before CLAIM.
 That reference canonically owns accepted fields, graph rules, fingerprints,
 scope, local-tracker paths, cross-Spec dependencies, integration partials,
 domain-knowledge closeout, and rejected legacy fields. Load
@@ -118,19 +117,18 @@ Goal, task, tracker write, or source mutation was created.
 0. **SURFACE** — prove the required App and Goal surfaces; reject a blocked root
    Goal as `new-root-required`.
 1. **AUTHORIZE** — verify the model policy and obtain the fixed-flow grant.
-2. **SNAPSHOT** — acquire the complete bundle once, retain it only as temporary
-   data; prepare its canonical bundle and derive the delivery set.
+2. **SNAPSHOT** — acquire the complete bundle once as temporary data; prepare
+   its canonical bundle and delivery set.
 3. **DELIVERY-PREFLIGHT** — with `references/execution-manifest.md`,
    prepare/run/verify `delivery-preflight` manifest. Require GitHub push/PR
    access, read access to PR lifecycle,
    mergeability/conflicts, and policy visibility; classify CI as `configured`
    or `not-configured`. Unknown or blocked capability returns
    `delivery-preflight-failed` with zero artifacts. `not-configured` is valid.
-4. **INTAKE** — validate and fingerprint the complete saved snapshot; resolve each task
-   profile and require its final delivery set to equal the preflight set exactly.
-   Convert verified GitHub `owner/repository#N` refs to
-   `https://github.com/owner/repository/issues/N`; use the URL as the claim/task source id while
-   preserving the authored ref as evidence.
+4. **INTAKE** — validate/fingerprint the snapshot; resolve profiles and require
+   deliveries equal preflight. Convert verified GitHub `owner/repository#N` to
+   `https://github.com/owner/repository/issues/N`; use the URL as the claim/task
+   source id while preserving the authored ref as evidence.
 5. **CLAIM** — load `references/run-state.md`; run
    `scripts/active-root-claim --json doctor`; canonicalize repositories and
    sources; acquire before any other artifact. Qualify local refs as
@@ -139,28 +137,24 @@ Goal, task, tracker write, or source mutation was created.
 6. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
    and fixed 180-day prune once in the root. Warnings are nonblocking.
 7. **REGISTER** — call `ledger create` with authorization/sources, complete Spec
-   registry, one delivery per affected repository, its validated preflight
-   fingerprint and CI availability, freshly derived current-contract portfolio objective, and
-   `portfolio_goal_state=pending`;
-   persist `root_task_title`, then set and observe the calling task title. Only
-   then reconcile with `get_goal`; otherwise call `create_goal`. Persist active
-   evidence. Never set `token_budget`.
+   registry, repository deliveries, preflight/CI, fresh portfolio objective,
+   and `portfolio_goal_state=pending`; persist `root_task_title`, then set and
+   observe the calling task title. Reconcile with `get_goal`; otherwise call
+   `create_goal`. Persist active evidence. Never set `token_budget`.
 8. **DISPATCH** — load `references/worker.md`; choose the deterministic static
    ready set; adopt/create one managed task per Spec with its profile; observe
    title, Goal tools/objective, and complete delivery checkout map before
    advancing beyond `created`.
-9. **MONITOR** — take one full task snapshot after dispatch, then consume compact
-   deltas until a material transition, attention request, claim-heartbeat
-   deadline or hard workflow deadline. Steer precise corrections with the
-   recorded profile. Never pull implementation or review into the root.
+9. **MONITOR** — after one full post-dispatch snapshot, consume compact deltas
+   until material transition, attention, heartbeat, or workflow deadline. Steer
+   with the recorded profile; never pull worker work into root.
 10. **GATE** — load `references/gates.md` and
    `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
    scope.
-11. **RECONCILE** — read the smallest `ledger-cache ledger read` projection,
-    refresh only changed external evidence, and atomically apply the resulting
-    events; dispatch another wave, reconcile the one fixed review wait, or
-    advance one staged terminal closeout transition.
+11. **RECONCILE** — read the smallest ledger projection, refresh changed external
+    evidence, atomically apply events, then dispatch, reconcile the fixed review
+    wait, or advance one staged closeout transition.
 
 An unchanged controller observation timeout performs only a required claim
 heartbeat. It creates no run-state event or no-progress record. Use a full task
@@ -246,13 +240,12 @@ ready-for-review, obtain current-revision review, then configured CI or explicit
 `not-configured` terminal revalidation, and terminal proof.
 Hosted and local issues remain open until a later default-branch merge.
 
-For pre-CLAIM aborts, report the evidence and zero-mutation result. Otherwise
-return run-state-derived source fingerprints, title, task/Goal and checkout proof,
-changes, validation, commits, PR URLs, reviewed revisions, CI availability and
-configured-CI results, captured
-domain-closeout evidence, prepared tracker closeout, current-head mergeability
-and repository-rule evidence, review-timeout warnings, blockers, recovery
-freshness, and next action.
+For pre-CLAIM aborts, report evidence and zero mutation. Otherwise return
+run-state-derived source/title/task/Goal/checkout proof, changes, validation,
+commits, PRs/revisions, CI, domain/tracker closeout, current-head mergeability
+and repository-rule evidence, captured domain-closeout evidence, review
+warnings, blockers, recovery freshness,
+and next action.
 
 After root-title revalidation, close out only in this order:
 `task-terminal-sealed`, worker Goal/readback, `task-goal-completed`,
@@ -269,6 +262,7 @@ Post-terminal drift blocks archive and never reopens Goals or implementation.
 
 ## Reference Routing
 
-Use the predicates. `run-state.md` owns commands, projections, and transitions;
+`run-state.md` owns commands, projections, and transitions;
 `run-state-packets.md` owns event fields before writes; `execution-manifest.md`
 owns bundles plus supported command manifests and receipts.
+Load `review-thread-resolution.md` only for inline finding ids or stored receipts.

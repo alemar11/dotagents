@@ -1259,7 +1259,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "9.0.0"', helper)
+        self.assertIn('__version__ = "10.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         for removed in (
             "references/ledger.md",
@@ -1270,14 +1270,14 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_v5_event_packet_registry_matches_the_v8_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v10_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "9.0.0"',
-            'LEDGER_SCHEMA_VERSION = "6.0.0"',
+            '__version__ = "10.0.0"',
+            'LEDGER_SCHEMA_VERSION = "7.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "4.0.0"',
         ):
             self.assertIn(constant, helper)
@@ -1287,7 +1287,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `6.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `7.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -2046,10 +2046,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
             98_449,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
-        # The typed request receipt adds 49 bytes to each clean-HEAD path:
-        # successful 98,385 -> 98,434; with manifest 105,693 -> 105,742;
-        # multi-repository 102,434 -> 102,483. Each ceiling keeps 15 bytes of
-        # explicit headroom; do not loosen these ceilings for the handshake.
+        # Typed thread resolution stays branch-loaded: the normal successful,
+        # manifest, and multi-repository paths remain within their existing
+        # ceilings at 98,309, 105,617, and 102,358 bytes respectively.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
             105_757,
@@ -2104,8 +2103,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIsNotNone(prompt_match)
         assert prompt_match is not None
         prompt = prompt_match.group(1)
-        # The receipt-bound wording stays within the existing prompt path:
-        # 1,698 -> 1,699 characters.
+        # Typed thread resolution remains behind a reference; the worker prompt
+        # stays at 1,699 characters.
         baseline_characters = 1704
         self.assertLessEqual(len(prompt), baseline_characters)
         self.assertNotIn("scripts/autoreview --", prompt)

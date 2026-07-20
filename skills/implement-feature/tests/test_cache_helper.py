@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV9Tests(unittest.TestCase):
+class LedgerCacheV10Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -577,6 +577,69 @@ class LedgerCacheV9Tests(unittest.TestCase):
             "status": status,
         }
 
+    def review_reply_receipt(
+        self,
+        finding_revision: dict,
+        reply_revision: dict,
+        *,
+        finding_comment_id: int = 55,
+        reply_comment_id: int = 56,
+    ) -> dict:
+        receipt = {
+            "schema": "gitstack-review-thread-reply:v1",
+            "repository": "example/dotagents",
+            "pr_number": 233,
+            "finding_head_sha": finding_revision["head_sha"],
+            "reply_head_sha": reply_revision["head_sha"],
+            "thread_id": "PRRT_thread_55",
+            "finding_comment_id": finding_comment_id,
+            "finding_node_id": "PRRC_finding_55",
+            "finding_ref": f"https://github.com/example/dotagents/pull/233#discussion_r{finding_comment_id}",
+            "finding_created_at": "2026-07-18T12:01:00Z",
+            "reply_comment_id": reply_comment_id,
+            "reply_node_id": "PRRC_reply_56",
+            "reply_author": "agent",
+            "reply_ref": f"https://github.com/example/dotagents/pull/233#discussion_r{reply_comment_id}",
+            "reply_created_at": "2026-07-18T13:01:00Z",
+            "body_fingerprint": hashlib.sha256(b"fixed with focused proof").hexdigest(),
+            "identity_fingerprint": "",
+            "status": "replied",
+        }
+        identity = {
+            name: receipt[name]
+            for name in receipt
+            if name not in {"identity_fingerprint", "status"}
+        }
+        receipt["identity_fingerprint"] = CACHE_RUNTIME.request_fingerprint(identity)
+        return receipt
+
+    def review_resolution_receipt(
+        self, reply_receipt: dict, *, status: str = "resolved"
+    ) -> dict:
+        receipt = {
+            "schema": "gitstack-review-thread-resolution:v1",
+            "repository": reply_receipt["repository"],
+            "pr_number": reply_receipt["pr_number"],
+            "head_sha": reply_receipt["reply_head_sha"],
+            "thread_id": reply_receipt["thread_id"],
+            "finding_comment_id": reply_receipt["finding_comment_id"],
+            "finding_node_id": reply_receipt["finding_node_id"],
+            "reply_comment_id": reply_receipt["reply_comment_id"],
+            "reply_node_id": reply_receipt["reply_node_id"],
+            "reply_identity_fingerprint": reply_receipt["identity_fingerprint"],
+            "resolution_fingerprint": "",
+            "is_resolved": True,
+            "observed_at": "2026-07-18T13:02:00Z",
+            "status": status,
+        }
+        identity = {
+            name: receipt[name]
+            for name in receipt
+            if name not in {"resolution_fingerprint", "is_resolved", "observed_at", "status"}
+        }
+        receipt["resolution_fingerprint"] = CACHE_RUNTIME.request_fingerprint(identity)
+        return receipt
+
     def observe_delivery(self, revision: dict, *, ready: bool = True) -> None:
         pr = self.pr_for(revision)
         if not ready:
@@ -635,6 +698,8 @@ class LedgerCacheV9Tests(unittest.TestCase):
                         b"clean-review"
                     ).hexdigest(),
                     "disposition": "accepted",
+                    "finding_count": 0,
+                    "finding_comment_ids": [],
                     "evidence_ref": "github-review://233/clean",
                     "warning_ref": None,
                     "warning_posted_at": None,
@@ -825,12 +890,12 @@ class LedgerCacheV9Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v8_offline_and_read_only(self) -> None:
+    def test_doctor_is_v10_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "9.0.0")
+        self.assertEqual(version, "10.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1429,6 +1494,8 @@ class LedgerCacheV9Tests(unittest.TestCase):
             "provider_state": "waiting",
             "observation_fingerprint": hashlib.sha256(b"pending-timeout").hexdigest(),
             "disposition": "timeout-accepted",
+            "finding_count": 0,
+            "finding_comment_ids": [],
             "evidence_ref": "github-review://233/pending",
             "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9010",
             "warning_posted_at": review["wait_deadline"],
@@ -1696,6 +1763,8 @@ class LedgerCacheV9Tests(unittest.TestCase):
             "provider_state": "failed",
             "observation_fingerprint": hashlib.sha256(b"failed").hexdigest(),
             "disposition": "accepted",
+            "finding_count": 0,
+            "finding_comment_ids": [],
             "evidence_ref": "github-review://233/failed",
             "warning_ref": None,
             "warning_posted_at": None,
@@ -1751,6 +1820,138 @@ class LedgerCacheV9Tests(unittest.TestCase):
         CACHE_RUNTIME.validate_state(state, self.ledger)
         self.assertTrue(CACHE_RUNTIME.review_is_accepted(state["reviews"][-1]))
         self.assertEqual(CACHE_RUNTIME.review_warnings(state), [])
+
+    def test_typed_thread_resolution_is_exact_idempotent_and_required_only_for_inline_findings(self) -> None:
+        self.bootstrap_active_task()
+        finding_revision = self.observe_revision(head="a" * 40)
+        self.apply([self.task_event(state="review-polling")])
+        request_receipt = self.request_receipt(finding_revision, request_key="run-findings")
+        self.apply([
+            {
+                "type": "review-wait-started",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": finding_revision["revision_key"],
+                "request_receipt": request_receipt,
+            }
+        ])
+        review = self.state()["reviews"][-1]
+        self.apply([
+            {
+                "type": "review-wait-invoked",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": finding_revision["revision_key"],
+                "request_receipt": request_receipt,
+                "wait_invoked_at": review["wait_started_at"],
+                "provider_timeout": 2700,
+            },
+            {
+                "type": "review-observed",
+                "task_key": self.task_key,
+                "delivery_key": "dotagents",
+                "revision_key": finding_revision["revision_key"],
+                "request_receipt": request_receipt,
+                "request_binding": "recognized",
+                "provider_state": "findings",
+                "observation_fingerprint": hashlib.sha256(b"one-inline-finding").hexdigest(),
+                "disposition": "fix-required",
+                "finding_count": 1,
+                "finding_comment_ids": [55],
+                "evidence_ref": "github-review://233/finding/55",
+                "warning_ref": None,
+                "warning_posted_at": None,
+                "warning_fingerprint": None,
+            },
+        ])
+        fixed_revision = self.observe_revision(head="c" * 40)
+        reply = self.review_reply_receipt(finding_revision, fixed_revision)
+        resolution = self.review_resolution_receipt(reply, status="already-resolved")
+        event = {
+            "type": "review-thread-resolved",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "finding_revision_key": finding_revision["revision_key"],
+            "resolution_revision_key": fixed_revision["revision_key"],
+            "reply_receipt": reply,
+            "resolution_receipt": resolution,
+        }
+        state = self.state()
+        task = state["tasks"][0]
+        delivery = task["deliveries"][0]
+        self.assertEqual(CACHE_RUNTIME.unresolved_finding_comment_ids(state, task, delivery), [55])
+        self.direct_event(state, event, datetime(2026, 7, 18, 13, 2, tzinfo=timezone.utc))
+        self.assertEqual(CACHE_RUNTIME.unresolved_finding_comment_ids(state, task, delivery), [])
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        CACHE_RUNTIME.validate_state(state, self.ledger)
+        self.assertFalse(
+            CACHE_RUNTIME.apply_event(
+                state, event, datetime(2026, 7, 18, 13, 3, tzinfo=timezone.utc)
+            )
+        )
+
+        stale = {**event, "resolution_revision_key": finding_revision["revision_key"]}
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "resolution revision is stale"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(self.state()), stale, datetime(2026, 7, 18, 13, 3, tzinfo=timezone.utc)
+            )
+        wrong_pr_reply = {**reply, "pr_number": 999}
+        wrong_pr_reply["finding_ref"] = "https://github.com/example/dotagents/pull/999#discussion_r55"
+        wrong_pr_reply["reply_ref"] = "https://github.com/example/dotagents/pull/999#discussion_r56"
+        wrong_pr_reply["identity_fingerprint"] = CACHE_RUNTIME.request_fingerprint({
+            name: wrong_pr_reply[name]
+            for name in wrong_pr_reply
+            if name not in {"identity_fingerprint", "status"}
+        })
+        wrong_pr = {
+            **event,
+            "reply_receipt": wrong_pr_reply,
+            "resolution_receipt": self.review_resolution_receipt(wrong_pr_reply),
+        }
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "pr_number does not match review state"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(self.state()), wrong_pr, datetime(2026, 7, 18, 13, 3, tzinfo=timezone.utc)
+            )
+        missing_reply = dict(event)
+        missing_reply.pop("reply_receipt")
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "schema is invalid"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(self.state()), missing_reply, datetime(2026, 7, 18, 13, 3, tzinfo=timezone.utc)
+            )
+
+    def test_findings_without_inline_comment_ids_require_fix_but_no_resolution_receipt(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.apply([self.task_event(state="review-polling")])
+        request_receipt = self.request_receipt(revision, request_key="provider-comment-findings")
+        self.apply([{
+            "type": "review-wait-started", "task_key": self.task_key,
+            "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+            "request_receipt": request_receipt,
+        }])
+        review = self.state()["reviews"][-1]
+        self.apply([
+            {
+                "type": "review-wait-invoked", "task_key": self.task_key,
+                "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+                "request_receipt": request_receipt, "wait_invoked_at": review["wait_started_at"],
+                "provider_timeout": 2700,
+            },
+            {
+                "type": "review-observed", "task_key": self.task_key,
+                "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+                "request_receipt": request_receipt, "request_binding": "recognized",
+                "provider_state": "findings", "observation_fingerprint": "d" * 64,
+                "disposition": "fix-required", "finding_count": 0,
+                "finding_comment_ids": [], "evidence_ref": "github-review://233/provider-comment",
+                "warning_ref": None, "warning_posted_at": None, "warning_fingerprint": None,
+            },
+        ])
+        state = self.state()
+        task = state["tasks"][0]
+        delivery = task["deliveries"][0]
+        self.assertEqual(CACHE_RUNTIME.unresolved_finding_comment_ids(state, task, delivery), [])
+        self.assertFalse(CACHE_RUNTIME.review_is_accepted(state["reviews"][-1]))
 
     def test_unbound_request_cannot_be_timeout_accepted(self) -> None:
         self.bootstrap_active_task()
@@ -1822,6 +2023,8 @@ class LedgerCacheV9Tests(unittest.TestCase):
                 "provider_state": "waiting",
                 "observation_fingerprint": hashlib.sha256(b"late-pending").hexdigest(),
                 "disposition": "timeout-accepted",
+                "finding_count": 0,
+                "finding_comment_ids": [],
                 "evidence_ref": "github-review://233/late-pending",
                 "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9002",
                 "warning_posted_at": "2026-07-18T12:50:00Z",

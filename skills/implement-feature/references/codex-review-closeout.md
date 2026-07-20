@@ -3,7 +3,8 @@
 ## Ownership
 
 The visible Feature Spec task owns every delivery's review request, wait,
-feedback fixes, configured CI, tracker-closeout preparation, ready-for-review transition,
+feedback fixes, evidence replies, typed thread resolution, configured CI,
+tracker-closeout preparation, ready-for-review transition,
 and terminal proof. The root issues immutable timing assignments, reconciles
 typed evidence, and independently verifies closeout; it never takes worker work
 back as a fallback.
@@ -15,7 +16,7 @@ PR number and URL, head SHA, base ref, and merge-base SHA tuple. Establish the
 tuple through `revision-observed`, bind its lifecycle through
 `delivery-observed`, and apply the result through delivery-keyed
 `review-observed`. Reuse a result only when the entire tuple matches and every
-finding is dispositioned. The review request is mandatory and has no skip
+addressable inline finding is dispositioned. The review request is mandatory and has no skip
 value. Only an exact request that remains pending through its fixed deadline may
 use the explicit timeout-accepted outcome below.
 
@@ -30,7 +31,9 @@ Actionable findings return to fix, focused validation, AutoReview's
 never add a full review to the lineage. A head, base, merge base, PR identity,
 material diff, repository-rule, tracker delivery, evidence-target, or relevant
 documentation change invalidates affected delivery-revision gates and the
-complete task-revision-set gates. Resolve review threads only after fix proof.
+complete task-revision-set gates. Resolve only addressable review threads after
+fix proof and an exact evidence reply. V1 does not resolve no-change
+dispositions.
 
 Before terminal sealing, require every delivery PR lifecycle `OPEN`, exact
 non-draft identity, conflict-free GitHub mergeability, required base freshness,
@@ -57,7 +60,7 @@ full head and caller-supplied `request_key`. It owns the strict canonical
 provider body, current-head preflight, one POST, one read-only recovery, and
 complete receipt. Apply `review-wait-started` with it before invoking the
 identity-bound waiter; the event persists it, and the waiter fetches the
-that comment.
+exact comment.
 Unbound, invalid, ambiguous, or unknown binding is exit 4 and never authorizes
 a repost or timeout. API, authentication, or configuration uncertainty never
 authorizes another request.

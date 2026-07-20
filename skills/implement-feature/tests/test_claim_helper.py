@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV9Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV10Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -178,7 +178,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_goal_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV9Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV10Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)

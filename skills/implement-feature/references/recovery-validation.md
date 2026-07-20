@@ -120,7 +120,15 @@ object/read-back as partial success, and never retry an ambiguous write. A
 connector mutation is byte-verified only after an exact-target read-back.
 
 Recompute the exact delivery revision before review work. Reuse a result only
-for that tuple with all findings dispositioned. Preserve an existing request's
+for that tuple with all addressable findings dispositioned. Re-read stored
+`finding_count` and `finding_comment_ids`; require equal cardinality. A
+fix-required result with zero ids needs a fresh fix revision and review but no
+thread receipt. For every nonzero id, preserve and revalidate the exact
+GitStack reply and resolution receipts against their finding and resolution
+revisions. Missing, conflicting, wrong-target, or stale receipts block; do not
+replace them with raw GraphQL or a no-change disposition. A GitStack result
+with `mutation_may_have_applied=true` remains blocked and is never retried.
+Preserve an existing request's
 original `wait_started_at` and deadline. Persist its single invocation before
 the provider call with `max(0,floor(deadline-wait_invoked_at))`; zero is one immediate
 check. A recorded invocation is never relaunched. Accept observations only for

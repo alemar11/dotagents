@@ -114,8 +114,9 @@ For every GitStack provider-text mutation other than the typed review request:
    proof.
 
 Use `reviews request --request-key` for Codex; it owns the body and receipt. Use
-`reviews comment`, one-target `reviews reply`, `reviews edit-comment`, and
-`reviews submit-review` for their matching operations. `reviews address` is
+`reviews comment`, exact-head one-target `reviews reply`, receipt-bound
+`reviews resolve`, `reviews edit-comment`, and `reviews submit-review` for their
+matching operations. `reviews address` is
 read-only. Open a new PR with `publish open --title-file --body-file`; existing
 PR text edits require the structured GitHub connector because GitStack has no
 `publish edit` command. Issue and release text follows the GitStack skill's

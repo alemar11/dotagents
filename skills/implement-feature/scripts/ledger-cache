@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "9.0.0"
-LEDGER_SCHEMA_VERSION = "6.0.0"
+__version__ = "10.0.0"
+LEDGER_SCHEMA_VERSION = "7.0.0"
 REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -110,6 +110,7 @@ EVENT_TYPES = {
     "review-wait-started",
     "review-wait-invoked",
     "review-observed",
+    "review-thread-resolved",
     "autoreview-observed",
     "gate-observed",
     "task-terminal-sealed",
@@ -144,6 +145,11 @@ REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"
 REVIEW_REQUEST_BINDINGS = {"recognized", "unbound", "invalid", "unknown", "ambiguous"}
 REQUEST_RECEIPT_SCHEMA = "gitstack-codex-review-request:v1"
 REQUEST_RECEIPT_STATUSES = {"posted", "recovered", "reused"}
+REVIEW_REPLY_RECEIPT_SCHEMA = "gitstack-review-thread-reply:v1"
+REVIEW_REPLY_RECEIPT_STATUSES = {"replied", "recovered"}
+REVIEW_RESOLUTION_RECEIPT_SCHEMA = "gitstack-review-thread-resolution:v1"
+REVIEW_RESOLUTION_RECEIPT_STATUSES = {"resolved", "recovered", "already-resolved"}
+NODE_ID_RE = re.compile(r"^[A-Za-z0-9_=-]+$")
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
 AUTOREVIEW_PHASES = {"full", "fix-verification", "disposition", "terminal-full"}
@@ -444,6 +450,130 @@ def validate_review_request_receipt(
     )
     if receipt["identity_fingerprint"] != expected_identity_fingerprint:
         raise CacheError(error_code, f"{field}.identity_fingerprint does not match provider identity", exit_code)
+    return receipt
+
+
+def validate_review_reply_receipt(
+    value: Any,
+    field: str,
+    *,
+    expected_repository: str | None = None,
+    expected_pr_number: int | None = None,
+    expected_finding_head_sha: str | None = None,
+    expected_reply_head_sha: str | None = None,
+    expected_finding_comment_id: int | None = None,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> dict[str, Any]:
+    fields = {
+        "schema", "repository", "pr_number", "finding_head_sha", "reply_head_sha",
+        "thread_id", "finding_comment_id", "finding_node_id", "finding_ref",
+        "finding_created_at", "reply_comment_id", "reply_node_id", "reply_author",
+        "reply_ref", "reply_created_at", "body_fingerprint", "identity_fingerprint",
+        "status",
+    }
+    receipt = exact_object(value, fields, field, error_code=error_code, exit_code=exit_code)
+    if receipt["schema"] != REVIEW_REPLY_RECEIPT_SCHEMA or receipt["status"] not in REVIEW_REPLY_RECEIPT_STATUSES:
+        raise CacheError(error_code, f"{field} schema or status is invalid", exit_code)
+    repository = canonical_github_repository(
+        receipt["repository"], f"{field}.repository", error_code=error_code, exit_code=exit_code
+    )
+    pr_number = receipt["pr_number"]
+    if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number < 1:
+        raise CacheError(error_code, f"{field}.pr_number is invalid", exit_code)
+    for name in ("finding_head_sha", "reply_head_sha"):
+        if not isinstance(receipt[name], str) or not FULL_HEAD_RE.fullmatch(receipt[name]):
+            raise CacheError(error_code, f"{field}.{name} must be a full lowercase SHA", exit_code)
+    for name in ("thread_id", "finding_node_id", "reply_node_id"):
+        if not isinstance(receipt[name], str) or not NODE_ID_RE.fullmatch(receipt[name]):
+            raise CacheError(error_code, f"{field}.{name} is not an opaque GitHub node id", exit_code)
+    for name in ("finding_comment_id", "reply_comment_id"):
+        if not isinstance(receipt[name], int) or isinstance(receipt[name], bool) or receipt[name] < 1:
+            raise CacheError(error_code, f"{field}.{name} is invalid", exit_code)
+    for name in ("finding_created_at", "reply_created_at"):
+        parse_timestamp(receipt[name], f"{field}.{name}")
+    if not isinstance(receipt["reply_author"], str) or not receipt["reply_author"].strip():
+        raise CacheError(error_code, f"{field}.reply_author is required", exit_code)
+    for name in ("body_fingerprint", "identity_fingerprint"):
+        canonical_fingerprint(receipt[name], f"{field}.{name}", error_code=error_code, exit_code=exit_code)
+    expected_finding_ref = (
+        f"https://github.com/{repository}/pull/{pr_number}"
+        f"#discussion_r{receipt['finding_comment_id']}"
+    )
+    expected_reply_ref = (
+        f"https://github.com/{repository}/pull/{pr_number}"
+        f"#discussion_r{receipt['reply_comment_id']}"
+    )
+    if receipt["finding_ref"] != expected_finding_ref or receipt["reply_ref"] != expected_reply_ref:
+        raise CacheError(error_code, f"{field} comment references do not match provider identity", exit_code)
+    identity = {
+        name: receipt[name]
+        for name in fields
+        if name not in {"identity_fingerprint", "status"}
+    }
+    if receipt["identity_fingerprint"] != request_fingerprint(identity):
+        raise CacheError(error_code, f"{field}.identity_fingerprint is invalid", exit_code)
+    expected = {
+        "repository": (repository, expected_repository),
+        "pr_number": (pr_number, expected_pr_number),
+        "finding_head_sha": (receipt["finding_head_sha"], expected_finding_head_sha),
+        "reply_head_sha": (receipt["reply_head_sha"], expected_reply_head_sha),
+        "finding_comment_id": (receipt["finding_comment_id"], expected_finding_comment_id),
+    }
+    for name, (actual, wanted) in expected.items():
+        if wanted is not None and actual != wanted:
+            raise CacheError(error_code, f"{field}.{name} does not match review state", exit_code)
+    return receipt
+
+
+def validate_review_resolution_receipt(
+    value: Any,
+    field: str,
+    *,
+    reply_receipt: dict[str, Any],
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> dict[str, Any]:
+    fields = {
+        "schema", "repository", "pr_number", "head_sha", "thread_id",
+        "finding_comment_id", "finding_node_id", "reply_comment_id", "reply_node_id",
+        "reply_identity_fingerprint", "resolution_fingerprint", "is_resolved",
+        "observed_at", "status",
+    }
+    receipt = exact_object(value, fields, field, error_code=error_code, exit_code=exit_code)
+    if receipt["schema"] != REVIEW_RESOLUTION_RECEIPT_SCHEMA or receipt["status"] not in REVIEW_RESOLUTION_RECEIPT_STATUSES:
+        raise CacheError(error_code, f"{field} schema or status is invalid", exit_code)
+    if receipt["is_resolved"] is not True:
+        raise CacheError(error_code, f"{field} must prove is_resolved=true", exit_code)
+    parse_timestamp(receipt["observed_at"], f"{field}.observed_at")
+    canonical_fingerprint(
+        receipt["reply_identity_fingerprint"], f"{field}.reply_identity_fingerprint",
+        error_code=error_code, exit_code=exit_code,
+    )
+    canonical_fingerprint(
+        receipt["resolution_fingerprint"], f"{field}.resolution_fingerprint",
+        error_code=error_code, exit_code=exit_code,
+    )
+    bindings = {
+        "repository": "repository",
+        "pr_number": "pr_number",
+        "head_sha": "reply_head_sha",
+        "thread_id": "thread_id",
+        "finding_comment_id": "finding_comment_id",
+        "finding_node_id": "finding_node_id",
+        "reply_comment_id": "reply_comment_id",
+        "reply_node_id": "reply_node_id",
+        "reply_identity_fingerprint": "identity_fingerprint",
+    }
+    if any(receipt[name] != reply_receipt[source] for name, source in bindings.items()):
+        raise CacheError(error_code, f"{field} does not bind the exact reply receipt", exit_code)
+    identity = {
+        name: receipt[name]
+        for name in fields
+        if name not in {"resolution_fingerprint", "is_resolved", "observed_at", "status"}
+    }
+    if receipt["resolution_fingerprint"] != request_fingerprint(identity):
+        raise CacheError(error_code, f"{field}.resolution_fingerprint is invalid", exit_code)
     return receipt
 
 
@@ -1920,11 +2050,12 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     "provider_timeout",
                     "wait_state",
                     "observations",
+                    "thread_resolutions",
                 },
                 f"run_state.reviews[{index}]",
             )
-            if not isinstance(item["observations"], list):
-                raise CacheError("integrity-failure", "run-state review observations are invalid", 5)
+            if not isinstance(item["observations"], list) or not isinstance(item["thread_resolutions"], list):
+                raise CacheError("integrity-failure", "run-state review observations or resolutions are invalid", 5)
             check_lower_kebab(item["task_key"], f"run_state.reviews[{index}].task_key")
             check_lower_kebab(item["delivery_key"], f"run_state.reviews[{index}].delivery_key")
             canonical_fingerprint(item["revision_key"], f"run_state.reviews[{index}].revision_key")
@@ -2007,6 +2138,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "warning_ref",
                         "warning_posted_at",
                         "warning_fingerprint",
+                        "finding_count",
+                        "finding_comment_ids",
                         "observed_at",
                     },
                     "run_state.review.observation",
@@ -2033,6 +2166,60 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     "integrity-failure",
                     5,
                 )
+                finding_count = observation["finding_count"]
+                finding_ids = observation["finding_comment_ids"]
+                if (
+                    not isinstance(finding_count, int)
+                    or isinstance(finding_count, bool)
+                    or finding_count < 0
+                    or not isinstance(finding_ids, list)
+                    or finding_ids != sorted(set(finding_ids))
+                    or any(not isinstance(value, int) or isinstance(value, bool) or value < 1 for value in finding_ids)
+                    or finding_count != len(finding_ids)
+                    or (observation["provider_state"] != "findings" and finding_count != 0)
+                ):
+                    raise CacheError("integrity-failure", "run-state review finding identities are invalid", 5)
+            seen_finding_resolutions: set[int] = set()
+            for resolution in item["thread_resolutions"]:
+                exact_object(
+                    resolution,
+                    {"resolution_revision_key", "reply_receipt", "resolution_receipt", "recorded_at"},
+                    "run_state.review.thread_resolution",
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                if not item["observations"]:
+                    raise CacheError("integrity-failure", "thread resolution has no finding observation", 5)
+                finding_ids = item["observations"][-1]["finding_comment_ids"]
+                reply_receipt = validate_review_reply_receipt(
+                    resolution["reply_receipt"],
+                    "run_state.review.thread_resolution.reply_receipt",
+                    expected_repository=review_github_repository,
+                    expected_pr_number=item["pr_number"],
+                    expected_finding_head_sha=item["reviewed_head_sha"],
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                if reply_receipt["finding_comment_id"] not in finding_ids:
+                    raise CacheError("integrity-failure", "thread resolution targets an unrecorded finding", 5)
+                canonical_fingerprint(
+                    resolution["resolution_revision_key"],
+                    "run_state.review.thread_resolution.resolution_revision_key",
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                validate_review_resolution_receipt(
+                    resolution["resolution_receipt"],
+                    "run_state.review.thread_resolution.resolution_receipt",
+                    reply_receipt=reply_receipt,
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                parse_timestamp(resolution["recorded_at"], "recorded_at")
+                finding_id = reply_receipt["finding_comment_id"]
+                if finding_id in seen_finding_resolutions:
+                    raise CacheError("integrity-failure", "review finding has duplicate resolutions", 5)
+                seen_finding_resolutions.add(finding_id)
             if (item["wait_state"] == "complete") != bool(item["observations"]):
                 raise CacheError("integrity-failure", "run-state review completion state is invalid", 5)
         for index, item in enumerate(value["gates"]):
@@ -2330,6 +2517,30 @@ def review_is_accepted(review: dict[str, Any] | None) -> bool:
     )
 
 
+def unresolved_finding_comment_ids(
+    state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
+) -> list[int]:
+    unresolved: list[int] = []
+    for review in state["reviews"]:
+        if review["task_key"] != task["task_key"] or review["delivery_key"] != delivery["delivery_key"]:
+            continue
+        if not review["observations"]:
+            continue
+        observation = review["observations"][-1]
+        if (observation["provider_state"], observation["disposition"]) != ("findings", "fix-required"):
+            continue
+        resolved = {
+            item["reply_receipt"]["finding_comment_id"]
+            for item in review["thread_resolutions"]
+        }
+        unresolved.extend(
+            finding_id
+            for finding_id in observation["finding_comment_ids"]
+            if finding_id not in resolved
+        )
+    return sorted(set(unresolved))
+
+
 def review_warnings(state: dict[str, Any]) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
     total = 0
@@ -2423,6 +2634,8 @@ def delivery_proof_blockers(
         blockers.append("missing-current-review")
     elif not review_is_accepted(review):
         blockers.append("review-not-accepted")
+    if unresolved_finding_comment_ids(state, task, delivery):
+        blockers.append("unresolved-review-findings")
     revision = delivery["revision"]
     pr = delivery["pr"]
     if pr is None:
@@ -3382,7 +3595,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
 
     if event_type in {
         "delivery-preflight-observed", "revision-observed", "delivery-observed", "review-wait-started",
-        "review-wait-invoked", "review-observed",
+        "review-wait-invoked", "review-observed", "review-thread-resolved",
     }:
         delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
         delivery = delivery_by_key(task, delivery_key)
@@ -3647,6 +3860,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "provider_timeout": None,
                 "wait_state": "active-wait",
                 "observations": [],
+                "thread_resolutions": [],
             }
         )
         return True
@@ -3702,7 +3916,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "type", "task_key", "delivery_key", "revision_key", "request_receipt", "request_binding",
                 "provider_state", "observation_fingerprint", "disposition",
                 "evidence_ref", "warning_ref", "warning_posted_at",
-                "warning_fingerprint",
+                "warning_fingerprint", "finding_count", "finding_comment_ids",
             },
             event_type,
         )
@@ -3734,6 +3948,19 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         )
         warning_posted_at = event["warning_posted_at"]
         warning_fingerprint = event["warning_fingerprint"]
+        finding_count = event["finding_count"]
+        finding_comment_ids = event["finding_comment_ids"]
+        if (
+            not isinstance(finding_count, int)
+            or isinstance(finding_count, bool)
+            or finding_count < 0
+            or not isinstance(finding_comment_ids, list)
+            or finding_comment_ids != sorted(set(finding_comment_ids))
+            or any(not isinstance(value, int) or isinstance(value, bool) or value < 1 for value in finding_comment_ids)
+            or finding_count != len(finding_comment_ids)
+            or (provider != "findings" and finding_count != 0)
+        ):
+            raise CacheError("invalid-input", "review finding identities are invalid", 2)
         validate_review_outcome(
             request_binding,
             provider,
@@ -3758,6 +3985,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             "warning_ref": warning_ref,
             "warning_posted_at": warning_posted_at,
             "warning_fingerprint": warning_fingerprint,
+            "finding_count": finding_count,
+            "finding_comment_ids": finding_comment_ids,
         }
         if review["observations"]:
             prior = review["observations"][-1]
@@ -3771,6 +4000,64 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         review["observations"].append({**observation, "observed_at": observed_at})
         review["request_binding"] = request_binding
         review["wait_state"] = "complete"
+        return True
+
+    if event_type == "review-thread-resolved":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "finding_revision_key",
+                "resolution_revision_key", "reply_receipt", "resolution_receipt",
+            },
+            event_type,
+        )
+        assert delivery is not None
+        finding_revision_key = canonical_fingerprint(event["finding_revision_key"], "finding_revision_key")
+        resolution_revision_key = canonical_fingerprint(event["resolution_revision_key"], "resolution_revision_key")
+        current_revision = delivery["revision"]
+        if current_revision is None or current_revision["revision_key"] != resolution_revision_key:
+            raise CacheError("state-conflict", "thread resolution revision is stale", 4)
+        matches = [
+            item for item in state["reviews"]
+            if item["task_key"] == task_key
+            and item["delivery_key"] == delivery["delivery_key"]
+            and item["revision_key"] == finding_revision_key
+        ]
+        if len(matches) != 1:
+            raise CacheError("state-conflict", "thread resolution finding review is missing or ambiguous", 4)
+        finding_review = matches[0]
+        if not finding_review["observations"]:
+            raise CacheError("state-conflict", "thread resolution requires a finding observation", 4)
+        observation = finding_review["observations"][-1]
+        if (observation["provider_state"], observation["disposition"]) != ("findings", "fix-required"):
+            raise CacheError("state-conflict", "thread resolution requires an actionable finding review", 4)
+        reply_receipt = validate_review_reply_receipt(
+            event["reply_receipt"],
+            "reply_receipt",
+            expected_repository=finding_review["github_repository"],
+            expected_pr_number=finding_review["pr_number"],
+            expected_finding_head_sha=finding_review["reviewed_head_sha"],
+            expected_reply_head_sha=current_revision["head_sha"],
+        )
+        finding_id = reply_receipt["finding_comment_id"]
+        if finding_id not in observation["finding_comment_ids"]:
+            raise CacheError("state-conflict", "thread resolution targets an unrecorded finding comment", 4)
+        resolution_receipt = validate_review_resolution_receipt(
+            event["resolution_receipt"], "resolution_receipt", reply_receipt=reply_receipt
+        )
+        candidate = {
+            "resolution_revision_key": resolution_revision_key,
+            "reply_receipt": reply_receipt,
+            "resolution_receipt": resolution_receipt,
+            "recorded_at": observed_at,
+        }
+        for existing in finding_review["thread_resolutions"]:
+            if existing["reply_receipt"]["finding_comment_id"] != finding_id:
+                continue
+            if all(existing[name] == candidate[name] for name in ("resolution_revision_key", "reply_receipt", "resolution_receipt")):
+                return False
+            raise CacheError("state-conflict", "review finding already has a different resolution receipt", 4)
+        finding_review["thread_resolutions"].append(candidate)
         return True
 
     if event_type == "autoreview-observed":

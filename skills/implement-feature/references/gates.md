@@ -40,7 +40,7 @@ ref, and merge-base SHA require:
   repository's currently discovered default branch;
 - `codex-review`: mandatory current-revision request with either a clean result,
   or an exact 45-minute pending timeout recorded as `timeout-accepted` with a
-  persistent PR warning; every returned actionable finding must be resolved;
+  persistent PR warning;
 - `ci`, only when `ci_availability=configured`: at least one applicable run or
   status context on the exact head SHA and every required applicable result
   successful;
