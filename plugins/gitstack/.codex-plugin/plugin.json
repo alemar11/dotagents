@@ -1,6 +1,6 @@
 {
   "name": "gitstack",
-  "version": "7.1.0",
+  "version": "7.1.1",
   "description": "Safe local Git and connector-first GitHub workflows for commits, issues, reviews, CI, releases, and pull-request delivery.",
   "author": {
     "name": "alemar11",

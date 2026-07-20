@@ -870,6 +870,32 @@ def terminal_provider_evidence(
             exit_code=4,
         )
 
+    final_pull = gh_json(
+        ["api", f"repos/{repo}/pulls/{pr}", "-H", "Accept: application/vnd.github+json"]
+    )
+    if not isinstance(final_pull, dict) or not isinstance(
+        (final_pull.get("head") or {}).get("sha"), str
+    ):
+        raise ReviewError(
+            "Final pull request response did not include an exact head SHA.",
+            code="terminal_evidence_invalid",
+            exit_code=4,
+        )
+    try:
+        final_head = validate_full_head(str((final_pull.get("head") or {}).get("sha") or ""))
+    except ValueError as exc:
+        raise ReviewError(
+            "Final pull request response did not include a valid full head SHA.",
+            code="terminal_evidence_invalid",
+            exit_code=4,
+        ) from exc
+    if final_head != head:
+        raise ReviewError(
+            "The pull request head changed during terminal evidence verification.",
+            code="terminal_evidence_head_drift",
+            exit_code=3,
+        )
+
     receipt_value = build_terminal_evidence_receipt(
         provider=provider,
         repository=repo,
