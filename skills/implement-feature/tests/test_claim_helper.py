@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV10Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV11Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -178,7 +178,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_goal_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV10Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV11Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
@@ -337,7 +337,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "10.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "11.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout

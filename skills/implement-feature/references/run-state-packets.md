@@ -84,7 +84,7 @@ values are refs or digests, never pasted output.
 | `source-moved` | `task_key`, `from_ref`, `to_ref`, `source_fingerprint`, `tracker_repository`, `revision_set_key`, `evidence_ref` |
 | `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_receipt` |
 | `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `wait_invoked_at`, `provider_timeout` |
-| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `request_binding`, `provider_state`, `observation_fingerprint`, `disposition`, `finding_count`, `finding_comment_ids`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
+| `review-observed` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `request_binding`, `provider_state`, `failure_kind`, `provider_error_code`, `observation_fingerprint`, `disposition`, `finding_count`, `finding_comment_ids`, `evidence_ref`, `warning_ref`, `warning_posted_at`, `warning_fingerprint` |
 | `review-thread-resolved` | `task_key`, `delivery_key`, `finding_revision_key`, `resolution_revision_key`, `reply_receipt`, `resolution_receipt` |
 | `autoreview-observed` | `task_key`, `delivery_key`, `evidence` |
 | `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
@@ -127,6 +127,8 @@ Task states are `pending`, `created`, `implementing`, `validating`, `draft-pr`,
 states are `pending`, `active`, and `complete`.
 Review provider/disposition values are `waiting|findings|clean|failed` and
 `timeout-accepted|fix-required|accepted|blocked`.
+Nonfailed observations use null failure fields; failed values follow the closed
+GitStack mapping in `review-reconciliation.md` and cannot be relabeled.
 
 `autoreview-observed.evidence` flattens the helper envelope's lineage, phase,
 target, counters, open findings, metrics, and ref; omit closed history and
@@ -146,23 +148,18 @@ revision and preflight keys. A task revision-set key digests sorted
 `(delivery_key, delivery_evidence_key)` pairs. When CI is `not-configured`, the
 `ci` gate is inapplicable and any such event is rejected.
 
-The deadline is `wait_started_at+45m`. Before the provider call, persist a
-nonfuture invocation and
-`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`; zero is one
-no-wait check. Exactly one observation completes the review. Valid pairs are
-`clean/accepted`, `findings/fix-required`, `failed/blocked`, and
-`waiting/timeout-accepted`. Only the last pair requires a nonempty
-`warning_ref`, and it is invalid before the deadline or unless it is a canonical
-issue-comment URL on that review's exact stored PR URL. It also requires
-`warning_posted_at` between the deadline and observation plus
-`warning_fingerprint` matching the exact warning body in
-`codex-review-closeout.md`. Every other pair
-requires all three warning fields to be null. No review schedule, Goal pause,
-or App heartbeat follows.
+The deadline is `wait_started_at+45m`. Before the provider call, persist
+nonfuture `wait_invoked_at` and
+`provider_timeout=max(0,floor(wait_deadline-wait_invoked_at))`; zero means one
+no-wait check. One observation completes review. Valid pairs
+are `clean/accepted`, `findings/fix-required`, `failed/blocked`, and
+`waiting/timeout-accepted`. Only the last permits warning fields: a canonical
+stored-PR issue-comment URL, post time between deadline and observation, and
+the `codex-review-closeout.md` body fingerprint. It is invalid before deadline;
+other pairs use null warnings. Never reschedule, pause a Goal, or heartbeat.
 
-Terminal seal requires all current gates and an accepted complete review set;
-timeout-accepted reviews remain explicit warnings and are not called clean.
-Worker Goal completion requires the unchanged seal; terminal handoff follows.
-Portfolio verification requires every task handoff; root Goal completion
-requires that verification. Post-terminal drift is the only post-seal evidence
-mutation, never reopens Goals, and blocks archive.
+Terminal seal requires all gates and a complete accepted review set; timeout
+acceptance stays a warning, never clean. Worker completion and handoff require
+the unchanged seal; root completion requires every verified task handoff. Only
+post-terminal drift may mutate sealed evidence; it blocks archive without
+reopening Goals.

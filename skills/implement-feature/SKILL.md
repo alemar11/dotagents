@@ -263,6 +263,8 @@ Post-terminal drift blocks archive and never reopens Goals or implementation.
 ## Reference Routing
 
 `run-state.md` owns commands, projections, and transitions;
-`run-state-packets.md` owns event fields before writes; `execution-manifest.md`
-owns bundles plus supported command manifests and receipts.
+`run-state-packets.md` owns event fields; `execution-manifest.md` owns bundles,
+command manifests, and receipts.
 Load `review-thread-resolution.md` only for inline finding ids or stored receipts.
+On exact-revision `request-correlation-failure`, load
+`review-reconciliation.md`.

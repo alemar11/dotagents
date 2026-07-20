@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV10Tests(unittest.TestCase):
+class LedgerCacheV11Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -577,6 +577,61 @@ class LedgerCacheV10Tests(unittest.TestCase):
             "status": status,
         }
 
+    def terminal_evidence_receipt(
+        self,
+        revision: dict,
+        request_receipt: dict,
+        *,
+        artifact_id: int = 9010,
+        outcome: str = "clean",
+        body_fingerprint: str | None = None,
+        artifact_created_at: str = "2026-07-18T12:05:00Z",
+        verified_at: str = "2026-07-18T12:10:00Z",
+    ) -> dict:
+        actor = "chatgpt-codex-connector[bot]"
+        artifact_ref = f"https://github.com/example/dotagents/pull/233#issuecomment-{artifact_id}"
+        receipt = {
+            "schema": "gitstack-terminal-provider-evidence:v1",
+            "status": "verified",
+            "provider": "codex",
+            "repository": "example/dotagents",
+            "pr_number": 233,
+            "head_sha": revision["head_sha"],
+            "request_identity_fingerprint": request_receipt["identity_fingerprint"],
+            "request_fingerprint": request_receipt["request_fingerprint"],
+            "provider_request_id": request_receipt["provider_request_id"],
+            "request_ref": request_receipt["request_ref"],
+            "request_created_at": request_receipt["created_at"],
+            "artifact_id": {"kind": "github-issue-comment", "value": str(artifact_id)},
+            "artifact_ref": artifact_ref,
+            "artifact_created_at": artifact_created_at,
+            "provider_actor": actor,
+            "provider_identity_fingerprint": CACHE_RUNTIME.request_fingerprint(
+                {"provider": "codex", "actor": actor}
+            ),
+            "body_fingerprint": body_fingerprint or hashlib.sha256(b"Codex clean result").hexdigest(),
+            "reviewed_head_token": revision["head_sha"][:10],
+            "resolved_head_sha": revision["head_sha"],
+            "outcome": outcome,
+            "artifact_fingerprint": "",
+            "verified_at": verified_at,
+            "receipt_fingerprint": "",
+        }
+        artifact_identity = {
+            name: receipt[name]
+            for name in (
+                "provider", "repository", "pr_number", "head_sha", "artifact_id",
+                "artifact_ref", "artifact_created_at", "provider_actor",
+                "provider_identity_fingerprint", "body_fingerprint", "reviewed_head_token",
+                "resolved_head_sha", "outcome",
+            )
+        }
+        receipt["artifact_fingerprint"] = CACHE_RUNTIME.request_fingerprint(artifact_identity)
+        receipt["receipt_fingerprint"] = CACHE_RUNTIME.request_fingerprint(
+            {key: value for key, value in receipt.items() if key != "receipt_fingerprint"}
+        )
+        return receipt
+
     def review_reply_receipt(
         self,
         finding_revision: dict,
@@ -694,6 +749,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
                     "request_receipt": request_receipt,
                     "request_binding": "recognized",
                     "provider_state": "clean",
+                    "failure_kind": None,
+                    "provider_error_code": None,
                     "observation_fingerprint": hashlib.sha256(
                         b"clean-review"
                     ).hexdigest(),
@@ -890,12 +947,12 @@ class LedgerCacheV10Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v10_offline_and_read_only(self) -> None:
+    def test_doctor_is_v11_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "10.0.0")
+        self.assertEqual(version, "11.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1492,6 +1549,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
             "request_receipt": request_receipt,
             "request_binding": "recognized",
             "provider_state": "waiting",
+            "failure_kind": None,
+            "provider_error_code": None,
             "observation_fingerprint": hashlib.sha256(b"pending-timeout").hexdigest(),
             "disposition": "timeout-accepted",
             "finding_count": 0,
@@ -1625,9 +1684,16 @@ class LedgerCacheV10Tests(unittest.TestCase):
                         "revision_key": revision_key,
                         "pr_url": pr_url,
                         "wait_state": "complete",
+                        "reconciliations": [],
                         "observations": [
                             {
+                                "request_binding": "recognized",
                                 "provider_state": "waiting",
+                                "failure_kind": None,
+                                "provider_error_code": None,
+                                "observation_fingerprint": hashlib.sha256(
+                                    f"warning-{warning_index}".encode()
+                                ).hexdigest(),
                                 "disposition": "timeout-accepted",
                                 "warning_ref": (
                                     f"{pr_url}#issuecomment-{warning_index}"
@@ -1761,6 +1827,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
             "request_receipt": request_receipt,
             "request_binding": "recognized",
             "provider_state": "failed",
+            "failure_kind": "provider-terminal-error",
+            "provider_error_code": "provider_terminal_error",
             "observation_fingerprint": hashlib.sha256(b"failed").hexdigest(),
             "disposition": "accepted",
             "finding_count": 0,
@@ -1796,6 +1864,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
         clean = {
             **invalid,
             "provider_state": "clean",
+            "failure_kind": None,
+            "provider_error_code": None,
             "observation_fingerprint": hashlib.sha256(b"clean").hexdigest(),
             "evidence_ref": "github-review://233/clean",
         }
@@ -1820,6 +1890,142 @@ class LedgerCacheV10Tests(unittest.TestCase):
         CACHE_RUNTIME.validate_state(state, self.ledger)
         self.assertTrue(CACHE_RUNTIME.review_is_accepted(state["reviews"][-1]))
         self.assertEqual(CACHE_RUNTIME.review_warnings(state), [])
+
+    def test_exact_head_correlation_failure_reconciles_append_only_to_clean(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        state = self.state()
+        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+        request_receipt = self.request_receipt(
+            revision, request_key="correlation-defect", created_at="2026-07-18T12:00:00Z"
+        )
+        self.direct_event(state, {
+            "type": "review-wait-started", "task_key": self.task_key,
+            "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+            "request_receipt": request_receipt,
+        }, started)
+        self.direct_event(state, {
+            "type": "review-wait-invoked", "task_key": self.task_key,
+            "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+            "request_receipt": request_receipt, "wait_invoked_at": "2026-07-18T12:00:00Z",
+            "provider_timeout": 2700,
+        }, started)
+        source_fingerprint = hashlib.sha256(b"typed-request-correlation-defect").hexdigest()
+        self.direct_event(state, {
+            "type": "review-observed", "task_key": self.task_key,
+            "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+            "request_receipt": request_receipt, "request_binding": "invalid",
+            "provider_state": "failed", "failure_kind": "request-correlation-failure",
+            "provider_error_code": "request_correlation_failure",
+            "observation_fingerprint": source_fingerprint, "disposition": "blocked",
+            "finding_count": 0, "finding_comment_ids": [],
+            "evidence_ref": "gitstack://review/correlation-defect",
+            "warning_ref": None, "warning_posted_at": None, "warning_fingerprint": None,
+        }, started + timedelta(minutes=6))
+        review = state["reviews"][-1]
+        immutable_before = copy.deepcopy({
+            "request_receipt": review["request_receipt"],
+            "wait_started_at": review["wait_started_at"],
+            "wait_deadline": review["wait_deadline"],
+            "wait_invoked_at": review["wait_invoked_at"],
+            "provider_timeout": review["provider_timeout"],
+            "observations": review["observations"],
+        })
+        receipt = self.terminal_evidence_receipt(revision, request_receipt)
+        event = {
+            "type": "review-reconciled", "task_key": self.task_key,
+            "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+            "source_observation_fingerprint": source_fingerprint,
+            "terminal_evidence_receipt": receipt,
+        }
+        pre_reconciliation = copy.deepcopy(state)
+        self.direct_event(state, event, started + timedelta(minutes=11))
+        immutable_after = {
+            "request_receipt": review["request_receipt"],
+            "wait_started_at": review["wait_started_at"],
+            "wait_deadline": review["wait_deadline"],
+            "wait_invoked_at": review["wait_invoked_at"],
+            "provider_timeout": review["provider_timeout"],
+            "observations": review["observations"],
+        }
+        self.assertEqual(immutable_after, immutable_before)
+        self.assertEqual(len(review["reconciliations"]), 1)
+        self.assertTrue(CACHE_RUNTIME.review_is_accepted(review))
+        projected = CACHE_RUNTIME.review_result_projection(review)
+        self.assertEqual(projected["original_provider_state"], "failed")
+        self.assertEqual(projected["effective_provider_state"], "clean")
+        self.assertEqual(projected["effective_source"], "terminal-provider-evidence")
+        self.assertFalse(CACHE_RUNTIME.apply_event(state, event, started + timedelta(minutes=12)))
+        self.direct_event(state, {
+            "type": "gate-observed", "task_key": self.task_key,
+            "delivery_key": "dotagents", "gate": "codex-review", "state": "passed",
+            "binding_key": CACHE_RUNTIME.delivery_evidence_key(state["tasks"][0]["deliveries"][0]),
+            "evidence_ref": receipt["artifact_ref"],
+        }, started + timedelta(minutes=12))
+        CACHE_RUNTIME.seal_state_fingerprint(state)
+        CACHE_RUNTIME.validate_state(state, self.ledger)
+        markdown = CACHE_RUNTIME.render_markdown(state)
+        self.assertIn("## Review Reconciliations", markdown)
+        self.assertIn(receipt["artifact_ref"], markdown)
+        self.assertIn(receipt["receipt_fingerprint"], markdown)
+        self.assertNotIn("Codex clean result", markdown)
+
+        different = self.terminal_evidence_receipt(revision, request_receipt, artifact_id=9011)
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as conflict:
+            CACHE_RUNTIME.apply_event(
+                state, {**event, "terminal_evidence_receipt": different},
+                started + timedelta(minutes=13),
+            )
+        self.assertEqual(conflict.exception.details["reason"], "reconciliation-artifact-conflict")
+
+        for name, candidate in (
+            ("source", {**event, "source_observation_fingerprint": "0" * 64}),
+            ("repository", {**event, "terminal_evidence_receipt": {**receipt, "repository": "example/other"}}),
+            ("request", {**event, "terminal_evidence_receipt": {**receipt, "request_identity_fingerprint": "0" * 64}}),
+            ("actor", {**event, "terminal_evidence_receipt": {**receipt, "provider_actor": "attacker"}}),
+            ("body", {**event, "terminal_evidence_receipt": {**receipt, "body_fingerprint": "0" * 64}}),
+        ):
+            with self.subTest(name=name), self.assertRaises(CACHE_RUNTIME.CacheError):
+                CACHE_RUNTIME.apply_event(
+                    copy.deepcopy(pre_reconciliation), candidate,
+                    started + timedelta(minutes=11),
+                )
+        findings_receipt = self.terminal_evidence_receipt(
+            revision, request_receipt, outcome="findings"
+        )
+        with self.assertRaises(CACHE_RUNTIME.CacheError) as findings:
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(pre_reconciliation),
+                {**event, "terminal_evidence_receipt": findings_receipt},
+                started + timedelta(minutes=11),
+            )
+        self.assertEqual(findings.exception.details["reason"], "reconciliation-artifact-not-clean")
+
+    def test_review_failure_mapping_rejects_caller_classification_combinations(self) -> None:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        state = self.state()
+        started = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+        request_receipt = self.request_receipt(revision, request_key="mapping")
+        for event in (
+            {"type": "review-wait-started", "task_key": self.task_key, "delivery_key": "dotagents", "revision_key": revision["revision_key"], "request_receipt": request_receipt},
+            {"type": "review-wait-invoked", "task_key": self.task_key, "delivery_key": "dotagents", "revision_key": revision["revision_key"], "request_receipt": request_receipt, "wait_invoked_at": "2026-07-18T12:00:00Z", "provider_timeout": 2700},
+        ):
+            self.direct_event(state, event, started)
+        invalid = {
+            "type": "review-observed", "task_key": self.task_key,
+            "delivery_key": "dotagents", "revision_key": revision["revision_key"],
+            "request_receipt": request_receipt, "request_binding": "invalid",
+            "provider_state": "failed", "failure_kind": "request-correlation-failure",
+            "provider_error_code": "api_error", "observation_fingerprint": "a" * 64,
+            "disposition": "blocked", "finding_count": 0, "finding_comment_ids": [],
+            "evidence_ref": "gitstack://review/invalid-mapping", "warning_ref": None,
+            "warning_posted_at": None, "warning_fingerprint": None,
+        }
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "does not match provider observation"):
+            CACHE_RUNTIME.apply_event(state, invalid, started + timedelta(minutes=1))
 
     def test_typed_thread_resolution_is_exact_idempotent_and_required_only_for_inline_findings(self) -> None:
         self.bootstrap_active_task()
@@ -1854,6 +2060,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
                 "request_receipt": request_receipt,
                 "request_binding": "recognized",
                 "provider_state": "findings",
+                "failure_kind": None,
+                "provider_error_code": None,
                 "observation_fingerprint": hashlib.sha256(b"one-inline-finding").hexdigest(),
                 "disposition": "fix-required",
                 "finding_count": 1,
@@ -1941,7 +2149,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
                 "type": "review-observed", "task_key": self.task_key,
                 "delivery_key": "dotagents", "revision_key": revision["revision_key"],
                 "request_receipt": request_receipt, "request_binding": "recognized",
-                "provider_state": "findings", "observation_fingerprint": "d" * 64,
+                "provider_state": "findings", "failure_kind": None,
+                "provider_error_code": None, "observation_fingerprint": "d" * 64,
                 "disposition": "fix-required", "finding_count": 0,
                 "finding_comment_ids": [], "evidence_ref": "github-review://233/provider-comment",
                 "warning_ref": None, "warning_posted_at": None, "warning_fingerprint": None,
@@ -1968,6 +2177,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
                     binding,
                     "waiting",
                     "timeout-accepted",
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -2021,6 +2232,8 @@ class LedgerCacheV10Tests(unittest.TestCase):
                 "request_receipt": request_receipt,
                 "request_binding": "recognized",
                 "provider_state": "waiting",
+                "failure_kind": None,
+                "provider_error_code": None,
                 "observation_fingerprint": hashlib.sha256(b"late-pending").hexdigest(),
                 "disposition": "timeout-accepted",
                 "finding_count": 0,
@@ -2092,6 +2305,7 @@ class LedgerCacheV10Tests(unittest.TestCase):
             "review-wait-started",
             "review-wait-invoked",
             "review-observed",
+            "review-reconciled",
             "gate-observed",
             "task-terminal-sealed",
         }

@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "10.0.0"
-LEDGER_SCHEMA_VERSION = "7.0.0"
+__version__ = "11.0.0"
+LEDGER_SCHEMA_VERSION = "8.0.0"
 REGISTRATION_SCHEMA_VERSION = "4.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -38,6 +38,7 @@ MAX_EVENTS_PER_BATCH = 64
 MAX_OPERATIONS = 512
 MAX_REVIEWS = 256
 MAX_REVIEW_OBSERVATIONS = 1
+MAX_REVIEW_RECONCILIATIONS = 1
 MAX_PROJECTED_REVIEW_WARNING_BYTES = 24 * 1024
 MAX_GATES = 2048
 MAX_HANDOFFS = 512
@@ -110,6 +111,7 @@ EVENT_TYPES = {
     "review-wait-started",
     "review-wait-invoked",
     "review-observed",
+    "review-reconciled",
     "review-thread-resolved",
     "autoreview-observed",
     "gate-observed",
@@ -143,12 +145,41 @@ CI_AVAILABILITIES = {"configured", "not-configured"}
 REVIEW_PROVIDER_STATES = {"waiting", "findings", "clean", "failed"}
 REVIEW_DISPOSITIONS = {"fix-required", "accepted", "timeout-accepted", "blocked"}
 REVIEW_REQUEST_BINDINGS = {"recognized", "unbound", "invalid", "unknown", "ambiguous"}
+REVIEW_FAILURE_KINDS = {
+    "request-correlation-failure",
+    "head-drift",
+    "provider-terminal-error",
+    "provider-api-failure",
+    "provider-auth-failure",
+    "provider-config-failure",
+    "ambiguous-provider-evidence",
+    "unknown-provider-failure",
+}
+REVIEW_FAILURE_CODE_MAP = {
+    "request_correlation_failure": ("request-correlation-failure", {"invalid", "unknown"}),
+    "request_unbound": ("request-correlation-failure", {"unbound"}),
+    "head_drift": ("head-drift", REVIEW_REQUEST_BINDINGS),
+    "terminal_head_mismatch": ("head-drift", REVIEW_REQUEST_BINDINGS),
+    "provider_terminal_error": ("provider-terminal-error", {"recognized"}),
+    "api_error": ("provider-api-failure", {"unknown", "recognized"}),
+    "command_failed": ("provider-api-failure", {"unknown", "recognized"}),
+    "provider_api_failure": ("provider-api-failure", {"unknown", "recognized"}),
+    "authentication_error": ("provider-auth-failure", {"unknown", "recognized"}),
+    "authentication_required": ("provider-auth-failure", {"unknown", "recognized"}),
+    "configuration_error": ("provider-config-failure", {"invalid", "unknown", "recognized"}),
+    "request_receipt_invalid": ("provider-config-failure", {"invalid"}),
+    "ambiguous_review_evidence": ("ambiguous-provider-evidence", {"ambiguous", "recognized"}),
+    "provider_response_invalid": ("unknown-provider-failure", {"invalid", "unknown", "recognized"}),
+}
 REQUEST_RECEIPT_SCHEMA = "gitstack-codex-review-request:v1"
 REQUEST_RECEIPT_STATUSES = {"posted", "recovered", "reused"}
 REVIEW_REPLY_RECEIPT_SCHEMA = "gitstack-review-thread-reply:v1"
 REVIEW_REPLY_RECEIPT_STATUSES = {"replied", "recovered"}
 REVIEW_RESOLUTION_RECEIPT_SCHEMA = "gitstack-review-thread-resolution:v1"
 REVIEW_RESOLUTION_RECEIPT_STATUSES = {"resolved", "recovered", "already-resolved"}
+TERMINAL_EVIDENCE_RECEIPT_SCHEMA = "gitstack-terminal-provider-evidence:v1"
+TERMINAL_EVIDENCE_RECEIPT_STATUS = "verified"
+CODEX_PROVIDER_ACTORS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connector"}
 NODE_ID_RE = re.compile(r"^[A-Za-z0-9_=-]+$")
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
@@ -450,6 +481,120 @@ def validate_review_request_receipt(
     )
     if receipt["identity_fingerprint"] != expected_identity_fingerprint:
         raise CacheError(error_code, f"{field}.identity_fingerprint does not match provider identity", exit_code)
+    return receipt
+
+
+def validate_terminal_evidence_receipt(
+    value: Any,
+    field: str,
+    *,
+    request_receipt: dict[str, Any],
+    expected_repository: str,
+    expected_pr_number: int,
+    expected_head_sha: str,
+    error_code: str = "invalid-input",
+    exit_code: int = 2,
+) -> dict[str, Any]:
+    fields = {
+        "schema", "status", "provider", "repository", "pr_number", "head_sha",
+        "request_identity_fingerprint", "request_fingerprint", "provider_request_id",
+        "request_ref", "request_created_at", "artifact_id", "artifact_ref",
+        "artifact_created_at", "provider_actor", "provider_identity_fingerprint",
+        "body_fingerprint", "reviewed_head_token", "resolved_head_sha", "outcome",
+        "artifact_fingerprint", "verified_at", "receipt_fingerprint",
+    }
+    receipt = exact_object(value, fields, field, error_code=error_code, exit_code=exit_code)
+    if (
+        receipt["schema"] != TERMINAL_EVIDENCE_RECEIPT_SCHEMA
+        or receipt["status"] != TERMINAL_EVIDENCE_RECEIPT_STATUS
+        or receipt["provider"] != "codex"
+    ):
+        raise CacheError(error_code, f"{field} schema, status, or provider is invalid", exit_code)
+    repository = canonical_github_repository(
+        receipt["repository"], f"{field}.repository", error_code=error_code, exit_code=exit_code
+    )
+    pr_number = receipt["pr_number"]
+    head_sha = receipt["head_sha"]
+    if (
+        repository != expected_repository
+        or not isinstance(pr_number, int)
+        or isinstance(pr_number, bool)
+        or pr_number != expected_pr_number
+        or not isinstance(head_sha, str)
+        or not FULL_HEAD_RE.fullmatch(head_sha)
+        or head_sha != expected_head_sha
+        or receipt["resolved_head_sha"] != head_sha
+    ):
+        raise CacheError(error_code, f"{field} target does not match the current review", exit_code)
+    if (
+        receipt["request_identity_fingerprint"] != request_receipt["identity_fingerprint"]
+        or receipt["request_fingerprint"] != request_receipt["request_fingerprint"]
+        or receipt["provider_request_id"] != request_receipt["provider_request_id"]
+        or receipt["request_ref"] != request_receipt["request_ref"]
+        or receipt["request_created_at"] != request_receipt["created_at"]
+    ):
+        raise CacheError(error_code, f"{field} request lineage does not match the stored receipt", exit_code)
+    for name in (
+        "request_identity_fingerprint", "request_fingerprint", "provider_identity_fingerprint",
+        "body_fingerprint", "artifact_fingerprint", "receipt_fingerprint",
+    ):
+        canonical_fingerprint(receipt[name], f"{field}.{name}", error_code=error_code, exit_code=exit_code)
+    artifact_id = exact_object(
+        receipt["artifact_id"], {"kind", "value"}, f"{field}.artifact_id",
+        error_code=error_code, exit_code=exit_code,
+    )
+    if (
+        artifact_id["kind"] != "github-issue-comment"
+        or not isinstance(artifact_id["value"], str)
+        or not artifact_id["value"].isdigit()
+        or int(artifact_id["value"]) < 1
+    ):
+        raise CacheError(error_code, f"{field}.artifact_id is invalid", exit_code)
+    expected_artifact_ref = (
+        f"https://github.com/{repository}/pull/{pr_number}#issuecomment-{artifact_id['value']}"
+    )
+    if receipt["artifact_ref"] != expected_artifact_ref:
+        raise CacheError(error_code, f"{field}.artifact_ref is invalid", exit_code)
+    request_at = parse_timestamp(receipt["request_created_at"], f"{field}.request_created_at")
+    artifact_at = parse_timestamp(receipt["artifact_created_at"], f"{field}.artifact_created_at")
+    verified_at = parse_timestamp(receipt["verified_at"], f"{field}.verified_at")
+    if artifact_at <= request_at or verified_at < artifact_at:
+        raise CacheError(error_code, f"{field} timestamps do not prove request-before-artifact verification", exit_code)
+    actor = receipt["provider_actor"]
+    if actor not in CODEX_PROVIDER_ACTORS:
+        raise CacheError(error_code, f"{field}.provider_actor is invalid", exit_code)
+    expected_provider_identity = request_fingerprint({"provider": "codex", "actor": actor})
+    if receipt["provider_identity_fingerprint"] != expected_provider_identity:
+        raise CacheError(error_code, f"{field}.provider_identity_fingerprint is invalid", exit_code)
+    reviewed_head_token = receipt["reviewed_head_token"]
+    if (
+        not isinstance(reviewed_head_token, str)
+        or not re.fullmatch(r"[0-9a-f]{7,40}", reviewed_head_token)
+        or not head_sha.startswith(reviewed_head_token)
+    ):
+        raise CacheError(error_code, f"{field}.reviewed_head_token does not resolve to the exact head", exit_code)
+    if receipt["outcome"] not in {"clean", "findings", "error"}:
+        raise CacheError(error_code, f"{field}.outcome is invalid", exit_code)
+    artifact_identity = {
+        "provider": "codex",
+        "repository": repository,
+        "pr_number": pr_number,
+        "head_sha": head_sha,
+        "artifact_id": artifact_id,
+        "artifact_ref": receipt["artifact_ref"],
+        "artifact_created_at": receipt["artifact_created_at"],
+        "provider_actor": actor,
+        "provider_identity_fingerprint": receipt["provider_identity_fingerprint"],
+        "body_fingerprint": receipt["body_fingerprint"],
+        "reviewed_head_token": reviewed_head_token,
+        "resolved_head_sha": head_sha,
+        "outcome": receipt["outcome"],
+    }
+    if receipt["artifact_fingerprint"] != request_fingerprint(artifact_identity):
+        raise CacheError(error_code, f"{field}.artifact_fingerprint is invalid", exit_code)
+    receipt_identity = {key: item for key, item in receipt.items() if key != "receipt_fingerprint"}
+    if receipt["receipt_fingerprint"] != request_fingerprint(receipt_identity):
+        raise CacheError(error_code, f"{field}.receipt_fingerprint is invalid", exit_code)
     return receipt
 
 
@@ -2050,12 +2195,17 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     "provider_timeout",
                     "wait_state",
                     "observations",
+                    "reconciliations",
                     "thread_resolutions",
                 },
                 f"run_state.reviews[{index}]",
             )
-            if not isinstance(item["observations"], list) or not isinstance(item["thread_resolutions"], list):
-                raise CacheError("integrity-failure", "run-state review observations or resolutions are invalid", 5)
+            if (
+                not isinstance(item["observations"], list)
+                or not isinstance(item["reconciliations"], list)
+                or not isinstance(item["thread_resolutions"], list)
+            ):
+                raise CacheError("integrity-failure", "run-state review observations, reconciliations, or resolutions are invalid", 5)
             check_lower_kebab(item["task_key"], f"run_state.reviews[{index}].task_key")
             check_lower_kebab(item["delivery_key"], f"run_state.reviews[{index}].delivery_key")
             canonical_fingerprint(item["revision_key"], f"run_state.reviews[{index}].revision_key")
@@ -2118,6 +2268,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     raise CacheError("integrity-failure", "run-state review timeout is invalid", 5)
             if len(item["observations"]) > MAX_REVIEW_OBSERVATIONS:
                 raise CacheError("integrity-failure", "run-state review observations exceed their bound", 5)
+            if len(item["reconciliations"]) > MAX_REVIEW_RECONCILIATIONS:
+                raise CacheError("integrity-failure", "run-state review reconciliations exceed their bound", 5)
             if item["observations"] and invoked_at is None:
                 raise CacheError(
                     "integrity-failure",
@@ -2132,6 +2284,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     {
                         "request_binding",
                         "provider_state",
+                        "failure_kind",
+                        "provider_error_code",
                         "observation_fingerprint",
                         "disposition",
                         "evidence_ref",
@@ -2157,6 +2311,8 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     observation["request_binding"],
                     observation["provider_state"],
                     observation["disposition"],
+                    observation["failure_kind"],
+                    observation["provider_error_code"],
                     observation["warning_ref"],
                     observation["warning_posted_at"],
                     observation["warning_fingerprint"],
@@ -2179,6 +2335,45 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     or (observation["provider_state"] != "findings" and finding_count != 0)
                 ):
                     raise CacheError("integrity-failure", "run-state review finding identities are invalid", 5)
+            for reconciliation in item["reconciliations"]:
+                exact_object(
+                    reconciliation,
+                    {
+                        "source_observation_fingerprint",
+                        "terminal_evidence_receipt",
+                        "reconciled_at",
+                    },
+                    "run_state.review.reconciliation",
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                if not item["observations"]:
+                    raise CacheError("integrity-failure", "review reconciliation has no source observation", 5)
+                source = item["observations"][-1]
+                if (
+                    reconciliation["source_observation_fingerprint"]
+                    != source["observation_fingerprint"]
+                    or not review_observation_is_reconcilable(source)
+                ):
+                    raise CacheError("integrity-failure", "review reconciliation source is ineligible", 5)
+                terminal_receipt = validate_terminal_evidence_receipt(
+                    reconciliation["terminal_evidence_receipt"],
+                    "run_state.review.reconciliation.terminal_evidence_receipt",
+                    request_receipt=item["request_receipt"],
+                    expected_repository=review_github_repository,
+                    expected_pr_number=item["pr_number"],
+                    expected_head_sha=item["reviewed_head_sha"],
+                    error_code="integrity-failure",
+                    exit_code=5,
+                )
+                reconciled_at = parse_timestamp(reconciliation["reconciled_at"], "reconciled_at")
+                if (
+                    terminal_receipt["outcome"] != "clean"
+                    or parse_timestamp(terminal_receipt["verified_at"], "verified_at")
+                    < parse_timestamp(source["observed_at"], "observed_at")
+                    or reconciled_at < parse_timestamp(terminal_receipt["verified_at"], "verified_at")
+                ):
+                    raise CacheError("integrity-failure", "review reconciliation timing or outcome is invalid", 5)
             seen_finding_resolutions: set[int] = set()
             for resolution in item["thread_resolutions"]:
                 exact_object(
@@ -2422,6 +2617,8 @@ def validate_review_outcome(
     request_binding: Any,
     provider: Any,
     disposition: Any,
+    failure_kind: Any,
+    provider_error_code: Any,
     warning_ref: Any,
     warning_posted_at: Any,
     warning_fingerprint: Any,
@@ -2441,6 +2638,15 @@ def validate_review_outcome(
         raise CacheError(error_code, "review request binding is invalid", exit_code)
     if provider not in REVIEW_PROVIDER_STATES or disposition not in REVIEW_DISPOSITIONS:
         raise CacheError(error_code, "review observation state is invalid", exit_code)
+    if provider != "failed":
+        if failure_kind is not None or provider_error_code is not None:
+            raise CacheError(error_code, "nonfailed review observation cannot carry failure classification", exit_code)
+    else:
+        if failure_kind not in REVIEW_FAILURE_KINDS or not isinstance(provider_error_code, str):
+            raise CacheError(error_code, "failed review observation requires machine failure classification", exit_code)
+        mapped = REVIEW_FAILURE_CODE_MAP.get(provider_error_code)
+        if mapped is None or mapped[0] != failure_kind or request_binding not in mapped[1]:
+            raise CacheError(error_code, "review failure classification does not match provider observation", exit_code)
     if request_binding != "recognized":
         if (provider, disposition) != ("failed", "blocked"):
             raise CacheError(error_code, "unrecognized review request must be blocked", exit_code)
@@ -2506,7 +2712,7 @@ def validate_review_outcome(
 def review_is_accepted(review: dict[str, Any] | None) -> bool:
     if review is None or review["wait_state"] != "complete" or not review["observations"]:
         return False
-    observation = review["observations"][-1]
+    observation = effective_review_observation(review)
     return (
         observation["provider_state"] == "clean"
         and observation["disposition"] == "accepted"
@@ -2515,6 +2721,57 @@ def review_is_accepted(review: dict[str, Any] | None) -> bool:
         and observation["disposition"] == "timeout-accepted"
         and observation["warning_ref"] is not None
     )
+
+
+def review_observation_is_reconcilable(observation: dict[str, Any]) -> bool:
+    return (
+        observation["request_binding"] in {"invalid", "unknown"}
+        and observation["provider_state"] == "failed"
+        and observation["disposition"] == "blocked"
+        and observation["failure_kind"] == "request-correlation-failure"
+        and observation["provider_error_code"] == "request_correlation_failure"
+    )
+
+
+def effective_review_observation(review: dict[str, Any]) -> dict[str, Any]:
+    observation = review["observations"][-1]
+    if not review["reconciliations"]:
+        return observation
+    reconciliation = review["reconciliations"][-1]
+    receipt = reconciliation["terminal_evidence_receipt"]
+    return {
+        **observation,
+        "request_binding": "recognized",
+        "provider_state": "clean",
+        "disposition": "accepted",
+        "failure_kind": None,
+        "provider_error_code": None,
+        "evidence_ref": receipt["artifact_ref"],
+        "effective_source": "terminal-provider-evidence",
+        "reconciliation_fingerprint": receipt["receipt_fingerprint"],
+    }
+
+
+def review_result_projection(review: dict[str, Any] | None) -> dict[str, Any] | None:
+    if review is None or not review["observations"]:
+        return None
+    original = review["observations"][-1]
+    effective = effective_review_observation(review)
+    reconciliation = review["reconciliations"][-1] if review["reconciliations"] else None
+    return {
+        "revision_key": review["revision_key"],
+        "original_provider_state": original["provider_state"],
+        "original_disposition": original["disposition"],
+        "original_failure_kind": original["failure_kind"],
+        "source_observation_fingerprint": original["observation_fingerprint"],
+        "effective_provider_state": effective["provider_state"],
+        "effective_disposition": effective["disposition"],
+        "effective_source": effective.get("effective_source", "provider-observation"),
+        "reconciliation_receipt_fingerprint": (
+            reconciliation["terminal_evidence_receipt"]["receipt_fingerprint"]
+            if reconciliation else None
+        ),
+    }
 
 
 def unresolved_finding_comment_ids(
@@ -2790,6 +3047,10 @@ def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
                 "task_key": task["task_key"],
                 "state": task["state"],
                 "revision_set_key": current_revision_set_key(task),
+                "review_results": [
+                    review_result_projection(current_review(state, task, delivery))
+                    for delivery in task["deliveries"]
+                ],
                 "seal_candidate_fingerprint": seal_candidate_fingerprint(state, task),
                 "sealed": task["seal"] is not None,
                 "proof_ready": not proof_blockers,
@@ -2895,6 +3156,7 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                     "revision_key": revision["revision_key"] if revision else None,
                     "pr": copy.deepcopy(delivery["pr"]),
                     "autoreview": copy.deepcopy(delivery["autoreview"]),
+                    "review_result": review_result_projection(current_review(state, task, delivery)),
                     "gates": delivery_gates,
                     "tracker_dirty": delivery["tracker_dirty_after_revision_key"] is not None,
                 }
@@ -2994,6 +3256,31 @@ def render_markdown(state: dict[str, Any]) -> str:
                     f"| `{task['task_key']}:{delivery['delivery_key']}` | `{item['terminal_state']}` | "
                     f"{item['full_reviews']} | {item['fix_verifications']} | {item['evidence_ref']} |"
                 )
+    lines.extend([
+        "", "## Review Reconciliations", "",
+        "| delivery | original | failure | source | effective | artifact | receipt | verified | reconciled |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ])
+    reconciliations_rendered = 0
+    for review in sorted(
+        state["reviews"], key=lambda item: (item["task_key"], item["delivery_key"], item["revision_key"])
+    ):
+        if not review["reconciliations"]:
+            continue
+        reconciliations_rendered += 1
+        original = review["observations"][-1]
+        reconciliation = review["reconciliations"][-1]
+        receipt = reconciliation["terminal_evidence_receipt"]
+        lines.append(
+            f"| `{review['task_key']}:{review['delivery_key']}` | "
+            f"`{original['provider_state']}/{original['disposition']}` | "
+            f"`{original['failure_kind']}` | `{original['observation_fingerprint']}` | "
+            f"`clean/accepted` | {receipt['artifact_ref']} | "
+            f"`{receipt['receipt_fingerprint']}` | `{receipt['verified_at']}` | "
+            f"`{reconciliation['reconciled_at']}` |"
+        )
+    if not reconciliations_rendered:
+        lines.append("| none | none | none | none | none | none | none | none | none |")
     lines.extend(["", "## Review Warnings", ""])
     warnings = review_warnings(state)
     if warnings:
@@ -3476,7 +3763,12 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         "terminal-handoff-recorded",
         "post-terminal-drift-recorded",
     }:
-        raise CacheError("state-conflict", "sealed task state is immutable", 4)
+        details = (
+            {"reason": "reconciliation-after-terminal-seal"}
+            if event_type == "review-reconciled"
+            else None
+        )
+        raise CacheError("state-conflict", "sealed task state is immutable", 4, details)
 
     if event_type == "managed-checkouts-observed":
         event = exact_object(raw, {"type", "task_key", "task_ref", "managed_checkouts", "evidence_ref"}, event_type)
@@ -3595,7 +3887,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
 
     if event_type in {
         "delivery-preflight-observed", "revision-observed", "delivery-observed", "review-wait-started",
-        "review-wait-invoked", "review-observed", "review-thread-resolved",
+        "review-wait-invoked", "review-observed", "review-reconciled", "review-thread-resolved",
     }:
         delivery_key = check_lower_kebab(raw.get("delivery_key"), "delivery_key")
         delivery = delivery_by_key(task, delivery_key)
@@ -3860,12 +4152,13 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "provider_timeout": None,
                 "wait_state": "active-wait",
                 "observations": [],
+                "reconciliations": [],
                 "thread_resolutions": [],
             }
         )
         return True
 
-    if event_type in {"review-wait-invoked", "review-observed"}:
+    if event_type in {"review-wait-invoked", "review-observed", "review-reconciled"}:
         assert delivery is not None
         review = current_review(state, task, delivery)
         if review is None:
@@ -3914,7 +4207,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             raw,
             {
                 "type", "task_key", "delivery_key", "revision_key", "request_receipt", "request_binding",
-                "provider_state", "observation_fingerprint", "disposition",
+                "provider_state", "failure_kind", "provider_error_code", "observation_fingerprint", "disposition",
                 "evidence_ref", "warning_ref", "warning_posted_at",
                 "warning_fingerprint", "finding_count", "finding_comment_ids",
             },
@@ -3965,6 +4258,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             request_binding,
             provider,
             disposition,
+            event["failure_kind"],
+            event["provider_error_code"],
             warning_ref,
             warning_posted_at,
             warning_fingerprint,
@@ -3979,6 +4274,8 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         observation = {
             "request_binding": request_binding,
             "provider_state": provider,
+            "failure_kind": event["failure_kind"],
+            "provider_error_code": event["provider_error_code"],
             "observation_fingerprint": fingerprint,
             "disposition": disposition,
             "evidence_ref": evidence_ref,
@@ -4000,6 +4297,86 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         review["observations"].append({**observation, "observed_at": observed_at})
         review["request_binding"] = request_binding
         review["wait_state"] = "complete"
+        return True
+
+    if event_type == "review-reconciled":
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "revision_key",
+                "source_observation_fingerprint", "terminal_evidence_receipt",
+            },
+            event_type,
+        )
+        assert review is not None
+        if event["revision_key"] != review["revision_key"]:
+            raise CacheError(
+                "state-conflict", "review reconciliation revision changed", 4,
+                {"reason": "reconciliation-target-mismatch"},
+            )
+        if not review["observations"]:
+            raise CacheError(
+                "state-conflict", "review reconciliation requires a source observation", 4,
+                {"reason": "reconciliation-source-ineligible"},
+            )
+        source = review["observations"][-1]
+        source_fingerprint = canonical_fingerprint(
+            event["source_observation_fingerprint"], "source_observation_fingerprint"
+        )
+        if source_fingerprint != source["observation_fingerprint"]:
+            raise CacheError(
+                "state-conflict", "review reconciliation source observation changed", 4,
+                {"reason": "reconciliation-source-mismatch"},
+            )
+        if not review_observation_is_reconcilable(source):
+            raise CacheError(
+                "state-conflict", "review reconciliation source is not a correlation failure", 4,
+                {"reason": "reconciliation-source-ineligible"},
+            )
+        receipt = validate_terminal_evidence_receipt(
+            event["terminal_evidence_receipt"],
+            "terminal_evidence_receipt",
+            request_receipt=review["request_receipt"],
+            expected_repository=review["github_repository"],
+            expected_pr_number=review["pr_number"],
+            expected_head_sha=review["reviewed_head_sha"],
+        )
+        if receipt["outcome"] != "clean":
+            raise CacheError(
+                "state-conflict", "review reconciliation artifact is not clean", 4,
+                {"reason": "reconciliation-artifact-not-clean"},
+            )
+        source_at = parse_timestamp(source["observed_at"], "source.observed_at")
+        verified_at = parse_timestamp(receipt["verified_at"], "terminal_evidence_receipt.verified_at")
+        if verified_at < source_at or now < verified_at:
+            raise CacheError(
+                "state-conflict", "review reconciliation verification time is invalid", 4,
+                {"reason": "reconciliation-artifact-conflict"},
+            )
+        candidate = {
+            "source_observation_fingerprint": source_fingerprint,
+            "terminal_evidence_receipt": receipt,
+            "reconciled_at": observed_at,
+        }
+        if review["reconciliations"]:
+            existing = review["reconciliations"][-1]
+            if (
+                existing["source_observation_fingerprint"] == source_fingerprint
+                and existing["terminal_evidence_receipt"]["artifact_fingerprint"]
+                == receipt["artifact_fingerprint"]
+                and existing["terminal_evidence_receipt"] == receipt
+            ):
+                return False
+            raise CacheError(
+                "state-conflict", "review reconciliation already binds another source or artifact", 4,
+                {"reason": "reconciliation-artifact-conflict"},
+            )
+        if len(review["reconciliations"]) >= MAX_REVIEW_RECONCILIATIONS:
+            raise CacheError(
+                "state-conflict", "review reconciliation bound reached", 4,
+                {"reason": "reconciliation-artifact-conflict"},
+            )
+        review["reconciliations"].append(candidate)
         return True
 
     if event_type == "review-thread-resolved":
