@@ -13,10 +13,51 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from gitstack.common import GitStackError
 from gitstack.provider_text import api_request, read_text_file
+from gitstack.review_mutation import (
+    ReservationError,
+    add_operation_marker,
+    build_reservation,
+    operation_id_for_mutation,
+    text_fingerprint,
+    validate_reservation_packet,
+)
 
 
 class ProviderTextContractTests(unittest.TestCase):
     HOSTILE = "`backticks` $(command) ${HOME} $PATH 'single' \"double\"\n-leading\nUnicode ✓ 🚀"
+
+    def test_reservation_rejects_operation_identity_replacement(self) -> None:
+        operation_id = operation_id_for_mutation(
+            "review-warning",
+            "owner/repo",
+            12,
+            "b" * 40,
+            request_fingerprint="a" * 64,
+        )
+        packet = build_reservation(
+            mutation_kind="review-warning",
+            repository="owner/repo",
+            pr_number=12,
+            head_sha="b" * 40,
+            task_key="task",
+            delivery_key="delivery",
+            operation_id=operation_id,
+            request_key="warning",
+            request_fingerprint="a" * 64,
+            thread_id=None,
+            thread_fingerprint=None,
+            finding_comment_id=None,
+            body_fingerprint="c" * 64,
+            reply_receipt_fingerprint=None,
+            expected_generation=1,
+            expected_state_fingerprint="d" * 64,
+            expected_claim_fingerprint="e" * 64,
+            expected_task_state="review-polling",
+        )
+        tampered = dict(packet)
+        tampered["operation_id"] = "f" * 32
+        with self.assertRaises(ReservationError):
+            validate_reservation_packet(tampered)
 
     def test_hostile_utf8_bytes_are_opaque_and_fingerprinted(self) -> None:
         with tempfile.NamedTemporaryFile("wb") as handle:
@@ -75,28 +116,78 @@ class ProviderTextContractTests(unittest.TestCase):
         request = json.loads(run.call_args.kwargs["input"].decode("utf-8"))
         self.assertEqual(request["body"], self.HOSTILE)
 
-    def test_shipped_cli_hostile_text_fake_provider_dry_run(self) -> None:
+    def test_shipped_cli_rejects_untrusted_authority_override_before_provider_dispatch(self) -> None:
         artifact = Path(__file__).resolve().parents[3] / "scripts" / "gitstack"
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             body_file = root / "-message.md"
             body_file.write_text(self.HOSTILE, encoding="utf-8")
+            request_fingerprint = "a" * 64
+            head = "b" * 40
+            operation_id = operation_id_for_mutation(
+                "review-warning",
+                "owner/repo",
+                12,
+                head,
+                request_fingerprint=request_fingerprint,
+            )
+            reservation = build_reservation(
+                mutation_kind="review-warning",
+                repository="owner/repo",
+                pr_number=12,
+                head_sha=head,
+                task_key="task",
+                delivery_key="delivery",
+                operation_id=operation_id,
+                request_key="warning",
+                request_fingerprint=request_fingerprint,
+                thread_id=None,
+                thread_fingerprint=None,
+                finding_comment_id=None,
+                body_fingerprint=text_fingerprint(add_operation_marker(self.HOSTILE, operation_id)),
+                reply_receipt_fingerprint=None,
+                expected_generation=1,
+                expected_state_fingerprint="c" * 64,
+                expected_claim_fingerprint="d" * 64,
+                expected_task_state="review-polling",
+            )
+            reservation_file = root / "reservation.json"
+            reservation_file.write_text(json.dumps(reservation), encoding="utf-8")
             fake_gh = root / "gh"
             fake_gh.write_text(
                 "#!/usr/bin/env python3\n"
                 "import json, sys\n"
                 f"assert {self.HOSTILE!r} not in sys.argv\n"
-                "print(json.dumps({'number': 12, 'url': 'https://api.github.com/repos/owner/repo/pulls/12'}))\n",
+                f"print(json.dumps({{'number': 12, 'url': 'https://api.github.com/repos/owner/repo/pulls/12', 'head': {{'sha': {head!r}}}}}))\n",
                 encoding="utf-8",
             )
             fake_gh.chmod(0o755)
+            fake_ledger = root / ".agents" / "skills" / "implement-feature" / "scripts" / "ledger-cache"
+            fake_ledger.parent.mkdir(parents=True, exist_ok=True)
+            fake_ledger.write_text(
+                "#!/usr/bin/env python3\n"
+                "import hashlib, json, sys\n"
+                "args = sys.argv\n"
+                "packet = json.loads(open(args[args.index('--reservation-file') + 1], encoding='utf-8').read())\n"
+                "encoded = json.dumps(packet, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode('utf-8')\n"
+                "print(json.dumps({'ok': True, 'authority': 'review-provider-mutation-started', 'reservation_id': packet['reservation_id'], 'operation_id': packet['operation_id'], 'packet_fingerprint': hashlib.sha256(encoded).hexdigest()}))\n",
+                encoding="utf-8",
+            )
+            fake_ledger.chmod(0o755)
+            ledger_file = root / "ledger.json"
+            ledger_file.write_text("{}", encoding="utf-8")
             environment = os.environ.copy()
+            environment["HOME"] = str(root)
             environment["PATH"] = f"{root}:{environment['PATH']}"
             completed = subprocess.run(
                 [
                     str(artifact), "--json", "reviews", "comment",
                     "--repo", "owner/repo", "--pr", "12",
-                    "--body-file", str(body_file), "--dry-run", "--allow-non-project",
+                    "--body-file", str(body_file), "--head", head,
+                    "--request-key", "warning", "--request-fingerprint", request_fingerprint,
+                    "--reservation-file", str(reservation_file),
+                    "--ledger-file", str(ledger_file),
+                    "--dry-run", "--allow-non-project",
                 ],
                 cwd=root,
                 env=environment,
@@ -105,11 +196,10 @@ class ProviderTextContractTests(unittest.TestCase):
                 check=False,
             )
 
-        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.returncode, 4, completed.stderr)
         self.assertNotIn(self.HOSTILE, completed.stdout + completed.stderr)
         payload = json.loads(completed.stdout)
-        self.assertEqual(payload["data"]["action"]["status"], "dry-run")
-        self.assertEqual(payload["data"]["action"]["text"]["bytes"], len(self.HOSTILE.encode("utf-8")))
+        self.assertEqual(payload["error"]["code"], "reservation_authority_invalid")
 
 
 if __name__ == "__main__":

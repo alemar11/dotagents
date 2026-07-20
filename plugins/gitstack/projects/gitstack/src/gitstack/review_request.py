@@ -8,6 +8,8 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from .review_mutation import ReservationError, marker_operation_id, operation_id_for_request, operation_marker
+
 
 REQUEST_SCHEMA = "gitstack-codex-review-request:v1"
 RECEIPT_STATUSES = {"posted", "recovered", "reused"}
@@ -33,7 +35,7 @@ REQUEST_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 TRIGGER_PATTERN = re.compile(r"(?i)@codex\s+review\b")
 MARKER_PREFIX = f"<!-- {REQUEST_SCHEMA}"
 TYPED_HEAD_PATTERN = re.compile(r"^@codex review (?P<head>[0-9a-f]{40})(?:\n|$)")
-CANONICAL_PATTERN = re.compile(
+BASE_CANONICAL_PATTERN = re.compile(
     rf"^@codex review (?P<head>[0-9a-f]{{40}})\n\n"
     rf"<!-- {re.escape(REQUEST_SCHEMA)}\n"
     r"request_key=(?P<request_key>[a-z0-9][a-z0-9._-]{0,127})\n"
@@ -62,6 +64,7 @@ class ParsedRequest:
     request_key: str | None = None
     request_fingerprint: str | None = None
     body_fingerprint: str | None = None
+    operation_id: str | None = None
 
 
 def _sha256(value: str) -> str:
@@ -125,12 +128,16 @@ def build_request(
         normalized_head,
         normalized_key,
     )
-    body = (
+    base_body = (
         f"@codex review {normalized_head}\n\n"
         f"<!-- {REQUEST_SCHEMA}\n"
         f"request_key={normalized_key}\n"
         f"request_fingerprint={fingerprint}\n"
         "-->"
+    )
+    body = (
+        f"{base_body}\n\n"
+        f"{operation_marker(operation_id_for_request(repository, pr_number, normalized_head, normalized_key, fingerprint))}"
     )
     return RequestPlan(
         schema=REQUEST_SCHEMA,
@@ -158,13 +165,23 @@ def parse_request(
         return ParsedRequest("absent")
     if MARKER_PREFIX not in text:
         return ParsedRequest("unbound")
-    match = CANONICAL_PATTERN.fullmatch(text)
+    try:
+        operation_id = marker_operation_id(text)
+    except ReservationError:
+        return ParsedRequest(
+            "invalid",
+            body_fingerprint=_sha256(text),
+        )
+    marker = operation_marker(operation_id) if operation_id is not None else None
+    base_text = text[: -len(marker)].rstrip() if marker and text.endswith(marker) else text
+    match = BASE_CANONICAL_PATTERN.fullmatch(base_text)
     if not match:
         typed_head = TYPED_HEAD_PATTERN.match(text)
         return ParsedRequest(
             "invalid",
             head_sha=typed_head.group("head") if typed_head else None,
             body_fingerprint=_sha256(text),
+            operation_id=operation_id,
         )
     head_sha = match.group("head")
     key = match.group("request_key")
@@ -176,6 +193,23 @@ def parse_request(
             request_key=key,
             request_fingerprint=fingerprint,
             body_fingerprint=_sha256(text),
+            operation_id=operation_id,
+        )
+    expected_operation_id = operation_id_for_request(
+        repository,
+        pr_number,
+        head_sha,
+        key,
+        fingerprint,
+    )
+    if operation_id != expected_operation_id:
+        return ParsedRequest(
+            "invalid",
+            head_sha=head_sha,
+            request_key=key,
+            request_fingerprint=fingerprint,
+            body_fingerprint=_sha256(text),
+            operation_id=operation_id,
         )
     return ParsedRequest(
         "canonical",
@@ -183,6 +217,7 @@ def parse_request(
         request_key=key,
         request_fingerprint=fingerprint,
         body_fingerprint=_sha256(text),
+        operation_id=operation_id,
     )
 
 

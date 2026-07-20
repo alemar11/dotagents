@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -15,11 +16,53 @@ from gitstack import reviews as cli
 from gitstack.common import GitStackError, Result
 from gitstack.provider_text import ProviderText
 from gitstack.review_request import build_request, parse_request, receipt, validate_receipt
+from gitstack.review_mutation import (
+    add_operation_marker,
+    build_reservation,
+    operation_id_for_mutation,
+    operation_id_for_request,
+    packet_fingerprint,
+    text_fingerprint,
+    thread_identity_fingerprint,
+)
 from gitstack.review_thread import build_reply_receipt, validate_reply_receipt, validate_resolution_receipt
 from gitstack.terminal_evidence import validate_terminal_evidence_receipt
 
 class ReviewsContractTests(unittest.TestCase):
     HOSTILE = "`ticks` $(command) ${HOME} $PATH 'single' \"double\"\n-leading\nUnicode ✓ 🚀"
+
+    def setUp(self) -> None:
+        def reservation(*_args, **kwargs):
+            kind = kwargs["kind"]
+            operation_id = "a" * 32
+            if kind == "review-request":
+                operation_id = operation_id_for_request(
+                    kwargs["repo"], kwargs["pr"], kwargs["head"],
+                    kwargs["request_key"], kwargs["request_fingerprint"],
+                )
+            return {
+                "schema": "gitstack-review-provider-mutation:v1",
+                "reservation_id": "b" * 64,
+                "operation_id": operation_id,
+                "head_sha": kwargs.get("head") or "b" * 40,
+                "body_fingerprint": kwargs.get("body_fingerprint") or "c" * 64,
+            }
+
+        self._reservation_patch = mock.patch.object(cli, "_require_reservation", side_effect=reservation)
+        self._consume_patch = mock.patch.object(cli, "_consume_reservation")
+        self._marked_body_patch = mock.patch.object(cli, "_marked_body", side_effect=lambda body, packet: body)
+        self._marker_match_patch = mock.patch.object(cli, "_marker_matches", return_value=True)
+        self._reservation_patch.start()
+        self._consume_patch.start()
+        self._marked_body_patch.start()
+        self._marker_match_patch.start()
+        self._head_patch = mock.patch.object(cli, "_verify_pr_head")
+        self._head_patch.start()
+        self.addCleanup(self._reservation_patch.stop)
+        self.addCleanup(self._consume_patch.stop)
+        self.addCleanup(self._marked_body_patch.stop)
+        self.addCleanup(self._marker_match_patch.stop)
+        self.addCleanup(self._head_patch.stop)
 
     def provider_body(self) -> ProviderText:
         return ProviderText("body", self.HOSTILE.encode("utf-8"), self.HOSTILE)
@@ -128,14 +171,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "7.1.1")
+        self.assertEqual(stdout.getvalue().strip(), "8.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "7.1.1")
+        self.assertEqual(payload["version"], "8.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -183,7 +226,7 @@ class ReviewsContractTests(unittest.TestCase):
         plan = build_request("codex", "owner/repo", 12, head, "run-01")
         self.assertEqual(
             plan.body,
-            f"@codex review {head}\n\n<!-- gitstack-codex-review-request:v1\nrequest_key=run-01\nrequest_fingerprint={plan.request_fingerprint}\n-->" ,
+            f"@codex review {head}\n\n<!-- gitstack-codex-review-request:v1\nrequest_key=run-01\nrequest_fingerprint={plan.request_fingerprint}\n-->\n\n<!-- gitstack-review-provider-mutation:v1\noperation_id={plan.operation_id if hasattr(plan, 'operation_id') else operation_id_for_request('owner/repo', 12, head, 'run-01', plan.request_fingerprint)}\n-->" ,
         )
         self.assertEqual(parse_request(plan.body, "codex", "owner/repo", 12).classification, "canonical")
         self.assertEqual(parse_request("@codex review", "codex", "owner/repo", 12).classification, "unbound")
@@ -538,13 +581,16 @@ class ReviewsContractTests(unittest.TestCase):
                 code = cli.main(
                     [
                         "--json", "comment", "--repo", "owner/repo", "--pr", "12",
-                        "--body-file", handle.name, "--dry-run",
+                        "--body-file", handle.name, "--head", "b" * 40,
+                        "--request-key", "run-warning", "--request-fingerprint", "a" * 64,
+                        "--reservation-file", "/tmp/review-warning-reservation.json",
+                        "--ledger-file", "/tmp/review-ledger.json", "--dry-run",
                     ]
                 )
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "7.1.1")
+        self.assertEqual(payload["version"], "8.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -573,7 +619,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "7.1.1")
+        self.assertEqual(payload["version"], "8.0.0")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -591,7 +637,10 @@ class ReviewsContractTests(unittest.TestCase):
                  contextlib.redirect_stdout(stdout):
                 code = cli.main([
                     "--json", "reply", "--repo", "owner/repo", "--pr", "12",
-                    "--head", head, "--comment-id", "123456", "--body-file", handle.name, "--dry-run",
+                    "--head", head, "--comment-id", "123456", "--body-file", handle.name,
+                    "--request-key", "run-reply", "--request-fingerprint", "a" * 64,
+                    "--reservation-file", "/tmp/review-reply-reservation.json",
+                    "--ledger-file", "/tmp/review-ledger.json", "--dry-run",
                 ])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
@@ -768,6 +817,26 @@ class ReviewsContractTests(unittest.TestCase):
              mock.patch.object(cli, "_review_thread_context", side_effect=[other, wanted]):
             selected = cli._finding_thread("owner/repo", 12, 55, "PRRC_finding_55")
         self.assertEqual(selected["thread_id"], "PRRT_thread_55")
+
+    def test_address_exposes_typed_thread_fingerprint_for_prepare(self) -> None:
+        wanted = self.thread()
+        with mock.patch.object(cli, "_review_thread_ids", return_value=["PRRT_thread_55"]), \
+             mock.patch.object(cli, "_review_thread_context", return_value=wanted):
+            entries = cli.review_threads("owner/repo", 12, include_resolved=False)
+        self.assertEqual(entries[0]["head_sha"], wanted["head_sha"])
+        self.assertEqual(
+            entries[0]["thread_fingerprint"],
+            thread_identity_fingerprint(
+                "owner/repo",
+                12,
+                wanted["head_sha"],
+                "PRRT_thread_55",
+                [
+                    {"node_id": "PRRC_finding_55", "comment_id": 55},
+                    {"node_id": "PRRC_reply_56", "comment_id": 56},
+                ],
+            ),
+        )
 
     def test_resolution_dry_run_and_already_resolved_require_typed_reply(self) -> None:
         body = self.provider_body()
@@ -1517,6 +1586,454 @@ class ReviewsContractTests(unittest.TestCase):
 
         self.assertEqual(code, 4)
         self.assertEqual(json.loads(stdout.getvalue())["error"]["code"], "api_error")
+
+
+class ReviewMutationAuthorityTests(unittest.TestCase):
+    HEAD = "b" * 40
+    REQUEST_KEY = "request-1"
+    REQUEST_FINGERPRINT = "a" * 64
+
+    def setUp(self) -> None:
+        self.directory = tempfile.TemporaryDirectory()
+        self.root = Path(self.directory.name)
+        self.addCleanup(self.directory.cleanup)
+        self.cache_patch = mock.patch.object(
+            cli, "_reservation_cache_root", return_value=self.root / "consumed"
+        )
+        self.cache_patch.start()
+        self.addCleanup(self.cache_patch.stop)
+        self.real_authority_verifier = cli._verify_started_ledger_authority
+        self.authority_patch = mock.patch.object(cli, "_verify_started_ledger_authority")
+        self.authority_patch.start()
+        self.addCleanup(self.authority_patch.stop)
+        self.head_patch = mock.patch.object(cli, "_verify_pr_head")
+        self.head_patch.start()
+        self.addCleanup(self.head_patch.stop)
+
+    def thread(self, *, head: str = HEAD, resolved: bool = False) -> dict[str, object]:
+        return {
+            "thread_id": "PRRT_thread_55",
+            "is_resolved": resolved,
+            "is_outdated": False,
+            "viewer_can_resolve": True,
+            "repository": "owner/repo",
+            "pr_number": 12,
+            "pr_state": "open",
+            "head_sha": head,
+            "comments": [
+                {"id": "PRRC_finding_55", "databaseId": 55},
+                {"id": "PRRC_reply_56", "databaseId": 56},
+            ],
+        }
+
+    def packet_file(
+        self,
+        kind: str,
+        *,
+        body: str = "evidence body",
+        head: str = HEAD,
+        reply_receipt_fingerprint: str | None = None,
+    ) -> tuple[Path, dict[str, object], str | None]:
+        request_key = self.REQUEST_KEY
+        request_fingerprint = self.REQUEST_FINGERPRINT
+        thread_id: str | None = None
+        thread_fingerprint: str | None = None
+        finding_comment_id: int | None = None
+        body_fingerprint: str | None = None
+        marked_body: str | None = None
+        if kind == "review-request":
+            plan = build_request("codex", "owner/repo", 12, head, request_key)
+            request_fingerprint = plan.request_fingerprint
+            operation_id = operation_id_for_request(
+                "owner/repo", 12, head, request_key, request_fingerprint
+            )
+            body_fingerprint = plan.body_fingerprint
+        else:
+            thread_id = "PRRT_thread_55" if kind in {"review-reply", "review-resolution"} else None
+            finding_comment_id = 55 if thread_id else None
+            if thread_id:
+                thread_fingerprint = thread_identity_fingerprint(
+                    "owner/repo",
+                    12,
+                    head,
+                    thread_id,
+                    [
+                        {"node_id": "PRRC_finding_55", "comment_id": 55},
+                        {"node_id": "PRRC_reply_56", "comment_id": 56},
+                    ],
+                )
+            source_fingerprint = (
+                reply_receipt_fingerprint
+                if kind == "review-resolution"
+                else text_fingerprint(body)
+            )
+            operation_id = operation_id_for_mutation(
+                kind,
+                "owner/repo",
+                12,
+                head,
+                request_fingerprint=request_fingerprint,
+                thread_id=thread_id,
+                finding_comment_id=finding_comment_id,
+                reply_receipt_fingerprint=(
+                    source_fingerprint if kind == "review-resolution" else None
+                ),
+            )
+            if kind != "review-resolution":
+                marked_body = add_operation_marker(body, operation_id)
+                body_fingerprint = text_fingerprint(marked_body)
+        packet = build_reservation(
+            mutation_kind=kind,
+            repository="owner/repo",
+            pr_number=12,
+            head_sha=head,
+            task_key="task-1",
+            delivery_key="delivery-1",
+            operation_id=operation_id,
+            request_key=request_key,
+            request_fingerprint=request_fingerprint,
+            thread_id=thread_id,
+            thread_fingerprint=thread_fingerprint,
+            finding_comment_id=finding_comment_id,
+            body_fingerprint=body_fingerprint,
+            reply_receipt_fingerprint=(
+                reply_receipt_fingerprint if kind == "review-resolution" else None
+            ),
+            expected_generation=1,
+            expected_state_fingerprint="c" * 64,
+            expected_claim_fingerprint="d" * 64,
+            expected_task_state="review-polling",
+        )
+        path = self.root / f"{kind}.json"
+        path.write_text(json.dumps(packet), encoding="utf-8")
+        return path, packet, marked_body
+
+    def test_all_review_mutations_fail_closed_without_reservation(self) -> None:
+        body = ProviderText("body", b"body", "body")
+        with self.assertRaises(cli.ReviewError) as request:
+            cli.request_automated_review(
+                "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY,
+                True, None, None,
+            )
+        self.assertEqual(request.exception.code, "reservation_required")
+
+        with self.assertRaises(cli.ReviewError) as warning:
+            cli.post_conversation_comment(
+                "owner/repo", 12, body, True, None, self.HEAD,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, None,
+            )
+        self.assertEqual(warning.exception.code, "reservation_required")
+
+        parent = {
+            "id": 55,
+            "node_id": "PRRC_finding_55",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r55",
+            "created_at": "2026-07-20T12:00:00Z",
+            "in_reply_to_id": None,
+            "commit_id": self.HEAD,
+        }
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "_finding_thread", return_value=self.thread()), \
+             self.assertRaises(cli.ReviewError) as reply:
+            cli.reply_to_review_comment(
+                "owner/repo", 12, self.HEAD, 55, body, True, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, None,
+            )
+        self.assertEqual(reply.exception.code, "reservation_required")
+
+        saved = {
+            "repository": "owner/repo",
+            "pr_number": 12,
+            "reply_head_sha": self.HEAD,
+            "thread_id": "PRRT_thread_55",
+            "finding_comment_id": 55,
+            "identity_fingerprint": "e" * 64,
+        }
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())), \
+             self.assertRaises(cli.ReviewError) as resolve:
+            cli.resolve_review_thread(
+                "owner/repo", 12, self.HEAD, saved, True, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, None,
+            )
+        self.assertEqual(resolve.exception.code, "reservation_required")
+
+    def test_typed_prepare_and_validate_surface_writes_one_immutable_packet(self) -> None:
+        output = self.root / "prepared.json"
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = cli.main([
+                "--json", "prepare", "--mutation-kind", "review-request",
+                "--repo", "owner/repo", "--allow-non-project", "--pr", "12",
+                "--head", self.HEAD, "--task-key", "task-1",
+                "--delivery-key", "delivery-1", "--request-key", self.REQUEST_KEY,
+                "--expected-generation", "1", "--expected-state-fingerprint", "c" * 64,
+                "--expected-claim-fingerprint", "d" * 64,
+                "--expected-task-state", "review-polling", "--output-file", str(output),
+            ])
+        self.assertEqual(code, 0)
+        packet = json.loads(output.read_text(encoding="utf-8"))
+        self.assertNotIn("attempt_state", packet)
+        stdout = io.StringIO()
+        with contextlib.redirect_stdout(stdout):
+            code = cli.main(["--json", "validate", "--reservation-file", str(output)])
+        self.assertEqual(code, 0)
+        validated = json.loads(stdout.getvalue())
+        self.assertEqual(validated["data"]["reservation"], packet)
+
+    def test_standalone_packet_is_not_provider_authority(self) -> None:
+        path, packet, _ = self.packet_file("review-request")
+        with self.assertRaises(cli.ReviewError) as raised:
+            self.real_authority_verifier(packet, str(path), None)
+        self.assertEqual(raised.exception.code, "reservation_authority_required")
+
+    def test_request_consumes_before_post_and_never_retries_after_crash(self) -> None:
+        path, packet, _ = self.packet_file("review-request")
+        plan = build_request("codex", "owner/repo", 12, self.HEAD, self.REQUEST_KEY)
+        posted = mock.Mock()
+
+        def crash_after_consumption(*_args: object, **_kwargs: object) -> object:
+            consumed = list((self.root / "consumed").glob("*.consumed.json"))
+            self.assertEqual(len(consumed), 1)
+            raise RuntimeError("simulated crash before provider response")
+
+        common = (
+            mock.patch.object(cli, "_verify_pr_head"),
+            mock.patch.object(cli, "gh_api_paginated_list", return_value=[]),
+            mock.patch.object(cli, "require_worktree", return_value=None),
+            mock.patch.object(cli, "_viewer_login", return_value="agent"),
+            mock.patch.object(cli, "api_request", side_effect=crash_after_consumption),
+        )
+        with common[0], common[1], common[2], common[3], common[4] as mutation:
+            with self.assertRaises(RuntimeError):
+                cli.request_automated_review(
+                    "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY,
+                    False, None, str(path),
+                )
+            self.assertEqual(mutation.call_count, 1)
+            with self.assertRaises(cli.ReviewError) as replay:
+                cli.request_automated_review(
+                    "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY,
+                    False, None, str(path),
+                )
+        self.assertEqual(replay.exception.code, "request_unknown")
+        self.assertEqual(replay.exception.details["recovery"], "needs-owner")
+        self.assertEqual(packet["body_fingerprint"], plan.body_fingerprint)
+        posted.assert_not_called()
+
+    def test_request_post_ambiguity_is_not_retried(self) -> None:
+        path, _, _ = self.packet_file("review-request")
+        api = mock.Mock(return_value=Result(0, "not-json", ""))
+        existing = mock.Mock(side_effect=[[], []])
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "gh_api_paginated_list", existing), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", api), \
+             self.assertRaises(cli.ReviewError) as first:
+            cli.request_automated_review(
+                "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY,
+                False, None, str(path),
+            )
+        self.assertEqual(first.exception.code, "request_unknown")
+        self.assertEqual(api.call_count, 1)
+        self.assertEqual(existing.call_count, 2)
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[]), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             self.assertRaises(cli.ReviewError) as replay:
+            cli.request_automated_review(
+                "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY,
+                False, None, str(path),
+            )
+        self.assertEqual(replay.exception.code, "request_unknown")
+        self.assertEqual(replay.exception.details["recovery"], "needs-owner")
+        self.assertEqual(api.call_count, 1)
+
+    def test_warning_post_consumes_before_post_and_replays_fail_closed(self) -> None:
+        body = "timeout warning"
+        path, packet, marked_body = self.packet_file("review-warning", body=body)
+        item = {
+            "id": 71,
+            "html_url": "https://github.com/owner/repo/pull/12#issuecomment-71",
+            "issue_url": "https://api.github.com/repos/owner/repo/issues/12",
+            "user": {"login": "agent"},
+            "body": marked_body,
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+        result = Result(0, json.dumps(item), "")
+        clock = mock.patch.object(cli, "datetime")
+        clock_value = clock.start()
+        self.addCleanup(clock.stop)
+        clock_value.now.return_value = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
+        with mock.patch.object(cli, "_verify_pr_target", return_value={"number": 12}), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", return_value=result) as api, \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[item]):
+            action = cli.post_conversation_comment(
+                "owner/repo", 12, ProviderText("body", body.encode(), body), False, None,
+                self.HEAD, self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+            self.assertEqual(action["status"], "posted")
+            recovered = cli.post_conversation_comment(
+                "owner/repo", 12, ProviderText("body", body.encode(), body), False, None,
+                self.HEAD, self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+        self.assertEqual(recovered["status"], "recovered")
+        self.assertEqual(api.call_count, 1)
+        self.assertEqual(action["text"]["sha256"], text_fingerprint(marked_body or ""))
+
+    def test_reply_ambiguity_is_not_retried_and_marker_is_exact(self) -> None:
+        body = "evidence body"
+        path, packet, marked_body = self.packet_file("review-reply", body=body)
+        parent = {
+            "id": 55,
+            "node_id": "PRRC_finding_55",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r55",
+            "created_at": "2026-07-20T12:00:00Z",
+            "in_reply_to_id": None,
+            "commit_id": self.HEAD,
+        }
+        api = mock.Mock(return_value=Result(0, "not-json", ""))
+        read_back = mock.Mock(return_value=[])
+        provider_body = ProviderText("body", body.encode(), body)
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "_finding_thread", return_value=self.thread()), \
+             mock.patch.object(cli, "_review_thread_context", return_value=self.thread()), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "api_request", api), \
+             mock.patch.object(cli, "gh_api_paginated_list", read_back), \
+             self.assertRaises(cli.ReviewError) as first:
+            cli.reply_to_review_comment(
+                "owner/repo", 12, self.HEAD, 55, provider_body, False, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+        self.assertEqual(first.exception.code, "provider_write_ambiguous")
+        self.assertEqual(api.call_count, 1)
+        self.assertEqual(read_back.call_count, 1)
+        self.assertEqual(packet["body_fingerprint"], text_fingerprint(marked_body or ""))
+        self.assertIn(packet["operation_id"], marked_body or "")
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "_finding_thread", return_value=self.thread()), \
+             mock.patch.object(cli, "_review_thread_context", return_value=self.thread()), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[]), \
+             self.assertRaises(cli.ReviewError) as replay:
+            cli.reply_to_review_comment(
+                "owner/repo", 12, self.HEAD, 55, provider_body, False, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+        self.assertEqual(replay.exception.code, "provider_recovery_ambiguous")
+        self.assertEqual(replay.exception.details["recovery"], "needs-owner")
+        self.assertEqual(api.call_count, 1)
+
+        recovered_item = {
+            "id": 57,
+            "node_id": "PRRC_reply_57",
+            "pull_request_url": "https://api.github.com/repos/owner/repo/pulls/12",
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r57",
+            "created_at": "2026-07-20T12:02:00Z",
+            "in_reply_to_id": 55,
+            "user": {"login": "agent"},
+            "body": marked_body,
+        }
+        recovery_thread = {
+            **self.thread(),
+            "comments": [
+                *self.thread()["comments"],
+                {"id": "PRRC_reply_57", "databaseId": 57},
+            ],
+        }
+        with mock.patch.object(cli, "_verify_pr_head"), \
+             mock.patch.object(cli, "_api_object", return_value=parent), \
+             mock.patch.object(cli, "_finding_thread", return_value=self.thread()), \
+             mock.patch.object(cli, "_review_thread_context", return_value=recovery_thread), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "_viewer_login", return_value="agent"), \
+             mock.patch.object(cli, "gh_api_paginated_list", return_value=[recovered_item]):
+            recovered = cli.reply_to_review_comment(
+                "owner/repo", 12, self.HEAD, 55, provider_body, False, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+        self.assertEqual(recovered["status"], "recovered")
+        self.assertEqual(recovered["reply"]["reply_comment_id"], 57)
+        self.assertEqual(api.call_count, 1)
+
+    def test_resolution_reservation_uses_thread_readback_without_comment_marker(self) -> None:
+        reply_fingerprint = "e" * 64
+        path, packet, _ = self.packet_file(
+            "review-resolution", reply_receipt_fingerprint=reply_fingerprint
+        )
+        saved = {
+            "repository": "owner/repo",
+            "pr_number": 12,
+            "reply_head_sha": self.HEAD,
+            "thread_id": "PRRT_thread_55",
+            "finding_comment_id": 55,
+            "identity_fingerprint": reply_fingerprint,
+        }
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, self.thread())), \
+             mock.patch.object(cli, "require_worktree", return_value=None):
+            action = cli.resolve_review_thread(
+                "owner/repo", 12, self.HEAD, saved, True, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+        self.assertEqual(action["status"], "dry-run")
+        self.assertNotIn("operation_id=", json.dumps(action))
+        self.assertNotIn(packet["operation_id"], json.dumps(action))
+        self.assertFalse(list((self.root / "consumed").glob("*.consumed.json")))
+
+    def test_resolution_reconciles_consumed_thread_without_graphql_retry(self) -> None:
+        finding = {
+            "id": 55,
+            "node_id": "PRRC_finding_55",
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r55",
+            "created_at": "2026-07-20T12:00:00Z",
+        }
+        reply = {
+            "id": 56,
+            "node_id": "PRRC_reply_56",
+            "user": {"login": "agent"},
+            "html_url": "https://github.com/owner/repo/pull/12#discussion_r56",
+            "created_at": "2026-07-20T12:01:00Z",
+        }
+        saved = build_reply_receipt(
+            repository="owner/repo",
+            pr_number=12,
+            finding_head_sha=self.HEAD,
+            reply_head_sha=self.HEAD,
+            thread_id="PRRT_thread_55",
+            finding=finding,
+            reply=reply,
+            body_fingerprint="f" * 64,
+            status="replied",
+        )
+        path, packet, _ = self.packet_file(
+            "review-resolution",
+            reply_receipt_fingerprint=saved["identity_fingerprint"],
+        )
+        thread = self.thread(resolved=True)
+        cli._consume_reservation(packet, str(path))
+        with mock.patch.object(cli, "_validate_reply_remote", return_value=(saved, thread)), \
+             mock.patch.object(cli, "_review_thread_context", return_value=thread), \
+             mock.patch.object(cli, "require_worktree", return_value=None), \
+             mock.patch.object(cli, "graphql_request") as graphql:
+            action = cli.resolve_review_thread(
+                "owner/repo", 12, self.HEAD, saved, False, None,
+                self.REQUEST_KEY, self.REQUEST_FINGERPRINT, str(path),
+            )
+        self.assertEqual(action["status"], "recovered")
+        self.assertTrue(action["transport"]["recovered"])
+        self.assertTrue(action["mutation_may_have_applied"])
+        graphql.assert_not_called()
 
 
 if __name__ == "__main__":

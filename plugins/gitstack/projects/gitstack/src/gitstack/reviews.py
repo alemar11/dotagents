@@ -3,7 +3,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import stat
 import subprocess
 import sys
 import time
@@ -41,6 +43,21 @@ from .review_thread import (
     build_reply_receipt,
     build_resolution_receipt,
     validate_reply_receipt,
+)
+from .review_mutation import (
+    MUTATION_KINDS,
+    RESERVATION_FIELDS,
+    ReservationError,
+    add_operation_marker,
+    build_reservation,
+    marker_operation_id,
+    operation_marker,
+    operation_id_for_mutation,
+    operation_id_for_request,
+    packet_fingerprint,
+    thread_identity_fingerprint,
+    text_fingerprint,
+    validate_reservation_packet,
 )
 from .terminal_evidence import (
     build_terminal_evidence_receipt,
@@ -101,6 +118,409 @@ class ReviewError(Exception):
         self.code = code
         self.exit_code = exit_code
         self.details = details
+
+
+def _reservation_cache_root() -> Path:
+    return _trusted_user_home() / ".cache/dotagents/plugins/gitstack/review-mutations"
+
+
+def _trusted_user_home() -> Path:
+    """Return the account home without trusting a caller-provided HOME."""
+
+    try:
+        import pwd
+
+        return Path(pwd.getpwuid(os.getuid()).pw_dir)
+    except (ImportError, KeyError, OSError, AttributeError):
+        # Windows has no pwd database; Path.home() is the platform fallback.
+        return Path.home()
+
+
+def _read_reservation_file(path_value: str | None) -> dict[str, Any]:
+    if not isinstance(path_value, str) or not path_value:
+        raise ReviewError(
+            "A root-issued reservation file is required before this review mutation.",
+            code="reservation_required",
+            exit_code=4,
+        )
+    path = Path(path_value)
+    if not path.is_absolute():
+        raise ReviewError(
+            "The reservation file must be an absolute regular non-symlinked file.",
+            code="reservation_invalid",
+            exit_code=4,
+        )
+    try:
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("reservation file is not regular")
+            value = json.loads(os.read(fd, 1_048_577).decode("utf-8"))
+        finally:
+            os.close(fd)
+        return validate_reservation_packet(value)
+    except (OSError, UnicodeError, json.JSONDecodeError, ReservationError) as exc:
+        raise ReviewError(
+            "The reservation file is not a valid immutable provider-mutation packet.",
+            code="reservation_invalid",
+            exit_code=4,
+        ) from exc
+
+
+def _require_reservation(
+    path_value: str | None,
+    *,
+    ledger_file: str | None,
+    kind: str,
+    repo: str,
+    pr: int,
+    head: str | None = None,
+    request_key: str | None = None,
+    request_fingerprint: str | None = None,
+    thread_id: str | None = None,
+    thread_fingerprint: str | None = None,
+    finding_comment_id: int | None = None,
+    body_fingerprint: str | None = None,
+    reply_receipt_fingerprint: str | None = None,
+    allow_thread_fingerprint_mismatch: bool = False,
+) -> dict[str, Any]:
+    if kind not in MUTATION_KINDS:
+        raise ReviewError("The requested mutation kind is not supported.", code="reservation_invalid", exit_code=4)
+    required = {
+        "head": head,
+        "request_key": request_key,
+        "request_fingerprint": request_fingerprint,
+    }
+    if kind in {"review-reply", "review-resolution"}:
+        required.update(
+            {
+                "thread_id": thread_id,
+                "thread_fingerprint": thread_fingerprint,
+                "finding_comment_id": finding_comment_id,
+            }
+        )
+    missing = [name for name, value in required.items() if value is None]
+    if missing:
+        raise ReviewError(
+            f"The reservation is missing exact mutation identity: {', '.join(missing)}.",
+            code="reservation_required",
+            exit_code=4,
+        )
+    packet = _read_reservation_file(path_value)
+    if packet["mutation_kind"] != kind or packet["repository"] != repo or packet["pr_number"] != pr:
+        raise ReviewError(
+            "The reservation does not match the exact review mutation target.",
+            code="reservation_target_mismatch",
+            exit_code=4,
+        )
+    if head is not None and packet["head_sha"] != validate_full_head(head):
+        raise ReviewError(
+            "The reservation does not match the exact pull-request head.",
+            code="reservation_target_mismatch",
+            exit_code=4,
+        )
+    checks = {
+        "request_key": request_key,
+        "request_fingerprint": request_fingerprint,
+        "thread_id": thread_id,
+        "thread_fingerprint": thread_fingerprint,
+        "finding_comment_id": finding_comment_id,
+        "body_fingerprint": body_fingerprint,
+        "reply_receipt_fingerprint": reply_receipt_fingerprint,
+    }
+    for field, expected in checks.items():
+        if field == "thread_fingerprint" and allow_thread_fingerprint_mismatch:
+            continue
+        if expected is not None and packet[field] != expected:
+            raise ReviewError(
+                f"The reservation does not match the exact {field}.",
+                code="reservation_target_mismatch",
+                exit_code=4,
+            )
+    _verify_started_ledger_authority(packet, path_value, ledger_file)
+    return packet
+
+
+def _ledger_cache_script() -> Path | None:
+    """Find the installed Implement Feature authority verifier.
+
+    The target checkout is never searched: it is provider data, not a trusted
+    runtime. The verifier is resolved only from installation-owned skill roots;
+    arbitrary environment overrides are intentionally unsupported.
+    """
+
+    roots = [*Path(__file__).resolve().parents]
+    roots.extend(
+        [
+            _trusted_user_home() / ".agents/skills/implement-feature",
+            _trusted_user_home() / ".codex/skills/implement-feature",
+        ]
+    )
+    seen: set[Path] = set()
+    candidates: list[Path] = []
+    for root in roots:
+        candidates.append(root / "skills" / "implement-feature" / "scripts" / "ledger-cache")
+        candidates.append(root / "scripts" / "ledger-cache")
+    for candidate in candidates:
+        candidate = Path(os.path.abspath(os.fspath(candidate)))
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_file() and not candidate.is_symlink() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def _verify_started_ledger_authority(
+    packet: dict[str, Any], reservation_file: str | None, ledger_file: str | None
+) -> None:
+    """Require the exact packet to be durably started in the root ledger.
+
+    GitStack owns provider transport and the one-use consumed marker.  The
+    Implement Feature ledger owns root authorization and lifecycle state; its
+    typed read-only command is the verifier at this boundary.
+    """
+
+    if not isinstance(reservation_file, str) or not reservation_file:
+        raise ReviewError(
+            "A reservation file is required before provider authority can be verified.",
+            code="reservation_authority_required",
+            exit_code=4,
+        )
+    if not isinstance(ledger_file, str) or not ledger_file:
+        raise ReviewError(
+            "The root ledger file is required before provider authority can be verified.",
+            code="reservation_authority_required",
+            exit_code=4,
+        )
+    ledger = Path(ledger_file)
+    if not ledger.is_absolute() or ledger.is_symlink() or not ledger.is_file():
+        raise ReviewError(
+            "The root ledger file must be an absolute regular non-symlinked file.",
+            code="reservation_authority_invalid",
+            exit_code=4,
+        )
+    verifier = _ledger_cache_script()
+    if verifier is None:
+        raise ReviewError(
+            "The Implement Feature ledger authority verifier is unavailable; refusing provider mutation.",
+            code="reservation_authority_unavailable",
+            exit_code=4,
+        )
+    try:
+        verifier_env = os.environ.copy()
+        verifier_env["HOME"] = str(_trusted_user_home())
+        verifier_env.pop("PYTHONPATH", None)
+        verifier_env.pop("PYTHONHOME", None)
+        verifier_env["PYTHONNOUSERSITE"] = "1"
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(verifier),
+                "--json",
+                "ledger",
+                "review-authority",
+                "--ledger",
+                str(ledger),
+                "--reservation-file",
+                str(Path(reservation_file)),
+            ],
+            text=True,
+            capture_output=True,
+            env=verifier_env,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ReviewError(
+            "The root ledger authority verifier could not be reached; refusing provider mutation.",
+            code="reservation_authority_unavailable",
+            exit_code=4,
+        ) from exc
+    if completed.returncode != 0:
+        raise ReviewError(
+            "The reservation is not durably started by the active root ledger; refusing provider mutation.",
+            code="reservation_authority_invalid",
+            exit_code=4,
+            details={"verifier_stderr": completed.stderr[-1000:]},
+        )
+    try:
+        result = json.loads(completed.stdout)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise ReviewError(
+            "The root ledger authority verifier returned invalid proof; refusing provider mutation.",
+            code="reservation_authority_invalid",
+            exit_code=4,
+        ) from exc
+    if (
+        not isinstance(result, dict)
+        or result.get("ok") is not True
+        or result.get("authority") != "review-provider-mutation-started"
+        or result.get("reservation_id") != packet["reservation_id"]
+        or result.get("operation_id") != packet["operation_id"]
+        or result.get("packet_fingerprint") != packet_fingerprint(packet)
+    ):
+        raise ReviewError(
+            "The root ledger authority proof does not match the immutable reservation; refusing provider mutation.",
+            code="reservation_authority_invalid",
+            exit_code=4,
+        )
+
+
+def _read_consumed_marker(
+    packet: dict[str, Any], reservation_file: str,
+) -> dict[str, Any] | None:
+    """Read the one-use marker without creating or changing it."""
+
+    root = _reservation_cache_root()
+    if not root.exists():
+        return None
+    if root.is_symlink() or not root.is_dir():
+        raise ReviewError(
+            "The one-use reservation marker store is unsafe; refusing recovery.",
+            code="reservation_consumed_unknown",
+            exit_code=4,
+        )
+    marker_path = root / f"{packet['operation_id']}.consumed.json"
+    try:
+        fd = os.open(marker_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise ReviewError(
+            "The consumed reservation marker is unavailable; refusing retry or recovery.",
+            code="reservation_consumed_unknown",
+            exit_code=4,
+        ) from exc
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError("consumed reservation marker is not regular")
+        value = json.loads(os.read(fd, 1_048_577).decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ReviewError(
+            "The consumed reservation marker is unreadable; refusing retry or recovery.",
+            code="reservation_consumed_unknown",
+            exit_code=4,
+        ) from exc
+    finally:
+        os.close(fd)
+    if (
+        not isinstance(value, dict)
+        or value.get("schema") != packet["schema"]
+        or value.get("operation_id") != packet["operation_id"]
+        or value.get("reservation_id") != packet["reservation_id"]
+        or value.get("packet_fingerprint") != packet_fingerprint(packet)
+        or value.get("reservation_file") != str(Path(reservation_file).resolve())
+    ):
+        raise ReviewError(
+            "The operation identity is already consumed by a conflicting reservation.",
+            code="reservation_conflict",
+            exit_code=4,
+        )
+    return value
+
+
+def _recovery_required(
+    message: str, *, code: str, details: dict[str, Any] | None = None,
+) -> ReviewError:
+    return ReviewError(
+        message,
+        code=code,
+        exit_code=4,
+        details={"recovery": "needs-owner", "automatic_retry": False, **(details or {})},
+    )
+
+
+def _consume_reservation(packet: dict[str, Any], reservation_file: str) -> None:
+    """Atomically consume one packet before any provider mutation."""
+
+    root = _reservation_cache_root()
+    try:
+        if root.exists() and (root.is_symlink() or not root.is_dir()):
+            raise OSError("reservation marker root is unsafe")
+        root.mkdir(parents=True, exist_ok=True)
+        if root.is_symlink() or not root.is_dir():
+            raise OSError("reservation marker root is unsafe")
+    except OSError as exc:
+        raise ReviewError(
+            "The one-use reservation marker store is unsafe or unavailable.",
+            code="reservation_consume_failed",
+            exit_code=4,
+        ) from exc
+    marker_path = root / f"{packet['operation_id']}.consumed.json"
+    marker = {
+        "schema": packet["schema"],
+        "reservation_id": packet["reservation_id"],
+        "operation_id": packet["operation_id"],
+        "packet_fingerprint": packet_fingerprint(packet),
+        "reservation_file": str(Path(reservation_file).resolve()),
+        "consumed_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
+    }
+    encoded = (json.dumps(marker, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    try:
+        fd = os.open(
+            marker_path,
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+    except FileExistsError as exc:
+        _read_consumed_marker(packet, reservation_file)
+        raise ReviewError(
+            "This provider mutation reservation was already consumed; reconcile read-only and do not retry.",
+            code="reservation_consumed",
+            exit_code=4,
+        ) from exc
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        raise ReviewError(
+            "The one-use reservation could not be durably consumed; no provider retry is allowed.",
+            code="reservation_consume_failed",
+            exit_code=4,
+        ) from exc
+    try:
+        directory_fd = os.open(
+            root,
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0),
+        )
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except OSError as exc:
+        raise ReviewError(
+            "The one-use reservation directory could not be durably synced; no provider mutation is allowed.",
+            code="reservation_consume_failed",
+            exit_code=4,
+        ) from exc
+
+
+def _marked_body(body: ProviderText, packet: dict[str, Any]) -> ProviderText:
+    try:
+        text = add_operation_marker(body.text, packet["operation_id"])
+    except ReservationError as exc:
+        raise ReviewError("The provider body marker is invalid.", code="reservation_invalid", exit_code=4) from exc
+    marked = ProviderText(body.field, text.encode("utf-8"), text)
+    if packet["body_fingerprint"] != marked.sha256:
+        raise ReviewError(
+            "The reservation body fingerprint does not match the exact provider text.",
+            code="reservation_body_mismatch",
+            exit_code=4,
+        )
+    return marked
+
+
+def _marker_matches(text: str, operation_id: str) -> bool:
+    try:
+        return marker_operation_id(text) == operation_id
+    except ReservationError:
+        return False
 
 
 class StrictParser(argparse.ArgumentParser):
@@ -399,6 +819,60 @@ def _request_conflicts(
     if len(exact) > 1:
         return "ambiguous", exact
     return None, exact
+
+
+def _reconcile_consumed_request(
+    repo: str, pr: int, plan: RequestPlan, packet: dict[str, Any],
+) -> dict[str, Any]:
+    """Recover one already-consumed request from an exact provider artifact."""
+
+    try:
+        actor = _viewer_login()
+        conversation = _read_back_list(f"repos/{repo}/issues/{pr}/comments")
+    except (ReviewError, GitStackError) as exc:
+        raise _recovery_required(
+            "The consumed review request could not be read back exactly; owner recovery is required.",
+            code="request_unknown",
+            details={"read_back_code": getattr(exc, "code", "provider_read_back_failed")},
+        ) from exc
+    matches = [
+        item for item in conversation
+        if _item_login(item) == actor
+        and _request_target_comment(item, repo, pr)
+        and _comment_for_plan(item, plan)
+        and _marker_matches(str(item.get("body") or ""), packet["operation_id"])
+    ]
+    if len(matches) != 1:
+        raise _recovery_required(
+            "The consumed review request did not map to one unique provider artifact; owner recovery is required.",
+            code="request_unknown",
+            details={"matches": len(matches)},
+        )
+    try:
+        saved_receipt = receipt(plan, matches[0], status="recovered")
+    except (KeyError, TypeError, ValueError) as exc:
+        raise _recovery_required(
+            "The recovered review request omitted complete provider identity; owner recovery is required.",
+            code="request_unknown",
+        ) from exc
+    return {
+        "status": "recovered",
+        "request": saved_receipt,
+        "target": {"repo": repo, "pr": pr, "kind": "codex-review-request"},
+        "text": {
+            "field": "body",
+            "encoding": "utf-8",
+            "bytes": len(plan.body.encode("utf-8")),
+            "sha256": plan.body_fingerprint,
+        },
+        "transport": {
+            "method": "POST",
+            "endpoint": f"repos/{repo}/issues/{pr}/comments",
+            "api_version": API_VERSION,
+            "posted": False,
+            "recovered": True,
+        },
+    }
 
 
 def _observed_request_metadata(
@@ -1098,6 +1572,26 @@ def _finding_thread(repo: str, pr: int, finding_comment_id: int, finding_node_id
     return matches[0]
 
 
+def _exact_thread_fingerprint(thread: dict[str, Any], repo: str, pr: int, head: str) -> str:
+    try:
+        return thread_identity_fingerprint(
+            repo,
+            pr,
+            head,
+            str(thread["thread_id"]),
+            [
+                {"node_id": item.get("id"), "comment_id": item.get("databaseId")}
+                for item in thread.get("comments", [])
+            ],
+        )
+    except (KeyError, ReservationError) as exc:
+        raise ReviewError(
+            "The exact review thread omitted stable provider identity.",
+            code="review_thread_mismatch",
+            exit_code=4,
+        ) from exc
+
+
 def review_threads(repo: str, pr: int, include_resolved: bool) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     for thread_id in _review_thread_ids(repo, pr):
@@ -1106,12 +1600,20 @@ def review_threads(repo: str, pr: int, include_resolved: bool) -> list[dict[str,
         outdated = thread["is_outdated"]
         if not include_resolved and (resolved or outdated):
             continue
+        exact_thread_fingerprint = _exact_thread_fingerprint(
+            thread,
+            repo,
+            pr,
+            thread["head_sha"],
+        )
         for comment in thread["comments"]:
             if isinstance(comment.get("databaseId"), int):
                 entries.append(
                     {
                         "type": "review_thread_comment",
                         "thread_id": thread_id,
+                        "thread_fingerprint": exact_thread_fingerprint,
+                        "head_sha": thread["head_sha"],
                         "comment_id": int(comment["databaseId"]),
                         "comment_node_id": comment.get("id"),
                         "author": ((comment.get("author") or {}).get("login") or ""),
@@ -1238,6 +1740,55 @@ def _read_back_list(endpoint: str) -> list[dict[str, Any]]:
         ) from exc
 
 
+def _reconcile_consumed_comment(
+    endpoint: str,
+    repo: str,
+    pr: int,
+    actor: str,
+    body: ProviderText,
+    packet: dict[str, Any],
+    *,
+    parent_comment_id: int | None = None,
+    thread_comment_node_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    """Find one exact marker-bound comment after a consumed reservation."""
+
+    try:
+        items = _read_back_list(endpoint)
+    except (ReviewError, GitStackError) as exc:
+        raise _recovery_required(
+            "The consumed comment could not be read back exactly; owner recovery is required.",
+            code="provider_recovery_ambiguous",
+            details={"read_back_code": getattr(exc, "code", "provider_read_back_failed")},
+        ) from exc
+    if endpoint.startswith(f"repos/{repo}/issues/"):
+        target_field = "issue_url"
+        target_suffix = f"/repos/{repo}/issues/{pr}"
+    else:
+        target_field = "pull_request_url"
+        target_suffix = f"/repos/{repo}/pulls/{pr}"
+    matches = [
+        item for item in items
+        if _item_login(item) == actor
+        and str(item.get(target_field) or "").endswith(target_suffix)
+        and response_text_matches(item, body)
+        and _marker_matches(str(item.get("body") or ""), packet["operation_id"])
+        and (parent_comment_id is None or item.get("in_reply_to_id") == parent_comment_id)
+        and (
+            thread_comment_node_ids is None
+            or isinstance(item.get("node_id"), str)
+            and item["node_id"] in thread_comment_node_ids
+        )
+    ]
+    if len(matches) != 1:
+        raise _recovery_required(
+            "The consumed comment did not map to one unique provider artifact; owner recovery is required.",
+            code="provider_recovery_ambiguous",
+            details={"matches": len(matches), "operation_id": packet["operation_id"]},
+        )
+    return matches[0]
+
+
 def _guarded_result(
     action: dict[str, Any],
     before: dict[str, Any] | None,
@@ -1260,19 +1811,47 @@ def post_conversation_comment(
     body: ProviderText,
     dry_run: bool,
     expected_worktree_fingerprint: str | None,
+    head: str | None = None,
+    request_key: str | None = None,
+    request_fingerprint: str | None = None,
+    reservation_file: str | None = None,
+    ledger_file: str | None = None,
 ) -> dict[str, Any]:
-    _verify_pr_target(repo, pr)
+    packet = _require_reservation(
+        reservation_file,
+        ledger_file=ledger_file,
+        kind="review-warning",
+        repo=repo,
+        pr=pr,
+        head=head,
+        request_key=request_key,
+        request_fingerprint=request_fingerprint,
+    )
+    body = _marked_body(body, packet)
     try:
         before = require_worktree(expected_worktree_fingerprint)
     except GitStackError as exc:
         raise _review_error(exc) from exc
     target = {"repo": repo, "pr": pr, "kind": "conversation-comment"}
+    if _read_consumed_marker(packet, reservation_file or "") is not None:
+        actor = _viewer_login()
+        item = _reconcile_consumed_comment(
+            f"repos/{repo}/issues/{pr}/comments",
+            repo,
+            pr,
+            actor,
+            body,
+            packet,
+        )
+        return _guarded_result(_proof(item, body, target=target, status="recovered"), before)
+    _verify_pr_head(repo, pr, packet["head_sha"])
     if dry_run:
         return {
             "status": "dry-run", "target": target, "text": body.proof(),
             "transport": {"method": "POST", "endpoint": f"repos/{repo}/issues/{pr}/comments", "api_version": API_VERSION},
         }
     actor = _viewer_login()
+    _consume_reservation(packet, reservation_file or "")
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", f"repos/{repo}/issues/{pr}/comments", {"body": body.text})
     finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -1281,6 +1860,7 @@ def post_conversation_comment(
         if (
             not str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}")
             or _item_login(item) != actor
+            or not _marker_matches(str(item.get("body") or ""), packet["operation_id"])
             or not _in_creation_window(item, "created_at", started_at, finished_at)
         ):
             raise _proof_failure("Comment response did not match the intended creation.", "provider_target_mismatch")
@@ -1292,6 +1872,7 @@ def post_conversation_comment(
             item for item in _read_back_list(f"repos/{repo}/issues/{pr}/comments")
             if _item_login(item) == actor
             and response_text_matches(item, body)
+            and _marker_matches(str(item.get("body") or ""), packet["operation_id"])
             and _in_creation_window(item, "created_at", started_at, finished_at)
             and str(item.get("issue_url") or "").endswith(f"/repos/{repo}/issues/{pr}")
         ]
@@ -1339,12 +1920,35 @@ def request_automated_review(
     request_key: str,
     dry_run: bool,
     expected_worktree_fingerprint: str | None,
+    reservation_file: str | None = None,
+    ledger_file: str | None = None,
 ) -> dict[str, Any]:
     is_provider_author(provider, "")
     try:
         plan = build_request(provider, repo, pr, head, request_key)
     except ValueError as exc:
         raise ReviewError(str(exc), code="invalid_request", exit_code=64) from exc
+    packet = _require_reservation(
+        reservation_file,
+        ledger_file=ledger_file,
+        kind="review-request",
+        repo=repo,
+        pr=pr,
+        head=plan.head_sha,
+        request_key=plan.request_key,
+        request_fingerprint=plan.request_fingerprint,
+        body_fingerprint=plan.body_fingerprint,
+    )
+    if packet["operation_id"] != operation_id_for_request(
+        repo, pr, plan.head_sha, plan.request_key, plan.request_fingerprint
+    ):
+        raise ReviewError(
+            "The request reservation operation identity is invalid.",
+            code="reservation_target_mismatch",
+            exit_code=4,
+        )
+    if _read_consumed_marker(packet, reservation_file or "") is not None:
+        return _reconcile_consumed_request(repo, pr, plan, packet)
     _verify_pr_head(repo, pr, plan.head_sha)
     conversation = gh_api_paginated_list(f"repos/{repo}/issues/{pr}/comments")
     conflict, exact = _request_conflicts(conversation, plan)
@@ -1370,7 +1974,15 @@ def request_automated_review(
             details={"request_binding": "ambiguous", "head": plan.head_sha},
         )
     if exact:
-        existing = exact[0]
+        actor = _viewer_login()
+        owned = [item for item in exact if _item_login(item) == actor]
+        if len(owned) != 1:
+            raise _recovery_required(
+                "The exact Codex request is not uniquely owned by the authenticated actor; owner recovery is required.",
+                code="request_unknown",
+                details={"matches": len(owned), "exact_matches": len(exact)},
+            )
+        existing = owned[0]
         try:
             saved_receipt = receipt(plan, existing, status="reused")
         except (KeyError, TypeError, ValueError) as exc:
@@ -1411,6 +2023,7 @@ def request_automated_review(
             "transport": {"method": "POST", "endpoint": f"repos/{repo}/issues/{pr}/comments", "api_version": API_VERSION, "posted": False},
         }
     actor = _viewer_login()
+    _consume_reservation(packet, reservation_file or "")
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", f"repos/{repo}/issues/{pr}/comments", {"body": plan.body})
     finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -1475,12 +2088,15 @@ def reply_to_review_comment(
     body: ProviderText,
     dry_run: bool,
     expected_worktree_fingerprint: str | None,
+    request_key: str | None = None,
+    request_fingerprint: str | None = None,
+    reservation_file: str | None = None,
+    ledger_file: str | None = None,
 ) -> dict[str, Any]:
     try:
         reply_head = validate_full_head(head)
     except ValueError as exc:
         raise ReviewError(str(exc), code="invalid_arguments", exit_code=64) from exc
-    _verify_pr_head(repo, pr, reply_head)
     parent = _api_object(f"repos/{repo}/pulls/comments/{comment_id}")
     if not str(parent.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}"):
         raise ReviewError("Review comment does not belong to the requested PR.", code="provider_target_mismatch", exit_code=65)
@@ -1497,6 +2113,25 @@ def reply_to_review_comment(
     except ValueError as exc:
         raise ReviewError("Review finding omitted its full commit identity.", code="provider_identity_missing", exit_code=65) from exc
     thread = _finding_thread(repo, pr, comment_id, parent["node_id"])
+    exact_thread_fingerprint = _exact_thread_fingerprint(thread, repo, pr, reply_head)
+    packet = _require_reservation(
+        reservation_file,
+        ledger_file=ledger_file,
+        kind="review-reply",
+        repo=repo,
+        pr=pr,
+        head=reply_head,
+        request_key=request_key,
+        request_fingerprint=request_fingerprint,
+        thread_id=str(thread["thread_id"]),
+        # Validate the immutable pre-reply fingerprint below. A consumed
+        # replay may already contain the one marker-bound reply, so the live
+        # thread's comment set is intentionally allowed to differ here.
+        thread_fingerprint=exact_thread_fingerprint,
+        finding_comment_id=comment_id,
+        allow_thread_fingerprint_mismatch=True,
+    )
+    body = _marked_body(body, packet)
     try:
         before = require_worktree(expected_worktree_fingerprint)
     except GitStackError as exc:
@@ -1511,6 +2146,85 @@ def reply_to_review_comment(
         "finding_node_id": parent["node_id"],
     }
     endpoint = f"repos/{repo}/pulls/{pr}/comments/{comment_id}/replies"
+    if _read_consumed_marker(packet, reservation_file or "") is not None:
+        try:
+            recovery_thread = _review_thread_context(str(packet["thread_id"]))
+        except ReviewError as exc:
+            raise _recovery_required(
+                "The consumed review reply thread could not be read back exactly; owner recovery is required.",
+                code="provider_recovery_ambiguous",
+                details={"read_back_code": exc.code},
+            ) from exc
+        recovered_reply_node_id: str | None = None
+        if (
+            recovery_thread.get("thread_id") != packet["thread_id"]
+            or recovery_thread.get("repository") != repo
+            or recovery_thread.get("pr_number") != pr
+            or recovery_thread.get("head_sha") != packet["head_sha"]
+        ):
+            raise _recovery_required(
+                "The consumed review reply thread changed; owner recovery is required.",
+                code="provider_recovery_ambiguous",
+            )
+        thread_comment_node_ids = {
+            str(item["id"])
+            for item in recovery_thread.get("comments", [])
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        actor = _viewer_login()
+        item = _reconcile_consumed_comment(
+            f"repos/{repo}/pulls/{pr}/comments",
+            repo,
+            pr,
+            actor,
+            body,
+            packet,
+            parent_comment_id=comment_id,
+            thread_comment_node_ids=thread_comment_node_ids,
+        )
+        recovered_reply_node_id = str(item.get("node_id") or "")
+        original_comments = [
+            comment for comment in recovery_thread.get("comments", [])
+            if not (
+                isinstance(comment, dict)
+                and (
+                    comment.get("id") == recovered_reply_node_id
+                    or comment.get("databaseId") == item.get("id")
+                )
+            )
+        ]
+        if len(original_comments) + 1 != len(recovery_thread.get("comments", [])):
+            raise _recovery_required(
+                "The consumed review reply was not the sole added thread comment; owner recovery is required.",
+                code="provider_recovery_ambiguous",
+            )
+        original_thread = {**recovery_thread, "comments": original_comments}
+        if _exact_thread_fingerprint(original_thread, repo, pr, reply_head) != packet["thread_fingerprint"]:
+            raise _recovery_required(
+                "The consumed review reply did not restore the reserved thread identity; owner recovery is required.",
+                code="provider_recovery_ambiguous",
+            )
+        proof = _proof(item, body, target=target, status="recovered")
+        proof["reply"] = build_reply_receipt(
+            repository=repo,
+            pr_number=pr,
+            finding_head_sha=finding_head,
+            reply_head_sha=reply_head,
+            thread_id=recovery_thread["thread_id"],
+            finding=parent,
+            reply=item,
+            body_fingerprint=body.sha256,
+            status="recovered",
+        )
+        proof["transport"] = {"method": "POST", "endpoint": endpoint, "recovered": True}
+        return _guarded_result(proof, before)
+    _verify_pr_head(repo, pr, reply_head)
+    if packet.get("thread_fingerprint") is not None and exact_thread_fingerprint != packet["thread_fingerprint"]:
+        raise ReviewError(
+            "The review thread changed before the typed reply could be posted.",
+            code="review_thread_mismatch",
+            exit_code=4,
+        )
     if dry_run:
         return {
             "status": "dry-run",
@@ -1519,6 +2233,7 @@ def reply_to_review_comment(
             "transport": {"method": "POST", "endpoint": endpoint, "api_version": API_VERSION},
         }
     actor = _viewer_login()
+    _consume_reservation(packet, reservation_file or "")
     started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     result = api_request("POST", endpoint, {"body": body.text})
     finished_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -1528,6 +2243,7 @@ def reply_to_review_comment(
             item.get("in_reply_to_id") != comment_id
             or not str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
             or _item_login(item) != actor
+            or not _marker_matches(str(item.get("body") or ""), packet["operation_id"])
             or not _in_creation_window(item, "created_at", started_at, finished_at)
             or not isinstance(item.get("node_id"), str)
         ):
@@ -1541,6 +2257,7 @@ def reply_to_review_comment(
             if item.get("in_reply_to_id") == comment_id
             and _item_login(item) == actor
             and response_text_matches(item, body)
+            and _marker_matches(str(item.get("body") or ""), packet["operation_id"])
             and _in_creation_window(item, "created_at", started_at, finished_at)
             and str(item.get("pull_request_url") or "").endswith(f"/repos/{repo}/pulls/{pr}")
         ]
@@ -1700,8 +2417,28 @@ def resolve_review_thread(
     reply_receipt: object,
     dry_run: bool,
     expected_worktree_fingerprint: str | None,
+    request_key: str | None = None,
+    request_fingerprint: str | None = None,
+    reservation_file: str | None = None,
+    ledger_file: str | None = None,
 ) -> dict[str, Any]:
     saved, thread = _validate_reply_remote(repo, pr, head, reply_receipt)
+    expected_head = validate_full_head(head)
+    exact_thread_fingerprint = _exact_thread_fingerprint(thread, repo, pr, expected_head)
+    packet = _require_reservation(
+        reservation_file,
+        ledger_file=ledger_file,
+        kind="review-resolution",
+        repo=repo,
+        pr=pr,
+        head=head,
+        request_key=request_key,
+        request_fingerprint=request_fingerprint,
+        thread_id=str(saved["thread_id"]),
+        thread_fingerprint=exact_thread_fingerprint,
+        finding_comment_id=int(saved["finding_comment_id"]),
+        reply_receipt_fingerprint=str(saved["identity_fingerprint"]),
+    )
     try:
         before = require_worktree(expected_worktree_fingerprint)
     except GitStackError as exc:
@@ -1715,6 +2452,34 @@ def resolve_review_thread(
         "finding_comment_id": saved["finding_comment_id"],
     }
     observed_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    if _read_consumed_marker(packet, reservation_file or "") is not None:
+        try:
+            recovery_thread = _review_thread_context(str(packet["thread_id"]))
+            if _exact_thread_fingerprint(recovery_thread, repo, pr, expected_head) != packet["thread_fingerprint"]:
+                raise ReviewError(
+                    "The consumed review-thread identity changed.",
+                    code="review_thread_mismatch",
+                    exit_code=4,
+                )
+            _prove_resolved_thread(recovery_thread, saved, mutation_may_have_applied=True)
+        except ReviewError as exc:
+            raise _recovery_required(
+                "The consumed review-thread resolution could not be proven exactly; owner recovery is required.",
+                code=exc.code,
+                details=exc.details,
+            ) from exc
+        receipt_value = build_resolution_receipt(saved, status="recovered", observed_at=observed_at)
+        return _guarded_result(
+            {
+                "status": "recovered",
+                "target": target,
+                "resolution": receipt_value,
+                "mutation_attempted": True,
+                "mutation_may_have_applied": True,
+                "transport": {"method": "POST", "endpoint": "graphql:resolveReviewThread", "recovered": True},
+            },
+            before,
+        )
     if thread["is_resolved"]:
         receipt_value = build_resolution_receipt(saved, status="already-resolved", observed_at=observed_at)
         return _guarded_result(
@@ -1754,6 +2519,7 @@ mutation($threadId: ID!) {
   }
 }
 """.strip()
+    _consume_reservation(packet, reservation_file or "")
     result = graphql_request(mutation, {"threadId": saved["thread_id"]})
     response_proven = False
     response_failure = "provider_write_unconfirmed"
@@ -1898,6 +2664,7 @@ def submit_review(
         before = require_worktree(expected_worktree_fingerprint)
     except GitStackError as exc:
         raise _review_error(exc) from exc
+
     provider_event = {"approve": "APPROVE", "request-changes": "REQUEST_CHANGES", "comment": "COMMENT"}[event]
     expected_state = {"approve": "APPROVED", "request-changes": "CHANGES_REQUESTED", "comment": "COMMENTED"}[event]
     target = {"repo": repo, "pr": pr, "kind": "review", "head": str((pr_payload.get("head") or {}).get("sha") or ""), "event": event}
@@ -1944,6 +2711,121 @@ def submit_review(
         return _guarded_result(_proof(proof.value, body, target=target, status=status), before)
     except GitStackError as exc:
         raise _review_error(exc) from exc
+
+
+def _write_reservation(path_value: str, packet: dict[str, Any]) -> None:
+    path = Path(path_value)
+    if not path.is_absolute() or path.is_symlink() or path.exists():
+        raise ReviewError(
+            "The reservation output must be a new absolute regular file.",
+            code="reservation_output_invalid",
+            exit_code=64,
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = (json.dumps(packet, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    try:
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except OSError as exc:
+        raise ReviewError("The reservation packet could not be written atomically.", code="reservation_output_failed", exit_code=4) from exc
+
+
+def prepare_reservation(args: argparse.Namespace) -> dict[str, Any]:
+    repo = resolve_repo(args.repo, allow_non_project=args.allow_non_project)
+    pr = positive_int(args.pr, "pr")
+    head = validate_full_head(args.head)
+    request_key = args.request_key
+    request_fp = args.request_fingerprint
+    thread_id = args.thread_id
+    thread_fp = args.thread_fingerprint
+    finding_id = positive_int(args.finding_comment_id, "finding-comment-id") if args.finding_comment_id else None
+    body_fp: str | None = None
+    reply_fp: str | None = None
+    operation_id: str
+    if args.mutation_kind == "review-request":
+        if not request_key:
+            raise ReviewError("review-request preparation requires --request-key.", code="invalid_arguments", exit_code=64)
+        plan = build_request("codex", repo, pr, head, request_key)
+        request_fp = plan.request_fingerprint
+        body_fp = plan.body_fingerprint
+        operation_id = operation_id_for_request(repo, pr, head, plan.request_key, plan.request_fingerprint)
+    elif args.mutation_kind in {"review-warning", "review-reply"}:
+        if not request_key or not request_fp or not args.body_file:
+            raise ReviewError("comment reservations require request identity and --body-file.", code="invalid_arguments", exit_code=64)
+        try:
+            source_body = read_text_file(args.body_file, field="body")
+        except GitStackError as exc:
+            raise _review_error(exc) from exc
+        operation_id = operation_id_for_mutation(
+            args.mutation_kind,
+            repo,
+            pr,
+            head,
+            request_fingerprint=request_fp,
+            thread_id=thread_id,
+            finding_comment_id=finding_id,
+        )
+        body_fp = text_fingerprint(add_operation_marker(source_body.text, operation_id))
+        if args.mutation_kind == "review-reply" and (thread_id is None or thread_fp is None or finding_id is None):
+            raise ReviewError("review-reply preparation requires exact thread and finding identity.", code="invalid_arguments", exit_code=64)
+    else:
+        if not request_key or not request_fp or not args.reply_receipt_file:
+            raise ReviewError("review-resolution preparation requires request identity and --reply-receipt-file.", code="invalid_arguments", exit_code=64)
+        try:
+            receipt_value = json.loads(read_text_file(args.reply_receipt_file, field="reply-receipt").text)
+            saved = validate_reply_receipt(receipt_value)
+        except (GitStackError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ReviewError("The reply receipt cannot be used to prepare a resolution reservation.", code="reply_receipt_invalid", exit_code=64) from exc
+        thread_id = str(saved["thread_id"])
+        finding_id = int(saved["finding_comment_id"])
+        if not thread_fp:
+            raise ReviewError(
+                "review-resolution preparation requires --thread-fingerprint.",
+                code="invalid_arguments",
+                exit_code=64,
+            )
+        reply_fp = str(saved["identity_fingerprint"])
+        operation_id = operation_id_for_mutation(
+            args.mutation_kind,
+            repo,
+            pr,
+            head,
+            request_fingerprint=request_fp,
+            thread_id=thread_id,
+            finding_comment_id=finding_id,
+            reply_receipt_fingerprint=reply_fp,
+        )
+    packet = build_reservation(
+        mutation_kind=args.mutation_kind,
+        repository=repo,
+        pr_number=pr,
+        head_sha=head,
+        task_key=args.task_key,
+        delivery_key=args.delivery_key,
+        operation_id=operation_id,
+        request_key=request_key,
+        request_fingerprint=request_fp,
+        thread_id=thread_id,
+        thread_fingerprint=thread_fp,
+        finding_comment_id=finding_id,
+        body_fingerprint=body_fp,
+        reply_receipt_fingerprint=reply_fp,
+        expected_generation=args.expected_generation,
+        expected_state_fingerprint=args.expected_state_fingerprint,
+        expected_claim_fingerprint=args.expected_claim_fingerprint,
+        expected_task_state=args.expected_task_state,
+    )
+    if args.output_file:
+        _write_reservation(args.output_file, packet)
+    return {
+        "reservation": packet,
+        "packet_fingerprint": packet_fingerprint(packet),
+        "marker": None if args.mutation_kind == "review-resolution" else operation_marker(packet["operation_id"]),
+        "output_file": args.output_file,
+    }
 
 
 def render_text(payload: dict[str, Any]) -> str:
@@ -2010,6 +2892,11 @@ def build_parser() -> argparse.ArgumentParser:
     comment.add_argument("--pr", required=True, help="Pull request number.")
     comment.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
     comment.add_argument("--body-file", required=True, help="Absolute UTF-8 regular-file path containing the comment body.")
+    comment.add_argument("--head", required=True, help="Full 40-character current PR head SHA.")
+    comment.add_argument("--request-key", required=True, help="Exact review request key bound to the warning.")
+    comment.add_argument("--request-fingerprint", required=True, help="Exact typed review request fingerprint.")
+    comment.add_argument("--reservation-file", required=True, help="Absolute immutable provider-mutation reservation packet.")
+    comment.add_argument("--ledger-file", required=True, help="Absolute active Implement Feature ledger that durably started this mutation.")
     comment.add_argument("--dry-run", action="store_true", help="Preview the comment action without posting.")
     comment.add_argument("--expected-worktree-fingerprint")
     comment.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
@@ -2019,6 +2906,8 @@ def build_parser() -> argparse.ArgumentParser:
     request.add_argument("--repo", help="Repository in owner/repo format. Defaults to current checkout.")
     request.add_argument("--head", required=True, help="Full 40-character expected reviewed head SHA.")
     request.add_argument("--request-key", required=True, help="Stable caller-owned request lineage key.")
+    request.add_argument("--reservation-file", required=True, help="Absolute immutable provider-mutation reservation packet.")
+    request.add_argument("--ledger-file", required=True, help="Absolute active Implement Feature ledger that durably started this mutation.")
     request.add_argument("--dry-run", action="store_true", help="Preview the canonical request without posting.")
     request.add_argument("--expected-worktree-fingerprint")
     request.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
@@ -2028,6 +2917,10 @@ def build_parser() -> argparse.ArgumentParser:
     reply.add_argument("--head", required=True, help="Full 40-character current PR head SHA.")
     reply.add_argument("--comment-id", required=True)
     reply.add_argument("--body-file", required=True)
+    reply.add_argument("--request-key", required=True)
+    reply.add_argument("--request-fingerprint", required=True)
+    reply.add_argument("--reservation-file", required=True)
+    reply.add_argument("--ledger-file", required=True)
     reply.add_argument("--dry-run", action="store_true")
     reply.add_argument("--expected-worktree-fingerprint")
     reply.add_argument("--allow-non-project", action="store_true")
@@ -2036,6 +2929,10 @@ def build_parser() -> argparse.ArgumentParser:
     resolve.add_argument("--repo")
     resolve.add_argument("--head", required=True, help="Full 40-character current PR head SHA.")
     resolve.add_argument("--reply-receipt-file", required=True, help="Absolute UTF-8 JSON file containing the typed reply receipt.")
+    resolve.add_argument("--request-key", required=True)
+    resolve.add_argument("--request-fingerprint", required=True)
+    resolve.add_argument("--reservation-file", required=True)
+    resolve.add_argument("--ledger-file", required=True)
     resolve.add_argument("--dry-run", action="store_true")
     resolve.add_argument("--expected-worktree-fingerprint")
     resolve.add_argument("--allow-non-project", action="store_true")
@@ -2056,6 +2953,34 @@ def build_parser() -> argparse.ArgumentParser:
     submit.add_argument("--dry-run", action="store_true")
     submit.add_argument("--expected-worktree-fingerprint")
     submit.add_argument("--allow-non-project", action="store_true")
+    prepare = subparsers.add_parser(
+        "prepare",
+        help="Create one canonical immutable provider-mutation packet for a managed root handoff; does not authorize transport.",
+    )
+    prepare.add_argument("--mutation-kind", required=True, choices=tuple(sorted(MUTATION_KINDS)))
+    prepare.add_argument("--repo")
+    prepare.add_argument("--pr", required=True)
+    prepare.add_argument("--head", required=True)
+    prepare.add_argument("--task-key", required=True)
+    prepare.add_argument("--delivery-key", required=True)
+    prepare.add_argument("--expected-generation", required=True, type=int)
+    prepare.add_argument("--expected-state-fingerprint", required=True)
+    prepare.add_argument("--expected-claim-fingerprint", required=True)
+    prepare.add_argument("--expected-task-state", required=True)
+    prepare.add_argument("--request-key")
+    prepare.add_argument("--request-fingerprint")
+    prepare.add_argument("--thread-id")
+    prepare.add_argument("--thread-fingerprint")
+    prepare.add_argument("--finding-comment-id")
+    prepare.add_argument("--body-file")
+    prepare.add_argument("--reply-receipt-file")
+    prepare.add_argument("--output-file")
+    prepare.add_argument("--allow-non-project", action="store_true")
+    validate = subparsers.add_parser(
+        "validate",
+        help="Validate one canonical immutable provider-mutation packet; does not authorize transport.",
+    )
+    validate.add_argument("--reservation-file", required=True)
     terminal = subparsers.add_parser(
         "terminal-evidence",
         help="Verify one typed exact-head terminal provider artifact read-only.",
@@ -2106,7 +3031,7 @@ def main(argv: list[str] | None = None) -> int:
     except ReviewError as exc:
         raw = list(argv or [])
         if "--json" in raw:
-            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait", "terminal-evidence"}), "")])
+            emit_error(exc, [next((item for item in raw if item in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "prepare", "validate", "check", "wait", "terminal-evidence"}), "")])
         else:
             print(exc.message, file=sys.stderr)
         return exc.exit_code
@@ -2122,6 +3047,39 @@ def main(argv: list[str] | None = None) -> int:
             print(f"git: {'ok' if payload['checks']['git']['ok'] else 'missing'}")
             print(f"gh: {'ok' if payload['checks']['gh']['ok'] else 'missing'}")
         return 0 if payload["ok"] else 1
+    if args.command == "validate":
+        try:
+            packet = _read_reservation_file(args.reservation_file)
+        except ReviewError as exc:
+            if args.json:
+                emit_error(exc, ["validate"])
+            else:
+                print(exc.message, file=sys.stderr)
+            return exc.exit_code
+        payload = {
+            "reservation": packet,
+            "packet_fingerprint": packet_fingerprint(packet),
+            "marker": None if packet["mutation_kind"] == "review-resolution" else operation_marker(packet["operation_id"]),
+        }
+        if args.json:
+            emit_success(payload, ["validate"])
+        else:
+            print(json.dumps(payload, indent=2))
+        return 0
+    if args.command == "prepare":
+        try:
+            payload = prepare_reservation(args)
+        except ReviewError as exc:
+            if args.json:
+                emit_error(exc, ["prepare"])
+            else:
+                print(exc.message, file=sys.stderr)
+            return exc.exit_code
+        if args.json:
+            emit_success(payload, ["prepare"])
+        else:
+            print(json.dumps(payload, indent=2))
+        return 0
     if args.command not in {"address", "comment", "request", "reply", "resolve", "edit-comment", "submit-review", "check", "wait", "terminal-evidence"}:
         parser.print_help()
         return 0
@@ -2192,6 +3150,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.request_key,
                 args.dry_run,
                 args.expected_worktree_fingerprint,
+                args.reservation_file,
+                args.ledger_file,
             )
             payload = {"repo": repo, "pr": pr, "action": action}
             if args.json:
@@ -2204,7 +3164,7 @@ def main(argv: list[str] | None = None) -> int:
                 body = read_text_file(args.body_file, field="body")
             except GitStackError as exc:
                 raise _review_error(exc) from exc
-            payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run, args.expected_worktree_fingerprint)}
+            payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run, args.expected_worktree_fingerprint, args.head, args.request_key, args.request_fingerprint, args.reservation_file, args.ledger_file)}
             if args.json:
                 emit_success(payload, ["comment"])
             else:
@@ -2225,6 +3185,10 @@ def main(argv: list[str] | None = None) -> int:
                 reply_receipt,
                 args.dry_run,
                 args.expected_worktree_fingerprint,
+                args.request_key,
+                args.request_fingerprint,
+                args.reservation_file,
+                args.ledger_file,
             )
             payload = {"repo": repo, "pr": pr, "action": action}
             if args.json:
@@ -2239,7 +3203,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise _review_error(exc) from exc
             if args.command == "reply":
                 comment_id = positive_int(args.comment_id, "comment-id")
-                action = reply_to_review_comment(repo, pr, args.head, comment_id, body, args.dry_run, args.expected_worktree_fingerprint)
+                action = reply_to_review_comment(repo, pr, args.head, comment_id, body, args.dry_run, args.expected_worktree_fingerprint, args.request_key, args.request_fingerprint, args.reservation_file, args.ledger_file)
             elif args.command == "edit-comment":
                 comment_id = positive_int(args.comment_id, "comment-id")
                 action = edit_comment(repo, pr, comment_id, args.kind, body, args.dry_run, args.expected_worktree_fingerprint)
