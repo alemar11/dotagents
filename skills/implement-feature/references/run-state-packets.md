@@ -9,7 +9,8 @@ files are short-lived strict JSON inputs, not recovery state. Reuse one stable
 Limit packets to 1 MiB, text/evidence fields to 4,096 UTF-8 characters, sources
 to 64, deliveries per task to 8, allowed paths per delivery to 128, and each
 batch to 64 events. State retains at most 512 operations, 256 reviews, and one
-final observation per review; command JSON output is at most 128 KiB.
+final observation per review, plus 64 command attempts per delivery; command
+JSON output is at most 128 KiB.
 
 ## Registration Packet
 
@@ -17,7 +18,7 @@ Use exactly these top-level fields:
 
 | field | value |
 | --- | --- |
-| `schema_version` | `6.0.0` |
+| `schema_version` | `7.0.0` |
 | `bundle_sha256` | SHA-256 of exact immutable execution-bundle bytes |
 | `execution_scope_fingerprint` | canonical complete delivery/path/validation-plan fingerprint |
 | `authorization_fingerprint` | fingerprint of execution scope plus permission evidence |
@@ -50,7 +51,8 @@ validation_plan
 Each nonempty `validation_plan[]` row has exactly
 `validation_key`, `command_id`, `adapter`, `policy`,
 `authored_argv_fingerprint`, `projected_argv_fingerprint`, and
-`tool_identities_fingerprint`. Adapter/policy pairs are closed by
+`tool_identities_fingerprint`, and `execution_policy_fingerprint`.
+Adapter/policy pairs are closed by
 `baseline-validation.md`; callers cannot select a free-form parser or policy.
 
 Keys and `feature_slug` are lower-kebab. `source_id` is the canonical claim/task
@@ -83,6 +85,10 @@ values are refs or digests, never pasted output.
 | `portfolio-preimplementation-aborted` | `reason`, `task_stop_evidence`, `evidence_ref` |
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
 | `delivery-preflight-observed` | `task_key`, `delivery_key`, `github_repository`, `target_branch`, `default_base`, `ci_availability`, `preflight_key`, `evidence_ref` |
+| `execution-command-reserved` | `task_key`, `delivery_key`, `attempt_id`, `command_id`, `operation`, `manifest_sha256`, `execution_policy_fingerprint`, `attempt_file`, `receipt_file`, `evidence_ref` |
+| `execution-command-launch-observed` | `task_key`, `delivery_key`, `attempt_id`, `attempt_fingerprint`, `evidence_ref` |
+| `execution-command-cancellation-authorized` | `task_key`, `delivery_key`, `attempt_id`, `reason`, `evidence_ref` |
+| `execution-command-terminal-observed` | `task_key`, `delivery_key`, `attempt_id`, `status`, `receipt_sha256`, `cleanup_verified`, `evidence_ref` |
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref` |
 | `task-dependency-wait-started` | `task_key`, `resume_state`, `reason`, `summary_ref`, `evidence_ref` |
 | `task-dependency-wait-resolved` | `task_key`, `resume_state`, `evidence_ref` |
@@ -124,6 +130,9 @@ absolute `manifest_file`, `manifest_bytes_sha256`, absolute `receipt_file`, and
 `receipt_bytes_sha256`. Its set must equal every registered validation tuple.
 `task_stop_evidence` is sorted complete task coverage with exact `task_key`,
 `task_ref`, and `evidence_ref`.
+`execution-command-terminal-observed.receipt_sha256` may be null only when a
+controller crash yields `interrupted` or `cleanup-failed`; all other terminal
+statuses require the verified receipt hash.
 
 AutoReview lifecycle details are branch-loaded from `autoreview-fix-loop.md`.
 `revision-observed` binds canonical repository, PR, head, base, and merge base.

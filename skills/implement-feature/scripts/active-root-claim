@@ -22,9 +22,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-__version__ = "14.0.0"
-SCHEMA_VERSION = "6.0.0"
-TAKEOVER_TRANSACTION_SCHEMA_VERSION = "2.0.0"
+__version__ = "15.0.0"
+SCHEMA_VERSION = "7.0.0"
+TAKEOVER_TRANSACTION_SCHEMA_VERSION = "3.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "2.0.0"
 RELEASE_REASONS = {"terminal", "preimplementation-abort"}
 LEDGER_CACHE_PATH = Path(__file__).resolve().with_name("ledger-cache")
@@ -39,6 +39,8 @@ GLOBAL_SOURCE_RE = re.compile(r"^[a-z][a-z0-9+.-]*://\S+$")
 TAKEOVER_PERMISSION = "granted-by-authorized-user"
 TAKEOVER_REASONS = {"verified-stale"}
 STALE_AFTER_SECONDS = 300
+HEARTBEAT_INTERVAL_SECONDS = 60
+MONITOR_DEGRADED_AFTER_SECONDS = 180
 
 
 class ClaimError(Exception):
@@ -615,6 +617,8 @@ def validate_task_adoption(
         "root_id",
         "claim_fingerprint",
         "task_termination_evidence",
+        "execution_recovery_fingerprint",
+        "command_cleanup_evidence",
         "specs",
     }
     if not isinstance(value, dict) or set(value) != required:
@@ -627,6 +631,75 @@ def validate_task_adoption(
         value["task_termination_evidence"],
         "task_adoption.task_termination_evidence",
     )
+    execution_recovery_fingerprint = check_fingerprint(
+        value["execution_recovery_fingerprint"]
+    )
+    if not isinstance(value["command_cleanup_evidence"], list):
+        raise ClaimError("invalid-input", "task adoption command cleanup evidence is invalid", 2)
+    command_cleanup_evidence: list[dict[str, Any]] = []
+    seen_attempts: set[str] = set()
+    for cleanup_index, cleanup in enumerate(value["command_cleanup_evidence"]):
+        cleanup_field = f"task_adoption.command_cleanup_evidence[{cleanup_index}]"
+        if not isinstance(cleanup, dict) or set(cleanup) != {
+            "attempt_id", "state", "cleanup_verified", "evidence_ref"
+        }:
+            raise ClaimError("invalid-input", f"{cleanup_field} schema is invalid", 2)
+        attempt_id = check_id(cleanup["attempt_id"], f"{cleanup_field}.attempt_id")
+        if not re.fullmatch(r"[0-9a-f]{32}", attempt_id) or attempt_id in seen_attempts:
+            raise ClaimError("invalid-input", f"{cleanup_field}.attempt_id is invalid", 2)
+        seen_attempts.add(attempt_id)
+        if cleanup["state"] != "terminal" or cleanup["cleanup_verified"] is not True:
+            raise ClaimError(
+                "state-conflict",
+                "takeover refuses a live or cleanup-unverified command attempt",
+                4,
+            )
+        command_cleanup_evidence.append(
+            {
+                "attempt_id": attempt_id,
+                "state": "terminal",
+                "cleanup_verified": True,
+                "evidence_ref": nonempty_string(cleanup["evidence_ref"], f"{cleanup_field}.evidence_ref"),
+            }
+        )
+    command_cleanup_evidence.sort(key=lambda item: item["attempt_id"])
+    if verify_checkouts:
+        ledger_path = Path(canonical_ledger_ref(claim["ledger_ref"], persisted=True))
+        expected_cleanup: list[dict[str, Any]] = []
+        if ledger_path.exists():
+            if ledger_path.is_symlink() or not ledger_path.is_file() or ledger_path.stat().st_size > 1024 * 1024:
+                raise ClaimError("state-conflict", "takeover ledger is unsafe", 4)
+            try:
+                ledger = json.loads(ledger_path.read_text())
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ClaimError("state-conflict", "takeover ledger is unreadable", 4) from exc
+            if not isinstance(ledger, dict) or ledger.get("schema_version") != "13.0.0":
+                raise ClaimError("state-conflict", "takeover ledger schema is unsupported", 4)
+            for task in ledger.get("tasks", []):
+                for delivery in task.get("deliveries", []):
+                    for attempt in delivery.get("command_attempts", []):
+                        if attempt.get("state") != "terminal" or attempt.get("cleanup_verified") is not True:
+                            raise ClaimError(
+                                "state-conflict",
+                                "takeover refuses a live or cleanup-unverified command attempt",
+                                4,
+                            )
+                        expected_cleanup.append(
+                            {
+                                "attempt_id": attempt["attempt_id"],
+                                "state": "terminal",
+                                "cleanup_verified": True,
+                                "evidence_ref": attempt["evidence_ref"],
+                            }
+                        )
+            expected_cleanup.sort(key=lambda item: item["attempt_id"])
+        if command_cleanup_evidence != expected_cleanup:
+            raise ClaimError("state-conflict", "task adoption command cleanup coverage is incomplete", 4)
+    expected_recovery_fingerprint = hashlib.sha256(
+        json.dumps(command_cleanup_evidence, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    if execution_recovery_fingerprint != expected_recovery_fingerprint:
+        raise ClaimError("invalid-input", "task adoption execution recovery fingerprint is invalid", 2)
     if not isinstance(value["specs"], list) or not value["specs"]:
         raise ClaimError("invalid-input", "task adoption specs are required", 2)
     allowed_repositories = set(claim["repositories"])
@@ -737,6 +810,8 @@ def validate_task_adoption(
         "root_id": root_id,
         "claim_fingerprint": claim_fingerprint,
         "task_termination_evidence": termination,
+        "execution_recovery_fingerprint": execution_recovery_fingerprint,
+        "command_cleanup_evidence": command_cleanup_evidence,
         "specs": sorted(normalized_specs, key=lambda item: item["source_spec_ref"]),
     }
 

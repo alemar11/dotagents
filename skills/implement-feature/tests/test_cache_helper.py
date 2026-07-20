@@ -155,7 +155,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
             "Implement the registered Feature Spec portfolio with CI when configured"
         )
         registration = {
-            "schema_version": "6.0.0",
+            "schema_version": "7.0.0",
             "bundle_sha256": hashlib.sha256(b"bundle-fixture").hexdigest(),
             "execution_scope_fingerprint": "0" * 64,
             "authorization_fingerprint": "0" * 64,
@@ -202,6 +202,16 @@ class LedgerCacheV15Tests(unittest.TestCase):
                                     "authored_argv_fingerprint": hashlib.sha256(b"authored-argv").hexdigest(),
                                     "projected_argv_fingerprint": hashlib.sha256(b"projected-argv").hexdigest(),
                                     "tool_identities_fingerprint": hashlib.sha256(b"tool-identities").hexdigest(),
+                                    "execution_policy_fingerprint": CACHE_RUNTIME.request_fingerprint(
+                                        {
+                                            "timeout_seconds": 3600,
+                                            "heartbeat_seconds": 15,
+                                            "term_grace_seconds": 10,
+                                            "cleanup_seconds": 30,
+                                            "stdout_limit_bytes": 8388608,
+                                            "stderr_limit_bytes": 8388608,
+                                        }
+                                    ),
                                 }
                             ],
                         }
@@ -262,6 +272,8 @@ class LedgerCacheV15Tests(unittest.TestCase):
             "root_id": old_root_id,
             "claim_fingerprint": snapshot["fingerprint"],
             "task_termination_evidence": termination_evidence,
+            "execution_recovery_fingerprint": CACHE_RUNTIME.request_fingerprint([]),
+            "command_cleanup_evidence": [],
             "specs": specs,
         }
         evidence = {
@@ -481,10 +493,18 @@ class LedgerCacheV15Tests(unittest.TestCase):
                         "diagnostic_set_fingerprint": CACHE_RUNTIME.request_fingerprint([]),
                     }
                     manifest = {
-                        "schema_version": "3.0.0",
+                        "schema_version": "4.0.0",
                         "operation": "baseline-validation",
                         "manifest_sha256": hashlib.sha256(b"manifest").hexdigest(),
                         "argv_fingerprint": plan["projected_argv_fingerprint"],
+                        "execution_policy": {
+                            "timeout_seconds": 3600,
+                            "heartbeat_seconds": 15,
+                            "term_grace_seconds": 10,
+                            "cleanup_seconds": 30,
+                            "stdout_limit_bytes": 8388608,
+                            "stderr_limit_bytes": 8388608,
+                        },
                         "baseline": {
                             "adapter": plan["adapter"],
                             "policy": plan["policy"],
@@ -493,7 +513,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
                         },
                     }
                     receipt = {
-                        "schema_version": "3.0.0",
+                        "schema_version": "4.0.0",
                         "status": "passed",
                         "manifest_sha256": manifest["manifest_sha256"],
                         "receipt_sha256": hashlib.sha256(b"receipt").hexdigest(),
@@ -1597,7 +1617,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "15.0.0")
+        self.assertEqual(version, "16.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -1706,6 +1726,24 @@ class LedgerCacheV15Tests(unittest.TestCase):
             os.path.abspath(os.fspath(markdown)),
         )
         self.assertFalse(self.ledger.exists())
+
+    def test_schema12_active_ledger_is_rejected_without_rewrite(self) -> None:
+        self.ledger_root.mkdir(parents=True, exist_ok=True)
+        legacy = self.ledger_root / "schema12.json"
+        legacy.write_text(json.dumps({"schema_version": "12.0.0"}, sort_keys=True) + "\n")
+        before = legacy.read_bytes()
+        result = self.run_cache(
+            "--json",
+            "ledger",
+            "read",
+            "--ledger",
+            str(legacy),
+            "--projection",
+            "status",
+            check=False,
+        )
+        self.assertEqual(result.returncode, 5)
+        self.assertEqual(legacy.read_bytes(), before)
 
     def test_apply_is_cas_idempotent_strict_and_does_not_record_noops(self) -> None:
         self.acquire()
@@ -3321,6 +3359,8 @@ class LedgerCacheV15Tests(unittest.TestCase):
             "root_id": "root-old",
             "claim_fingerprint": snapshot["fingerprint"],
             "task_termination_evidence": "app-task://old/terminated",
+            "execution_recovery_fingerprint": CACHE_RUNTIME.request_fingerprint([]),
+            "command_cleanup_evidence": [],
             "specs": [
                 {
                     "source_spec_ref": self.source_ref,
@@ -3363,6 +3403,69 @@ class LedgerCacheV15Tests(unittest.TestCase):
             task["task_assignment_fingerprint"], self.task_assignment_fingerprint
         )
         self.assertIsNotNone(task["deliveries"][0]["managed_checkout"])
+
+    def test_command_attempt_lifecycle_is_bounded_typed_and_single_launch(self) -> None:
+        self.acquire()
+        self.create()
+        state = self.state()
+        delivery = state["tasks"][0]["deliveries"][0]
+        plan = delivery["validation_plan"][0]
+        attempt_id = "c" * 32
+        reservation = {
+            "type": "execution-command-reserved",
+            "task_key": self.task_key,
+            "delivery_key": delivery["delivery_key"],
+            "attempt_id": attempt_id,
+            "command_id": plan["command_id"],
+            "operation": "baseline-validation",
+            "manifest_sha256": "d" * 64,
+            "execution_policy_fingerprint": plan["execution_policy_fingerprint"],
+            "attempt_file": str(self.home / "command.attempt.jsonl"),
+            "receipt_file": str(self.home / "command.receipt.json"),
+            "evidence_ref": "execution-manifest://reserved",
+        }
+        self.apply([reservation])
+        duplicate = self.apply([reservation], check=False)
+        self.assertEqual(duplicate.returncode, 4)
+        launch = {
+            "type": "execution-command-launch-observed",
+            "task_key": self.task_key,
+            "delivery_key": delivery["delivery_key"],
+            "attempt_id": attempt_id,
+            "attempt_fingerprint": "e" * 64,
+            "evidence_ref": "execution-manifest://launch-released",
+        }
+        self.apply([launch])
+        cancel = {
+            "type": "execution-command-cancellation-authorized",
+            "task_key": self.task_key,
+            "delivery_key": delivery["delivery_key"],
+            "attempt_id": attempt_id,
+            "reason": "claim-lost",
+            "evidence_ref": "active-root-claim://mismatch",
+        }
+        self.apply([cancel])
+        terminal = {
+            "type": "execution-command-terminal-observed",
+            "task_key": self.task_key,
+            "delivery_key": delivery["delivery_key"],
+            "attempt_id": attempt_id,
+            "status": "cancelled",
+            "receipt_sha256": "f" * 64,
+            "cleanup_verified": True,
+            "evidence_ref": "execution-manifest://cleanup-verified",
+        }
+        self.apply([terminal])
+        attempt = self.state()["tasks"][0]["deliveries"][0]["command_attempts"][0]
+        self.assertEqual(attempt["state"], "terminal")
+        self.assertEqual(attempt["terminal_status"], "cancelled")
+        self.assertTrue(attempt["cleanup_verified"])
+        event_types = {
+            event_type
+            for operation in self.state()["operations"]
+            for event_type in operation["event_types"]
+        }
+        self.assertNotIn("execution-command-heartbeat", event_types)
 
     def test_takeover_adoptions_bind_by_source_id_and_are_consumed_once(self) -> None:
         second_source = "https://github.com/example/dotagents/issues/234"

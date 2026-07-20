@@ -4,19 +4,27 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
+import fcntl
 import hashlib
 import json
 import os
+import platform
 import re
+import secrets
+import selectors
 import shutil
+import signal
 import subprocess
 import sys
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 
-__version__ = "3.0.0"
-SCHEMA_VERSION = "3.0.0"
+__version__ = "4.0.0"
+SCHEMA_VERSION = "4.0.0"
 MAX_PACKET_BYTES = 1024 * 1024
 MAX_OUTPUT_BYTES = 128 * 1024
 COMMAND_ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -27,6 +35,46 @@ SHELL_WRAPPERS = {"sh", "bash", "zsh", "dash", "ksh", "fish", "cmd", "powershell
 OPERATIONS = {"delivery-preflight", "baseline-validation", "validation", "autoreview"}
 BASELINE_ADAPTERS = {"clean-exit-v1", "prettier-check-v1"}
 BASELINE_POLICIES = {"clean-required", "unchanged-outside-scope-allowed"}
+CONTROL_TIMEOUT_SECONDS = 30
+TERMINAL_STATUSES = {
+    "passed", "failed", "timed-out", "cancelled", "output-limit",
+    "interrupted", "cleanup-failed", "reused",
+}
+EXECUTION_POLICIES = {
+    "delivery-preflight": {
+        "timeout_seconds": 30 * 60,
+        "heartbeat_seconds": 15,
+        "term_grace_seconds": 10,
+        "cleanup_seconds": 30,
+        "stdout_limit_bytes": 8 * 1024 * 1024,
+        "stderr_limit_bytes": 8 * 1024 * 1024,
+    },
+    "baseline-validation": {
+        "timeout_seconds": 60 * 60,
+        "heartbeat_seconds": 15,
+        "term_grace_seconds": 10,
+        "cleanup_seconds": 30,
+        "stdout_limit_bytes": 8 * 1024 * 1024,
+        "stderr_limit_bytes": 8 * 1024 * 1024,
+    },
+    "validation": {
+        "timeout_seconds": 60 * 60,
+        "heartbeat_seconds": 15,
+        "term_grace_seconds": 10,
+        "cleanup_seconds": 30,
+        "stdout_limit_bytes": 8 * 1024 * 1024,
+        "stderr_limit_bytes": 8 * 1024 * 1024,
+    },
+    "autoreview": {
+        "timeout_seconds": 60 * 60,
+        "heartbeat_seconds": 15,
+        "term_grace_seconds": 10,
+        "cleanup_seconds": 30,
+        "stdout_limit_bytes": 8 * 1024 * 1024,
+        "stderr_limit_bytes": 8 * 1024 * 1024,
+    },
+}
+_BOOT_IDENTITY: str | None = None
 
 
 class ManifestError(Exception):
@@ -102,7 +150,19 @@ def read_json(path_value: str, label: str) -> dict[str, Any]:
 def write_json(path_value: str, value: dict[str, Any]) -> Path:
     path = absolute_path(path_value, "output")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(canonical_bytes(value) + b"\n")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(descriptor, canonical_bytes(value) + b"\n")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.replace(temporary, path)
+    directory = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
     return path
 
 
@@ -137,7 +197,8 @@ def validate_manifest(value: dict[str, Any]) -> dict[str, Any]:
     fields = {
         "schema_version", "command_id", "operation", "owner", "cwd", "argv",
         "expected_exit_codes", "dependencies", "tools", "write_set", "outputs",
-        "bundle_sha256", "baseline", "argv_fingerprint", "gate_fingerprint", "manifest_sha256",
+        "bundle_sha256", "baseline", "execution_policy", "argv_fingerprint",
+        "gate_fingerprint", "manifest_sha256",
     }
     exact_object(value, fields, "command manifest")
     if value["schema_version"] != SCHEMA_VERSION or value["operation"] not in OPERATIONS:
@@ -148,6 +209,20 @@ def validate_manifest(value: dict[str, Any]) -> dict[str, Any]:
         raise ManifestError("manifest-schema-invalid", "command manifest id is invalid", "prepare-command-again")
     if value["owner"] not in {"root", "worker"}:
         raise ManifestError("manifest-schema-invalid", "command manifest owner is invalid", "prepare-command-again")
+    policy = exact_object(
+        value["execution_policy"],
+        {
+            "timeout_seconds", "heartbeat_seconds", "term_grace_seconds",
+            "cleanup_seconds", "stdout_limit_bytes", "stderr_limit_bytes",
+        },
+        "command execution_policy",
+    )
+    if policy != EXECUTION_POLICIES[value["operation"]]:
+        raise ManifestError(
+            "manifest-schema-invalid",
+            "command execution policy is not the fixed operation policy",
+            "prepare-command-again",
+        )
     absolute_path(value["cwd"], "command manifest cwd")
     validate_literal_argv(value["argv"])
     if value["argv_fingerprint"] != fingerprint({"cwd": value["cwd"], "argv": value["argv"]}):
@@ -231,6 +306,7 @@ def gate_fingerprint(value: dict[str, Any]) -> str:
             "outputs": value["outputs"],
             "bundle_sha256": value["bundle_sha256"],
             "baseline": value["baseline"],
+            "execution_policy": value["execution_policy"],
         }
     )
 
@@ -379,12 +455,21 @@ def validate_relative_paths(value: Any, label: str) -> list[str]:
 
 
 def git_output(cwd: Path, git_path: str, *args: str) -> bytes:
-    result = subprocess.run(
-        [git_path, "-C", str(cwd), *args],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [git_path, "-C", str(cwd), *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=CONTROL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ManifestError(
+            "control-command-timeout",
+            f"managed checkout observation timed out: {' '.join(args)}",
+            "owner-required",
+            4,
+        ) from exc
     if result.returncode:
         raise ManifestError(
             "command-cwd-invalid",
@@ -730,6 +815,7 @@ def prepare_command(request: dict[str, Any], bundle: dict[str, Any]) -> dict[str
         "outputs": sorted(outputs),
         "bundle_sha256": bundle["bundle_sha256"],
         "baseline": baseline,
+        "execution_policy": dict(EXECUTION_POLICIES[operation]),
     }
     manifest["argv_fingerprint"] = fingerprint({"cwd": manifest["cwd"], "argv": argv})
     manifest["gate_fingerprint"] = gate_fingerprint(manifest)
@@ -750,12 +836,21 @@ def verify_file_record(record: dict[str, Any], *, tool: bool) -> None:
 
 
 def tracked_snapshot(cwd: Path, git_path: str) -> dict[str, str]:
-    result = subprocess.run(
-        [git_path, "-C", str(cwd), "ls-files", "-co", "--exclude-standard", "-z"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [git_path, "-C", str(cwd), "ls-files", "-co", "--exclude-standard", "-z"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=CONTROL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ManifestError(
+            "control-command-timeout",
+            "write observation timed out",
+            "owner-required",
+            4,
+        ) from exc
     if result.returncode != 0:
         raise ManifestError("command-cwd-invalid", "write observation requires a Git checkout", "use-managed-git-checkout", 3)
     snapshot: dict[str, str] = {}
@@ -773,7 +868,328 @@ def path_allowed(path: str, allowed: list[str]) -> bool:
     return any(path == item or path.startswith(item.rstrip("/") + "/") for item in allowed)
 
 
-def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str, Any], int]:
+def utc_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def boot_identity() -> str:
+    global _BOOT_IDENTITY
+    if _BOOT_IDENTITY is not None:
+        return _BOOT_IDENTITY
+    linux = Path("/proc/sys/kernel/random/boot_id")
+    if linux.is_file():
+        value = linux.read_text().strip()
+        if value:
+            _BOOT_IDENTITY = f"linux:{value}"
+            return _BOOT_IDENTITY
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", "kern.boottime"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        result = None
+    if result is not None and result.returncode == 0 and result.stdout.strip():
+        _BOOT_IDENTITY = "darwin:" + digest(result.stdout.strip())
+        return _BOOT_IDENTITY
+    _BOOT_IDENTITY = "unknown:" + digest(str(time.time_ns()).encode())
+    return _BOOT_IDENTITY
+
+
+class ProcBSDInfo(ctypes.Structure):
+    _fields_ = [
+        ("pbi_flags", ctypes.c_uint32), ("pbi_status", ctypes.c_uint32),
+        ("pbi_xstatus", ctypes.c_uint32), ("pbi_pid", ctypes.c_uint32),
+        ("pbi_ppid", ctypes.c_uint32), ("pbi_uid", ctypes.c_uint32),
+        ("pbi_gid", ctypes.c_uint32), ("pbi_ruid", ctypes.c_uint32),
+        ("pbi_rgid", ctypes.c_uint32), ("pbi_svuid", ctypes.c_uint32),
+        ("pbi_svgid", ctypes.c_uint32), ("rfu_1", ctypes.c_uint32),
+        ("pbi_comm", ctypes.c_char * 16), ("pbi_name", ctypes.c_char * 32),
+        ("pbi_nfiles", ctypes.c_uint32), ("pbi_pgid", ctypes.c_uint32),
+        ("pbi_pjobc", ctypes.c_uint32), ("e_tdev", ctypes.c_uint32),
+        ("e_tpgid", ctypes.c_uint32), ("pbi_nice", ctypes.c_int32),
+        ("pbi_start_tvsec", ctypes.c_uint64), ("pbi_start_tvusec", ctypes.c_uint64),
+    ]
+
+
+def platform_process_rows() -> dict[int, tuple[int, int, str]]:
+    rows: dict[int, tuple[int, int, str]] = {}
+    if platform.system() == "Linux":
+        for path in Path("/proc").iterdir():
+            if not path.name.isdigit():
+                continue
+            try:
+                raw = (path / "stat").read_text()
+                rest = raw[raw.rfind(")") + 2 :].split()
+                pid = int(path.name)
+                ppid = int(rest[1])
+                pgid = int(rest[2])
+                start = rest[19]
+            except (OSError, ValueError, IndexError):
+                continue
+            rows[pid] = (ppid, pgid, digest(f"{boot_identity()}:{start}".encode()))
+        return rows
+    if platform.system() == "Darwin":
+        libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+        libproc.proc_listallpids.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        libproc.proc_listallpids.restype = ctypes.c_int
+        capacity = max(1024, libproc.proc_listallpids(None, 0) * 2)
+        pids = (ctypes.c_int * capacity)()
+        count = libproc.proc_listallpids(pids, ctypes.sizeof(pids))
+        libproc.proc_pidinfo.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_uint64, ctypes.c_void_p, ctypes.c_int]
+        libproc.proc_pidinfo.restype = ctypes.c_int
+        for pid in pids[: max(0, count)]:
+            if pid <= 0:
+                continue
+            info = ProcBSDInfo()
+            size = libproc.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info))
+            if size != ctypes.sizeof(info):
+                continue
+            identity = digest(
+                f"{boot_identity()}:{info.pbi_start_tvsec}:{info.pbi_start_tvusec}".encode()
+            )
+            rows[int(pid)] = (int(info.pbi_ppid), int(info.pbi_pgid), identity)
+        return rows
+    raise ManifestError(
+        "process-identity-unverifiable",
+        "this platform has no supported process census",
+        "owner-required",
+        4,
+    )
+
+
+def process_start_identity(pid: int) -> str | None:
+    row = platform_process_rows().get(pid)
+    return row[2] if row is not None else None
+
+
+def process_census() -> dict[int, tuple[int, int]]:
+    return {pid: (row[0], row[1]) for pid, row in platform_process_rows().items()}
+
+
+def owned_processes(
+    leader_pid: int,
+    pgid: int,
+    known_identities: dict[int, str],
+) -> tuple[list[int], list[int], dict[int, str]]:
+    rows = process_census()
+    descendants = {leader_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, (ppid, _) in rows.items():
+            if ppid in descendants and pid not in descendants:
+                descendants.add(pid)
+                changed = True
+    group_members = sorted(pid for pid, (_, member_pgid) in rows.items() if member_pgid == pgid)
+    escaped = sorted(pid for pid in descendants if pid in rows and rows[pid][1] != pgid)
+    identities = dict(known_identities)
+    for pid in sorted(descendants | set(group_members)):
+        if pid in rows and pid not in identities:
+            identity = process_start_identity(pid)
+            if identity is not None:
+                identities[pid] = identity
+    return group_members, escaped, identities
+
+
+def append_attempt(path: Path, event: dict[str, Any], *, create: bool = False) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+    if create:
+        flags |= os.O_EXCL
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except FileExistsError as exc:
+        raise ManifestError(
+            "attempt-already-exists",
+            "this command already has a physical attempt",
+            "recover-existing-attempt",
+            4,
+        ) from exc
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        os.write(descriptor, canonical_bytes(event) + b"\n")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    if create:
+        directory = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+
+
+def write_lease(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        os.write(descriptor, canonical_bytes(value) + b"\n")
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    os.replace(temporary, path)
+    directory = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
+def exclusive_output(path: Path):
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except FileExistsError as exc:
+        raise ManifestError(
+            "attempt-artifact-conflict",
+            f"command output artifact already exists: {path}",
+            "use-new-receipt-path",
+            4,
+        ) from exc
+    return os.fdopen(descriptor, "wb")
+
+
+def launch_gated(
+    manifest: dict[str, Any],
+    environment: dict[str, str],
+    stdout_write: int,
+    stderr_write: int,
+) -> tuple[int, int, int]:
+    release_read, release_write = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.close(release_write)
+            os.setsid()
+            os.chdir(manifest["cwd"])
+            os.dup2(stdout_write, 1)
+            os.dup2(stderr_write, 2)
+            os.close(stdout_write)
+            os.close(stderr_write)
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            signal.signal(signal.SIGINT, signal.SIG_DFL)
+            release = os.read(release_read, 1)
+            os.close(release_read)
+            if release != b"1":
+                os._exit(125)
+            os.execve(manifest["argv"][0], manifest["argv"], environment)
+        except BaseException:
+            os._exit(126)
+    os.close(release_read)
+    return pid, pid, release_write
+
+
+def signal_owned_group(
+    pgid: int,
+    known_identities: dict[int, str],
+    signal_number: int,
+) -> tuple[list[int], dict[int, str]]:
+    members, escaped, identities = owned_processes(pgid, pgid, known_identities)
+    try:
+        child_state = os.waitid(os.P_PID, pgid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+    except (ChildProcessError, ProcessLookupError, PermissionError):
+        child_state = None
+    if child_state is not None and members == [pgid] and not escaped:
+        return [], identities
+    verified = []
+    for pid in members:
+        expected = identities.get(pid)
+        if expected is not None and process_start_identity(pid) == expected:
+            verified.append(pid)
+    if pgid in members and pgid not in verified:
+        try:
+            live_child = os.waitid(os.P_PID, pgid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+            if live_child is None and os.getpgid(pgid) == pgid:
+                verified.append(pgid)
+        except (ChildProcessError, ProcessLookupError, PermissionError):
+            pass
+    if members and not verified:
+        raise ManifestError(
+            "process-identity-unverifiable",
+            "owned process identities cannot be matched safely",
+            "owner-required",
+            4,
+        )
+    if verified:
+        try:
+            os.killpg(pgid, signal_number)
+        except ProcessLookupError:
+            pass
+    if escaped:
+        raise ManifestError("process-group-escaped", "a command descendant escaped its owned process group", "owner-required", 4)
+    return members, identities
+
+
+def terminate_owned_group(
+    pgid: int,
+    known_identities: dict[int, str],
+    policy: dict[str, int],
+) -> tuple[dict[str, Any], dict[int, str]]:
+    term_at = utc_timestamp()
+    try:
+        _, identities = signal_owned_group(pgid, known_identities, signal.SIGTERM)
+    except ManifestError as exc:
+        return {
+            "term_sent_at": None,
+            "kill_sent_at": None,
+            "verified_at": None,
+            "remaining_pids": sorted(known_identities),
+            "error_code": exc.code,
+        }, known_identities
+    term_deadline = time.monotonic() + policy["term_grace_seconds"]
+    remaining: list[int] = []
+    escaped: list[int] = []
+    while time.monotonic() < term_deadline:
+        remaining, escaped, identities = owned_processes(pgid, pgid, identities)
+        if escaped or not remaining:
+            break
+        time.sleep(0.05)
+    kill_at = None
+    if remaining and not escaped:
+        kill_at = utc_timestamp()
+        try:
+            _, identities = signal_owned_group(pgid, identities, signal.SIGKILL)
+        except ManifestError as exc:
+            return {
+                "term_sent_at": term_at,
+                "kill_sent_at": None,
+                "verified_at": None,
+                "remaining_pids": remaining,
+                "error_code": exc.code,
+            }, identities
+    cleanup_deadline = time.monotonic() + policy["cleanup_seconds"]
+    while time.monotonic() < cleanup_deadline:
+        remaining, escaped, identities = owned_processes(pgid, pgid, identities)
+        if escaped or not remaining:
+            break
+        time.sleep(0.05)
+    error_code = "process-group-escaped" if escaped else ("cleanup-incomplete" if remaining else None)
+    return {
+        "term_sent_at": term_at,
+        "kill_sent_at": kill_at,
+        "verified_at": utc_timestamp() if error_code is None else None,
+        "remaining_pids": sorted(set(remaining + escaped)),
+        "error_code": error_code,
+    }, identities
+
+
+def run_manifest(
+    manifest: dict[str, Any],
+    receipt_path: str,
+    *,
+    phase_hook: Callable[[str, dict[str, Any]], None] | None = None,
+) -> tuple[dict[str, Any], int]:
     manifest = validate_manifest(manifest)
     for dependency in manifest["dependencies"]:
         verify_file_record(dependency, tool=False)
@@ -799,12 +1215,271 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
     environment = os.environ.copy()
     pinned_directories = list(dict.fromkeys(str(Path(tool["resolved_path"]).parent) for tool in manifest["tools"]))
     environment["PATH"] = os.pathsep.join(pinned_directories + [environment.get("PATH", "")])
-    result = subprocess.run(
-        manifest["argv"], cwd=cwd, env=environment,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
+    policy = manifest["execution_policy"]
+    attempt_path = receipt.with_suffix(receipt.suffix + ".attempt.jsonl")
+    lease_path = receipt.with_suffix(receipt.suffix + ".lease.json")
+    cancel_path = receipt.with_suffix(receipt.suffix + ".cancel.json")
+    attempt_id = secrets.token_hex(16)
+    controller_session_id = secrets.token_hex(16)
+    boot_id = boot_identity()
+    start_utc = datetime.now(timezone.utc)
+    deadline_utc = start_utc + timedelta(seconds=policy["timeout_seconds"])
+    start_monotonic = time.monotonic()
+    deadline_monotonic = start_monotonic + policy["timeout_seconds"]
+    common = {
+        "schema_version": SCHEMA_VERSION,
+        "attempt_id": attempt_id,
+        "manifest_sha256": manifest["manifest_sha256"],
+        "command_id": manifest["command_id"],
+        "controller_session_id": controller_session_id,
+        "boot_identity": boot_id,
+    }
+    append_attempt(
+        attempt_path,
+        {
+            **common,
+            "transition": "prepared",
+            "observed_at": utc_timestamp(),
+            "started_at": start_utc.isoformat().replace("+00:00", "Z"),
+            "deadline_at": deadline_utc.isoformat().replace("+00:00", "Z"),
+            "execution_policy": policy,
+        },
+        create=True,
     )
-    stdout_path.write_bytes(result.stdout)
-    stderr_path.write_bytes(result.stderr)
+    output_files = {
+        "stdout": exclusive_output(stdout_path),
+        "stderr": exclusive_output(stderr_path),
+    }
+    stdout_read, stdout_write = os.pipe()
+    stderr_read, stderr_write = os.pipe()
+    os.set_blocking(stdout_read, False)
+    os.set_blocking(stderr_read, False)
+    pid, pgid, release_write = launch_gated(manifest, environment, stdout_write, stderr_write)
+    os.close(stdout_write)
+    os.close(stderr_write)
+    start_identity = process_start_identity(pid)
+    if start_identity is None:
+        os.close(release_write)
+        raise ManifestError("process-identity-unverifiable", "launcher identity cannot be recorded", "owner-required", 4)
+    process = {
+        "pid": pid,
+        "pgid": pgid,
+        "process_start_identity": start_identity,
+    }
+    append_attempt(
+        attempt_path,
+        {**common, "transition": "launcher-bound", "observed_at": utc_timestamp(), "process": process},
+    )
+    try:
+        if phase_hook is not None:
+            phase_hook("launcher-bound", {**common, "process": process})
+        append_attempt(
+            attempt_path,
+            {**common, "transition": "launch-authorized", "observed_at": utc_timestamp(), "process": process},
+        )
+        if phase_hook is not None:
+            phase_hook("launch-authorized", {**common, "process": process})
+    except BaseException:
+        os.close(release_write)
+        os.close(stdout_read)
+        os.close(stderr_read)
+        os.waitpid(pid, 0)
+        for file in output_files.values():
+            file.close()
+        append_attempt(
+            attempt_path,
+            {**common, "transition": "interrupted-before-release", "observed_at": utc_timestamp(), "process": process},
+        )
+        raise
+    os.write(release_write, b"1")
+    os.close(release_write)
+    append_attempt(
+        attempt_path,
+        {**common, "transition": "launch-released", "observed_at": utc_timestamp(), "process": process},
+    )
+    try:
+        if phase_hook is not None:
+            phase_hook("launch-released", {**common, "process": process})
+    except BaseException:
+        os.close(stdout_read)
+        os.close(stderr_read)
+        for file in output_files.values():
+            file.close()
+        raise
+
+    selector = selectors.DefaultSelector()
+    selector.register(stdout_read, selectors.EVENT_READ, ("stdout", stdout_path))
+    selector.register(stderr_read, selectors.EVENT_READ, ("stderr", stderr_path))
+    streams = {
+        "stdout": {"observed_bytes": 0, "stored_bytes": 0, "digest": hashlib.sha256(), "truncated": False},
+        "stderr": {"observed_bytes": 0, "stored_bytes": 0, "digest": hashlib.sha256(), "truncated": False},
+    }
+    known_identities = {pid: start_identity}
+    exit_code: int | None = None
+    exit_signal: int | None = None
+    requested_status: str | None = None
+    cleanup = {
+        "term_sent_at": None,
+        "kill_sent_at": None,
+        "verified_at": None,
+        "remaining_pids": [],
+        "error_code": None,
+    }
+    last_heartbeat = start_monotonic
+    try:
+        while True:
+            if cancel_path.is_file():
+                cancellation = read_json(str(cancel_path), "cancellation authorization")
+                exact_object(
+                    cancellation,
+                    {"schema_version", "attempt_id", "manifest_sha256", "reason", "authorization_fingerprint"},
+                    "cancellation authorization",
+                )
+                if (
+                    cancellation["schema_version"] != SCHEMA_VERSION
+                    or cancellation["attempt_id"] != attempt_id
+                    or cancellation["manifest_sha256"] != manifest["manifest_sha256"]
+                    or cancellation["reason"] not in {"root-authorized", "claim-lost", "root-monitor-degraded"}
+                    or not isinstance(cancellation["authorization_fingerprint"], str)
+                    or not HEX64_RE.fullmatch(cancellation["authorization_fingerprint"])
+                ):
+                    raise ManifestError("cancellation-unauthorized", "cancellation authorization is invalid", "owner-required", 4)
+                requested_status = "cancelled"
+                append_attempt(
+                    attempt_path,
+                    {**common, "transition": "cancellation-committed", "observed_at": utc_timestamp(), "reason": cancellation["reason"], "process": process},
+                )
+                break
+            waited_pid, wait_status = os.waitpid(pid, os.WNOHANG)
+            if waited_pid == pid:
+                if os.WIFEXITED(wait_status):
+                    exit_code = os.WEXITSTATUS(wait_status)
+                elif os.WIFSIGNALED(wait_status):
+                    exit_signal = os.WTERMSIG(wait_status)
+                    exit_code = -exit_signal
+                break
+            now = time.monotonic()
+            if now >= deadline_monotonic:
+                requested_status = "timed-out"
+                append_attempt(
+                    attempt_path,
+                    {**common, "transition": "timeout-committed", "observed_at": utc_timestamp(), "process": process},
+                )
+                break
+            for key, _ in selector.select(timeout=0.05):
+                stream_name, _ = key.data
+                try:
+                    chunk = os.read(key.fd, 65536)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    selector.unregister(key.fd)
+                    os.close(key.fd)
+                    continue
+                row = streams[stream_name]
+                row["observed_bytes"] += len(chunk)
+                row["digest"].update(chunk)
+                limit = policy[f"{stream_name}_limit_bytes"]
+                remaining = max(0, limit - row["stored_bytes"])
+                if remaining:
+                    stored = chunk[:remaining]
+                    output_files[stream_name].write(stored)
+                    row["stored_bytes"] += len(stored)
+                if row["observed_bytes"] > limit:
+                    row["truncated"] = True
+                    requested_status = "output-limit"
+                    append_attempt(
+                        attempt_path,
+                        {**common, "transition": "output-limit-committed", "observed_at": utc_timestamp(), "stream": stream_name, "process": process},
+                    )
+                    break
+            if requested_status is not None:
+                break
+            if now - last_heartbeat >= policy["heartbeat_seconds"]:
+                members, escaped, known_identities = owned_processes(pid, pgid, known_identities)
+                lease = {
+                    **common,
+                    "state": "running",
+                    "heartbeat_at": utc_timestamp(),
+                    "started_at": start_utc.isoformat().replace("+00:00", "Z"),
+                    "deadline_at": deadline_utc.isoformat().replace("+00:00", "Z"),
+                    "process": process,
+                    "group_members": members,
+                    "escaped_descendants": escaped,
+                    "stdout_observed_bytes": streams["stdout"]["observed_bytes"],
+                    "stderr_observed_bytes": streams["stderr"]["observed_bytes"],
+                }
+                write_lease(lease_path, lease)
+                if escaped:
+                    requested_status = "cleanup-failed"
+                    append_attempt(
+                        attempt_path,
+                        {**common, "transition": "process-group-escape-observed", "observed_at": utc_timestamp(), "escaped_pids": escaped, "process": process},
+                    )
+                    break
+                last_heartbeat = now
+        if requested_status is not None:
+            cleanup, known_identities = terminate_owned_group(pgid, known_identities, policy)
+            if cleanup["error_code"] is not None:
+                requested_status = "cleanup-failed"
+            try:
+                waited_pid, wait_status = os.waitpid(pid, 0)
+            except ChildProcessError:
+                waited_pid = 0
+            if waited_pid == pid:
+                if os.WIFEXITED(wait_status):
+                    exit_code = os.WEXITSTATUS(wait_status)
+                elif os.WIFSIGNALED(wait_status):
+                    exit_signal = os.WTERMSIG(wait_status)
+                    exit_code = -exit_signal
+        drain_deadline = time.monotonic() + 1
+        while selector.get_map() and time.monotonic() < drain_deadline:
+            events = selector.select(timeout=0.05)
+            if not events:
+                continue
+            for key, _ in events:
+                stream_name, _ = key.data
+                try:
+                    chunk = os.read(key.fd, 65536)
+                except BlockingIOError:
+                    continue
+                if not chunk:
+                    selector.unregister(key.fd)
+                    os.close(key.fd)
+                    continue
+                row = streams[stream_name]
+                row["observed_bytes"] += len(chunk)
+                row["digest"].update(chunk)
+                limit = policy[f"{stream_name}_limit_bytes"]
+                remaining = max(0, limit - row["stored_bytes"])
+                if remaining:
+                    stored = chunk[:remaining]
+                    output_files[stream_name].write(stored)
+                    row["stored_bytes"] += len(stored)
+                if row["observed_bytes"] > limit:
+                    row["truncated"] = True
+                    requested_status = "output-limit"
+    finally:
+        for file in output_files.values():
+            file.flush()
+            os.fsync(file.fileno())
+            file.close()
+        for key in list(selector.get_map().values()):
+            try:
+                selector.unregister(key.fd)
+                os.close(key.fd)
+            except OSError:
+                pass
+        selector.close()
+    output_directory = os.open(receipt.parent, os.O_RDONLY)
+    try:
+        os.fsync(output_directory)
+    finally:
+        os.close(output_directory)
+
+    for stream_name, row in streams.items():
+        row["sha256"] = row.pop("digest").hexdigest()
+    status = requested_status or ("passed" if exit_code in manifest["expected_exit_codes"] else "failed")
     after = tracked_snapshot(cwd, git_path)
     changed = sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
     unexpected = [path for path in changed if not path_allowed(path, manifest["write_set"]["allowed_paths"])]
@@ -817,8 +1492,7 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
             output_records.append(file_record(path, source_kind="command-output", source_ref=path.name))
         else:
             missing_outputs.append(raw)
-    status = "passed"
-    if result.returncode not in manifest["expected_exit_codes"] or unexpected or missing or missing_outputs:
+    if status == "passed" and (unexpected or missing or missing_outputs):
         status = "failed"
     baseline_observation = None
     if manifest["operation"] == "baseline-validation":
@@ -826,12 +1500,15 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
         if before != after or baseline_before != baseline_after:
             status = "failed"
         adapter = manifest["baseline"]["adapter"]
-        if adapter == "prettier-check-v1":
-            diagnostics = prettier_diagnostics(cwd, result.stdout, result.stderr, result.returncode)
+        if status in {"timed-out", "cancelled", "output-limit", "interrupted", "cleanup-failed"}:
+            diagnostics = []
+            outcome = "planning-required"
+        elif adapter == "prettier-check-v1":
+            diagnostics = prettier_diagnostics(cwd, stdout_path.read_bytes(), stderr_path.read_bytes(), exit_code or 0)
             outcome = "clean" if not diagnostics else "unchanged-debt-candidate"
         else:
             diagnostics = []
-            outcome = "clean" if result.returncode == 0 else "planning-required"
+            outcome = "clean" if exit_code == 0 else "planning-required"
         baseline_observation = {
             "adapter": adapter,
             "policy": manifest["baseline"]["policy"],
@@ -850,7 +1527,30 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
         "command_id": manifest["command_id"],
         "gate_fingerprint": manifest["gate_fingerprint"],
         "status": status,
-        "exit_code": result.returncode,
+        "exit_code": exit_code,
+        "exit_signal": exit_signal,
+        "attempt": {
+            "attempt_id": attempt_id,
+            "attempt_file": str(attempt_path),
+            "lease_file": str(lease_path),
+            "controller_session_id": controller_session_id,
+            "boot_identity": boot_id,
+            "started_at": start_utc.isoformat().replace("+00:00", "Z"),
+            "deadline_at": deadline_utc.isoformat().replace("+00:00", "Z"),
+            "completed_at": utc_timestamp(),
+            "process": process,
+            "cleanup": cleanup,
+        },
+        "output_capture": {
+            name: {
+                "limit_bytes": policy[f"{name}_limit_bytes"],
+                "observed_bytes": row["observed_bytes"],
+                "stored_bytes": row["stored_bytes"],
+                "observed_sha256": row["sha256"],
+                "truncated": row["truncated"],
+            }
+            for name, row in streams.items()
+        },
         "cwd_observed": str(cwd.resolve()),
         "argv_fingerprint": fingerprint({"cwd": str(cwd), "argv": manifest["argv"]}),
         "tools": [{"tool_id": row["tool_id"], "resolved_path": row["resolved_path"], "sha256": row["sha256"], "version": row["version"]} for row in manifest["tools"]],
@@ -861,6 +1561,30 @@ def run_manifest(manifest: dict[str, Any], receipt_path: str) -> tuple[dict[str,
         "baseline_observation": baseline_observation,
         "prior_receipt_sha256": None,
     }
+    append_attempt(
+        attempt_path,
+        {
+            **common,
+            "transition": "terminal-observed",
+            "observed_at": utc_timestamp(),
+            "status": status,
+            "exit_code": exit_code,
+            "exit_signal": exit_signal,
+            "cleanup": cleanup,
+            "output_capture": value["output_capture"],
+        },
+    )
+    write_lease(
+        lease_path,
+        {
+            **common,
+            "state": status,
+            "heartbeat_at": utc_timestamp(),
+            "deadline_at": deadline_utc.isoformat().replace("+00:00", "Z"),
+            "process": process,
+            "cleanup": cleanup,
+        },
+    )
     value["receipt_sha256"] = fingerprint(value)
     write_json(receipt_path, value)
     return value, 0 if status == "passed" else 4
@@ -870,6 +1594,7 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
     manifest = validate_manifest(manifest)
     fields = {
         "schema_version", "manifest_sha256", "command_id", "gate_fingerprint", "status", "exit_code",
+        "exit_signal", "attempt", "output_capture",
         "cwd_observed", "argv_fingerprint", "tools", "stdout", "stderr", "writes", "outputs",
         "baseline_observation", "prior_receipt_sha256", "receipt_sha256",
     }
@@ -878,10 +1603,68 @@ def validate_receipt(receipt: dict[str, Any], manifest: dict[str, Any]) -> dict[
         raise ManifestError("receipt-invalid", "receipt fingerprint is invalid", "run-command-again")
     if receipt["manifest_sha256"] != manifest["manifest_sha256"] or receipt["command_id"] != manifest["command_id"] or receipt["gate_fingerprint"] != manifest["gate_fingerprint"]:
         raise ManifestError("receipt-invalid", "receipt is bound to another command manifest", "run-command-again")
-    if receipt["status"] not in {"passed", "failed", "reused"}:
+    if receipt["status"] not in TERMINAL_STATUSES:
         raise ManifestError("receipt-invalid", "receipt status is invalid", "run-command-again")
-    if not isinstance(receipt["exit_code"], int) or isinstance(receipt["exit_code"], bool):
+    if receipt["exit_code"] is not None and (
+        not isinstance(receipt["exit_code"], int) or isinstance(receipt["exit_code"], bool)
+    ):
         raise ManifestError("receipt-invalid", "receipt exit code is invalid", "run-command-again")
+    if receipt["exit_signal"] is not None and (
+        not isinstance(receipt["exit_signal"], int) or isinstance(receipt["exit_signal"], bool)
+    ):
+        raise ManifestError("receipt-invalid", "receipt exit signal is invalid", "run-command-again")
+    attempt = exact_object(
+        receipt["attempt"],
+        {
+            "attempt_id", "attempt_file", "lease_file", "controller_session_id",
+            "boot_identity", "started_at", "deadline_at", "completed_at", "process", "cleanup",
+        },
+        "receipt attempt",
+    )
+    for field in ("attempt_id", "controller_session_id"):
+        if not isinstance(attempt[field], str) or not re.fullmatch(r"[0-9a-f]{32}", attempt[field]):
+            raise ManifestError("receipt-invalid", f"receipt {field} is invalid", "owner-required")
+    for field in ("attempt_file", "lease_file"):
+        absolute_path(attempt[field], f"receipt {field}", existing=True)
+    nonempty(attempt["boot_identity"], "receipt boot identity")
+    for field in ("started_at", "deadline_at", "completed_at"):
+        try:
+            parse_timestamp(attempt[field])
+        except (TypeError, ValueError) as exc:
+            raise ManifestError("receipt-invalid", f"receipt {field} is invalid", "owner-required") from exc
+    process = exact_object(
+        attempt["process"],
+        {"pid", "pgid", "process_start_identity"},
+        "receipt process",
+    )
+    if any(not isinstance(process[field], int) or process[field] <= 0 for field in ("pid", "pgid")):
+        raise ManifestError("receipt-invalid", "receipt process identity is invalid", "owner-required")
+    if not isinstance(process["process_start_identity"], str) or not HEX64_RE.fullmatch(process["process_start_identity"]):
+        raise ManifestError("receipt-invalid", "receipt process start identity is invalid", "owner-required")
+    cleanup = exact_object(
+        attempt["cleanup"],
+        {"term_sent_at", "kill_sent_at", "verified_at", "remaining_pids", "error_code"},
+        "receipt cleanup",
+    )
+    if not isinstance(cleanup["remaining_pids"], list) or any(not isinstance(pid, int) or pid <= 0 for pid in cleanup["remaining_pids"]):
+        raise ManifestError("receipt-invalid", "receipt cleanup pids are invalid", "owner-required")
+    captures = exact_object(receipt["output_capture"], {"stdout", "stderr"}, "receipt output_capture")
+    for name in ("stdout", "stderr"):
+        capture = exact_object(
+            captures[name],
+            {"limit_bytes", "observed_bytes", "stored_bytes", "observed_sha256", "truncated"},
+            f"receipt output_capture.{name}",
+        )
+        if capture["limit_bytes"] != manifest["execution_policy"][f"{name}_limit_bytes"]:
+            raise ManifestError("receipt-invalid", "receipt output limit differs from manifest", "owner-required")
+        if any(not isinstance(capture[field], int) or capture[field] < 0 for field in ("observed_bytes", "stored_bytes")):
+            raise ManifestError("receipt-invalid", "receipt output byte counts are invalid", "owner-required")
+        if capture["stored_bytes"] > capture["limit_bytes"] or capture["observed_bytes"] < capture["stored_bytes"]:
+            raise ManifestError("receipt-invalid", "receipt output byte counts conflict", "owner-required")
+        if not isinstance(capture["observed_sha256"], str) or not HEX64_RE.fullmatch(capture["observed_sha256"]):
+            raise ManifestError("receipt-invalid", "receipt output digest is invalid", "owner-required")
+        if not isinstance(capture["truncated"], bool) or capture["truncated"] != (capture["observed_bytes"] > capture["limit_bytes"]):
+            raise ManifestError("receipt-invalid", "receipt output truncation evidence conflicts", "owner-required")
     absolute_path(receipt["cwd_observed"], "receipt cwd")
     if receipt["argv_fingerprint"] != manifest["argv_fingerprint"]:
         raise ManifestError("receipt-invalid", "receipt argv does not match", "run-command-again")
@@ -996,6 +1779,182 @@ def reuse_receipt(manifest: dict[str, Any], prior: dict[str, Any]) -> dict[str, 
     return value
 
 
+def read_attempt(path_value: str, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    path = absolute_path(path_value, "attempt file", existing=True)
+    if path.stat().st_size > MAX_PACKET_BYTES:
+        raise ManifestError("attempt-invalid", "attempt journal exceeds 1 MiB", "owner-required", 4)
+    events: list[dict[str, Any]] = []
+    try:
+        for line in path.read_text().splitlines():
+            value = json.loads(line)
+            if (
+                not isinstance(value, dict)
+                or value.get("schema_version") != SCHEMA_VERSION
+                or value.get("manifest_sha256") != manifest["manifest_sha256"]
+                or value.get("command_id") != manifest["command_id"]
+            ):
+                raise ManifestError("attempt-invalid", "attempt journal identity is invalid", "owner-required", 4)
+            events.append(value)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ManifestError("attempt-invalid", "attempt journal is unreadable", "owner-required", 4) from exc
+    if not events or events[0].get("transition") != "prepared":
+        raise ManifestError("attempt-invalid", "attempt journal lacks its durable reservation", "owner-required", 4)
+    attempt_id = events[0].get("attempt_id")
+    if any(event.get("attempt_id") != attempt_id for event in events):
+        raise ManifestError("attempt-invalid", "attempt journal changes identity", "owner-required", 4)
+    return events
+
+
+def attempt_status(manifest: dict[str, Any], attempt_path: str) -> dict[str, Any]:
+    events = read_attempt(attempt_path, validate_manifest(manifest))
+    transitions = [event.get("transition") for event in events]
+    released = "launch-authorized" in transitions
+    terminal = next((event for event in reversed(events) if event.get("transition") == "terminal-observed"), None)
+    return {
+        "ok": True,
+        "command": "command-status",
+        "version": __version__,
+        "attempt_id": events[0]["attempt_id"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "launch_may_have_occurred": released,
+        "relaunch_allowed": False,
+        "terminal": terminal is not None,
+        "status": terminal.get("status") if terminal else "interrupted",
+        "last_transition": transitions[-1],
+        "attempt_fingerprint": fingerprint(events),
+    }
+
+
+def recover_attempt(manifest: dict[str, Any], attempt_path: str) -> dict[str, Any]:
+    manifest = validate_manifest(manifest)
+    path = absolute_path(attempt_path, "attempt file", existing=True)
+    events = read_attempt(str(path), manifest)
+    existing_terminal = next(
+        (event for event in reversed(events) if event.get("transition") == "terminal-observed"),
+        None,
+    )
+    if existing_terminal is not None:
+        return attempt_status(manifest, str(path))
+    process = next(
+        (event.get("process") for event in reversed(events) if isinstance(event.get("process"), dict)),
+        None,
+    )
+    prepared = events[0]
+    common = {
+        "schema_version": SCHEMA_VERSION,
+        "attempt_id": prepared["attempt_id"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "command_id": manifest["command_id"],
+        "controller_session_id": prepared["controller_session_id"],
+        "boot_identity": prepared["boot_identity"],
+    }
+    cleanup = {
+        "term_sent_at": None,
+        "kill_sent_at": None,
+        "verified_at": utc_timestamp(),
+        "remaining_pids": [],
+        "error_code": None,
+    }
+    if process is not None:
+        cleanup, _ = terminate_owned_group(
+            process["pgid"],
+            {process["pid"]: process["process_start_identity"]},
+            manifest["execution_policy"],
+        )
+    cancel_path = Path(str(path).removesuffix(".attempt.jsonl") + ".cancel.json")
+    if cleanup["error_code"] is not None:
+        status = "cleanup-failed"
+    elif cancel_path.is_file():
+        status = "cancelled"
+    else:
+        try:
+            expired = datetime.now(timezone.utc) >= parse_timestamp(prepared["deadline_at"])
+        except (KeyError, TypeError, ValueError):
+            expired = False
+        status = "timed-out" if expired else "interrupted"
+    terminal = {
+        **common,
+        "transition": "terminal-observed",
+        "observed_at": utc_timestamp(),
+        "status": status,
+        "exit_code": None,
+        "exit_signal": None,
+        "cleanup": cleanup,
+        "output_capture": None,
+        "recovered": True,
+    }
+    append_attempt(path, terminal)
+    return {
+        "ok": cleanup["error_code"] is None,
+        "command": "command-recover",
+        "version": __version__,
+        "attempt_id": prepared["attempt_id"],
+        "status": status,
+        "cleanup": cleanup,
+        "attempt_fingerprint": fingerprint(events + [terminal]),
+        "relaunch_allowed": False,
+    }
+
+
+def authorize_cancellation(
+    manifest: dict[str, Any],
+    attempt_path: str,
+    receipt_path: str,
+    ledger_path: str,
+    reason: str,
+    authorization_fingerprint: str,
+) -> dict[str, Any]:
+    events = read_attempt(attempt_path, validate_manifest(manifest))
+    if reason not in {"root-authorized", "claim-lost", "root-monitor-degraded"}:
+        raise ManifestError("cancellation-unauthorized", "cancellation reason is invalid", "owner-required", 4)
+    if not HEX64_RE.fullmatch(authorization_fingerprint):
+        raise ManifestError("cancellation-unauthorized", "cancellation fingerprint is invalid", "owner-required", 4)
+    ledger = read_json(ledger_path, "cancellation ledger")
+    if ledger.get("schema_version") != "13.0.0" or ledger.get("content_fingerprint") != authorization_fingerprint:
+        raise ManifestError("cancellation-unauthorized", "cancellation ledger identity is stale", "owner-required", 4)
+    authorities = [
+        command
+        for task in ledger.get("tasks", []) if isinstance(task, dict)
+        for delivery in task.get("deliveries", []) if isinstance(delivery, dict)
+        for command in delivery.get("command_attempts", []) if isinstance(command, dict)
+        if command.get("attempt_id") == events[0]["attempt_id"]
+        and command.get("manifest_sha256") == manifest["manifest_sha256"]
+        and command.get("state") == "cancellation-authorized"
+        and command.get("cancellation_reason") == reason
+    ]
+    if len(authorities) != 1:
+        raise ManifestError("cancellation-unauthorized", "ledger does not authorize this cancellation", "owner-required", 4)
+    if any(event.get("transition") == "terminal-observed" for event in events):
+        raise ManifestError("attempt-terminal", "terminal command cannot be cancelled", "read-terminal-receipt", 4)
+    receipt = absolute_path(receipt_path, "receipt")
+    cancel_path = receipt.with_suffix(receipt.suffix + ".cancel.json")
+    value = {
+        "schema_version": SCHEMA_VERSION,
+        "attempt_id": events[0]["attempt_id"],
+        "manifest_sha256": manifest["manifest_sha256"],
+        "reason": reason,
+        "authorization_fingerprint": authorization_fingerprint,
+    }
+    if cancel_path.exists():
+        if read_json(str(cancel_path), "cancellation authorization") != value:
+            raise ManifestError("cancellation-conflict", "cancellation authorization conflicts", "owner-required", 4)
+    else:
+        descriptor = os.open(cancel_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        try:
+            os.write(descriptor, canonical_bytes(value) + b"\n")
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    return {
+        "ok": True,
+        "command": "command-cancel",
+        "version": __version__,
+        "attempt_id": events[0]["attempt_id"],
+        "cancellation_file": str(cancel_path),
+        "reason": reason,
+    }
+
+
 def doctor() -> dict[str, Any]:
     return {
         "ok": True,
@@ -1035,6 +1994,19 @@ def build_parser() -> argparse.ArgumentParser:
     command_run = command_verbs.add_parser("run")
     command_run.add_argument("--manifest", required=True)
     command_run.add_argument("--receipt", required=True)
+    command_status_parser = command_verbs.add_parser("status")
+    command_status_parser.add_argument("--manifest", required=True)
+    command_status_parser.add_argument("--attempt", required=True)
+    command_recover = command_verbs.add_parser("recover")
+    command_recover.add_argument("--manifest", required=True)
+    command_recover.add_argument("--attempt", required=True)
+    command_cancel = command_verbs.add_parser("cancel")
+    command_cancel.add_argument("--manifest", required=True)
+    command_cancel.add_argument("--attempt", required=True)
+    command_cancel.add_argument("--receipt", required=True)
+    command_cancel.add_argument("--ledger", required=True)
+    command_cancel.add_argument("--reason", choices=["root-authorized", "claim-lost", "root-monitor-degraded"], required=True)
+    command_cancel.add_argument("--authorization-fingerprint", required=True)
     receipt = nouns.add_parser("receipt", help="Verify or reuse a command receipt.")
     receipt_verbs = receipt.add_subparsers(dest="verb", required=True)
     receipt_verify = receipt_verbs.add_parser("verify")
@@ -1070,6 +2042,25 @@ def main(argv: list[str] | None = None) -> int:
                 value = prepare_command(read_json(args.input, "command input"), read_json(args.bundle, "bundle manifest"))
             elif args.verb == "refresh-tools":
                 value = refresh_tools(validate_manifest(read_json(args.manifest, "command manifest")))
+            elif args.verb == "status":
+                result = attempt_status(validate_manifest(read_json(args.manifest, "command manifest")), args.attempt)
+                emit(result, args.json)
+                return 0
+            elif args.verb == "recover":
+                result = recover_attempt(validate_manifest(read_json(args.manifest, "command manifest")), args.attempt)
+                emit(result, args.json)
+                return 0 if result["ok"] else 4
+            elif args.verb == "cancel":
+                result = authorize_cancellation(
+                    validate_manifest(read_json(args.manifest, "command manifest")),
+                    args.attempt,
+                    args.receipt,
+                    args.ledger,
+                    args.reason,
+                    args.authorization_fingerprint,
+                )
+                emit(result, args.json)
+                return 0
             else:
                 value, exit_code = run_manifest(validate_manifest(read_json(args.manifest, "command manifest")), args.receipt)
                 emit(value, args.json)

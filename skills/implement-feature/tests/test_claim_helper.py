@@ -63,7 +63,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
             subprocess.run(["git", "-C", str(repository), "commit", "-qm", "base"], check=True)
         self.ledger = self.ledger_root / "fixture.json"
-        self.ledger.write_text('{"schema_version":"fixture"}\n')
+        self.ledger.write_text('{"schema_version":"13.0.0","tasks":[]}\n')
         self.adoption_index = 0
         self.env = os.environ.copy()
         self.env["HOME"] = str(self.base)
@@ -296,6 +296,8 @@ class AtomicClaimHelperTests(unittest.TestCase):
             "root_id": claim["root_id"],
             "claim_fingerprint": claim["fingerprint"],
             "task_termination_evidence": termination_evidence,
+            "execution_recovery_fingerprint": hashlib.sha256(b"[]").hexdigest(),
+            "command_cleanup_evidence": [],
             "specs": specs,
         }
         path = self.base / f"adoption-{claim['root_id']}-{self.adoption_index}.json"
@@ -356,7 +358,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "14.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "15.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -960,7 +962,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             acquired["claim"]["repository_checkouts"][0]["checkout"],
             str(self.repo.resolve()),
         )
-        self.assertEqual(acquired["claim"]["schema_version"], "6.0.0")
+        self.assertEqual(acquired["claim"]["schema_version"], "7.0.0")
         self.assertNotIn("execution_adapter", acquired["claim"])
 
     def test_bare_repository_local_source_ref_is_rejected(self) -> None:
@@ -1802,8 +1804,36 @@ class AtomicClaimHelperTests(unittest.TestCase):
         self.assertEqual(blocked.returncode, 4)
         self.assertIn("changed after takeover preparation", blocked.stdout)
 
+    def test_takeover_refuses_nonterminal_or_cleanup_unverified_command(self) -> None:
+        claim = json.loads(
+            run_claim(
+                *self.acquire_args("root-command-recovery", self.repo, "spec-command"),
+                env=self.env,
+            ).stdout
+        )["claim"]
+        adoption_path = self.make_task_adoption(claim, "app-task://old/terminated")
+        adoption = json.loads(adoption_path.read_text())
+        adoption["command_cleanup_evidence"] = [
+            {
+                "attempt_id": "a" * 32,
+                "state": "running",
+                "cleanup_verified": False,
+                "evidence_ref": "execution-manifest://still-running",
+            }
+        ]
+        adoption["execution_recovery_fingerprint"] = hashlib.sha256(
+            json.dumps(adoption["command_cleanup_evidence"], sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        with self.assertRaises(CLAIM_RUNTIME.ClaimError) as error:
+            CLAIM_RUNTIME.validate_task_adoption(
+                adoption,
+                claim,
+                verify_checkouts=False,
+            )
+        self.assertEqual(error.exception.code, "state-conflict")
+
     def test_previous_claim_schemas_fail_closed_without_mutation(self) -> None:
-        for schema_version in ("3.0.0", "4.0.0", "5.0.0"):
+        for schema_version in ("3.0.0", "4.0.0", "5.0.0", "6.0.0"):
             with self.subTest(schema_version=schema_version):
                 if self.claim_root.exists():
                     for path in self.claim_root.iterdir():

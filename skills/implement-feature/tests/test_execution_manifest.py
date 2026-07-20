@@ -4,17 +4,20 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = SKILL_ROOT / "scripts" / "execution-manifest"
-REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v3.json"
+REPLAY_FIXTURE = SKILL_ROOT / "tests" / "fixtures" / "execution-manifest-replay-v4.json"
 loader = importlib.machinery.SourceFileLoader("execution_manifest_script", str(SCRIPT))
 spec = importlib.util.spec_from_loader(loader.name, loader)
 assert spec is not None
@@ -31,7 +34,7 @@ class ExecutionManifestTests(unittest.TestCase):
         source = root / "source.md"
         source.write_bytes("Café\n".encode())
         request = {
-            "schema_version": "3.0.0",
+            "schema_version": "4.0.0",
             "template": False,
             "root_task_ref": "task:test",
             "entries": [
@@ -71,7 +74,7 @@ class ExecutionManifestTests(unittest.TestCase):
         allowed = allowed or []
         expected = expected or []
         return {
-            "schema_version": "3.0.0",
+            "schema_version": "4.0.0",
             "template": False,
             "command_id": "focused-validation",
             "operation": "validation",
@@ -89,7 +92,7 @@ class ExecutionManifestTests(unittest.TestCase):
 
     def baseline_request(self, repo: Path, argv: list[str]) -> dict[str, object]:
         return {
-            "schema_version": "3.0.0",
+            "schema_version": "4.0.0",
             "template": False,
             "command_id": "baseline-validation",
             "operation": "baseline-validation",
@@ -114,6 +117,33 @@ class ExecutionManifestTests(unittest.TestCase):
         tool.chmod(0o755)
         return tool
 
+    def short_policy(
+        self,
+        *,
+        timeout: float = 0.5,
+        stdout_limit: int = 8192,
+        stderr_limit: int = 8192,
+    ) -> dict[str, float | int]:
+        return {
+            "timeout_seconds": timeout,
+            "heartbeat_seconds": 0.05,
+            "term_grace_seconds": 0.1,
+            "cleanup_seconds": 0.3,
+            "stdout_limit_bytes": stdout_limit,
+            "stderr_limit_bytes": stderr_limit,
+        }
+
+    def prepare_short_validation(
+        self,
+        root: Path,
+        repo: Path,
+        argv: list[str],
+        policy: dict[str, float | int],
+    ) -> dict[str, object]:
+        _, bundle = self.make_bundle(root)
+        with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+            return cli.prepare_command(self.validation_request(repo, argv), bundle)
+
     def test_bundle_hash_is_deterministic_and_reconstructable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -125,7 +155,7 @@ class ExecutionManifestTests(unittest.TestCase):
                 {"entry_id": "unicode", "kind": "issue", "source_ref": "issue:2", "snapshot_path": str(unicode_file)},
                 {"entry_id": "empty", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(empty)},
             ]
-            request = {"schema_version": "3.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
+            request = {"schema_version": "4.0.0", "template": False, "root_task_ref": "task:1", "entries": entries}
             first = cli.prepare_bundle(request)
             second = cli.prepare_bundle({**request, "entries": list(reversed(entries))})
             self.assertEqual(first["bundle_sha256"], second["bundle_sha256"])
@@ -206,6 +236,26 @@ class ExecutionManifestTests(unittest.TestCase):
             _, bundle = self.make_bundle(Path(directory))
             with self.assertRaisesRegex(cli.ManifestError, "must contain exactly"):
                 cli.prepare_command(request, bundle)
+
+    def test_v3_manifest_contract_is_rejected_without_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.md"
+            source.write_text("immutable\n")
+            request = {
+                "schema_version": "3.0.0",
+                "template": False,
+                "root_task_ref": "task:legacy",
+                "entries": [{
+                    "entry_id": "legacy",
+                    "kind": "feature-spec",
+                    "source_ref": "legacy:1",
+                    "snapshot_path": str(source),
+                }],
+            }
+            with self.assertRaises(cli.ManifestError):
+                cli.prepare_bundle(request)
+            self.assertEqual(source.read_text(), "immutable\n")
 
     def test_validation_requires_literal_non_shell_argv(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -344,7 +394,7 @@ class ExecutionManifestTests(unittest.TestCase):
             )
             fake_gh.chmod(0o755)
             request = {
-                "schema_version": "3.0.0", "template": False,
+                "schema_version": "4.0.0", "template": False,
                 "command_id": "delivery-preflight", "operation": "delivery-preflight",
                 "owner": "root", "cwd": None, "parameters": {"input": str(packet)},
                 "dependency_files": [],
@@ -369,7 +419,7 @@ class ExecutionManifestTests(unittest.TestCase):
             (root / "autoreview-next.json").write_text("{}\n")
             _, bundle = self.make_bundle(root)
             request = {
-                "schema_version": "3.0.0", "template": False,
+                "schema_version": "4.0.0", "template": False,
                 "command_id": "autoreview-dry-run", "operation": "autoreview",
                 "owner": "worker", "cwd": str(repo),
                 "parameters": {
@@ -398,7 +448,7 @@ class ExecutionManifestTests(unittest.TestCase):
             self.write_json(
                 request,
                 {
-                    "schema_version": "3.0.0",
+                    "schema_version": "4.0.0",
                     "template": False,
                     "root_task_ref": "task:fixture",
                     "entries": [{"entry_id": "source", "kind": "spec", "source_ref": "spec:1", "snapshot_path": str(source)}],
@@ -431,6 +481,251 @@ class ExecutionManifestTests(unittest.TestCase):
             self.assertEqual(manifest["operation"], fixture["expected"]["operation"])
             self.assertEqual(receipt["status"], fixture["expected"]["receipt_status"])
             self.assertEqual(cli.validate_receipt(json.loads(receipt_path.read_text()), manifest), receipt)
+
+    def test_two_phase_launcher_never_executes_before_durable_release(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            marker = repo / "executed"
+            policy = self.short_policy()
+            manifest = self.prepare_short_validation(
+                root,
+                repo,
+                [sys.executable, "-c", "from pathlib import Path\nPath('executed').write_text('yes')"],
+                policy,
+            )
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                with self.assertRaisesRegex(RuntimeError, "controller-death"):
+                    cli.run_manifest(
+                        manifest,
+                        str(root / "receipt.json"),
+                        phase_hook=lambda phase, _: (_ for _ in ()).throw(RuntimeError("controller-death"))
+                        if phase == "launch-authorized"
+                        else None,
+                    )
+            self.assertFalse(marker.exists())
+            attempt = root / "receipt.json.attempt.jsonl"
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                status = cli.attempt_status(manifest, str(attempt))
+            self.assertTrue(status["launch_may_have_occurred"])
+            self.assertFalse(status["relaunch_allowed"])
+            self.assertEqual(status["status"], "interrupted")
+
+    def test_timeout_kills_hung_child_and_grandchild_that_ignore_term(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            policy = self.short_policy(timeout=0.25)
+            code = (
+                "import signal,subprocess,sys,time\n"
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+                "subprocess.Popen([sys.executable,'-c','import signal,time\\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\\ntime.sleep(30)'])\n"
+                "time.sleep(30)\n"
+            )
+            manifest = self.prepare_short_validation(root, repo, [sys.executable, "-c", code], policy)
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                receipt, exit_code = cli.run_manifest(manifest, str(root / "timeout.json"))
+            self.assertEqual(exit_code, 4)
+            self.assertEqual(receipt["status"], "timed-out")
+            self.assertIsNotNone(receipt["attempt"]["cleanup"]["kill_sent_at"])
+            self.assertEqual(receipt["attempt"]["cleanup"]["remaining_pids"], [])
+            transitions = [json.loads(line)["transition"] for line in Path(receipt["attempt"]["attempt_file"]).read_text().splitlines()]
+            self.assertLess(transitions.index("timeout-committed"), transitions.index("terminal-observed"))
+
+    def test_controller_death_after_release_never_relaunches(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            marker = repo / "released"
+            policy = self.short_policy(timeout=1)
+            manifest = self.prepare_short_validation(
+                root,
+                repo,
+                [sys.executable, "-c", "from pathlib import Path\nPath('released').write_text('yes')"],
+                policy,
+            )
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                with self.assertRaisesRegex(RuntimeError, "after-release"):
+                    cli.run_manifest(
+                        manifest,
+                        str(root / "released.json"),
+                        phase_hook=lambda phase, _: (_ for _ in ()).throw(RuntimeError("after-release"))
+                        if phase == "launch-released"
+                        else None,
+                    )
+            deadline = time.monotonic() + 2
+            while not marker.exists() and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertTrue(marker.exists())
+            attempt_path = root / "released.json.attempt.jsonl"
+            events = [json.loads(line) for line in attempt_path.read_text().splitlines()]
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                recovered = cli.recover_attempt(manifest, str(attempt_path))
+            self.assertEqual(recovered["status"], "interrupted")
+            self.assertFalse(recovered["relaunch_allowed"])
+            os.waitpid(events[-1]["process"]["pid"], 0)
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                status = cli.attempt_status(manifest, str(attempt_path))
+            self.assertTrue(status["launch_may_have_occurred"])
+            self.assertFalse(status["relaunch_allowed"])
+            self.assertEqual(status["status"], "interrupted")
+
+    def test_output_flood_is_capped_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            policy = self.short_policy(stdout_limit=1024, stderr_limit=1024)
+            manifest = self.prepare_short_validation(
+                root,
+                repo,
+                [sys.executable, "-c", "import os\nos.write(1, b'x' * 65536)"],
+                policy,
+            )
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                receipt, exit_code = cli.run_manifest(manifest, str(root / "flood.json"))
+            self.assertEqual(exit_code, 4)
+            self.assertEqual(receipt["status"], "output-limit", receipt["attempt"]["cleanup"])
+            capture = receipt["output_capture"]["stdout"]
+            self.assertEqual(capture["stored_bytes"], 1024)
+            self.assertGreater(capture["observed_bytes"], 1024)
+            self.assertTrue(capture["truncated"])
+            self.assertEqual(Path(receipt["stdout"]["resolved_path"]).stat().st_size, 1024)
+
+    def test_quiet_process_is_healthy_but_does_not_extend_deadline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            policy = self.short_policy(timeout=0.6)
+            manifest = self.prepare_short_validation(
+                root,
+                repo,
+                [sys.executable, "-c", "import time\ntime.sleep(0.15)"],
+                policy,
+            )
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                receipt, exit_code = cli.run_manifest(manifest, str(root / "quiet.json"))
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(receipt["status"], "passed")
+            self.assertEqual(receipt["output_capture"]["stdout"]["observed_bytes"], 0)
+
+    def test_wall_clock_jump_does_not_change_monotonic_enforcement(self) -> None:
+        class JumpingDateTime(datetime):
+            calls = 0
+
+            @classmethod
+            def now(cls, tz: timezone | None = None) -> datetime:
+                cls.calls += 1
+                base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+                return base + timedelta(days=cls.calls * 30)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            policy = self.short_policy(timeout=0.5)
+            manifest = self.prepare_short_validation(
+                root,
+                repo,
+                [sys.executable, "-c", "import time\ntime.sleep(0.1)"],
+                policy,
+            )
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}), mock.patch.object(cli, "datetime", JumpingDateTime):
+                receipt, exit_code = cli.run_manifest(manifest, str(root / "wall-clock.json"))
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(receipt["status"], "passed")
+
+    def test_attempt_replay_and_pid_identity_mismatch_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            _, bundle = self.make_bundle(root)
+            manifest = cli.prepare_command(self.validation_request(repo, [sys.executable, "--version"]), bundle)
+            receipt_path = root / "once.json"
+            cli.run_manifest(manifest, str(receipt_path))
+            with self.assertRaises(cli.ManifestError) as replay:
+                cli.run_manifest(manifest, str(receipt_path))
+            self.assertEqual(replay.exception.code, "attempt-already-exists")
+            with mock.patch.object(cli, "owned_processes", return_value=([999999], [], {999999: "f" * 64})), mock.patch.object(cli, "process_start_identity", return_value="0" * 64):
+                with self.assertRaises(cli.ManifestError) as mismatch:
+                    cli.signal_owned_group(999999, {999999: "f" * 64}, signal.SIGTERM)
+            self.assertEqual(mismatch.exception.code, "process-identity-unverifiable")
+
+    def test_claim_loss_cancellation_requires_current_typed_ledger_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            _, bundle = self.make_bundle(root)
+            manifest = cli.prepare_command(self.validation_request(repo, [sys.executable, "--version"]), bundle)
+            attempt_id = "a" * 32
+            attempt_path = root / "cancel.attempt.jsonl"
+            cli.append_attempt(
+                attempt_path,
+                {
+                    "schema_version": "4.0.0",
+                    "attempt_id": attempt_id,
+                    "manifest_sha256": manifest["manifest_sha256"],
+                    "command_id": manifest["command_id"],
+                    "controller_session_id": "b" * 32,
+                    "boot_identity": "test:boot",
+                    "transition": "prepared",
+                },
+                create=True,
+            )
+            state_fingerprint = "c" * 64
+            ledger = {
+                "schema_version": "13.0.0",
+                "content_fingerprint": state_fingerprint,
+                "tasks": [{
+                    "deliveries": [{
+                        "command_attempts": [{
+                            "attempt_id": attempt_id,
+                            "manifest_sha256": manifest["manifest_sha256"],
+                            "state": "cancellation-authorized",
+                            "cancellation_reason": "claim-lost",
+                        }]
+                    }]
+                }],
+            }
+            ledger_path = root / "ledger.json"
+            self.write_json(ledger_path, ledger)
+            result = cli.authorize_cancellation(
+                manifest,
+                str(attempt_path),
+                str(root / "receipt.json"),
+                str(ledger_path),
+                "claim-lost",
+                state_fingerprint,
+            )
+            self.assertEqual(result["reason"], "claim-lost")
+            with self.assertRaises(cli.ManifestError) as stale:
+                cli.authorize_cancellation(
+                    manifest,
+                    str(attempt_path),
+                    str(root / "other.json"),
+                    str(ledger_path),
+                    "claim-lost",
+                    "d" * 64,
+                )
+            self.assertEqual(stale.exception.code, "cancellation-unauthorized")
+
+    def test_group_escape_is_detected_without_claiming_complete_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = self.make_repo(root)
+            policy = self.short_policy(timeout=1)
+            escaped_pid = root / "escaped.pid"
+            code = (
+                "import subprocess,sys,time\n"
+                f"child=subprocess.Popen([sys.executable,'-c',\"import os,time\\nos.setsid()\\nopen({str(escaped_pid)!r},'w').write(str(os.getpid()))\\ntime.sleep(30)\"])\n"
+                "time.sleep(30)\n"
+            )
+            manifest = self.prepare_short_validation(root, repo, [sys.executable, "-c", code], policy)
+            with mock.patch.dict(cli.EXECUTION_POLICIES, {"validation": policy}):
+                receipt, exit_code = cli.run_manifest(manifest, str(root / "escape.json"))
+            self.assertEqual(exit_code, 4)
+            self.assertEqual(receipt["status"], "cleanup-failed")
+            self.assertIsNotNone(receipt["attempt"]["cleanup"]["error_code"])
+            if escaped_pid.exists():
+                os.kill(int(escaped_pid.read_text()), signal.SIGKILL)
 
 
 if __name__ == "__main__":

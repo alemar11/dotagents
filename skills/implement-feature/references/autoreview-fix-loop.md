@@ -36,6 +36,12 @@ operation; it alone validates authoritative finding fields and generates the
 canonical ids. Prepare each supported AutoReview invocation as an
 `execution-manifest` command, then run and verify its receipt before recording
 evidence.
+The manifest's fixed 60-minute outer deadline supervises the AutoReview and
+nested Codex process group only. AutoReview v2 remains the semantic model-attempt
+authority. On outer timeout, output limit, cancellation, interruption, or
+cleanup failure, reconcile the existing typed attempt. If `model-started` is
+durable, never relaunch or reserve a replacement model call. Manifest liveness
+does not alter that attempt or reset any provider-review deadline.
 Batch accepted fixes, commit a substantive revision, run focused proof,
 then use `fix-verification`; delta rounds have no numeric cap but each must
 advance the head. After first-full fixes reach `verification-clean`, run the

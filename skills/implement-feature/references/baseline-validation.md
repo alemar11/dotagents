@@ -44,9 +44,15 @@ The root submits exactly one `implementation-baseline-accepted` CAS containing
 every registered `(task_key, delivery_key, validation_key)` tuple. The CAS binds
 the current generation, state and claim fingerprints, execution-scope
 fingerprint, exact manifest and receipt byte SHA-256 values, checkout identity,
-authored/projected argv, adapter/policy, tool identities, and the complete sorted
+authored/projected argv, adapter/policy, tool identities, fixed execution-policy
+fingerprint, and the complete sorted
 diagnostic set with each file's content SHA-256. Missing, duplicate, stale, or
 partially valid rows reject the entire event and authorize no mutation.
+
+Each baseline command has one fixed 60-minute monotonic attempt. Timeout, output
+limit, interruption, or cleanup failure prevents atomic acceptance and routes
+to the existing typed preimplementation stop; no baseline attempt is
+automatically relaunched.
 
 Only after that event accepts every task may the root create and record its one
 lifecycle Goal and allow workers to enter `implementing`.

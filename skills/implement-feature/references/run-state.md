@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v15 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v16 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,8 +14,8 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `12.0.0` created from registration
-schema `6.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+Active state accepts only ledger schema `13.0.0` created from registration
+schema `7.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
@@ -68,7 +68,8 @@ and a review wait consumes a slot.
 ## Atomic Implementation Baseline
 
 Registration binds immutable bundle, execution-scope, and authorization
-fingerprints plus every delivery validation plan. Before baseline acceptance,
+fingerprints plus every delivery validation plan and fixed execution-policy
+fingerprint. Before baseline acceptance,
 tasks are baseline-only in `created`; no delivery/review/provider/AutoReview/gate
 event is legal and no external root Goal exists.
 
@@ -78,6 +79,24 @@ manifest/receipt byte hashes, with every registered tuple present exactly once.
 The helper validates checkout/revision/tree/status, command/adapter/policy/tool
 identities, and complete canonical diagnostic/content fingerprints before it
 changes any task to `accepted`. Rejection leaves every task pending.
+
+## Bounded Command Journal
+
+Each delivery retains at most 64 one-attempt command records. The closed events
+are `execution-command-reserved`, `execution-command-launch-observed`,
+`execution-command-cancellation-authorized`, and
+`execution-command-terminal-observed`. They persist reservation, durable launch
+release, root cancellation authority, and terminal receipt/cleanup evidence
+only. Lease heartbeats, process census churn, and raw output stay in
+execution-manifest artifacts and never consume ledger operations.
+
+Reservation binds one `command_id`, attempt id, manifest and execution-policy
+fingerprints, and absolute attempt/receipt refs. A command id cannot receive a
+second physical attempt. Claim loss or a root monitor degraded for 180 seconds
+requires the root to apply cancellation authorization and invoke manifest
+cleanup. Terminal status is distinct for normal failure, timeout, cancellation,
+output limit, interruption, and cleanup failure. Cleanup-failed blocks dispatch,
+seal, claim release, archival, and takeover.
 
 Only complete acceptance permits root Goal creation/activation and an
 implementation transition. `portfolio-preimplementation-aborted` is the sole
@@ -215,7 +234,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `12.0.0`, any registration schema before `6.0.0`, or any
+JSON schema before `13.0.0`, any registration schema before `7.0.0`, or any
 legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses

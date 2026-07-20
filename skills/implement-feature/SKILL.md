@@ -143,8 +143,11 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
    Never set `token_budget`; read it back, record activation, and
    allow tasks to implement. On failure use the typed preimplementation stop.
 10. **MONITOR** — after one full post-dispatch snapshot, consume compact deltas
-   until material transition, attention, heartbeat, or workflow deadline. Steer
-   with the recorded profile; never pull worker work into root.
+   until material transition, attention, heartbeat, or deadline. The root alone
+   heartbeats/CASes the claim every 60 seconds, including during commands. At
+   180 seconds without success, stop dispatch and authorize cleanup; claim loss
+   cancels and cleans up. At five minutes remain fail-closed. Children never
+   renew ownership. Follow `execution-manifest.md`; never pull worker work into root.
 11. **GATE** — load `references/gates.md` and
    `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
@@ -203,8 +206,9 @@ the journal remains an ownership record and embeds each full replaced-claim
 snapshot plus validated per-Spec adoption data. Recover through `claim status`
 and `claim recover-takeover`; adopt those exact tasks. Never create a new task
 for a Spec that has recorded or embedded task evidence. The helper accepts only
-current schema-6 claims and fails closed on unsupported claim or takeover state
-without migration, retirement, or deletion.
+current schema-7 claims and takeover transaction schema 3, including complete
+terminal command-cleanup evidence, and fails closed on unsupported state without
+migration, retirement, or deletion.
 
 Missing candidate state is created only from complete claim-embedded task/no-task
 and delivery-checkout mappings. Creation binds that exact claim. Never add an

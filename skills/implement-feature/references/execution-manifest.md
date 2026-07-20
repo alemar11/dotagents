@@ -3,7 +3,7 @@
 Load this reference before preparing a source bundle or executing delivery
 preflight, worker validation, or AutoReview through a command manifest.
 `scripts/execution-manifest` is the shipped standard-library Python artifact;
-its schema version is `3.0.0` and its CLI version is `3.0.0`.
+its schema version is `4.0.0` and its CLI version is `4.0.0`.
 
 ## Boundary
 
@@ -17,6 +17,8 @@ This first version owns only:
 - pinned tool and dependency observations;
 - Git-visible write-set checks and output checks;
 - command receipts, verification, and byte-identical evidence reuse.
+- fixed operation deadlines, one physical attempt, two-phase launch gating,
+  bounded output capture, process census, cancellation, and cleanup evidence.
 
 Claims, ledger commands, GitStack, CI, and Codex hosted-review commands retain
 their current owners and direct command contracts. Do not describe them as
@@ -74,7 +76,7 @@ required, resolves literal argv and tool records, copies `bundle_sha256`, and
 generates argv, gate, and manifest fingerprints. Receipts contain observations
 only; callers author none of their fields.
 
-These are hard-cut `3.0.0` exact-object schemas. There are no aliases, command
+These are hard-cut `4.0.0` exact-object schemas. There are no aliases, command
 string inputs, migrations, or legacy packet readers.
 
 `validation.parameters.argv` is a nonempty literal string array. A string
@@ -83,6 +85,44 @@ environment assignments, and shell wrappers are invalid; invoke the executable
 directly. Delivery preflight derives the helper cwd and root ownership.
 AutoReview requires a worker-owned absolute managed-checkout cwd and typed mode,
 base, phase, evidence, finding, and output fields.
+
+## Fixed Bounded Execution
+
+Preparation derives `execution_policy`; callers and workers cannot provide or
+override it. Delivery preflight has a 30-minute deadline. Baseline validation,
+validation, and the outer AutoReview process each have a 60-minute deadline.
+Every operation has one physical attempt, a 15-second supervisor heartbeat,
+10-second TERM grace, 30-second cleanup cutoff, and separate 8 MiB stdout and
+stderr caps. A heartbeat or new output never extends the immutable deadline.
+
+The runner starts only a minimal launcher in a new session. It durably records
+the attempt, PID, PGID, process-start identity, boot identity, UTC start and
+deadline, then commits launch authorization before releasing the launcher to
+`exec` the real argv. Controller loss before release prevents real execution;
+loss after authorization or release is interrupted and never grants a relaunch.
+
+Live enforcement uses a monotonic clock. UTC timestamps plus boot and controller
+session identity support replay; wall-clock movement never refreshes the
+duration. The lease records supervisor liveness, output byte counts, owned group
+members, and observed escaped descendants. It is process evidence, not a
+root-claim heartbeat, and heartbeat churn never enters the ledger.
+
+Stdout and stderr are drained into capped regular files. Receipts preserve
+observed/stored byte counts, observed digests, limits, and truncation evidence.
+Crossing either cap commits `output-limit`, cleans the verified process tree,
+and fails closed; truncated output can never pass.
+
+Commands must not daemonize, call `setsid`, or escape the owned process group.
+The supervisor censuses descendants and group membership through kernel process
+metadata and signals only identities it can match safely. Timeout,
+root-authorized cancellation, output limit, and claim loss commit their typed
+transition before TERM/KILL/reap/rescan cleanup. An escaped or unverifiable
+process produces `cleanup-failed` and `owner-required`.
+
+Terminal statuses are `passed`, `failed`, `timed-out`, `cancelled`,
+`output-limit`, `interrupted`, and `cleanup-failed`. A verified exit observed
+before the durable timeout transition wins the boundary race; after
+`timeout-committed`, timeout wins.
 
 ## Baseline Validation
 
@@ -127,6 +167,9 @@ Run and verify with:
 
 ```bash
 scripts/execution-manifest --json command run --manifest '<absolute-command-manifest>' --receipt '<absolute-receipt>'
+scripts/execution-manifest --json command status --manifest '<absolute-command-manifest>' --attempt '<absolute-attempt-jsonl>'
+scripts/execution-manifest --json command recover --manifest '<absolute-command-manifest>' --attempt '<absolute-attempt-jsonl>'
+scripts/execution-manifest --json command cancel --manifest '<absolute-command-manifest>' --attempt '<absolute-attempt-jsonl>' --receipt '<absolute-receipt>' --ledger '<absolute-ledger-json>' --reason 'root-authorized|claim-lost|root-monitor-degraded' --authorization-fingerprint '<ledger-state-fingerprint>'
 scripts/execution-manifest --json receipt verify --manifest '<absolute-command-manifest>' --receipt '<absolute-receipt>'
 ```
 

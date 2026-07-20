@@ -1321,7 +1321,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "15.0.0"', helper)
+        self.assertIn('__version__ = "16.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         self.assertIn("review-authority", helper)
         for removed in (
@@ -1333,7 +1333,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v15_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v16_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md") + self.read(
             "references/review-reconciliation.md"
@@ -1341,18 +1341,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "15.0.0"',
-            'LEDGER_SCHEMA_VERSION = "12.0.0"',
-            'REGISTRATION_SCHEMA_VERSION = "6.0.0"',
+            '__version__ = "16.0.0"',
+            'LEDGER_SCHEMA_VERSION = "13.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("| `schema_version` | `6.0.0` |", packets)
+        self.assertIn("| `schema_version` | `7.0.0` |", packets)
         self.assertIn(
             "exact `{git_common_dir, checkout}` claim map",
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `12.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `13.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -1550,7 +1550,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("recover-takeover", combined)
         self.assertIn("stale heartbeat alone", runtime.lower())
         self.assertIn("fixed five-minute stale threshold", compact_runtime)
-        self.assertIn("current schema-6 claims", compact_runtime)
+        self.assertIn("current schema-7 claims", compact_runtime)
         self.assertIn(
             "Do not import, migrate, rename, dual-read, dual-write, retire, or delete",
             compact_runtime,
@@ -2118,8 +2118,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn('display_name: "Implement Feature"', metadata)
         self.assertIn("allow_implicit_invocation: false", metadata)
         skill_bytes = len(skill.encode("utf-8"))
-        self.assertLessEqual(skill_bytes, 16_000)
-        self.assertLessEqual((skill_bytes + 3) // 4, 4_000)
+        self.assertLessEqual(skill_bytes, 16_500)
+        self.assertLessEqual((skill_bytes + 3) // 4, 4_125)
         successful_path = (
             "SKILL.md",
             "references/options.md",
@@ -2138,12 +2138,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
             114_000,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
-        # Typed thread resolution stays branch-loaded: the normal successful,
-        # manifest, and multi-repository paths remain within their existing
-        # ceilings at 97,697, 105,005, and 101,718 bytes respectively.
+        # Bounded execution stays branch-loaded; normal, manifest, and
+        # multi-repository paths retain explicit measured ceilings.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
-            120_000,
+            125_100,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -2153,7 +2152,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            116_000,
+            118_000,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE
@@ -2195,9 +2194,9 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIsNotNone(prompt_match)
         assert prompt_match is not None
         prompt = prompt_match.group(1)
-        # Typed thread resolution remains behind a reference; the worker prompt
-        # stays at 1,337 characters.
-        baseline_characters = 1704
+        # Bounded attempt and root monitor ownership add 329 characters while
+        # provider and helper mechanics remain behind references.
+        baseline_characters = 2033
         self.assertLessEqual(len(prompt), baseline_characters)
         self.assertNotIn("scripts/autoreview --", prompt)
         self.assertNotIn("scripts/delivery-preflight", prompt)
@@ -2205,6 +2204,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("Canonical bundle manifest", prompt)
         self.assertIn("command ids/manifests/digests", prompt)
         self.assertIn("references/execution-manifest.md", skill)
+        self.assertIn("every 60 seconds", prompt)
+        self.assertIn("one bounded attempt", prompt)
+        self.assertIn("HEARTBEAT_INTERVAL_SECONDS = 60", self.read("scripts/active-root-claim"))
+        self.assertIn("MONITOR_DEGRADED_AFTER_SECONDS = 180", self.read("scripts/active-root-claim"))
         for operation in ("delivery-preflight", "validation", "autoreview"):
             self.assertIn(f'"{operation}"', script)
             self.assertIn(operation, execution)

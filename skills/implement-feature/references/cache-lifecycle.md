@@ -24,7 +24,7 @@ remain blocking.
 
 ## Active And Archived State
 
-Keep resumable ledger-schema `12.0.0` state as absolute direct-child `.json` files under
+Keep resumable ledger-schema `13.0.0` state as absolute direct-child `.json` files under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v15 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
@@ -56,9 +56,12 @@ scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-
 scripts/ledger-cache --json ledger archive --ledger '<absolute-active-json>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
 ```
 
-Under lock, release requires claim schema `6.0.0`, exact ownership, and an
+Under lock, release requires claim schema `7.0.0`, exact ownership, and an
 archive-ready terminal projection before receipt or claim deletion. Rejection
 leaves claim and ledger unchanged.
+Every bounded command attempt must be terminal with verified cleanup;
+`cleanup-failed` or other live/uncertain process evidence blocks release,
+archive, and takeover.
 
 `ledger_sha256` and `ledger_size_bytes` bind validated JSON bytes, root,
 fingerprint, path, and the ledger's exact terminal evidence, not Markdown.

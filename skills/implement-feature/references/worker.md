@@ -279,8 +279,12 @@ byte fingerprints plus canonical diagnostics. Do not edit, commit, push,
 reserve provider/AutoReview authority, emit gates, or call a Goal until the root
 reports atomic baseline acceptance and Goal activation. If
 this task is already terminal, report without resuming implementation. Never
-create, read, update, complete, or block a Goal. Work only in the managed
-checkouts. Use fixed actions, persist the GitStack request receipt, and
+create, read, update, complete, or block a Goal. Run each assigned manifest only
+through its one bounded attempt; never launch directly, change its fixed policy,
+or relaunch after release. Report attempt, timeout, output-limit, cancellation,
+and cleanup evidence. The root alone renews the claim every 60 seconds and
+authorizes cancellation after claim loss or monitor degradation. Work only in
+the managed checkouts. Use fixed actions, persist the GitStack request receipt, and
 pass it unchanged to the receipt-bound waiter under the root-issued 45-minute
 deadline; if pending at deadline, post/report the persistent PR warning and
 continue the remaining gates. Report arguments, readbacks, receipts, and

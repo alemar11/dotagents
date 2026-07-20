@@ -22,9 +22,9 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "15.0.0"
-LEDGER_SCHEMA_VERSION = "12.0.0"
-REGISTRATION_SCHEMA_VERSION = "6.0.0"
+__version__ = "16.0.0"
+LEDGER_SCHEMA_VERSION = "13.0.0"
+REGISTRATION_SCHEMA_VERSION = "7.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -41,14 +41,15 @@ MAX_REVIEWS = 256
 MAX_REVIEW_OBSERVATIONS = 1
 MAX_REVIEW_RECONCILIATIONS = 1
 MAX_REVIEW_PROVIDER_MUTATIONS = 16
+MAX_COMMAND_ATTEMPTS_PER_DELIVERY = 64
 MAX_PROJECTED_REVIEW_WARNING_BYTES = 24 * 1024
 MAX_GATES = 2048
 MAX_HANDOFFS = 512
 MAX_OUTPUT_BYTES = 128 * 1024
 MAX_PACKET_BYTES = 1024 * 1024
 READ_ARCHIVE_REASONS = {"terminal", "preimplementation-abort", "legacy-cutover"}
-CLAIM_SCHEMA_VERSION = "6.0.0"
-TAKEOVER_SCHEMA_VERSION = "2.0.0"
+CLAIM_SCHEMA_VERSION = "7.0.0"
+TAKEOVER_SCHEMA_VERSION = "3.0.0"
 RELEASE_RECEIPT_SCHEMA_VERSION = "2.0.0"
 RELEASE_REASONS = {"terminal", "preimplementation-abort"}
 ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -116,6 +117,10 @@ EVENT_TYPES = {
     "delivery-scope-observed",
     "portfolio-preimplementation-aborted",
     "delivery-preflight-observed",
+    "execution-command-reserved",
+    "execution-command-launch-observed",
+    "execution-command-cancellation-authorized",
+    "execution-command-terminal-observed",
     "task-observed",
     "task-dependency-wait-started",
     "task-dependency-wait-resolved",
@@ -1291,6 +1296,8 @@ def takeover_adoptions(claim: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "root_id",
             "claim_fingerprint",
             "task_termination_evidence",
+            "execution_recovery_fingerprint",
+            "command_cleanup_evidence",
             "specs",
         }
         if set(adoption) != adoption_required:
@@ -1307,6 +1314,24 @@ def takeover_adoptions(claim: dict[str, Any]) -> dict[str, dict[str, Any]]:
             or replaced.get("task_termination_evidence") != termination
         ):
             raise CacheError("state-conflict", "candidate takeover termination changed", 4)
+        cleanup_evidence = adoption.get("command_cleanup_evidence")
+        if not isinstance(cleanup_evidence, list):
+            raise CacheError("state-conflict", "candidate command cleanup evidence is invalid", 4)
+        normalized_cleanup: list[dict[str, Any]] = []
+        for cleanup in cleanup_evidence:
+            if not isinstance(cleanup, dict) or set(cleanup) != {"attempt_id", "state", "cleanup_verified", "evidence_ref"}:
+                raise CacheError("state-conflict", "candidate command cleanup evidence is invalid", 4)
+            if (
+                not isinstance(cleanup["attempt_id"], str)
+                or not TRANSACTION_ID_RE.fullmatch(cleanup["attempt_id"])
+                or cleanup["state"] != "terminal"
+                or cleanup["cleanup_verified"] is not True
+            ):
+                raise CacheError("state-conflict", "candidate takeover includes an unsafe command attempt", 4)
+            normalized_cleanup.append(cleanup)
+        normalized_cleanup.sort(key=lambda item: item["attempt_id"])
+        if adoption.get("execution_recovery_fingerprint") != request_fingerprint(normalized_cleanup):
+            raise CacheError("state-conflict", "candidate execution recovery fingerprint changed", 4)
         specs = adoption.get("specs")
         if not isinstance(specs, list) or not specs:
             raise CacheError("state-conflict", "candidate takeover adoption specs are invalid", 4)
@@ -1654,7 +1679,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
                     {
                         "validation_key", "command_id", "adapter", "policy",
                         "authored_argv_fingerprint", "projected_argv_fingerprint",
-                        "tool_identities_fingerprint",
+                        "tool_identities_fingerprint", "execution_policy_fingerprint",
                     },
                     validation_field,
                 )
@@ -1674,6 +1699,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
                         "authored_argv_fingerprint": canonical_fingerprint(validation["authored_argv_fingerprint"], f"{validation_field}.authored_argv_fingerprint"),
                         "projected_argv_fingerprint": canonical_fingerprint(validation["projected_argv_fingerprint"], f"{validation_field}.projected_argv_fingerprint"),
                         "tool_identities_fingerprint": canonical_fingerprint(validation["tool_identities_fingerprint"], f"{validation_field}.tool_identities_fingerprint"),
+                        "execution_policy_fingerprint": canonical_fingerprint(validation["execution_policy_fingerprint"], f"{validation_field}.execution_policy_fingerprint"),
                     }
                 )
             if validation_plan != sorted(validation_plan, key=lambda row: row["validation_key"]):
@@ -2181,6 +2207,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                         "autoreview_reservation",
                         "autoreview_attempts",
                         "review_provider_mutations",
+                        "command_attempts",
                         "hosted_obligations",
                         "lineage_reset_authority",
                         "baseline_validations",
@@ -2338,6 +2365,47 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     raise CacheError("integrity-failure", "run-state AutoReview journals are invalid", 5)
                 if not isinstance(delivery["review_provider_mutations"], list):
                     raise CacheError("integrity-failure", "run-state review provider mutation journal is invalid", 5)
+                if (
+                    not isinstance(delivery["command_attempts"], list)
+                    or len(delivery["command_attempts"]) > MAX_COMMAND_ATTEMPTS_PER_DELIVERY
+                ):
+                    raise CacheError("integrity-failure", "run-state command attempt journal is invalid", 5)
+                command_ids: set[str] = set()
+                attempt_ids: set[str] = set()
+                for attempt_index, attempt in enumerate(delivery["command_attempts"]):
+                    attempt_field = f"{delivery_field}.command_attempts[{attempt_index}]"
+                    exact_object(
+                        attempt,
+                        {
+                            "attempt_id", "command_id", "manifest_sha256",
+                            "execution_policy_fingerprint", "attempt_file", "receipt_file",
+                            "state", "terminal_status", "cleanup_verified",
+                            "cancellation_reason", "evidence_ref", "recorded_at",
+                        },
+                        attempt_field,
+                    )
+                    attempt_id = nonempty(attempt["attempt_id"], f"{attempt_field}.attempt_id")
+                    command_id = check_lower_kebab(attempt["command_id"], f"{attempt_field}.command_id")
+                    if not TRANSACTION_ID_RE.fullmatch(attempt_id) or attempt_id in attempt_ids or command_id in command_ids:
+                        raise CacheError("integrity-failure", "command attempt identity is invalid or duplicated", 5)
+                    attempt_ids.add(attempt_id)
+                    command_ids.add(command_id)
+                    canonical_fingerprint(attempt["manifest_sha256"], f"{attempt_field}.manifest_sha256")
+                    canonical_fingerprint(attempt["execution_policy_fingerprint"], f"{attempt_field}.execution_policy_fingerprint")
+                    canonical_absolute_path(attempt["attempt_file"], f"{attempt_field}.attempt_file")
+                    canonical_absolute_path(attempt["receipt_file"], f"{attempt_field}.receipt_file")
+                    if attempt["state"] not in {"reserved", "launch-released", "cancellation-authorized", "terminal"}:
+                        raise CacheError("integrity-failure", "command attempt state is invalid", 5)
+                    terminal_statuses = {"passed", "failed", "timed-out", "cancelled", "output-limit", "interrupted", "cleanup-failed"}
+                    if attempt["state"] == "terminal":
+                        if attempt["terminal_status"] not in terminal_statuses or not isinstance(attempt["cleanup_verified"], bool):
+                            raise CacheError("integrity-failure", "terminal command attempt evidence is invalid", 5)
+                    elif attempt["terminal_status"] is not None or attempt["cleanup_verified"] is not None:
+                        raise CacheError("integrity-failure", "nonterminal command attempt has terminal evidence", 5)
+                    if attempt["cancellation_reason"] is not None and attempt["cancellation_reason"] not in {"root-authorized", "claim-lost", "root-monitor-degraded"}:
+                        raise CacheError("integrity-failure", "command cancellation reason is invalid", 5)
+                    nonempty(attempt["evidence_ref"], f"{attempt_field}.evidence_ref")
+                    parse_timestamp(attempt["recorded_at"], f"{attempt_field}.recorded_at")
                 if len(delivery["review_provider_mutations"]) > MAX_REVIEW_PROVIDER_MUTATIONS:
                     raise CacheError("integrity-failure", "run-state review provider mutation journal exceeds its bound", 5)
                 mutation_ids: set[str] = set()
@@ -3276,6 +3344,11 @@ def task_proof_blockers(state: dict[str, Any], task: dict[str, Any]) -> list[str
         if not evidence or evidence["state"] != "passed":
             blockers.append(f"gate:{gate}")
     for delivery in task["deliveries"]:
+        for attempt in delivery["command_attempts"]:
+            if attempt["state"] != "terminal":
+                blockers.append(f"{delivery['delivery_key']}:command-attempt-nonterminal")
+            elif attempt["cleanup_verified"] is not True:
+                blockers.append(f"{delivery['delivery_key']}:command-cleanup-unverified")
         blockers.extend(
             f"{delivery['delivery_key']}:{blocker}"
             for blocker in delivery_proof_blockers(state, task, delivery)
@@ -3736,6 +3809,7 @@ def new_state(
                 "autoreview_reservation": None,
                 "autoreview_attempts": [],
                 "review_provider_mutations": [],
+                "command_attempts": [],
                 "hosted_obligations": [],
                 "lineage_reset_authority": None,
                 "baseline_validations": [],
@@ -4114,10 +4188,10 @@ def validate_baseline_row(state: dict[str, Any], raw: Any, field: str) -> tuple[
         raise CacheError("state-conflict", f"{field} lacks a managed checkout", 4)
     manifest = baseline_artifact(row["manifest_file"], row["manifest_bytes_sha256"], f"{field}.manifest_file")
     receipt = baseline_artifact(row["receipt_file"], row["receipt_bytes_sha256"], f"{field}.receipt_file")
-    if manifest.get("schema_version") != "3.0.0" or manifest.get("operation") != "baseline-validation":
-        raise CacheError("state-conflict", f"{field} manifest is not baseline v3", 4)
-    if receipt.get("schema_version") != "3.0.0" or receipt.get("status") != "passed":
-        raise CacheError("state-conflict", f"{field} receipt is not a passed baseline v3 receipt", 4)
+    if manifest.get("schema_version") != "4.0.0" or manifest.get("operation") != "baseline-validation":
+        raise CacheError("state-conflict", f"{field} manifest is not baseline v4", 4)
+    if receipt.get("schema_version") != "4.0.0" or receipt.get("status") != "passed":
+        raise CacheError("state-conflict", f"{field} receipt is not a passed baseline v4 receipt", 4)
     if receipt.get("manifest_sha256") != manifest.get("manifest_sha256"):
         raise CacheError("state-conflict", f"{field} receipt is bound to another manifest", 4)
     baseline = manifest.get("baseline")
@@ -4134,6 +4208,8 @@ def validate_baseline_row(state: dict[str, Any], raw: Any, field: str) -> tuple[
         raise CacheError("state-conflict", f"{field} baseline identity differs from registration", 4)
     if manifest.get("argv_fingerprint") != plan["projected_argv_fingerprint"] or observation.get("argv_fingerprint") != plan["projected_argv_fingerprint"]:
         raise CacheError("state-conflict", f"{field} projected argv differs from registration", 4)
+    if request_fingerprint(manifest.get("execution_policy")) != plan["execution_policy_fingerprint"]:
+        raise CacheError("state-conflict", f"{field} execution policy differs from registration", 4)
     if observation.get("tool_identities_fingerprint") != plan["tool_identities_fingerprint"]:
         raise CacheError("state-conflict", f"{field} tool identity differs from registration", 4)
     identity = observation.get("checkout_identity")
@@ -4355,7 +4431,15 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     task_key = check_lower_kebab(raw.get("task_key"), "task_key")
     task = task_by_key(state, task_key)
 
-    if task["implementation_baseline"] != "accepted" and event_type not in {"managed-checkouts-observed", "task-observed"}:
+    command_event_types = {
+        "execution-command-reserved",
+        "execution-command-launch-observed",
+        "execution-command-cancellation-authorized",
+        "execution-command-terminal-observed",
+    }
+    if task["implementation_baseline"] != "accepted" and event_type not in {
+        "managed-checkouts-observed", "task-observed", *command_event_types,
+    }:
         raise CacheError("state-conflict", "worker is baseline-only before atomic implementation baseline acceptance", 4)
 
     if task["seal"] is not None and event_type not in {
@@ -4368,6 +4452,112 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             else None
         )
         raise CacheError("state-conflict", "sealed task state is immutable", 4, details)
+
+    if event_type in command_event_types:
+        delivery = delivery_by_key(task, check_lower_kebab(raw.get("delivery_key"), "delivery_key"))
+        attempt_id = nonempty(raw.get("attempt_id"), "attempt_id")
+        if not TRANSACTION_ID_RE.fullmatch(attempt_id):
+            raise CacheError("invalid-input", "attempt_id must be 32 lowercase hex characters", 2)
+        existing = next((item for item in delivery["command_attempts"] if item["attempt_id"] == attempt_id), None)
+        if event_type == "execution-command-reserved":
+            event = exact_object(
+                raw,
+                {
+                    "type", "task_key", "delivery_key", "attempt_id", "command_id",
+                    "operation", "manifest_sha256", "execution_policy_fingerprint",
+                    "attempt_file", "receipt_file", "evidence_ref",
+                },
+                event_type,
+            )
+            if existing is not None or len(delivery["command_attempts"]) >= MAX_COMMAND_ATTEMPTS_PER_DELIVERY:
+                raise CacheError("state-conflict", "command attempt is duplicated or exceeds its bound", 4)
+            command_id = check_lower_kebab(event["command_id"], "command_id")
+            if any(item["command_id"] == command_id for item in delivery["command_attempts"]):
+                raise CacheError("state-conflict", "command_id already has a physical attempt", 4)
+            operation = event["operation"]
+            if operation not in {"baseline-validation", "validation", "autoreview"}:
+                raise CacheError("invalid-input", "ledger command operation is unsupported", 2)
+            policy_fingerprint = canonical_fingerprint(event["execution_policy_fingerprint"], "execution_policy_fingerprint")
+            if operation in {"baseline-validation", "validation"}:
+                plan = next((item for item in delivery["validation_plan"] if item["command_id"] == command_id), None)
+                if plan is None or plan["execution_policy_fingerprint"] != policy_fingerprint:
+                    raise CacheError("state-conflict", "command attempt differs from the authorized validation plan", 4)
+            elif delivery["autoreview_reservation"] is None:
+                raise CacheError("state-conflict", "AutoReview command requires its semantic reservation", 4)
+            delivery["command_attempts"].append(
+                {
+                    "attempt_id": attempt_id,
+                    "command_id": command_id,
+                    "manifest_sha256": canonical_fingerprint(event["manifest_sha256"], "manifest_sha256"),
+                    "execution_policy_fingerprint": policy_fingerprint,
+                    "attempt_file": canonical_absolute_path(event["attempt_file"], "attempt_file"),
+                    "receipt_file": canonical_absolute_path(event["receipt_file"], "receipt_file"),
+                    "state": "reserved",
+                    "terminal_status": None,
+                    "cleanup_verified": None,
+                    "cancellation_reason": None,
+                    "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+                    "recorded_at": observed_at,
+                }
+            )
+            delivery["command_attempts"].sort(key=lambda item: item["command_id"])
+            return True
+        if existing is None:
+            raise CacheError("state-conflict", "command attempt is not reserved", 4)
+        if event_type == "execution-command-launch-observed":
+            event = exact_object(raw, {"type", "task_key", "delivery_key", "attempt_id", "attempt_fingerprint", "evidence_ref"}, event_type)
+            canonical_fingerprint(event["attempt_fingerprint"], "attempt_fingerprint")
+            if existing["state"] == "launch-released" and existing["evidence_ref"] == event["evidence_ref"]:
+                return False
+            if existing["state"] != "reserved":
+                raise CacheError("state-conflict", "command launch observation is out of order", 4)
+            existing.update({"state": "launch-released", "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"), "recorded_at": observed_at})
+            return True
+        if event_type == "execution-command-cancellation-authorized":
+            event = exact_object(raw, {"type", "task_key", "delivery_key", "attempt_id", "reason", "evidence_ref"}, event_type)
+            if existing["state"] not in {"reserved", "launch-released"}:
+                raise CacheError("state-conflict", "command cancellation is out of order", 4)
+            if event["reason"] not in {"root-authorized", "claim-lost", "root-monitor-degraded"}:
+                raise CacheError("invalid-input", "command cancellation reason is invalid", 2)
+            existing.update({"state": "cancellation-authorized", "cancellation_reason": event["reason"], "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"), "recorded_at": observed_at})
+            return True
+        event = exact_object(
+            raw,
+            {
+                "type", "task_key", "delivery_key", "attempt_id", "status",
+                "receipt_sha256", "cleanup_verified", "evidence_ref",
+            },
+            event_type,
+        )
+        if existing["state"] == "terminal":
+            if existing["terminal_status"] == event["status"] and existing["evidence_ref"] == event["evidence_ref"]:
+                return False
+            raise CacheError("state-conflict", "terminal command observation conflicts", 4)
+        if existing["state"] not in {"reserved", "launch-released", "cancellation-authorized"}:
+            raise CacheError("state-conflict", "terminal command observation is out of order", 4)
+        statuses = {"passed", "failed", "timed-out", "cancelled", "output-limit", "interrupted", "cleanup-failed"}
+        if event["status"] not in statuses or not isinstance(event["cleanup_verified"], bool):
+            raise CacheError("invalid-input", "terminal command status is invalid", 2)
+        if (event["status"] == "cleanup-failed") == event["cleanup_verified"]:
+            raise CacheError("invalid-input", "terminal command cleanup evidence conflicts", 2)
+        if event["status"] in {"interrupted", "cleanup-failed"}:
+            if event["receipt_sha256"] is not None:
+                canonical_fingerprint(event["receipt_sha256"], "receipt_sha256")
+        else:
+            canonical_fingerprint(event["receipt_sha256"], "receipt_sha256")
+        existing.update(
+            {
+                "state": "terminal",
+                "terminal_status": event["status"],
+                "cleanup_verified": event["cleanup_verified"],
+                "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"),
+                "recorded_at": observed_at,
+            }
+        )
+        if event["status"] != "passed" and task["implementation_baseline"] == "accepted":
+            task["state"] = "needs-owner"
+            task["attention_reason"] = f"command-{event['status']}"
+        return True
 
     if event_type == "managed-checkouts-observed":
         event = exact_object(raw, {"type", "task_key", "task_ref", "managed_checkouts", "evidence_ref"}, event_type)

@@ -329,6 +329,14 @@ class SessionReplayTests(unittest.TestCase):
                 "authored_argv_fingerprint": hashlib.sha256(b"authored").hexdigest(),
                 "projected_argv_fingerprint": hashlib.sha256(b"projected").hexdigest(),
                 "tool_identities_fingerprint": hashlib.sha256(b"tools").hexdigest(),
+                "execution_policy_fingerprint": fingerprint({
+                    "timeout_seconds": 3600,
+                    "heartbeat_seconds": 15,
+                    "term_grace_seconds": 10,
+                    "cleanup_seconds": 30,
+                    "stdout_limit_bytes": 8388608,
+                    "stderr_limit_bytes": 8388608,
+                }),
             }
             bundle_sha = hashlib.sha256(b"schema12-replay-bundle").hexdigest()
             source_fingerprint = hashlib.sha256(b"schema12-replay-source").hexdigest()
@@ -359,7 +367,7 @@ class SessionReplayTests(unittest.TestCase):
             permission = "user-message://schema12-replay-authorized"
             objective = "Implement replay Feature Spec with CI when configured"
             registration = {
-                "schema_version": "6.0.0",
+                "schema_version": "7.0.0",
                 "bundle_sha256": bundle_sha,
                 "execution_scope_fingerprint": execution_scope,
                 "authorization_fingerprint": fingerprint({
@@ -400,7 +408,7 @@ class SessionReplayTests(unittest.TestCase):
                 "--operation-id", "10000000000000000000000000000001",
                 "--registration-file", str(packet("registration", registration)),
             )
-            self.assertEqual(created["version"], "15.0.0")
+            self.assertEqual(created["version"], "16.0.0")
 
             head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
             tree = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True, capture_output=True, check=True).stdout.strip()
@@ -454,9 +462,17 @@ class SessionReplayTests(unittest.TestCase):
                 "diagnostic_set_fingerprint": fingerprint([]),
             }
             manifest = {
-                "schema_version": "3.0.0", "operation": "baseline-validation",
+                "schema_version": "4.0.0", "operation": "baseline-validation",
                 "manifest_sha256": hashlib.sha256(b"manifest").hexdigest(),
                 "argv_fingerprint": plan["projected_argv_fingerprint"],
+                "execution_policy": {
+                    "timeout_seconds": 3600,
+                    "heartbeat_seconds": 15,
+                    "term_grace_seconds": 10,
+                    "cleanup_seconds": 30,
+                    "stdout_limit_bytes": 8388608,
+                    "stderr_limit_bytes": 8388608,
+                },
                 "baseline": {
                     "adapter": plan["adapter"], "policy": plan["policy"],
                     "execution_scope_fingerprint": execution_scope,
@@ -464,7 +480,7 @@ class SessionReplayTests(unittest.TestCase):
                 },
             }
             receipt = {
-                "schema_version": "3.0.0", "status": "passed",
+                "schema_version": "4.0.0", "status": "passed",
                 "manifest_sha256": manifest["manifest_sha256"],
                 "receipt_sha256": hashlib.sha256(b"receipt").hexdigest(),
                 "baseline_observation": observation,
@@ -509,7 +525,7 @@ class SessionReplayTests(unittest.TestCase):
             self.assertEqual(applied["mutation_state"], "applied")
             self.assertEqual(replayed["mutation_state"], "already-applied")
             state = json.loads(ledger.read_text())
-            self.assertEqual(state["schema_version"], "12.0.0")
+            self.assertEqual(state["schema_version"], "13.0.0")
             self.assertEqual(state["goal"]["state"], "active")
             self.assertEqual(state["tasks"][0]["implementation_baseline"], "accepted")
             self.assertEqual(state["tasks"][0]["state"], "implementing")
@@ -751,7 +767,7 @@ class SessionReplayTests(unittest.TestCase):
                 str(registration_file),
             )
             self.assertEqual(created["mutation_state"], "created")
-            self.assertEqual(created["version"], "14.0.0")
+            self.assertEqual(created["version"], "15.0.0")
             generation = created["generation"]
             typed_state_writes = 1
             final_batch_command: tuple[str, ...] | None = None
