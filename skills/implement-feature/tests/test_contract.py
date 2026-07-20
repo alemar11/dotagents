@@ -11,6 +11,93 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REPO = ROOT.parents[1]
 
+CONTROL_PLANE_BUDGET_SECONDS = {
+    "title-or-goal": 60,
+    "queued-identity": 120,
+}
+CONTROL_PLANE_NOTICE_AFTER_SECONDS = 10
+CONTROL_PLANE_WAIT_SLICE_SECONDS = 30
+TITLE_QUIET_SECONDS = 5
+SAFE_CONTROL_PLANE_RETRIES = {"read", "exact-title-write"}
+UNSAFE_CONTROL_PLANE_RETRIES = {
+    "create-thread",
+    "steer-or-message",
+    "create-goal",
+    "update-goal",
+}
+
+
+def within_control_plane_budget(
+    *, first_attempt_at: int, observed_at: int, operation: str
+) -> bool:
+    return observed_at - first_attempt_at <= CONTROL_PLANE_BUDGET_SECONDS[operation]
+
+
+def clipped_control_plane_wait(
+    *, first_attempt_at: int, now: int, operation: str
+) -> int:
+    remaining = CONTROL_PLANE_BUDGET_SECONDS[operation] - (now - first_attempt_at)
+    return min(CONTROL_PLANE_WAIT_SLICE_SECONDS, max(0, remaining))
+
+
+def control_plane_notice_count(
+    *, first_attempt_at: int, observations: list[int]
+) -> int:
+    return min(
+        1,
+        sum(
+            observed_at - first_attempt_at >= CONTROL_PLANE_NOTICE_AFTER_SECONDS
+            for observed_at in observations
+        ),
+    )
+
+
+def title_stabilized(
+    *, first_attempt_at: int, desired: str, observations: list[tuple[int, str]]
+) -> bool:
+    previous_match_at: int | None = None
+    for observed_at, title in observations:
+        if not within_control_plane_budget(
+            first_attempt_at=first_attempt_at,
+            observed_at=observed_at,
+            operation="title-or-goal",
+        ):
+            return False
+        if title != desired:
+            previous_match_at = None
+            continue
+        if (
+            previous_match_at is not None
+            and observed_at - previous_match_at >= TITLE_QUIET_SECONDS
+        ):
+            return True
+        previous_match_at = observed_at
+    return False
+
+
+def reconcile_ambiguous_goal(
+    *, expected_objective: str, expected_state: str, readback: tuple[str, str] | None
+) -> str:
+    if readback == (expected_objective, expected_state):
+        return "matching-readback"
+    return "needs-owner"
+
+
+def resumed_control_plane_budget(*, deadline_origin_available: bool) -> str:
+    return "continue-original" if deadline_origin_available else "exhausted"
+
+
+def resumed_notice_action(*, notice_history: bool | None) -> str:
+    return "eligible" if notice_history is False else "suppress"
+
+
+def recovery_title_route(observation: str) -> tuple[str, bool]:
+    return "exact-derived-title", observation in {
+        "delayed",
+        "ambiguous",
+        "overwritten",
+    }
+
 
 def run_app_preclaim_fixture(
     *,
@@ -487,10 +574,223 @@ class ImplementFeatureContractTests(unittest.TestCase):
         normalized_recovery = " ".join(recovery.split())
         self.assertIn("Record live title drift without repairing it", normalized_recovery)
         self.assertIn("Only after the full pass succeeds", normalized_recovery)
-        self.assertIn("derived display title", normalized_recovery)
-        self.assertIn("that same task", normalized_recovery)
+        self.assertIn(
+            "require exact source assignment, task ref, exact derived display title",
+            normalized_recovery,
+        )
+        self.assertIn(
+            "Only if that exact title or identity observation is delayed",
+            normalized_recovery,
+        )
+        self.assertIn("preserve a later explicit user title", normalized_recovery)
         self.assertNotIn("task_title", options)
         self.assertNotIn('"task_title"', claim_helper)
+
+    def test_app_control_plane_delay_policy_is_bounded_and_fail_closed(self) -> None:
+        contract = self.read("references/app-control-plane-delays.md")
+        skill = self.read("SKILL.md")
+        worker = self.read("references/worker.md")
+        recovery = self.read("references/recovery-validation.md")
+        options = self.read("references/options.md")
+        packets = self.read("references/run-state-packets.md")
+        cache_helper = self.read("scripts/ledger-cache")
+
+        self.assertLessEqual(len(contract.encode("utf-8")), 4_096)
+        for routed in (skill, worker, recovery):
+            self.assertIn("app-control-plane-delays.md", routed)
+
+        baseline_accept = " ".join(
+            skill.split("9. **BASELINE-ACCEPT**", 1)[1]
+            .split("10. **MONITOR**", 1)[0]
+            .split()
+        )
+        goal_route = " ".join(
+            skill.split("12. **RECONCILE**", 1)[1]
+            .split("An unchanged observation timeout", 1)[0]
+            .split()
+        )
+        terminal_goal = " ".join(
+            skill.split("After root-title revalidation", 1)[1]
+            .split("An exact Codex review", 1)[0]
+            .split()
+        )
+        self.assertIn("references/app-control-plane-delays.md", goal_route)
+        self.assertIn(
+            "delayed/ambiguous activation or terminal Goal mutation/readback",
+            goal_route,
+        )
+        register = " ".join(
+            skill.split("7. **REGISTER**", 1)[1]
+            .split("8. **BASELINE-DISPATCH**", 1)[0]
+            .split()
+        )
+        self.assertIn("Set/read back root title", register)
+        self.assertIn("call `create_goal` once", baseline_accept)
+        self.assertIn("then `get_goal`", baseline_accept)
+        self.assertIn("root Goal/readback", terminal_goal)
+
+        recovery_cases = (
+            ("exact", False),
+            ("delayed", True),
+            ("ambiguous", True),
+            ("overwritten", True),
+        )
+        for observation, edge_loaded in recovery_cases:
+            with self.subTest(recovery_observation=observation):
+                title_rule, actual_edge_loaded = recovery_title_route(observation)
+                self.assertEqual(title_rule, "exact-derived-title")
+                self.assertEqual(actual_edge_loaded, edge_loaded)
+
+        timing_cases = (
+            ("title-or-goal", 100, 160, True),
+            ("title-or-goal", 100, 161, False),
+            ("queued-identity", 100, 220, True),
+            ("queued-identity", 100, 221, False),
+        )
+        for operation, first_attempt, observed_at, expected in timing_cases:
+            with self.subTest(operation=operation, observed_at=observed_at):
+                self.assertEqual(
+                    within_control_plane_budget(
+                        first_attempt_at=first_attempt,
+                        observed_at=observed_at,
+                        operation=operation,
+                    ),
+                    expected,
+                )
+
+        self.assertEqual(
+            clipped_control_plane_wait(
+                first_attempt_at=100, now=105, operation="title-or-goal"
+            ),
+            30,
+        )
+        self.assertEqual(
+            clipped_control_plane_wait(
+                first_attempt_at=100, now=159, operation="title-or-goal"
+            ),
+            1,
+        )
+        self.assertEqual(
+            clipped_control_plane_wait(
+                first_attempt_at=100, now=161, operation="title-or-goal"
+            ),
+            0,
+        )
+        self.assertEqual(
+            control_plane_notice_count(
+                first_attempt_at=100, observations=[105, 110, 120, 159]
+            ),
+            1,
+        )
+        self.assertEqual(
+            control_plane_notice_count(first_attempt_at=100, observations=[105, 109]),
+            0,
+        )
+        self.assertEqual(
+            resumed_control_plane_budget(deadline_origin_available=True),
+            "continue-original",
+        )
+        self.assertEqual(
+            resumed_control_plane_budget(deadline_origin_available=False),
+            "exhausted",
+        )
+        self.assertEqual(resumed_notice_action(notice_history=False), "eligible")
+        self.assertEqual(resumed_notice_action(notice_history=True), "suppress")
+        self.assertEqual(resumed_notice_action(notice_history=None), "suppress")
+
+        title_cases = (
+            ([(0, "generated"), (5, "wanted"), (10, "wanted")], True),
+            ([(0, "wanted"), (5, "generated"), (10, "wanted")], False),
+            ([(55, "wanted"), (60, "wanted")], True),
+            ([(56, "wanted"), (61, "wanted")], False),
+        )
+        for observations, expected in title_cases:
+            with self.subTest(observations=observations):
+                self.assertEqual(
+                    title_stabilized(
+                        first_attempt_at=0,
+                        desired="wanted",
+                        observations=observations,
+                    ),
+                    expected,
+                )
+
+        self.assertEqual(
+            reconcile_ambiguous_goal(
+                expected_objective="deliver",
+                expected_state="active",
+                readback=("deliver", "active"),
+            ),
+            "matching-readback",
+        )
+        for readback in (None, ("other", "active"), ("deliver", "complete")):
+            with self.subTest(readback=readback):
+                self.assertEqual(
+                    reconcile_ambiguous_goal(
+                        expected_objective="deliver",
+                        expected_state="active",
+                        readback=readback,
+                    ),
+                    "needs-owner",
+                )
+
+        normalized = " ".join(contract.split())
+        for token in (
+            "monotonic clock from the first operation attempt",
+            "never reset it",
+            "at most one concise notice",
+            "same live controller or exact durable App/tool history",
+            "deadline origin is unavailable, treat the budget as exhausted",
+            "notice history is unavailable, suppress another notice",
+            "exact creation exposes `(hostId, threadId)`",
+            "Titles, timestamps",
+            "Only a direct full `read_thread` page chain",
+            "never compared",
+            "not worker inactivity",
+            "call `create_goal` exactly once",
+            "never blindly retry",
+            "explicit user title, persisted parent title, then generated title",
+            "zero workflow mutations",
+            "existing `needs-owner` handling",
+        ):
+            self.assertIn(token, normalized)
+        retry_tokens = {
+            "read": "Safe retries are limited to reads",
+            "exact-title-write": "exact same `(hostId, threadId, persisted_title)` title write",
+            "create-thread": "Never retry `create_thread`",
+            "steer-or-message": "steering or message calls",
+            "create-goal": "`create_goal`",
+            "update-goal": "`update_goal`",
+        }
+        for operation in SAFE_CONTROL_PLANE_RETRIES | UNSAFE_CONTROL_PLANE_RETRIES:
+            self.assertIn(retry_tokens[operation], normalized)
+
+        self.assertNotIn("control-plane-delayed", options)
+        self.assertNotIn("control-plane-delayed", packets)
+        self.assertNotIn("control-plane-delayed", cache_helper)
+        self.assertNotIn("control-plane", options)
+        self.assertNotIn("control-plane", packets)
+
+        self.assertIn('__version__ = "18.1.0"', cache_helper)
+        self.assertIn('LEDGER_SCHEMA_VERSION = "14.0.0"', cache_helper)
+        self.assertIn(
+            '__version__ = "4.0.0"', self.read("scripts/execution-manifest")
+        )
+        self.assertIn(
+            'VERSION = "2.1.0"',
+            (REPO / "skills/autoreview/scripts/autoreview").read_text(),
+        )
+        self.assertIn(
+            'PROTOCOL_VERSION = "2.0.0"',
+            (REPO / "skills/autoreview/scripts/autoreview_protocol.py").read_text(),
+        )
+        self.assertIn(
+            '__version__ = "5.0.0"',
+            (
+                REPO
+                / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py"
+            ).read_text(),
+        )
 
     def test_root_task_title_is_stable_adaptive_and_recoverable(self) -> None:
         skill = self.read("SKILL.md")
@@ -589,7 +889,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Record live title drift without repairing it",
             "Call `get_goal` in the root",
             "Only after the full pass succeeds",
-            "Repair title drift on that same task",
+            "Repair generated-title drift only",
+            "preserve a later explicit user title",
             "Never repair or resume implementation",
             "Do not infer identity from task titles",
         ):
@@ -1041,7 +1342,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for tool in ("`create_goal`", "`get_goal`", "`update_goal`"):
             self.assertNotIn(tool, worker)
 
-        self.assertIn("Never set", skill)
+        self.assertIn("Then never set", skill)
         self.assertIn("`token_budget`", skill)
         self.assertIn("exact Feature Spec", worker)
         self.assertIn("repositories and allowed paths", worker)
@@ -2137,7 +2438,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         # model while the worker prompt remains at its existing ceiling.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            114_600,
+            114_512,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
         # Bounded execution stays branch-loaded; normal, manifest, and
@@ -2199,7 +2500,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         # Bounded attempt and root monitor ownership add 329 characters while
         # provider and helper mechanics remain behind references.
         baseline_characters = 2033
-        self.assertLessEqual(len(prompt), baseline_characters)
+        self.assertEqual(len(prompt), baseline_characters)
         self.assertNotIn("scripts/autoreview --", prompt)
         self.assertNotIn("scripts/delivery-preflight", prompt)
         self.assertNotIn("ledger-cache --json", prompt)

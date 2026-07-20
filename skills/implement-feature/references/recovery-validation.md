@@ -14,6 +14,9 @@ heartbeat automation are not required. Prior evidence, background agents, and fi
 access are insufficient. Missing support is `unsupported-runtime` without
 asking permission or performing mutation.
 
+On delayed or ambiguous task identity, title, or root Goal evidence, load
+`app-control-plane-delays.md` and retain its original monotonic deadline.
+
 Call `get_goal` once in the root. If `blocked`, return `new-root-required` before
 authorization/run-state reads, require a fresh App task, preserve prior
 artifacts, and never adopt/update that Goal.
@@ -131,11 +134,13 @@ only when none exists, call `create_goal` once without `token_budget`; apply
 `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`; a
 blocked root Goal never reaches this phase.
 
-For a nonterminal task, require exact source assignment, task ref, derived display title,
-profile, matching assignment fingerprint, and complete managed
-checkout map. Repair title drift on that same task only after freshness passes,
-then report it through `task-observed`. Resume only the original visible task
-with its recorded profile.
+For a nonterminal task, require exact source assignment, task ref, exact derived
+display title, profile, matching assignment fingerprint, and complete managed
+checkout map. Only if that exact title or identity observation is delayed,
+ambiguous, or overwritten, load `app-control-plane-delays.md`. Repair
+generated-title drift only inside its initial quiet window or with title-source
+proof; preserve a later explicit user title. Report accepted evidence through
+`task-observed`. Resume only the original visible task with its recorded profile.
 
 If a local move is fully proven, apply `source-moved`; it is valid only when all
 prerequisite current task-revision-set gates passed before it. It dirties its

@@ -132,16 +132,17 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
    and fixed 180-day prune once in the root. Warnings are nonblocking.
 7. **REGISTER** — call `ledger create` with immutable bundle, authorization,
    execution-scope fingerprint, sources, deliveries, validation plans,
-   preflight/CI, and fresh objective. Set and observe the root title. Ledger Goal
-   state remains internal `pending`; do not call Goal tools yet.
+   preflight/CI, and fresh objective. Set/read back root title; on
+   delay/ambiguity/overwrite load `references/app-control-plane-delays.md`. Goal state remains
+   internal `pending`; do not call Goal tools yet.
 8. **BASELINE-DISPATCH** — load `references/worker.md`; adopt/create one managed
    baseline-only task per Spec, observe title/assignment/full checkout map, and
    run every registered read-only baseline manifest. No implementation,
    provider/AutoReview mutation, terminal gate, or root Goal is allowed.
 9. **BASELINE-ACCEPT** — submit one all-delivery/all-validation
-   `implementation-baseline-accepted` CAS. On acceptance, call `create_goal`.
-   Never set `token_budget`; read it back, record activation, and
-   allow tasks to implement. On failure use the typed preimplementation stop.
+   `implementation-baseline-accepted` CAS. Then never set
+   `token_budget`; call `create_goal` once, then `get_goal`; record activation; allow
+   implementation. Failure uses the typed preimplementation stop.
 10. **MONITOR** — after one full post-dispatch snapshot, compact deltas are
    hints; never mutate durable state. The root alone
    heartbeats/CASes the claim every 60 seconds, including during commands. At
@@ -152,10 +153,13 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
    `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
    scope.
-12. **RECONCILE** — read the smallest ledger projection, using `diagnostics` for
-    user-facing status and closeout wording; refresh changed external evidence,
+12. **RECONCILE** — read smallest projection (`diagnostics` for user status
+    and closeout); refresh changed external evidence,
     atomically apply events, then dispatch, reconcile the fixed review wait, or
     advance one staged closeout transition.
+
+On delayed/ambiguous activation or terminal Goal mutation/readback, load
+`references/app-control-plane-delays.md`.
 
 An unchanged observation timeout performs only a claim heartbeat and no event.
 Read children at gates; root does not self-read. The

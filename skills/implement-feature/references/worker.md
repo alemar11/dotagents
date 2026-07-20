@@ -49,10 +49,9 @@ through the worker prompt:
 4. Advance beyond `created` only after both the title and assignment fingerprint are
    verified.
 
-If creation fails before a task exists, retain the resolved title for the same
-dispatch retry. If title mutation or observation fails after creation, record
-the task ref, desired title, and blocker; resume and repair that same task
-instead of creating a replacement. The worker must never rename its own task.
+On delayed/ambiguous creation or title overwrite, load
+`app-control-plane-delays.md`; preserve creation, never replace the task or let
+the worker rename itself.
 
 ## Fixed Actions
 
