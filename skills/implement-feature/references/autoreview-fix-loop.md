@@ -1,5 +1,9 @@
 # AutoReview Fix Loop
 
+AutoReview authority begins only after atomic implementation baseline
+acceptance and root Goal activation. Baseline-only workers may not reserve an
+action, prepare an attempt, or make a model call.
+
 Load before the first AutoReview reservation and again after AutoReview or a
 hosted Codex review returns an accepted finding.
 

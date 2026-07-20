@@ -112,6 +112,13 @@ Require:
   only `upstream_feature_spec_ref` and `dependency_reason` rows that form an
   acyclic cross-Spec graph;
 - bounded goals, requirements, acceptance criteria, and validation commands;
+- a complete deterministic validation plan derived from those commands before
+  authorization. Each entry binds a stable validation/command id, authored argv
+  fingerprint, closed adapter/policy, projected read-only argv fingerprint, and
+  pinned tool/version identity fingerprint. Only `prettier-check-v1` with
+  `unchanged-outside-scope-allowed` and `clean-exit-v1` with `clean-required`
+  are valid; any command without a provably read-only projection is
+  `planning-required` and its authored mutating form is never run;
 - named integration gates for multi-repository work;
 - exactly one distinct repo-owned integration Feature Spec in every
   multi-repository bundle, downstream of every implementation partial, with at

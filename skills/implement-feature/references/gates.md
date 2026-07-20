@@ -9,10 +9,14 @@ closure, or target-repository instruction changes.
 
 Before edits, apply one `managed-checkouts-observed` event containing every
 registered delivery exactly once. Require an App-managed isolated checkout,
-matching repository, target branch, Git top-level, baseline revision, and
-isolation proof for every delivery. Missing, duplicated, shared, unmanaged, or
+matching repository, target branch, Git top-level, baseline revision/tree,
+clean-status and execution-scope fingerprints, and isolation proof for every delivery. Missing, duplicated, shared, unmanaged, or
 non-isolated checkout evidence blocks. Never create raw Git worktrees, rotate
 the caller checkout, or transfer implementation to the root.
+
+Run every registered baseline manifest while workers remain baseline-only, then
+accept all rows through the single CAS in `baseline-validation.md`. No Goal or
+implementation authority exists before that acceptance.
 
 ## Static Dispatch Gates
 
@@ -55,6 +59,11 @@ verified current command receipt from `execution-manifest.md`. Its gate
 fingerprint must bind the current bundle, checkout cwd, exact argv, pinned
 tools/dependencies, write policy, and outputs. A pre-call manifest or finding
 validation failure is not a gate result and consumes no AutoReview budget.
+Focused/full validation additionally require one current
+`validation-nonregression-observed` row per registered validation plan. Exact
+outside-scope baseline diagnostics and content hashes may remain only under the
+registered debt policy; all in-scope diagnostics must be gone and command/tool
+identity must be unchanged.
 
 When `ci_availability=not-configured`, do not emit, wait for, poll, or accept a
 `ci` gate; report availability, never `passed`. For configured CI, skipped or
@@ -78,6 +87,10 @@ delivery key. Partial sets fail.
 
 The `autoreview` gate requires terminal `autoreview-observed` evidence for the
 current head/base/merge-base; repository or scope drift starts a new lineage.
+`scope-acceptance` additionally requires current canonical changed paths for
+every delivery, no untracked paths, complete non-regression evidence, and exact
+equality with each AutoReview target's review scope. An undeclared path is
+`needs-owner`, never a late formatting permission request.
 
 ## Domain Knowledge Closeout Gate
 

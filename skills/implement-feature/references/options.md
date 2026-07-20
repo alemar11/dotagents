@@ -20,7 +20,10 @@ This file owns every user-controlled App orchestration field.
 For `visible_app_task_permission=not-requested`, state this exact disclosure:
 
 > Each executable Feature Spec is one feature; one plan may create multiple
-> visible tasks. This run may change and validate code, push
+> visible tasks. The scope summary immediately below lists every repository,
+> writable path, and validation command covered by this one grant. Before any
+> code change, baseline-only tasks run deterministic read-only validation; the
+> root Goal starts only after every baseline is accepted together. This run may change and validate code, push
 > commits, create or update pull requests, address Codex review, wait for CI
 > when a repository has CI configured,
 > prepare hosted issue closeout, and move, commit, and push completed local issue
@@ -34,6 +37,13 @@ For `visible_app_task_permission=not-requested`, state this exact disclosure:
 > review as clean. A later merge workflow must check for late findings. After Codex
 > reserves the work, it automatically deletes valid run-state archives older
 > than 180 days; it never plans, expands scope, merges, releases, or deploys.
+
+Immediately after the disclosure, render a deterministic scope summary from the
+accepted snapshot: sorted repository identity; target branch; sorted canonical
+`allowed_paths`; and each validation key, authored command identity, closed
+adapter, policy, and pinned tool/version identity. Do not include mutable output
+or let the caller select an adapter/policy. If the summary cannot be complete,
+return `planning-required` without asking.
 
 Then use one `request_user_input`:
 
@@ -49,9 +59,15 @@ Then use one `request_user_input`:
 | 2 | `Cancel` | Stop here without starting implementation or changing anything. | `denied-by-authorized-user` |
 
 Define only these answers. The App owns the free-form response; it is never an
-implicit grant. Ask after the runtime surface gate. Denial or no answer aborts
+implicit grant. Ask after the runtime surface gate and complete read-only
+intake/preflight, but before CLAIM. Denial or no answer aborts
 without artifacts. The grant never changes target-repository instructions;
 model policy stays fixed by `task-model-policy.md`.
+
+This is the only normal-run permission question. Later source/scope/tool/argv
+drift returns `authorization-stale` before implementation; a newly required
+undeclared path after implementation is a scope violation and `needs-owner`.
+Never ask again, widen `allowed_paths`, or recapture a baseline.
 
 Resolve `stale_claim_takeover_permission` after read-only discovery proves an
 atomic claim conflict, stale-heartbeat evidence, every replaced root's complete

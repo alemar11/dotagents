@@ -24,15 +24,16 @@ remain blocking.
 
 ## Active And Archived State
 
-Keep resumable ledger-schema `11.0.0` state as absolute direct-child `.json` files under
-`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v14 is the
+Keep resumable ledger-schema `12.0.0` state as absolute direct-child `.json` files under
+`~/.cache/dotagents/skills/implement-feature/ledgers/`. `ledger-cache` v15 is the
 sole active-state writer. Archived entries live below `ledgers/archive/` as cold
 evidence; never restore, load, or migrate them into active state.
 
 Quote placeholders. `<claim-fingerprint>` is the raw 64-hex acquire fingerprint,
 never a `sha256:` value or receipt fingerprint.
-`terminal` is the only active release reason; every receipt binds stable ledger
-hash and size.
+Release receipt schema `2.0.0` permits only `terminal` and
+`preimplementation-abort`; every receipt binds its exact reason, evidence,
+stable ledger hash, size, owner, and claim fingerprint.
 
 For an in-flight review wait, retain active JSON, the complete typed request
 receipt, and the exact claim/fingerprint.
@@ -55,13 +56,19 @@ scripts/active-root-claim --json claim release --root-id '<root-id>' --expected-
 scripts/ledger-cache --json ledger archive --ledger '<absolute-active-json>' --root-id '<same-root-id>' --evidence-ref '<same-terminal-evidence-ref>'
 ```
 
-Under lock, release requires schema-3 JSON, exact ownership, and an
+Under lock, release requires claim schema `6.0.0`, exact ownership, and an
 archive-ready terminal projection before receipt or claim deletion. Rejection
 leaves claim and ledger unchanged.
 
 `ledger_sha256` and `ledger_size_bytes` bind validated JSON bytes, root,
 fingerprint, path, and the ledger's exact terminal evidence, not Markdown.
 Archive consumes the receipt; interruption remains recoverable.
+
+If baseline preparation/acceptance cannot continue, first apply the verified
+`portfolio-preimplementation-aborted` event from `baseline-validation.md`, then
+run the same two commands with `--release-reason preimplementation-abort` and
+`ledger archive --reason preimplementation-abort`, using the exact abort
+evidence ref. This path never creates, completes, or synthesizes a Goal.
 
 ## Archive V2 Contract
 
@@ -82,7 +89,7 @@ idempotent and resolves to the same entry.
 | field | contract |
 | --- | --- |
 | `archive_id` | Canonical entry-directory identity. |
-| `archive_reason` | `terminal`. |
+| `archive_reason` | `terminal` or `preimplementation-abort`. |
 | `archive_group` | `null` for v2 terminal archives. |
 | `archived_at` | UTC retention timestamp. |
 | `portfolio_key` | Original active-state stem. |

@@ -279,6 +279,241 @@ class SessionReplayTests(unittest.TestCase):
             sensitivity["fresh_token_reduction_percent"],
         )
 
+    def test_schema12_atomic_baseline_replays_through_production_cli(self) -> None:
+        def fingerprint(value: Any) -> str:
+            encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            return hashlib.sha256(encoded).hexdigest()
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            env = {**os.environ, "HOME": str(root)}
+            repository = root / "repository"
+            subprocess.run(
+                ["git", "init", "--quiet", "--initial-branch", "main", str(repository)],
+                check=True,
+            )
+            subprocess.run(["git", "-C", str(repository), "config", "user.name", "Replay"], check=True)
+            subprocess.run(["git", "-C", str(repository), "config", "user.email", "replay@example.invalid"], check=True)
+            (repository / "README.md").write_text("baseline\n")
+            subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
+            subprocess.run(["git", "-C", str(repository), "commit", "--quiet", "-m", "baseline"], check=True)
+
+            def invoke(tool: Path, *args: str, check: bool = True) -> dict[str, Any]:
+                result = subprocess.run([str(tool), *args], env=env, text=True, capture_output=True)
+                payload = json.loads(result.stdout)
+                if check and result.returncode:
+                    self.fail(f"{tool.name} failed: {payload}")
+                return payload
+
+            packet_root = root / "packets"
+            packet_root.mkdir()
+
+            def packet(name: str, value: Any) -> Path:
+                path = packet_root / f"{name}.json"
+                path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+                return path
+
+            ledger = root / ".cache/dotagents/skills/implement-feature/ledgers/replay.json"
+            source = "https://github.com/example/replay/issues/1"
+            claim = invoke(
+                ACTIVE_ROOT_CLAIM,
+                "--json", "claim", "acquire", "--root-id", "replay-root",
+                "--repository", str(repository), "--source", source,
+                "--ledger-ref", str(ledger),
+            )["claim"]
+            plan = {
+                "validation_key": "full-validation",
+                "command_id": "full-validation",
+                "adapter": "clean-exit-v1",
+                "policy": "clean-required",
+                "authored_argv_fingerprint": hashlib.sha256(b"authored").hexdigest(),
+                "projected_argv_fingerprint": hashlib.sha256(b"projected").hexdigest(),
+                "tool_identities_fingerprint": hashlib.sha256(b"tools").hexdigest(),
+            }
+            bundle_sha = hashlib.sha256(b"schema12-replay-bundle").hexdigest()
+            source_fingerprint = hashlib.sha256(b"schema12-replay-source").hexdigest()
+            delivery = {
+                "delivery_key": "replay",
+                "repository": claim["repositories"][0],
+                "github_repository": "example/replay",
+                "target_branch": "main",
+                "default_base": "main",
+                "allowed_paths": ["src"],
+                "ci_availability": "not-configured",
+                "preflight_key": hashlib.sha256(b"preflight").hexdigest(),
+                "preflight_evidence_ref": "preflight://replay",
+                "validation_plan": [plan],
+            }
+            scope_payload = {
+                "bundle_sha256": bundle_sha,
+                "sources": [{
+                    "task_key": "replay-spec",
+                    "source_fingerprint": source_fingerprint,
+                    "deliveries": [{
+                        key: delivery[key]
+                        for key in ("delivery_key", "repository", "target_branch", "allowed_paths", "validation_plan")
+                    }],
+                }],
+            }
+            execution_scope = fingerprint(scope_payload)
+            permission = "user-message://schema12-replay-authorized"
+            objective = "Implement replay Feature Spec with CI when configured"
+            registration = {
+                "schema_version": "6.0.0",
+                "bundle_sha256": bundle_sha,
+                "execution_scope_fingerprint": execution_scope,
+                "authorization_fingerprint": fingerprint({
+                    "execution_scope_fingerprint": execution_scope,
+                    "permission_evidence_ref": permission,
+                }),
+                "root_task_ref": "app-task://replay-root",
+                "root_checkout": str(repository),
+                "objective": objective,
+                "objective_fingerprint": hashlib.sha256(objective.encode()).hexdigest(),
+                "permission_evidence_ref": permission,
+                "repositories": claim["repositories"],
+                "repository_checkouts": claim["repository_checkouts"],
+                "sources": [{
+                    "task_key": "replay-spec",
+                    "source_id": source,
+                    "source_spec_ref": source,
+                    "feature_spec_title": "Feature Spec: Replay",
+                    "feature_slug": "replay",
+                    "source_state": "ready-for-agent",
+                    "source_fingerprint": source_fingerprint,
+                    "planned_done_ref": source,
+                    "tracker_backend": "github",
+                    "tracker_repository": claim["repositories"][0],
+                    "deliveries": [delivery],
+                    "dependency_ids": [],
+                    "requires_domain_closeout": False,
+                    "task_model": "gpt-5.6-sol",
+                    "task_thinking": "medium",
+                    "thinking_reason": "single bounded replay",
+                    "task_assignment_fingerprint": hashlib.sha256(b"assignment").hexdigest(),
+                }],
+            }
+            created = invoke(
+                LEDGER_CACHE,
+                "--json", "ledger", "create", "--ledger", str(ledger),
+                "--root-id", "replay-root", "--expected-claim-fingerprint", claim["fingerprint"],
+                "--operation-id", "10000000000000000000000000000001",
+                "--registration-file", str(packet("registration", registration)),
+            )
+            self.assertEqual(created["version"], "15.0.0")
+
+            head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
+            tree = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True, capture_output=True, check=True).stdout.strip()
+            clean_status = hashlib.sha256(b"").hexdigest()
+            binding_events = [
+                {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://replay-root/title"},
+                {
+                    "type": "managed-checkouts-observed", "task_key": "replay-spec",
+                    "task_ref": "app-task://replay-worker",
+                    "managed_checkouts": [{
+                        "delivery_key": "replay", "repository": claim["repositories"][0],
+                        "target_branch": "main", "checkout": str(repository),
+                        "git_top_level": str(repository), "baseline_revision": head,
+                        "baseline_tree_sha": tree, "baseline_status_fingerprint": clean_status,
+                        "execution_scope_fingerprint": execution_scope,
+                        "isolation_evidence_ref": "app-task://replay-worker/worktree",
+                    }],
+                    "evidence_ref": "app-task://replay-worker/checkout-map",
+                },
+                {
+                    "type": "task-observed", "task_key": "replay-spec",
+                    "model": "gpt-5.6-sol", "reasoning_effort": "medium",
+                    "thinking_reason": "single bounded replay",
+                    "task_title": "🧪 Feature Spec: Replay",
+                    "task_title_evidence_ref": "app-task://replay-worker/title",
+                    "task_assignment_fingerprint": hashlib.sha256(b"assignment").hexdigest(),
+                    "state": "created", "outcome": None, "attention_reason": None,
+                    "summary_ref": "app-task://replay-worker/summary",
+                },
+            ]
+            bound = invoke(
+                LEDGER_CACHE,
+                "--json", "ledger", "apply", "--ledger", str(ledger),
+                "--root-id", "replay-root", "--expected-claim-fingerprint", claim["fingerprint"],
+                "--expected-generation", str(created["generation"]),
+                "--operation-id", "10000000000000000000000000000002",
+                "--events-file", str(packet("binding", binding_events)),
+            )
+            state = json.loads(ledger.read_text())
+            observation = {
+                "adapter": plan["adapter"], "policy": plan["policy"],
+                "execution_scope_fingerprint": execution_scope,
+                "authored_argv_fingerprint": plan["authored_argv_fingerprint"],
+                "argv_fingerprint": plan["projected_argv_fingerprint"],
+                "checkout_identity": {
+                    "checkout": str(repository), "branch": "main", "head_sha": head,
+                    "tree_sha": tree, "status_sha256": clean_status, "status_clean": True,
+                },
+                "tool_identities_fingerprint": plan["tool_identities_fingerprint"],
+                "result": "clean", "diagnostics": [],
+                "diagnostic_set_fingerprint": fingerprint([]),
+            }
+            manifest = {
+                "schema_version": "3.0.0", "operation": "baseline-validation",
+                "manifest_sha256": hashlib.sha256(b"manifest").hexdigest(),
+                "argv_fingerprint": plan["projected_argv_fingerprint"],
+                "baseline": {
+                    "adapter": plan["adapter"], "policy": plan["policy"],
+                    "execution_scope_fingerprint": execution_scope,
+                    "authored_argv_fingerprint": plan["authored_argv_fingerprint"],
+                },
+            }
+            receipt = {
+                "schema_version": "3.0.0", "status": "passed",
+                "manifest_sha256": manifest["manifest_sha256"],
+                "receipt_sha256": hashlib.sha256(b"receipt").hexdigest(),
+                "baseline_observation": observation,
+            }
+            manifest_path = packet("baseline-manifest", manifest)
+            receipt_path = packet("baseline-receipt", receipt)
+            baseline_event = {
+                "type": "implementation-baseline-accepted",
+                "expected_generation": state["generation"],
+                "expected_state_fingerprint": state["content_fingerprint"],
+                "expected_claim_fingerprint": claim["fingerprint"],
+                "execution_scope_fingerprint": execution_scope,
+                "baselines": [{
+                    "task_key": "replay-spec", "delivery_key": "replay",
+                    "validation_key": "full-validation",
+                    "manifest_file": str(manifest_path),
+                    "manifest_bytes_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                    "receipt_file": str(receipt_path),
+                    "receipt_bytes_sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
+                }],
+                "evidence_ref": "baseline://schema12-replay",
+            }
+            final_events = [
+                baseline_event,
+                {
+                    "type": "portfolio-goal-activated",
+                    "goal_evidence_ref": "app-task://replay-root/goal",
+                    "objective_fingerprint": registration["objective_fingerprint"],
+                },
+                {**binding_events[-1], "state": "implementing"},
+            ]
+            final_packet = packet("baseline-accept", final_events)
+            command = (
+                "--json", "ledger", "apply", "--ledger", str(ledger),
+                "--root-id", "replay-root", "--expected-claim-fingerprint", claim["fingerprint"],
+                "--expected-generation", str(bound["generation"]),
+                "--operation-id", "10000000000000000000000000000003",
+                "--events-file", str(final_packet),
+            )
+            applied = invoke(LEDGER_CACHE, *command)
+            replayed = invoke(LEDGER_CACHE, *command)
+            self.assertEqual(applied["mutation_state"], "applied")
+            self.assertEqual(replayed["mutation_state"], "already-applied")
+            state = json.loads(ledger.read_text())
+            self.assertEqual(state["schema_version"], "12.0.0")
+            self.assertEqual(state["goal"]["state"], "active")
+            self.assertEqual(state["tasks"][0]["implementation_baseline"], "accepted")
+            self.assertEqual(state["tasks"][0]["state"], "implementing")
+
     def test_session_events_replay_through_production_cli(self) -> None:
         fixture = self.fixture
         legacy_autoreview = next(

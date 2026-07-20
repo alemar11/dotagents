@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v14 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v15 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,8 +14,8 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `11.0.0` created from registration
-schema `5.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+Active state accepts only ledger schema `12.0.0` created from registration
+schema `6.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
@@ -51,7 +51,9 @@ chain, review, and gates.
 No managed `(repository, checkout)` pair may serve two Specs.
 
 Bind the complete isolated checkout map with `managed-checkouts-observed`
-before work passes `created`; bind task lifecycle with `task-observed`.
+before work passes `created`; bind task lifecycle with `task-observed`. Each
+checkout also binds baseline tree, clean-status fingerprint, and the registered
+execution-scope fingerprint.
 `revision-observed` establishes the immutable delivery/PR tuple and
 `revision_key`; `delivery-observed` binds lifecycle plus committed/published
 truth to it. The events are distinct, not aliases.
@@ -62,6 +64,26 @@ Registration seeds the passed preflight. Before seal,
 last valid state. At most three tasks are nonterminal. Scheduling, review
 deadlines, closeout, and next actions are derived; dependencies require merge,
 and a review wait consumes a slot.
+
+## Atomic Implementation Baseline
+
+Registration binds immutable bundle, execution-scope, and authorization
+fingerprints plus every delivery validation plan. Before baseline acceptance,
+tasks are baseline-only in `created`; no delivery/review/provider/AutoReview/gate
+event is legal and no external root Goal exists.
+
+`implementation-baseline-accepted` is one all-delivery/all-validation CAS. It
+must match current generation, state, claim, and scope fingerprints and exact
+manifest/receipt byte hashes, with every registered tuple present exactly once.
+The helper validates checkout/revision/tree/status, command/adapter/policy/tool
+identities, and complete canonical diagnostic/content fingerprints before it
+changes any task to `accepted`. Rejection leaves every task pending.
+
+Only complete acceptance permits root Goal creation/activation and an
+implementation transition. `portfolio-preimplementation-aborted` is the sole
+typed early closeout after registration; it requires complete task-stop and
+unchanged-checkout proof and the absence of Goal, delivery, provider,
+AutoReview, review, gate, and partial-acceptance state.
 
 ## Gate Scopes And Invalidation
 
@@ -96,10 +118,10 @@ excludes coordination-only parent/global artifacts. Derive
 exactly `👨🏻‍💻 Feature Orchestrator` for one or
 `👨🏻‍💻 Multi-Feature Orchestrator` for more than one, with no counter or suffix.
 The title is stable for the accepted run, is UI evidence, and is never identity
-or scheduling input. After registration, set and observe the calling task title before Goal registration
-or dispatch, then apply `root-title-observed`. Call `get_goal`; adopt a matching
-interrupted registration or call `create_goal` without `token_budget`, then
-apply `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`;
+or scheduling input. After registration, set and observe the calling task title,
+then apply `root-title-observed`. Create baseline-only tasks and accept the
+complete atomic baseline before calling `create_goal` without `token_budget`;
+call `get_goal` to read it back, then apply `portfolio-goal-activated`. A different unfinished Goal is `needs-owner`;
 a missing active Goal is never recreated during recovery. The entry gate returns
 `new-root-required` for a blocked root Goal; never adopt or replace it.
 
@@ -193,7 +215,8 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `11.0.0`.
+JSON schema before `12.0.0`, any registration schema before `6.0.0`, or any
+legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses
 the `ledger archive` command in `cache-lifecycle.md`; active state exposes only

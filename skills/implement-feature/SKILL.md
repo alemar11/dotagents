@@ -29,30 +29,8 @@ contract. This gate does not create a task to inspect task-local tools.
 Call `get_goal` once in the root. A `blocked` Goal returns `new-root-required`
 before authorization: require a fresh App task; do not read
 sources, preflight, claim, create artifacts, or call `create_goal`/`update_goal`.
-Prior artifacts stay untouched. CLI/background-agent access does not prove this
-surface. If any capability is absent or unverifiable, return
+Prior artifacts stay untouched. If any capability is absent, return
 `unsupported-runtime` without asking permission or creating artifacts.
-
-## Mandatory Run Authorization
-
-After the surface gate, load `references/options.md` and
-`references/task-model-policy.md`. Verify that visible-task creation and
-steering support the exact model and bounded adaptive thinking policy. Otherwise
-return `unsupported-runtime` without artifacts.
-
-Resolve `visible_app_task_permission`. When `not-requested`, ask once using the
-standard disclosure, exact question, and two fixed answers in
-`references/options.md`. Together they disclose the exact visible-task model,
-thinking policy, fixed flow, retention, and no-merge boundary. Keep them
-adjacent; do not improvise them, expose controller terms, or define the
-App-owned free-form response.
-
-Continue only with
-`visible_app_task_permission=granted-by-authorized-user`. Denial, silence, or
-inability to ask stops without artifacts. Generic delegation or subagent
-authority never supplies this grant. The grant covers only the accepted bundle
-and fixed execution flow; it does not authorize scope expansion, planning,
-merge, release, or deployment.
 
 ## Fixed Contract
 
@@ -62,11 +40,10 @@ merge, release, or deployment.
   mergeability, approval, update, and merge-queue eligibility gates satisfied.
   Unknown or pending evidence blocks except exact 45-minute `timeout-accepted`.
   Never enqueue or merge.
-- Every terminal PR targets its discovered default branch; the base is derived
-  and verified, never selected by the user or source. A draft is only a vehicle;
-  convert it to ready-for-review after substantive proof and terminal
-  `$autoreview`, before current-revision review and CI. This transition is not
-  the terminal result.
+- Every terminal PR targets the discovered default branch; its base is derived
+  and verified, never selected. A draft is only a vehicle; convert it to
+  ready-for-review after substantive proof and terminal `$autoreview`, before
+  current-revision review and CI; the transition is not the terminal result.
 - Use only App-managed worktrees. Never create raw Git worktrees, rotate the
   caller checkout, or implement in the root or a background worker.
 - Create exactly one visible task per Feature Spec, including a multi-repository
@@ -75,17 +52,17 @@ merge, release, or deployment.
 - After CLAIM, give the calling task the stable root title defined by
   `references/run-state.md`: `👨🏻‍💻 Feature Orchestrator` for one executable Spec
   or `👨🏻‍💻 Multi-Feature Orchestrator` for more than one, with no counter.
-- Give every task a root-owned display title: one relevant emoji, one space, and
-  the exact authored Feature Spec title. Use `🛠️` only when nothing is clearer;
-  the title is UI evidence, not identity.
+- Give each task a root-owned title: relevant emoji, one space, exact authored
+  Feature Spec title; use `🛠️` as fallback. It is UI evidence, not identity.
 - The root performs cache maintenance synchronously after CLAIM. It never uses a
   task, Goal, worktree, or internal subagent for cache work.
-- This skill never merges a pull request. A later merge request must start a
-  separate GitHub workflow.
+- This skill never merges a pull request.
+- A later merge request must start a separate GitHub workflow.
 
 ## Execution-Ready Intake
 
-After authorization, load `references/spec-backed-delivery.md` and take one
+After the surface gate, load `references/spec-backed-delivery.md`,
+`references/execution-manifest.md`, and `references/baseline-validation.md` and take one
 read-only snapshot of the durable Spec/issue graph. Derive/preflight deliveries and reuse
 the exact bytes for intake and fingerprinting. Proven drift requires refetch
 and preflight before CLAIM.
@@ -112,23 +89,40 @@ task profile before CLAIM. Missing or contradictory evidence is
 planning or tracker artifacts. Report exact failures and that no claim, run state,
 Goal, task, tracker write, or source mutation was created.
 
+## Mandatory Run Authorization
+
+After successful read-only intake, load `references/options.md` and
+`references/task-model-policy.md`. Verify the exact model policy, then ask once
+using the standard disclosure and fixed answers. The disclosure names the
+complete normalized repository/path scope and validation plan already derived
+from the snapshot. Continue only with
+`visible_app_task_permission=granted-by-authorized-user`.
+
+The grant binds immutable bundle/scope fingerprints. Denial, silence, or
+inability to ask stops without artifacts. Generic delegation or subagent
+authority never supplies this grant.
+Preimplementation identity drift is `authorization-stale`; a later undeclared
+path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
+
 ## Controller Loop
 
 0. **SURFACE** — prove the required App and Goal surfaces; reject a blocked root
    Goal as `new-root-required`.
-1. **AUTHORIZE** — verify the model policy and obtain the fixed-flow grant.
-2. **SNAPSHOT** — acquire the complete bundle once as temporary data; prepare
+1. **SNAPSHOT** — acquire the complete bundle once as temporary data; prepare
    its canonical bundle and delivery set.
-3. **DELIVERY-PREFLIGHT** — with `references/execution-manifest.md`,
+2. **DELIVERY-PREFLIGHT** — with `references/execution-manifest.md`,
    prepare/run/verify `delivery-preflight` manifest. Require GitHub push/PR
    access, read access to PR lifecycle,
    mergeability/conflicts, and policy visibility; classify CI as `configured`
    or `not-configured`. Unknown or blocked capability returns
    `delivery-preflight-failed` with zero artifacts. `not-configured` is valid.
-4. **INTAKE** — validate/fingerprint the snapshot; resolve profiles and require
+3. **INTAKE** — validate/fingerprint the snapshot, classify every validation
+   through a closed read-only baseline adapter, resolve profiles, and require
    deliveries equal preflight. Convert verified GitHub `owner/repository#N` to
    `https://github.com/owner/repository/issues/N`; use the URL as the claim/task
    source id while preserving the authored ref as evidence.
+4. **AUTHORIZE** — disclose the exact normalized scope/validation plan and
+   obtain the single fixed-flow grant.
 5. **CLAIM** — load `references/run-state.md`; run
    `scripts/active-root-claim --json doctor`; canonicalize repositories and
    sources; acquire before any other artifact. Qualify local refs as
@@ -136,30 +130,32 @@ Goal, task, tracker write, or source mutation was created.
    helper.
 6. **CACHE-MAINTENANCE** — load `references/cache-lifecycle.md`; run its doctor
    and fixed 180-day prune once in the root. Warnings are nonblocking.
-7. **REGISTER** — call `ledger create` with authorization/sources, complete Spec
-   registry, repository deliveries, preflight/CI, fresh portfolio objective,
-   and `portfolio_goal_state=pending`; persist `root_task_title`, then set and
-   observe the calling task title. Reconcile with `get_goal`; otherwise call
-   `create_goal`. Persist active evidence. Never set `token_budget`.
-8. **DISPATCH** — load `references/worker.md`; choose the deterministic static
-   ready set; adopt/create one managed task per Spec with its profile; observe
-   title, assignment fingerprint, and complete delivery checkout map before
-   advancing beyond `created`.
-9. **MONITOR** — after one full post-dispatch snapshot, consume compact deltas
+7. **REGISTER** — call `ledger create` with immutable bundle, authorization,
+   execution-scope fingerprint, sources, deliveries, validation plans,
+   preflight/CI, and fresh objective. Set and observe the root title. Ledger Goal
+   state remains internal `pending`; do not call Goal tools yet.
+8. **BASELINE-DISPATCH** — load `references/worker.md`; adopt/create one managed
+   baseline-only task per Spec, observe title/assignment/full checkout map, and
+   run every registered read-only baseline manifest. No implementation,
+   provider/AutoReview mutation, terminal gate, or root Goal is allowed.
+9. **BASELINE-ACCEPT** — submit one all-delivery/all-validation
+   `implementation-baseline-accepted` CAS. On acceptance, call `create_goal`.
+   Never set `token_budget`; read it back, record activation, and
+   allow tasks to implement. On failure use the typed preimplementation stop.
+10. **MONITOR** — after one full post-dispatch snapshot, consume compact deltas
    until material transition, attention, heartbeat, or workflow deadline. Steer
    with the recorded profile; never pull worker work into root.
-10. **GATE** — load `references/gates.md` and
+11. **GATE** — load `references/gates.md` and
    `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
    scope.
-11. **RECONCILE** — read the smallest ledger projection, refresh changed external
+12. **RECONCILE** — read the smallest ledger projection, refresh changed external
     evidence, atomically apply events, then dispatch, reconcile the fixed review
     wait, or advance one staged closeout transition.
 
-An unchanged controller observation timeout performs only a required claim
-heartbeat. It creates no run-state event or no-progress record. Use a full task
-read only for startup verification, anomaly or blocker diagnosis, and independent terminal
-verification. The worker owns the single bounded provider wait; the root never
+An unchanged observation timeout performs only a claim heartbeat and no event.
+Use a full task read only for startup, anomaly/blocker diagnosis, and terminal
+verification. The worker owns the bounded provider wait; the root never
 polls the same provider in parallel. If the exact review is still pending at
 the 45-minute deadline, persist the required warning evidence and continue
 under the explicit `timeout-accepted` result. The root Goal remains active
@@ -242,7 +238,10 @@ ready-for-review, obtain current-revision review, then configured CI or explicit
 `not-configured` terminal revalidation, and terminal proof.
 Hosted and local issues remain open until a later default-branch merge.
 
-For pre-CLAIM aborts, report evidence and zero mutation. Otherwise return
+For pre-CLAIM aborts, report evidence and zero mutation. For a post-REGISTER
+baseline failure, stop/archive baseline-only tasks, prove no source/Goal/provider
+or AutoReview mutation, release/archive with `preimplementation-abort`, and
+report `planning-required` or `authorization-stale` without another prompt. Otherwise return
 run-state-derived source/title/task/root-Goal/checkout proof, changes, validation,
 commits, PRs/revisions, CI, domain/tracker closeout, current-head mergeability
 and repository-rule evidence, captured domain-closeout evidence, review
@@ -266,7 +265,8 @@ Post-terminal drift blocks archive and never reopens Goals or implementation.
 
 `run-state.md` owns commands, projections, and transitions;
 `run-state-packets.md` owns event fields; `execution-manifest.md` owns bundles,
-command manifests, and receipts.
+command manifests, and receipts; `baseline-validation.md` owns one-grant scope,
+atomic baseline, non-regression, and preimplementation-stop semantics.
 Load `review-thread-resolution.md` only for inline finding ids or stored receipts.
 On exact-revision `request-correlation-failure`, load
 `review-reconciliation.md`.

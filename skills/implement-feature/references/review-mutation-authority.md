@@ -1,5 +1,10 @@
 # Review Mutation Authority
 
+This authority is unavailable while any task has
+`implementation_baseline=pending`. Do not prepare or persist a reservation,
+start a provider call, or invoke GitStack until the atomic baseline is accepted
+and the root Goal is active.
+
 Load this reference before any review provider mutation or its recovery. It is
 the Implement Feature boundary for GitStack's shared pure protocol; it does not
 duplicate GitStack receipts or AutoReview's attempt protocol.

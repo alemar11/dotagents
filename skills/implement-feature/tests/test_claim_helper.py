@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV14Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV15Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -178,12 +178,24 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_assignment_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV14Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV15Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
         registration["sources"][0]["deliveries"][0]["target_branch"] = branch
+        helper.refresh_registration_fingerprints(registration)
         delivery = registration["sources"][0]["deliveries"][0]
+        tree = subprocess.run(
+            ["git", "-C", str(checkout), "rev-parse", "HEAD^{tree}"],
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout.strip()
+        status = subprocess.run(
+            ["git", "-C", str(checkout), "status", "--porcelain=v2", "--untracked-files=all", "-z"],
+            capture_output=True,
+            check=True,
+        ).stdout
         checkout_event = {
             "type": "managed-checkouts-observed",
             "task_key": helper.task_key,
@@ -196,6 +208,9 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "checkout": str(checkout),
                     "git_top_level": str(checkout),
                     "baseline_revision": baseline,
+                    "baseline_tree_sha": tree,
+                    "baseline_status_fingerprint": hashlib.sha256(status).hexdigest(),
+                    "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
                     "isolation_evidence_ref": "app-task://worker-232/worktree",
                 }
             ],
@@ -268,7 +283,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "thinking_reason": "default-medium-fixture",
                     "task_assignment_fingerprint": (
                         hashlib.sha256(
-                            CACHE_TEST_RUNTIME.LedgerCacheV14Tests.task_assignment_objective.encode()
+            CACHE_TEST_RUNTIME.LedgerCacheV15Tests.task_assignment_objective.encode()
                         ).hexdigest()
                         if source_recorded
                         else "none"
@@ -341,7 +356,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         return args
 
     def test_doctor_is_read_only_and_versioned(self) -> None:
-        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "13.0.0")
+        self.assertEqual(run_claim("--version", env=self.env).stdout.strip(), "14.0.0")
         self.assertNotRegex(TOOL.read_text(), r"os\.environ\.get\(.+CLAIM_ROOT")
         self.assertNotIn("--adapter", run_claim("claim", "acquire", "--help", env=self.env).stdout)
         takeover_help = run_claim("claim", "takeover", "--help", env=self.env).stdout
@@ -420,7 +435,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
         release_help = run_claim(
             "claim", "release", "--help", env=self.env
         ).stdout
-        self.assertIn("{terminal}", release_help)
+        self.assertIn("{preimplementation-abort,terminal}", release_help)
         self.assertNotIn("durable-handoff", release_help)
 
         rejected = run_claim(

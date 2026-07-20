@@ -27,6 +27,15 @@ Read `ledger-cache ledger read --projection recovery` only after that gate.
 Before any mutation, read each exact recorded task and require matching Goal
 tools and never create a replacement or objective fallback.
 
+For `implementation_baseline=pending`, recovery is baseline-only. Require
+internal Goal state `pending` and no external Goal, verify immutable bundle,
+authorization and execution-scope fingerprints, exact managed checkout
+revision/tree/status, and every manifest/receipt byte hash. Resume only the same
+baseline-only tasks. Never recapture after source, tool, argv, adapter, policy,
+or scope drift; return `authorization-stale` or execute the typed
+preimplementation abort. Partial baseline evidence grants no implementation
+authority.
+
 ## Complete Freshness Pass
 
 Perform one complete read-only pass:

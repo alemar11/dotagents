@@ -20,6 +20,11 @@ required repository delivery, then atomically record the complete delivery-keyed
 id, checkout path, shared target branch, Git top-level, baseline revision, and
 isolation proof.
 
+Every delivery in every repository participates in the same portfolio-level
+baseline CAS before implementation. One missing or invalid validation row
+rejects all repositories; partial repository acceptance cannot create a Goal or
+grant mutation authority.
+
 If the checkout map is incomplete, abort as blocked before edits. Do not use
 owner checkouts, raw helper worktrees, branch rotation, or one task per child
 repository as fallback.

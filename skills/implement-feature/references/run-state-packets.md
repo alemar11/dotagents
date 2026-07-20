@@ -17,7 +17,10 @@ Use exactly these top-level fields:
 
 | field | value |
 | --- | --- |
-| `schema_version` | `5.0.0` |
+| `schema_version` | `6.0.0` |
+| `bundle_sha256` | SHA-256 of exact immutable execution-bundle bytes |
+| `execution_scope_fingerprint` | canonical complete delivery/path/validation-plan fingerprint |
+| `authorization_fingerprint` | fingerprint of execution scope plus permission evidence |
 | `root_task_ref` | calling App task ref |
 | `root_checkout` | absolute root checkout |
 | `objective` | freshly derived portfolio Goal text containing exact `CI when configured` |
@@ -40,8 +43,15 @@ Each nonempty `deliveries[]` object has exactly:
 
 ```text
 delivery_key, repository, github_repository, target_branch, default_base,
-allowed_paths, ci_availability, preflight_key, preflight_evidence_ref
+allowed_paths, ci_availability, preflight_key, preflight_evidence_ref,
+validation_plan
 ```
+
+Each nonempty `validation_plan[]` row has exactly
+`validation_key`, `command_id`, `adapter`, `policy`,
+`authored_argv_fingerprint`, `projected_argv_fingerprint`, and
+`tool_identities_fingerprint`. Adapter/policy pairs are closed by
+`baseline-validation.md`; callers cannot select a free-form parser or policy.
 
 Keys and `feature_slug` are lower-kebab. `source_id` is the canonical claim/task
 id; `source_spec_ref` preserves the authored ref. `tracker_backend` is `github`
@@ -69,6 +79,8 @@ values are refs or digests, never pasted output.
 | --- | --- |
 | `root-title-observed` | `title`, `evidence_ref` |
 | `portfolio-goal-activated` | `goal_evidence_ref`, `objective_fingerprint` |
+| `implementation-baseline-accepted` | `expected_generation`, `expected_state_fingerprint`, `expected_claim_fingerprint`, `execution_scope_fingerprint`, `baselines`, `evidence_ref` |
+| `portfolio-preimplementation-aborted` | `reason`, `task_stop_evidence`, `evidence_ref` |
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
 | `delivery-preflight-observed` | `task_key`, `delivery_key`, `github_repository`, `target_branch`, `default_base`, `ci_availability`, `preflight_key`, `evidence_ref` |
 | `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref` |
@@ -80,6 +92,8 @@ values are refs or digests, never pasted output.
 | `committed-revision-observed` | `task_key`, `delivery_key`, `target`, `evidence_ref` |
 | `revision-observed` | `task_key`, `delivery_key`, `repository`, `github_repository`, `pr_number`, `pr_url`, `head_sha`, `base_ref`, `merge_base_sha`, `evidence_ref` |
 | `delivery-observed` | `task_key`, `delivery_key`, `revision_key`, `pr`, `committed`, `published`, `evidence_ref` |
+| `validation-nonregression-observed` | `task_key`, `delivery_key`, `validation_key`, `revision_key`, `adapter`, `policy`, `argv_fingerprint`, `tool_identities_fingerprint`, `diagnostics`, `diagnostic_set_fingerprint`, `evidence_ref` |
+| `delivery-scope-observed` | `task_key`, `delivery_key`, `revision_key`, `changed_paths`, `untracked_paths`, `evidence_ref` |
 | `source-moved` | `task_key`, `from_ref`, `to_ref`, `source_fingerprint`, `tracker_repository`, `revision_set_key`, `evidence_ref` |
 | `review-wait-started` | `task_key`, `delivery_key`, `revision_key`, `request_receipt` |
 | `review-wait-invoked` | `task_key`, `delivery_key`, `revision_key`, `request_receipt`, `wait_invoked_at`, `provider_timeout` |
@@ -102,6 +116,14 @@ values are refs or digests, never pasted output.
 exactly `delivery_key`, `repository`, absolute App-managed `checkout`, matching
 absolute `git_top_level`, registered `target_branch`, 40-hex
 `baseline_revision`, and `isolation_evidence_ref`.
+It also has `baseline_tree_sha`, `baseline_status_fingerprint`, and
+`execution_scope_fingerprint`.
+
+Each baseline CAS row has exactly `task_key`, `delivery_key`, `validation_key`,
+absolute `manifest_file`, `manifest_bytes_sha256`, absolute `receipt_file`, and
+`receipt_bytes_sha256`. Its set must equal every registered validation tuple.
+`task_stop_evidence` is sorted complete task coverage with exact `task_key`,
+`task_ref`, and `evidence_ref`.
 
 AutoReview lifecycle details are branch-loaded from `autoreview-fix-loop.md`.
 `revision-observed` binds canonical repository, PR, head, base, and merge base.
@@ -125,6 +147,8 @@ Task states are `pending`, `created`, `implementing`, `validating`, `draft-pr`,
 `preparing-tracker-closeout`, `checking-mergeability`,
 `terminal-sealed`, `merge-ready`, `blocked`, `needs-owner`, and `failed`. Goal
 states are `pending`, `active`, and `complete`.
+`implementation_baseline` is `pending`, `accepted`, `planning-required`, or
+`blocked`; before acceptance, task state may only remain `created`.
 Review provider/disposition values are `waiting|findings|clean|failed` and
 `timeout-accepted|fix-required|accepted|blocked`.
 Nonfailed observations use null failure fields; failed values follow the closed

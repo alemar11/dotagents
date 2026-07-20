@@ -71,6 +71,14 @@ the accepted bundle. The task may not edit the orchestration run state, manage
 sibling or root tasks, change branch or PR strategy, merge, release, deploy,
 perform post-merge closure, or change target-repository instructions.
 
+The action set is dormant during `baseline-only`. In that phase the worker may
+only verify assignment/title/managed-checkout identity and prepare/run/verify
+the registered `baseline-validation` manifests. It remains `created`; it cannot
+edit source, commit, push, reserve provider mutation, reserve/call AutoReview,
+emit gates, mutate trackers, or call Goal tools. The root sends one explicit
+`baseline-accepted` continuation only after the atomic CAS and Goal activation;
+that continuation enables the fixed action set without changing scope.
+
 For a local Markdown issue, the move action is legal only when its tracker-owning
 repository and exact active plus derived `done/` paths are already present in
 the Execution Contract and exposed by the App-managed checkout.
@@ -147,7 +155,8 @@ review and CI evidence and repeats the fixed final gates.
 
 Create the task through the App-managed worktree target before implementation.
 Record one complete `managed-checkouts-observed` map of delivery key,
-repository, checkout, branch, Git top-level, baseline, and isolation. A
+repository, checkout, branch, Git top-level, baseline revision/tree,
+clean-status and execution-scope fingerprints, and isolation. A
 multi-repository Spec remains one task. No task-level checkout/PR/revision exists.
 
 If any checkout is missing or not isolated, stop as blocked. Never create,
@@ -178,7 +187,13 @@ deadlines, leases, and host recovery are outside this contract.
 
 ## Execution
 
-Implement only the accepted bundle and prove substantive acceptance and
+During baseline-only execution, run only the registered read-only projections
+and report exact manifest/receipt byte fingerprints and complete canonical
+diagnostic/content fingerprints. If the projection cannot be proven read-only,
+diagnostics are ambiguous, or identity drifts, report `planning-required` or
+`authorization-stale` and stop without source mutation.
+
+After the root reports atomic acceptance and Goal activation, implement only the accepted bundle and prove substantive acceptance and
 integration. Read the root-prepared canonical bundle manifest, verify its
 digest, and execute only the assigned worker-owned `validation` and `autoreview`
 command ids through `scripts/execution-manifest`; verify each receipt and report
@@ -251,13 +266,18 @@ Own this Feature Spec through pull-request-ready-for-merge-but-not-merged.
 
 Assignment: <canonical source id; authored Feature Spec ref/title; feature slug>
 Managed scope: <delivery, repository, checkout, branch, baseline, allowed paths>
+Execution scope: <bundle, authorization, and execution-scope fingerprints>
 Scope and acceptance: <exact requirements and acceptance refs>
 Dependencies: <verified merged cross-Spec dependencies>
 Validation/integration: <requirements, proof refs, command ids/manifests/digests>
 Knowledge closeout: <exact final-issue delta or none>
 Canonical bundle manifest: <absolute path and manifest/bundle digests>
 
-Verify the exact assignment fingerprint before continuing nonterminal work. If
+Start baseline-only. Verify the exact assignment and checkout fingerprints,
+then run only registered baseline-validation manifests and report their exact
+byte fingerprints plus canonical diagnostics. Do not edit, commit, push,
+reserve provider/AutoReview authority, emit gates, or call a Goal until the root
+reports atomic baseline acceptance and Goal activation. If
 this task is already terminal, report without resuming implementation. Never
 create, read, update, complete, or block a Goal. Work only in the managed
 checkouts. Use fixed actions, persist the GitStack request receipt, and

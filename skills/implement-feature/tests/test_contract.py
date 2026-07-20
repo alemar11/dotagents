@@ -250,6 +250,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/review-reconciliation.md",
             "references/recovery-validation.md",
             "references/multi-repo-workspace.md",
+            "references/baseline-validation.md",
         }
         self.assertTrue(all((ROOT / path).is_file() for path in required))
         self.assertFalse((ROOT / "references/stacked-feature-specs.md").exists())
@@ -260,7 +261,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         ):
             self.assertFalse((ROOT / removed).exists(), removed)
 
-    def test_runtime_surface_gate_precedes_authorization_and_intake(self) -> None:
+    def test_runtime_surface_then_read_only_intake_precede_authorization(self) -> None:
         skill = self.read("SKILL.md")
         surface = skill.index("## Mandatory Runtime Surface Gate")
         authorization = skill.index("## Mandatory Run Authorization")
@@ -268,15 +269,16 @@ class ImplementFeatureContractTests(unittest.TestCase):
         controller = skill.index("## Controller Loop")
 
         self.assertLess(surface, authorization)
-        self.assertLess(authorization, intake)
-        self.assertLess(intake, controller)
-        surface_text = " ".join(skill[surface:authorization].split())
+        self.assertLess(intake, authorization)
+        self.assertLess(authorization, controller)
+        surface_text = " ".join(skill[surface:intake].split())
         self.assertIn("This is the first runtime step", surface_text)
         self.assertIn("visible ChatGPT desktop app task creation", surface_text)
         self.assertIn("App-managed worktree binding", surface_text)
         self.assertIn("without asking permission", surface_text)
         self.assertIn("0. **SURFACE**", skill[controller:])
-        self.assertLess(skill.index("0. **SURFACE**"), skill.index("1. **AUTHORIZE**"))
+        self.assertLess(skill.index("0. **SURFACE**"), skill.index("1. **SNAPSHOT**"))
+        self.assertLess(skill.index("3. **INTAKE**"), skill.index("4. **AUTHORIZE**"))
 
         recovery = " ".join(
             self.read("references/recovery-validation.md").split()
@@ -308,7 +310,11 @@ class ImplementFeatureContractTests(unittest.TestCase):
         options = self.read("references/options.md")
         disclosure = (
             "Each executable Feature Spec is one feature; one plan may create "
-            "multiple visible tasks. This run may change and validate code, push "
+            "multiple visible tasks. The scope summary immediately below lists "
+            "every repository, writable path, and validation command covered by "
+            "this one grant. Before any code change, baseline-only tasks run "
+            "deterministic read-only validation; the root Goal starts only after "
+            "every baseline is accepted together. This run may change and validate code, push "
             "commits, create or update pull requests, address "
             "Codex review, wait for CI when a repository has CI configured, "
             "prepare hosted issue closeout, and move, "
@@ -336,8 +342,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             line.removeprefix("> ") for line in options.splitlines()
         )
         normalized_options = " ".join(normalized_options.split())
-        self.assertIn("standard disclosure, exact question", normalized_skill)
-        self.assertIn("do not improvise them", normalized_skill)
+        self.assertIn("standard disclosure and fixed answers", normalized_skill)
         self.assertIn(disclosure, normalized_options)
         self.assertIn("| Header | `Start work?` |", options)
         self.assertIn(
@@ -393,12 +398,12 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         authorization = " ".join(
             skill.split("## Mandatory Run Authorization", 1)[1]
-            .split("## Fixed Contract", 1)[0]
+            .split("## Controller Loop", 1)[0]
             .split()
         )
         self.assertIn("references/task-model-policy.md", authorization)
-        self.assertIn("exact visible-task model", authorization)
-        self.assertIn("bounded adaptive thinking policy", authorization)
+        self.assertIn("exact model policy", authorization)
+        self.assertIn("normalized repository/path scope", authorization)
         self.assertIn("not another user-controlled field", options)
 
         for text in (policy, worker):
@@ -559,30 +564,21 @@ class ImplementFeatureContractTests(unittest.TestCase):
 
         self.assertLess(
             compact_contract.index("set and observe the calling task title"),
-            compact_contract.index("Goal registration or dispatch"),
-        )
-        self.assertLess(
-            compact_contract.index("`get_goal`"),
-            compact_contract.index("`create_goal`"),
+            compact_contract.index("atomic baseline"),
         )
 
         register = " ".join(
             skill.split("7. **REGISTER**", 1)[1]
-            .split("8. **DISPATCH**", 1)[0]
+            .split("8. **BASELINE-DISPATCH**", 1)[0]
             .split()
         )
         for token in (
-            "complete Spec registry",
-            "root_task_title",
-            "set and observe the calling task title",
-            "portfolio_goal_state=pending",
+            "immutable bundle",
+            "execution-scope fingerprint",
+            "validation plans",
+            "Goal state remains internal `pending`",
         ):
             self.assertIn(token, register)
-        self.assertLess(
-            register.index("root_task_title"),
-            register.index("get_goal"),
-        )
-        self.assertLess(register.index("get_goal"), register.index("create_goal"))
 
         self.assertIn("root_task_title", packets)
         self.assertIn("portfolio_goal_state=pending", packets)
@@ -800,7 +796,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLess(controller.index("5. **CLAIM**"), controller.index("6. **CACHE-MAINTENANCE**"))
         self.assertLess(controller.index("6. **CACHE-MAINTENANCE**"), controller.index("7. **REGISTER**"))
-        self.assertLess(controller.index("7. **REGISTER**"), controller.index("8. **DISPATCH**"))
+        self.assertLess(controller.index("7. **REGISTER**"), controller.index("8. **BASELINE-DISPATCH**"))
 
         for command in (
             "scripts/ledger-cache --json doctor",
@@ -843,7 +839,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertIn("bind validated JSON bytes", normalized_lifecycle)
         self.assertIn("ledger's exact terminal evidence", normalized_lifecycle)
-        self.assertIn("`terminal` is the only active release reason", lifecycle)
+        self.assertIn("permits only `terminal` and", lifecycle)
+        self.assertIn("`preimplementation-abort`", lifecycle)
         self.assertIn("Frozen archive-v1 entries remain readable evidence", normalized_ledger)
         self.assertIn("deterministic Markdown audit report is rendered only during archival", normalized_ledger)
 
@@ -1100,18 +1097,16 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("Goal pause/resume and App heartbeat automation are not part", surface)
         self.assertIn("does not create a task to inspect task-local tools", surface)
         dispatch = " ".join(
-            skill.split("8. **DISPATCH**", 1)[1].split("9. **MONITOR**", 1)[0].split()
+            skill.split("8. **BASELINE-DISPATCH**", 1)[1].split("9. **BASELINE-ACCEPT**", 1)[0].split()
         )
-        self.assertIn("title, assignment fingerprint", dispatch)
-        self.assertIn("before advancing beyond `created`", dispatch)
+        self.assertIn("title/assignment/full checkout map", dispatch)
+        self.assertIn("No implementation", dispatch)
 
         register = " ".join(
-            skill.split("7. **REGISTER**", 1)[1].split("8. **DISPATCH**", 1)[0].split()
+            skill.split("7. **REGISTER**", 1)[1].split("8. **BASELINE-DISPATCH**", 1)[0].split()
         )
-        self.assertLess(
-            register.index("portfolio_goal_state=pending"),
-            register.index("otherwise call `create_goal`"),
-        )
+        self.assertIn("Goal state remains internal `pending`", register)
+        self.assertIn("do not call Goal tools yet", register)
 
         delivery = " ".join(skill.split("## Delivery And Final Report", 1)[1].split())
         closeout_order = (
@@ -1326,7 +1321,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "14.0.0"', helper)
+        self.assertIn('__version__ = "15.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         self.assertIn("review-authority", helper)
         for removed in (
@@ -1338,7 +1333,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v14_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v15_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md") + self.read(
             "references/review-reconciliation.md"
@@ -1346,18 +1341,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "14.0.0"',
-            'LEDGER_SCHEMA_VERSION = "11.0.0"',
-            'REGISTRATION_SCHEMA_VERSION = "5.0.0"',
+            '__version__ = "15.0.0"',
+            'LEDGER_SCHEMA_VERSION = "12.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "6.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("| `schema_version` | `5.0.0` |", packets)
+        self.assertIn("| `schema_version` | `6.0.0` |", packets)
         self.assertIn(
             "exact `{git_common_dir, checkout}` claim map",
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `11.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `12.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)
@@ -1436,7 +1431,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn("never imported", reconciliation)
         self.assertIn("`review-reconciled`", reconciliation)
 
-    def test_v5_registration_packet_registry_matches_the_runtime(self) -> None:
+    def test_v6_registration_packet_registry_matches_the_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md")
         module = ast.parse(helper)
@@ -2130,6 +2125,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/options.md",
             "references/task-model-policy.md",
             "references/spec-backed-delivery.md",
+            "references/baseline-validation.md",
             "references/run-state.md",
             "references/run-state-packets.md",
             "references/cache-lifecycle.md",
@@ -2139,7 +2135,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         )
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            98_449,
+            114_000,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
         # Typed thread resolution stays branch-loaded: the normal successful,
@@ -2147,7 +2143,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         # ceilings at 97,697, 105,005, and 101,718 bytes respectively.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
-            105_757,
+            120_000,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -2157,7 +2153,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            102_498,
+            116_000,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE
