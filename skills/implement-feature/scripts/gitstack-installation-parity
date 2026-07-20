@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Read-only proof that the App-loaded GitStack satisfies Implement Feature."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import pwd
+import stat
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+__version__ = "1.0.0"
+SCHEMA_VERSION = "gitstack-installation-parity:v1"
+EXPECTED_PLUGIN = "gitstack"
+EXPECTED_VERSION = "5.0.0"
+EXPECTED_SKILL = Path("skills/github-review-threads/SKILL.md")
+EXPECTED_CLI_SHA256 = "23f976ac1435963faab8d0762f728ef9248f4141ce58ff9b2c79bfebae3148ef"
+
+
+class ParityError(Exception):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+
+
+def canonical(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def system_home() -> Path:
+    return Path(pwd.getpwuid(os.getuid()).pw_dir)
+
+
+def reject_symlinks(path: Path, root: Path) -> None:
+    try:
+        relative = path.relative_to(root)
+    except ValueError as exc:
+        raise ParityError("gitstack-installation-mismatch", "loaded skill escapes the installed GitStack root") from exc
+    current = root
+    for part in relative.parts:
+        current = current / part
+        try:
+            mode = current.lstat().st_mode
+        except OSError as exc:
+            raise ParityError("gitstack-installation-mismatch", "loaded GitStack artifact is missing") from exc
+        if stat.S_ISLNK(mode):
+            raise ParityError("gitstack-installation-mismatch", "loaded GitStack path contains a symlink")
+
+
+def verify(loaded_skill_path: str | None, *, home: Path | None = None) -> dict[str, object]:
+    if not loaded_skill_path:
+        raise ParityError("unsupported-runtime", "App did not provide the loaded GitStack bundled-skill path")
+    home = system_home() if home is None else home
+    root = home / ".codex/plugins/cache/alemar11/gitstack/5.0.0"
+    supplied = Path(loaded_skill_path)
+    if not supplied.is_absolute():
+        raise ParityError("unsupported-runtime", "App-provided loaded GitStack skill path must be absolute")
+    try:
+        reject_symlinks(supplied, root)
+        skill = supplied.resolve(strict=True)
+        expected_skill = (root / EXPECTED_SKILL).resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise ParityError("gitstack-installation-mismatch", "required installed GitStack artifact is missing") from exc
+    if skill != expected_skill or not skill.is_file():
+        raise ParityError("gitstack-installation-mismatch", "loaded skill is not the expected GitStack review-thread skill")
+    if root.is_symlink():
+        raise ParityError("gitstack-installation-mismatch", "installed GitStack root is not canonical")
+
+    manifest_path = root / ".codex-plugin/plugin.json"
+    package_path = root / "projects/gitstack/pyproject.toml"
+    cli_path = root / "scripts/gitstack"
+    reject_symlinks(manifest_path, root)
+    reject_symlinks(package_path, root)
+    reject_symlinks(cli_path, root)
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        package = tomllib.loads(package_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
+        raise ParityError("gitstack-installation-mismatch", "installed GitStack metadata is unreadable") from exc
+    manifest_version = manifest.get("version") if manifest.get("name") == EXPECTED_PLUGIN else None
+    package_version = ((package.get("project") or {}).get("version"))
+    try:
+        cli_version = subprocess.run([str(cli_path), "--version"], check=False, text=True, capture_output=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ParityError("gitstack-installation-mismatch", "installed GitStack CLI cannot report its version") from exc
+    cli_sha256 = hashlib.sha256(cli_path.read_bytes()).hexdigest()
+    values = (manifest_version, package_version, cli_version)
+    if any(value != EXPECTED_VERSION for value in values) or cli_sha256 != EXPECTED_CLI_SHA256:
+        raise ParityError("gitstack-installation-mismatch", "installed GitStack is not the required 5.0.0 runtime artifact")
+    evidence = {
+        "schema_version": SCHEMA_VERSION,
+        "plugin_name": EXPECTED_PLUGIN,
+        "plugin_root": str(root),
+        "loaded_skill_path": str(skill),
+        "manifest_version": manifest_version,
+        "package_version": package_version,
+        "cli_version": cli_version,
+        "cli_sha256": cli_sha256,
+    }
+    evidence["fingerprint"] = hashlib.sha256(canonical(evidence).encode()).hexdigest()
+    return evidence
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Verify the App-loaded GitStack 5.0.0 artifact.")
+    parser.add_argument("--version", action="version", version=__version__)
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("verify", nargs="?")
+    parser.add_argument("--loaded-skill-path")
+    args = parser.parse_args(argv)
+    try:
+        evidence = verify(args.loaded_skill_path)
+        payload = {"ok": True, "evidence": evidence}
+        code = 0
+    except ParityError as exc:
+        payload = {"ok": False, "error": {"code": exc.code, "message": exc.message}}
+        code = 2
+    if args.json:
+        print(canonical(payload))
+    elif code:
+        print(payload["error"]["message"], file=sys.stderr)
+    else:
+        print(evidence["fingerprint"])
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

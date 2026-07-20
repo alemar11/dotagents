@@ -53,6 +53,8 @@ Every response has exactly `ok`, `command`, `controller_schema_version`,
 The controller never launches a task or model, mutates a provider, grants Goal
 or worktree authority, or selects merge, enqueue, deploy, or post-merge work.
 Its template is validated selection data, not launch authority.
+The registered GitStack installation evidence is immutable controller context;
+the controller never replaces it with source-checkout or caller-provided data.
 
 Owned GitStack and AutoReview actions expose only their owner/operation identity,
 immutable authority binding, generic evidence descriptors, accepted result,

@@ -167,7 +167,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "Implement the registered Feature Spec portfolio with CI when configured"
         )
         registration = {
-            "schema_version": "7.0.0",
+            "schema_version": "8.0.0",
             "bundle_sha256": hashlib.sha256(b"bundle-fixture").hexdigest(),
             "execution_scope_fingerprint": "0" * 64,
             "authorization_fingerprint": "0" * 64,
@@ -176,6 +176,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
             "objective": objective,
             "objective_fingerprint": hashlib.sha256(objective.encode()).hexdigest(),
             "permission_evidence_ref": "user-message://authorized-visible-tasks",
+            "gitstack_installation_evidence": self.gitstack_installation_evidence(),
             "repositories": claim["repositories"],
             "repository_checkouts": claim["repository_checkouts"],
             "sources": [
@@ -266,8 +267,23 @@ class LedgerCacheV18Tests(unittest.TestCase):
             {
                 "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
                 "permission_evidence_ref": registration["permission_evidence_ref"],
+                "gitstack_installation_fingerprint": registration["gitstack_installation_evidence"]["fingerprint"],
             }
         )
+
+    def gitstack_installation_evidence(self) -> dict:
+        evidence = {
+            "schema_version": "gitstack-installation-parity:v1",
+            "plugin_name": "gitstack",
+            "plugin_root": "/installed/gitstack/5.0.0",
+            "loaded_skill_path": "/installed/gitstack/5.0.0/skills/github-review-threads/SKILL.md",
+            "manifest_version": "5.0.0",
+            "package_version": "5.0.0",
+            "cli_version": "5.0.0",
+            "cli_sha256": hashlib.sha256(b"gitstack-cli").hexdigest(),
+        }
+        evidence["fingerprint"] = CACHE_RUNTIME.request_fingerprint(evidence)
+        return evidence
 
     def install_takeover_evidence(
         self,

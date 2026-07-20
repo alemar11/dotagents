@@ -3,7 +3,7 @@
   "controller_schema_version": "2.0.0",
   "template_schema_version": "2.0.0",
   "ledger_schema_version": "15.0.0",
-  "registration_schema_version": "7.0.0",
+  "registration_schema_version": "8.0.0",
   "registry": [
     ["reconcile-command-attempt", 1, "operation-recovery", "root-orchestrator", "execution-command", 3],
     ["execute-gitstack-mutation-reconciliation", 2, "operation-recovery", "root-orchestrator", "owned-operation", 3],

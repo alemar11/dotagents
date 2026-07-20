@@ -15,7 +15,7 @@ missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
 Active state accepts only ledger schema `15.0.0` created from registration
-schema `7.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
+schema `8.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
 remain byte-identical cold evidence that can only be read, verified, or pruned.
@@ -254,7 +254,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `15.0.0`, any registration schema before `7.0.0`, or any
+JSON schema before `15.0.0`, any registration schema before `8.0.0`, or any
 legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses

@@ -23,7 +23,7 @@ from typing import Any, Iterator
 
 __version__ = "20.0.0"
 LEDGER_SCHEMA_VERSION = "15.0.0"
-REGISTRATION_SCHEMA_VERSION = "7.0.0"
+REGISTRATION_SCHEMA_VERSION = "8.0.0"
 DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "1.0.0"
 CONTROLLER_PROJECTION_SCHEMA_VERSION = "2.0.0"
 CONTROLLER_TEMPLATE_SCHEMA_VERSION = "2.0.0"
@@ -1265,6 +1265,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         "objective",
         "objective_fingerprint",
         "permission_evidence_ref",
+        "gitstack_installation_evidence",
         "repositories",
         "repository_checkouts",
         "sources",
@@ -1296,6 +1297,25 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     permission = nonempty(
         registration["permission_evidence_ref"], "registration.permission_evidence_ref"
     )
+    gitstack_evidence = exact_object(
+        registration["gitstack_installation_evidence"],
+        {
+            "schema_version", "plugin_name", "plugin_root", "loaded_skill_path",
+            "manifest_version", "package_version", "cli_version", "cli_sha256", "fingerprint",
+        },
+        "registration.gitstack_installation_evidence",
+    )
+    if gitstack_evidence["schema_version"] != "gitstack-installation-parity:v1":
+        raise CacheError("invalid-input", "GitStack installation evidence schema is unsupported", 2)
+    for field in ("manifest_version", "package_version", "cli_version"):
+        if gitstack_evidence[field] != "5.0.0":
+            raise CacheError("invalid-input", "GitStack installation evidence version is invalid", 2)
+    for field in ("cli_sha256", "fingerprint"):
+        canonical_fingerprint(gitstack_evidence[field], f"registration.gitstack_installation_evidence.{field}")
+    evidence_payload = dict(gitstack_evidence)
+    evidence_fingerprint = evidence_payload.pop("fingerprint")
+    if request_fingerprint(evidence_payload) != evidence_fingerprint:
+        raise CacheError("invalid-input", "GitStack installation evidence fingerprint does not match", 2)
     repositories = registration["repositories"]
     checkouts = registration["repository_checkouts"]
     if repositories != claim["repositories"] or checkouts != claim["repository_checkouts"]:
@@ -1682,7 +1702,8 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     if request_fingerprint(scope_payload) != execution_scope_fingerprint:
         raise CacheError("state-conflict", "registration execution scope fingerprint does not match", 4)
     if request_fingerprint(
-        {"execution_scope_fingerprint": execution_scope_fingerprint, "permission_evidence_ref": permission}
+        {"execution_scope_fingerprint": execution_scope_fingerprint, "permission_evidence_ref": permission,
+         "gitstack_installation_fingerprint": evidence_fingerprint}
     ) != authorization_fingerprint:
         raise CacheError("state-conflict", "registration authorization fingerprint does not match", 4)
     return {
@@ -1694,6 +1715,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
         "objective": objective,
         "objective_fingerprint": objective_fingerprint,
         "permission_evidence_ref": permission,
+        "gitstack_installation_evidence": gitstack_evidence,
         "repositories": repositories,
         "repository_checkouts": checkouts,
         "sources": normalized_sources,
@@ -1779,7 +1801,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             value["authorization"],
             {
                 "visible_app_task_permission", "evidence_ref", "bundle_sha256",
-                "execution_scope_fingerprint", "authorization_fingerprint",
+                "execution_scope_fingerprint", "authorization_fingerprint", "gitstack_installation_evidence",
             },
             "run_state.authorization",
         )
@@ -3532,6 +3554,7 @@ def new_state(
             "bundle_sha256": registration["bundle_sha256"],
             "execution_scope_fingerprint": registration["execution_scope_fingerprint"],
             "authorization_fingerprint": registration["authorization_fingerprint"],
+            "gitstack_installation_evidence": registration["gitstack_installation_evidence"],
         },
         "goal": {
             "state": "pending",

@@ -882,7 +882,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn('CONTROLLER_TEMPLATE_SCHEMA_VERSION = "2.0.0"', helper)
         self.assertIn('LEDGER_SCHEMA_VERSION = "15.0.0"', helper)
         self.assertIn('__version__ = "20.0.0"', helper)
-        self.assertIn('REGISTRATION_SCHEMA_VERSION = "7.0.0"', helper)
+        self.assertIn('REGISTRATION_SCHEMA_VERSION = "8.0.0"', helper)
         self.assertIn("owned-operation-started", helper)
         self.assertIn("validate_owned_artifact", helper)
         for retired_runtime in (
@@ -1896,10 +1896,10 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for constant in (
             '__version__ = "20.0.0"',
             'LEDGER_SCHEMA_VERSION = "15.0.0"',
-            'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
+            'REGISTRATION_SCHEMA_VERSION = "8.0.0"',
         ):
             self.assertIn(constant, helper)
-        self.assertIn("Registration schema is exactly `7.0.0`", packets)
+        self.assertIn("Registration schema is exactly `8.0.0`", packets)
         self.assertIn(
             "claim-identical Git common directories",
             packets,

@@ -421,18 +421,25 @@ class SessionReplayTests(unittest.TestCase):
             permission = "user-message://schema12-replay-authorized"
             objective = "Implement replay Feature Spec with CI when configured"
             registration = {
-                "schema_version": "7.0.0",
+                "schema_version": "8.0.0",
                 "bundle_sha256": bundle_sha,
                 "execution_scope_fingerprint": execution_scope,
                 "authorization_fingerprint": fingerprint({
                     "execution_scope_fingerprint": execution_scope,
                     "permission_evidence_ref": permission,
+                    "gitstack_installation_fingerprint": "1" * 64,
                 }),
                 "root_task_ref": "app-task://replay-root",
                 "root_checkout": str(repository),
                 "objective": objective,
                 "objective_fingerprint": hashlib.sha256(objective.encode()).hexdigest(),
                 "permission_evidence_ref": permission,
+                "gitstack_installation_evidence": {
+                    "schema_version": "gitstack-installation-parity:v1", "plugin_name": "gitstack",
+                    "plugin_root": "/installed/gitstack/5.0.0", "loaded_skill_path": "/installed/gitstack/5.0.0/skills/github-review-threads/SKILL.md",
+                    "manifest_version": "5.0.0", "package_version": "5.0.0", "cli_version": "5.0.0",
+                    "cli_sha256": "2" * 64, "fingerprint": "1" * 64,
+                },
                 "repositories": claim["repositories"],
                 "repository_checkouts": claim["repository_checkouts"],
                 "sources": [{
@@ -455,6 +462,13 @@ class SessionReplayTests(unittest.TestCase):
                     "task_assignment_fingerprint": hashlib.sha256(b"assignment").hexdigest(),
                 }],
             }
+            evidence = registration["gitstack_installation_evidence"]
+            evidence["fingerprint"] = fingerprint({key: value for key, value in evidence.items() if key != "fingerprint"})
+            registration["authorization_fingerprint"] = fingerprint({
+                "execution_scope_fingerprint": execution_scope,
+                "permission_evidence_ref": permission,
+                "gitstack_installation_fingerprint": evidence["fingerprint"],
+            })
             created = invoke(
                 LEDGER_CACHE,
                 "--json", "ledger", "create", "--ledger", str(ledger),

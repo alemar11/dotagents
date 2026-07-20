@@ -1,7 +1,8 @@
 # Root Bootstrap
 
 This file owns the complete pre-registration order. It applies only after the
-runtime surface gate in `SKILL.md` passes and before the ledger exists.
+runtime surface and installed GitStack parity gates in `SKILL.md` pass and before
+the ledger exists.
 
 ## Closed Contract Selection
 
@@ -63,7 +64,8 @@ wait. Never serialize, force-bind, or schedule around a duplicate executable
 Render the deterministic complete scope summary and ask the single question
 owned by `options.md`. A grant binds the exact execution-scope fingerprint.
 
-Run `active-root-claim --json doctor`, canonicalize repository and source
+Carry the verified GitStack installation evidence and fingerprint during
+registration. Run `active-root-claim --json doctor`, canonicalize repository and source
 identities, and acquire the complete portfolio claim before cache or ledger
 mutation. Qualify local refs with their Git common directory. A live overlap is
 `needs-owner`; a stale conflict follows the separately authorized takeover

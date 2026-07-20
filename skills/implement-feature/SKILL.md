@@ -20,6 +20,11 @@ capability returns `unsupported-runtime`; a blocked root Goal returns
 mutation. Goal pause/resume and App heartbeat automation are outside this
 runtime. Do not create a task to inspect capabilities.
 
+Immediately after that App surface gate, run the installed GitStack parity gate
+in `references/gitstack-installation-parity.md` using the exact bundled-skill
+path supplied by the App/system skill catalog. Failure stops before source reads,
+permission, claim, artifacts, tasks, Goals, or mutation.
+
 After read-only intake succeeds, use the exact disclosure and fixed answers in
 `references/options.md`. Continue only with
 `visible_app_task_permission=granted-by-authorized-user`. The grant binds the
