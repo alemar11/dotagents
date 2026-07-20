@@ -1098,7 +1098,7 @@ def signal_owned_group(
     members, escaped, identities = owned_processes(pgid, pgid, known_identities)
     try:
         child_state = os.waitid(os.P_PID, pgid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
-    except (ChildProcessError, ProcessLookupError, PermissionError):
+    except (AttributeError, ChildProcessError, ProcessLookupError, PermissionError):
         child_state = None
     if child_state is not None and members == [pgid] and not escaped:
         return [], identities
@@ -1109,12 +1109,14 @@ def signal_owned_group(
             verified.append(pid)
     if pgid in members and pgid not in verified:
         try:
-            live_child = os.waitid(os.P_PID, pgid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
-            if live_child is None and os.getpgid(pgid) == pgid:
-                verified.append(pgid)
-        except (ChildProcessError, ProcessLookupError, PermissionError):
-            pass
-    if members and not verified:
+            exited_child = os.waitid(os.P_PID, pgid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        except (AttributeError, ChildProcessError, ProcessLookupError, PermissionError):
+            exited_child = None
+        if exited_child is not None:
+            fresh_members, fresh_escaped, fresh_identities = owned_processes(pgid, pgid, identities)
+            if not fresh_members and not fresh_escaped:
+                return [], fresh_identities
+    if any(pid not in verified for pid in members):
         raise ManifestError(
             "process-identity-unverifiable",
             "owned process identities cannot be matched safely",

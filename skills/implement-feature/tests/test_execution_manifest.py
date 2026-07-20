@@ -649,6 +649,50 @@ class ExecutionManifestTests(unittest.TestCase):
                     cli.signal_owned_group(999999, {999999: "f" * 64}, signal.SIGTERM)
             self.assertEqual(mismatch.exception.code, "process-identity-unverifiable")
 
+    def test_signal_owned_group_accepts_only_confirmed_exit_with_empty_fresh_census(self) -> None:
+        pgid = 999999
+        identity = "f" * 64
+        initial = ([pgid], [], {pgid: identity})
+        scenarios = {
+            "clean-exit": ([[], [], {pgid: identity}], False),
+            "remaining-member": ([[999998], [], {pgid: identity, 999998: identity}], True),
+            "escaped-descendant": ([[], [999998], {pgid: identity}], True),
+        }
+        for name, (fresh, should_fail) in scenarios.items():
+            with self.subTest(name=name), \
+                mock.patch.object(cli, "owned_processes", side_effect=[initial, tuple(fresh)]), \
+                mock.patch.object(cli, "process_start_identity", return_value=None), \
+                mock.patch.object(cli.os, "waitid", side_effect=[None, object()]), \
+                mock.patch.object(cli.os, "killpg") as killpg:
+                if should_fail:
+                    with self.assertRaises(cli.ManifestError) as raised:
+                        cli.signal_owned_group(pgid, {pgid: identity}, signal.SIGTERM)
+                    self.assertEqual(raised.exception.code, "process-identity-unverifiable")
+                else:
+                    members, identities = cli.signal_owned_group(pgid, {pgid: identity}, signal.SIGTERM)
+                    self.assertEqual(members, [])
+                    self.assertEqual(identities, {pgid: identity})
+                killpg.assert_not_called()
+
+        with mock.patch.object(cli, "owned_processes", return_value=initial), \
+            mock.patch.object(cli, "process_start_identity", return_value=None), \
+            mock.patch.object(cli.os, "waitid", return_value=None), \
+            mock.patch.object(cli.os, "killpg") as killpg:
+            with self.assertRaises(cli.ManifestError) as ambiguous:
+                cli.signal_owned_group(pgid, {pgid: identity}, signal.SIGTERM)
+        self.assertEqual(ambiguous.exception.code, "process-identity-unverifiable")
+        killpg.assert_not_called()
+
+        member_identity = "e" * 64
+        with mock.patch.object(cli, "owned_processes", return_value=([pgid, 999998], [], {pgid: identity, 999998: member_identity})), \
+            mock.patch.object(cli, "process_start_identity", side_effect=[None, member_identity]), \
+            mock.patch.object(cli.os, "waitid", return_value=None), \
+            mock.patch.object(cli.os, "killpg") as killpg:
+            with self.assertRaises(cli.ManifestError) as mixed_identity:
+                cli.signal_owned_group(pgid, {pgid: identity}, signal.SIGTERM)
+        self.assertEqual(mixed_identity.exception.code, "process-identity-unverifiable")
+        killpg.assert_not_called()
+
     def test_claim_loss_cancellation_requires_current_typed_ledger_authority(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
