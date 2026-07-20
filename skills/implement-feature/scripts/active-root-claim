@@ -612,6 +612,7 @@ def validate_task_adoption(
     *,
     verify_checkouts: bool,
     require_task_profile: bool = True,
+    require_task_observation: bool = True,
 ) -> dict[str, Any]:
     required = {
         "root_id",
@@ -673,8 +674,10 @@ def validate_task_adoption(
                 ledger = json.loads(ledger_path.read_text())
             except (OSError, json.JSONDecodeError) as exc:
                 raise ClaimError("state-conflict", "takeover ledger is unreadable", 4) from exc
-            if not isinstance(ledger, dict) or ledger.get("schema_version") != "13.0.0":
+            if not isinstance(ledger, dict) or ledger.get("schema_version") != "14.0.0":
                 raise ClaimError("state-conflict", "takeover ledger schema is unsupported", 4)
+            if not isinstance(value["specs"], list) or not isinstance(ledger.get("tasks"), list):
+                raise ClaimError("invalid-input", "task adoption or takeover ledger tasks are invalid", 2)
             for task in ledger.get("tasks", []):
                 for delivery in task.get("deliveries", []):
                     for attempt in delivery.get("command_attempts", []):
@@ -806,6 +809,46 @@ def validate_task_adoption(
                 "actual": sorted(seen_sources),
             },
         )
+    if verify_checkouts and require_task_observation:
+        ledger_path = Path(canonical_ledger_ref(claim["ledger_ref"], persisted=True))
+        ledger_present = ledger_path.exists()
+        ledger_tasks: dict[str, dict[str, Any]] = {}
+        if ledger_present:
+            try:
+                ledger = json.loads(ledger_path.read_text())
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ClaimError("state-conflict", "takeover ledger is unreadable", 4) from exc
+            ledger_tasks = {
+                task.get("source_spec_ref"): task
+                for task in ledger.get("tasks", [])
+                if isinstance(task, dict)
+            }
+        recorded_specs = [
+            spec for spec in normalized_specs if spec["task_state"] == "recorded"
+        ]
+        if recorded_specs and not ledger_present:
+            raise ClaimError(
+                "state-conflict",
+                "takeover requires the latest accepted full-read task observation",
+                4,
+            )
+        for spec in recorded_specs:
+            task = ledger_tasks.get(spec["source_spec_ref"])
+            observation = task.get("current_observation") if task else None
+            if (
+                not isinstance(observation, dict)
+                or observation.get("observation_kind") != "full-read"
+                or observation.get("read_scope") != "eof"
+                or observation.get("task_ref") != spec["task_ref"]
+                or not isinstance(observation.get("observation_fingerprint"), str)
+                or not FINGERPRINT_RE.fullmatch(observation["observation_fingerprint"])
+            ):
+                raise ClaimError(
+                    "state-conflict",
+                    "takeover requires the latest accepted EOF full-read task observation",
+                    4,
+                    {"source_spec_ref": spec["source_spec_ref"]},
+                )
     return {
         "root_id": root_id,
         "claim_fingerprint": claim_fingerprint,
@@ -1540,7 +1583,8 @@ def takeover(args: argparse.Namespace) -> dict[str, Any]:
         replaced_evidence: list[dict[str, Any]] = []
         for root_id in expected:
             adoption = validate_task_adoption(
-                task_adoptions[root_id], claims[root_id], verify_checkouts=True
+                task_adoptions[root_id], claims[root_id], verify_checkouts=True,
+                require_task_observation=False,
             )
             if adoption["task_termination_evidence"] != expected_task_terminations[root_id]:
                 raise ClaimError(
@@ -1559,6 +1603,11 @@ def takeover(args: argparse.Namespace) -> dict[str, Any]:
         validate_candidate_adoption_uniqueness(
             [item["task_adoption"] for item in replaced_evidence]
         )
+        for item in replaced_evidence:
+            root_id = item["claim_snapshot"]["root_id"]
+            item["task_adoption"] = validate_task_adoption(
+                task_adoptions[root_id], claims[root_id], verify_checkouts=True
+            )
         takeover_evidence = {
             "stale_claim_takeover_permission": args.takeover_permission,
             "takeover_reason": args.takeover_reason,

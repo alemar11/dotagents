@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v16 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v17 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -14,7 +14,7 @@ helper also requires a regular, non-symlinked state root and shared lock; a
 missing lock or unsafe path fails closed. Filesystem `EACCES`, `EPERM`, and
 `EROFS` report `claim-store-unavailable`; they are not corruption evidence.
 
-Active state accepts only ledger schema `13.0.0` created from registration
+Active state accepts only ledger schema `14.0.0` created from registration
 schema `7.0.0`. Active Markdown, earlier JSON schemas, aliases, unknown fields,
 invalid paths, and invalid transitions block as `unsupported-active-ledger`. Do not import, migrate,
 rename, dual-read, dual-write, retire, or delete them. Frozen archive-v1 entries
@@ -112,7 +112,6 @@ the delivery key plus its delivery evidence binding; `task-revision-set` uses
 the complete set key with no delivery. The delivery evidence key binds its
 revision key and preflight key. The task set contains every delivery evidence
 key once. CI is inapplicable only for `not-configured`.
-
 A changed revision, preflight/CI state, diff, PR identity, rule, or tracker
 delivery invalidates affected delivery and task-set gates. AutoReview is
 reusable only for an unchanged complete target; unknown or pending truth blocks.
@@ -234,7 +233,7 @@ clock; a projection never persists or invents an `overdue` fact.
 ## Hard Cut
 
 There is no compatibility path or migration for active Markdown or any active
-JSON schema before `13.0.0`, any registration schema before `7.0.0`, or any
+JSON schema before `14.0.0`, any registration schema before `7.0.0`, or any
 legacy active claim adoption.
 Frozen archive-v1 entries remain readable evidence only. The deterministic
 Markdown audit report is rendered only during archival. Terminal archival uses

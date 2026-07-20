@@ -336,7 +336,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
         operation_id: str,
     ) -> tuple[str, ...]:
         assert self.claim is not None
-        packet = self.write_packet(events, "events")
+        packet = self.write_packet(self.bind_decision_events(events), "events")
         return (
             "--json",
             "ledger",
@@ -399,7 +399,41 @@ class LedgerCacheV15Tests(unittest.TestCase):
         model: str = "gpt-5.6-sol",
         reasoning_effort: str = "xhigh",
         assignment_fingerprint: str | None = None,
+        read_scope: str = "eof",
+        anchor_observation_fingerprint: str | None = None,
+        anchor_marker_id: str | None = None,
     ) -> dict:
+        state_snapshot = self.state()
+        marker = f"{state_snapshot['generation']}-{state}"
+        content_fingerprint = CACHE_RUNTIME.request_fingerprint(
+            {
+                "task_ref": "app-task://worker-232",
+                "state": state,
+                "marker": marker,
+            }
+        )
+        page_chain_fingerprint = CACHE_RUNTIME.request_fingerprint(
+            {"read": read_scope, "marker": marker, "content": content_fingerprint}
+        )
+        observation = {
+            "observation_kind": "full-read",
+            "task_ref": "app-task://worker-232",
+            "host_id": "host-implement-feature",
+            "wait_cursor": f"opaque-wait-{state_snapshot['generation']}",
+            "read_scope": read_scope,
+            "anchor_observation_fingerprint": anchor_observation_fingerprint,
+            "anchor_marker_id": anchor_marker_id,
+            "latest_turn_id": f"turn-{marker}",
+            "latest_message_id": f"message-{marker}",
+            "latest_tool_marker_id": f"tool-{marker}",
+            "observed_status": state,
+            "content_fingerprint": content_fingerprint,
+            "page_chain_fingerprint": page_chain_fingerprint,
+            "observed_at": state_snapshot["updated_at"],
+            "base_generation": state_snapshot["generation"],
+            "base_head": state_snapshot["content_fingerprint"],
+        }
+        observation["observation_fingerprint"] = CACHE_RUNTIME.full_read_observation_fingerprint(observation)
         return {
             "type": "task-observed",
             "task_key": self.task_key,
@@ -418,7 +452,29 @@ class LedgerCacheV15Tests(unittest.TestCase):
             ),
             "attention_reason": None,
             "summary_ref": "app-task://worker-232/summary",
+            "observation": observation,
         }
+
+    def bind_decision_event(self, event: dict, state: dict | None = None) -> dict:
+        bound = copy.deepcopy(event)
+        event_type = bound.get("type")
+        state = state or self.state()
+        if (
+            event_type in CACHE_RUNTIME.TASK_OBSERVATION_BOUND_EVENTS
+            and "task_observation_fingerprint" not in bound
+        ):
+            task = next(
+                item for item in state["tasks"] if item["task_key"] == bound.get("task_key")
+            )
+            observation = task["current_observation"]
+            if observation is not None:
+                bound["task_observation_fingerprint"] = observation[
+                    "observation_fingerprint"
+                ]
+        return bound
+
+    def bind_decision_events(self, events: list[dict]) -> list[dict]:
+        return [self.bind_decision_event(event) for event in events]
 
     def checkout_event(self) -> dict:
         assert self.registration is not None
@@ -616,6 +672,188 @@ class LedgerCacheV15Tests(unittest.TestCase):
         self.assertEqual(task["state"], "implementing")
         self.assertIsNone(task["dependency_wait"])
         self.assertNotEqual(task["state"], "blocked")
+
+    def test_full_read_proof_is_bounded_replay_safe_and_cas_bound(self) -> None:
+        self.acquire()
+        self.create()
+        first = self.task_event(state="created")
+        self.apply([self.checkout_event(), first])
+        state = self.state()
+        observation = state["tasks"][0]["current_observation"]
+        self.assertIsNotNone(observation)
+        assert observation is not None
+        self.assertEqual(observation["observation_kind"], "full-read")
+        self.assertIn("wait_cursor", observation)
+        self.assertNotIn("read_cursor", observation)
+        self.assertEqual(observation["read_scope"], "eof")
+        self.assertIsNone(observation["anchor_observation_fingerprint"])
+        self.assertIsNone(observation["anchor_marker_id"])
+        self.assertEqual(
+            observation["observation_fingerprint"],
+            CACHE_RUNTIME.full_read_observation_fingerprint(observation),
+        )
+
+        before = self.ledger.read_bytes()
+        compact = copy.deepcopy(first)
+        compact["observation"]["observation_kind"] = "compact"
+        rejected_compact = self.apply([compact], check=False)
+        self.error(rejected_compact, "invalid-input")
+        self.assertEqual(self.ledger.read_bytes(), before)
+
+        pagination_cursor = copy.deepcopy(first)
+        pagination_cursor["observation"]["read_cursor"] = "read-page-2"
+        rejected_cursor = self.apply([pagination_cursor], check=False)
+        self.error(rejected_cursor, "invalid-input")
+        self.assertEqual(self.ledger.read_bytes(), before)
+
+        duplicate = parse_result(self.apply([first], operation_id=self.next_operation_id()))
+        self.assertEqual(duplicate["mutation_state"], "unchanged")
+        self.assertEqual(self.ledger.read_bytes(), before)
+
+        conflicting = copy.deepcopy(first)
+        conflicting["observation"]["content_fingerprint"] = "0" * 64
+        conflicting["observation"]["observation_fingerprint"] = (
+            CACHE_RUNTIME.full_read_observation_fingerprint(conflicting["observation"])
+        )
+        rejected_conflict = self.apply(
+            [conflicting], operation_id=self.next_operation_id(), check=False
+        )
+        self.error(rejected_conflict, "state-conflict")
+        self.assertEqual(self.ledger.read_bytes(), before)
+
+        stale = self.task_event(state="created")
+        stale["observation"]["base_generation"] -= 1
+        rejected_stale = self.apply(
+            [stale], operation_id=self.next_operation_id(), check=False
+        )
+        self.error(rejected_stale, "state-conflict")
+        self.assertEqual(self.ledger.read_bytes(), before)
+
+        # An unrelated durable append does not invalidate the accepted proof.
+        self.apply([self.baseline_acceptance_event()])
+        replay_after_unrelated = parse_result(
+            self.apply([first], operation_id=self.next_operation_id())
+        )
+        self.assertEqual(replay_after_unrelated["mutation_state"], "unchanged")
+
+    def test_full_read_scope_requires_eof_or_exact_prior_anchor(self) -> None:
+        self.acquire()
+        self.create()
+
+        initial_anchored = self.task_event(
+            state="created",
+            read_scope="anchored",
+            anchor_observation_fingerprint="a" * 64,
+            anchor_marker_id="turn-initial",
+        )
+        rejected_initial = self.apply(
+            [self.checkout_event(), initial_anchored], check=False
+        )
+        self.error(rejected_initial, "state-conflict")
+        self.assertIsNone(self.state()["tasks"][0]["current_observation"])
+
+        initial_eof = self.task_event(state="created")
+        self.apply([self.checkout_event(), initial_eof])
+        prior = self.state()["tasks"][0]["current_observation"]
+        assert prior is not None
+
+        missing_anchor = self.task_event(
+            state="created",
+            read_scope="anchored",
+            anchor_observation_fingerprint=None,
+            anchor_marker_id=prior["latest_turn_id"],
+        )
+        rejected_missing_anchor = self.apply(
+            [missing_anchor], operation_id=self.next_operation_id(), check=False
+        )
+        self.error(rejected_missing_anchor, "state-conflict")
+
+        wrong_anchor_fingerprint = self.task_event(
+            state="created",
+            read_scope="anchored",
+            anchor_observation_fingerprint="b" * 64,
+            anchor_marker_id=prior["latest_turn_id"],
+        )
+        rejected_wrong_fingerprint = self.apply(
+            [wrong_anchor_fingerprint],
+            operation_id=self.next_operation_id(),
+            check=False,
+        )
+        self.error(rejected_wrong_fingerprint, "state-conflict")
+
+        wrong_anchor_marker = self.task_event(
+            state="created",
+            read_scope="anchored",
+            anchor_observation_fingerprint=prior["observation_fingerprint"],
+            anchor_marker_id="turn-not-from-prior",
+        )
+        rejected_wrong_marker = self.apply(
+            [wrong_anchor_marker], operation_id=self.next_operation_id(), check=False
+        )
+        self.error(rejected_wrong_marker, "state-conflict")
+
+        anchored = self.task_event(
+            state="created",
+            read_scope="anchored",
+            anchor_observation_fingerprint=prior["observation_fingerprint"],
+            anchor_marker_id=prior["latest_message_id"],
+        )
+        accepted_anchored = parse_result(
+            self.apply([anchored], operation_id=self.next_operation_id())
+        )
+        self.assertEqual(accepted_anchored["mutation_state"], "applied")
+        anchored_observation = self.state()["tasks"][0]["current_observation"]
+        assert anchored_observation is not None
+        self.assertEqual(anchored_observation["read_scope"], "anchored")
+        self.assertEqual(
+            anchored_observation["anchor_observation_fingerprint"],
+            prior["observation_fingerprint"],
+        )
+        self.assertEqual(
+            anchored_observation["anchor_marker_id"], prior["latest_message_id"]
+        )
+
+        replay_bytes = self.ledger.read_bytes()
+        replayed_anchored = parse_result(
+            self.apply([anchored], operation_id=self.next_operation_id())
+        )
+        self.assertEqual(replayed_anchored["mutation_state"], "unchanged")
+        self.assertEqual(self.ledger.read_bytes(), replay_bytes)
+
+        changed_eof = self.task_event(state="created", read_scope="eof")
+        accepted_eof = parse_result(
+            self.apply([changed_eof], operation_id=self.next_operation_id())
+        )
+        self.assertEqual(accepted_eof["mutation_state"], "applied")
+        eof_observation = self.state()["tasks"][0]["current_observation"]
+        assert eof_observation is not None
+        self.assertEqual(eof_observation["read_scope"], "eof")
+        self.assertIsNone(eof_observation["anchor_observation_fingerprint"])
+        self.assertIsNone(eof_observation["anchor_marker_id"])
+
+    def test_decision_events_require_the_latest_task_full_read(self) -> None:
+        self.bootstrap_active_task()
+        state = self.state()
+        event = {
+            "type": "gate-observed",
+            "task_key": self.task_key,
+            "delivery_key": None,
+            "gate": "dependency-integration",
+            "state": "passed",
+            "binding_key": None,
+            "evidence_ref": "proof://dependency-integration",
+        }
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "schema is invalid"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state), event, datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+            )
+        stale = {**event, "task_observation_fingerprint": "0" * 64}
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "latest accepted"):
+            CACHE_RUNTIME.apply_event(
+                copy.deepcopy(state), stale, datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
+            )
+        self.apply([event])
+        self.assertEqual(self.state()["gates"][0]["gate"], "dependency-integration")
 
     def test_review_provider_mutation_guard_is_cas_bound_append_only_and_replay_safe(self) -> None:
         self.bootstrap_active_task()
@@ -862,7 +1100,9 @@ class LedgerCacheV15Tests(unittest.TestCase):
         self.observe_revision(head="e" * 40, merge_base="f" * 40)
         CACHE_RUNTIME.validate_state(self.state(), self.ledger)
     def direct_event(self, state: dict, event: dict, now: datetime) -> None:
-        changed = CACHE_RUNTIME.apply_event(state, event, now)
+        changed = CACHE_RUNTIME.apply_event(
+            state, self.bind_decision_event(event, state), now
+        )
         self.assertTrue(changed)
 
     def add_synthetic_delivery(self, state: dict) -> dict:
@@ -1617,7 +1857,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "16.0.0")
+        self.assertEqual(version, "17.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -3149,6 +3389,28 @@ class LedgerCacheV15Tests(unittest.TestCase):
         self.assertEqual(self.state()["goal"]["state"], "complete")
         self.assertEqual(self.state()["goal"]["completion_evidence_ref"], goal_evidence)
 
+    def test_late_full_read_after_seal_records_drift_without_reopening_or_regranting(self) -> None:
+        sealed = self.make_terminal_sealed_state()
+        seal_fingerprint = sealed["tasks"][0]["seal"]["seal_fingerprint"]
+        prior_observation = copy.deepcopy(sealed["tasks"][0]["current_observation"])
+        late = self.task_event(state="terminal-sealed")
+
+        self.apply([late])
+        state = self.state()
+        task = state["tasks"][0]
+        self.assertEqual(task["state"], "terminal-sealed")
+        self.assertEqual(task["seal"]["seal_fingerprint"], seal_fingerprint)
+        self.assertEqual(task["current_observation"], prior_observation)
+        self.assertIsNotNone(task["post_terminal_drift"])
+        self.assertEqual(state["goal"]["state"], "active")
+        terminal = parse_result(self.read_projection("terminal"))
+        self.assertEqual(terminal["phase"], "drifted")
+        self.assertFalse(terminal["archive_ready"])
+
+        replay = parse_result(self.apply([late], operation_id=self.next_operation_id()))
+        self.assertEqual(replay["mutation_state"], "unchanged")
+        self.assertEqual(self.state()["tasks"][0]["seal"]["seal_fingerprint"], seal_fingerprint)
+
     def test_sealed_task_rejects_all_ordinary_mutations_and_repeated_seal(self) -> None:
         sealed = self.make_terminal_sealed_state()
         now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
@@ -3186,7 +3448,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
         handed_off = copy.deepcopy(sealed)
         CACHE_RUNTIME.apply_event(
             handed_off,
-            {
+            self.bind_decision_event({
                 "type": "terminal-handoff-recorded",
                 "task_key": self.task_key,
                 "seal_fingerprint": seal_fingerprint,
@@ -3194,7 +3456,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
                 "authority": "external-merge-required",
                 "evidence_ref": "https://github.com/example/dotagents/pull/233",
                 "next_action": "Human may merge after final inspection.",
-            },
+            }, handed_off),
             now,
         )
         stages.append(("terminal-handoff", copy.deepcopy(handed_off)))
@@ -3204,11 +3466,11 @@ class LedgerCacheV15Tests(unittest.TestCase):
         self.assertIsNotNone(verification)
         CACHE_RUNTIME.apply_event(
             verified,
-            {
+            self.bind_decision_event({
                 "type": "portfolio-terminal-verified",
                 "verification_fingerprint": verification,
                 "evidence_ref": "proof://portfolio-terminal/232",
-            },
+            }, verified),
             now,
         )
         stages.append(("portfolio-verified", copy.deepcopy(verified)))
@@ -3216,12 +3478,12 @@ class LedgerCacheV15Tests(unittest.TestCase):
         root_complete = copy.deepcopy(verified)
         CACHE_RUNTIME.apply_event(
             root_complete,
-            {
+            self.bind_decision_event({
                 "type": "portfolio-goal-completed",
                 "goal_evidence_ref": "app-task://root-a/goal",
                 "completion_evidence_ref": "app-task://root-a/goal-complete",
                 "verification_fingerprint": verification,
-            },
+            }, root_complete),
             now,
         )
         stages.append(("portfolio-goal-complete", root_complete))
@@ -3234,7 +3496,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
                 )
                 changed = CACHE_RUNTIME.apply_event(
                     stage,
-                    {
+                    self.bind_decision_event({
                         "type": "post-terminal-drift-recorded",
                         "task_key": self.task_key,
                         "delivery_key": "dotagents",
@@ -3244,7 +3506,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
                         ).hexdigest(),
                         "reason": f"The PR head changed during {stage_name}.",
                         "evidence_ref": f"git://post-terminal-drift/{stage_name}",
-                    },
+                    }, stage),
                     now,
                 )
                 self.assertTrue(changed)
@@ -3264,7 +3526,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
         now = datetime(2026, 7, 18, 12, 0, tzinfo=timezone.utc)
         CACHE_RUNTIME.apply_event(
             state,
-            {
+            self.bind_decision_event({
                 "type": "post-terminal-drift-recorded",
                 "task_key": self.task_key,
                 "delivery_key": "dotagents",
@@ -3272,14 +3534,14 @@ class LedgerCacheV15Tests(unittest.TestCase):
                 "drift_fingerprint": hashlib.sha256(b"pre-completion-drift").hexdigest(),
                 "reason": "The PR head changed before terminal handoff was recorded.",
                 "evidence_ref": "git://post-terminal-drift/pre-completion",
-            },
+            }, state),
             now,
         )
         self.assertIsNotNone(state["tasks"][0]["post_terminal_drift"])
         with self.assertRaises(CACHE_RUNTIME.CacheError) as rejected:
             CACHE_RUNTIME.apply_event(
                 state,
-                {
+                self.bind_decision_event({
                     "type": "terminal-handoff-recorded",
                     "task_key": self.task_key,
                     "seal_fingerprint": seal_fingerprint,
@@ -3287,7 +3549,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
                     "authority": "external-merge-required",
                     "evidence_ref": "https://github.com/example/dotagents/pull/233",
                     "next_action": "Human may merge after final inspection.",
-                },
+                }, state),
                 now,
             )
         self.assertEqual(rejected.exception.code, "state-conflict")
@@ -3407,6 +3669,7 @@ class LedgerCacheV15Tests(unittest.TestCase):
     def test_command_attempt_lifecycle_is_bounded_typed_and_single_launch(self) -> None:
         self.acquire()
         self.create()
+        self.apply([self.checkout_event(), self.task_event(state="created")])
         state = self.state()
         delivery = state["tasks"][0]["deliveries"][0]
         plan = delivery["validation_plan"][0]

@@ -22,8 +22,8 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "16.0.0"
-LEDGER_SCHEMA_VERSION = "13.0.0"
+__version__ = "17.0.0"
+LEDGER_SCHEMA_VERSION = "14.0.0"
 REGISTRATION_SCHEMA_VERSION = "7.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
@@ -147,6 +147,37 @@ EVENT_TYPES = {
     "terminal-handoff-recorded",
     "portfolio-terminal-verified",
     "post-terminal-drift-recorded",
+}
+TASK_OBSERVATION_FIELDS = {
+    "observation_kind",
+    "task_ref",
+    "host_id",
+    "wait_cursor",
+    "read_scope",
+    "anchor_observation_fingerprint",
+    "anchor_marker_id",
+    "latest_turn_id",
+    "latest_message_id",
+    "latest_tool_marker_id",
+    "observed_status",
+    "content_fingerprint",
+    "page_chain_fingerprint",
+    "observed_at",
+    "base_generation",
+    "base_head",
+    "observation_fingerprint",
+}
+TASK_OBSERVATION_MARKER_FIELDS = (
+    "latest_turn_id",
+    "latest_message_id",
+    "latest_tool_marker_id",
+)
+TASK_OBSERVATION_BOUND_EVENTS = {
+    "execution-command-reserved",
+    "execution-command-cancellation-authorized",
+    "task-dependency-wait-started",
+    "task-dependency-wait-resolved",
+    "gate-observed",
 }
 TASK_STATIC_GATES = {"dependency-integration"}
 TASK_REVISION_SET_GATES = {
@@ -457,6 +488,202 @@ def canonical_fingerprint(
     if not isinstance(value, str) or not FINGERPRINT_RE.fullmatch(value):
         raise CacheError(error_code, f"{field} is not a SHA-256 fingerprint", exit_code)
     return value
+
+
+def full_read_observation_fingerprint(observation: dict[str, Any]) -> str:
+    """Fingerprint stable direct-read evidence, not transport or CAS metadata."""
+
+    payload = {
+        key: observation[key]
+        for key in TASK_OBSERVATION_FIELDS
+        if key not in {
+            "wait_cursor",
+            "observed_at",
+            "base_generation",
+            "base_head",
+            "observation_fingerprint",
+        }
+    }
+    return request_fingerprint(payload)
+
+
+def validate_task_observation(
+    value: Any,
+    task: dict[str, Any],
+    field: str,
+    *,
+    state: dict[str, Any] | None = None,
+    validate_anchor: bool = True,
+) -> dict[str, Any]:
+    observation = exact_object(value, TASK_OBSERVATION_FIELDS, field)
+    if observation["observation_kind"] != "full-read":
+        raise CacheError(
+            "invalid-input",
+            f"{field}.observation_kind must be full-read",
+            2,
+        )
+    task_ref = nonempty(observation["task_ref"], f"{field}.task_ref")
+    if task["task_ref"] is None or task_ref != task["task_ref"]:
+        raise CacheError(
+            "state-conflict",
+            f"{field}.task_ref does not match the visible task",
+            4,
+        )
+    host_id = nonempty(observation["host_id"], f"{field}.host_id")
+    wait_cursor = observation["wait_cursor"]
+    if wait_cursor is not None:
+        wait_cursor = nonempty(wait_cursor, f"{field}.wait_cursor")
+    read_scope = observation["read_scope"]
+    if read_scope not in {"eof", "anchored"}:
+        raise CacheError("invalid-input", f"{field}.read_scope is invalid", 2)
+    anchor_observation_fingerprint = observation["anchor_observation_fingerprint"]
+    if anchor_observation_fingerprint is not None:
+        anchor_observation_fingerprint = canonical_fingerprint(
+            anchor_observation_fingerprint,
+            f"{field}.anchor_observation_fingerprint",
+        )
+    anchor_marker_id = observation["anchor_marker_id"]
+    if anchor_marker_id is not None:
+        anchor_marker_id = nonempty(anchor_marker_id, f"{field}.anchor_marker_id")
+    marker_values: dict[str, str | None] = {}
+    for marker in TASK_OBSERVATION_MARKER_FIELDS:
+        raw_marker = observation[marker]
+        marker_values[marker] = (
+            nonempty(raw_marker, f"{field}.{marker}")
+            if raw_marker is not None
+            else None
+        )
+    observed_status = observation["observed_status"]
+    if observed_status not in TASK_STATES:
+        raise CacheError("invalid-input", f"{field}.observed_status is invalid", 2)
+    observed_at = parse_timestamp(observation["observed_at"], f"{field}.observed_at")
+    if not isinstance(observation["base_generation"], int) or isinstance(
+        observation["base_generation"], bool
+    ) or observation["base_generation"] < 1:
+        raise CacheError("invalid-input", f"{field}.base_generation is invalid", 2)
+    base_head = canonical_fingerprint(observation["base_head"], f"{field}.base_head")
+    content_fingerprint = canonical_fingerprint(
+        observation["content_fingerprint"], f"{field}.content_fingerprint"
+    )
+    page_chain_fingerprint = canonical_fingerprint(
+        observation["page_chain_fingerprint"], f"{field}.page_chain_fingerprint"
+    )
+    observation_fingerprint = canonical_fingerprint(
+        observation["observation_fingerprint"], f"{field}.observation_fingerprint"
+    )
+    prior = task.get("current_observation")
+    if read_scope == "eof":
+        if anchor_observation_fingerprint is not None or anchor_marker_id is not None:
+            raise CacheError(
+                "state-conflict",
+                f"{field}.eof proof cannot carry an anchor",
+                4,
+            )
+    elif not validate_anchor and (
+        anchor_observation_fingerprint is None or anchor_marker_id is None
+    ):
+        raise CacheError(
+            "integrity-failure",
+            f"{field}.anchored proof is missing its bounded anchor",
+            5,
+        )
+    normalized = {
+        "observation_kind": "full-read",
+        "task_ref": task_ref,
+        "host_id": host_id,
+        "wait_cursor": wait_cursor,
+        "read_scope": read_scope,
+        "anchor_observation_fingerprint": anchor_observation_fingerprint,
+        "anchor_marker_id": anchor_marker_id,
+        **marker_values,
+        "observed_status": observed_status,
+        "content_fingerprint": content_fingerprint,
+        "page_chain_fingerprint": page_chain_fingerprint,
+        "observed_at": format_timestamp(observed_at),
+        "base_generation": observation["base_generation"],
+        "base_head": base_head,
+        "observation_fingerprint": observation_fingerprint,
+    }
+    if full_read_observation_fingerprint(normalized) != observation_fingerprint:
+        raise CacheError(
+            "state-conflict",
+            f"{field}.observation_fingerprint does not match the direct-read proof",
+            4,
+        )
+    if read_scope == "anchored" and not (
+        prior is not None
+        and prior["observation_fingerprint"] == observation_fingerprint
+    ):
+        if prior is None:
+            raise CacheError(
+                "state-conflict",
+                f"{field}.anchored proof requires a prior accepted observation",
+                4,
+            )
+        if anchor_observation_fingerprint != prior["observation_fingerprint"]:
+            raise CacheError(
+                "state-conflict",
+                f"{field}.anchor_observation_fingerprint does not match the prior observation",
+                4,
+            )
+        prior_markers = {
+            prior[marker]
+            for marker in TASK_OBSERVATION_MARKER_FIELDS
+            if prior[marker] is not None
+        }
+        if anchor_marker_id is None or anchor_marker_id not in prior_markers:
+            raise CacheError(
+                "state-conflict",
+                f"{field}.anchor_marker_id does not match the prior observation",
+                4,
+            )
+    if prior is not None:
+        if prior["task_ref"] != task_ref or prior["host_id"] != host_id:
+            raise CacheError(
+                "state-conflict",
+                f"{field} visible task or host identity changed",
+                4,
+            )
+        for marker in TASK_OBSERVATION_MARKER_FIELDS:
+            if (
+                prior[marker] is not None
+                and prior[marker] == normalized[marker]
+                and (
+                    prior["content_fingerprint"] != content_fingerprint
+                    or prior["page_chain_fingerprint"] != page_chain_fingerprint
+                )
+            ):
+                raise CacheError(
+                    "state-conflict",
+                    f"{field} reuses a marker id with different content",
+                    4,
+                )
+    if state is not None and (
+        prior is None
+        or prior["observation_fingerprint"] != observation_fingerprint
+    ):
+        if (
+            observation["base_generation"] != state["generation"]
+            or base_head != state["content_fingerprint"]
+        ):
+            raise CacheError("state-conflict", f"{field} base CAS identity is stale", 4)
+    return normalized
+
+
+def require_task_observation(
+    task: dict[str, Any], value: Any, field: str = "task_observation_fingerprint"
+) -> str:
+    fingerprint = canonical_fingerprint(value, field)
+    current = task.get("current_observation")
+    if current is None or current["observation_fingerprint"] != fingerprint:
+        raise CacheError(
+            "state-conflict",
+            "decision is not bound to the latest accepted full-read task observation",
+            4,
+        )
+    return fingerprint
+
+
 
 
 def validate_review_request_receipt(
@@ -2113,6 +2340,7 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
             "task_title",
             "task_title_evidence_ref",
             "task_assignment_fingerprint",
+            "current_observation",
             "dependency_wait",
             "state",
             "outcome",
@@ -2155,6 +2383,19 @@ def validate_state(state: Any, ledger: Path) -> dict[str, Any]:
                     raise CacheError("integrity-failure", "run-state dependency wait is invalid", 5)
             if item["task_ref"] is not None:
                 nonempty(item["task_ref"], f"run_state.tasks[{index}].task_ref")
+            if item["current_observation"] is not None:
+                if item["task_ref"] is None:
+                    raise CacheError(
+                        "integrity-failure",
+                        f"run_state.tasks[{index}].current_observation has no task_ref",
+                        5,
+                    )
+                validate_task_observation(
+                    item["current_observation"],
+                    item,
+                    f"run_state.tasks[{index}].current_observation",
+                    validate_anchor=False,
+                )
             exact_object(
                 item["adoption"],
                 {
@@ -3327,6 +3568,8 @@ def delivery_proof_blockers(
 
 def task_proof_blockers(state: dict[str, Any], task: dict[str, Any]) -> list[str]:
     blockers: list[str] = []
+    if task["current_observation"] is None:
+        blockers.append("missing-full-read-task-observation")
     if task["task_title"] is None or task["task_title_evidence_ref"] is None:
         blockers.append("missing-task-title-evidence")
     if task["task_ref"] is None or task["managed_checkouts_evidence_ref"] is None:
@@ -3372,6 +3615,9 @@ def seal_candidate_fingerprint(state: dict[str, Any], task: dict[str, Any]) -> s
     return request_fingerprint(
         {
             "task_key": task["task_key"],
+            "observation_fingerprint": task["current_observation"][
+                "observation_fingerprint"
+            ],
             "revision_set_key": revision_set,
             "source": next(item for item in state["sources"] if item["task_key"] == task["task_key"]),
             "deliveries": [
@@ -3420,6 +3666,9 @@ def portfolio_verification_candidate(state: dict[str, Any]) -> str | None:
             {
                 "task_key": task["task_key"],
                 "seal_fingerprint": task["seal"]["seal_fingerprint"],
+                "observation_fingerprint": task["current_observation"][
+                    "observation_fingerprint"
+                ],
                 "handoff": terminal_handoff(state, task),
             }
             for task in sorted(state["tasks"], key=lambda item: item["task_key"])
@@ -3454,6 +3703,7 @@ def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
                 "task_key": task["task_key"],
                 "state": task["state"],
                 "revision_set_key": current_revision_set_key(task),
+                "current_observation": copy.deepcopy(task["current_observation"]),
                 "review_results": [
                     review_result_projection(current_review(state, task, delivery))
                     for delivery in task["deliveries"]
@@ -3577,6 +3827,7 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
                 "task_ref": task["task_ref"],
                 "task_title": task["task_title"],
                 "state": task["state"],
+                "current_observation": copy.deepcopy(task["current_observation"]),
                 "dependency_wait": copy.deepcopy(task["dependency_wait"]),
                 "revision_set_key": current_revision_set_key(task),
                 "gates": gate_summary,
@@ -3844,6 +4095,7 @@ def new_state(
                 "task_title": None,
                 "task_title_evidence_ref": None,
                 "task_assignment_fingerprint": item["task_assignment_fingerprint"],
+                "current_observation": None,
                 "dependency_wait": None,
                 "state": "created" if adoption["task_state"] == "recorded" else "pending",
                 "outcome": None,
@@ -4442,7 +4694,15 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     }:
         raise CacheError("state-conflict", "worker is baseline-only before atomic implementation baseline acceptance", 4)
 
+    if (
+        task["seal"] is not None
+        and event_type == "task-observed"
+        and (not isinstance(raw, dict) or "observation" not in raw)
+    ):
+        raise CacheError("state-conflict", "sealed task state is immutable", 4)
+
     if task["seal"] is not None and event_type not in {
+        "task-observed",
         "terminal-handoff-recorded",
         "post-terminal-drift-recorded",
     }:
@@ -4465,9 +4725,13 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 {
                     "type", "task_key", "delivery_key", "attempt_id", "command_id",
                     "operation", "manifest_sha256", "execution_policy_fingerprint",
-                    "attempt_file", "receipt_file", "evidence_ref",
+                    "attempt_file", "receipt_file", "task_observation_fingerprint",
+                    "evidence_ref",
                 },
                 event_type,
+            )
+            require_task_observation(
+                task, event["task_observation_fingerprint"]
             )
             if existing is not None or len(delivery["command_attempts"]) >= MAX_COMMAND_ATTEMPTS_PER_DELIVERY:
                 raise CacheError("state-conflict", "command attempt is duplicated or exceeds its bound", 4)
@@ -4514,7 +4778,15 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             existing.update({"state": "launch-released", "evidence_ref": nonempty(event["evidence_ref"], "evidence_ref"), "recorded_at": observed_at})
             return True
         if event_type == "execution-command-cancellation-authorized":
-            event = exact_object(raw, {"type", "task_key", "delivery_key", "attempt_id", "reason", "evidence_ref"}, event_type)
+            event = exact_object(
+                raw,
+                {
+                    "type", "task_key", "delivery_key", "attempt_id", "reason",
+                    "task_observation_fingerprint", "evidence_ref",
+                },
+                event_type,
+            )
+            require_task_observation(task, event["task_observation_fingerprint"])
             if existing["state"] not in {"reserved", "launch-released"}:
                 raise CacheError("state-conflict", "command cancellation is out of order", 4)
             if event["reason"] not in {"root-authorized", "claim-lost", "root-monitor-degraded"}:
@@ -4695,7 +4967,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
                 "type", "task_key", "model", "reasoning_effort", "thinking_reason",
                 "task_title", "task_title_evidence_ref", "task_assignment_fingerprint",
                 "state", "outcome",
-                "attention_reason", "summary_ref",
+                "attention_reason", "summary_ref", "observation",
             },
             event_type,
         )
@@ -4707,6 +4979,82 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             or nonempty(event["thinking_reason"], "thinking_reason") != task["thinking_reason"]
         ):
             raise CacheError("state-conflict", "task execution profile changed", 4)
+        observation = validate_task_observation(
+            event["observation"], task, "observation"
+        )
+        if observation["observed_status"] != event["state"]:
+            raise CacheError(
+                "state-conflict",
+                "task observation status does not match the lifecycle observation",
+                4,
+            )
+        if (
+            task["current_observation"] is not None
+            and task["current_observation"]["observation_fingerprint"]
+            == observation["observation_fingerprint"]
+        ):
+            return False
+        if task["seal"] is not None:
+            expected_drift_fingerprint = request_fingerprint(
+                {
+                    "task_key": task_key,
+                    "observation_fingerprint": observation[
+                        "observation_fingerprint"
+                    ],
+                    "observed_status": observation["observed_status"],
+                }
+            )
+            expected_evidence_ref = (
+                nonempty(event["summary_ref"], "summary_ref")
+                if event["summary_ref"] is not None
+                else f"{task['task_ref']}/late-observation"
+            )
+            if task["post_terminal_drift"] is not None and all(
+                task["post_terminal_drift"][field] == expected
+                for field, expected in (
+                    ("drift_fingerprint", expected_drift_fingerprint),
+                    ("evidence_ref", expected_evidence_ref),
+                )
+            ):
+                return False
+            observation = validate_task_observation(
+                event["observation"], task, "observation", state=state
+            )
+            seal = task["seal"]
+            delivery_key = task["deliveries"][0]["delivery_key"]
+            drift = {
+                "delivery_key": delivery_key,
+                "seal_fingerprint": seal["seal_fingerprint"],
+                "drift_fingerprint": request_fingerprint(
+                    {
+                        "task_key": task_key,
+                        "observation_fingerprint": observation[
+                            "observation_fingerprint"
+                        ],
+                        "observed_status": observation["observed_status"],
+                    }
+                ),
+                "reason": "late full-read task evidence after terminal seal",
+                "evidence_ref": expected_evidence_ref,
+                "recorded_at": observed_at,
+            }
+            if task["post_terminal_drift"] is not None:
+                if all(
+                    task["post_terminal_drift"][field] == drift[field]
+                    for field in drift
+                    if field != "recorded_at"
+                ):
+                    return False
+                raise CacheError("state-conflict", "post-terminal drift evidence changed", 4)
+            task["post_terminal_drift"] = drift
+            state["closeout"]["post_terminal_drift"] = {
+                "task_key": task_key,
+                **drift,
+            }
+            return True
+        observation = validate_task_observation(
+            event["observation"], task, "observation", state=state
+        )
         title = nonempty(event["task_title"], "task_title")
         title_evidence = event["task_title_evidence_ref"]
         if title_evidence is not None:
@@ -4716,6 +5064,12 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if event["task_assignment_fingerprint"] != task["task_assignment_fingerprint"]:
             raise CacheError("state-conflict", "task assignment fingerprint changed", 4)
         state_value = event["state"]
+        if observation["observed_status"] != state_value:
+            raise CacheError(
+                "state-conflict",
+                "task observation status does not match the lifecycle observation",
+                4,
+            )
         if task["implementation_baseline"] != "accepted" and state_value != "created":
             raise CacheError("state-conflict", "baseline-only worker cannot leave created state", 4)
         if state_value in {"dependency-wait", "merge-ready", "terminal-sealed"}:
@@ -4737,6 +5091,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
             "outcome": nonempty(event["outcome"], "outcome") if event["outcome"] is not None else None,
             "attention_reason": nonempty(event["attention_reason"], "attention_reason") if event["attention_reason"] is not None else None,
             "summary_ref": nonempty(event["summary_ref"], "summary_ref") if event["summary_ref"] is not None else None,
+            "current_observation": observation,
         }
         changed = any(task[field] != value for field, value in candidate.items())
         task.update(candidate)
@@ -4745,9 +5100,13 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "task-dependency-wait-started":
         event = exact_object(
             raw,
-            {"type", "task_key", "resume_state", "reason", "summary_ref", "evidence_ref"},
+            {
+                "type", "task_key", "resume_state", "reason", "summary_ref",
+                "task_observation_fingerprint", "evidence_ref",
+            },
             event_type,
         )
+        require_task_observation(task, event["task_observation_fingerprint"])
         if state["goal"]["state"] != "active":
             raise CacheError("state-conflict", "dependency wait requires an active root Goal", 4)
         resume_state = event["resume_state"]
@@ -4767,9 +5126,13 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "task-dependency-wait-resolved":
         event = exact_object(
             raw,
-            {"type", "task_key", "resume_state", "evidence_ref"},
+            {
+                "type", "task_key", "resume_state", "task_observation_fingerprint",
+                "evidence_ref",
+            },
             event_type,
         )
+        require_task_observation(task, event["task_observation_fingerprint"])
         wait = task["dependency_wait"]
         if state["goal"]["state"] != "active":
             raise CacheError("state-conflict", "dependency wait resolution requires an active root Goal", 4)
@@ -4817,9 +5180,14 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "review-provider-mutation-reserved":
         event = exact_object(
             raw,
-            {"type", "task_key", "delivery_key", "reservation", "packet_fingerprint", "evidence_ref"},
+            {
+                "type", "task_key", "delivery_key", "reservation", "packet_fingerprint",
+                "evidence_ref",
+            },
             event_type,
         )
+        if task["current_observation"] is None:
+            raise CacheError("state-conflict", "provider reservation requires a full-read task observation", 4)
         assert delivery is not None
         protocol = require_review_mutation()
         try:
@@ -5697,10 +6065,15 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "autoreview-action-reserved":
         event = exact_object(
             raw,
-            {"type", "task_key", "delivery_key", "reservation_id", "expected_state_fingerprint", "projection"},
+            {
+                "type", "task_key", "delivery_key", "reservation_id",
+                "expected_state_fingerprint", "projection",
+            },
             event_type,
         )
         assert delivery is not None
+        if task["current_observation"] is None:
+            raise CacheError("state-conflict", "AutoReview reservation requires a full-read task observation", 4)
         if event["expected_state_fingerprint"] != state["content_fingerprint"]:
             raise CacheError("state-conflict", "AutoReview reservation state fingerprint is stale", 4)
         if delivery["committed_revision"] is None:
@@ -5839,9 +6212,13 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "gate-observed":
         event = exact_object(
             raw,
-            {"type", "task_key", "delivery_key", "gate", "state", "binding_key", "evidence_ref"},
+            {
+                "type", "task_key", "delivery_key", "gate", "state", "binding_key",
+                "task_observation_fingerprint", "evidence_ref",
+            },
             event_type,
         )
+        require_task_observation(task, event["task_observation_fingerprint"])
         gate = event["gate"]
         if gate not in STATIC_GATES | REVISION_GATES or event["state"] not in GATE_STATES:
             raise CacheError("invalid-input", "gate observation is invalid", 2)
@@ -5940,7 +6317,9 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "task-terminal-sealed":
         event = exact_object(
             raw,
-            {"type", "task_key", "revision_set_key", "seal_fingerprint", "evidence_ref"},
+            {
+                "type", "task_key", "revision_set_key", "seal_fingerprint", "evidence_ref",
+            },
             event_type,
         )
         if state["goal"]["state"] != "active":
@@ -5962,7 +6341,10 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
     if event_type == "terminal-handoff-recorded":
         event = exact_object(
             raw,
-            {"type", "task_key", "seal_fingerprint", "handoff_kind", "authority", "evidence_ref", "next_action"},
+            {
+                "type", "task_key", "seal_fingerprint", "handoff_kind", "authority",
+                "evidence_ref", "next_action",
+            },
             event_type,
         )
         seal = task["seal"]

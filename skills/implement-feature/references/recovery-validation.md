@@ -27,6 +27,30 @@ Read `ledger-cache ledger read --projection recovery` only after that gate.
 Before any mutation, read each exact recorded task and require matching Goal
 tools and never create a replacement or objective fallback.
 
+Compact `wait_threads` snapshots are hints only: they never append
+`task-observed` or update durable task state. Before a task lifecycle mutation,
+worker steering, authority grant, completion acceptance, gate, terminal
+decision, release, or takeover, read the same visible task directly with
+`read_thread`. Read newest-first pages to EOF, or stop at an exact durable
+anchor only when the normalized ID/hash chain is unbroken. A cursor reset or
+expiry, missing/broken anchor, conflicting marker/hash, or takeover falls back
+to EOF. Keep only the bounded full-read observation packet; never persist raw
+history or pagination cursors. Reuse the exact `task_ref` and `host_id` on
+reconnect. `wait_cursor` is an opaque resume hint and is never compared with a
+`read_thread` pagination cursor.
+
+The bounded proof has exactly `observation_kind`, `task_ref`, `host_id`,
+optional `wait_cursor`, `read_scope` (`eof` or `anchored`), nullable
+`anchor_observation_fingerprint`, nullable `anchor_marker_id`, latest
+turn/message/tool-marker IDs, `observed_status`, content and page-chain
+fingerprints, `observed_at`, `base_generation`, `base_head`, and
+`observation_fingerprint`. An initial proof must be `eof` with null anchors;
+an `eof` proof always has null anchors. An `anchored` proof must name the
+previous accepted observation fingerprint and one of its marker IDs. These
+fields are part of the proof fingerprint. It invents no App revision,
+frontier, or gap fields. An exact proof replay is a no-op; marker/hash,
+anchor, or identity conflict fails closed.
+
 For `implementation_baseline=pending`, recovery is baseline-only. Require
 internal Goal state `pending` and no external Goal, verify immutable bundle,
 authorization and execution-scope fingerprints, exact managed checkout
@@ -91,6 +115,10 @@ prose.
 Only after the full pass succeeds may the root apply material events through
 `ledger-cache ledger apply` at the observed generation. On CAS conflict,
 discard the batch, reread, and recompute.
+
+Late direct task evidence after a seal uses the existing `task-observed` packet
+to record terminal drift only; it never replaces the sealed observation/result,
+reopens the Goal, or regrants authority.
 
 Before seal, apply a changed definitive capability observation through
 `delivery-preflight-observed`; its new preflight key invalidates delivery and

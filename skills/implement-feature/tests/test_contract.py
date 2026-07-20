@@ -1321,7 +1321,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "16.0.0"', helper)
+        self.assertIn('__version__ = "17.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         self.assertIn("review-authority", helper)
         for removed in (
@@ -1333,7 +1333,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v16_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v17_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md") + self.read(
             "references/review-reconciliation.md"
@@ -1341,8 +1341,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "16.0.0"',
-            'LEDGER_SCHEMA_VERSION = "13.0.0"',
+            '__version__ = "17.0.0"',
+            'LEDGER_SCHEMA_VERSION = "14.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
         ):
             self.assertIn(constant, helper)
@@ -1352,7 +1352,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             packets,
         )
         self.assertNotIn("exact `{repository, checkout}` claim map", packets)
-        self.assertIn("Active state accepts only ledger schema `13.0.0`", run_state)
+        self.assertIn("Active state accepts only ledger schema `14.0.0`", run_state)
         self.assertIn("no compatibility path or migration", run_state)
 
         module = ast.parse(helper)

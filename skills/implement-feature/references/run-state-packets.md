@@ -85,13 +85,13 @@ values are refs or digests, never pasted output.
 | `portfolio-preimplementation-aborted` | `reason`, `task_stop_evidence`, `evidence_ref` |
 | `managed-checkouts-observed` | `task_key`, `task_ref`, `managed_checkouts`, `evidence_ref` |
 | `delivery-preflight-observed` | `task_key`, `delivery_key`, `github_repository`, `target_branch`, `default_base`, `ci_availability`, `preflight_key`, `evidence_ref` |
-| `execution-command-reserved` | `task_key`, `delivery_key`, `attempt_id`, `command_id`, `operation`, `manifest_sha256`, `execution_policy_fingerprint`, `attempt_file`, `receipt_file`, `evidence_ref` |
+| `execution-command-reserved` | `task_key`, `delivery_key`, `attempt_id`, `command_id`, `operation`, `manifest_sha256`, `execution_policy_fingerprint`, `attempt_file`, `receipt_file`, `task_observation_fingerprint`, `evidence_ref` |
 | `execution-command-launch-observed` | `task_key`, `delivery_key`, `attempt_id`, `attempt_fingerprint`, `evidence_ref` |
-| `execution-command-cancellation-authorized` | `task_key`, `delivery_key`, `attempt_id`, `reason`, `evidence_ref` |
+| `execution-command-cancellation-authorized` | `task_key`, `delivery_key`, `attempt_id`, `reason`, `task_observation_fingerprint`, `evidence_ref` |
 | `execution-command-terminal-observed` | `task_key`, `delivery_key`, `attempt_id`, `status`, `receipt_sha256`, `cleanup_verified`, `evidence_ref` |
-| `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref` |
-| `task-dependency-wait-started` | `task_key`, `resume_state`, `reason`, `summary_ref`, `evidence_ref` |
-| `task-dependency-wait-resolved` | `task_key`, `resume_state`, `evidence_ref` |
+| `task-observed` | `task_key`, `model`, `reasoning_effort`, `thinking_reason`, `task_title`, `task_title_evidence_ref`, `task_assignment_fingerprint`, `state`, `outcome`, `attention_reason`, `summary_ref`, `observation` |
+| `task-dependency-wait-started` | `task_key`, `resume_state`, `reason`, `summary_ref`, `task_observation_fingerprint`, `evidence_ref` |
+| `task-dependency-wait-resolved` | `task_key`, `resume_state`, `task_observation_fingerprint`, `evidence_ref` |
 | `review-provider-mutation-reserved` | `task_key`, `delivery_key`, `reservation`, `packet_fingerprint`, `evidence_ref` |
 | `review-provider-mutation-started` | `task_key`, `delivery_key`, `reservation_id`, `operation_id`, `packet_fingerprint`, `evidence_ref` |
 | `review-provider-mutation-observed` | `task_key`, `delivery_key`, `reservation_id`, `operation_id`, `attempt_state`, `result_fingerprint`, `receipt_ref`, `recovery_state`, `evidence_ref` |
@@ -111,7 +111,7 @@ values are refs or digests, never pasted output.
 | `autoreview-attempt-observed` | `task_key`, `delivery_key`, `reservation_id`, `attempt_id`, `attempt_state`, `model_call_started`, `candidate_fingerprint`, `operation_id`, `evidence_ref` |
 | `autoreview-lineage-reset-authorized` | `task_key`, `delivery_key`, `authority`, `reason`, `evidence_ref`, `prior_evidence_fingerprint`, `next_review_target_key`, `next_committed_revision_key` |
 | `autoreview-observed` | `task_key`, `delivery_key`, `reservation_id`, `candidate_fingerprint`, `operation_id`, `evidence_ref`, `evidence` |
-| `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `evidence_ref` |
+| `gate-observed` | `task_key`, `delivery_key`, `gate`, `state`, `binding_key`, `task_observation_fingerprint`, `evidence_ref` |
 | `task-terminal-sealed` | `task_key`, `revision_set_key`, `seal_fingerprint`, `evidence_ref` |
 | `terminal-handoff-recorded` | `task_key`, `seal_fingerprint`, `handoff_kind`, `authority`, `evidence_ref`, `next_action` |
 | `portfolio-terminal-verified` | `verification_fingerprint`, `evidence_ref` |

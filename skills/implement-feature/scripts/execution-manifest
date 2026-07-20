@@ -1910,7 +1910,7 @@ def authorize_cancellation(
     if not HEX64_RE.fullmatch(authorization_fingerprint):
         raise ManifestError("cancellation-unauthorized", "cancellation fingerprint is invalid", "owner-required", 4)
     ledger = read_json(ledger_path, "cancellation ledger")
-    if ledger.get("schema_version") != "13.0.0" or ledger.get("content_fingerprint") != authorization_fingerprint:
+    if ledger.get("schema_version") != "14.0.0" or ledger.get("content_fingerprint") != authorization_fingerprint:
         raise ManifestError("cancellation-unauthorized", "cancellation ledger identity is stale", "owner-required", 4)
     authorities = [
         command

@@ -142,8 +142,8 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
    `implementation-baseline-accepted` CAS. On acceptance, call `create_goal`.
    Never set `token_budget`; read it back, record activation, and
    allow tasks to implement. On failure use the typed preimplementation stop.
-10. **MONITOR** — after one full post-dispatch snapshot, consume compact deltas
-   until material transition, attention, heartbeat, or deadline. The root alone
+10. **MONITOR** — after one full post-dispatch snapshot, compact deltas are
+   hints; never mutate durable state. The root alone
    heartbeats/CASes the claim every 60 seconds, including during commands. At
    180 seconds without success, stop dispatch and authorize cleanup; claim loss
    cancels and cleans up. At five minutes remain fail-closed. Children never
@@ -157,8 +157,8 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
     wait, or advance one staged closeout transition.
 
 An unchanged observation timeout performs only a claim heartbeat and no event.
-Use a full task read only for startup, anomaly/blocker diagnosis, and terminal
-verification. The worker owns the bounded provider wait; the root never
+Read children at gates; root does not self-read. The
+worker owns the bounded provider wait; the root never
 polls the same provider in parallel. If the exact review is still pending at
 the 45-minute deadline, persist the required warning evidence and continue
 under the explicit `timeout-accepted` result. The root Goal remains active

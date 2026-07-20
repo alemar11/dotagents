@@ -63,7 +63,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
             subprocess.run(["git", "-C", str(repository), "commit", "-qm", "base"], check=True)
         self.ledger = self.ledger_root / "fixture.json"
-        self.ledger.write_text('{"schema_version":"13.0.0","tasks":[]}\n')
+        self.ledger.write_text('{"schema_version":"14.0.0","tasks":[]}\n')
         self.adoption_index = 0
         self.env = os.environ.copy()
         self.env["HOME"] = str(self.base)
@@ -292,6 +292,73 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "evidence_ref": f"task-state-{claim['root_id']}-{index}",
                 }
             )
+        ledger_path = Path(claim["ledger_ref"])
+        ledger_value = json.loads(ledger_path.read_text()) if ledger_path.exists() else {
+            "schema_version": "14.0.0",
+            "tasks": [],
+        }
+        ledger_tasks = ledger_value.setdefault("tasks", [])
+        for spec in specs:
+            if spec["task_state"] != "recorded":
+                continue
+            task = next(
+                (
+                    item
+                    for item in ledger_tasks
+                    if isinstance(item, dict)
+                    and item.get("source_spec_ref") == spec["source_spec_ref"]
+                ),
+                None,
+            )
+            if task is not None and task.get("current_observation") is not None:
+                continue
+            observation = {
+                "observation_kind": "full-read",
+                "task_ref": spec["task_ref"],
+                "host_id": f"host-{claim['root_id']}",
+                "wait_cursor": f"opaque-wait-{self.adoption_index}",
+                "read_scope": "eof",
+                "anchor_observation_fingerprint": None,
+                "anchor_marker_id": None,
+                "latest_turn_id": f"turn-{self.adoption_index}",
+                "latest_message_id": f"message-{self.adoption_index}",
+                "latest_tool_marker_id": f"tool-{self.adoption_index}",
+                "observed_status": "created",
+                "content_fingerprint": "a" * 64,
+                "page_chain_fingerprint": "b" * 64,
+                "observed_at": "2026-07-18T12:00:00Z",
+                "base_generation": 1,
+                "base_head": "c" * 64,
+            }
+            observation["observation_fingerprint"] = hashlib.sha256(
+                json.dumps(
+                    {
+                        key: value
+                        for key, value in observation.items()
+                        if key
+                        not in {
+                            "wait_cursor",
+                            "observed_at",
+                            "base_generation",
+                            "base_head",
+                        }
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            if task is None:
+                ledger_tasks.append(
+                    {
+                        "source_spec_ref": spec["source_spec_ref"],
+                        "current_observation": observation,
+                        "deliveries": [],
+                    }
+                )
+            else:
+                task["current_observation"] = observation
+        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+        ledger_path.write_text(json.dumps(ledger_value, indent=2, sort_keys=True) + "\n")
         value = {
             "root_id": claim["root_id"],
             "claim_fingerprint": claim["fingerprint"],
@@ -1044,6 +1111,62 @@ class AtomicClaimHelperTests(unittest.TestCase):
             sorted(claim["root_id"] for claim in status["claims"]),
             ["root-b", "root-c"],
         )
+
+    def test_takeover_requires_eof_observation_and_accepts_refreshed_eof(self) -> None:
+        first = json.loads(
+            run_claim(
+                *self.acquire_args("root-a", self.repo, "spec-1"), env=self.env
+            ).stdout
+        )["claim"]
+        self.make_stale(first)
+        adoption = self.make_task_adoption(first, "app-task-terminal-fixture")
+
+        ledger_value = json.loads(self.ledger.read_text())
+        observation = ledger_value["tasks"][0]["current_observation"]
+        prior_fingerprint = observation["observation_fingerprint"]
+        observation["read_scope"] = "anchored"
+        observation["anchor_observation_fingerprint"] = prior_fingerprint
+        observation["anchor_marker_id"] = observation["latest_turn_id"]
+        observation["observation_fingerprint"] = (
+            CACHE_TEST_RUNTIME.CACHE_RUNTIME.full_read_observation_fingerprint(
+                observation
+            )
+        )
+        self.ledger.write_text(json.dumps(ledger_value, indent=2, sort_keys=True) + "\n")
+
+        anchored_takeover = run_claim(
+            "--json",
+            *self.takeover_args(
+                "root-b", [first], [adoption], ["app-task-terminal-fixture"]
+            ),
+            env=self.env,
+            check=False,
+        )
+        self.assertEqual(anchored_takeover.returncode, 4)
+        anchored_error = json.loads(anchored_takeover.stdout)["error"]
+        self.assertIn("EOF", anchored_error["message"])
+        self.assertFalse((self.claim_root / "root-b.json").exists())
+
+        observation["read_scope"] = "eof"
+        observation["anchor_observation_fingerprint"] = None
+        observation["anchor_marker_id"] = None
+        observation["observation_fingerprint"] = (
+            CACHE_TEST_RUNTIME.CACHE_RUNTIME.full_read_observation_fingerprint(
+                observation
+            )
+        )
+        self.ledger.write_text(json.dumps(ledger_value, indent=2, sort_keys=True) + "\n")
+
+        refreshed_takeover = json.loads(
+            run_claim(
+                "--json",
+                *self.takeover_args(
+                    "root-b", [first], [adoption], ["app-task-terminal-fixture"]
+                ),
+                env=self.env,
+            ).stdout
+        )
+        self.assertEqual(refreshed_takeover["claim"]["replaced_root_ids"], ["root-a"])
 
     def test_takeover_rejects_partial_multi_repository_root_scope(self) -> None:
         first_args = self.acquire_args("root-a", self.repo, "spec-1")

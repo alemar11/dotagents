@@ -63,6 +63,60 @@ def delivery_evidence_key(revision: str, preflight: str) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def task_observation(
+    *, base_generation: int, base_head: str, status: str, marker: str,
+    observed_at: str,
+) -> dict[str, Any]:
+    content = hashlib.sha256(
+        json.dumps(
+            {"task_ref": "app-task://replay-worker", "status": status, "marker": marker},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    page_chain = hashlib.sha256(
+        json.dumps(
+            {"read": "eof", "marker": marker, "content": content},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    value = {
+        "observation_kind": "full-read",
+        "task_ref": "app-task://replay-worker",
+        "host_id": "host-replay",
+        "wait_cursor": f"opaque-wait-{marker}",
+        "read_scope": "eof",
+        "anchor_observation_fingerprint": None,
+        "anchor_marker_id": None,
+        "latest_turn_id": f"turn-{marker}",
+        "latest_message_id": f"message-{marker}",
+        "latest_tool_marker_id": f"tool-{marker}",
+        "observed_status": status,
+        "content_fingerprint": content,
+        "page_chain_fingerprint": page_chain,
+        "observed_at": observed_at,
+        "base_generation": base_generation,
+        "base_head": base_head,
+    }
+    value["observation_fingerprint"] = hashlib.sha256(
+        json.dumps(
+            {
+                key: value[key]
+                for key in (
+                    "observation_kind", "task_ref", "host_id", "latest_turn_id",
+                    "read_scope", "anchor_observation_fingerprint", "anchor_marker_id",
+                    "latest_message_id", "latest_tool_marker_id", "observed_status",
+                    "content_fingerprint", "page_chain_fingerprint",
+                )
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    return value
+
+
 def materialize(value: Any, replacements: dict[str, Any]) -> Any:
     if isinstance(value, str):
         if value in replacements:
@@ -408,11 +462,18 @@ class SessionReplayTests(unittest.TestCase):
                 "--operation-id", "10000000000000000000000000000001",
                 "--registration-file", str(packet("registration", registration)),
             )
-            self.assertEqual(created["version"], "16.0.0")
+            self.assertEqual(created["version"], "17.0.0")
 
             head = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True, check=True).stdout.strip()
             tree = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD^{tree}"], text=True, capture_output=True, check=True).stdout.strip()
             clean_status = hashlib.sha256(b"").hexdigest()
+            created_observation = task_observation(
+                base_generation=created["generation"],
+                base_head=created["content_fingerprint"],
+                status="created",
+                marker="created",
+                observed_at="2026-07-18T12:00:00Z",
+            )
             binding_events = [
                 {"type": "root-title-observed", "title": "👨🏻‍💻 Feature Orchestrator", "evidence_ref": "app-task://replay-root/title"},
                 {
@@ -437,6 +498,7 @@ class SessionReplayTests(unittest.TestCase):
                     "task_assignment_fingerprint": hashlib.sha256(b"assignment").hexdigest(),
                     "state": "created", "outcome": None, "attention_reason": None,
                     "summary_ref": "app-task://replay-worker/summary",
+                    "observation": created_observation,
                 },
             ]
             bound = invoke(
@@ -510,7 +572,17 @@ class SessionReplayTests(unittest.TestCase):
                     "goal_evidence_ref": "app-task://replay-root/goal",
                     "objective_fingerprint": registration["objective_fingerprint"],
                 },
-                {**binding_events[-1], "state": "implementing"},
+                {
+                    **binding_events[-1],
+                    "state": "implementing",
+                    "observation": task_observation(
+                        base_generation=state["generation"],
+                        base_head=state["content_fingerprint"],
+                        status="implementing",
+                        marker="implementing",
+                        observed_at="2026-07-18T12:01:00Z",
+                    ),
+                },
             ]
             final_packet = packet("baseline-accept", final_events)
             command = (
@@ -525,7 +597,7 @@ class SessionReplayTests(unittest.TestCase):
             self.assertEqual(applied["mutation_state"], "applied")
             self.assertEqual(replayed["mutation_state"], "already-applied")
             state = json.loads(ledger.read_text())
-            self.assertEqual(state["schema_version"], "13.0.0")
+            self.assertEqual(state["schema_version"], "14.0.0")
             self.assertEqual(state["goal"]["state"], "active")
             self.assertEqual(state["tasks"][0]["implementation_baseline"], "accepted")
             self.assertEqual(state["tasks"][0]["state"], "implementing")
