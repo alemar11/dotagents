@@ -24,11 +24,18 @@ reservation requirement.
 Reservations are generation/state-fingerprint bound, one-use, and have no TTL.
 Release is allowed only before model launch. Attempts append `prepared`, then
 `model-started` only after successful `Popen`, then `completed` or `failed`.
-Once model-started is durable, relaunch is forbidden. Invalid output consumes
-the attempt as failed. A valid candidate is quarantined with an immutable
-operation file; the producer runs the real ledger apply path in dry-run mode
-before handoff. Interrupted apply reuses the exact candidate bytes and stable
-operation id.
+The ledger keeps that existing lifecycle. AutoReview's external attempt journal
+may additionally record one helper-owned `repair-prepared` and
+`repair-model-started` pair for schema-parse or semantic-invariant output; its
+`model_launch_count` counts both physical launches while evidence still counts
+one logical review phase. The repair changes no reservation, target, phase,
+parent, finding set, bundle, model, search policy, manifest command attempt, or
+worker prompt/path budget. Once either launch starts, process interruption
+cannot relaunch it. A second invalid output consumes the reservation as
+`consumed-failed`, returns `needs-owner`, and `autoreview next` refuses a new
+reservation. A valid candidate is quarantined with an immutable operation file;
+the producer runs the real ledger apply path in dry-run mode before handoff.
+Interrupted apply reuses the exact candidate bytes and stable operation id.
 
 Follow AutoReview's `references/evidence-chain.md` on the committed branch.
 Create finding drafts without ids and run AutoReview's `findings prepare`

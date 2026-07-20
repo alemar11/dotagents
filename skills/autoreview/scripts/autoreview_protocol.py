@@ -13,13 +13,22 @@ PROTOCOL_VERSION = "2.0.0"
 EVIDENCE_SCHEMA_VERSION = "2.0.0"
 RESERVATION_SCHEMA_VERSION = "2.0.0"
 OBLIGATION_SCHEMA_VERSION = "2.0.0"
-ATTEMPT_SCHEMA_VERSION = "2.0.0"
+ATTEMPT_SCHEMA_VERSION = "2.1.0"
 
 REVIEW_PHASES = frozenset({"full", "fix-verification", "disposition", "terminal-full"})
 TERMINAL_STATES = frozenset(
     {"fix-required", "verification-clean", "terminal-clean", "terminal-composite-clean"}
 )
 ATTEMPT_STATES = frozenset({"prepared", "model-started", "completed", "failed"})
+ATTEMPT_TRANSITIONS = (
+    "prepared",
+    "model-started",
+    "repair-prepared",
+    "repair-model-started",
+    "completed",
+    "failed",
+)
+INVALID_OUTPUT_CLASSIFICATIONS = frozenset({"schema-parse", "semantic-invariant"})
 MODEL_PHASES = frozenset({"full", "fix-verification", "terminal-full"})
 FULL_REVIEW_LIMIT = 2
 TERMINAL_FULL_LIMIT = 1
@@ -401,3 +410,139 @@ def validate_attempt_transition(records: list[dict[str, Any]], candidate: dict[s
     started = state == "model-started" or any(row["state"] == "model-started" for row in records)
     if candidate.get("model_call_started") is not started:
         raise ProtocolError("model-call-accounting-invalid", "model_call_started does not match attempt history")
+
+
+def validate_invalid_output(value: Any, name: str = "invalid_output") -> dict[str, Any]:
+    item = _exact(
+        value,
+        {
+            "classification", "validator_code", "violated_rule",
+            "output_fingerprint", "output_size_bytes", "output_truncated",
+            "preview", "artifact_ref",
+        },
+        name,
+    )
+    if item["classification"] not in INVALID_OUTPUT_CLASSIFICATIONS:
+        raise ProtocolError("attempt-invalid", f"{name}.classification is invalid")
+    _text(item["validator_code"], f"{name}.validator_code")
+    _text(item["violated_rule"], f"{name}.violated_rule")
+    _fingerprint(item["output_fingerprint"], f"{name}.output_fingerprint")
+    if (
+        not isinstance(item["output_size_bytes"], int)
+        or isinstance(item["output_size_bytes"], bool)
+        or item["output_size_bytes"] < 0
+    ):
+        raise ProtocolError("attempt-invalid", f"{name}.output_size_bytes is invalid")
+    if not isinstance(item["output_truncated"], bool):
+        raise ProtocolError("attempt-invalid", f"{name}.output_truncated is invalid")
+    if not isinstance(item["preview"], str) or len(item["preview"].encode("utf-8")) > 2048:
+        raise ProtocolError("attempt-invalid", f"{name}.preview is invalid")
+    _text(item["artifact_ref"], f"{name}.artifact_ref")
+    return item
+
+
+def validate_attempt_journal(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    prior: dict[str, Any] | None = None
+    identity: tuple[str, str] | None = None
+    repair_seen = False
+    for index, value in enumerate(records):
+        name = f"attempt[{index}]"
+        item = _exact(
+            value,
+            {
+                "schema_version", "transition", "state", "model_call_started",
+                "model_launch_count", "attempt_id", "reservation_id", "pid",
+                "invalid_output", "prompt_fingerprint", "candidate_fingerprint",
+                "operation_id", "parent_record_fingerprint",
+            },
+            name,
+        )
+        if item["schema_version"] != ATTEMPT_SCHEMA_VERSION:
+            raise ProtocolError("attempt-invalid", f"{name}.schema_version is unsupported")
+        transition = item["transition"]
+        allowed = {
+            None: {"prepared"},
+            "prepared": {"model-started", "completed", "failed"},
+            "model-started": {"repair-prepared", "completed", "failed"},
+            "repair-prepared": {"repair-model-started", "failed"},
+            "repair-model-started": {"completed", "failed"},
+            "completed": set(),
+            "failed": set(),
+        }
+        previous = prior["transition"] if prior else None
+        if transition not in ATTEMPT_TRANSITIONS or transition not in allowed[previous]:
+            raise ProtocolError("attempt-transition-invalid", f"{name} cannot follow {previous}")
+        state_by_transition = {
+            "prepared": "prepared",
+            "model-started": "model-started",
+            "repair-prepared": "model-started",
+            "repair-model-started": "model-started",
+            "completed": "completed",
+            "failed": "failed",
+        }
+        if item["state"] != state_by_transition[transition]:
+            raise ProtocolError("attempt-invalid", f"{name}.state is inconsistent")
+        attempt_id = _fingerprint(item["attempt_id"], f"{name}.attempt_id")
+        reservation_id = _fingerprint(item["reservation_id"], f"{name}.reservation_id")
+        if identity is None:
+            identity = (attempt_id, reservation_id)
+        elif identity != (attempt_id, reservation_id):
+            raise ProtocolError("attempt-invalid", f"{name} changed attempt identity")
+        expected_parent = fingerprint(prior) if prior else None
+        if item["parent_record_fingerprint"] != expected_parent:
+            raise ProtocolError("attempt-invalid", f"{name}.parent_record_fingerprint is invalid")
+        if transition == "prepared":
+            expected_launches = 0
+        elif transition == "model-started":
+            expected_launches = 1
+        elif transition == "repair-model-started":
+            expected_launches = 2
+        else:
+            expected_launches = prior["model_launch_count"] if prior else 0
+        if (
+            not isinstance(item["model_launch_count"], int)
+            or isinstance(item["model_launch_count"], bool)
+            or item["model_launch_count"] != expected_launches
+        ):
+            raise ProtocolError("model-call-accounting-invalid", f"{name}.model_launch_count is invalid")
+        if item["model_call_started"] is not (expected_launches > 0):
+            raise ProtocolError("model-call-accounting-invalid", f"{name}.model_call_started is invalid")
+        if item["pid"] is not None and (
+            not isinstance(item["pid"], int) or isinstance(item["pid"], bool) or item["pid"] < 1
+        ):
+            raise ProtocolError("attempt-invalid", f"{name}.pid is invalid")
+        if transition in {"model-started", "repair-model-started"}:
+            if item["pid"] is None:
+                raise ProtocolError("attempt-invalid", f"{name}.pid is required")
+        elif item["pid"] is not None:
+            raise ProtocolError("attempt-invalid", f"{name}.pid is forbidden")
+        for field in ("prompt_fingerprint", "candidate_fingerprint"):
+            if item[field] is not None:
+                _fingerprint(item[field], f"{name}.{field}")
+        if item["operation_id"] is not None and (
+            not isinstance(item["operation_id"], str)
+            or not re.fullmatch(r"[0-9a-f]{32}", item["operation_id"])
+        ):
+            raise ProtocolError("attempt-invalid", f"{name}.operation_id is invalid")
+        if transition in {"repair-prepared", "failed"} and item["invalid_output"] is not None:
+            validate_invalid_output(item["invalid_output"], f"{name}.invalid_output")
+        elif item["invalid_output"] is not None:
+            raise ProtocolError("attempt-invalid", f"{name}.invalid_output is forbidden")
+        if transition == "repair-prepared":
+            if repair_seen or item["prompt_fingerprint"] is None or item["invalid_output"] is None:
+                raise ProtocolError("attempt-invalid", "duplicate or incomplete repair preparation")
+            repair_seen = True
+        if transition in {"model-started", "repair-model-started"} and item["prompt_fingerprint"] is None:
+            raise ProtocolError("attempt-invalid", f"{name}.prompt_fingerprint is required")
+        if transition == "repair-model-started" and not repair_seen:
+            raise ProtocolError("attempt-invalid", "repair launch lacks invalid-output preparation")
+        if transition == "completed" and (
+            item["candidate_fingerprint"] is None or item["operation_id"] is None
+        ):
+            raise ProtocolError("attempt-invalid", "completed attempt lacks candidate identity")
+        if transition != "completed" and (
+            item["candidate_fingerprint"] is not None or item["operation_id"] is not None
+        ):
+            raise ProtocolError("attempt-invalid", f"{name} has premature candidate identity")
+        prior = item
+    return records

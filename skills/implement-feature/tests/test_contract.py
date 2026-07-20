@@ -1321,7 +1321,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "18.0.0"', helper)
+        self.assertIn('__version__ = "18.1.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         self.assertIn("review-authority", helper)
         for removed in (
@@ -1341,7 +1341,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "18.0.0"',
+            '__version__ = "18.1.0"',
             'LEDGER_SCHEMA_VERSION = "14.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
         ):

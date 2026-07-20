@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib.util
 import sys
 import unittest
@@ -98,6 +99,30 @@ def obligation(parent: dict, *, marker: str, finding_comment_ids: list[str]) -> 
 
 
 class AutoReviewProtocolTests(unittest.TestCase):
+    def journal_record(
+        self,
+        prior: dict | None,
+        transition: str,
+        launches: int,
+        **overrides: object,
+    ) -> dict:
+        state = {
+            "prepared": "prepared", "model-started": "model-started",
+            "repair-prepared": "model-started", "repair-model-started": "model-started",
+            "completed": "completed", "failed": "failed",
+        }[transition]
+        record = {
+            "schema_version": "2.1.0", "transition": transition, "state": state,
+            "model_call_started": launches > 0, "model_launch_count": launches,
+            "attempt_id": "a" * 64, "reservation_id": "b" * 64,
+            "pid": 101 if transition in {"model-started", "repair-model-started"} else None,
+            "invalid_output": None, "prompt_fingerprint": None,
+            "candidate_fingerprint": None, "operation_id": None,
+            "parent_record_fingerprint": PROTOCOL.fingerprint(prior) if prior else None,
+        }
+        record.update(overrides)
+        return record
+
     def test_identity_separates_target_revision_and_publication(self) -> None:
         first = target()
         same = target()
@@ -193,6 +218,62 @@ class AutoReviewProtocolTests(unittest.TestCase):
         PROTOCOL.validate_attempt_transition([prepared], started)
         with self.assertRaises(PROTOCOL.ProtocolError):
             PROTOCOL.validate_attempt_transition([prepared, started], started)
+
+    def test_attempt_journal_replays_every_crash_boundary_and_rejects_tampering(self) -> None:
+        records: list[dict] = []
+        for transition, launches, overrides in (
+            ("prepared", 0, {}),
+            ("model-started", 1, {"prompt_fingerprint": "c" * 64}),
+            ("repair-prepared", 1, {
+                "prompt_fingerprint": "d" * 64,
+                "invalid_output": {
+                    "classification": "semantic-invariant",
+                    "validator_code": "review-fail-without-finding",
+                    "violated_rule": "Fail requires a discrete finding.",
+                    "output_fingerprint": hashlib.sha256(b"invalid").hexdigest(),
+                    "output_size_bytes": 7,
+                    "output_truncated": False,
+                    "preview": "invalid",
+                    "artifact_ref": "attempt://a/record-3",
+                },
+            }),
+            ("repair-model-started", 2, {"prompt_fingerprint": "d" * 64}),
+        ):
+            records.append(self.journal_record(records[-1] if records else None, transition, launches, **overrides))
+            self.assertEqual(PROTOCOL.validate_attempt_journal(copy.deepcopy(records)), records)
+
+        for index in range(len(records)):
+            tampered = copy.deepcopy(records)
+            tampered[index]["reservation_id"] = "f" * 64
+            with self.assertRaises(PROTOCOL.ProtocolError):
+                PROTOCOL.validate_attempt_journal(tampered)
+
+        unknown = copy.deepcopy(records)
+        unknown[-1]["retry"] = True
+        with self.assertRaisesRegex(PROTOCOL.ProtocolError, "invalid field set"):
+            PROTOCOL.validate_attempt_journal(unknown)
+
+        broken_chain = copy.deepcopy(records)
+        broken_chain[-1]["parent_record_fingerprint"] = "0" * 64
+        with self.assertRaisesRegex(PROTOCOL.ProtocolError, "parent_record_fingerprint"):
+            PROTOCOL.validate_attempt_journal(broken_chain)
+
+        duplicate = copy.deepcopy(records)
+        duplicate.append(self.journal_record(duplicate[-1], "repair-prepared", 2))
+        with self.assertRaises(PROTOCOL.ProtocolError):
+            PROTOCOL.validate_attempt_journal(duplicate)
+
+    def test_attempt_journal_terminal_records_preserve_launch_count(self) -> None:
+        prepared = self.journal_record(None, "prepared", 0)
+        started = self.journal_record(prepared, "model-started", 1, prompt_fingerprint="c" * 64)
+        failed = self.journal_record(started, "failed", 1)
+        PROTOCOL.validate_attempt_journal([prepared, started, failed])
+
+        completed = self.journal_record(
+            started, "completed", 1,
+            candidate_fingerprint="d" * 64, operation_id="e" * 32,
+        )
+        PROTOCOL.validate_attempt_journal([prepared, started, completed])
 
 
 if __name__ == "__main__":

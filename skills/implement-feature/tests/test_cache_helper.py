@@ -1667,6 +1667,46 @@ class LedgerCacheV18Tests(unittest.TestCase):
         )
         self.error(release, "state-conflict")
 
+    def test_consumed_failed_autoreview_attempt_requires_owner_and_cannot_reserve_again(self) -> None:
+        self.bootstrap_active_task()
+        self.observe_revision()
+        projection = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
+        )
+        reservation = projection["reservation_event"]
+        self.apply([reservation])
+        attempt_id = "d" * 64
+        base = {
+            "type": "autoreview-attempt-observed",
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+            "reservation_id": reservation["reservation_id"],
+            "attempt_id": attempt_id,
+            "candidate_fingerprint": None,
+            "operation_id": None,
+            "evidence_ref": f"attempt://{attempt_id}",
+        }
+        self.apply([
+            {**base, "attempt_state": "prepared", "model_call_started": False},
+            {**base, "attempt_state": "model-started", "model_call_started": True},
+            {**base, "attempt_state": "failed", "model_call_started": True},
+        ])
+
+        blocked = parse_result(
+            self.run_cache(
+                "--json", "autoreview", "next", "--ledger", str(self.ledger),
+                "--task-key", self.task_key, "--delivery-key", "dotagents",
+            )
+        )
+        self.assertIsNone(blocked["action"])
+        self.assertIsNone(blocked["reservation_event"])
+        self.assertIn("autoreview-attempt-consumed-failed-needs-owner", blocked["blockers"])
+        delivery = self.state()["tasks"][0]["deliveries"][0]
+        self.assertEqual(delivery["autoreview_reservation"]["state"], "consumed-failed")
+
     def observe_nonregression_and_scope(self, revision: dict) -> None:
         delivery = self.state()["tasks"][0]["deliveries"][0]
         plan = delivery["validation_plan"][0]
@@ -1857,7 +1897,7 @@ class LedgerCacheV18Tests(unittest.TestCase):
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "18.0.0")
+        self.assertEqual(version, "18.1.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])

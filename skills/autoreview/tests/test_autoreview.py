@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib.machinery
 import importlib.util
 import io
@@ -104,7 +105,7 @@ class AutoreviewContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "autoreview 2.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "autoreview 2.1.0")
 
     def test_findings_prepare_owns_canonical_ids(self) -> None:
         finding = {
@@ -660,24 +661,315 @@ class AutoreviewContractTests(unittest.TestCase):
             identity = {"attempt_id": "a" * 64, "reservation_id": "b" * 64}
             cli.append_attempt(
                 str(journal),
-                {**identity, "state": "prepared", "model_call_started": False},
+                cli.attempt_record(**identity, transition="prepared", model_launch_count=0),
                 create=True,
             )
             cli.append_attempt(
                 str(journal),
-                {**identity, "state": "model-started", "model_call_started": True},
+                cli.attempt_record(
+                    **identity,
+                    transition="model-started",
+                    model_launch_count=1,
+                    pid=started[0],
+                    prompt_fingerprint="c" * 64,
+                ),
             )
             cli.append_attempt(
                 str(journal),
-                {**identity, "state": "failed", "model_call_started": True},
+                cli.attempt_record(**identity, transition="failed", model_launch_count=1),
             )
             with self.assertRaisesRegex(cli.AutoreviewError, "already has an attempt journal"):
                 cli.append_attempt(
                     str(journal),
-                    {**identity, "state": "prepared", "model_call_started": False},
+                    cli.attempt_record(**identity, transition="prepared", model_launch_count=0),
                     create=True,
                 )
             self.assertEqual(counter.read_text(), "1")
+
+            empty = root / "empty-attempt.jsonl"
+            empty.touch()
+            with self.assertRaisesRegex(cli.AutoreviewError, "already has an attempt journal"):
+                cli.append_attempt(
+                    str(empty),
+                    cli.attempt_record(**identity, transition="prepared", model_launch_count=0),
+                    create=True,
+                )
+
+    def managed_fake_recovery(
+        self,
+        root: Path,
+        outputs: list[dict | str | BaseException],
+        *,
+        identity_error: cli.AutoreviewError | None = None,
+    ) -> tuple[object, list[dict], list[str]]:
+        args = cli.parse_args([])
+        journal = root / "attempt.jsonl"
+        attempt_id = "a" * 64
+        reservation_id = "b" * 64
+        prompts: list[str] = []
+        cli.append_attempt(
+            str(journal),
+            cli.attempt_record(
+                transition="prepared",
+                attempt_id=attempt_id,
+                reservation_id=reservation_id,
+                model_launch_count=0,
+            ),
+            create=True,
+        )
+
+        def started(pid: int) -> None:
+            cli.append_attempt(
+                str(journal),
+                cli.attempt_record(
+                    transition="model-started",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=1,
+                    pid=pid,
+                    prompt_fingerprint=args._active_prompt_fingerprint,
+                ),
+            )
+
+        def prepare(exc: cli.ReviewOutputError, original: str, repair: str) -> None:
+            invalid = cli.invalid_output_record(args, exc, f"{journal.resolve()}#record-3")
+            cli.append_attempt(
+                str(journal),
+                cli.attempt_record(
+                    transition="repair-prepared",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=1,
+                    invalid_output=invalid,
+                    prompt_fingerprint=cli.sha256_text(repair),
+                ),
+            )
+
+        def repair_started(pid: int) -> None:
+            cli.append_attempt(
+                str(journal),
+                cli.attempt_record(
+                    transition="repair-model-started",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=2,
+                    pid=pid,
+                    prompt_fingerprint=args._active_prompt_fingerprint,
+                ),
+            )
+
+        args._on_model_started = started
+        args._prepare_invalid_output_repair = prepare
+        args._start_invalid_output_repair = repair_started
+
+        def validate_identity(prompt: str, schema: dict) -> None:
+            if identity_error is not None:
+                raise identity_error
+
+        args._validate_invalid_output_repair = validate_identity
+
+        def fake_run(_args: object, _repo: Path, prompt: str, _schema: dict) -> str:
+            index = len(prompts)
+            prompts.append(prompt)
+            item = outputs[index]
+            args._on_model_started(100 + index)
+            if isinstance(item, BaseException):
+                raise item
+            raw = (item if isinstance(item, str) else json.dumps(item)).encode()
+            args._last_review_output = {
+                "output_fingerprint": hashlib.sha256(raw).hexdigest(),
+                "output_size_bytes": len(raw),
+                "output_truncated": False,
+                "preview": cli.bounded_utf8_preview(raw),
+            }
+            return raw.decode()
+
+        with mock.patch.object(cli, "run_codex", side_effect=fake_run):
+            try:
+                result: object = cli.run_validated_model(
+                    args,
+                    root,
+                    "immutable prompt",
+                    cli.SCHEMA,
+                    changed={"app.py"},
+                )
+            except BaseException as exc:
+                result = exc
+        if isinstance(result, BaseException):
+            records = cli.load_attempt_journal(journal)
+            terminal_invalid = (
+                getattr(args, "_terminal_invalid_output", None)
+                or getattr(args, "_pending_invalid_output", None)
+            )
+            invalid_record = (
+                cli.invalid_output_record(
+                    args, terminal_invalid, f"{journal.resolve()}#record-{len(records) + 1}"
+                )
+                if terminal_invalid is not None
+                else None
+            )
+            cli.append_attempt(
+                str(journal),
+                cli.attempt_record(
+                    transition="failed",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=records[-1]["model_launch_count"],
+                    invalid_output=invalid_record,
+                    prompt_fingerprint=getattr(args, "_active_prompt_fingerprint", None),
+                ),
+            )
+        return result, cli.load_attempt_journal(journal), prompts
+
+    def test_bounded_invalid_output_recovery_replays_once_to_clean_or_finding(self) -> None:
+        invalid = {
+            "findings": [],
+            "review_outcome": "fail",
+            "review_explanation": "No discrete regression supplied.",
+            "review_confidence": 0.8,
+        }
+        clean = {
+            "findings": [],
+            "review_outcome": "pass",
+            "review_explanation": "Clean.",
+            "review_confidence": 1.0,
+        }
+        finding = {
+            "findings": [{
+                "title": "Regression",
+                "body": "The changed line drops the required guard.",
+                "priority": 2,
+                "confidence": 0.9,
+                "finding_category": "regression",
+                "code_location": {"file_path": "app.py", "line": 1},
+            }],
+            "review_outcome": "fail",
+            "review_explanation": "One actionable regression.",
+            "review_confidence": 0.9,
+        }
+        for final in (clean, finding):
+            with self.subTest(outcome=final["review_outcome"]), tempfile.TemporaryDirectory() as directory:
+                result, records, prompts = self.managed_fake_recovery(Path(directory), [invalid, final])
+                self.assertEqual(result, final)
+                self.assertEqual([row["transition"] for row in records], [
+                    "prepared", "model-started", "repair-prepared", "repair-model-started",
+                ])
+                self.assertEqual(records[-1]["model_launch_count"], 2)
+                self.assertEqual(len(prompts), 2)
+                self.assertLessEqual(len(prompts[1].encode()) - len(prompts[0].encode()), 2048)
+                self.assertIn("review-fail-without-finding", prompts[1])
+
+        with tempfile.TemporaryDirectory() as directory:
+            result, records, prompts = self.managed_fake_recovery(Path(directory), [finding])
+            self.assertEqual(result, finding)
+            self.assertEqual([row["transition"] for row in records], ["prepared", "model-started"])
+            self.assertEqual(len(prompts), 1)
+
+        with tempfile.TemporaryDirectory() as directory:
+            result, records, prompts = self.managed_fake_recovery(
+                Path(directory), ["hostile non-json output", clean]
+            )
+            self.assertEqual(result, clean)
+            self.assertEqual(records[2]["invalid_output"]["classification"], "schema-parse")
+            self.assertEqual(len(prompts), 2)
+
+    def test_second_invalid_output_is_terminal_and_cannot_loop(self) -> None:
+        invalid = {
+            "findings": [], "review_outcome": "fail",
+            "review_explanation": "No finding.", "review_confidence": 0.5,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result, records, prompts = self.managed_fake_recovery(root, [invalid, invalid])
+            self.assertIsInstance(result, cli.AutoreviewError)
+            self.assertEqual(result.code, "invalid-output-repair-exhausted")
+            self.assertEqual(result.recovery, "needs-owner")
+            self.assertEqual(records[-1]["transition"], "failed")
+            self.assertEqual(records[-1]["model_launch_count"], 2)
+            self.assertEqual(records[-1]["invalid_output"]["validator_code"], "review-fail-without-finding")
+            self.assertEqual(len(prompts), 2)
+
+    def test_transport_and_identity_failures_never_repair(self) -> None:
+        transport = cli.AutoreviewError("transport failed", code="codex-engine-failed", recovery="inspect-error")
+        with tempfile.TemporaryDirectory() as directory:
+            result, records, prompts = self.managed_fake_recovery(Path(directory), [transport])
+            self.assertIs(result, transport)
+            self.assertEqual(len(prompts), 1)
+            self.assertEqual(
+                [row["transition"] for row in records], ["prepared", "model-started", "failed"]
+            )
+            self.assertIsNone(records[-1]["invalid_output"])
+
+        invalid = {
+            "findings": [], "review_outcome": "fail",
+            "review_explanation": "No finding.", "review_confidence": 0.5,
+        }
+        drift = cli.AutoreviewError("target drift", code="repair-identity-drift", recovery="needs-owner")
+        with tempfile.TemporaryDirectory() as directory:
+            result, records, prompts = self.managed_fake_recovery(
+                Path(directory), [invalid], identity_error=drift
+            )
+            self.assertIs(result, drift)
+            self.assertEqual(len(prompts), 1)
+            self.assertEqual(
+                [row["transition"] for row in records], ["prepared", "model-started", "failed"]
+            )
+            self.assertEqual(
+                records[-1]["invalid_output"]["output_fingerprint"],
+                hashlib.sha256(json.dumps(invalid).encode()).hexdigest(),
+            )
+
+    def test_standalone_invalid_output_never_becomes_a_caller_retry_loop(self) -> None:
+        args = cli.parse_args([])
+        invalid = json.dumps({
+            "findings": [], "review_outcome": "fail",
+            "review_explanation": "No finding.", "review_confidence": 0.5,
+        })
+        raw = invalid.encode()
+        args._last_review_output = {
+            "output_fingerprint": hashlib.sha256(raw).hexdigest(),
+            "output_size_bytes": len(raw),
+            "output_truncated": False,
+            "preview": invalid,
+        }
+        with mock.patch.object(cli, "run_codex", return_value=invalid) as reviewer:
+            with self.assertRaises(cli.AutoreviewError) as rejected:
+                cli.run_validated_model(
+                    args, Path.cwd(), "immutable prompt", cli.SCHEMA, changed={"app.py"}
+                )
+        self.assertEqual(rejected.exception.recovery, "needs-owner")
+        self.assertEqual(reviewer.call_count, 1)
+
+    def test_hostile_oversized_and_finding_drift_outputs_are_bounded_or_nonrepairable(self) -> None:
+        hostile = b"\xff" * 4096
+        preview = cli.bounded_utf8_preview(hostile)
+        self.assertLessEqual(len(preview.encode()), cli.INVALID_OUTPUT_PREVIEW_BYTES)
+        args = cli.parse_args([])
+        args._last_review_output = {
+            "output_fingerprint": hashlib.sha256(hostile).hexdigest(),
+            "output_size_bytes": cli.MAX_REVIEW_OUTPUT_BYTES + 1,
+            "output_truncated": True,
+            "preview": preview,
+        }
+        with self.assertRaises(cli.ReviewOutputError) as oversized:
+            cli.validate_model_response(args, "{}", changed={"app.py"})
+        self.assertEqual(oversized.exception.validator_code, "review-output-too-large")
+        record = cli.invalid_output_record(args, oversized.exception, "attempt://oversized")
+        self.assertEqual(record["output_fingerprint"], hashlib.sha256(hostile).hexdigest())
+        self.assertTrue(record["output_truncated"])
+
+        drift = {
+            "findings": [{
+                "title": "Wrong target", "body": "Outside target.", "priority": 2,
+                "confidence": 0.9, "finding_category": "regression",
+                "code_location": {"file_path": "other.py", "line": 1},
+            }],
+            "review_outcome": "fail", "review_explanation": "Drift.", "review_confidence": 0.9,
+        }
+        with self.assertRaises(cli.AutoreviewError) as rejected:
+            cli.validate_model_response(cli.parse_args([]), json.dumps(drift), changed={"app.py"})
+        self.assertNotIsInstance(rejected.exception, cli.ReviewOutputError)
+        self.assertEqual(rejected.exception.code, "review-output-identity-drift")
 
     def test_managed_checkout_without_reservation_fails_before_review_launch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

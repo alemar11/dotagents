@@ -120,6 +120,15 @@ web search, not the Codex engine transfer.
 
 ## Structured Result Contract
 
+### In simple words: which problem to fix and how
+
+`[Medium][Edge case]` In two monitored runs, the reviewer returned a result
+that said the review failed but did not name any actual problem, so the helper
+could not safely use it. For managed Implement Feature reviews, the helper may
+ask the same reviewer once to return the required shape, with the same code and
+review scope. If that one repair also fails, it stops and asks the owner; it
+never guesses a finding or calls the invalid result clean.
+
 The validated JSON result uses canonical option values:
 
 - `review_outcome=pass|fail`

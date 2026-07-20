@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "18.0.0"
+__version__ = "18.1.0"
 LEDGER_SCHEMA_VERSION = "14.0.0"
 REGISTRATION_SCHEMA_VERSION = "7.0.0"
 DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "1.0.0"
@@ -7154,6 +7154,8 @@ def autoreview_next(args: argparse.Namespace) -> dict[str, Any]:
     current = delivery["autoreview_reservation"]
     if current is not None and current["state"] == "reserved":
         blockers.append("action-already-reserved")
+    if current is not None and current["state"] == "consumed-failed":
+        blockers.append("autoreview-attempt-consumed-failed-needs-owner")
     open_obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
     if len(open_obligations) > 1:
         blockers.append("multiple-hosted-obligations")

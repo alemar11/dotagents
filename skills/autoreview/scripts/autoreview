@@ -21,7 +21,11 @@ protocol = importlib.util.module_from_spec(PROTOCOL_SPEC)
 sys.modules[PROTOCOL_SPEC.name] = protocol
 PROTOCOL_SPEC.loader.exec_module(protocol)
 
-VERSION = "2.0.0"
+VERSION = "2.1.0"
+
+MAX_REVIEW_OUTPUT_BYTES = 128 * 1024
+INVALID_OUTPUT_PREVIEW_BYTES = 2048
+MAX_REPAIR_APPENDIX_BYTES = 2048
 
 PRIORITIES = {0, 1, 2, 3}
 FINDING_CATEGORIES = {"bug", "security", "regression", "test-gap", "maintainability"}
@@ -120,6 +124,21 @@ class AutoreviewError(RuntimeError):
         super().__init__(message)
         self.code = code
         self.recovery = recovery
+
+
+class ReviewOutputError(AutoreviewError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        classification: str,
+        validator_code: str,
+        violated_rule: str,
+    ) -> None:
+        super().__init__(message, code=validator_code, recovery="repair-invalid-output")
+        self.classification = classification
+        self.validator_code = validator_code
+        self.violated_rule = violated_rule
 
 
 def writable_path_status(path: Path) -> dict[str, Any]:
@@ -775,10 +794,37 @@ def write_json_temp(data: dict[str, Any]) -> Path:
     return path
 
 
+def read_review_output(path: Path) -> tuple[str, dict[str, Any]]:
+    digest = hashlib.sha256()
+    size = 0
+    kept = bytearray()
+    try:
+        with path.open("rb") as handle:
+            while chunk := handle.read(64 * 1024):
+                digest.update(chunk)
+                size += len(chunk)
+                if len(kept) < MAX_REVIEW_OUTPUT_BYTES:
+                    kept.extend(chunk[: MAX_REVIEW_OUTPUT_BYTES - len(kept)])
+    except OSError as exc:
+        raise AutoreviewError(
+            f"review output is unreadable: {type(exc).__name__}: {exc}",
+            code="review-output-unreadable",
+            recovery="inspect-error",
+        ) from exc
+    preview = bounded_utf8_preview(bytes(kept))
+    metadata = {
+        "output_fingerprint": digest.hexdigest(),
+        "output_size_bytes": size,
+        "output_truncated": size > MAX_REVIEW_OUTPUT_BYTES,
+        "preview": preview,
+    }
+    return bytes(kept).decode("utf-8", errors="replace"), metadata
+
+
 def run_codex(args: argparse.Namespace, repo: Path, prompt: str, schema: dict[str, Any] | None = None) -> str:
     ensure_review_environment()
     codex_bin = resolve_command(args.codex_bin, repo)
-    model = args.model or configured_codex_model()
+    model = getattr(args, "_resolved_model", None) or args.model or configured_codex_model()
     cmd = [codex_bin, "--ask-for-approval", "never"]
     if args.web_search:
         cmd.append("--search")
@@ -833,7 +879,8 @@ def run_codex(args: argparse.Namespace, repo: Path, prompt: str, schema: dict[st
                 recovery=recovery,
             )
         else:
-            output = output_path.read_text()
+            output, metadata = read_review_output(output_path)
+            args._last_review_output = metadata
     except AutoreviewError as exc:
         primary_error = exc
     except Exception as exc:
@@ -903,7 +950,12 @@ def parse_json_candidate(text: str) -> Any | None:
 def extract_json(text: str) -> dict[str, Any]:
     stripped = text.strip()
     if not stripped:
-        raise AutoreviewError("review engine returned empty output")
+        raise ReviewOutputError(
+            "review engine returned empty output",
+            classification="schema-parse",
+            validator_code="review-output-empty",
+            violated_rule="The reviewer must return exactly one JSON object.",
+        )
     parsed = parse_json_candidate(stripped)
     if isinstance(parsed, dict) and "findings" in parsed:
         return parsed
@@ -914,7 +966,12 @@ def extract_json(text: str) -> dict[str, Any]:
         if isinstance(result, dict) and "findings" in result:
             return result
     preview = stripped[:2000]
-    raise AutoreviewError(f"review engine returned unexpected JSON shape:\n{preview}")
+    raise ReviewOutputError(
+        f"review engine returned unexpected JSON shape:\n{preview}",
+        classification="schema-parse",
+        validator_code="review-output-shape-invalid",
+        violated_rule="The reviewer output must match the requested object schema exactly.",
+    )
 
 
 def number_in_range(value: Any) -> bool:
@@ -1021,6 +1078,166 @@ def validate_verification_report(
     expected_fail = unresolved or bool(report["findings"])
     if expected_fail != (report["review_outcome"] == "fail"):
         raise AutoreviewError("verification outcome does not match unresolved findings")
+
+
+def classified_validation_error(exc: AutoreviewError, *, verification: bool) -> AutoreviewError:
+    detail = str(exc)
+    if (
+        "unexpected finding_id" in detail
+        or "must cover every accepted finding" in detail
+        or "outside the changed delta lines" in detail
+        or "outside the reviewed change" in detail
+    ):
+        return AutoreviewError(
+            detail,
+            code="review-output-identity-drift",
+            recovery="needs-owner",
+        )
+    semantic_codes = {
+        "review JSON with findings must set review_outcome to fail": "review-pass-with-finding",
+        "review JSON fail outcome must include a discrete finding": "review-fail-without-finding",
+        "verification outcome does not match unresolved findings": "verification-outcome-mismatch",
+    }
+    code = semantic_codes.get(detail)
+    classification = "semantic-invariant" if code else "schema-parse"
+    semantic_rules = {
+        "review-pass-with-finding": "A result with findings must use review_outcome=fail.",
+        "review-fail-without-finding": "A result with review_outcome=fail must include a discrete finding.",
+        "verification-outcome-mismatch": "Verification outcome must match unresolved findings.",
+    }
+    return ReviewOutputError(
+        detail,
+        classification=classification,
+        validator_code=code or ("verification-schema-invalid" if verification else "review-schema-invalid"),
+        violated_rule=semantic_rules.get(
+            code,
+            "The reviewer output must satisfy the requested schema and field constraints.",
+        ),
+    )
+
+
+def validate_model_response(
+    args: argparse.Namespace,
+    text: str,
+    *,
+    changed: set[str],
+    verification: tuple[set[str], dict[str, list[tuple[int, int]]]] | None = None,
+) -> dict[str, Any]:
+    metadata = getattr(args, "_last_review_output", {})
+    if metadata.get("output_truncated"):
+        raise ReviewOutputError(
+            f"review output exceeds {MAX_REVIEW_OUTPUT_BYTES} bytes",
+            classification="schema-parse",
+            validator_code="review-output-too-large",
+            violated_rule=f"Reviewer output must not exceed {MAX_REVIEW_OUTPUT_BYTES} bytes.",
+        )
+    report = extract_json(text)
+    try:
+        if verification is None:
+            validate_report(report, changed)
+        else:
+            accepted_ids, ranges = verification
+            validate_verification_report(report, accepted_ids, changed, ranges)
+    except ReviewOutputError:
+        raise
+    except AutoreviewError as exc:
+        raise classified_validation_error(exc, verification=verification is not None) from exc
+    return report
+
+
+def invalid_output_record(args: argparse.Namespace, exc: ReviewOutputError, artifact_ref: str) -> dict[str, Any]:
+    metadata = getattr(args, "_last_review_output", {})
+    return {
+        "classification": exc.classification,
+        "validator_code": exc.validator_code,
+        "violated_rule": exc.violated_rule,
+        "output_fingerprint": metadata.get("output_fingerprint", hashlib.sha256(b"").hexdigest()),
+        "output_size_bytes": metadata.get("output_size_bytes", 0),
+        "output_truncated": bool(metadata.get("output_truncated")),
+        "preview": bounded_utf8_preview(str(metadata.get("preview", "")).encode("utf-8")),
+        "artifact_ref": artifact_ref,
+    }
+
+
+def bounded_utf8_preview(raw: bytes) -> str:
+    preview = raw[:INVALID_OUTPUT_PREVIEW_BYTES].decode("utf-8", errors="replace")
+    while len(preview.encode("utf-8")) > INVALID_OUTPUT_PREVIEW_BYTES:
+        preview = preview[:-1]
+    return preview
+
+
+def build_repair_appendix(exc: ReviewOutputError) -> str:
+    appendix = textwrap.dedent(
+        f"""
+
+        # Structured Output Repair
+        The previous response was rejected with validator_code={exc.validator_code}.
+        Violated rule: {exc.violated_rule}
+        Return a valid result using only the immutable bundle and read-only repository context already supplied.
+        Do not add context, broaden scope, synthesize findings, or repeat an invalid verdict.
+        """
+    ).rstrip()
+    if len(appendix.encode("utf-8")) > MAX_REPAIR_APPENDIX_BYTES:
+        raise AutoreviewError(
+            "helper-owned repair appendix exceeds its bound",
+            code="repair-appendix-too-large",
+            recovery="needs-owner",
+        )
+    return appendix
+
+
+def run_validated_model(
+    args: argparse.Namespace,
+    repo: Path,
+    prompt: str,
+    schema: dict[str, Any],
+    *,
+    changed: set[str],
+    verification: tuple[set[str], dict[str, list[tuple[int, int]]]] | None = None,
+) -> dict[str, Any]:
+    args._active_prompt_fingerprint = sha256_text(prompt)
+    try:
+        return validate_model_response(
+            args,
+            run_codex(args, repo, prompt, schema),
+            changed=changed,
+            verification=verification,
+        )
+    except ReviewOutputError as first:
+        args._pending_invalid_output = first
+        prepare_repair = getattr(args, "_prepare_invalid_output_repair", None)
+        start_repair = getattr(args, "_start_invalid_output_repair", None)
+        validate_identity = getattr(args, "_validate_invalid_output_repair", None)
+        if prepare_repair is None or start_repair is None or validate_identity is None:
+            raise AutoreviewError(
+                "review output is invalid and this invocation has no managed repair reservation",
+                code=first.validator_code,
+                recovery="needs-owner",
+            ) from first
+        repair_prompt = prompt + build_repair_appendix(first)
+        validate_identity(prompt, schema)
+        prepare_repair(first, prompt, repair_prompt)
+        args._pending_invalid_output = None
+        prior_callback = getattr(args, "_on_model_started", None)
+        args._on_model_started = start_repair
+        args._active_prompt_fingerprint = sha256_text(repair_prompt)
+        try:
+            text = run_codex(args, repo, repair_prompt, schema)
+            return validate_model_response(
+                args,
+                text,
+                changed=changed,
+                verification=verification,
+            )
+        except ReviewOutputError as second:
+            args._terminal_invalid_output = second
+            raise AutoreviewError(
+                "review output remained invalid after one bounded repair launch",
+                code="invalid-output-repair-exhausted",
+                recovery="needs-owner",
+            ) from second
+        finally:
+            args._on_model_started = prior_callback
 
 
 def finding_rows(report: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1308,9 +1525,8 @@ def run_review(args: argparse.Namespace) -> int:
 
     import time
     started = time.monotonic()
-    report = extract_json(run_codex(args, repo, prompt, SCHEMA))
+    report = run_validated_model(args, repo, prompt, SCHEMA, changed=changed)
     elapsed = int(time.monotonic() - started)
-    validate_report(report, changed)
     if args.json_output:
         Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     if args.evidence_output:
@@ -1366,10 +1582,16 @@ def run_fix_verification(args: argparse.Namespace) -> int:
         return 0
     import time
     started = time.monotonic()
-    report = extract_json(run_codex(args, repo, prompt, VERIFICATION_SCHEMA))
-    elapsed = int(time.monotonic() - started)
     accepted_ids = {row["finding_id"] for row in accepted}
-    validate_verification_report(report, accepted_ids, delta_paths, ranges)
+    report = run_validated_model(
+        args,
+        repo,
+        prompt,
+        VERIFICATION_SCHEMA,
+        changed=delta_paths,
+        verification=(accepted_ids, ranges),
+    )
+    elapsed = int(time.monotonic() - started)
     if args.json_output:
         Path(args.json_output).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     evidence = make_evidence(
@@ -1598,33 +1820,89 @@ def managed_owner(repo: Path) -> dict[str, Any] | None:
     return matches[0] if matches else None
 
 
-def append_attempt(path_value: str, record: dict[str, Any], *, create: bool = False) -> None:
+def load_attempt_journal(path: Path) -> list[dict[str, Any]]:
+    try:
+        raw = path.read_bytes()
+        if raw and not raw.endswith(b"\n"):
+            raise AutoreviewError(
+                "attempt journal is truncated",
+                code="attempt-invalid",
+                recovery="needs-owner",
+            )
+        records = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line]
+        protocol.validate_attempt_journal(records)
+        return records
+    except AutoreviewError:
+        raise
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, protocol.ProtocolError) as exc:
+        raise AutoreviewError(
+            "attempt journal is unreadable or invalid",
+            code="attempt-invalid",
+            recovery="needs-owner",
+        ) from exc
+
+
+def append_attempt(path_value: str, record: dict[str, Any], *, create: bool = False) -> dict[str, Any]:
     path = Path(path_value)
     path.parent.mkdir(parents=True, exist_ok=True)
     prior: list[dict[str, Any]] = []
-    if path.exists():
-        try:
-            prior = [json.loads(line) for line in path.read_text().splitlines() if line]
-        except (OSError, json.JSONDecodeError) as exc:
-            raise AutoreviewError("attempt journal is unreadable", code="attempt-invalid", recovery="needs-owner") from exc
+    existed = path.exists()
+    if existed:
+        prior = load_attempt_journal(path)
     elif not create:
         raise AutoreviewError("attempt journal is missing", code="attempt-invalid", recovery="needs-owner")
-    if create and prior:
+    if create and existed:
         raise AutoreviewError("reservation already has an attempt journal", code="review-relaunch-forbidden", recovery="resume-identical-operation")
-    try:
-        protocol.validate_attempt_transition(prior, record)
-    except protocol.ProtocolError as exc:
-        raise AutoreviewError(str(exc), code=exc.code, recovery=exc.recovery) from exc
     payload = {
         "schema_version": protocol.ATTEMPT_SCHEMA_VERSION,
         **record,
         "parent_record_fingerprint": protocol.fingerprint(prior[-1]) if prior else None,
     }
-    mode = "x" if create and not path.exists() else "a"
+    try:
+        protocol.validate_attempt_journal([*prior, payload])
+    except protocol.ProtocolError as exc:
+        raise AutoreviewError(str(exc), code=exc.code, recovery=exc.recovery) from exc
+    mode = "x" if create else "a"
     with path.open(mode) as handle:
         handle.write(json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n")
         handle.flush()
         os.fsync(handle.fileno())
+    return payload
+
+
+def attempt_record(
+    *,
+    transition: str,
+    attempt_id: str,
+    reservation_id: str,
+    model_launch_count: int,
+    pid: int | None = None,
+    invalid_output: dict[str, Any] | None = None,
+    prompt_fingerprint: str | None = None,
+    candidate_fingerprint: str | None = None,
+    operation_id: str | None = None,
+) -> dict[str, Any]:
+    state = {
+        "prepared": "prepared",
+        "model-started": "model-started",
+        "repair-prepared": "model-started",
+        "repair-model-started": "model-started",
+        "completed": "completed",
+        "failed": "failed",
+    }[transition]
+    return {
+        "transition": transition,
+        "state": state,
+        "model_call_started": model_launch_count > 0,
+        "model_launch_count": model_launch_count,
+        "attempt_id": attempt_id,
+        "reservation_id": reservation_id,
+        "pid": pid,
+        "invalid_output": invalid_output,
+        "prompt_fingerprint": prompt_fingerprint,
+        "candidate_fingerprint": candidate_fingerprint,
+        "operation_id": operation_id,
+    }
 
 
 def load_managed_reservation(args: argparse.Namespace) -> dict[str, Any] | None:
@@ -1764,7 +2042,12 @@ def main(argv: list[str] | None = None) -> int:
             "operation_id": None,
             "evidence_ref": f"autoreview-attempt://{attempt_id}",
         }
-        prepared_record = {"state": "prepared", "model_call_started": False, "attempt_id": attempt_id, "reservation_id": reservation_id}
+        prepared_record = attempt_record(
+            transition="prepared",
+            attempt_id=attempt_id,
+            reservation_id=reservation_id,
+            model_launch_count=0,
+        )
         append_attempt(args.attempt_file, prepared_record, create=True)
         prepared_event = {**event_base, "attempt_state": "prepared", "model_call_started": False}
         ledger_apply_events(
@@ -1772,11 +2055,26 @@ def main(argv: list[str] | None = None) -> int:
             protocol.fingerprint({"attempt_id": attempt_id, "state": "prepared"})[:32], dry_run=False,
         )
         launched = False
+        model_launch_count = 0
+        args._resolved_model = args.model or configured_codex_model()
+        finding_fingerprint = (
+            hashlib.sha256(Path(args.finding_file).read_bytes()).hexdigest()
+            if args.finding_file
+            else None
+        )
 
         def model_started(pid: int) -> None:
-            nonlocal launched
+            nonlocal launched, model_launch_count
             launched = True
-            record = {"state": "model-started", "model_call_started": True, "attempt_id": attempt_id, "reservation_id": reservation_id, "pid": pid}
+            model_launch_count = 1
+            record = attempt_record(
+                transition="model-started",
+                attempt_id=attempt_id,
+                reservation_id=reservation_id,
+                model_launch_count=model_launch_count,
+                pid=pid,
+                prompt_fingerprint=args._active_prompt_fingerprint,
+            )
             append_attempt(args.attempt_file, record)
             event = {**event_base, "attempt_state": "model-started", "model_call_started": True}
             ledger_apply_events(
@@ -1784,7 +2082,106 @@ def main(argv: list[str] | None = None) -> int:
                 protocol.fingerprint({"attempt_id": attempt_id, "state": "model-started"})[:32], dry_run=False,
             )
 
+        def validate_invalid_output_repair(prompt: str, schema: dict[str, Any]) -> None:
+            repo = repo_root()
+            target = managed["packet"]["target"]
+            if current_head(repo) != target["head_sha"] or is_dirty(repo):
+                raise AutoreviewError(
+                    "managed review target changed before invalid-output repair",
+                    code="repair-identity-drift",
+                    recovery="needs-owner",
+                )
+            if args.finding_file:
+                current_findings = hashlib.sha256(Path(args.finding_file).read_bytes()).hexdigest()
+                if current_findings != finding_fingerprint:
+                    raise AutoreviewError(
+                        "managed finding input changed before invalid-output repair",
+                        code="repair-identity-drift",
+                        recovery="needs-owner",
+                    )
+            state = json.loads(Path(managed["ledger"]).read_text())
+            delivery = next(
+                delivery
+                for task in state["tasks"] if task["task_key"] == managed["task_key"]
+                for delivery in task["deliveries"] if delivery["delivery_key"] == managed["delivery_key"]
+            )
+            active = delivery.get("autoreview_reservation")
+            committed = delivery.get("committed_revision")
+            if (
+                not isinstance(active, dict)
+                or active.get("reservation_id") != reservation_id
+                or active.get("state") != "reserved"
+                or not isinstance(committed, dict)
+                or committed.get("target") != target
+            ):
+                raise AutoreviewError(
+                    "managed reservation changed before invalid-output repair",
+                    code="repair-identity-drift",
+                    recovery="needs-owner",
+                )
+            identity = protocol.fingerprint(
+                {
+                    "reservation_id": reservation_id,
+                    "packet": managed["packet"],
+                    "prior_evidence": managed["prior_evidence"],
+                    "hosted_obligation": managed["hosted_obligation"],
+                    "prompt_fingerprint": sha256_text(prompt),
+                    "schema_fingerprint": protocol.fingerprint(schema),
+                    "finding_fingerprint": finding_fingerprint,
+                    "model": args._resolved_model,
+                    "web_search": args.web_search,
+                }
+            )
+            expected = getattr(args, "_repair_identity_fingerprint", None)
+            if expected is None:
+                args._repair_identity_fingerprint = identity
+            elif expected != identity:
+                raise AutoreviewError(
+                    "managed operation identity changed before invalid-output repair",
+                    code="repair-identity-drift",
+                    recovery="needs-owner",
+                )
+
+        def prepare_invalid_output_repair(
+            exc: ReviewOutputError, original_prompt: str, repair_prompt: str
+        ) -> None:
+            records = load_attempt_journal(Path(args.attempt_file))
+            invalid = invalid_output_record(
+                args,
+                exc,
+                f"{Path(args.attempt_file).resolve()}#record-{len(records) + 1}",
+            )
+            append_attempt(
+                args.attempt_file,
+                attempt_record(
+                    transition="repair-prepared",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=model_launch_count,
+                    invalid_output=invalid,
+                    prompt_fingerprint=sha256_text(repair_prompt),
+                ),
+            )
+
+        def start_invalid_output_repair(pid: int) -> None:
+            nonlocal model_launch_count
+            model_launch_count = 2
+            append_attempt(
+                args.attempt_file,
+                attempt_record(
+                    transition="repair-model-started",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=model_launch_count,
+                    pid=pid,
+                    prompt_fingerprint=args._active_prompt_fingerprint,
+                ),
+            )
+
         args._on_model_started = model_started
+        args._prepare_invalid_output_repair = prepare_invalid_output_repair
+        args._start_invalid_output_repair = start_invalid_output_repair
+        args._validate_invalid_output_repair = validate_invalid_output_repair
         try:
             exit_code = run_review(args)
             candidate = validate_evidence(load_json_file(args.candidate_output, "candidate evidence"))
@@ -1792,11 +2189,15 @@ def main(argv: list[str] | None = None) -> int:
             operation_id = protocol.fingerprint(
                 {"reservation_id": reservation_id, "candidate_fingerprint": candidate_fingerprint}
             )[:32]
-            completed_record = {
-                "state": "completed", "model_call_started": launched,
-                "attempt_id": attempt_id, "reservation_id": reservation_id,
-                "candidate_fingerprint": candidate_fingerprint, "operation_id": operation_id,
-            }
+            completed_record = attempt_record(
+                transition="completed",
+                attempt_id=attempt_id,
+                reservation_id=reservation_id,
+                model_launch_count=model_launch_count,
+                prompt_fingerprint=getattr(args, "_active_prompt_fingerprint", None),
+                candidate_fingerprint=candidate_fingerprint,
+                operation_id=operation_id,
+            )
             append_attempt(args.attempt_file, completed_record)
             completed_event = {
                 **event_base, "attempt_state": "completed", "model_call_started": launched,
@@ -1821,12 +2222,27 @@ def main(argv: list[str] | None = None) -> int:
             ledger_apply_events(managed, operation["events"], operation_id, dry_run=True)
             return exit_code
         except BaseException:
-            records = [json.loads(line) for line in Path(args.attempt_file).read_text().splitlines() if line]
+            records = load_attempt_journal(Path(args.attempt_file))
             if records and records[-1]["state"] not in {"completed", "failed"}:
-                failed_record = {
-                    "state": "failed", "model_call_started": launched,
-                    "attempt_id": attempt_id, "reservation_id": reservation_id,
-                }
+                terminal_invalid = (
+                    getattr(args, "_terminal_invalid_output", None)
+                    or getattr(args, "_pending_invalid_output", None)
+                )
+                invalid = None
+                if terminal_invalid is not None:
+                    invalid = invalid_output_record(
+                        args,
+                        terminal_invalid,
+                        f"{Path(args.attempt_file).resolve()}#record-{len(records) + 1}",
+                    )
+                failed_record = attempt_record(
+                    transition="failed",
+                    attempt_id=attempt_id,
+                    reservation_id=reservation_id,
+                    model_launch_count=model_launch_count,
+                    invalid_output=invalid,
+                    prompt_fingerprint=getattr(args, "_active_prompt_fingerprint", None),
+                )
                 append_attempt(args.attempt_file, failed_record)
                 failed_event = {**event_base, "attempt_state": "failed", "model_call_started": launched}
                 ledger_apply_events(

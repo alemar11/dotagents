@@ -71,6 +71,32 @@ autoreview next`. They reserve before launch and do not accept caller-selected
 mode, phase, prompt, or evidence parent. Publication facts attach to the
 existing clean committed revision and do not reset lineage.
 
+## Bounded Invalid-Output Recovery
+
+This is a `[Medium][Edge case]` learned from two monitored runs, not a general
+review-loop redesign. After a successful engine launch returns output that
+fails only schema parsing or a semantic result invariant, a managed invocation
+may make exactly one internal repair launch. It keeps the reservation, target,
+phase, evidence parent, finding set, bundle, model, and web-search policy fixed.
+The helper-owned appendix is at most 2 KiB and states only the validator code,
+violated rule, and instruction to reuse the supplied immutable context.
+
+Transport, timeout, cancellation, cleanup, filesystem, protocol, reservation,
+target, lineage, or finding-identity failures never repair. Valid clean results
+and valid actionable findings never repair. Reviewer output is stream-hashed
+before loading, capped at 128 KiB, and represented in the append-only attempt
+journal by its exact hash, size, classification, validator code, bounded
+preview/artifact reference, prompt fingerprints, and `model_launch_count`.
+The evidence schema and logical `counts.model_calls` remain `2.0.0` semantics;
+the external attempt journal is `2.1.0` and counts physical launches.
+
+Before every append, the helper replays the exact journal schema, identity,
+parent fingerprint chain, transitions, and monotonic launch count. A second
+invalid response appends terminal failure, consumes the reservation as
+`consumed-failed`, emits no candidate or clean gate, and returns
+`recovery=needs-owner`. A consumed-failed exact operation cannot reserve again.
+Process interruption after either launch also cannot relaunch.
+
 Terminal states are:
 
 - `terminal-clean`: a full review is clean on the exact current patch.
