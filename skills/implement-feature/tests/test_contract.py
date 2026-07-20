@@ -26,6 +26,98 @@ UNSAFE_CONTROL_PLANE_RETRIES = {
     "update-goal",
 }
 
+VISIBLE_REPORT_FIELDS = (
+    "lifecycle",
+    "state",
+    "outcome",
+    "attention_reason",
+    "blocker_identity",
+    "approval_identity",
+    "failure_identity",
+    "next_action",
+    "deadline_risk",
+    "freshness_state",
+    "revision_identity",
+    "pr_identity",
+    "review_identity",
+    "ci_identity",
+    "mergeability_identity",
+    "evidence_identity",
+    "claim_loss",
+    "monitor_degraded",
+    "terminal_state",
+    "closeout_state",
+)
+
+
+def visible_report_transcript(
+    observations: list[dict[str, object]],
+    *,
+    cached_fingerprint: tuple[object, ...] | None = None,
+) -> tuple[list[str], list[str]]:
+    """Model visible dedup separately from durable observation application."""
+
+    last_fingerprint = cached_fingerprint
+    pending_cycle: int | None = None
+    pending_fingerprint: tuple[object, ...] | None = None
+    packets: list[str] = []
+    applied_events: list[str] = []
+    app_delay_notice = False
+
+    def flush_pending() -> None:
+        nonlocal last_fingerprint, pending_cycle, pending_fingerprint
+        if pending_fingerprint is not None:
+            packets.append("delta")
+            last_fingerprint = pending_fingerprint
+        pending_cycle = None
+        pending_fingerprint = None
+
+    for observation in observations:
+        cycle = int(observation["cycle"])
+        if pending_cycle is not None and cycle != pending_cycle:
+            flush_pending()
+        applied_events.append(str(observation["event"]))
+
+        if observation.get("app_delay") and not app_delay_notice:
+            packets.append("app-delay")
+            app_delay_notice = True
+
+        if observation.get("heartbeat"):
+            continue
+        if observation.get("freshness") != "fresh":
+            if observation.get("freshness_blocker"):
+                packets.append("attention")
+            continue
+
+        fingerprint = tuple(observation.get(field) for field in VISIBLE_REPORT_FIELDS)
+        if observation.get("urgent"):
+            flush_pending()
+            packets.append("urgent")
+            last_fingerprint = fingerprint
+        elif last_fingerprint is None:
+            flush_pending()
+            packets.append("snapshot")
+            last_fingerprint = fingerprint
+        elif fingerprint != last_fingerprint:
+            pending_cycle = cycle
+            pending_fingerprint = fingerprint
+
+    flush_pending()
+    return packets, applied_events
+
+
+def progress_observation(
+    *, event: str, cycle: int, **changes: object
+) -> dict[str, object]:
+    observation: dict[str, object] = {
+        "event": event,
+        "cycle": cycle,
+        "freshness": "fresh",
+        **{field: None for field in VISIBLE_REPORT_FIELDS},
+    }
+    observation.update(changes)
+    return observation
+
 
 def within_control_plane_budget(
     *, first_attempt_at: int, observed_at: int, operation: str
@@ -791,6 +883,162 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py"
             ).read_text(),
         )
+
+    def test_visible_progress_dedup_is_transient_post_reconciliation_and_bounded(
+        self,
+    ) -> None:
+        worker = " ".join(self.read("references/worker.md").split())
+        skill = " ".join(self.read("SKILL.md").split())
+        for token in (
+            "presentation-only",
+            "required full reads",
+            "freshness validation",
+            "ledger reconciliation",
+            "event application",
+            "never suppress `task-observed`",
+            "Transient root fingerprint",
+            "cache loss permits one",
+            "Closed fingerprint",
+            "Wording-only changes are not material",
+            "Stale/out-of-order/ambiguous input",
+            "authoritative observation/reconciliation cycle",
+            "never wait",
+            "one-shot 10-second App-delay notice",
+            "at most one concise liveness line per 60 seconds",
+            "no worker packet/event",
+            "Claim/execution/provider heartbeats stay internal",
+            "These retain task assignment evidence, state, complete delivery-keyed managed checkout map, changed files, exact task title/observation, model/thinking/profile reason, validation, commits, exact PR number/URL/revision, review/wait, CI, prepared tracker closeout, internal subagents, blockers/drift/next action",
+        ):
+            self.assertIn(token, worker)
+        self.assertIn("post-reconciliation presentation only", skill)
+        self.assertIn("atomically apply events", skill)
+        self.assertIn("It never gates durable evidence", skill)
+
+        baseline = progress_observation(
+            event="task-observed-1",
+            cycle=0,
+            lifecycle="active",
+            state="waiting",
+            next_action="poll",
+        )
+        repeated = dict(baseline)
+        repeated.update(
+            event="task-observed-2",
+            observed_at="later",
+            elapsed_seconds=60,
+            poll_count=4,
+            pid=123,
+            process_cpu=0.1,
+            repeated_output="still waiting",
+            static_paths=["same/path"],
+        )
+        packets, applied = visible_report_transcript([baseline, repeated])
+        self.assertEqual(packets, ["snapshot"])
+        self.assertEqual(applied, ["task-observed-1", "task-observed-2"])
+
+        field_trace = [baseline]
+        for index, field in enumerate(VISIBLE_REPORT_FIELDS, start=1):
+            field_trace.append(
+                progress_observation(
+                    event=f"task-observed-{index + 2}",
+                    cycle=index,
+                    **{field: f"changed-{index}"},
+                )
+            )
+        field_packets, _ = visible_report_transcript(field_trace)
+        self.assertEqual(field_packets, ["snapshot"] + ["delta"] * len(VISIBLE_REPORT_FIELDS))
+
+        stale = progress_observation(
+            event="task-observed-stale",
+            cycle=1,
+            freshness="stale",
+            state="failed",
+        )
+        stale_blocker = dict(stale)
+        stale_blocker.update(
+            event="task-observed-stale-blocker",
+            freshness_blocker=True,
+            attention_reason="stale evidence",
+        )
+        stale_packets, _ = visible_report_transcript(
+            [baseline, stale, stale_blocker, dict(baseline, event="task-observed-3", cycle=2)]
+        )
+        self.assertEqual(stale_packets, ["snapshot", "attention"])
+
+        same_cycle = [
+            baseline,
+            progress_observation(event="task-observed-4", cycle=1, state="running"),
+            progress_observation(event="task-observed-5", cycle=1, state="reviewing"),
+            progress_observation(event="task-observed-6", cycle=2, state="complete"),
+        ]
+        same_cycle_packets, _ = visible_report_transcript(same_cycle)
+        self.assertEqual(same_cycle_packets, ["snapshot", "delta", "delta"])
+
+        urgent = progress_observation(
+            event="task-observed-urgent",
+            cycle=1,
+            approval_identity="approval-1",
+            urgent=True,
+        )
+        urgent_packets, _ = visible_report_transcript(
+            [baseline, progress_observation(event="task-observed-7", cycle=1, state="running"), urgent]
+        )
+        self.assertEqual(urgent_packets, ["snapshot", "delta", "urgent"])
+
+        cached = tuple(baseline.get(field) for field in VISIBLE_REPORT_FIELDS)
+        self.assertEqual(
+            visible_report_transcript([baseline], cached_fingerprint=cached)[0],
+            [],
+        )
+        self.assertEqual(visible_report_transcript([baseline])[0], ["snapshot"])
+
+        delay_trace = [
+            baseline,
+            dict(baseline, event="task-observed-delay-1", app_delay=True),
+            dict(baseline, event="task-observed-delay-2", app_delay=True),
+        ]
+        delay_packets, _ = visible_report_transcript(delay_trace)
+        self.assertEqual(delay_packets, ["snapshot", "app-delay"])
+
+        heartbeat_packets, heartbeat_events = visible_report_transcript(
+            [baseline, dict(baseline, event="claim-heartbeat", heartbeat=True)]
+        )
+        self.assertEqual(heartbeat_packets, ["snapshot"])
+        self.assertEqual(heartbeat_events, ["task-observed-1", "claim-heartbeat"])
+
+    def test_progress_reporting_preserves_versions_and_loaded_path_ceilings(self) -> None:
+        skill = self.read("SKILL.md")
+        worker = self.read("references/worker.md")
+        prompt_match = re.search(r"## Prompt\n\n```text\n(.*?)\n```", worker, re.DOTALL)
+        self.assertIsNotNone(prompt_match)
+        assert prompt_match is not None
+        self.assertEqual(len(prompt_match.group(1)), 2_033)
+        self.assertLessEqual(len(skill.encode("utf-8")), 16_500)
+
+        loaded = (
+            "SKILL.md",
+            "references/options.md",
+            "references/task-model-policy.md",
+            "references/spec-backed-delivery.md",
+            "references/baseline-validation.md",
+            "references/run-state.md",
+            "references/run-state-packets.md",
+            "references/cache-lifecycle.md",
+            "references/worker.md",
+            "references/gates.md",
+            "references/codex-review-closeout.md",
+        )
+        sizes = lambda paths: sum(len(self.read(path).encode("utf-8")) for path in paths)
+        self.assertLessEqual(sizes(loaded), 114_502)
+        self.assertLessEqual(sizes(loaded + ("references/execution-manifest.md",)), 125_899)
+        self.assertLessEqual(sizes(loaded + ("references/multi-repo-workspace.md",)), 118_788)
+
+        self.assertIn('__version__ = "18.1.0"', self.read("scripts/ledger-cache"))
+        self.assertIn('LEDGER_SCHEMA_VERSION = "14.0.0"', self.read("scripts/ledger-cache"))
+        self.assertIn('__version__ = "4.0.0"', self.read("scripts/execution-manifest"))
+        self.assertIn('VERSION = "2.1.0"', (REPO / "skills/autoreview/scripts/autoreview").read_text())
+        self.assertIn('PROTOCOL_VERSION = "2.0.0"', (REPO / "skills/autoreview/scripts/autoreview_protocol.py").read_text())
+        self.assertIn('__version__ = "5.0.0"', (REPO / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py").read_text())
 
     def test_root_task_title_is_stable_adaptive_and_recoverable(self) -> None:
         skill = self.read("SKILL.md")

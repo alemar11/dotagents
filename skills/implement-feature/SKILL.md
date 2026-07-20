@@ -11,10 +11,9 @@ Use this skill only when the owner explicitly invokes $implement-feature in the
 ChatGPT desktop app. It is the single App-only implementation adapter and never
 plans or repairs planning artifacts.
 
-The root owns intake, the active-root claim, typed run state,
-review deadlines, reconciliation, and final status. Exactly one visible App task
-owns each implementation-eligible Feature Spec through the only successful App result:
-`pull-request-ready-for-merge-but-not-merged`.
+Root owns intake, claim, typed state, deadlines, reconciliation, and status. One
+visible App task owns each eligible Spec through the only successful
+App result: `pull-request-ready-for-merge-but-not-merged`.
 
 ## Mandatory Runtime Surface Gate
 
@@ -46,48 +45,43 @@ Prior artifacts stay untouched. If any capability is absent, return
   current-revision review and CI; the transition is not the terminal result.
 - Use only App-managed worktrees. Never create raw Git worktrees, rotate the
   caller checkout, or implement in the root or a background worker.
-- Create exactly one visible task per Feature Spec, including a multi-repository
-  Spec, and at most three nonterminal Spec tasks. Every created, resumed, or
+- Create exactly one visible task per Feature Spec, including multi-repository
+  Specs, and at most three nonterminal Spec tasks. Every created, resumed, or
   steered task uses the recorded per-Spec model profile.
 - After CLAIM, give the calling task the stable root title defined by
   `references/run-state.md`: `👨🏻‍💻 Feature Orchestrator` for one executable Spec
   or `👨🏻‍💻 Multi-Feature Orchestrator` for more than one, with no counter.
 - Give each task a root-owned title: relevant emoji, one space, exact authored
   Feature Spec title; use `🛠️` as fallback. It is UI evidence, not identity.
-- The root performs cache maintenance synchronously after CLAIM. It never uses a
-  task, Goal, worktree, or internal subagent for cache work.
+- Root performs cache maintenance synchronously after CLAIM; no task, Goal,
+  worktree, or internal subagent handles cache work.
 - This skill never merges a pull request.
 - A later merge request must start a separate GitHub workflow.
 
 ## Execution-Ready Intake
 
 After the surface gate, load `references/spec-backed-delivery.md`,
-`references/execution-manifest.md`, and `references/baseline-validation.md` and take one
-read-only snapshot of the durable Spec/issue graph. Derive/preflight deliveries and reuse
-the exact bytes for intake and fingerprinting. Proven drift requires refetch
-and preflight before CLAIM.
-That reference canonically owns accepted fields, graph rules, fingerprints,
-scope, local-tracker paths, cross-Spec dependencies, integration partials,
-domain-knowledge closeout, and rejected legacy fields. Load
-`references/multi-repo-workspace.md` when any Spec affects multiple repositories
-or the bundle contains partial and integration Specs, even when each Spec is
-single-repository.
+`references/execution-manifest.md`, and `references/baseline-validation.md`; take one
+read-only snapshot of the durable Spec/issue graph, reuse exact bytes for intake/
+fingerprinting, and refetch/preflight proven drift before CLAIM. The first reference
+owns accepted fields, graph rules, fingerprints, scope, paths, dependencies,
+integration partials, domain-knowledge closeout, and rejected legacy fields. Load
+`references/multi-repo-workspace.md` when any Spec affects multiple repositories or
+the bundle contains partial and integration Specs, even when each Spec is single-repository.
 
 Require exactly one Feature Spec owner for every implementation-bundle
-`(repository, target_branch_name)` pair. Coordination-only parent/global
-artifacts create no task. The same branch name in different repositories is
-valid; two executable Specs in the same repository collide even when paths are
-disjoint. Return `planning-required` before CLAIM; never serialize around the
-collision, rename the branch, or force-bind an App-managed worktree.
+`(repository, target_branch_name)` pair; coordination-only parent/global artifacts
+create no task. The same branch in different repositories is valid; two executable
+Specs in one repository collide even with disjoint paths. Return `planning-required`
+before CLAIM; never serialize around the collision, rename the branch, or force-bind
+an App-managed worktree.
 
-Validate stable refs, scope, earlier-only dependencies, acyclic intra- and
-cross-Spec graphs, repositories, allowed paths, acceptance, validation, GitHub
-delivery compatibility, and integration gates. Resolve each accepted Spec's
-task profile before CLAIM. Missing or contradictory evidence is
-`planning-required`; an explicit non-App target is
-`unsupported-app-delivery-target`. Never create, repair, publish, or mutate
-planning or tracker artifacts. Report exact failures and that no claim, run state,
-Goal, task, tracker write, or source mutation was created.
+Validate stable refs, scope, earlier-only dependencies, acyclic graphs, repositories,
+allowed paths, acceptance, validation, GitHub compatibility, and integration gates;
+resolve profiles before CLAIM. Missing or contradictory evidence is
+`planning-required`; an explicit non-App target is `unsupported-app-delivery-target`.
+Never create, repair, publish, or mutate planning or tracker artifacts. Report exact
+failures and that no claim, run state, Goal, task, tracker write, or source mutation was created.
 
 ## Mandatory Run Authorization
 
@@ -144,30 +138,32 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
    `token_budget`; call `create_goal` once, then `get_goal`; record activation; allow
    implementation. Failure uses the typed preimplementation stop.
 10. **MONITOR** — after one full post-dispatch snapshot, compact deltas are
-   hints; never mutate durable state. The root alone
-   heartbeats/CASes the claim every 60 seconds, including during commands. At
-   180 seconds without success, stop dispatch and authorize cleanup; claim loss
-   cancels and cleans up. At five minutes remain fail-closed. Children never
-   renew ownership. Follow `execution-manifest.md`; never pull worker work into root.
+   hints, never durable state. The root alone heartbeats/CASes the claim every
+   60 seconds, including during commands. At 180 seconds without success stop
+   dispatch and authorize cleanup; claim loss cancels and cleans up. At five
+   minutes remain fail-closed. Children never renew ownership. Follow
+   `execution-manifest.md`; never pull worker work into root.
 11. **GATE** — load `references/gates.md` and
    `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
    scope.
-12. **RECONCILE** — read smallest projection (`diagnostics` for user status
-    and closeout); refresh changed external evidence,
-    atomically apply events, then dispatch, reconcile the fixed review wait, or
-    advance one staged closeout transition.
+12. **RECONCILE** — read smallest projection (`diagnostics` for user status and
+    closeout); refresh changed external evidence, atomically apply events, then
+    dispatch, reconcile the fixed review wait, or advance one staged closeout transition.
+
+Visible progress deduplication is post-reconciliation presentation only;
+`references/worker.md` owns its transient fingerprint. It never gates durable
+evidence, full reads, freshness, event application, claim CAS/heartbeat, command
+attempts, review waits, or warnings.
 
 On delayed/ambiguous activation or terminal Goal mutation/readback, load
 `references/app-control-plane-delays.md`.
 
-An unchanged observation timeout performs only a claim heartbeat and no event.
-Read children at gates; root does not self-read. The
-worker owns the bounded provider wait; the root never
-polls the same provider in parallel. If the exact review is still pending at
-the 45-minute deadline, persist the required warning evidence and continue
-under the explicit `timeout-accepted` result. The root Goal remains active
-until normal terminal completion.
+On unchanged observation timeout, perform only claim heartbeat; no event. Read
+children at gates; root does not self-read. Worker owns the bounded provider wait;
+root never polls the same provider in parallel. If exact review remains pending at
+the 45-minute deadline, persist required warning evidence and continue under
+explicit `timeout-accepted`. Root Goal remains active until normal terminal completion.
 
 ## Scheduling
 
