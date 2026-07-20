@@ -62,7 +62,7 @@ exists.
 ## Delivery And Closeout
 
 Each task uses its Feature Spec's target branch name in every delivery. Each
-delivery produces one real, non-draft, reviewed, CI-clean-when-configured,
+delivery produces one real, non-draft, reviewed PR with CI passed when configured,
 ready-to-merge PR based on that repository's
 discovered default branch. Delivery observations and revision gates are keyed
 independently; task-set validation and integration bind the complete canonical

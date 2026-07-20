@@ -32,7 +32,7 @@ Run exactly one read-only GitStack proof operation against the stored request:
 
 GitStack must re-prove the exact typed request comment and receipt, current full
 head, request interval, provider identity, terminal comment identity and body
-fingerprint, clean outcome, and absence of conflicting evidence. A later or
+fingerprint, provider `outcome=clean`, and absence of conflicting evidence. A later or
 overlapping request, edited/deleted request, duplicate or multiple plausible
 artifact, inline finding, findings/error formal review, mismatched head, or
 other terminal outcome conflict fails closed. Do not use `check`, start another
@@ -56,7 +56,8 @@ recomputes provider, artifact, and receipt fingerprints.
 The event appends one `reviews[].reconciliations[]` item. It never changes the
 stored request receipt, observation, wait start, wait deadline, invocation time,
 provider timeout, or warning fields. Projection derives
-`clean/accepted` with `effective_source=terminal-provider-evidence`; then apply
+provider review `clean/accepted` for the exact revision with
+`effective_source=terminal-provider-evidence`; then apply
 the ordinary delivery-bound `codex-review` gate with the verified artifact ref.
 No unrelated gate changes automatically.
 
@@ -68,7 +69,7 @@ outcome conflicts. Terminal seal makes reconciliation permanently invalid.
 
 PR `ambrogio-dev/yn-ai-workflows#237`, head
 `03dca5ad3e5603be343c9b927e372e25f5671f1e`, plain request comment
-`5016644000`, and clean result comment `5016657271` are non-executable
+`5016644000`, and provider `outcome=clean` comment `5016657271` are non-executable
 motivating metadata. That schema-5/plain-request incident is never imported,
 migrated, adopted, or repaired. Executable replay uses only schema-8 state, a
 valid typed exact-head request receipt, and a simulated correlation defect.

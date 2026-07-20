@@ -78,5 +78,6 @@ baseline-only task and apply `portfolio-preimplementation-aborted` with complete
 task-stop evidence. It proves Goal state is still pending, no delivery revision,
 provider/AutoReview authority, review, gate, source mutation, or partial
 baseline acceptance exists, and each checkout still has its baseline revision
-and clean status. Release with the typed `preimplementation-abort` receipt and
+and a status fingerprint proving no Git-visible changes. Release with the typed
+`preimplementation-abort` receipt and
 archive with the same reason/evidence. Never synthesize Goal state.

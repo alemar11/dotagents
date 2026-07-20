@@ -42,7 +42,8 @@ ref, and merge-base SHA require:
 
 - `publication`: real PR identity, lifecycle `OPEN`, and base equal to that
   repository's currently discovered default branch;
-- `codex-review`: mandatory current-revision request with either a clean result,
+- `codex-review`: mandatory current-revision request with either
+  `provider_state=clean` and `disposition=accepted`,
   or an exact 45-minute pending timeout recorded as `timeout-accepted` with a
   persistent PR warning;
 - `ci`, only when `ci_availability=configured`: at least one applicable run or

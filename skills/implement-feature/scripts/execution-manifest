@@ -491,7 +491,7 @@ def checkout_identity(cwd: Path, git_path: str, *, require_clean: bool) -> dict[
     if not HEX40_RE.fullmatch(head) or not HEX40_RE.fullmatch(tree) or not branch:
         raise ManifestError("command-cwd-invalid", "managed checkout identity is incomplete", "restore-managed-checkout", 3)
     if require_clean and status:
-        raise ManifestError("baseline-checkout-dirty", "baseline checkout must be Git-visible clean", "planning-required", 4)
+        raise ManifestError("baseline-checkout-dirty", "baseline checkout must have no Git-visible changes", "planning-required", 4)
     return {
         "checkout": str(cwd.resolve()),
         "branch": branch,

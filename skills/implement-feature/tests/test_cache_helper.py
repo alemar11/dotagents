@@ -50,7 +50,7 @@ def parse_result(result: subprocess.CompletedProcess[str]) -> dict:
     return json.loads(result.stdout)
 
 
-class LedgerCacheV15Tests(unittest.TestCase):
+class LedgerCacheV18Tests(unittest.TestCase):
     source_ref = "https://github.com/example/dotagents/issues/232"
     task_key = "spec-232"
     task_title = "Implement Feature Spec 232"
@@ -1852,12 +1852,12 @@ class LedgerCacheV15Tests(unittest.TestCase):
             snapshot[relative] = path.read_bytes() if path.is_file() else None
         return snapshot
 
-    def test_doctor_is_v15_offline_and_read_only(self) -> None:
+    def test_doctor_is_v18_offline_and_read_only(self) -> None:
         before = self.snapshot_tree(self.home)
         version = self.run_cache("--version").stdout.strip()
         doctor = parse_result(self.run_cache("--json", "doctor"))
 
-        self.assertEqual(version, "17.0.0")
+        self.assertEqual(version, "18.0.0")
         self.assertTrue(doctor["ok"])
         self.assertTrue(doctor["offline"])
         self.assertEqual(doctor["active_ledgers"], [])
@@ -2794,6 +2794,8 @@ class LedgerCacheV15Tests(unittest.TestCase):
                                     f"warning-{warning_index}".encode()
                                 ).hexdigest(),
                                 "disposition": "timeout-accepted",
+                                "finding_count": 0,
+                                "finding_comment_ids": [],
                                 "warning_ref": (
                                     f"{pr_url}#issuecomment-{warning_index}"
                                 ),
@@ -3936,9 +3938,224 @@ class LedgerCacheV15Tests(unittest.TestCase):
         self.assertEqual(marker.read_text(), "preserve\n")
         self.assertEqual(list(target.iterdir()), [marker])
 
+    def diagnostic_base_state(self) -> dict:
+        self.bootstrap_active_task()
+        revision = self.observe_revision()
+        self.observe_delivery(revision)
+        self.start_clean_review(revision)
+        state = self.state()
+        state["tasks"][0]["deliveries"][0]["autoreview"] = self.autoreview_evidence()
+        return state
+
+    def diagnostic_command_attempt(
+        self, command_id: str, status: str, *, terminal: bool = True
+    ) -> dict:
+        return {
+            "attempt_id": hashlib.md5(command_id.encode(), usedforsecurity=False).hexdigest(),
+            "command_id": command_id,
+            "manifest_sha256": hashlib.sha256(f"manifest:{command_id}".encode()).hexdigest(),
+            "execution_policy_fingerprint": hashlib.sha256(f"policy:{command_id}".encode()).hexdigest(),
+            "attempt_file": str(self.home / f"{command_id}.attempt.jsonl"),
+            "receipt_file": str(self.home / f"{command_id}.receipt.json"),
+            "state": "terminal" if terminal else "launch-released",
+            "terminal_status": status if terminal else None,
+            "cleanup_verified": status != "cleanup-failed" if terminal else None,
+            "cancellation_reason": None,
+            "evidence_ref": f"execution-manifest://{command_id}",
+            "recorded_at": "2026-07-18T12:00:00Z",
+        }
+
+    def add_diagnostic_gate(
+        self, state: dict, gate: str, gate_state: str, *, binding_key: str | None = None
+    ) -> None:
+        task = state["tasks"][0]
+        delivery = task["deliveries"][0]
+        state["gates"].append(
+            {
+                "task_key": task["task_key"],
+                "delivery_key": delivery["delivery_key"],
+                "gate": gate,
+                "state": gate_state,
+                "binding_key": binding_key or CACHE_RUNTIME.delivery_evidence_key(delivery),
+                "evidence_ref": f"proof://{gate}/{gate_state}",
+                "observed_at": "2026-07-18T12:00:00Z",
+            }
+        )
+
+    def test_diagnostics_projection_mixed_case_truth_table(self) -> None:
+        base = self.diagnostic_base_state()
+
+        command_passed_semantic_failed = copy.deepcopy(base)
+        delivery = command_passed_semantic_failed["tasks"][0]["deliveries"][0]
+        delivery["command_attempts"] = [
+            self.diagnostic_command_attempt("semantic-review", "passed")
+        ]
+        delivery["autoreview"]["terminal_state"] = "fix-required"
+        delivery["autoreview"]["report"]["review_outcome"] = "fail"
+        projected = CACHE_RUNTIME.diagnostics_projection(command_passed_semantic_failed)
+        result = projected["tasks"][0]["deliveries"][0]
+        self.assertEqual(result["commands"][0]["raw_terminal_status"], "passed")
+        self.assertEqual(result["semantic_review"]["raw_review_outcome"], "fail")
+        self.assertTrue(result["semantic_review"]["blocking"])
+        self.assertTrue(projected["blocking"])
+
+        semantic_clean_nonterminal = CACHE_RUNTIME.diagnostics_projection(base)
+        semantic = semantic_clean_nonterminal["tasks"][0]["deliveries"][0]["semantic_review"]
+        self.assertEqual(semantic["raw_terminal_state"], "terminal-clean")
+        self.assertIn("exact revision", semantic["display_result"])
+        self.assertEqual(semantic_clean_nonterminal["terminal_verification"], "incomplete")
+
+        ci_green_findings = copy.deepcopy(base)
+        review = ci_green_findings["reviews"][-1]["observations"][-1]
+        review.update(
+            {
+                "provider_state": "findings",
+                "disposition": "fix-required",
+                "finding_count": 1,
+                "finding_comment_ids": [55],
+            }
+        )
+        self.add_diagnostic_gate(ci_green_findings, "ci", "passed")
+        projected = CACHE_RUNTIME.diagnostics_projection(ci_green_findings)
+        result = projected["tasks"][0]["deliveries"][0]
+        self.assertEqual(result["deterministic_validation"]["ci"]["raw_state"], "passed")
+        self.assertEqual(result["provider_review"]["raw_provider_state"], "findings")
+        self.assertTrue(result["provider_review"]["blocking"])
+
+        conflict_free_blocked = copy.deepcopy(base)
+        self.add_diagnostic_gate(conflict_free_blocked, "mergeability", "failed")
+        projected = CACHE_RUNTIME.diagnostics_projection(conflict_free_blocked)
+        mergeability = projected["tasks"][0]["deliveries"][0]["mergeability"]
+        self.assertEqual(mergeability["raw_merge_state"], "clean")
+        self.assertEqual(mergeability["display_result"], "conflict-free; merge requirements blocked")
+        self.assertTrue(mergeability["blocking"])
+
+        timeout_accepted = copy.deepcopy(base)
+        observation = timeout_accepted["reviews"][-1]["observations"][-1]
+        observation.update(
+            {
+                "provider_state": "waiting",
+                "disposition": "timeout-accepted",
+                "evidence_ref": "github-review://233/pending",
+                "warning_ref": "https://github.com/example/dotagents/pull/233#issuecomment-9002",
+                "warning_posted_at": "2026-07-18T12:50:00Z",
+                "warning_fingerprint": "f" * 64,
+            }
+        )
+        projected = CACHE_RUNTIME.diagnostics_projection(timeout_accepted)
+        provider = projected["tasks"][0]["deliveries"][0]["provider_review"]
+        self.assertTrue(provider["warning_only"])
+        self.assertFalse(provider["blocking"])
+        self.assertIn("not a clean verdict", provider["display_result"])
+        self.assertEqual(len(projected["warnings"]), 1)
+
+        cleanup_failed = copy.deepcopy(base)
+        cleanup_failed["tasks"][0]["deliveries"][0]["command_attempts"] = [
+            self.diagnostic_command_attempt("cleanup", "cleanup-failed")
+        ]
+        projected = CACHE_RUNTIME.diagnostics_projection(cleanup_failed)
+        command = projected["tasks"][0]["deliveries"][0]["commands"][0]
+        self.assertEqual(command["raw_terminal_status"], "cleanup-failed")
+        self.assertTrue(command["blocking"])
+        self.assertTrue(projected["blocking"])
+
+    def test_diagnostics_projection_marks_exact_revision_evidence_stale(self) -> None:
+        self.bootstrap_active_task()
+        first = self.observe_revision()
+        self.observe_delivery(first)
+        self.start_clean_review(first)
+        self.record_autoreview(self.autoreview_evidence())
+        current = parse_result(self.read_projection("diagnostics"))
+        current_delivery = current["tasks"][0]["deliveries"][0]
+        self.assertEqual(current_delivery["semantic_review"]["evidence_state"], "current")
+        self.assertEqual(current_delivery["provider_review"]["evidence_state"], "current")
+        self.assertEqual(current_delivery["mergeability"]["evidence_state"], "current")
+
+        self.observe_revision(head="c" * 40)
+        stale = parse_result(self.read_projection("diagnostics"))
+        stale_delivery = stale["tasks"][0]["deliveries"][0]
+        self.assertEqual(stale_delivery["semantic_review"]["evidence_state"], "stale")
+        self.assertEqual(stale_delivery["provider_review"]["evidence_state"], "stale")
+        self.assertEqual(stale_delivery["mergeability"]["evidence_state"], "stale")
+        self.assertTrue(stale_delivery["stale_reasons"])
+        self.assertEqual(stale["terminal_verification"], "incomplete")
+
+    def test_diagnostics_terminal_verification_clean_then_invalidated(self) -> None:
+        state = self.make_terminal_state()
+        projected = CACHE_RUNTIME.diagnostics_projection(state)
+        self.assertEqual(projected["terminal_verification"], "clean")
+        self.assertEqual(projected["display_terminal_verification"], "Terminal verification: clean")
+        self.assertFalse(projected["blocking"])
+
+        task = state["tasks"][0]
+        self.apply(
+            [
+                {
+                    "type": "post-terminal-drift-recorded",
+                    "task_key": self.task_key,
+                    "delivery_key": "dotagents",
+                    "seal_fingerprint": task["seal"]["seal_fingerprint"],
+                    "drift_fingerprint": hashlib.sha256(b"diagnostic-drift").hexdigest(),
+                    "reason": "The exact PR head changed after terminal verification.",
+                    "evidence_ref": "git://post-terminal-drift/diagnostics",
+                }
+            ]
+        )
+        invalidated = parse_result(self.read_projection("diagnostics"))
+        self.assertEqual(invalidated["terminal_verification"], "invalidated")
+        self.assertTrue(invalidated["blocking"])
+        self.assertIn("post-terminal-drift", invalidated["blocking_reasons"])
+
+    def test_diagnostics_read_is_pure_bounded_and_fail_closed(self) -> None:
+        self.bootstrap_active_task()
+        before_bytes = self.ledger.read_bytes()
+        before_state = self.state()
+        before_cache = {
+            str(path.relative_to(self.cache_root)): path.read_bytes()
+            for path in self.cache_root.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        }
+        result = self.read_projection("diagnostics")
+        payload = parse_result(result)
+        after_cache = {
+            str(path.relative_to(self.cache_root)): path.read_bytes()
+            for path in self.cache_root.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        }
+        self.assertEqual(payload["projection_schema_version"], "1.0.0")
+        self.assertEqual(payload["ledger_schema_version"], "14.0.0")
+        self.assertEqual(payload["generation"], before_state["generation"])
+        self.assertEqual(payload["content_fingerprint"], before_state["content_fingerprint"])
+        self.assertLessEqual(len(result.stdout.encode()), CACHE_RUNTIME.MAX_OUTPUT_BYTES)
+        self.assertEqual(self.ledger.read_bytes(), before_bytes)
+        self.assertEqual(self.state()["operations"], before_state["operations"])
+        self.assertEqual(before_cache, after_cache)
+
+        bounded = self.state()
+        bounded["tasks"][0]["deliveries"][0]["command_attempts"] = [
+            self.diagnostic_command_attempt(f"command-{index:02d}", "passed")
+            for index in range(CACHE_RUNTIME.MAX_COMMAND_ATTEMPTS_PER_DELIVERY)
+        ]
+        projected = CACHE_RUNTIME.diagnostics_projection(bounded)
+        self.assertEqual(
+            len(projected["tasks"][0]["deliveries"][0]["commands"]),
+            CACHE_RUNTIME.MAX_COMMAND_ATTEMPTS_PER_DELIVERY,
+        )
+        with mock.patch.object(CACHE_RUNTIME, "MAX_DIAGNOSTIC_REASONS_PER_SCOPE", 1):
+            with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "reason bound"):
+                CACHE_RUNTIME.bounded_diagnostic_reasons(["one", "two"], "fixture")
+
+        impossible = self.state()
+        impossible["closeout"]["post_terminal_drift"] = {
+            "task_key": self.task_key,
+            "delivery_key": "dotagents",
+        }
+        with self.assertRaisesRegex(CACHE_RUNTIME.CacheError, "inconsistent post-terminal drift"):
+            CACHE_RUNTIME.diagnostics_projection(impossible)
+
     def test_projections_and_markdown_are_deterministic_and_bounded(self) -> None:
         self.bootstrap_active_task()
-        for projection in ("status", "dispatch", "recovery", "terminal"):
+        for projection in ("status", "dispatch", "recovery", "terminal", "diagnostics"):
             first = self.read_projection(projection).stdout
             second = self.read_projection(projection).stdout
             self.assertEqual(first, second)
@@ -3946,11 +4163,52 @@ class LedgerCacheV15Tests(unittest.TestCase):
             self.assertNotIn("operations", payload)
             self.assertNotIn("reviews", payload)
 
+        expected_common = {
+            "ok", "command", "version", "projection", "generation",
+            "content_fingerprint", "portfolio_key", "root_id", "root_task_title",
+            "root_task_title_evidence_ref", "goal", "warnings", "phase",
+        }
+        status = parse_result(self.read_projection("status"))
+        dispatch = parse_result(self.read_projection("dispatch"))
+        recovery = parse_result(self.read_projection("recovery"))
+        terminal = parse_result(self.read_projection("terminal"))
+        self.assertEqual(set(status), expected_common | {"tasks", "terminal_eligible"})
+        self.assertEqual(set(dispatch), expected_common | {"ready_task_keys", "available_capacity"})
+        self.assertEqual(
+            set(recovery),
+            expected_common | {"tasks", "terminal_eligible", "sources", "handoffs", "adoptions"},
+        )
+        self.assertEqual(
+            set(terminal),
+            expected_common
+            | {
+                "eligible", "archive_ready", "blockers",
+                "portfolio_verification_candidate", "portfolio_verified", "tasks",
+            },
+        )
+        self.assertEqual(
+            set(status["tasks"][0]),
+            {
+                "task_key", "task_ref", "task_title", "state", "current_observation",
+                "dependency_wait", "revision_set_key", "gates", "deliveries",
+                "terminal_blockers",
+            },
+        )
+        self.assertEqual(
+            set(status["tasks"][0]["deliveries"][0]),
+            {
+                "delivery_key", "repository", "github_repository", "default_base",
+                "ci_availability", "preflight_key", "revision_key", "pr", "autoreview",
+                "review_provider_mutations", "review_result", "gates", "tracker_dirty",
+            },
+        )
+
         state = self.state()
         first_markdown = CACHE_RUNTIME.render_markdown(state)
         second_markdown = CACHE_RUNTIME.render_markdown(state)
         self.assertEqual(first_markdown, second_markdown)
         self.assertIn("# Implement Feature Terminal Run State", first_markdown)
+        self.assertIn("## Qualified Diagnostics", first_markdown)
         self.assertNotIn("Wave Report", first_markdown)
         self.assertNotIn("Recovery Packet", first_markdown)
 

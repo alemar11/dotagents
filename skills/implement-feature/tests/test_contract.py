@@ -1321,7 +1321,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "Every event uses exactly the fields below",
             " ".join(packets.split()),
         )
-        self.assertIn('__version__ = "17.0.0"', helper)
+        self.assertIn('__version__ = "18.0.0"', helper)
         self.assertIn("unsupported-active-ledger", helper)
         self.assertIn("review-authority", helper)
         for removed in (
@@ -1333,7 +1333,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for retired_heading in ("## Wave Reports", "## Recovery Packet"):
             self.assertNotIn(retired_heading, run_state)
 
-    def test_event_packet_registry_matches_the_v17_runtime(self) -> None:
+    def test_event_packet_registry_matches_the_v18_runtime(self) -> None:
         helper = self.read("scripts/ledger-cache")
         packets = self.read("references/run-state-packets.md") + self.read(
             "references/review-reconciliation.md"
@@ -1341,7 +1341,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         run_state = " ".join(self.read("references/run-state.md").split())
 
         for constant in (
-            '__version__ = "17.0.0"',
+            '__version__ = "18.0.0"',
             'LEDGER_SCHEMA_VERSION = "14.0.0"',
             'REGISTRATION_SCHEMA_VERSION = "7.0.0"',
         ):
@@ -1743,7 +1743,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         text = " ".join(self.read("references/multi-repo-workspace.md").split())
         self.assertIn("one visible App task per Feature Spec", text)
         self.assertIn("distinct isolated checkout for every required repository", text)
-        self.assertIn("one real, non-draft, reviewed, CI-clean", text)
+        self.assertIn("one real, non-draft, reviewed PR with CI passed", text)
         self.assertIn("Each task uses its Feature Spec's target branch name", text)
         self.assertIn("exactly one distinct repo-owned integration Feature Spec", text)
         self.assertIn("bounded path change", text)
@@ -2133,16 +2133,18 @@ class ImplementFeatureContractTests(unittest.TestCase):
             "references/gates.md",
             "references/codex-review-closeout.md",
         )
+        # The root-only qualified diagnostics contract adds one bounded read
+        # model while the worker prompt remains at its existing ceiling.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in successful_path),
-            114_000,
+            114_600,
         )
         manifest_path = successful_path + ("references/execution-manifest.md",)
         # Bounded execution stays branch-loaded; normal, manifest, and
         # multi-repository paths retain explicit measured ceilings.
         self.assertLessEqual(
             sum(len(self.read(path).encode("utf-8")) for path in manifest_path),
-            125_100,
+            126_000,
         )
         multi_repository_path = successful_path + (
             "references/multi-repo-workspace.md",
@@ -2152,7 +2154,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
                 len(self.read(path).encode("utf-8"))
                 for path in multi_repository_path
             ),
-            118_000,
+            118_900,
         )
         short_description = re.search(
             r'^  short_description: "(.+)"$', metadata, re.MULTILINE
@@ -2201,6 +2203,8 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertNotIn("scripts/autoreview --", prompt)
         self.assertNotIn("scripts/delivery-preflight", prompt)
         self.assertNotIn("ledger-cache --json", prompt)
+        self.assertNotIn("--projection diagnostics", prompt)
+        self.assertNotIn("terminal_verification", prompt)
         self.assertIn("Canonical bundle manifest", prompt)
         self.assertIn("command ids/manifests/digests", prompt)
         self.assertIn("references/execution-manifest.md", skill)
@@ -2214,6 +2218,54 @@ class ImplementFeatureContractTests(unittest.TestCase):
         for deferred in ("Claims", "ledger commands", "GitStack", "CI"):
             self.assertIn(deferred, execution)
         self.assertIn("scripts/ledger-cache --json ledger create", run_state)
+        self.assertIn("projection 'status|dispatch|recovery|terminal|diagnostics'", run_state)
+
+    def test_diagnostic_wording_is_qualified_without_renaming_raw_values(self) -> None:
+        prose = "\n".join(
+            self.read(path)
+            for path in (
+                "SKILL.md",
+                "references/autoreview-fix-loop.md",
+                "references/baseline-validation.md",
+                "references/codex-review-closeout.md",
+                "references/execution-manifest.md",
+                "references/gates.md",
+                "references/multi-repo-workspace.md",
+                "references/review-reconciliation.md",
+                "references/run-state.md",
+                "references/spec-backed-delivery.md",
+            )
+        )
+        errors = "\n".join(
+            (
+                self.read("scripts/ledger-cache"),
+                self.read("scripts/execution-manifest"),
+            )
+        )
+        for banned in (
+            "complete and clean",
+            "completed and clean",
+            "CI-clean",
+            "clean scoped local commit",
+            "clean committed revision",
+            "Git-visible clean",
+        ):
+            with self.subTest(banned=banned):
+                self.assertNotIn(banned.lower(), prose.lower())
+                self.assertNotIn(banned.lower(), errors.lower())
+        run_state = self.read("references/run-state.md")
+        ledger = self.read("scripts/ledger-cache")
+        self.assertIn("Provider `merge_state=clean` renders", run_state)
+        self.assertIn('"raw_merge_state": raw_merge_state', ledger)
+        self.assertIn('display_result = "conflict-free"', ledger)
+        for raw_identifier in (
+            "clean-required",
+            "clean-exit-v1",
+            '"provider_state": "clean"',
+            "terminal-clean",
+            'pr["merge_state"] != "clean"',
+        ):
+            self.assertIn(raw_identifier, errors)
 
     def test_execution_manifest_validation_forbids_shell_transport(self) -> None:
         execution = self.read("references/execution-manifest.md")

@@ -5,7 +5,7 @@
 Use one absolute direct-child `.json` state document per overlapping
 repository/source portfolio under
 `~/.cache/dotagents/skills/implement-feature/ledgers/`. Create it only after
-atomic claim acquisition. `scripts/ledger-cache` v17 is the sole active-state
+atomic claim acquisition. `scripts/ledger-cache` v18 is the sole active-state
 writer; roots and visible tasks never patch or replace it directly.
 
 `scripts/active-root-claim` remains the sole ownership authority. Every
@@ -28,7 +28,7 @@ packet. It is the sole strict field registry.
 ```text
 scripts/ledger-cache --json ledger create --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --operation-id '<unique-operation-id>' --registration-file '<absolute-registration-json>'
 scripts/ledger-cache --json ledger apply --ledger '<absolute-active-json>' --root-id '<root-id>' --expected-claim-fingerprint '<claim-fingerprint>' --expected-generation '<current-generation>' --operation-id '<unique-operation-id>' --events-file '<absolute-events-json>'
-scripts/ledger-cache --json ledger read --ledger '<absolute-active-json>' --projection 'status|dispatch|recovery|terminal'
+scripts/ledger-cache --json ledger read --ledger '<absolute-active-json>' --projection 'status|dispatch|recovery|terminal|diagnostics'
 ```
 
 `expected_generation` is compare-and-swap authority. A stale generation
@@ -227,7 +227,17 @@ paths reject absolute/backslash/empty/parent traversal.
 `status` reports bounded identity and progress, `dispatch` reports only the
 derived ready set and capacity, `recovery` reports freshness inputs, and
 `terminal` reports staged closeout, review-timeout warnings, and archive
-readiness. Callers compare the immutable review deadline with their observed
+readiness. Their shapes remain unchanged in v18. `diagnostics` schema `1.0.0`
+is the root's user-facing read model. It binds generation/fingerprint, preserves
+typed evidence in raw fields, and adds qualified display fields. It derives
+`terminal_verification=invalidated|clean|incomplete`; only unchanged
+archive-ready proof is `clean`. Revision evidence uses
+`evidence_state=current|stale|incomplete`; blocking/reasons stay derived.
+Provider `merge_state=clean` renders as `conflict-free`, and
+`waiting/timeout-accepted` remains warning-only. Reads are pure and bounded by
+existing state limits.
+
+Callers compare the immutable review deadline with their observed
 clock; a projection never persists or invents an `overdue` fact.
 
 ## Hard Cut

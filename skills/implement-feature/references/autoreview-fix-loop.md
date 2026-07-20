@@ -7,7 +7,7 @@ action, prepare an attempt, or make a model call.
 Load before the first AutoReview reservation and again after AutoReview or a
 hosted Codex review returns an accepted finding.
 
-Create a clean scoped local commit before push. Record
+Create a scoped local commit with no pending Git-visible changes before push. Record
 `committed-revision-observed` with a stable `review_target_key` for
 repository/base/review scope and a `committed_revision_key` for exact head plus
 canonical reviewed patch. PR identity is separate publication fact: pushing

@@ -152,9 +152,10 @@ path is `needs-owner`. Never ask again, recapture, or widen `allowed_paths`.
    `references/codex-review-closeout.md`; apply task-static,
    delivery-revision, and complete task-revision-set evidence at its canonical
    scope.
-12. **RECONCILE** — read the smallest ledger projection, refresh changed external
-    evidence, atomically apply events, then dispatch, reconcile the fixed review
-    wait, or advance one staged closeout transition.
+12. **RECONCILE** — read the smallest ledger projection, using `diagnostics` for
+    user-facing status and closeout wording; refresh changed external evidence,
+    atomically apply events, then dispatch, reconcile the fixed review wait, or
+    advance one staged closeout transition.
 
 An unchanged observation timeout performs only a claim heartbeat and no event.
 Read children at gates; root does not self-read. The
@@ -249,8 +250,8 @@ report `planning-required` or `authorization-stale` without another prompt. Othe
 run-state-derived source/title/task/root-Goal/checkout proof, changes, validation,
 commits, PRs/revisions, CI, domain/tracker closeout, current-head mergeability
 and repository-rule evidence, captured domain-closeout evidence, review
-warnings, blockers, recovery freshness,
-and next action.
+warnings, blockers, recovery freshness, qualified diagnostic display fields,
+and the next action.
 
 After root-title revalidation, close out only in this order:
 `task-terminal-sealed`, `terminal-handoff-recorded`,
@@ -258,7 +259,7 @@ After root-title revalidation, close out only in this order:
 `portfolio-goal-completed`, release and archive. Failure retains active state.
 
 An exact Codex review that remains pending after the fixed 45-minute wait is not
-reported as clean. Post a persistent warning on the PR, persist its reference as
+reported as a clean provider-review verdict. Post a persistent warning on the PR, persist its reference as
 `timeout-accepted`, warn the user in the final report, and continue the
 remaining gates. Review request failure, access uncertainty, findings, and
 missing request evidence remain blockers. A later merge workflow must re-check

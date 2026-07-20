@@ -133,7 +133,7 @@ adapters are `clean-exit-v1` for approved test runners and
 unsupported commands return `planning-required` without launch.
 
 Preparation binds the execution-scope fingerprint, authored and projected argv,
-pinned tool identities, and a clean checkout identity containing branch, HEAD,
+pinned tool identities, and a checkout identity with no Git-visible changes,
 tree, and Git-visible status digest. Execution requires the same identity before
 launch and after completion. Any Git-visible write fails the command.
 

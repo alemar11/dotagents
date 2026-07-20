@@ -160,7 +160,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             check=True,
         ).stdout.strip()
 
-        helper = CACHE_TEST_RUNTIME.LedgerCacheV15Tests(methodName="runTest")
+        helper = CACHE_TEST_RUNTIME.LedgerCacheV18Tests(methodName="runTest")
         helper.home = self.base
         helper.cache_root = self.claim_root.parent
         helper.claim_root = self.claim_root
@@ -178,7 +178,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
             helper.task_assignment_objective.encode()
         ).hexdigest()
 
-        registration = CACHE_TEST_RUNTIME.LedgerCacheV15Tests.registration_for(
+        registration = CACHE_TEST_RUNTIME.LedgerCacheV18Tests.registration_for(
             helper, claim
         )
         registration["root_checkout"] = str(checkout)
@@ -283,7 +283,7 @@ class AtomicClaimHelperTests(unittest.TestCase):
                     "thinking_reason": "default-medium-fixture",
                     "task_assignment_fingerprint": (
                         hashlib.sha256(
-            CACHE_TEST_RUNTIME.LedgerCacheV15Tests.task_assignment_objective.encode()
+            CACHE_TEST_RUNTIME.LedgerCacheV18Tests.task_assignment_objective.encode()
                         ).hexdigest()
                         if source_recorded
                         else "none"

@@ -22,9 +22,10 @@ from pathlib import Path
 from typing import Any, Iterator
 
 
-__version__ = "17.0.0"
+__version__ = "18.0.0"
 LEDGER_SCHEMA_VERSION = "14.0.0"
 REGISTRATION_SCHEMA_VERSION = "7.0.0"
+DIAGNOSTIC_PROJECTION_SCHEMA_VERSION = "1.0.0"
 WRITE_METADATA_SCHEMA_VERSION = "2.0.0"
 READ_METADATA_SCHEMA_VERSIONS = {"1.0.0", "2.0.0"}
 DEFAULT_RETENTION_DAYS = 180
@@ -42,6 +43,7 @@ MAX_REVIEW_OBSERVATIONS = 1
 MAX_REVIEW_RECONCILIATIONS = 1
 MAX_REVIEW_PROVIDER_MUTATIONS = 16
 MAX_COMMAND_ATTEMPTS_PER_DELIVERY = 64
+MAX_DIAGNOSTIC_REASONS_PER_SCOPE = 256
 MAX_PROJECTED_REVIEW_WARNING_BYTES = 24 * 1024
 MAX_GATES = 2048
 MAX_HANDOFFS = 512
@@ -241,7 +243,9 @@ CODEX_PROVIDER_ACTORS = {"chatgpt-codex-connector[bot]", "chatgpt-codex-connecto
 NODE_ID_RE = re.compile(r"^[A-Za-z0-9_=-]+$")
 REVIEW_WAIT_STATES = {"active-wait", "complete"}
 REVIEW_WAIT_SECONDS = 45 * 60
-PROJECTIONS = {"status", "dispatch", "recovery", "terminal"}
+PROJECTIONS = {"status", "dispatch", "recovery", "terminal", "diagnostics"}
+DIAGNOSTIC_EVIDENCE_STATES = {"current", "stale", "incomplete"}
+TERMINAL_VERIFICATION_STATES = {"incomplete", "clean", "invalidated"}
 PORTFOLIO_OBJECTIVE_CI_CLAUSE = "CI when configured"
 
 
@@ -3691,6 +3695,535 @@ def task_terminal_blockers(
     return blockers
 
 
+def bounded_diagnostic_reasons(reasons: list[str], field: str) -> list[str]:
+    values = sorted(set(reasons))
+    if len(values) > MAX_DIAGNOSTIC_REASONS_PER_SCOPE:
+        raise CacheError(
+            "integrity-failure",
+            f"{field} exceeds the diagnostic reason bound",
+            5,
+        )
+    return values
+
+
+def diagnostic_gate_projection(
+    state: dict[str, Any],
+    task: dict[str, Any],
+    gate: str,
+    delivery: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    current = current_gate(state, task, gate, delivery)
+    delivery_key = delivery["delivery_key"] if delivery is not None else None
+    historical = [
+        item
+        for item in state["gates"]
+        if item["task_key"] == task["task_key"]
+        and item["delivery_key"] == delivery_key
+        and item["gate"] == gate
+    ]
+    selected = current or (historical[-1] if historical else None)
+    evidence_state = (
+        "current" if current is not None else
+        "stale" if historical else
+        "incomplete"
+    )
+    raw_state = selected["state"] if selected is not None else None
+    blocking = evidence_state == "current" and raw_state == "failed"
+    display_result = (
+        raw_state if evidence_state == "current" else
+        f"stale {gate} evidence" if evidence_state == "stale" else
+        f"{gate} not observed"
+    )
+    return {
+        "evidence_state": evidence_state,
+        "raw_state": raw_state,
+        "raw_binding_key": selected["binding_key"] if selected is not None else None,
+        "display_result": display_result,
+        "blocking": blocking,
+        "blocking_reasons": [f"gate-{gate}-failed"] if blocking else [],
+    }
+
+
+def diagnostic_command_projection(
+    task: dict[str, Any], delivery: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
+    commands: list[dict[str, Any]] = []
+    blocking_reasons: list[str] = []
+    incomplete_reasons: list[str] = []
+    sealed = task["seal"] is not None
+    for attempt in delivery["command_attempts"]:
+        terminal = attempt["state"] == "terminal"
+        raw_status = attempt["terminal_status"]
+        blocking = terminal and raw_status != "passed" and not sealed
+        incomplete = not terminal
+        if raw_status == "passed":
+            display_result = "command passed; cleanup verified"
+        elif terminal:
+            display_result = f"command {raw_status}"
+        else:
+            display_result = f"command {attempt['state']}"
+        reasons = []
+        if blocking:
+            reasons.append(f"command-{attempt['command_id']}-{raw_status}")
+            blocking_reasons.extend(reasons)
+        if incomplete:
+            incomplete_reasons.append(
+                f"command-{attempt['command_id']}-incomplete"
+            )
+        commands.append(
+            {
+                "command_id": attempt["command_id"],
+                "attempt_id": attempt["attempt_id"],
+                "raw_state": attempt["state"],
+                "raw_terminal_status": raw_status,
+                "cleanup_verified": attempt["cleanup_verified"],
+                "display_result": display_result,
+                "blocking": blocking,
+                "blocking_reasons": reasons,
+            }
+        )
+    return commands, blocking_reasons, incomplete_reasons
+
+
+def diagnostic_autoreview_projection(
+    task: dict[str, Any], delivery: dict[str, Any]
+) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
+    revision = delivery["revision"]
+    autoreview = delivery["autoreview"]
+    if autoreview is None:
+        value = {
+            "evidence_state": "incomplete",
+            "current_revision_key": revision["revision_key"] if revision else None,
+            "raw_target": None,
+            "raw_terminal_state": None,
+            "raw_review_outcome": None,
+            "display_result": "semantic review not observed",
+            "blocking": False,
+            "blocking_reasons": [],
+        }
+        return value, [], ["semantic-review-incomplete"], []
+    target = autoreview["target"]
+    current = revision is not None and all(
+        target[field] == revision[field]
+        for field in ("head_sha", "base_ref", "merge_base_sha")
+    )
+    evidence_state = "current" if current else "stale"
+    raw_terminal_state = autoreview["terminal_state"]
+    raw_review_outcome = autoreview["report"]["review_outcome"]
+    blocking = current and (
+        raw_terminal_state == "fix-required" or raw_review_outcome == "fail"
+    )
+    if not current:
+        display_result = "semantic review evidence stale"
+    elif raw_terminal_state in {"terminal-clean", "terminal-composite-clean"}:
+        display_result = f"semantic review {raw_terminal_state} for exact revision"
+    elif raw_terminal_state == "verification-clean":
+        display_result = "semantic verification passed; terminal review incomplete"
+    else:
+        display_result = "semantic review failed; fixes required"
+    blocking_reasons = ["semantic-review-failed"] if blocking else []
+    incomplete_reasons = (
+        ["semantic-review-terminal-incomplete"]
+        if current and raw_terminal_state == "verification-clean" else []
+    )
+    stale_reasons = ["semantic-review-stale"] if not current else []
+    return (
+        {
+            "evidence_state": evidence_state,
+            "current_revision_key": revision["revision_key"] if revision else None,
+            "raw_target": {
+                field: target[field]
+                for field in ("head_sha", "base_ref", "merge_base_sha")
+            },
+            "raw_terminal_state": raw_terminal_state,
+            "raw_review_outcome": raw_review_outcome,
+            "display_result": display_result,
+            "blocking": blocking,
+            "blocking_reasons": blocking_reasons,
+        },
+        blocking_reasons,
+        incomplete_reasons,
+        stale_reasons,
+    )
+
+
+def diagnostic_provider_review_projection(
+    state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
+) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
+    revision = delivery["revision"]
+    current = current_review(state, task, delivery)
+    historical = [
+        item
+        for item in state["reviews"]
+        if item["task_key"] == task["task_key"]
+        and item["delivery_key"] == delivery["delivery_key"]
+        and item["observations"]
+    ]
+    if current is not None and current["observations"]:
+        selected = current
+        evidence_state = "current"
+    elif current is not None:
+        selected = current
+        evidence_state = "incomplete"
+    elif historical:
+        selected = historical[-1]
+        evidence_state = "stale"
+    else:
+        selected = None
+        evidence_state = "incomplete"
+
+    original = selected["observations"][-1] if selected and selected["observations"] else None
+    effective = effective_review_observation(selected) if original is not None else None
+    raw_provider_state = effective["provider_state"] if effective is not None else None
+    raw_disposition = effective["disposition"] if effective is not None else None
+    finding_count = original["finding_count"] if original is not None else 0
+    unresolved = (
+        unresolved_finding_comment_ids(state, task, delivery)
+        if revision is not None else []
+    )
+    warning_only = (
+        evidence_state == "current"
+        and raw_provider_state == "waiting"
+        and raw_disposition == "timeout-accepted"
+    )
+    blocking = evidence_state == "current" and (
+        raw_provider_state in {"findings", "failed"} or bool(unresolved)
+    )
+    if evidence_state == "stale":
+        display_result = "provider review evidence stale"
+    elif evidence_state == "incomplete":
+        display_result = "provider review pending" if current is not None else "provider review not observed"
+    elif warning_only:
+        display_result = "provider review timed out; accepted with warning; not a clean verdict"
+    elif raw_provider_state == "clean":
+        display_result = "provider review clean for exact revision"
+    elif raw_provider_state == "findings":
+        display_result = "provider review findings require fixes"
+    else:
+        display_result = "provider review failed"
+    blocking_reasons = []
+    if evidence_state == "current" and raw_provider_state == "findings":
+        blocking_reasons.append("provider-review-findings")
+    if evidence_state == "current" and raw_provider_state == "failed":
+        blocking_reasons.append("provider-review-failed")
+    if unresolved:
+        blocking_reasons.append("provider-review-unresolved-findings")
+    incomplete_reasons = (
+        ["provider-review-incomplete"] if evidence_state == "incomplete" else []
+    )
+    stale_reasons = ["provider-review-stale"] if evidence_state == "stale" else []
+    return (
+        {
+            "evidence_state": evidence_state,
+            "current_revision_key": revision["revision_key"] if revision else None,
+            "review_revision_key": selected["revision_key"] if selected is not None else None,
+            "raw_original_provider_state": original["provider_state"] if original else None,
+            "raw_original_disposition": original["disposition"] if original else None,
+            "raw_provider_state": raw_provider_state,
+            "raw_disposition": raw_disposition,
+            "raw_effective_source": (
+                effective.get("effective_source", "provider-observation")
+                if effective is not None else None
+            ),
+            "finding_count": finding_count,
+            "unresolved_finding_comment_ids": unresolved,
+            "warning_only": warning_only,
+            "display_result": display_result,
+            "blocking": blocking,
+            "blocking_reasons": bounded_diagnostic_reasons(
+                blocking_reasons, "provider_review.blocking_reasons"
+            ),
+        },
+        blocking_reasons,
+        incomplete_reasons,
+        stale_reasons,
+    )
+
+
+def diagnostic_mergeability_projection(
+    state: dict[str, Any], task: dict[str, Any], delivery: dict[str, Any]
+) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
+    revision = delivery["revision"]
+    pr = delivery["pr"]
+    gate = diagnostic_gate_projection(state, task, "mergeability", delivery)
+    current = pr is not None and revision is not None and all(
+        pr[field] == revision[field]
+        for field in (
+            "repository", "github_repository", "head_sha", "base_ref",
+            "merge_base_sha",
+        )
+    ) and pr["number"] == revision["pr_number"] and pr["url"] == revision["pr_url"]
+    evidence_state = (
+        "current" if current else
+        "stale" if pr is not None else
+        "incomplete"
+    )
+    raw_merge_state = pr["merge_state"] if pr is not None else None
+    raw_mergeable = pr["mergeable"] if pr is not None else None
+    explicit_block = current and (
+        pr["state"] == "closed"
+        or raw_merge_state in {"blocked", "dirty", "behind"}
+        or (raw_merge_state == "clean" and raw_mergeable is False)
+    )
+    blocking = explicit_block or gate["blocking"]
+    if evidence_state == "stale":
+        display_result = "mergeability evidence stale"
+    elif evidence_state == "incomplete":
+        display_result = "mergeability not observed"
+    elif raw_merge_state == "clean" and raw_mergeable:
+        display_result = "conflict-free"
+    elif raw_merge_state == "dirty":
+        display_result = "merge conflicts present"
+    elif raw_merge_state == "behind":
+        display_result = "base branch update required"
+    elif raw_merge_state == "blocked":
+        display_result = "merge requirements blocked"
+    else:
+        display_result = "mergeability incomplete"
+    if current and raw_merge_state == "clean" and raw_mergeable and gate["blocking"]:
+        display_result = "conflict-free; merge requirements blocked"
+    blocking_reasons = []
+    if explicit_block:
+        blocking_reasons.append("mergeability-provider-blocked")
+    blocking_reasons.extend(gate["blocking_reasons"])
+    incomplete_reasons = []
+    stale_reasons = []
+    if evidence_state == "incomplete" or gate["evidence_state"] == "incomplete":
+        incomplete_reasons.append("mergeability-incomplete")
+    if evidence_state == "stale" or gate["evidence_state"] == "stale":
+        stale_reasons.append("mergeability-stale")
+    if current and pr["is_draft"]:
+        incomplete_reasons.append("pull-request-draft")
+    if current and raw_merge_state == "unknown":
+        incomplete_reasons.append("mergeability-provider-unknown")
+    return (
+        {
+            "evidence_state": evidence_state,
+            "current_revision_key": revision["revision_key"] if revision else None,
+            "raw_pr_state": pr["state"] if pr is not None else None,
+            "raw_is_draft": pr["is_draft"] if pr is not None else None,
+            "raw_mergeable": raw_mergeable,
+            "raw_merge_state": raw_merge_state,
+            "gate": gate,
+            "display_result": display_result,
+            "blocking": blocking,
+            "blocking_reasons": bounded_diagnostic_reasons(
+                blocking_reasons, "mergeability.blocking_reasons"
+            ),
+        },
+        blocking_reasons,
+        incomplete_reasons,
+        stale_reasons,
+    )
+
+
+def diagnostics_projection(state: dict[str, Any]) -> dict[str, Any]:
+    terminal = terminal_projection(state)
+    portfolio_drifted = state["closeout"]["post_terminal_drift"] is not None
+    task_drifted = any(task["post_terminal_drift"] is not None for task in state["tasks"])
+    if portfolio_drifted != task_drifted:
+        raise CacheError(
+            "integrity-failure",
+            "diagnostic projection found inconsistent post-terminal drift evidence",
+            5,
+        )
+    terminal_verification = (
+        "invalidated" if portfolio_drifted else
+        "clean" if terminal["archive_ready"] else
+        "incomplete"
+    )
+    if terminal_verification not in TERMINAL_VERIFICATION_STATES:
+        raise CacheError("integrity-failure", "terminal verification is invalid", 5)
+
+    tasks: list[dict[str, Any]] = []
+    portfolio_blocking: list[str] = []
+    portfolio_incomplete: list[str] = []
+    portfolio_stale: list[str] = []
+    for task in state["tasks"]:
+        task_blocking: list[str] = []
+        task_incomplete: list[str] = []
+        task_stale: list[str] = []
+        task_gates = {
+            gate: diagnostic_gate_projection(state, task, gate)
+            for gate in sorted(TASK_STATIC_GATES | TASK_REVISION_SET_GATES)
+            if gate != "domain-closeout" or task["requires_domain_closeout"]
+        }
+        for gate, projection in task_gates.items():
+            task_blocking.extend(projection["blocking_reasons"])
+            if projection["evidence_state"] == "incomplete":
+                task_incomplete.append(f"gate-{gate}-incomplete")
+            elif projection["evidence_state"] == "stale":
+                task_stale.append(f"gate-{gate}-stale")
+
+        deliveries: list[dict[str, Any]] = []
+        for delivery in task["deliveries"]:
+            delivery_blocking: list[str] = []
+            delivery_incomplete: list[str] = []
+            delivery_stale: list[str] = []
+            commands, blocked, incomplete = diagnostic_command_projection(task, delivery)
+            delivery_blocking.extend(blocked)
+            delivery_incomplete.extend(incomplete)
+
+            validation: dict[str, Any] = {}
+            for gate in ("focused-validation", "full-validation"):
+                item = diagnostic_gate_projection(state, task, gate, delivery)
+                validation[gate.replace("-", "_")] = item
+                delivery_blocking.extend(item["blocking_reasons"])
+                if item["evidence_state"] == "incomplete":
+                    delivery_incomplete.append(f"gate-{gate}-incomplete")
+                elif item["evidence_state"] == "stale":
+                    delivery_stale.append(f"gate-{gate}-stale")
+            if delivery["ci_availability"] == "not-configured":
+                validation["ci"] = {
+                    "raw_availability": "not-configured",
+                    "evidence_state": "current",
+                    "raw_state": None,
+                    "raw_binding_key": None,
+                    "display_result": "CI not configured",
+                    "blocking": False,
+                    "blocking_reasons": [],
+                }
+            else:
+                ci = diagnostic_gate_projection(state, task, "ci", delivery)
+                validation["ci"] = {"raw_availability": "configured", **ci}
+                delivery_blocking.extend(ci["blocking_reasons"])
+                if ci["evidence_state"] == "incomplete":
+                    delivery_incomplete.append("gate-ci-incomplete")
+                elif ci["evidence_state"] == "stale":
+                    delivery_stale.append("gate-ci-stale")
+
+            semantic, blocked, incomplete, stale = diagnostic_autoreview_projection(
+                task, delivery
+            )
+            delivery_blocking.extend(blocked)
+            delivery_incomplete.extend(incomplete)
+            delivery_stale.extend(stale)
+            provider, blocked, incomplete, stale = diagnostic_provider_review_projection(
+                state, task, delivery
+            )
+            delivery_blocking.extend(blocked)
+            delivery_incomplete.extend(incomplete)
+            delivery_stale.extend(stale)
+            mergeability, blocked, incomplete, stale = diagnostic_mergeability_projection(
+                state, task, delivery
+            )
+            delivery_blocking.extend(blocked)
+            delivery_incomplete.extend(incomplete)
+            delivery_stale.extend(stale)
+
+            delivery_blocking = bounded_diagnostic_reasons(
+                delivery_blocking, "delivery.blocking_reasons"
+            )
+            delivery_incomplete = bounded_diagnostic_reasons(
+                delivery_incomplete, "delivery.incomplete_reasons"
+            )
+            delivery_stale = bounded_diagnostic_reasons(
+                delivery_stale, "delivery.stale_reasons"
+            )
+            deliveries.append(
+                {
+                    "delivery_key": delivery["delivery_key"],
+                    "revision_key": (
+                        delivery["revision"]["revision_key"]
+                        if delivery["revision"] is not None else None
+                    ),
+                    "commands": commands,
+                    "deterministic_validation": validation,
+                    "semantic_review": semantic,
+                    "provider_review": provider,
+                    "mergeability": mergeability,
+                    "blocking": bool(delivery_blocking),
+                    "blocking_reasons": delivery_blocking,
+                    "incomplete_reasons": delivery_incomplete,
+                    "stale_reasons": delivery_stale,
+                }
+            )
+            task_blocking.extend(
+                f"{delivery['delivery_key']}:{reason}" for reason in delivery_blocking
+            )
+            task_incomplete.extend(
+                f"{delivery['delivery_key']}:{reason}" for reason in delivery_incomplete
+            )
+            task_stale.extend(
+                f"{delivery['delivery_key']}:{reason}" for reason in delivery_stale
+            )
+
+        if task["state"] in {"blocked", "needs-owner", "failed"}:
+            task_blocking.append(f"task-state-{task['state']}")
+        elif task["state"] != "merge-ready":
+            task_incomplete.append(f"task-state-{task['state']}")
+        if task["post_terminal_drift"] is not None:
+            task_blocking.append("post-terminal-drift")
+        task_blocking = bounded_diagnostic_reasons(
+            task_blocking, "task.blocking_reasons"
+        )
+        task_incomplete = bounded_diagnostic_reasons(
+            task_incomplete, "task.incomplete_reasons"
+        )
+        task_stale = bounded_diagnostic_reasons(task_stale, "task.stale_reasons")
+        tasks.append(
+            {
+                "task_key": task["task_key"],
+                "raw_state": task["state"],
+                "revision_set_key": current_revision_set_key(task),
+                "sealed": task["seal"] is not None,
+                "handoff_recorded": terminal_handoff(state, task) is not None,
+                "blocking": bool(task_blocking),
+                "blocking_reasons": task_blocking,
+                "incomplete_reasons": task_incomplete,
+                "stale_reasons": task_stale,
+                "gates": task_gates,
+                "deliveries": deliveries,
+            }
+        )
+        portfolio_blocking.extend(task_blocking)
+        portfolio_incomplete.extend(task_incomplete)
+        portfolio_stale.extend(task_stale)
+
+    if portfolio_drifted:
+        portfolio_blocking.append("post-terminal-drift")
+    portfolio_blocking = bounded_diagnostic_reasons(
+        portfolio_blocking, "diagnostics.blocking_reasons"
+    )
+    portfolio_incomplete = bounded_diagnostic_reasons(
+        portfolio_incomplete, "diagnostics.incomplete_reasons"
+    )
+    portfolio_stale = bounded_diagnostic_reasons(
+        portfolio_stale, "diagnostics.stale_reasons"
+    )
+    if terminal_verification == "clean" and portfolio_blocking:
+        raise CacheError(
+            "integrity-failure",
+            "archive-ready terminal proof conflicts with diagnostic blockers",
+            5,
+        )
+    display_terminal_verification = {
+        "clean": "Terminal verification: clean",
+        "invalidated": "Terminal verification: invalidated by post-terminal drift",
+        "incomplete": "Terminal verification: incomplete",
+    }[terminal_verification]
+    return {
+        "projection": "diagnostics",
+        "projection_schema_version": DIAGNOSTIC_PROJECTION_SCHEMA_VERSION,
+        "ledger_schema_version": LEDGER_SCHEMA_VERSION,
+        "generation": state["generation"],
+        "content_fingerprint": state["content_fingerprint"],
+        "portfolio_key": state["portfolio"]["key"],
+        "root_id": state["portfolio"]["root_id"],
+        "root_task_title": state["portfolio"]["root_task_title"],
+        "goal": copy.deepcopy(state["goal"]),
+        "terminal_phase": terminal["phase"],
+        "terminal_verification": terminal_verification,
+        "display_terminal_verification": display_terminal_verification,
+        "blocking": bool(portfolio_blocking),
+        "blocking_reasons": portfolio_blocking,
+        "incomplete_reasons": portfolio_incomplete,
+        "stale_reasons": portfolio_stale,
+        "warnings": copy.deepcopy(terminal["warnings"]),
+        "tasks": tasks,
+    }
+
+
 def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
     tasks: list[dict[str, Any]] = []
     blockers: list[str] = []
@@ -3751,6 +4284,8 @@ def terminal_projection(state: dict[str, Any]) -> dict[str, Any]:
 def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
     if projection not in PROJECTIONS:
         raise CacheError("invalid-input", f"unknown projection: {projection}", 2)
+    if projection == "diagnostics":
+        return diagnostics_projection(state)
     terminal = terminal_projection(state)
     base: dict[str, Any] = {
         "projection": projection,
@@ -3861,6 +4396,7 @@ def project_state(state: dict[str, Any], projection: str) -> dict[str, Any]:
 
 def render_markdown(state: dict[str, Any]) -> str:
     terminal = terminal_projection(state)
+    diagnostics = diagnostics_projection(state)
     lines = [
         "# Implement Feature Terminal Run State",
         "",
@@ -3870,7 +4406,8 @@ def render_markdown(state: dict[str, Any]) -> str:
         f"- Objective: {state['portfolio']['objective']}",
         f"- Generation: `{state['generation']}`",
         f"- Goal: `{state['goal']['state']}`",
-        f"- Terminal eligible: `{'yes' if terminal['eligible'] else 'no'}`",
+        f"- Terminal verification: `{diagnostics['terminal_verification']}`",
+        f"- Blocking diagnostics: `{'yes' if diagnostics['blocking'] else 'no'}`",
         "",
         "## Feature Spec Tasks",
         "",
@@ -3893,6 +4430,26 @@ def render_markdown(state: dict[str, Any]) -> str:
         lines.append(
             f"| `{task['task_key']}` | {task['source_spec_ref']} | `{task['state']}` | `{ci}` | `{revisions}` | {prs} |"
         )
+    lines.extend([
+        "", "## Qualified Diagnostics", "",
+        "| delivery | command execution | deterministic validation | semantic review | provider review | mergeability |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ])
+    for task in diagnostics["tasks"]:
+        for delivery in task["deliveries"]:
+            commands = "; ".join(
+                item["display_result"] for item in delivery["commands"]
+            ) or "no command attempts"
+            validation = "; ".join(
+                f"{name.replace('_', '-')}={item['display_result']}"
+                for name, item in delivery["deterministic_validation"].items()
+            )
+            lines.append(
+                f"| `{task['task_key']}:{delivery['delivery_key']}` | {commands} | "
+                f"{validation} | {delivery['semantic_review']['display_result']} | "
+                f"{delivery['provider_review']['display_result']} | "
+                f"{delivery['mergeability']['display_result']} |"
+            )
     lines.extend(["", "## Current Gate Evidence", "", "| task | gate | state | evidence |", "| --- | --- | --- | --- |"])
     for task in sorted(state["tasks"], key=lambda item: item["task_key"]):
         for gate in sorted(TASK_STATIC_GATES | TASK_REVISION_SET_GATES):
@@ -3920,7 +4477,7 @@ def render_markdown(state: dict[str, Any]) -> str:
                 )
     lines.extend([
         "", "## Review Reconciliations", "",
-        "| delivery | original | failure | source | effective | artifact | receipt | verified | reconciled |",
+        "| delivery | original | failure | source | effective provider review | artifact | receipt | verified | reconciled |",
         "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ])
     reconciliations_rendered = 0
@@ -3937,7 +4494,7 @@ def render_markdown(state: dict[str, Any]) -> str:
             f"| `{review['task_key']}:{review['delivery_key']}` | "
             f"`{original['provider_state']}/{original['disposition']}` | "
             f"`{original['failure_kind']}` | `{original['observation_fingerprint']}` | "
-            f"`clean/accepted` | {receipt['artifact_ref']} | "
+            f"`provider review clean/accepted for exact revision` | {receipt['artifact_ref']} | "
             f"`{receipt['receipt_fingerprint']}` | `{receipt['verified_at']}` | "
             f"`{reconciliation['reconciled_at']}` |"
         )
@@ -5874,7 +6431,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         )
         if receipt["outcome"] != "clean":
             raise CacheError(
-                "state-conflict", "review reconciliation artifact is not clean", 4,
+                "state-conflict", "review reconciliation artifact does not report outcome=clean", 4,
                 {"reason": "reconciliation-artifact-not-clean"},
             )
         source_at = parse_timestamp(source["observed_at"], "source.observed_at")
@@ -6077,7 +6634,11 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         if event["expected_state_fingerprint"] != state["content_fingerprint"]:
             raise CacheError("state-conflict", "AutoReview reservation state fingerprint is stale", 4)
         if delivery["committed_revision"] is None:
-            raise CacheError("state-conflict", "AutoReview reservation requires a clean committed revision", 4)
+            raise CacheError(
+                "state-conflict",
+                "AutoReview reservation requires a committed revision with no pending Git-visible changes",
+                4,
+            )
         open_obligations = [row["artifact"] for row in delivery["hosted_obligations"] if row["state"] == "open"]
         reset = delivery["lineage_reset_authority"]
         projection_parent = (
@@ -6249,7 +6810,7 @@ def apply_event(state: dict[str, Any], raw: Any, now: datetime) -> bool:
         ):
             raise CacheError(
                 "state-conflict",
-                "codex-review gate requires a clean review or an evidenced accepted timeout",
+                "codex-review gate requires provider_state=clean with disposition=accepted or an evidenced accepted timeout",
                 4,
             )
         if gate == "autoreview" and event["state"] == "passed":
