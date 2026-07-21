@@ -436,8 +436,8 @@ class SessionReplayTests(unittest.TestCase):
                 "permission_evidence_ref": permission,
                 "gitstack_installation_evidence": {
                     "schema_version": "gitstack-installation-parity:v1", "plugin_name": "gitstack",
-                    "plugin_root": "/installed/gitstack/5.0.0", "loaded_skill_path": "/installed/gitstack/5.0.0/skills/github-review-threads/SKILL.md",
-                    "manifest_version": "5.0.0", "package_version": "5.0.0", "cli_version": "5.0.0",
+                    "plugin_root": "/installed/gitstack/6.0.0", "loaded_skill_path": "/installed/gitstack/6.0.0/skills/github-review-threads/SKILL.md",
+                    "manifest_version": "6.0.0", "package_version": "6.0.0", "cli_version": "6.0.0",
                     "cli_sha256": "2" * 64, "fingerprint": "1" * 64,
                 },
                 "repositories": claim["repositories"],

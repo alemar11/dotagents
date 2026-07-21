@@ -4,7 +4,7 @@ Load this reference before a GitStack review operation or its recovery.
 Authority is unavailable before atomic baseline acceptance and root Goal
 activation.
 
-GitStack 5.0.0 owns the closed `request`, `wait`, `warning`, `reply`, `resolve`,
+GitStack 6.0.0 owns the closed `request`, `wait`, `warning`, `reply`, `resolve`,
 `reconcile-mutation`, and `reconcile-terminal` operation schemas, request
 recognition, provider transport, receipts, findings, replies, resolutions, and
 readback reconciliation. Implement Feature does not define those fields.
@@ -12,16 +12,21 @@ readback reconciliation. Implement Feature does not define those fields.
 The controller selects an operation and supplies only its immutable authority
 binding and typed evidence descriptor. GitStack prepares and validates the
 owner request. A prepared request or controller template is not mutation or
-wait authority. Immediately before transport or waiter launch, GitStack must
-atomically obtain the generic `owned-operation-started` receipt described in
-`controller.md`. The bridge revalidates exact live controller equality,
-claim/CAS, task observation, current revision, and App-managed checkout.
+wait authority. Immediately before launch, Implement Feature calls its own
+`operation start`; that step revalidates exact live controller equality,
+claim/CAS, task observation, current revision, and App-managed checkout and
+records the `owned-operation-started` receipt described in `controller.md`.
+GitStack then independently writes the same deterministic
+`gitstack-review-operation-start:v1` receipt to its plugin-owned journal before
+provider transport. GitStack never reads this skill's ledger or executes one of
+its scripts.
 
-Each started physical mutation or waiter is single-use. Repeating `operation
-start` fails with `reconcile-required`; recovery uses `operation read-start`
-and the owner reconciliation operation. GitStack's consumed marker and the
-generic started receipt bind the same request. No caller-selected executable,
-authority command, transport, or installed path is accepted.
+Each started physical mutation or waiter is single-use. Repeating Implement
+Feature `operation start` fails with `reconcile-required`; recovery uses
+`operation read-start` and the owner reconciliation operation. Repeating a
+GitStack execute against its existing start journal also fails closed. GitStack's
+consumed marker and both journals bind the same deterministic receipt and exact
+request. No caller-selected executable, transport, or installed path is accepted.
 
 ## Request and deadline invariants
 

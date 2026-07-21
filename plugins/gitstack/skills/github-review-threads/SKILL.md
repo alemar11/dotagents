@@ -27,13 +27,13 @@ Resolve `<plugin-root>` as two directories above the directory containing this
 <plugin-root>/scripts/gitstack --json doctor
 <plugin-root>/scripts/gitstack --json repo snapshot
 <plugin-root>/scripts/gitstack --json reviews address --repo <owner/repo> --pr <number>
-<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
+<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
 <plugin-root>/scripts/gitstack --json reviews terminal-evidence --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
-<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256>
-<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256>
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
 ```
 
 The CLI validates absolute regular non-symlink UTF-8 files, sends JSON to `gh
@@ -44,13 +44,11 @@ It cannot invoke connector tools. Its Codex adapter normalizes formal reviews,
 inline findings, authenticated top-level terminal result comments, and clean
 reactions into one current-head state and one stable observation fingerprint.
 
-GitStack 5.0.0 intentionally makes the four provider mutation commands
-(`request`, timeout-warning `comment`, `reply`, and `resolve`) managed-only:
-standalone callers may use typed `prepare`/`validate` for packet creation and
-inspection, but transport also requires the immutable reservation packet and
-active ledger path. Before transport, GitStack asks the repository-owned
-Implement Feature ledger verifier to prove that the exact packet is journaled
-and durably `mutation-started`; a self-consistent packet alone is not authority.
+GitStack 6.0.0 is self-contained. The four provider mutation commands
+(`request`, timeout-warning `comment`, `reply`, and `resolve`) require an exact
+immutable GitStack reservation packet. GitStack atomically consumes that packet
+before transport and owns the durable one-use marker and recovery readback; it
+does not locate, load, or execute another skill to authorize the mutation.
 Use JSON `reviews address` as the typed source for a review thread's current
 `head_sha` and `thread_fingerprint` before preparing reply or resolution
 authority; do not reproduce the hash locally.
@@ -58,9 +56,10 @@ authority; do not reproduce the hash locally.
 Managed orchestration uses the closed `reviews operation` family. GitStack owns
 the complete request/result schemas for `request`, `wait`, `warning`, `reply`,
 `resolve`, `reconcile-mutation`, and `reconcile-terminal`. Preparation and
-validation are read-only. Execution must obtain a live generic started receipt
-from the installation-owned ledger bridge before transport; reconciliation
-uses the same started journal and never launches, posts, or retries.
+validation are read-only. Execution atomically appends a
+`gitstack-review-operation-start:v1` receipt to GitStack's own per-user journal
+before transport; resume and reconciliation read the same exact journal and
+never create a second mutation, repost, or reset a wait deadline.
 For an owned `reply`, prepare derives the exact live thread id and pre-reply
 fingerprint through read-only provider inspection; callers do not supply those
 fields. `resume` reloads the original wait and deadline. `reconcile-mutation`

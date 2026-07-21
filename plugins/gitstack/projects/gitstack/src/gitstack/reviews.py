@@ -72,6 +72,7 @@ from .review_operation import (
     validate_result as validate_operation_result,
     validate_result_for_request,
     validate_start_receipt,
+    validate_start_receipt_identity,
     validate_target as validate_operation_target,
 )
 REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
@@ -135,6 +136,10 @@ def _reservation_cache_root() -> Path:
     return _trusted_user_home() / ".cache/dotagents/plugins/gitstack/review-mutations"
 
 
+def _operation_journal_root() -> Path:
+    return _trusted_user_home() / ".cache/dotagents/plugins/gitstack/review-operations"
+
+
 def _trusted_user_home() -> Path:
     """Return the account home without trusting a caller-provided HOME."""
 
@@ -182,7 +187,6 @@ def _read_reservation_file(path_value: str | None) -> dict[str, Any]:
 def _require_reservation(
     path_value: str | None,
     *,
-    ledger_file: str | None,
     kind: str,
     repo: str,
     pr: int,
@@ -274,135 +278,7 @@ def _require_reservation(
                 code="reservation_target_mismatch",
                 exit_code=4,
             )
-    if owned_operation is None:
-        _verify_started_ledger_authority(packet, path_value, ledger_file)
     return packet
-
-
-def _ledger_cache_script() -> Path | None:
-    """Find the installed Implement Feature authority verifier.
-
-    The target checkout is never searched: it is provider data, not a trusted
-    runtime. The verifier is resolved only from installation-owned skill roots;
-    arbitrary environment overrides are intentionally unsupported.
-    """
-
-    roots = [*Path(__file__).resolve().parents]
-    roots.extend(
-        [
-            _trusted_user_home() / ".agents/skills/implement-feature",
-            _trusted_user_home() / ".codex/skills/implement-feature",
-        ]
-    )
-    seen: set[Path] = set()
-    candidates: list[Path] = []
-    for root in roots:
-        candidates.append(root / "skills" / "implement-feature" / "scripts" / "ledger-cache")
-        candidates.append(root / "scripts" / "ledger-cache")
-    for candidate in candidates:
-        candidate = Path(os.path.abspath(os.fspath(candidate)))
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        if candidate.is_file() and not candidate.is_symlink() and os.access(candidate, os.X_OK):
-            return candidate
-    return None
-
-
-def _verify_started_ledger_authority(
-    packet: dict[str, Any], reservation_file: str | None, ledger_file: str | None
-) -> None:
-    """Require the exact packet to be durably started in the root ledger.
-
-    GitStack owns provider transport and the one-use consumed marker.  The
-    Implement Feature ledger owns root authorization and lifecycle state; its
-    typed read-only command is the verifier at this boundary.
-    """
-
-    if not isinstance(reservation_file, str) or not reservation_file:
-        raise ReviewError(
-            "A reservation file is required before provider authority can be verified.",
-            code="reservation_authority_required",
-            exit_code=4,
-        )
-    if not isinstance(ledger_file, str) or not ledger_file:
-        raise ReviewError(
-            "The root ledger file is required before provider authority can be verified.",
-            code="reservation_authority_required",
-            exit_code=4,
-        )
-    ledger = Path(ledger_file)
-    if not ledger.is_absolute() or ledger.is_symlink() or not ledger.is_file():
-        raise ReviewError(
-            "The root ledger file must be an absolute regular non-symlinked file.",
-            code="reservation_authority_invalid",
-            exit_code=4,
-        )
-    verifier = _ledger_cache_script()
-    if verifier is None:
-        raise ReviewError(
-            "The Implement Feature ledger authority verifier is unavailable; refusing provider mutation.",
-            code="reservation_authority_unavailable",
-            exit_code=4,
-        )
-    try:
-        verifier_env = os.environ.copy()
-        verifier_env["HOME"] = str(_trusted_user_home())
-        verifier_env.pop("PYTHONPATH", None)
-        verifier_env.pop("PYTHONHOME", None)
-        verifier_env["PYTHONNOUSERSITE"] = "1"
-        completed = subprocess.run(
-            [
-                sys.executable,
-                str(verifier),
-                "--json",
-                "ledger",
-                "review-authority",
-                "--ledger",
-                str(ledger),
-                "--reservation-file",
-                str(Path(reservation_file)),
-            ],
-            text=True,
-            capture_output=True,
-            env=verifier_env,
-            timeout=10,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise ReviewError(
-            "The root ledger authority verifier could not be reached; refusing provider mutation.",
-            code="reservation_authority_unavailable",
-            exit_code=4,
-        ) from exc
-    if completed.returncode != 0:
-        raise ReviewError(
-            "The reservation is not durably started by the active root ledger; refusing provider mutation.",
-            code="reservation_authority_invalid",
-            exit_code=4,
-            details={"verifier_stderr": completed.stderr[-1000:]},
-        )
-    try:
-        result = json.loads(completed.stdout)
-    except (TypeError, json.JSONDecodeError) as exc:
-        raise ReviewError(
-            "The root ledger authority verifier returned invalid proof; refusing provider mutation.",
-            code="reservation_authority_invalid",
-            exit_code=4,
-        ) from exc
-    if (
-        not isinstance(result, dict)
-        or result.get("ok") is not True
-        or result.get("authority") != "review-provider-mutation-started"
-        or result.get("reservation_id") != packet["reservation_id"]
-        or result.get("operation_id") != packet["operation_id"]
-        or result.get("packet_fingerprint") != packet_fingerprint(packet)
-    ):
-        raise ReviewError(
-            "The root ledger authority proof does not match the immutable reservation; refusing provider mutation.",
-            code="reservation_authority_invalid",
-            exit_code=4,
-        )
 
 
 def _read_consumed_marker(
@@ -1916,14 +1792,12 @@ def post_conversation_comment(
     request_key: str | None = None,
     request_fingerprint: str | None = None,
     reservation_file: str | None = None,
-    ledger_file: str | None = None,
     owned_operation: dict[str, Any] | None = None,
     reconcile_consumed: bool = False,
     recovery_marker: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     packet = _require_reservation(
         reservation_file,
-        ledger_file=ledger_file,
         kind="review-warning",
         repo=repo,
         pr=pr,
@@ -2032,7 +1906,6 @@ def request_automated_review(
     dry_run: bool,
     expected_worktree_fingerprint: str | None,
     reservation_file: str | None = None,
-    ledger_file: str | None = None,
     owned_operation: dict[str, Any] | None = None,
     reconcile_consumed: bool = False,
     recovery_marker: dict[str, Any] | None = None,
@@ -2044,7 +1917,6 @@ def request_automated_review(
         raise ReviewError(str(exc), code="invalid_request", exit_code=64) from exc
     packet = _require_reservation(
         reservation_file,
-        ledger_file=ledger_file,
         kind="review-request",
         repo=repo,
         pr=pr,
@@ -2211,7 +2083,6 @@ def reply_to_review_comment(
     request_key: str | None = None,
     request_fingerprint: str | None = None,
     reservation_file: str | None = None,
-    ledger_file: str | None = None,
     owned_operation: dict[str, Any] | None = None,
     reconcile_consumed: bool = False,
     recovery_marker: dict[str, Any] | None = None,
@@ -2232,7 +2103,6 @@ def reply_to_review_comment(
     reserved_thread_fingerprint = expected_thread_fingerprint or exact_thread_fingerprint
     packet = _require_reservation(
         reservation_file,
-        ledger_file=ledger_file,
         kind="review-reply",
         repo=repo,
         pr=pr,
@@ -2543,7 +2413,6 @@ def resolve_review_thread(
     request_key: str | None = None,
     request_fingerprint: str | None = None,
     reservation_file: str | None = None,
-    ledger_file: str | None = None,
     owned_operation: dict[str, Any] | None = None,
     reconcile_consumed: bool = False,
     recovery_marker: dict[str, Any] | None = None,
@@ -2553,7 +2422,6 @@ def resolve_review_thread(
     exact_thread_fingerprint = _exact_thread_fingerprint(thread, repo, pr, expected_head)
     packet = _require_reservation(
         reservation_file,
-        ledger_file=ledger_file,
         kind="review-resolution",
         repo=repo,
         pr=pr,
@@ -3012,28 +2880,119 @@ def _write_json_object(path_value: str, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _owned_operation_bridge(request_file: str, command: str) -> dict[str, Any]:
-    verifier = _ledger_cache_script()
-    if verifier is None:
-        raise ReviewError("The installation-owned operation authority bridge is unavailable.", code="owned_operation_authority_unavailable", exit_code=4)
-    request = validate_operation_request(_read_json_object(request_file, "operation request"))
-    args = [
-        str(verifier), "--json", "operation", command,
-        "--owner", "gitstack", "--request-file", request_file,
-        "--ledger", request["authority"]["ledger"],
-    ]
-    result = subprocess.run(args, text=True, capture_output=True)
+def _operation_start_receipt(request: dict[str, Any]) -> dict[str, Any]:
+    authority = request["authority"]
+    value = {
+        "schema": "gitstack-review-operation-start:v1",
+        "owner": "gitstack",
+        "operation": request["operation"],
+        "operation_id": request["operation_id"],
+        "request_fingerprint": request["request_fingerprint"],
+        "journal_id": hashlib.sha256(json.dumps({
+            "owner": "gitstack",
+            "operation": request["operation"],
+            "operation_id": request["operation_id"],
+            "request_fingerprint": request["request_fingerprint"],
+        }, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")).hexdigest(),
+        "started_generation": authority["expected_generation"] + 1,
+        "started_state_fingerprint": authority["expected_state_fingerprint"],
+        "receipt_fingerprint": "0" * 64,
+    }
+    value["receipt_fingerprint"] = hashlib.sha256(json.dumps(
+        {key: item for key, item in value.items() if key != "receipt_fingerprint"},
+        sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+    ).encode("utf-8")).hexdigest()
+    return validate_start_receipt(value, request)
+
+
+def _read_operation_start(identity: dict[str, Any]) -> dict[str, Any]:
+    root = _operation_journal_root()
+    if not root.exists() or root.is_symlink() or not root.is_dir():
+        raise ReviewError(
+            "The exact GitStack operation start journal is absent or unsafe.",
+            code="owned_operation_start_missing", exit_code=4,
+        )
+    path = root / f"{identity['operation_id']}.started.json"
     try:
-        payload = json.loads(result.stdout) if result.stdout else None
-    except json.JSONDecodeError as exc:
-        raise ReviewError("The owned-operation authority bridge returned invalid output.", code="owned_operation_authority_invalid", exit_code=4) from exc
-    if result.returncode or not isinstance(payload, dict) or payload.get("ok") is not True:
-        raise ReviewError("The owned-operation authority bridge rejected the request.", code="owned_operation_authority_rejected", exit_code=4, details=payload if isinstance(payload, dict) else None)
-    receipt_value = payload.get("data", payload).get("start_receipt")
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise OSError("operation start journal is not regular")
+            value = json.loads(os.read(fd, 1_048_577).decode("utf-8"))
+        finally:
+            os.close(fd)
+        return validate_start_receipt_identity(
+            value,
+            operation=identity["operation"],
+            operation_id=identity["operation_id"],
+            request_fingerprint=identity["request_fingerprint"],
+            receipt_fingerprint=identity.get("start_receipt_fingerprint"),
+        )
+    except FileNotFoundError as exc:
+        raise ReviewError(
+            "The exact GitStack operation start journal is absent.",
+            code="owned_operation_start_missing", exit_code=4,
+        ) from exc
+    except (OSError, UnicodeError, json.JSONDecodeError, OperationError) as exc:
+        raise ReviewError(
+            "The GitStack operation start journal is invalid or conflicting.",
+            code="owned_operation_start_invalid", exit_code=4,
+        ) from exc
+
+
+def _start_owned_operation(request: dict[str, Any]) -> dict[str, Any]:
+    receipt_value = _operation_start_receipt(request)
+    root = _operation_journal_root()
     try:
-        return validate_start_receipt(receipt_value, request)
-    except OperationError as exc:
-        raise ReviewError(str(exc), code="owned_operation_authority_invalid", exit_code=4) from exc
+        if root.exists() and (root.is_symlink() or not root.is_dir()):
+            raise OSError("operation journal root is unsafe")
+        root.mkdir(parents=True, exist_ok=True)
+        if root.is_symlink() or not root.is_dir():
+            raise OSError("operation journal root is unsafe")
+        path = root / f"{request['operation_id']}.started.json"
+        encoded = (json.dumps(receipt_value, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        directory_fd = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+        return receipt_value
+    except FileExistsError as exc:
+        existing = _read_operation_start({
+            "operation": request["operation"],
+            "operation_id": request["operation_id"],
+            "request_fingerprint": request["request_fingerprint"],
+            "start_receipt_fingerprint": receipt_value["receipt_fingerprint"],
+        })
+        raise ReviewError(
+            "This GitStack operation already started; resume or reconcile it without retrying.",
+            code="owned_operation_already_started", exit_code=4,
+            details={"start_receipt_fingerprint": existing["receipt_fingerprint"]},
+        ) from exc
+    except OSError as exc:
+        raise ReviewError(
+            "The GitStack operation could not be durably started.",
+            code="owned_operation_start_failed", exit_code=4,
+        ) from exc
+
+
+def _owned_operation_start(request: dict[str, Any], *, create: bool) -> dict[str, Any]:
+    if create:
+        return _start_owned_operation(request)
+    descriptor = operation_validation_descriptor(request)
+    identity = descriptor["start_identity"]
+    try:
+        return _read_operation_start(identity)
+    except ReviewError as exc:
+        if request["operation"] == "reconcile-mutation" and exc.code == "owned_operation_start_missing":
+            started = request["input"]["started_operation"]
+            return validate_start_receipt(started["start_receipt"], started["request"])
+        raise
 
 
 def prepare_owned_operation(controller_file: str, input_file: str, output_file: str) -> dict[str, Any]:
@@ -3193,13 +3152,13 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
         raise ReviewError("Only an already-started wait may use operation resume.", code="owned_operation_invalid", exit_code=64)
     if mode == "execute" and request["operation"] in {"reconcile-mutation", "reconcile-terminal"}:
         raise ReviewError("Reconciliation operations require operation reconcile.", code="owned_operation_invalid", exit_code=64)
-    start = _owned_operation_bridge(request_file, "start" if mode == "execute" else "read-start")
+    start = _owned_operation_start(request, create=mode == "execute")
     target, supplied = request["target"], request["input"]
     operation = request["operation"]
     repo, pr, head, provider = target["repository"], target["pr_number"], target["head_sha"], target["provider"]
     exit_code = 0
     if operation == "request":
-        facts = request_automated_review(repo, pr, provider, head, supplied["request_key"], False, request["authority"]["managed_checkout_fingerprint"], request_file, request["authority"]["ledger"], request)
+        facts = request_automated_review(repo, pr, provider, head, supplied["request_key"], False, request["authority"]["managed_checkout_fingerprint"], request_file, request)
     elif operation == "wait":
         from datetime import datetime as _datetime
         deadline = _datetime.fromisoformat(supplied["wait_deadline"].replace("Z", "+00:00"))
@@ -3210,15 +3169,15 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
         body = read_text_file(supplied["body_file"], field="body")
         if body.sha256 != supplied["body_fingerprint"]: raise ReviewError("Warning body fingerprint changed.", code="owned_operation_drift", exit_code=4)
         receipt_value = supplied["request_receipt"]
-        facts = post_conversation_comment(repo, pr, body, False, request["authority"]["managed_checkout_fingerprint"], head, receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request["authority"]["ledger"], request)
+        facts = post_conversation_comment(repo, pr, body, False, request["authority"]["managed_checkout_fingerprint"], head, receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request)
     elif operation == "reply":
         body = read_text_file(supplied["body_file"], field="body")
         if body.sha256 != supplied["body_fingerprint"]: raise ReviewError("Reply body fingerprint changed.", code="owned_operation_drift", exit_code=4)
         receipt_value = supplied["request_receipt"]
-        facts = reply_to_review_comment(repo, pr, head, supplied["finding_comment_id"], body, False, request["authority"]["managed_checkout_fingerprint"], receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request["authority"]["ledger"], request, expected_thread_id=supplied["thread_id"], expected_thread_fingerprint=supplied["thread_fingerprint"])
+        facts = reply_to_review_comment(repo, pr, head, supplied["finding_comment_id"], body, False, request["authority"]["managed_checkout_fingerprint"], receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request, expected_thread_id=supplied["thread_id"], expected_thread_fingerprint=supplied["thread_fingerprint"])
     elif operation == "resolve":
         receipt_value = supplied["request_receipt"]
-        facts = resolve_review_thread(repo, pr, head, supplied["reply_receipt"], False, request["authority"]["managed_checkout_fingerprint"], receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request["authority"]["ledger"], request)
+        facts = resolve_review_thread(repo, pr, head, supplied["reply_receipt"], False, request["authority"]["managed_checkout_fingerprint"], receipt_value["request_key"], receipt_value["request_fingerprint"], request_file, request)
     elif operation == "reconcile-terminal":
         facts = terminal_provider_evidence(repo, pr, provider, head, supplied["request_receipt"])
     else:
@@ -3233,7 +3192,7 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
                     started_target["repository"], started_target["pr_number"], started_target["provider"],
                     started_target["head_sha"], started_input["request_key"], False,
                     started["authority"]["managed_checkout_fingerprint"], request_file,
-                    started["authority"]["ledger"], started, reconcile_consumed=True,
+                    started, reconcile_consumed=True,
                     recovery_marker=recovery_marker,
                 )
             elif started["operation"] == "warning":
@@ -3242,7 +3201,7 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
                     started_target["repository"], started_target["pr_number"], body, False,
                     started["authority"]["managed_checkout_fingerprint"], started_target["head_sha"],
                     started_input["request_receipt"]["request_key"], started_input["request_receipt"]["request_fingerprint"],
-                    request_file, started["authority"]["ledger"], started, reconcile_consumed=True,
+                    request_file, started, reconcile_consumed=True,
                     recovery_marker=recovery_marker,
                 )
             elif started["operation"] == "reply":
@@ -3252,7 +3211,7 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
                     started_input["finding_comment_id"], body, False,
                     started["authority"]["managed_checkout_fingerprint"],
                     started_input["request_receipt"]["request_key"], started_input["request_receipt"]["request_fingerprint"],
-                    request_file, started["authority"]["ledger"], started, reconcile_consumed=True,
+                    request_file, started, reconcile_consumed=True,
                     recovery_marker=recovery_marker,
                     expected_thread_id=started_input["thread_id"],
                     expected_thread_fingerprint=started_input["thread_fingerprint"],
@@ -3263,7 +3222,7 @@ def execute_owned_operation(request_file: str, result_file: str, *, mode: str) -
                     started_input["reply_receipt"], False,
                     started["authority"]["managed_checkout_fingerprint"],
                     started_input["request_receipt"]["request_key"], started_input["request_receipt"]["request_fingerprint"],
-                    request_file, started["authority"]["ledger"], started, reconcile_consumed=True,
+                    request_file, started, reconcile_consumed=True,
                     recovery_marker=recovery_marker,
                 )
             recovered_status, recovered_outcome = _operation_outcome(started["operation"], recovered_raw)
@@ -3353,7 +3312,6 @@ def build_parser() -> argparse.ArgumentParser:
     comment.add_argument("--request-key", required=True, help="Exact review request key bound to the warning.")
     comment.add_argument("--request-fingerprint", required=True, help="Exact typed review request fingerprint.")
     comment.add_argument("--reservation-file", required=True, help="Absolute immutable provider-mutation reservation packet.")
-    comment.add_argument("--ledger-file", required=True, help="Absolute active Implement Feature ledger that durably started this mutation.")
     comment.add_argument("--dry-run", action="store_true", help="Preview the comment action without posting.")
     comment.add_argument("--expected-worktree-fingerprint")
     comment.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
@@ -3364,7 +3322,6 @@ def build_parser() -> argparse.ArgumentParser:
     request.add_argument("--head", required=True, help="Full 40-character expected reviewed head SHA.")
     request.add_argument("--request-key", required=True, help="Stable caller-owned request lineage key.")
     request.add_argument("--reservation-file", required=True, help="Absolute immutable provider-mutation reservation packet.")
-    request.add_argument("--ledger-file", required=True, help="Absolute active Implement Feature ledger that durably started this mutation.")
     request.add_argument("--dry-run", action="store_true", help="Preview the canonical request without posting.")
     request.add_argument("--expected-worktree-fingerprint")
     request.add_argument("--allow-non-project", action="store_true", help="Allow --repo usage outside a git checkout.")
@@ -3377,7 +3334,6 @@ def build_parser() -> argparse.ArgumentParser:
     reply.add_argument("--request-key", required=True)
     reply.add_argument("--request-fingerprint", required=True)
     reply.add_argument("--reservation-file", required=True)
-    reply.add_argument("--ledger-file", required=True)
     reply.add_argument("--dry-run", action="store_true")
     reply.add_argument("--expected-worktree-fingerprint")
     reply.add_argument("--allow-non-project", action="store_true")
@@ -3389,7 +3345,6 @@ def build_parser() -> argparse.ArgumentParser:
     resolve.add_argument("--request-key", required=True)
     resolve.add_argument("--request-fingerprint", required=True)
     resolve.add_argument("--reservation-file", required=True)
-    resolve.add_argument("--ledger-file", required=True)
     resolve.add_argument("--dry-run", action="store_true")
     resolve.add_argument("--expected-worktree-fingerprint")
     resolve.add_argument("--allow-non-project", action="store_true")
@@ -3636,7 +3591,6 @@ def main(argv: list[str] | None = None) -> int:
                 args.dry_run,
                 args.expected_worktree_fingerprint,
                 args.reservation_file,
-                args.ledger_file,
             )
             payload = {"repo": repo, "pr": pr, "action": action}
             if args.json:
@@ -3649,7 +3603,7 @@ def main(argv: list[str] | None = None) -> int:
                 body = read_text_file(args.body_file, field="body")
             except GitStackError as exc:
                 raise _review_error(exc) from exc
-            payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run, args.expected_worktree_fingerprint, args.head, args.request_key, args.request_fingerprint, args.reservation_file, args.ledger_file)}
+            payload = {"repo": repo, "pr": pr, "action": post_conversation_comment(repo, pr, body, args.dry_run, args.expected_worktree_fingerprint, args.head, args.request_key, args.request_fingerprint, args.reservation_file)}
             if args.json:
                 emit_success(payload, ["comment"])
             else:
@@ -3673,7 +3627,6 @@ def main(argv: list[str] | None = None) -> int:
                 args.request_key,
                 args.request_fingerprint,
                 args.reservation_file,
-                args.ledger_file,
             )
             payload = {"repo": repo, "pr": pr, "action": action}
             if args.json:
@@ -3688,7 +3641,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise _review_error(exc) from exc
             if args.command == "reply":
                 comment_id = positive_int(args.comment_id, "comment-id")
-                action = reply_to_review_comment(repo, pr, args.head, comment_id, body, args.dry_run, args.expected_worktree_fingerprint, args.request_key, args.request_fingerprint, args.reservation_file, args.ledger_file)
+                action = reply_to_review_comment(repo, pr, args.head, comment_id, body, args.dry_run, args.expected_worktree_fingerprint, args.request_key, args.request_fingerprint, args.reservation_file)
             elif args.command == "edit-comment":
                 comment_id = positive_int(args.comment_id, "comment-id")
                 action = edit_comment(repo, pr, comment_id, args.kind, body, args.dry_run, args.expected_worktree_fingerprint)

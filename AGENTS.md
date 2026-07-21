@@ -95,6 +95,7 @@ Canonical planning vocabulary and GitHub label mappings live in
 - Keep repo-local plugin registration centralized in `.agents/plugins/marketplace.json`; do not add a plugin without wiring it there in the same rollout.
 - Treat `.codex-plugin/plugin.json` as the plugin-local source of truth for plugin name, version, assets, and bundled-skill exposure.
 - Keep plugin-bundled skills discoverable under `plugins/<plugin>/skills/` and keep any plugin-owned shared runtime surfaces under `plugins/<plugin>/scripts/`.
+- Keep GitStack runtime self-contained: it must not locate, import, or execute another skill for authorization or state. Composing workflows may validate their own lifecycle state before invoking GitStack, while GitStack owns its exact operation start journal, provider transport, one-use markers, and reconciliation evidence. (Codex learning)
 - When a plugin grows a maintenance-only implementation tree, keep it under `plugins/<plugin>/projects/<tool>/` and document rebuild/runtime rules there with a local `AGENTS.md`.
 - Keep `skills-link.sh` as the canonical local install helper for this repo's reusable skills: it links `skills/` into `~/.agents/skills` only and must not install, mirror, or rewrite plugin marketplace entries. (Codex learning)
 

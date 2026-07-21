@@ -275,11 +275,11 @@ class LedgerCacheV18Tests(unittest.TestCase):
         evidence = {
             "schema_version": "gitstack-installation-parity:v1",
             "plugin_name": "gitstack",
-            "plugin_root": "/installed/gitstack/5.0.0",
-            "loaded_skill_path": "/installed/gitstack/5.0.0/skills/github-review-threads/SKILL.md",
-            "manifest_version": "5.0.0",
-            "package_version": "5.0.0",
-            "cli_version": "5.0.0",
+            "plugin_root": "/installed/gitstack/6.0.0",
+            "loaded_skill_path": "/installed/gitstack/6.0.0/skills/github-review-threads/SKILL.md",
+            "manifest_version": "6.0.0",
+            "package_version": "6.0.0",
+            "cli_version": "6.0.0",
             "cli_sha256": hashlib.sha256(b"gitstack-cli").hexdigest(),
         }
         evidence["fingerprint"] = CACHE_RUNTIME.request_fingerprint(evidence)

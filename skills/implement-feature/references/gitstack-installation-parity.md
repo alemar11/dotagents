@@ -7,7 +7,7 @@ provider action. The path is an App/system-catalog fact for the loaded
 `$gitstack:github-review-threads` skill; it is never a user option, repository
 path, environment override, or guessed cache path.
 
-The verifier accepts only the canonical installed 5.0.0 GitStack root, its
+The verifier accepts only the canonical installed 6.0.0 GitStack root, its
 expected bundled `SKILL.md`, exact manifest/package/CLI version, and pinned
 shipped CLI hash. It reads only those installed files and runs CLI `--version`.
 It emits `gitstack-installation-parity:v1` evidence with a canonical fingerprint.

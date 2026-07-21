@@ -6,7 +6,7 @@ Create the typed request first. GitStack owns the only accepted request grammar
 and returns the complete provider identity receipt:
 
 ```bash
-<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
+<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file>
 ```
 
 The generated body is exactly `@codex review <full-40-sha>` followed by the
@@ -14,11 +14,10 @@ versioned GitStack marker and request fingerprint. Callers cannot provide or
 assemble request text. The operation reuses only one exact matching comment;
 plain, markerless, malformed, conflicting, or duplicate requests fail closed.
 
-In GitStack 5.0.0, `prepare` and `validate` remain usable by standalone
-callers for typed packet creation and inspection. Provider mutations are
-intentionally managed-only: `request`, timeout-warning `comment`, `reply`, and
-`resolve` also require `--ledger-file`, and fail closed unless the active root
-ledger proves the exact packet reached `mutation-started`.
+In GitStack 6.0.0, `prepare` and `validate` remain read-only packet creation and
+inspection surfaces. Provider mutations require the exact GitStack reservation;
+GitStack itself owns its atomic one-use consumption and recovery state and has
+no runtime dependency on an orchestrator skill or its ledger.
 After the one-use marker is consumed, a replay performs one read-only lookup:
 only one exact marker/target/body/thread/actor artifact may return a recovered
 receipt. Missing or ambiguous evidence returns `recovery=needs-owner` and never
@@ -84,8 +83,8 @@ current full head:
 
 ```bash
 <plugin-root>/scripts/gitstack --json repo snapshot
-<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256> --dry-run
-<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
 ```
 
 Write reply text to an absolute UTF-8 regular non-symlink file outside the
@@ -109,8 +108,8 @@ receipt unchanged.
 Resolve only after the requested fix and evidence reply are complete:
 
 ```bash
-<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256> --dry-run
-<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
 ```
 
 The resolver validates the complete receipt, re-reads the exact REST finding
@@ -146,8 +145,8 @@ review-request operation owns request composition, head binding, identity,
 acknowledgment, and waiting.
 
 ```bash
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256> --dry-run
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger> --expected-worktree-fingerprint <sha256>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256> --dry-run
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --expected-worktree-fingerprint <sha256>
 ```
 
 Use `--dry-run` unless the user explicitly asked to post the discussion comment

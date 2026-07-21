@@ -368,7 +368,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         autoreview = self.read("references/autoreview-fix-loop.md")
         authority = self.read("references/review-mutation-authority.md")
         for token in (
-            "GitStack 5.0.0",
+            "GitStack 6.0.0",
             "`request`, `wait`, `warning`, `reply`, `resolve`",
             "`owned-operation-started`",
             "single-use",
@@ -841,7 +841,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
             (REPO / "skills/autoreview/scripts/autoreview_protocol.py").read_text(),
         )
         self.assertIn(
-            '__version__ = "5.0.0"',
+            '__version__ = "6.0.0"',
             (
                 REPO
                 / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py"
@@ -1071,7 +1071,7 @@ class ImplementFeatureContractTests(unittest.TestCase):
         self.assertIn('__version__ = "4.0.0"', self.read("scripts/execution-manifest"))
         self.assertIn('VERSION = "3.0.0"', (REPO / "skills/autoreview/scripts/autoreview").read_text())
         self.assertIn('PROTOCOL_VERSION = "2.0.0"', (REPO / "skills/autoreview/scripts/autoreview_protocol.py").read_text())
-        self.assertIn('__version__ = "5.0.0"', (REPO / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py").read_text())
+        self.assertIn('__version__ = "6.0.0"', (REPO / "plugins/gitstack/projects/gitstack/src/gitstack/__init__.py").read_text())
 
     def test_root_task_title_is_stable_adaptive_and_recoverable(self) -> None:
         skill = self.read("SKILL.md")

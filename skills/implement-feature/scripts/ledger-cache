@@ -1308,7 +1308,7 @@ def validate_registration(value: Any, claim: dict[str, Any], ledger: Path) -> di
     if gitstack_evidence["schema_version"] != "gitstack-installation-parity:v1":
         raise CacheError("invalid-input", "GitStack installation evidence schema is unsupported", 2)
     for field in ("manifest_version", "package_version", "cli_version"):
-        if gitstack_evidence[field] != "5.0.0":
+        if gitstack_evidence[field] != "6.0.0":
             raise CacheError("invalid-input", "GitStack installation evidence version is invalid", 2)
     for field in ("cli_sha256", "fingerprint"):
         canonical_fingerprint(gitstack_evidence[field], f"registration.gitstack_installation_evidence.{field}")
@@ -5454,7 +5454,11 @@ def owned_authority_scope(state: dict[str, Any], ledger: Path, request: dict[str
 
 def owned_start_receipt(owner: str, request: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
     receipt = {
-        "schema": "implement-feature-owned-operation-start:v1", "owner": owner,
+        "schema": (
+            "gitstack-review-operation-start:v1"
+            if owner == "gitstack"
+            else "implement-feature-owned-operation-start:v1"
+        ), "owner": owner,
         "operation": request["operation"], "operation_id": request["operation_id"],
         "request_fingerprint": request["request_fingerprint"],
         "journal_id": request_fingerprint({"owner": owner, "operation": request["operation"], "operation_id": request["operation_id"], "request_fingerprint": request["request_fingerprint"]}),

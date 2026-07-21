@@ -172,14 +172,14 @@ class ReviewsContractTests(unittest.TestCase):
         with contextlib.redirect_stdout(stdout):
             code = cli.main(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(stdout.getvalue().strip(), "5.0.0")
+        self.assertEqual(stdout.getvalue().strip(), "6.0.0")
 
     def test_json_doctor_shape(self) -> None:
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             cli.main(["--json", "doctor"])
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "5.0.0")
+        self.assertEqual(payload["version"], "6.0.0")
         self.assertIn("git", payload["checks"])
         self.assertIn("gh", payload["checks"])
 
@@ -585,13 +585,13 @@ class ReviewsContractTests(unittest.TestCase):
                         "--body-file", handle.name, "--head", "b" * 40,
                         "--request-key", "run-warning", "--request-fingerprint", "a" * 64,
                         "--reservation-file", "/tmp/review-warning-reservation.json",
-                        "--ledger-file", "/tmp/review-ledger.json", "--dry-run",
+                        "--dry-run",
                     ]
                 )
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
         self.assertTrue(payload["ok"])
-        self.assertEqual(payload["version"], "5.0.0")
+        self.assertEqual(payload["version"], "6.0.0")
         self.assertEqual(payload["command"], ["comment"])
         self.assertEqual(payload["data"]["repo"], "owner/repo")
         self.assertEqual(payload["data"]["pr"], 12)
@@ -620,7 +620,7 @@ class ReviewsContractTests(unittest.TestCase):
             code = cli.main(["--json", "address", "--repo", "owner/repo", "--pr", "12"])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
-        self.assertEqual(payload["version"], "5.0.0")
+        self.assertEqual(payload["version"], "6.0.0")
         self.assertNotIn("actions", payload["data"])
 
     def test_reply_dry_run_is_one_target_and_file_backed(self) -> None:
@@ -641,7 +641,7 @@ class ReviewsContractTests(unittest.TestCase):
                     "--head", head, "--comment-id", "123456", "--body-file", handle.name,
                     "--request-key", "run-reply", "--request-fingerprint", "a" * 64,
                     "--reservation-file", "/tmp/review-reply-reservation.json",
-                    "--ledger-file", "/tmp/review-ledger.json", "--dry-run",
+                    "--dry-run",
                 ])
         self.assertEqual(code, 0)
         payload = json.loads(stdout.getvalue())
@@ -1603,10 +1603,6 @@ class ReviewMutationAuthorityTests(unittest.TestCase):
         )
         self.cache_patch.start()
         self.addCleanup(self.cache_patch.stop)
-        self.real_authority_verifier = cli._verify_started_ledger_authority
-        self.authority_patch = mock.patch.object(cli, "_verify_started_ledger_authority")
-        self.authority_patch.start()
-        self.addCleanup(self.authority_patch.stop)
         self.head_patch = mock.patch.object(cli, "_verify_pr_head")
         self.head_patch.start()
         self.addCleanup(self.head_patch.stop)
@@ -1789,22 +1785,22 @@ class ReviewMutationAuthorityTests(unittest.TestCase):
             calls = (
                 lambda: cli.request_automated_review(
                     "owner/repo", 12, "codex", self.HEAD, self.REQUEST_KEY, False, None,
-                    str(request_file), "/tmp/ledger", reconcile_consumed=True,
+                    str(request_file), reconcile_consumed=True,
                 ),
                 lambda: cli.post_conversation_comment(
                     "owner/repo", 12, body, False, None, self.HEAD,
                     self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
-                    str(warning_file), "/tmp/ledger", reconcile_consumed=True,
+                    str(warning_file), reconcile_consumed=True,
                 ),
                 lambda: cli.reply_to_review_comment(
                     "owner/repo", 12, self.HEAD, 55, body, False, None,
                     self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
-                    str(reply_file), "/tmp/ledger", reconcile_consumed=True,
+                    str(reply_file), reconcile_consumed=True,
                 ),
                 lambda: cli.resolve_review_thread(
                     "owner/repo", 12, self.HEAD, saved, False, None,
                     self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
-                    str(resolve_file), "/tmp/ledger", reconcile_consumed=True,
+                    str(resolve_file), reconcile_consumed=True,
                 ),
             )
             for call in calls:
@@ -1841,7 +1837,7 @@ class ReviewMutationAuthorityTests(unittest.TestCase):
                 cli.reply_to_review_comment(
                     "owner/repo", 12, self.HEAD, 55, body, False, None,
                     self.REQUEST_KEY, self.REQUEST_FINGERPRINT,
-                    str(reply_file), "/tmp/ledger", expected_thread_id=expected_thread_id,
+                    str(reply_file), expected_thread_id=expected_thread_id,
                     expected_thread_fingerprint=expected_thread_fingerprint,
                 )
             self.assertEqual(rejected.exception.code, "review_thread_mismatch")
@@ -1870,11 +1866,9 @@ class ReviewMutationAuthorityTests(unittest.TestCase):
         validated = json.loads(stdout.getvalue())
         self.assertEqual(validated["data"]["reservation"], packet)
 
-    def test_standalone_packet_is_not_provider_authority(self) -> None:
-        path, packet, _ = self.packet_file("review-request")
-        with self.assertRaises(cli.ReviewError) as raised:
-            self.real_authority_verifier(packet, str(path), None)
-        self.assertEqual(raised.exception.code, "reservation_authority_required")
+    def test_gitstack_has_no_external_skill_authority_verifier(self) -> None:
+        self.assertFalse(hasattr(cli, "_verify_started_ledger_authority"))
+        self.assertFalse(hasattr(cli, "_ledger_cache_script"))
 
     def test_request_consumes_before_post_and_never_retries_after_crash(self) -> None:
         path, packet, _ = self.packet_file("review-request")

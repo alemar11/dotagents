@@ -1,9 +1,8 @@
 """Canonical immutable provider-mutation reservation protocol.
 
-This module is deliberately pure.  Implement Feature imports this exact file
-for packet validation; it does not copy the schema or provider operation
-rules.  Lifecycle state is owned by the Implement Feature ledger journal and
-is intentionally absent from the packet.
+The protocol is deliberately self-contained so any controller can prepare an
+exact packet while GitStack alone owns provider transport and its durable
+one-use marker.
 """
 
 from __future__ import annotations

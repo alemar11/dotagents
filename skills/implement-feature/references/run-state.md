@@ -154,8 +154,10 @@ a missing active Goal is never recreated during recovery. The entry gate returns
 
 Keep one GitStack owned-operation lineage per delivery revision. GitStack fixes
 the exact request receipt and immutable `wait_deadline=wait_started_at+45m` in
-its request. The generic started receipt is single-launch authority: never
-default, restart, extend, or return it to a second execute call.
+its request. Implement Feature records the controller-authorized start first;
+GitStack then records the same deterministic receipt in its own journal before
+transport. The receipt is single-launch authority: never default, restart,
+extend, or return it to a second execute call.
 
 Schema-15 operation history appends `owned-operation-started` and
 `owned-operation-result` records. Each carries normalized task/delivery/

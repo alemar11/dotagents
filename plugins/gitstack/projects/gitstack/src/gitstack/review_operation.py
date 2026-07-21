@@ -16,7 +16,7 @@ from .terminal_evidence import validate_terminal_evidence_receipt
 
 REQUEST_SCHEMA = "gitstack-review-operation-request:v1"
 RESULT_SCHEMA = "gitstack-review-operation-result:v1"
-START_RECEIPT_SCHEMA = "implement-feature-owned-operation-start:v1"
+START_RECEIPT_SCHEMA = "gitstack-review-operation-start:v1"
 VALIDATION_DESCRIPTOR_SCHEMA = "owned-operation-validation-descriptor:v1"
 OPERATIONS = frozenset({
     "request", "wait", "warning", "reply", "resolve",
@@ -290,6 +290,37 @@ def validate_start_receipt(value: Any, request: dict[str, Any]) -> dict[str, Any
     return item
 
 
+def validate_start_receipt_identity(
+    value: Any, *, operation: str, operation_id: str,
+    request_fingerprint: str, receipt_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Validate a GitStack receipt when only immutable operation identity remains."""
+
+    item = _exact(value, {
+        "schema", "owner", "operation", "operation_id", "request_fingerprint",
+        "journal_id", "started_generation", "started_state_fingerprint", "receipt_fingerprint",
+    }, "start_receipt")
+    if item["schema"] != START_RECEIPT_SCHEMA or item["owner"] != "gitstack":
+        raise OperationError("start receipt schema or owner is invalid")
+    expected = {
+        "operation": operation,
+        "operation_id": operation_id,
+        "request_fingerprint": request_fingerprint,
+    }
+    for name, expected_value in expected.items():
+        if item[name] != expected_value:
+            raise OperationError(f"start receipt {name} does not match operation identity")
+    for name in ("journal_id", "started_state_fingerprint", "receipt_fingerprint"):
+        _sha(item[name], f"start_receipt.{name}")
+    if not isinstance(item["started_generation"], int) or isinstance(item["started_generation"], bool) or item["started_generation"] < 1:
+        raise OperationError("start receipt generation is invalid")
+    if item["receipt_fingerprint"] != fingerprint({k: v for k, v in item.items() if k != "receipt_fingerprint"}):
+        raise OperationError("start receipt fingerprint is invalid")
+    if receipt_fingerprint is not None and item["receipt_fingerprint"] != receipt_fingerprint:
+        raise OperationError("start receipt fingerprint does not match operation identity")
+    return item
+
+
 def validate_started_mutation(value: Any) -> dict[str, Any]:
     item = _exact(value, {"request", "start_receipt"}, "started_operation")
     request = validate_request(item["request"])
@@ -304,7 +335,18 @@ def build_result(*, request: dict[str, Any], start_receipt: dict[str, Any], stat
     receipt_request = request
     if request["operation"] == "reconcile-mutation":
         receipt_request = validate_started_mutation(request["input"]["started_operation"])["request"]
-    start_receipt = validate_start_receipt(start_receipt, receipt_request)
+        start_receipt = validate_start_receipt(start_receipt, receipt_request)
+    elif request["operation"] == "reconcile-terminal":
+        prior = validate_result(request["input"]["prior_failed_result"])
+        start_receipt = validate_start_receipt_identity(
+            start_receipt,
+            operation=prior["operation"],
+            operation_id=prior["operation_id"],
+            request_fingerprint=prior["request_fingerprint"],
+            receipt_fingerprint=prior["start_receipt_fingerprint"],
+        )
+    else:
+        start_receipt = validate_start_receipt(start_receipt, receipt_request)
     value = {
         "schema": RESULT_SCHEMA, "owner_version": __version__,
         "operation": request["operation"], "operation_id": request["operation_id"],

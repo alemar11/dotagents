@@ -64,7 +64,7 @@ class ReviewOperationContractTests(unittest.TestCase):
 
     def start(self, request_value: dict[str, object]) -> dict[str, object]:
         value = {
-            "schema": "implement-feature-owned-operation-start:v1", "owner": "gitstack",
+            "schema": "gitstack-review-operation-start:v1", "owner": "gitstack",
             "operation": request_value["operation"], "operation_id": request_value["operation_id"],
             "request_fingerprint": request_value["request_fingerprint"], "journal_id": "2" * 64,
             "started_generation": 5, "started_state_fingerprint": "3" * 64,
@@ -390,13 +390,27 @@ class ReviewOperationContractTests(unittest.TestCase):
                 request_file = Path(root) / "request.json"
                 result_file = Path(root) / "result.json"
                 request_file.write_text(json.dumps(request_value))
-                with mock.patch.object(reviews, "_owned_operation_bridge", return_value=self.start(request_value)) as bridge, \
+                with mock.patch.object(reviews, "_owned_operation_start", return_value=self.start(request_value)) as bridge, \
                      mock.patch.object(reviews, "wait_for_automated_review", return_value=(raw, 0)) as waiter:
                     reviews.execute_owned_operation(str(request_file), str(result_file), mode="resume")
-                bridge.assert_called_once_with(str(request_file), "read-start")
+                bridge.assert_called_once_with(request_value, create=False)
                 timeout = waiter.call_args.args[4]
                 self.assertEqual(timeout == 0, expected_zero)
                 self.assertLessEqual(timeout, 45 * 60)
+
+    def test_gitstack_owns_exact_start_journal_and_rejects_second_start(self) -> None:
+        request_value = self.request("request")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            reviews, "_operation_journal_root", return_value=Path(directory)
+        ):
+            started = reviews._owned_operation_start(request_value, create=True)
+            self.assertEqual(started["schema"], "gitstack-review-operation-start:v1")
+            self.assertEqual(
+                reviews._owned_operation_start(request_value, create=False), started,
+            )
+            with self.assertRaises(reviews.ReviewError) as duplicate:
+                reviews._owned_operation_start(request_value, create=True)
+            self.assertEqual(duplicate.exception.code, "owned_operation_already_started")
 
 
 if __name__ == "__main__":

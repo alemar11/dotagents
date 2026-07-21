@@ -28,13 +28,13 @@ class CliContractTests(unittest.TestCase):
     def test_version(self) -> None:
         code, output = self.invoke(["--version"])
         self.assertEqual(code, 0)
-        self.assertEqual(output.strip(), "5.0.0")
+        self.assertEqual(output.strip(), "6.0.0")
 
     def test_json_doctor_shape(self) -> None:
         code, output = self.invoke(["--json", "doctor"])
         payload = json.loads(output)
         self.assertIn(code, {0, 1})
-        self.assertEqual(payload["version"], "5.0.0")
+        self.assertEqual(payload["version"], "6.0.0")
         self.assertFalse(payload["checks"]["connector"]["cli_access"])
 
     def test_json_argument_error(self) -> None:
@@ -44,14 +44,25 @@ class CliContractTests(unittest.TestCase):
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], "invalid_arguments")
 
-    def test_managed_review_mutation_help_requires_ledger_authority(self) -> None:
+    def test_review_mutation_help_requires_gitstack_reservation_only(self) -> None:
         for command in ("request", "comment", "reply", "resolve"):
             output = io.StringIO()
             with contextlib.redirect_stdout(output), self.assertRaises(SystemExit) as raised:
                 cli.main(["reviews", command, "--help"])
             self.assertEqual(raised.exception.code, 0)
             self.assertIn("--reservation-file", output.getvalue())
-            self.assertIn("--ledger-file", output.getvalue())
+            self.assertNotIn("--ledger-file", output.getvalue())
+
+    def test_plugin_runtime_does_not_reference_external_skill_installations(self) -> None:
+        source = Path(__file__).resolve().parents[1] / "src" / "gitstack"
+        runtime = "\n".join(
+            path.read_text(encoding="utf-8") for path in sorted(source.glob("*.py"))
+        )
+        for forbidden in (
+            "skills/implement-feature", ".agents/skills", ".codex/skills",
+            "ledger-cache", "--ledger-file",
+        ):
+            self.assertNotIn(forbidden, runtime)
 
     def test_publish_rejects_inline_title_without_echoing_it(self) -> None:
         hostile = "`unsafe` $(command) $HOME"

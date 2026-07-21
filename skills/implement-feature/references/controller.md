@@ -64,11 +64,13 @@ model attempts, owner schemas, and result details remain owned by those tools.
 ## Started And Result Boundary
 
 Preparation and owner validation are read-only. Immediately before a physical
-mutation, waiter, or AutoReview launch, call `operation start`. The bridge
-reruns the owner validator, requires exact live controller equality, revalidates
-claim/CAS/task/revision/checkout authority, and atomically records one generic
-started receipt. A second start returns `reconcile-required`; recovery reads the
-original request and receipt and never relaunches or reposts.
+mutation, waiter, or AutoReview launch, call this skill's `operation start`.
+It reruns the owner validator, requires exact live controller equality,
+revalidates claim/CAS/task/revision/checkout authority, and atomically records
+one generic started receipt. GitStack independently records the same
+deterministic receipt in its own journal when `execute` begins; it does not call
+back into this skill. A second start returns `reconcile-required`; recovery
+reads the original request and receipt and never relaunches or reposts.
 
 `operation record-result` invokes the owner's request-correlated validator,
 requires the exact start and current binding, and records the opaque owner

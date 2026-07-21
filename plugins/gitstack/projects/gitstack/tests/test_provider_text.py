@@ -116,7 +116,7 @@ class ProviderTextContractTests(unittest.TestCase):
         request = json.loads(run.call_args.kwargs["input"].decode("utf-8"))
         self.assertEqual(request["body"], self.HOSTILE)
 
-    def test_shipped_cli_rejects_untrusted_authority_override_before_provider_dispatch(self) -> None:
+    def test_shipped_cli_needs_no_external_skill_for_reserved_dry_run(self) -> None:
         artifact = Path(__file__).resolve().parents[3] / "scripts" / "gitstack"
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -162,20 +162,6 @@ class ProviderTextContractTests(unittest.TestCase):
                 encoding="utf-8",
             )
             fake_gh.chmod(0o755)
-            fake_ledger = root / ".agents" / "skills" / "implement-feature" / "scripts" / "ledger-cache"
-            fake_ledger.parent.mkdir(parents=True, exist_ok=True)
-            fake_ledger.write_text(
-                "#!/usr/bin/env python3\n"
-                "import hashlib, json, sys\n"
-                "args = sys.argv\n"
-                "packet = json.loads(open(args[args.index('--reservation-file') + 1], encoding='utf-8').read())\n"
-                "encoded = json.dumps(packet, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode('utf-8')\n"
-                "print(json.dumps({'ok': True, 'authority': 'review-provider-mutation-started', 'reservation_id': packet['reservation_id'], 'operation_id': packet['operation_id'], 'packet_fingerprint': hashlib.sha256(encoded).hexdigest()}))\n",
-                encoding="utf-8",
-            )
-            fake_ledger.chmod(0o755)
-            ledger_file = root / "ledger.json"
-            ledger_file.write_text("{}", encoding="utf-8")
             environment = os.environ.copy()
             environment["HOME"] = str(root)
             environment["PATH"] = f"{root}:{environment['PATH']}"
@@ -186,7 +172,6 @@ class ProviderTextContractTests(unittest.TestCase):
                     "--body-file", str(body_file), "--head", head,
                     "--request-key", "warning", "--request-fingerprint", request_fingerprint,
                     "--reservation-file", str(reservation_file),
-                    "--ledger-file", str(ledger_file),
                     "--dry-run", "--allow-non-project",
                 ],
                 cwd=root,
@@ -196,10 +181,11 @@ class ProviderTextContractTests(unittest.TestCase):
                 check=False,
             )
 
-        self.assertEqual(completed.returncode, 4, completed.stderr)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertNotIn(self.HOSTILE, completed.stdout + completed.stderr)
         payload = json.loads(completed.stdout)
-        self.assertEqual(payload["error"]["code"], "reservation_authority_invalid")
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["data"]["action"]["status"], "dry-run")
 
 
 if __name__ == "__main__":

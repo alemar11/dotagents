@@ -1,6 +1,6 @@
 # Review Thread Resolution
 
-GitStack 5.0.0 owns reply and resolution request/result schemas, body and thread
+GitStack 6.0.0 owns reply and resolution request/result schemas, body and thread
 identity, provider transport, receipts, and reconciliation. Implement Feature
 selects the closed owner operation and supplies immutable authority only.
 

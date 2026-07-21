@@ -14,12 +14,12 @@
 <plugin-root>/scripts/gitstack --json reviews operation reconcile --request-file <absolute-reconciliation-request-json> --result-output <absolute-result-json>
 <plugin-root>/scripts/gitstack --json reviews operation validate-result --request-file <absolute-request-json> --result-file <absolute-result-json>
 <plugin-root>/scripts/gitstack reviews address --repo <owner/repo> --pr <number>
-<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
-<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
-<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
+<plugin-root>/scripts/gitstack --json reviews request --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --reservation-file <absolute-reservation-file>
+<plugin-root>/scripts/gitstack --json reviews reply --repo <owner/repo> --pr <number> --head <full-40-sha> --comment-id <id> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file>
+<plugin-root>/scripts/gitstack --json reviews resolve --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --reply-receipt-file <absolute-receipt-file> --reservation-file <absolute-reservation-file>
 <plugin-root>/scripts/gitstack reviews edit-comment --repo <owner/repo> --pr <number> --kind <conversation-or-review> --comment-id <id> --body-file <absolute-message-file>
 <plugin-root>/scripts/gitstack reviews submit-review --repo <owner/repo> --pr <number> --event <approve-or-request-changes-or-comment> --body-file <absolute-message-file>
-<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file> --ledger-file <absolute-active-ledger>
+<plugin-root>/scripts/gitstack reviews comment --repo <owner/repo> --pr <number> --head <full-40-sha> --request-key <request-key> --request-fingerprint <request-fingerprint> --body-file <absolute-message-file> --reservation-file <absolute-reservation-file>
 <plugin-root>/scripts/gitstack --json reviews check --provider codex --repo <owner/repo> --pr <number> --head <sha>
 <plugin-root>/scripts/gitstack --json reviews wait --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file> --timeout <caller-owned-duration>
 <plugin-root>/scripts/gitstack --json reviews terminal-evidence --provider codex --repo <owner/repo> --pr <number> --head <full-40-sha> --request-receipt-file <absolute-receipt-file>
@@ -59,12 +59,12 @@ The script does not write configuration files.
 
 Managed orchestration uses the closed operations `request`, `wait`, `warning`,
 `reply`, `resolve`, `reconcile-mutation`, and `reconcile-terminal`. GitStack
-5.0.0 owns the complete `gitstack-review-operation-request:v1` and
+6.0.0 owns the complete `gitstack-review-operation-request:v1` and
 `gitstack-review-operation-result:v1` schemas. `prepare` and both validators are
-read-only. `execute` revalidates the exact live controller envelope and obtains
-an `implement-feature-owned-operation-start:v1` receipt from the
-installation-owned ledger bridge immediately before transport. `reconcile`
-requires the same started journal and never posts, retries, or extends a wait.
+read-only. `execute` revalidates the exact controller envelope and atomically
+writes a `gitstack-review-operation-start:v1` receipt to GitStack's own journal
+immediately before transport. `resume` and `reconcile` require the same exact
+journal identity and never post twice, retry a consumed mutation, or extend a wait.
 
 Owned reply preparation reads the selected finding and its unique live thread
 read-only, derives the canonical thread id/fingerprint, and writes those values

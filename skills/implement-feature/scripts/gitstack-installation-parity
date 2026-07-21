@@ -16,9 +16,9 @@ from pathlib import Path
 __version__ = "1.0.0"
 SCHEMA_VERSION = "gitstack-installation-parity:v1"
 EXPECTED_PLUGIN = "gitstack"
-EXPECTED_VERSION = "5.0.0"
+EXPECTED_VERSION = "6.0.0"
 EXPECTED_SKILL = Path("skills/github-review-threads/SKILL.md")
-EXPECTED_CLI_SHA256 = "23f976ac1435963faab8d0762f728ef9248f4141ce58ff9b2c79bfebae3148ef"
+EXPECTED_CLI_SHA256 = "be829ef2833956e028fb5de2f5b0bafd273e8f5e8582480a73c204aa41a759de"
 
 
 class ParityError(Exception):
@@ -55,7 +55,7 @@ def verify(loaded_skill_path: str | None, *, home: Path | None = None) -> dict[s
     if not loaded_skill_path:
         raise ParityError("unsupported-runtime", "App did not provide the loaded GitStack bundled-skill path")
     home = system_home() if home is None else home
-    root = home / ".codex/plugins/cache/alemar11/gitstack/5.0.0"
+    root = home / ".codex/plugins/cache/alemar11/gitstack/6.0.0"
     supplied = Path(loaded_skill_path)
     if not supplied.is_absolute():
         raise ParityError("unsupported-runtime", "App-provided loaded GitStack skill path must be absolute")
@@ -90,7 +90,7 @@ def verify(loaded_skill_path: str | None, *, home: Path | None = None) -> dict[s
     cli_sha256 = hashlib.sha256(cli_path.read_bytes()).hexdigest()
     values = (manifest_version, package_version, cli_version)
     if any(value != EXPECTED_VERSION for value in values) or cli_sha256 != EXPECTED_CLI_SHA256:
-        raise ParityError("gitstack-installation-mismatch", "installed GitStack is not the required 5.0.0 runtime artifact")
+        raise ParityError("gitstack-installation-mismatch", "installed GitStack is not the required 6.0.0 runtime artifact")
     evidence = {
         "schema_version": SCHEMA_VERSION,
         "plugin_name": EXPECTED_PLUGIN,
@@ -106,7 +106,7 @@ def verify(loaded_skill_path: str | None, *, home: Path | None = None) -> dict[s
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Verify the App-loaded GitStack 5.0.0 artifact.")
+    parser = argparse.ArgumentParser(description="Verify the App-loaded GitStack 6.0.0 artifact.")
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("verify", nargs="?")
